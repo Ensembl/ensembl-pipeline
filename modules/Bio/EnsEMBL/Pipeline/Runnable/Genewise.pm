@@ -79,7 +79,8 @@ sub run {
 sub output {
     my ($self) = @_;
 
-    return $self->eachGene;
+#    return $self->eachGene;
+    return $self->eachExon;
 }
 
 # Now the blastwise stuff
@@ -153,14 +154,15 @@ sub _align_protein {
   
   open(GW, "$command |");
   
-  my @gff;
-  my $sf;
+  my @gff_exons;
+  my $curr_gff;
   my $count = 1;
   
-  my @gw_exons;
+  my @alb_exons;
   my $curr_exon;
+  my $prev_state = "";  
+  my $albphase = "";
   
-  my $genename;
   # need to parse both gff and alb output
   # making assumption of only 1 gene prediction ...
   # gff o/p always comes before alb o/p
@@ -169,47 +171,42 @@ sub _align_protein {
     my @f = split;
     
     #      print STDERR "Line is " . $_ . "\n";
-    # may be foolish, but I *think* we only care about exon intron boundaries ... at least at this stage.
-    next GW unless (defined($f[2]) &&($f[2] eq '"MATCH_STATE"' || $f[2] eq '"INTRON_STATE"' || $f[2] eq "cds"));
+    # at this stage, just worry about exon boundaries
+    next GW unless (defined($f[2]) &&( $f[2] eq '"MATCH_STATE"'  || $f[2] eq '"INTRON_STATE"' ||
+				       $f[2] eq '"INSERT_STATE"' || $f[2] eq '"DELETE_STATE"' ||
+				       $f[2] eq "cds"));
     
     if($f[2] eq 'cds'){
       # this is gff
+      # make a new "exon"
+      $curr_gff = new Bio::EnsEMBL::SeqFeature;
+      $curr_gff->seqname   ($f[8]);
+      $curr_gff->id        ($self->protein->id);
+      $curr_gff->source_tag('genewise');
+      $curr_gff->primary_tag('similarity');
       
-      if ($f[8] ne $genename) {
-	print STDERR "Found new gene\n";
-	
-	$genename = $f[8];
-	$sf = new Bio::EnsEMBL::SeqFeature;
-	$sf->seqname   ($f[8]);
-	$sf->id        ($self->protein->id);
-	$sf->source_tag('genewise');
-	$sf->primary_tag('similarity');
-	
-	push(@gff,$sf);
-	
-	$count = 1;
-      }
+      push(@gff_exons,$curr_gff);
       
-      my $subsf = new Bio::EnsEMBL::SeqFeature;
+      $count = 1;
+      
       
       my $strand = $f[6];
       
       if ($strand eq "+") {
-	$subsf->strand(1);
+	$curr_gff->strand(1);
       } else {
-	$subsf->strand(-1);
+	$curr_gff->strand(-1);
       }
       
-      $subsf->seqname($f[8]);
+      $curr_gff->seqname($f[8]);
       
       if ($f[3] < $f[4]) {
-	$subsf->start  ($f[3]);
-	$subsf->end    ($f[4]);
+	$curr_gff->start  ($f[3]);
+	$curr_gff->end    ($f[4]);
       } else {
-	$subsf->start  ($f[4]);
-	$subsf->end    ($f[3]);
+	$curr_gff->start  ($f[4]);
+	$curr_gff->end    ($f[3]);
       }
-      print STDERR "Found exon " . $sf->start . " " . $sf->end . "\n";
       
       my $phase = $f[7];
       
@@ -218,106 +215,101 @@ sub _align_protein {
       }	elsif ($phase == 1) { 
 	$phase = 2;
       }
-      $subsf->{_phase} = $phase;
-      $subsf->id ($self->protein->id . ".$count");
       
-      print STDERR "SF " . $subsf->start . " " . $subsf->end . " " . $subsf->strand . " " . $subsf->{_phase} . "\n";
+      $curr_gff->{_phase} = $phase;
+      $curr_gff->id ($self->protein->id . ".$count"); 
+      
       $count++;
-      
-      $sf->add_sub_SeqFeature($subsf,'EXPAND');
-      
     }
     else {
       # this is alb
       $f[1] =~ /\[\d+:(\d+)/;
       my $coord = $1;
       $coord++;
+
+      if ($f[4] eq '"SEQUENCE_INSERTION"' || $f[4] eq '"SEQUENCE_DELETION"') {
+
+	# and make sure we don't increment it
+	$albphase = '"3SS_PHASE_0"';
+	# start a new exon
+	$curr_exon = undef;
+      }
+
       
-      if($f[2] ne '"MATCH_STATE"'){
+      if ($f[2] eq '"MATCH_STATE"') {
+	if ($f[4] =~ /PHASE/) {
+	  $albphase = $f[4];
+	}
 	
-	if($f[4] eq '"CENTRAL_INTRON"'){
-	  $coord++;
-	  # start a new exon
-	  my $ef = new Bio::EnsEMBL::SeqFeature;
-	  $ef->seqname   ($self->protein->id);
-	  $ef->id        ('exon_pred');
-	  $ef->source_tag('genewise');
-	  $ef->primary_tag('similarity');
-	  $ef->start($coord);
-	  $ef->end($coord);
+	elsif ( $f[4] eq '"CODON"' || $f[4] eq '"3SS_PHASE_2"' ) {
+	  # first, make sure there's a $curr_exon
+	  if (!defined($curr_exon)) {
+	    # start a new exon
+	    my $ef = new Bio::EnsEMBL::SeqFeature;
+	    $ef->seqname   ($self->protein->id);
+	    $ef->id        ('exon_pred');
+	    $ef->source_tag('genewise');
+	    $ef->primary_tag('similarity');
+	    $ef->start($coord);
+	    $ef->end($coord);
+	    
+	    $curr_exon = $ef;
+	    push(@alb_exons,$curr_exon);
+	  }
 	  
-	  $curr_exon = $ef;
-	  push(@gw_exons,$curr_exon);
-	}
-	
-      }
-      else {
-	if(!defined($curr_exon)){
-	  # start a new exon
-	  my $ef = new Bio::EnsEMBL::SeqFeature;
-	  $ef->seqname   ($self->protein->id);
-	  $ef->id        ('exon_pred');
-	  $ef->source_tag('genewise');
-	  $ef->primary_tag('similarity');
-	  $curr_exon = $ef;
-	  $curr_exon->start(0);
-	  push(@gw_exons,$curr_exon);
-	}
-	
-	# extend existing exon boundary
-	$curr_exon->end($coord);
-	# set start if we need to - this should only happen for the very first exon
-	if(!$curr_exon->start) {
-	  print STDERR "rigging start\n";
-	  $curr_exon->start($coord);
+	  $curr_exon->end($coord);
 	  
 	}
+	$prev_state = 'MATCH';
 	
       }
+      
+      elsif ( $f[2] eq '"INTRON_STATE"' && $f[4] eq '"CENTRAL_INTRON"' ) {
+	$prev_state = 'INTRON';
+	$curr_exon = undef;
+      }
+      
     }
-    
   } 
   
   close(GW);
   
   # Now convert into feature pairs
   # makes hstart & hend for the feature pair in cDNA coordinates?
-  if(scalar(@gff) > 1){
-    $self->throw("rats; more than one gene predicted");
+  # Now convert into feature pairs
+  if(scalar(@gff_exons) != scalar(@alb_exons) ){
+    print STDERR "gff: " .scalar(@gff_exons) . "\talb: " . scalar(@alb_exons) .  "\n";
+    unlink $genfile;
+    unlink $protfile;
+    unlink $gwfile;
+    $self->throw("rats; exon numbers don't match");
   }
   
-  foreach my $gene (@gff) {
-    my @sub = $gene->sub_SeqFeature;
-    
-    if (scalar(@sub) != scalar(@gw_exons)) {
-      die "unequal number of features from gff and alb sections\n"; 
-    }
-    
-    my $index=0;
-    my @fp;
-    for ($index=0; $index <= $#sub; $index++){
-      my $feat_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $sub[$index],
-						    -feature2 => $gw_exons[$index]);
-      push(@fp,$feat_pair);
-    }     
-    
-    # now sort them
-    if ($#sub >=0) {
-      if ($sub[0]->strand == 1) {
-	@fp = sort {$a->start <=> $b->start} @fp;
-      } else {
-	@fp = sort {$b->start <=> $a->start} @fp;
-      }
-    }
-    
-    foreach my $pair(@fp){
-      $self->addGene($pair);
+  my $index=0;
+  my @fp;
+  for ($index=0; $index <= $#gff_exons; $index++){
+    my $feat_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $gff_exons[$index],
+						  -feature2 => $alb_exons[$index]);
+    push(@fp,$feat_pair);
+  }     
+  
+  # now sort them
+  if ($#gff_exons >=0) {
+    if ($gff_exons[0]->strand == 1) {
+      @fp = sort {$a->start <=> $b->start} @fp;
+    } else {
+      @fp = sort {$b->start <=> $a->start} @fp;
     }
   }
   
-      unlink $genfile;
-      unlink $protfile;
-      unlink $gwfile;
+  foreach my $pair(@fp){
+    $self->addExon($pair);
+  }
+
+  
+  unlink $genfile;
+  unlink $protfile;
+  unlink $gwfile;
 }
 
 
@@ -388,7 +380,26 @@ sub protein {
     return $self->{_protein};
 }
 
-sub addGene {
+#sub addGene {
+#    my ($self,$arg) = @_;
+
+#    if (!defined($self->{_output})) {
+#	$self->{_output} = [];
+#    }
+#    push(@{$self->{_output}},$arg);
+
+#}
+
+#sub eachGene {
+#    my ($self) = @_;
+
+#    if (!defined($self->{_output})) {
+#	$self->{_output} = [];
+#    }
+
+#    return @{$self->{_output}};
+#}
+sub addExon {
     my ($self,$arg) = @_;
 
     if (!defined($self->{_output})) {
@@ -398,7 +409,7 @@ sub addGene {
 
 }
 
-sub eachGene {
+sub eachExon {
     my ($self) = @_;
 
     if (!defined($self->{_output})) {
@@ -407,6 +418,7 @@ sub eachGene {
 
     return @{$self->{_output}};
 }
+
 
 
 1;
