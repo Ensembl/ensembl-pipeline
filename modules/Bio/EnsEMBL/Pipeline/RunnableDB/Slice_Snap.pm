@@ -90,7 +90,7 @@ sub fetch_input {
     }
 
     $self->throw("Unable to fetch virtual contig") unless $slice;
-    print STDERR $slice->seq."\n";
+    #print STDERR $slice->seq."\n";
     $self->query($genseq);
     
 
