@@ -187,7 +187,88 @@ sub get_Seq_by_acc {
         return $seq_list[0];
     }
 }
+
 sub write_descriptions {
+    my( $self, $dbobj, $id_list, $count ) = @_;
+    
+    $count ||= 200;
+    $self->prepare_hit_desc_sth($dbobj);
+    
+    my $failed = [];
+    for (my $i = 0; $i < @$id_list; $i += $count) {
+        my $j = $i + $count - 1;
+        if ($j >= @$id_list) {
+            $j = @$id_list - 1;
+        }
+        my $fetch_list = [@$id_list[$i..$j]];
+        $fetch_list = $self->write_descriptions_by_accession_sv($fetch_list);
+        if (@$fetch_list) {
+            $fetch_list = $self->write_descriptions_by_accession($fetch_list);
+        }
+        push(@$failed, @$fetch_list);
+    }
+    return $failed;
+}
+
+sub write_descriptions_by_accession_sv {
+    my( $self, $id_list ) = @_;
+    
+    my $sth = $self->get_hit_desc_sth
+        or die "hit_desc_sth not initialized";
+    
+    my $srv = $self->get_server;
+    print $srv join(' ', '-F', @$id_list), "\n";
+
+    # Set the input record separator to split on EMBL
+    # entries, which end with "//\n" on a line.
+    local ${/} = "//\n";  # ${/} is the same as $/, but doesn't mess up
+                          # syntax highlighting in my editor!
+
+    my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new;
+    for (my $i = 0; $i < @$id_list; $i++) {
+        my $entry = <$srv>;
+
+        # Each entry may have one or more "no match" lines at the start
+        $i += $entry =~ s/^no match\n//mg;
+
+        # The end of the loop
+        last unless $entry;
+        
+        my $this_id = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
+        $embl_parser->parse($entry);
+        my $acc_sv = $embl_parser->sequence_version;
+        my $all_acc = $embl_parser->accession;
+        if ($this_id eq $acc_sv) {
+            warn "Found '$acc_sv'";
+            $id_list->[$i] = undef;
+        } else {
+            warn "Expecting '$this_id' but got '$acc_sv'";
+        }
+    }
+    return [grep defined($_), @$id_list];
+}
+
+sub prepare_hit_desc_sth {
+    my( $self, $dbobj ) = @_;
+    
+    my $sth = $dbobj->prepare(qq{ 
+        REPLACE INTO hit_description (hit_name
+              , hit_description
+              , hit_length
+              , hit_taxon
+              , hit_db)
+        VALUES (?,TRIM(?),?,?,?)
+        });
+    $self->{'_hit_desc_sth'} = $sth;
+}
+
+sub get_hit_desc_sth {
+    my( $self ) = @_;
+    
+    reuturn $self->{'_hit_desc_sth'};
+}
+
+sub OLD_write_descriptions {
     my ( $self, $dbobj, @ids ) = @_;
 
     my $sth = $dbobj->prepare(qq{ 
@@ -203,7 +284,7 @@ sub write_descriptions {
     my( @failed_to_fetch );
     while (my @hundred_ids = splice(@ids, @ids > $count ? -$count : 0)) {
     
-        printf STDERR "Pfetching %d EMBL sequences\n", scalar(@hundred_ids);
+        printf STDERR "Pfetching %d sequences\n", scalar(@hundred_ids);
     
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
@@ -217,7 +298,7 @@ sub write_descriptions {
                 $embl_parser->parse($_);
                 my $name = $embl_parser->sequence_version || $embl_parser->accession->[0];
                 delete($ids_to_fetch{$name})
-                    or die "Got identifier '$name' from EMBL entry, but it was not in list of sequences to fetch:\n@hundred_ids";
+                    or die "Got identifier '$name' from entry, but it was not in list of sequences to fetch:\n@hundred_ids";
                 $sth->execute(
                     $name,
                     $embl_parser->description,
@@ -253,7 +334,9 @@ sub write_descriptions {
                     warn "Can't make accession from '$acc_sv'";
                     next;
                 }
-                $acc_missing{$acc} = $acc_sv;
+                # May be missing more than one SV from the same accession!
+                my $list = $acc_missing{$acc} ||= [];
+                push(@$list, $acc_sv);
             }
             
             # Now get the rest of the info from the latest version
@@ -267,18 +350,20 @@ sub write_descriptions {
                     next unless $_;
                     $embl_parser->parse($_);
                     my $acc = $embl_parser->accession->[0];
-                    my $acc_sv = $acc_missing{$acc}
+                    my $list = $acc_missing{$acc}
                         or die "Can't see ACCESSION.SV for ACCESSION '$acc'";
-                    my $length = $acc_sv_lengths{$acc_sv};
-                    delete($ids_to_fetch{$acc_sv})
-                        or die "Got identifier '$acc_sv' from EMBL entry, but it was not in list of sequences to fetch:\n@hundred_ids";
-                    $sth->execute(
-                        $acc_sv,
-                        $embl_parser->description,
-                        $embl_parser->seq_length,
-                        $embl_parser->taxon,
-                        $embl_parser->which_database
-                        );
+                    foreach my $acc_sv (@$list) {
+                        my $length = $acc_sv_lengths{$acc_sv};
+                        delete($ids_to_fetch{$acc_sv})
+                            or die "Got identifier '$acc_sv' from EMBL entry, but it was not in list of sequences to fetch:\n@hundred_ids";
+                        $sth->execute(
+                            $acc_sv,
+                            $embl_parser->description,
+                            $embl_parser->seq_length,
+                            $embl_parser->taxon,
+                            $embl_parser->which_database
+                            );
+                    }
 	        }
             }
         }
