@@ -73,6 +73,11 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBPASS
 							     GB_GW_DBNAME
 							     GB_GW_DBPORT
+							     GB_BLESSED_DBHOST
+							     GB_BLESSED_DBUSER
+							     GB_BLESSED_DBPASS
+							     GB_BLESSED_DBNAME
+							     GB_BLESSED_DBPORT
 							     GB_cDNA_DBHOST
 							     GB_cDNA_DBUSER
 							     GB_cDNA_DBNAME
@@ -147,11 +152,12 @@ sub fetch_input{
 
   my @blessed_genes;
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
-    push(@blessed_genes, @{$slice->get_all_Genes_by_type($bgt)});
+    push(@blessed_genes, @{$slice->get_all_Genes_by_type($bgt->{'type'})});
   }
 
   print STDERR "got " . scalar(@blessed_genes) . " blessed genes\n";
   $self->blessed_genes( \@blessed_genes );
+  print STDERR "converted to " . scalar(@{$self->blessed_genes}) . " blessed genes\n";
 
   # cdnas db
   my $slice_adaptor2 = $self->cdna_db->get_SliceAdaptor();
@@ -177,9 +183,25 @@ sub fetch_input{
 
 sub run {
   my ($self,@args) = @_;
-  
+  # run with blessed genes
+  $self->run_merging($self->blessed_genes, $GB_BLESSED_COMBINED_GENETYPE);
+  # empty out gene arrays as necessary
+
+  # run again with genewise genes
+  $self->run_merging($self->gw_genes, $GB_GENEWISE_COMBINED_GENETYPE);
+
+  # remap to raw contig coords
+  my @remapped = $self->remap_genes();
+  $self->output(@remapped);
+}
+
+############################################################
+
+sub run_merging {
+  my ($self, $genesref, $combined_genetype) = @_;
+
   # merge exons with frameshifts into a big exon
-  my @merged_genes = $self->_merge_genes($self->gw_genes);
+  my @merged_genes = $self->_merge_genes($genesref);
   print STDERR "got " . scalar(@merged_genes) . " merged genes\n";  
   
   # first of all, sort CDS genes by exonic length and genomic length  
@@ -307,7 +329,7 @@ sub run {
     my $combined_transcript = $self->combine_genes($cds, $cdna_match);
     if ( $combined_transcript ){
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
-      $self->make_gene($combined_transcript);
+      $self->make_gene($combined_genetype, $combined_transcript);
     }
     else{
       #print STDERR "no combined gene built from " . $cds->dbID ."\n";
@@ -315,13 +337,9 @@ sub run {
       next CDS;
     }
   }
-  
-  # remap to raw contig coords
-  my @remapped = $self->remap_genes();
-  $self->output(@remapped);
+
 }
 
-############################################################
 
 =head2
 
@@ -426,10 +444,9 @@ sub write_output {
 
 # make some lovely genes
 sub make_gene{
-  my ($self,@transcripts) = @_;
+  my ($self, $genetype, @transcripts) = @_;
   
   # the genetype should be given in Bio::EnsEMBL::Pipeline::GeneConf
-  my $genetype = $GB_GENEWISE_COMBINED_GENETYPE;
   unless ( $genetype ){
     $self->throw("You must define GB_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::GeneConf");
   }
@@ -691,7 +708,8 @@ sub _compute_UTRlength{
 
 =head2 _merge_genes
 
- Function: merges adjacent exons if they are frameshifted; stores component exons as subSeqFeatures of the merged exon
+ Function: merges adjacent exons if they are frameshifted; stores
+ component exons as subSeqFeatures of the merged exon
 
 =cut
 
@@ -703,6 +721,7 @@ sub _merge_genes {
   
  UNMERGED_GENE:
   foreach my $unmerged (@{$genesref}){
+    
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('combined');
     $gene->dbID($unmerged->dbID);
@@ -829,7 +848,7 @@ sub _merge_genes {
 
     # store match between merged and original gene so we can easily retrieve the latter if we need to
     $self->merged_unmerged_pairs($gene,$unmerged);
-  } # end GW_GENE
+  } # end UNMERGED_GENE
   
   return @merged;
 }
@@ -2063,11 +2082,53 @@ sub blessed_genes {
   if (!defined($self->{'_blessed_genes'})) {
     $self->{'_blessed_genes'} = [];
   }
-  
+
   if (defined $genes && scalar(@{$genes})) {
-    push(@{$self->{'_blessed_genes'}},@{$genes});
+
+    # split input genes into one transcript per gene; keep type the same
+  OLDGENE:
+    foreach my $gene(@{$genes}){
+      foreach my $transcript(@{$gene->get_all_Transcripts}){
+
+	# check transcript sanity
+	next OLDGENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->query));
+
+	# make a new gene
+	my $newgene = new Bio::EnsEMBL::Gene;
+	$newgene->type($gene->type);
+	
+	# clone transcript
+	my $newtranscript = new Bio::EnsEMBL::Transcript;
+	$newgene->add_Transcript($newtranscript);
+
+	# clone translation
+	my $newtranslation = new Bio::EnsEMBL::Translation;
+	$newtranscript->translation($newtranslation);
+
+	foreach my $exon(@{$transcript->get_all_Exons}){
+	  # clone the exon
+	  my $newexon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon($exon);
+	  # get rid of stable ids
+	  $newexon->stable_id('');
+
+	  # if this is start/end of translation, keep that info:
+	  if ( $exon == $transcript->translation->start_Exon ){
+		$newtranslation->start_Exon( $newexon );
+		$newtranslation->start($transcript->translation->start);
+	    }
+	    if ( $exon == $transcript->translation->end_Exon ){
+		$newtranslation->end_Exon( $newexon );
+		$newtranslation->end($transcript->translation->end);
+	    }
+	  $newtranscript->add_Exon($newexon);
+	}
+
+	push(@{$self->{'_blessed_genes'}}, $newgene);	
+	
+      }
+    }
   }
-  
+
   return $self->{'_blessed_genes'};
 }
 
@@ -2211,14 +2272,16 @@ sub blessed_db {
     if(!$self->{_blessed_db}){
       $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
-         '-host'   => $GB_GW_DBHOST,
-         '-user'   => $GB_GW_DBUSER,
-         '-pass'   => $GB_GW_DBPASS,
-         '-port'   => $GB_GW_DBPORT,
-         '-dbname' => $GB_GW_DBNAME,
+         '-host'   => $GB_BLESSED_DBHOST,
+         '-user'   => $GB_BLESSED_DBUSER,
+         '-pass'   => $GB_BLESSED_DBPASS,
+         '-port'   => $GB_BLESSED_DBPORT,
+         '-dbname' => $GB_BLESSED_DBNAME,
          '-dnadb' => $self->db,
         );
     }
+
+
     return $self->{_blessed_db};
 }
 
