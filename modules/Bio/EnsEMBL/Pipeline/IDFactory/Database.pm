@@ -28,8 +28,10 @@
 =head1 DESCRIPTION
 
 This is an implementation of the IDFactory interface.  It provides a means to 
-retrieve identifiers stored in a single column of a database table.
-It is assumed that the table will have a single unique identifier per row.
+retrieve identifiers stored in a database via a specified query.
+It is assumed that the table will have a single unique identifier per row of
+results, and only the first column of the result set is used to construct the
+identifiers.
 
 =head1 CONTACT
 
@@ -68,15 +70,17 @@ use Bio::EnsEMBL::Pipeline::IDSet;
                                            -CONFIG => $conf);
   Description: Instantiates a Database IDFactory class.  The configuration 
                object that is passed to this constructor must define a
-               database, a table, and a column to be used to retrieve
-               identifiers.
+               database, and an sql query used to retrieve the identifiers.
+               Note that only the first column of results is used to construct
+               the ids.  If columns need to be joined to form identifiers the
+               CONCAT function should be used in the query.
 
                Note that a database connection is not actually established
                until the next() method is called for the first time.  The
                database does not need to be present until this time.
 
                An example of a configuration file specifying an id factory
-               that creates ids from the name column of contig table in 
+               that creates ids from the name column of contig table in
                an ensembl database follows.
 
                ------
@@ -89,14 +93,12 @@ use Bio::EnsEMBL::Pipeline::IDSet;
                [CONTIG_ID_FACTORY]
                module = Bio::EnsEMBL::Pipeline::IDFactory::Database
                database = ensembl_database
-               table = contig
-               column = name
+               query = SELECT name FROM contig
 
                [CHROMOSOME_ID_FACTORY]
                module = Bio::EnsEMBL::Pipeline::IDFactory::Database
                database = ensembl_database
-               table = chromosome
-               column = name
+               query = SELECT name FROM chromosome
 
                [REPEAT_MASKER_TASK]
                where = LSF:acari
@@ -155,20 +157,14 @@ sub new {
   $self->pass($pass);
 
 
-  my $table = $config->get_parameter($name, 'table');
-  my $column = $config->get_parameter($name, 'column');
+  my $query = $config->get_parameter($name, 'query');
 
-  if(!$table) {
+  if(!$query) {
     $self->throw("[$name] configuration must define a value for the parameter"
-                 . " table") 
-  }
-  if(!$column) {
-    $self->throw("[$name] configuration must define a vlue for the parameter"
-                 . " column");
+                 . " query");
   }
 
-  $self->column($column);
-  $self->table($table);
+  $self->query($query);
 
   return $self;
 }
@@ -192,16 +188,10 @@ sub pass {
 }
 
 
-sub table {
+sub query {
   my $self = shift;
-  $self->{'table'} = shift if(@_);
-  return $self->{'table'};
-}
-
-sub column {
-  my $self = shift;
-  $self->{'column'} = shift if(@_);
-  return $self->{'column'};
+  $self->{'query'} = shift if(@_);
+  return $self->{'query'};
 }
 
 
@@ -235,12 +225,11 @@ sub next {
   # a database connection and execute the query
   #
   if(!$dbh) {
-    my $col = $self->column();
-    my $tab = $self->table();
+    my $query = $self->query();
 
     $dbh = DBI->connect($self->dsn(), $self->user(), 
                         $self->pass(), {'RaiseError' => 1});
-    $sth = $dbh->prepare("select $col from $tab");
+    $sth = $dbh->prepare($query);
     $sth->execute();
 
     $self->{'sth'} = $sth;
