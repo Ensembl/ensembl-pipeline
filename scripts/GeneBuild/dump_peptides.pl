@@ -24,36 +24,36 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_FINALDBHOST
-					 GB_FINALDBNAME
-					 GB_DBHOST
-					 GB_DBNAME
-					);
-use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
-
-my $dbhost      = $GB_FINALDBHOST;
-my $dbuser    = 'ensro';
-my $dbname    = $GB_FINALDBNAME;
-my $dbpass    = undef;
-
-my $dnadbhost = $GB_DBHOST;
-my $dnadbuser = 'ensro';
-my $dnadbname = $GB_DBNAME;
-my $dnadbpass = undef;
 
 my $file;
 
+my $dbhost;
+my $dbuser    = 'ensro';
+my $dbname;
+my $dbpass    = undef;
 
+my $dnadbhost;
+my $dnadbuser = 'ensro';
+my $dnadbname;
+my $dnadbpass = undef;
+
+my $genetype = "ensembl"; # default genetype
+
+
+$dbuser = "ensro";
 &GetOptions(
-	    'peptide_file:s' => \$file,
-	   );
+	    'dbname:s'    => \$dbname,
+	    'dbhost:s'    => \$dbhost,
+	    'dnadbname:s' => \$dnadbname,
+	    'dnadbhost:s' => \$dnadbhost,
+	    'peptide_file:s'  => \$file,
+);
 
-unless( $file){     
-  print STDERR "Usage: dump_peptides -peptide_file file\n";
+unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
+  print STDERR "script to dump all the translations from the transcripts in a database\n";
+  print STDERR "Usage: $0 --dbname -dbhost -dnadbname -dnadbhost -peptide_file \n";
   exit(0);
 }
-
 
 
 my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -79,8 +79,6 @@ print STDERR "connected to $dbname : $dbhost\n";
 my $sa = $db->get_StaticGoldenPathAdaptor();
 
 
-
-
 open (OUT,">$file") or die("unable to open file $file");
 
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*OUT ) ;
@@ -98,14 +96,16 @@ foreach my $gene_id($db->get_GeneAdaptor->list_geneIds) {
       my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
       
       my $tseq = $trans->translate();
+      #print STDERR "translation->translate is a : $tseq\n";
+      #print STDERR "translation: ".$tseq->seq()."\n";
       if ( $tseq->seq =~ /\*/ ) {
-	print STDERR "translation of ".$trans->dbID." in chr $chr has stop codons. Skipping! (in clone". $fe->clone_id .")\n";
+	print STDERR "translation of transcript: ".$trans->dbID." in chr $chr has stop codons. Skipping! (in clone". $fe->clone_id .")\n";
 	next;
       }
       my $gene_version = $gene->version;
       
       $tseq->desc("Gene:$gene_id.$gene_version Clone:".$fe->clone_id . " Contig:" . $fe->contig_id . " Chr: " . $chr . " Pos: " . $cdna_start);
-      $seqio->write_seq($tseq);
+      my $result = $seqio->write_seq($tseq);
     }
   };
   
