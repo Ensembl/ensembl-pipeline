@@ -151,8 +151,9 @@ sub _parse_files {
 
   foreach my $file (@files) {
 
-    #print "Parsing $file \n";
-
+    if (! -e $file) {
+      $self->throw("Configuration file $file not found\n");
+    }
     my $header = "";
 
     open (FILE, $file);
@@ -308,7 +309,7 @@ sub get_keys {
 
 =head2 get_headers
 
-  Arg [1]    : string $header
+  Arg [1]    : None
   Example    : 
   Description: Returns a list of headers present in the configuration,
                including default headers
