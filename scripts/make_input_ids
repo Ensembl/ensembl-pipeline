@@ -32,6 +32,8 @@ this script allows input_ids to be generated and written to the input_id_analysi
                the format chrname.start-end
 
     -slice_size the size to make the slice ids
+
+    -slice_overlap the slice overlap (non-overlapping by default)
     
     -file     if the input_ids are to be a list of filenames from a directory
     
@@ -65,6 +67,7 @@ my $port = 3306;
 my $dbname;
 my $logic_name;
 my $slice_size;
+my $slice_overlap;
 my $type;
 my $contig;
 my $slice;
@@ -86,6 +89,7 @@ my $help;
 	    'contig'       => \$contig,
 	    'slice'        => \$slice,
             'slice_size:s' => \$slice_size,
+            'slice_overlap:s' => \$slice_overlap,
             'logic_name:s' => \$logic_name,
             'input_type:s' => \$input_type,
 	    'file'         => \$file,
@@ -135,7 +139,7 @@ if ($slice) {
  
   $input_type = "SLICE" unless $input_type;
   
-  @ids = $inputIDFactory->generate_slice_input_ids($slice_size);
+  @ids = $inputIDFactory->generate_slice_input_ids($slice_size, $slice_overlap);
   
 }elsif($contig) {
 
