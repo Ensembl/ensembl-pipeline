@@ -475,7 +475,7 @@ sub calculate_and_set_phases_new {
           substr($genscan, $x, 1) = 'X';
           $x++;
         }
-        my $x = 0;
+        $x = 0;
         while (($x = index($peptide, 'X', $x)) != -1) {
           #print STDERR "Found an 'X' at ", $i + 1, "\n";
           substr($temp_tran, $x, 1) = 'X';
