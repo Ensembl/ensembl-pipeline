@@ -75,6 +75,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_GENETYPE
 					EST_FEATFILT_COVERAGE
 					EST_FEATFILT_MINSCORE
+					EST_REPEAT_MASKING
 				       );
 
 
@@ -357,7 +358,7 @@ sub fetch_input {
   my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->db);
   
   # only fetch this once for the whole set or it's SLOW!
-  my $genomic  = $self->query->get_repeatmasked_seq;
+  my $genomic  = $self->query->get_repeatmasked_seq($EST_REPEAT_MASKING);
   
  ID:    
   foreach my $id(keys %final_ests) {

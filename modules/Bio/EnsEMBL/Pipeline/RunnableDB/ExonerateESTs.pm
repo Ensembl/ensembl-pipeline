@@ -58,7 +58,9 @@ use strict;
 # Object preamble
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
-
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_REPEAT_MASKING
+				       );
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
 
@@ -226,7 +228,7 @@ sub fetch_input {
     
     $contig->_chr_name($chrid);
     
-    my $genseq    = $contig->get_repeatmasked_seq;
+    my $genseq    = $contig->get_repeatmasked_seq($EST_REPEAT_MASKING);
   
     $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs('-genomic'        => $genseq, 
 								     '-ests'           => $self->estfile,

@@ -69,6 +69,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                                          GB_SKIP_BMG
                                          GB_SIMILARITY_DATABASES
                                          GB_SIMILARITY_GENETYPE
+					 GB_REPEAT_MASKING
                                         );
 
 
@@ -208,7 +209,7 @@ sub fetch_input {
 
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
 
-    my $genseq    = $contig->get_repeatmasked_seq;
+    my $genseq    = $contig->get_repeatmasked_seq($GB_REPEAT_MASKING);
 
     #print STDERR "Length is " . $genseq->length . "\n";
     #print STDERR "Fetching features \n";
