@@ -269,6 +269,8 @@ sub run_analysis {
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
 	$command .= ' '.$self->options. ' > '.$self->results . ".$db";
+	#print STDERR "Blast Commmandline: $command\n";
+	#exit;
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
   }
@@ -409,54 +411,54 @@ sub parse_results {
   NAME: while  ( my $sbjct =$parser->nextSbjct) {
       
     my $name = $sbjct->name ;	  
-
+    
     print STDERR "Name " . $name . "\n";
-     if (($self->filter == 1) && !defined($ids{$name})) {
+    if (($self->filter == 1) && !defined($ids{$name})) {
       next NAME;
     }
-
+    
     my ($ug) = $name =~ m{/ug=(.*?)\ };
-
+    
     if ($name =~ /\|UG\|(\S+)/) {
-         # scp - unigene ID 'patch'
-         # there must be a better way of doing this...
-         if (length $ug > 0) { # just in case "/ug=" not in header
-             $name = $ug;
-         } else {
-             $name = $1;
-         }
-      } elsif ($name =~ /\S+\|(\S+)\|\S+/) {
-	  $name = $1;
-      } elsif ($name =~ /^(\S+) (\S+)/) {
-        my $word = $2;
-        if ($self->database =~ /halfwise/i) {
-         if ($word =~ /^([^;]*)/) {
-           $name = $1;
-         } else {
-           $self->throw("unable to parse name properly for halfwise : $!");
-         }
+      # scp - unigene ID 'patch'
+      # there must be a better way of doing this...
+      if (length $ug > 0) { # just in case "/ug=" not in header
+	$name = $ug;
       } else {
-        $name = $1 || $2;
+	$name = $1;
+      }
+    } elsif ($name =~ /\S+\|(\S+)\|\S+/) {
+      $name = $1;
+    } elsif ($name =~ /^(\S+) (\S+)/) {
+      my $word = $2;
+      if ($self->database =~ /halfwise/i) {
+	if ($word =~ /^([^;]*)/) {
+	  $name = $1;
+	} else {
+	  $self->throw("unable to parse name properly for halfwise : $!");
+	}
+      } else {
+	$name = $1 || $2;
       }
     }
-    print "Parsing name $name\n";
-    HSP: while (my $hsp = $sbjct->nextHSP) {
-
-	if ($self->threshold_type eq "PID") {
-	  next HSP if ($hsp->percent < $self->threshold);
-	} elsif ($self->threshold_type eq "PVALUE") {
-	  next HSP if ($hsp->P > $self->threshold);
+    print STDERR "Parsing name $name\n";
+  HSP: while (my $hsp = $sbjct->nextHSP) {
+      
+      if ($self->threshold_type eq "PID") {
+	next HSP if ($hsp->percent < $self->threshold);
+      } elsif ($self->threshold_type eq "PVALUE") {
+	next HSP if ($hsp->P > $self->threshold);
 	}
-	# Each HSP is a gapped alignment.
-	# This method splits the gapped alignment into
-	# ungapped pieces
-	print "HSP " . $hsp->P . "\n";
-	$self->split_HSP($hsp,$name);
-
-      }
+      # Each HSP is a gapped alignment.
+      # This method splits the gapped alignment into
+      # ungapped pieces
+      print STDERR "HSP " . $hsp->P . "\n";
+      $self->split_HSP($hsp,$name);
+	
+    }
   }
   }
-
+  
 
 # Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
 
@@ -634,6 +636,7 @@ sub split_HSP {
 
     my @gap;
 
+
     my @qchars = split(//,$hsp->querySeq);  # split alignment into array of char
     my @hchars = split(//,$hsp->sbjctSeq);  # ditto for hit sequence
     
@@ -733,7 +736,11 @@ sub split_HSP {
       } else {
 	$self->throw( "Hardcoded values wrong?? " );
       }
-      
+
+      # helps debugging subsequent steps
+      $fp->{'qseq'} = $hsp->querySeq();
+      $fp->{'sseq'} = $hsp->sbjctSeq();
+
       $self->growfplist($fp);
     }
 }

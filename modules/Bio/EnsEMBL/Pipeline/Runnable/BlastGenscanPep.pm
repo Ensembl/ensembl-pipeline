@@ -106,8 +106,10 @@ sub new {
     $self->throw("No genomic sequence input");
   }
   
-  if (defined($peptide) && $peptide->isa("Bio::EnsEMBL::Transcript")) {
-    $self->peptide($peptide);
+  if (defined($peptide) && $peptide->isa("Bio::EnsEMBL::PredictionTranscript")) {
+      $self->peptide($peptide);
+  } elsif (defined($peptide)) {
+      $self->throw("[$peptide] is not a Bio::EnsEMBL::PredictionTranscript");
   } else {
     $self->throw("No peptide input");
   }
@@ -163,10 +165,10 @@ sub run {
     $self->throw("No peptide input");
   }
   
-  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->temporary_id."\n";
+  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
 
-  my $peptide = Bio::PrimarySeq->new(-id         => $transcript->temporary_id,
-				     -seq        => $transcript->translate->seq(),
+  my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
+				     -seq        => $transcript->translate(),
 				     -moltype    => 'protein' );
 
   print STDERR "Peptide length: ", $peptide->length, "\n";
@@ -174,17 +176,23 @@ sub run {
     print "Peptide too short (min length is 3); skipping transcript\n";
     return;
   }
+  
+  print ::LOG "New BlastGenscanPep Runnable\n";
+  print ::LOG $transcript->_dump();
+  print ::LOG "\n";
 
   my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $peptide,
 							       -program   => $self->program,
 							       -database  => $self->database,
 							       -threshold => $self->threshold,
 							       -threshold_type => $self->threshold_type,
+							       -ungapped => 0,
 							       -options   => $self->options,
                                                                -filter    => 1);
   $runnable->run();
   
-  $self->align_hits_to_contig($runnable->output);
+  $self->align_hits_to_contig2($runnable->output);
+#  $self->align_hits_to_contig($runnable->output);
 #  $self->check_features($transcript->translate->seq,$self->featurepairs);
   
 }
@@ -206,94 +214,198 @@ sub output {
 }
 
 
+sub align_hits_to_contig2 {
+  my ( $self, @features )  = @_;
+  
+  # for each feature
+  
+  for my $feature ( @features ) {
+    print ::LOG join
+      ( "\n", 
+	( "Blast result:",
+	  "Start ".$feature->start." End ".$feature->end,
+	  "hstart ".$feature->hstart." hend ".$feature->hend,
+	  "qury: ".$feature->{'qseq'},
+	  "subj: ".$feature->{'sseq'},
+	  "\n" ));
+
+    my %exon_hash = ();
+  # for each ungapped piece in it
+    for my $ugFeature ( $feature->ungapped_features() ) {
+
+      # ask the $self->peptide to do pep2genomic
+      #   for f->start f->end
+      my @split = $self->peptide->pep2genomic( $ugFeature->start, $ugFeature->end );
+      
+      for my $gcoord ( @split ) {
+	
+	my ( $gstart, $gend, $gstrand, $contig, $exon, $pep_start, $pep_end ) =
+	  @$gcoord;
+
+  # Take the pieces and make a list of features from it
+  # hash them by exon
+
+	my $dna_feat = Bio::EnsEMBL::SeqFeature->new 
+	  ( -seqname    =>  $contig->name,
+	    -start      =>  $gstart, 
+	    -end        =>  $gend,
+	    -strand     =>  $gstrand,
+	    -score      =>  $feature->score,
+	    -p_value    =>  $feature->p_value,
+	    -percent_id =>  $feature->percent_id,
+	    -analysis   =>  $feature->analysis,
+	    -phase      =>  $exon->phase() );  
+	
+	my $pep_feat = Bio::EnsEMBL::SeqFeature->new 
+	  ( -seqname    =>  $feature->hseqname,
+	    -start      =>  $pep_start - $ugFeature->start() + $ugFeature->hstart(),
+	    -end        =>  $pep_end - $ugFeature->start() + $ugFeature->hstart(),
+	    -score      =>  $feature->score,
+	    -p_value    =>  $feature->p_value,
+	    -percent_id =>  $feature->percent_id,
+	    -analysis   =>  $feature->analysis );
+
+      
+	my $featurepair = Bio::EnsEMBL::FeaturePair->new (-feature1   => $dna_feat,
+							  -feature2   => $pep_feat );
+	
+	push( @{$exon_hash{$exon}}, $featurepair );
+      }
+    }
+
+    # Take the pieces for each exon and make gapped feature
+    foreach my $ex ( keys %exon_hash ) {
+      my $dna_align_feature = Bio::EnsEMBL::DnaPepAlignFeature->new
+	(-features => $exon_hash{$ex});
+      $self->featurepairs($dna_align_feature);
+    }
+  }
+}
+
+
+
 # This function creates a hash which is used to map between the exon genomic position
 # and a position within the genscan predicted peptide. The hash is then matched
 # against blast peptide hits to return a set of featurepairs of exons and blast
 # peptides
 sub align_hits_to_contig {
-    my ($self, @features) = @_;
-
-    my (%dna_align, @exon_aligns, @featurepairs); #structure for tracking alignment variables
+  my ($self, @features) = @_;
+  
+  my (%dna_align, @exon_aligns, @featurepairs); #structure for tracking alignment variables
+  
+  $dna_align {'exons'} = [];
+  my $stop_codon_present = 0;
+  
+  my $trans = $self->peptide;
+  
+  #    print STDERR "Peptide translation is " . $trans->translate->seq . "\n";
+  
+  
+  # Calculate boundaries and map exons to translated peptide
+  # Each exon is trimmed at either end so it has a whole number
+  # of residues
+  
+  my $pep = $trans->translate();
+  
+  foreach my $exon ($trans->get_all_Exons) {
     
-    $dna_align {'exons'} = [];
-
-    my $trans = $self->peptide;
-    $trans->sort;
-
-#    print STDERR "Peptide translation is " . $trans->translate->seq . "\n";
-
-
-    # Calculate boundaries and map exons to translated peptide
-    # Each exon is trimmed at either end so it has a whole number
-    # of residues
-
-    my $pep = $trans->translate->seq;
-
-    foreach my $exon ($trans->get_all_Exons) {
-
-        my %ex_align;
-
-#	print STDERR "\tGenscan exon " . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->phase . "\n";
-	my $strand = "+";
-	if ($exon->strand == -1) {
-	  $strand = "-";
-	}
-#	print STDERR "exon\tgenscan\tsimilarity\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand ."\t" . $exon->phase . "\t" . $trans->id . "\n";
-
-        my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
-	if ($expep =~ s/x$//i) {
-	    print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
-	}
-
-        $self->throw("Exon translation not found in peptide") 
-                    unless ($pep =~ /$expep/);
-
-        $ex_align {'name'}      = $self->genomic->id;
-
-	# Trim the start and end of the exon
-	if ($exon->strand == 1) {
-	  $ex_align {'gen_start'} = $exon->start + (3 - $exon->phase)%3;
-	  $ex_align {'gen_end'}   = $exon->end   - $exon->end_phase;  
-	} else {
-	  $ex_align {'gen_start'} = $exon->start + $exon->end_phase;
-	  $ex_align {'gen_end'}   = $exon->end   - (3 - $exon->phase) %3;  
-	}	  
-
-        $ex_align {'strand'}    = $exon->strand;
-        $ex_align {'phase'}     = $exon->phase;
-        $ex_align {'end_phase'} = $exon->end_phase;
-        $ex_align {'pep_start'} = index($pep, $expep)+1;
-        $ex_align {'pep_end'}   = ($ex_align {'pep_start'} + length($expep))-1;
-      
-        push (@exon_aligns, \%ex_align);
-        
-        $dna_align {'exon_dna_limit'} += $exon->length;   
-        
+    my %ex_align;
+    
+    #	print STDERR "\tGenscan exon " . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->phase . "\n";
+    my $strand = "+";
+    if ($exon->strand == -1) {
+      $strand = "-";
+    }
+    #	print STDERR "exon\tgenscan\tsimilarity\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $strand ."\t" . $exon->phase . "\t" . $trans->id . "\n";
+    
+    my $expep = $exon->translate->seq();
+    if( $expep =~ /\*$/ ) {
+      $expep =~ s/\*$//g;
+      $stop_codon_present = 1;
     }
     
-    $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
+    my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
+    if ($expep =~ s/x$//i) {
+      print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
+    }
     
-    #map each feature to 1 or more exons
-    foreach my $fp (@features) {
+    $self->throw("Exon translation not found in peptide") 
+      unless ($pep =~ /$expep/);
+    
+    $ex_align {'name'}      = $self->genomic->id;
+    
+    # Trim the start and end of the exon
+    if ($exon->strand == 1) {
+      $ex_align {'gen_start'} = $exon->start + (3 - $exon->phase)%3;
+      $ex_align {'gen_end'}   = $exon->end   - $exon->end_phase;  
+    } else {
+      $ex_align {'gen_start'} = $exon->start + $exon->end_phase;
+      $ex_align {'gen_end'}   = $exon->end   - (3 - $exon->phase) %3;  
+    }	  
+    
+    $ex_align {'strand'}    = $exon->strand;
+    $ex_align {'phase'}     = $exon->phase;
+    $ex_align {'end_phase'} = $exon->end_phase;
+    $ex_align {'pep_start'} = index($pep, $expep)+1;
+    $ex_align {'pep_end'}   = ($ex_align {'pep_start'} + length($expep))-1;
+    
+    push (@exon_aligns, \%ex_align);
+    
+    $dna_align {'exon_dna_limit'} += $exon->length;   
+    
+  }
+  
+  $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
+  
+  #map each feature to 1 or more exons
+  foreach my $gapped_feature (@features) {
+    
+    my @split_features;
+    
+    foreach my $fp ( $gapped_feature->ungapped_features() ) {   
       unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'}) {
-#	$self->throw("Feature length (".$fp->start."-".$fp->end. 
-#		     ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
+	#	$self->throw("Feature length (".$fp->start."-".$fp->end. 
+	#		     ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
       }
-
+      
       #find each matching exon
       my @aligned_exons;
-
+      
       foreach my $ex_align (@exon_aligns) {
-#	print STDERR "\texon " . $fp->start . "\t" . $fp->end . "\t" . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\n";
+	#	print STDERR "\texon " . $fp->start . "\t" . $fp->end . "\t" . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\n";
 	if (!($fp->end < $ex_align->{pep_start} || $fp->start > $ex_align->{pep_end})) {
 	  push (@aligned_exons, $ex_align);
 	}
       }
       #create sets of featurepairs mapping peptide features to exons
-      $self->create_peptide_featurepairs($fp, @aligned_exons);
+      push( @split_features, $self->create_peptide_featurepairs($fp, @aligned_exons));
       
     }
+    
+    # hash on exon align to reconstruct exon based alignments
+    # for each exon align we expect 1 or more seqfeatures, hence the
+    # array
+    my %exon_hash;
+    foreach my $split ( @split_features ) {
+      if( !defined $exon_hash{$split->{'_exon_align'}} ) {
+	$exon_hash{$split->{'_exon_align'}} = [];
+      }
+      push(@{$exon_hash{$split->{'_exon_align'}}},$split);
+    }
+    
+    foreach my $exon_id ( keys %exon_hash ) {
+      foreach my $sf ( @{$exon_hash{$exon_id}} ) {
+	print STDERR "DEBUG features pair ",$sf->start," ",$sf->end," ",$sf->hstart," ",$sf->hend,"\n";
+      }
+      
+      my $dna_align_feature = Bio::EnsEMBL::DnaPepAlignFeature->new
+	(-features => $exon_hash{$exon_id});
+      $self->featurepairs($dna_align_feature);
+    }
+
   }
+}
+
 
 # This function takes a blast peptide feature hit and a set of matching exons and
 # creates a set of featurepairs aligned to genomic coordinates. It will split
@@ -301,12 +413,13 @@ sub align_hits_to_contig {
 sub create_peptide_featurepairs {
     my ($self, $fp, @aligned_exons) = @_;
     #create featurepairs
-    
-    #print "Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
+    my @output_features;
+
+    print STDERR " ARNE Converting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\n";
 
     foreach my $ex_align (@aligned_exons)
     {
-#      print "Found aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
+      print STDERR "ARNE Found aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
 
         my ($ex_start, $ex_end, $pep_start, $pep_end, $start_phase, $end_phase);
 
@@ -315,7 +428,7 @@ sub create_peptide_featurepairs {
       
       if ($ex_align->{'pep_start'}  < $fp->start) {
 	#feature starts inside current exon
-
+	print STDERR "ARNE - inside\n";
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'}
 	  + (($fp->start - $ex_align->{'pep_start'})*3);
@@ -328,6 +441,7 @@ sub create_peptide_featurepairs {
 	$pep_start   = $fp->hstart;
       } else {
 	#feature starts in a previous exon or absolute start of current exon
+	print STDERR "ARNE - previous\n";
 
 	if ($ex_align->{strand} == 1) {
 	  $ex_start   = $ex_align->{'gen_start'};
@@ -340,6 +454,8 @@ sub create_peptide_featurepairs {
         
       if ($$ex_align{'pep_end'}    > $fp->end) {
 	#feature ends in current exon
+	print STDERR "ARNE - ends\n";
+
 	if ($ex_align->{strand} == 1) {
 	  $ex_end     = $ex_align->{'gen_start'}
 	  + (($fp->end -  $ex_align->{'pep_start'})*3)+2;
@@ -350,6 +466,7 @@ sub create_peptide_featurepairs {
 	$end_phase  = 0;
 	$pep_end    = $fp->hend;
       } else {
+	print STDERR "ARNE - later exon\n";
 
 	#feature ends in a later exon or absolute end of current exon
 	if ($ex_align->{strand} == 1) {
@@ -393,13 +510,14 @@ sub create_peptide_featurepairs {
       my $featurepair = Bio::EnsEMBL::FeaturePair->new (-feature1   => $dna_feat,
 							-feature2   => $pep_feat );
 
-      $featurepair->attach_seq($self->genomic);
-      
-      $self->featurepairs($featurepair);    
+	$featurepair->attach_seq($self->genomic);
+	$featurepair->{'_exon_align'} = $ex_align;
+	push( @output_features, $featurepair );
 
-#      print "\n" . $featurepair->gffstring . "\n";
+	print STDERR "\n ARNE" . $featurepair->gffstring . "\n";
 
-    }
+      }
+    return @output_features;
 }
 
 sub check_features {
@@ -513,8 +631,8 @@ sub peptide {
     my($self,$seq) = @_;
     
     if (defined($seq)) {
-      if (!($seq->isa("Bio::EnsEMBL::Transcript"))) {
-	$self->throw("[$seq] is not a Bio::EnsEMBL::Transcript");
+      if (!($seq->isa("Bio::EnsEMBL::PredictionTranscript"))) {
+	$self->throw("[$seq] is not a Bio::EnsEMBL::PredicitionTranscript");
       }
       $self->{'_peptide'} = $seq;
     }

@@ -372,7 +372,7 @@ sub align_hits_to_contig {
     #map each feature to 1 or more exons
     foreach my $gapped_feature ( @features ) {
       my @split_features;
-      print STDERR "DEBUG: processing $gapped_feature\n";
+      print STDERR "DEBUG: processing $gapped_feature Cigar:",$gapped_feature->cigar_string(),"\n";
 
       foreach my $fp ( $gapped_feature->ungapped_features() ) {   
 	unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'})
