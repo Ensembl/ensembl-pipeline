@@ -2036,54 +2036,64 @@ sub _genomic_sequence {
 =cut
 
 sub _exon_nucleotide_sequence {
-
   my ($self) = @_;
 
   if (!defined $self->{'_exon_nucleotide_sequence'}) {
 
-    my @exon_only_sequence;
+    # Make a sortable exon list.
+
+    my @exon_list;
 
     foreach my $exon (@{$self->_transcript->get_all_Exons}) {
-
-      # Add the exon sequence to our 'exons only' sequence.
-
-      my @exon_seq = split //, $exon->seq->seq;
-
-      my $exon_position;
+      my $exon_start;
 
       if ($self->_strand == 1) {
-	$exon_position = $exon->start - 1;
+	$exon_start = $exon->start - 1;
       }elsif ($self->_strand == -1) {
-	$exon_position = $self->_slice->length - $exon->end;
+	$exon_start = $self->_slice->length - $exon->end;
       }
 
-      foreach my $exon_nucleotide (@exon_seq){
-	if (!defined $exon_only_sequence[$exon_position]){
-	  $exon_only_sequence[$exon_position] = $exon_nucleotide;
-	  $exon_position++;
-	} else {
-	  throw "Overlapping exons\n$@";
-	}
-      }
+      push @exon_list, [$exon, $exon_start];
     }
 
-    # Fill in the blanks
+    # Sort exon list.
 
-    for (my $i = 0; $i < $self->_slice->length; $i++) {
-      unless (defined $exon_only_sequence[$i]){
-	$exon_only_sequence[$i] = '-';
-      } 
+    @exon_list = sort {$a->[1] <=> $b->[1]} @exon_list;
+
+
+    # Build our string.
+
+    my $genomic_exon_seq = '';
+    my $gap_start = 1;
+
+    foreach my $exon_item (@exon_list) {
+
+      my $exon       = $exon_item->[0];
+      my $exon_start = $exon_item->[1];
+      my $exon_seq   = $exon->seq->seq;
+
+      my $gap_length = $exon_start - $gap_start + 1;
+
+      $genomic_exon_seq .= ('-' x $gap_length) . $exon_seq;
+
+      $gap_start += $gap_length + length($exon_seq);
+
     }
 
-    # Convert back to a string
+      # Add final gap.
 
-    my $exon_sequence = join('', @exon_only_sequence);
+    my $final_gap_length = $self->_slice->length - $gap_start + 1;
 
-    $self->{'_exon_nucleotide_sequence'} = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
-					     '-seq'  => $exon_sequence,
-					     '-name' => 'exon_sequence',
-					     '-type' => 'nucleotide'
-                                             );
+    $genomic_exon_seq .= ('-' x $final_gap_length);
+
+
+    # Build and store AlignmentSeq object for this sequence.
+
+    $self->{'_exon_nucleotide_sequence'} 
+      = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+	   '-seq'  => $genomic_exon_seq,
+	   '-name' => 'exon_sequence',
+	   '-type' => 'nucleotide');
   }
 
   return $self->{'_exon_nucleotide_sequence'};
@@ -2107,22 +2117,21 @@ sub _exon_protein_translation {
 
   if (! defined $self->{'_exon_protein_translation'}) {
 
-    my @exon_translation_sequence;
+    # Make a sorted list of exons, arranged in coding order.
 
-    my $exons = $self->_transcript->get_all_Exons;
+    my @exon_list;
 
-    foreach my $exon (@{$exons}){
-      # Add a translation of this exon peptide to our translated exon sequence.
+    foreach my $exon (@{$self->_transcript->get_all_Exons}){
+
+      # Derive a translation of this exon peptide.
 
       my $peptide_obj = $exon->peptide($self->_transcript);
       my $peptide = $peptide_obj->seq;
 
       $peptide =~ s/(.)/$1\-\-/g;
 
-      my @peptide = split //, $peptide;
-
       # Whack off the first residue if it is only a partial 
-      # codon (the internal rule is to:
+      # codon.  The internal rule applied is :
       #   - include a whole residue for partial codons at ends
       #       of exons
       #   - ignore/remove residues from partial codons at 
@@ -2131,11 +2140,11 @@ sub _exon_protein_translation {
       # is displayed in the alignment.
 
       if ($exon->phase == 2){ 
-	splice (@peptide, 0, 2);
+	$peptide = substr($peptide, 2, length($peptide) - 2);
       }
 
       if ($exon->phase == 1){
-	shift @peptide;
+	$peptide = substr($peptide, 1, length($peptide) - 1);
       }
 
       # Darstardly, hidden in here is the coordinate shuffle
@@ -2143,15 +2152,15 @@ sub _exon_protein_translation {
       # is of course in the forward direction already, just the 
       # coordinates need to be reversed).
 
-      my $exon_start = $exon->start;
-      my $exon_end = $exon->end;
-      my $exon_length = $exon_end - $exon_start;
-      my $exon_phase = $exon->phase;
+      my $exon_start     = $exon->start;
+      my $exon_end       = $exon->end;
+      my $exon_length    = $exon_end - $exon_start;
+      my $exon_phase     = $exon->phase;
       my $exon_end_phase = $exon->end_phase;
 
       if ($self->_strand == -1) {
 	$exon_start = $self->_slice->length - $exon_end;
-	$exon_end = $exon_start + $exon_length - 1;
+	$exon_end   = $exon_start + $exon_length - 1;
       }
 
       # Jiggling the exons about to get frame right
@@ -2164,7 +2173,7 @@ sub _exon_protein_translation {
       my $peptide_genomic_start;
 
       if ($exon_end_phase != -1) {
-	$peptide_genomic_start = $exon_end - (scalar @peptide) + $extra_length + 1 - 1;
+	$peptide_genomic_start = $exon_end - length($peptide) + $extra_length + 1 - 1;
 
       } else {
 	$peptide_genomic_start = $exon_start - 1;
@@ -2177,39 +2186,50 @@ sub _exon_protein_translation {
 	$peptide_genomic_start += 2;
       }
 
-      my $insert_point = $peptide_genomic_start;
+      push @exon_list, [$peptide_genomic_start, $peptide];
 
-      foreach my $exon_aa (@peptide) {
-	$exon_translation_sequence[$insert_point] = $exon_aa;
-
-	$insert_point++;
-      }
     }
 
-    # Fill in the blanks
+    # Build the string representing the translated exons in a
+    # genomic context.
 
-    for (my $i = 0; $i < $self->_slice->length; $i++) {
-      unless (defined $exon_translation_sequence[$i]){
-	$exon_translation_sequence[$i] = '-';
-      } 
+    my $exon_translation_string = '';
+    my $gap_start = 1;
+
+    foreach my $exon_item (@exon_list){
+      my $genomic_start = $exon_item->[0];
+      my $peptide_seq   = $exon_item->[1];
+
+      my $gap_length = $genomic_start - $gap_start + 1;
+
+      $exon_translation_string .= ('-' x $gap_length) . $peptide_seq;
+
+      $gap_start += $gap_length + length($peptide_seq);
     }
 
-    # Convert back to a string
+      # Add last gap.
 
-    my $translated_exon_sequence = '';
-    foreach my $element (@exon_translation_sequence) {
-      $translated_exon_sequence .= $element;
+    my $last_gap_length = $self->_slice->length - $gap_start;
+    $exon_translation_string .= ('-' x $last_gap_length);
+
+    # Convert to three letter AA names, if desired.
+
+    if ($self->_three_letter_aa) {
+      $exon_translation_string =~ s/([^\-])\-\-/$self->{_aa_names}{$1}/g;
     }
+
+    # Build alignment seq from our merged sequences.
 
     $self->{'_exon_protein_translation'} = 
       Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
-	 '-seq'  => $translated_exon_sequence,
+	 '-seq'  => $exon_translation_string,
 	 '-name' => 'translated_exon_sequence',
 	 '-type' => 'protein');
   }
 
   return $self->{'_exon_protein_translation'};
 }
+
 
 =head2 _all_supporting_features
 
