@@ -101,7 +101,7 @@ sub _initialize {
     $self->{_repeatmasker} = undef;  #location of RepeatMasker executable
     $self->{_workdir}   = undef;     #location of temp directory
     $self->{_filename}  =undef;      #file to store Bio::Seq object
-    $self->{_results}   =undef;      #file to store results of RepeatMaskerHum
+    $self->{_results}   =undef;      #file to store results of RepeatMasker
     $self->{_protected} =[];         #a list of files protected from deletion
     $self->{_arguments} =undef;      #arguments for RepeatMasker
     
@@ -111,15 +111,15 @@ sub _initialize {
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
     eval {
-	$self->repeatmasker($self->locate_executable('RepeatMaskerHum'));
+	$self->repeatmasker($self->locate_executable('RepeatMasker'));
     };
     if ($@) {
-	$self->repeatmasker('/usr/local/ensembl/bin/RepeatMaskerHum');
+	$self->repeatmasker('/usr/local/ensembl/bin/RepeatMasker');
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments('-low -m') ;      }
+    { $self->arguments('-low') ;      }
     return $self; # success - we hope!
 }
 
@@ -218,7 +218,7 @@ sub arguments {
 
     Title   :  run
     Usage   :   $obj->run($workdir, $args)
-    Function:   Runs RepeatMaskerHum script and creates array of featurepairs
+    Function:   Runs RepeatMasker script and creates array of featurepairs
     Returns :   none
     Args    :   optional $workdir and $args (e.g. '-ace' for ace file output)
 
@@ -245,7 +245,7 @@ sub run {
 
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
-    Function:   Parses RepeatMaskerHum output to give a set of feature pairs
+    Function:   Parses RepeatMasker output to give a set of feature pairs
                 parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
@@ -254,8 +254,9 @@ sub run {
 
 sub run_repeatmasker {
     my ($self) = @_;
-    #run RepeatMaskerHum
-    print "Running RepeatMasker\n";
+    #run RepeatMasker
+    print "Running RepeatMasker; ";
+    print "cmd: ", $self->repeatmasker.' '.$self->arguments.' '.$self->filename, "\n";
     $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
         if (system ($self->repeatmasker.' '.$self->arguments.' '.$self->filename)); 
 }
@@ -265,7 +266,7 @@ sub parse_results {
     my ($self) = @_;
     my $filehandle;
     #The results filename is different in RepeatMasker (8/14/2000) and RepeatMaskerHum
-    my $results = (-e $self->results) ? $self->results : $self->filename.".RepMask.out";
+    my $results = (-e $self->results) ? $self->results : $self->filename.".out";
     if (ref ($self->results) !~ /GLOB/)
     {
         open (REPOUT, "<$results") or $self->throw("Error opening $results \n");
@@ -290,29 +291,29 @@ sub parse_results {
     {  
         if (/\d+/) #ignore introductory lines
         {
-            my @element = split (/\s+/, $_); 
+            my @element = split;
             # ignore features with negatives 
-            next if ($element[12-14] =~ /-/); 
+            next if ($element[11-13] =~ /-/); 
             my (%feat1, %feat2);
-            $feat1 {name} = $element[5];
-            $feat1 {score} = $element[1];
-            $feat1 {start} = $element[6];
-            $feat1 {end} = $element[7];
+            $feat1 {name} = $element[4];
+            $feat1 {score} = $element[0];
+            $feat1 {start} = $element[5];
+            $feat1 {end} = $element[6];
             #The start and end values are in different columns depending 
             #on orientation!
-            if ($element[9] eq '+')
+            if ($element[8] eq '+')
             {
                 $feat2 {strand} = 1;
-                $feat2 {start} = $element[12];     
-                $feat2 {end} = $element[13];
+                $feat2 {start} = $element[11];     
+                $feat2 {end} = $element[12];
             }
-            elsif ($element[9] eq 'C')
+            elsif ($element[8] eq 'C')
             {
                 $feat2 {strand} = -1 ;
-                $feat2 {start} = $element[14];     
-                $feat2 {end} = $element[13];
+                $feat2 {start} = $element[13];     
+                $feat2 {end} = $element[12];
             }
-            $feat2 {name} = $element[10];
+            $feat2 {name} = $element[9];
             $feat2 {score} = $feat1 {score};
             $feat1 {strand} = $feat2 {strand};
             #misc
