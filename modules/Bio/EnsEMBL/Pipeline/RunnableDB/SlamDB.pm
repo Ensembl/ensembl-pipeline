@@ -104,67 +104,68 @@ sub new {
   $self->regions($input_id);
   $self->db($db);               #super db()
   $self->db_org2;
-
   return $self;
 }
 
 
+# gets a reference to an array of slices to run avid on
+# returns reference to an avid-object
+sub avid{
+  my ($self,$slices) = @_;
 
-sub run{
-  my ($self) = shift;
-
-  #============================== RUN AVID ==============================
   my $avid =  new Bio::EnsEMBL::Pipeline::Runnable::Avid (
-                                                          -slice1      => ${$self->slices}[0],
-                                                          -slice2      => ${$self->slices}[1],
-                                                          -slam_output => 'true',
+                                                          -slice1      => ${$slices}[0],
+                                                          -slice2      => ${$slices}[1],
                                                          );
   $avid->run;
-  #============================== RUN AAT ==============================
-  my $ApproxAlign = new Bio::EnsEMBL::Pipeline::Tools::ApproxAlign(
-                                                                   -aat =>  $avid -> parsed_binary_filename, # /path/to/parsedbinaryfile
-                                                                   -seqY => $avid -> fasta_filename1,        # /path/to/firstfasta.fasta
-                                                                   -seqZ => $avid -> fasta_filename2         # /path/to/secondfasta.fasta
+  return $avid;
+}
+
+
+# gets name of parsed binary and fastanames
+# returns name of written modified approximate alignment
+sub approx_align{
+  my ($parsed_bin,$fasta1,$fasta2);
+
+  my $approx_obj = new Bio::EnsEMBL::Pipeline::Tools::ApproxAlign(
+                                                                   -aat =>  $parsed_bin,   # /path/to/parsedbinaryfile
+                                                                   -seqY => $fasta1,       # /path/to/firstfasta.fasta
+                                                                   -seqZ => $fasta2        # /path/to/secondfasta.fasta
                                                                   );
+  $approx_obj->expand($approx_obj->exonbounds);
+  $approx_obj->makeConsistent();
 
-  $ApproxAlign->expand($ApproxAlign->exonbounds);
-  $ApproxAlign->makeConsistent();
-  # CHANGE THIS   # CHANGE THIS   # CHANGE THIS   # CHANGE THIS   # CHANGE THIS   # CHANGE THIS   # CHANGE THIS   # CHANGE THIS
-
-  my $aat_filename = Bio::EnsEMBL::Pipeline::RunnableI->get_tmp_file("/tmp","approxAlignOutput","aat"); #CHANGE THIS!!!!!!!!!!!!1
-
-  if ($ApproxAlign->isConsistent) {
-    $ApproxAlign->write("$aat_filename"); #can perhaps return the filename instead of getting one
-    print "data written to $aat_filename\n"  ;
+  if ($approx_obj->isConsistent) {
+    my $aatfile = $approx_obj->write(); #can perhaps return the filename instead of getting one
+    print "data written to $aatfile\n"  ;
   } else {
     die "Error: final aat is not consistent (shouldn't have happened).\n"
   }
+  return $approx_obj;
+}
 
-  # output-format of aat-file (one row for each base, slam needs the same input)
-  #   base lowerBound upperBound
-  #   0        0          881
-  #   1        2          882
-  #   2        843        883
-  #   3        843        884
-  #   4        849        885
-  #   5        850        886
-  #   6        851        887
-  #   7        852        888
-  #   8        853        889
-  #   9        856        898
 
-  # if seqlength > maxlength we have to split seq
+sub run{
+  my ($self) = shift;
+  my @subslices;
+
+  ####  if seqlength > maxlength we have to split seq ###
+
   if ( (${$self->slices}[0]->length  || ${$self->slices}[0]->length ) > $SLAM_MAXLENGTH) {
+
+    # run avid on original slices
+    my $avid = &avid(${$self->slices}[0],${$self->slices}[1] );
+
+    # run ApproxAlign on org slices
+    my $approx = &approx_align($avid->parsed_binary_filename,$avid->fasta_filename1,$avid->fasta_filename2);
 
     # cut the first seq according to the positions of the repeats
     # and than try to find equal positions in the second seq by
-    # using the approximate Alignment
+    # using the approximate Alignment-aatfile
 
-    my @cuts = @{ $self->calculate_cutting ($ApproxAlign) } ;
-    my @subslices;
+    my @cuts = @{ $self->calculate_cutting ($approx->aatfile) } ;
 
-    # now we got the cutting positions in @cuts
-    # and we build the subslices and store them
+    # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
     for my $subseqs (@cuts) {
       # store the subslices in 2nd array of arrays
@@ -175,15 +176,26 @@ sub run{
       my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
       push @subslices, [$subslice1,$subslice2];
     }
-    # comparing results with normal slam algorithm / which seq do we choose ???
   }else{
-  #========== JUST RUN SLAM NOW ==============================
+    # we don't need any cutting
+    push @subslices, $self->slices;
+  }
+
+  for my $slices (@subslices) {
+
+    my $avid = &avid(${$slices}[0],${$slices}[1] );
+
+    # run ApproxAlign on org slices
+    my $approx = &approx_align($avid->parsed_binary_filename,$avid->fasta_filename1,$avid->fasta_filename2);
+
+
+    # make new slam-run with subslice
     my $slamobj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
-                                                              -slice1      => ${$self->slices}[0],
-                                                            -slice2      => ${$self->slices}[1],
+                                                            -slice1      => ${$slices}[0],
+                                                            -slice2      => ${$slices}[1],
                                                             -fasta1        => $avid->fasta_filename1,
                                                             -fasta2        => $avid->fasta_filename2,
-                                                            -approx_align  => $aat_filename,
+                                                            -approx_align  => $approx->aafile,
                                                             -org1          => $SLAM_ORG1_NAME,
                                                             -org2          => $SLAM_ORG2_NAME,
                                                             -slam_bin      => $SLAM_BIN,
@@ -193,46 +205,51 @@ sub run{
                                                             -verbose       => 0
                                                            );
   # run slam, parse results
-  $slamobj->run;
+    $slamobj->run;
 
   # set ref to arrays with predicted transcripts for both organisms
-  $self->predtrans_both_org ( $slamobj ->predtrans );
+    $self->predtrans_both_org ( $slamobj ->predtrans );
 
-}
-
-
-
-  # run the cascade above all (i.e. AVID. aat Slam)
-  # make new avid run with subslice
-  # make new aat-run witsh subslice
-  # make new slam-run with subslice
   # get back the parsed gff->hang the gff's together
   # write the results to database
   # AND WHAT ABOUT THE COORDINATES ???
-  # AND WHAT ABOUT THE COORDINATES ???
-  #
-  # testing if the calculated cuttings by the repeats out of db are nearly the same as the calculated repeats
-  # by running repeatmasker
+  }
+
+
   # POSSIBILITES :
   # compare repeats of first seq in db with repeats after RM-run
   # transfer db-repeats in RM-outfile for first seq 
   # or 
   # transfer RM-outfile-repeats in array which is used by this script (format START - END)
   #
-  #
   # cut the sequence in diffrent parts --- but do we have to to it ? what are the needs for it ?
   # Which programs are working with it ?
   # Which programs need to read the files, which get slices ?
   # Why is the RM done ? (logic in slam.pl)
   # AND WHAT ABOUT THE COORDINATES ???
-  #
-  #
 
-  exit(0);
-}
+
+
+}  # end run
+
+
 
 
   ### make cuts according to position of repeats in first sequence
+
+    # output-format of aat-file (one row for each base, slam needs the same input)
+    #   base lowerBound upperBound
+    #   0        0          881
+    #   1        2          882
+    #   2        843        883
+    #   3        843        884
+    #   4        849        885
+    #   5        850        886
+    #   6        851        887
+    #   7        852        888
+    #   8        853        889
+    #   9        856        898
+
 
 sub calculate_cutting{
   my ($self,$ApproxAlign) = @_;
@@ -360,7 +377,7 @@ sub regions {
   my ($self,$input_id) = @_;
 
   if (defined $input_id) {
-    my @input = split /---/,$input_id; # format chr2-start1-end1---chr2-start2---end2
+    my @input = split /---/,$input_id; # format chr2-start1-end1---chr2-start2-end2
     my ($chr1, $start1, $end1) = split/-/, $input[0];
     my ($chr2, $start2, $end2) = split/-/, $input[1];
     $self->{_regions}=[$chr1, $start1, $end1, $chr2, $start2, $end2];
