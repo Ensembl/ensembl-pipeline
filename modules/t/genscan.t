@@ -75,36 +75,35 @@ else
 my $all_exons_found = 1;
 my @peptides = $genscan->genscan_peptides;
 
-foreach my $gene (@results) {
-  print STDERR "Gene $gene\n";
+foreach my $feat_pair (@results) {
+#  print STDERR "Gene $feat_pair\n";
     if ($all_exons_found == 1) {
 
-      print STDERR "Phase " . $feature->phase . "\n";
+#      print STDERR "Phase " . $feat_pair->phase . "\n";
       $all_exons_found = 0;
       my $exon = Bio::EnsEMBL::Exon->new();
-      $exon->temporary_id ($feature->seqname);
-      $exon->start        ($feature->start);
-      $exon->end          ($feature->end);
-      $exon->strand       ($feature->strand);
-      $exon->phase        ($feature->phase);
+      $exon->temporary_id ($feat_pair->seqname);
+      $exon->start        ($feat_pair->start);
+      $exon->end          ($feat_pair->end);
+      $exon->strand       ($feat_pair->strand);
+      $exon->phase        ($feat_pair->phase);
       $exon->contig_id    ($clone->id);
-      $exon->attach_seq   ($clone);
+      $exon->contig       ($clone);
+#      $exon->attach_seq   ($clone);  ## the Bio::EnsEMBL::Exon class does nothing with the attached seq.
       
-      print STDERR "\n";
+#      print STDERR "\n";
       foreach my $full_pep (@peptides) {
 	
-	print STDERR "$full_pep\n";
+#	print STDERR "$full_pep\n";
 	my $exon_pep = $exon->translate->seq;
-	
-
 	
 	$exon_pep =~ s/^M//i; # remove leading M's
 	$exon_pep =~ s/\*$//; # remove strailing tops
 	$exon_pep =~ s/X$//;  # remove trailing Xs - should track these
 
-	print STDERR $exon->phase . " " . "$exon_pep\n";		
+#	print STDERR $exon->phase . " " . "$exon_pep\n";		
 	if (index ($full_pep, $exon_pep) > -1) {
-	  print STDERR "Found exon\n";
+#	  print STDERR "Found exon\n";
 	  $all_exons_found = 1;
 	  last;
 	}
@@ -192,7 +191,7 @@ my $seq =
 'gctcaggagcaggttgcaattcaaaatcaagggctgctttgaggaggcctctccaccgggctgctgtagtcaccaag'.
 'tccagcccatgcccaaaggaagaggaatgagttcccccttaaaaaaaaaaaaaaaaagaaaaagacagagtcttgct'.
 'ctgtgcccaggctggagtgcagtgatgacatcatagctcactgtagcctcaaactcctgagctccagtgatcctccc'.
-  'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
+'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
 'ggggtctccctatgttgcccagactggtctcaaactcctggcctcaagcgatcctcttgcctcaacctcccaaagtg'.
 'ctgggagtacaggtgtgtgcttggtctgaggctccaactttttgttgttgtttctcgagacagtctctcgctctgtt'.
 'gcccaggctggagtgcagtggcgcgatcttggctccctgcaacctctgtgaggctccaactcttgaagggaggagag'.
