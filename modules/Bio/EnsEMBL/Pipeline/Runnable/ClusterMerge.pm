@@ -535,7 +535,24 @@ sub _check_leaves{
 
 
 ############################################################
-# every extension parent must account for a triangle, otherwise we have a candidate
+# Every extension parent must account for a triangle, otherwise we have a candidate
+#
+# This method basically checks for situations like this:
+#
+#                     z       s              s     z <=== w
+#                     |\      |              |    /     //
+#                     |  \    |      or      |  /     //
+#                     |    \  |              |/     //
+#                     x ====> y              y <==//
+#
+# if every extension parent of y can be put into a triangle of either of these
+# two forms, the node y cannot be the leaf of a 'hidden' branch.
+# In the cartoons above, node s represents a hidden branch, and y has no triangle
+# with this extension parent. As a consequence, y is labelled as candidate
+# and later one, when retrieving the solutions, the branch y --- s ---... 
+# will be included.
+#
+
 sub check_triangle{
     my ($self, $node ) = @_;
 
@@ -550,6 +567,7 @@ sub check_triangle{
     foreach my $extension_parent ( @{$node->extension_parents} ){
       print STDERR "extension parent: ".$extension_parent->transcript->dbID."\n" if $verbose;
       my $found_triangle = 0;
+   
     INCL_PARENT:
       foreach my $inclusion_parent ( @{$node->inclusion_parents} ){	
 	my $incl_id = $inclusion_parent->transcript->dbID;
