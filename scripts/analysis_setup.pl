@@ -81,7 +81,7 @@ module=RepeatMasker
 module_version=1
 gff_source=RepeatMasker
 gff_feature=Repeat
-type=CONTIG
+input_id_type=CONTIG
 
 =cut
 

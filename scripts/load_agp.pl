@@ -125,6 +125,9 @@ LINE:while(<FH>){
   if($type eq 'N'){
     next LINE; #skipping gaps as not stored in db
   }
+  if(!$type){
+    next LINE;
+  }
   my $strand = 1;
   if($ori eq '-'){
     $strand = -1;
@@ -132,6 +135,9 @@ LINE:while(<FH>){
   
   my ($a_id, $c_id);
   if(!$assembled_ids{$a_name}){
+    if($a_name =~ /^chr(\d+)/){
+      $a_name = $1;
+    }
     my $a_piece = $sa->fetch_by_region($assembled_cs->name, $a_name,
                                        undef, undef, undef, 
                                        $assembled_cs->version);
@@ -188,6 +194,6 @@ sub insert_agp_line{
   }
   my $sql = "insert into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
   
-  my $sth = $db->prepare($sql);
+  my $sth = $db->dbc->prepare($sql);
   $sth->execute($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori); 
 }
