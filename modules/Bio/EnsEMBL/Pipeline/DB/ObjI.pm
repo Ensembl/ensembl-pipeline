@@ -38,7 +38,6 @@ package Bio::EnsEMBL::Pipeline::ObjI;
 use vars qw(@ISA);
 use strict;
 
-
 use Bio::Root::RootI;
 use Bio::EnsEMBL::DB::ObjI;
 
@@ -153,6 +152,7 @@ sub get_all_Status {
     my ($self) = @_;
     $self->throw("Method get_all_Status not implemented");
 }
+
 =head2 write_Analysis {
 
   Title   : write_Analysis
@@ -190,4 +190,4 @@ sub get_Analysis {
     $self->throw("Method get_Analysis not implemented");
 }
 
-
+1;

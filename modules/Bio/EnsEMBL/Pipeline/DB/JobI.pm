@@ -353,3 +353,4 @@ sub status_file {
     return $self->{_status_file};
 }
 
+1;
