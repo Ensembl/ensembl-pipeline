@@ -131,18 +131,26 @@ sub fetch_input{
        my $number = $1;
        my $id = $self->id_generation;
        my $version = $newclone->embl_version;
-       $id_hash{$id}=$version.".".$number;
+       $id_hash{$id}=$number;
        my $seq = Bio::PrimarySeq->new( -display_id => "$id", -seq => $contig->seq);
-       print STDERR "Created seq with id $id for ".$id_hash{$id}." 9contig id ".$contig->id."\n";
+       print STDERR "Created seq with id $id for ".$id_hash{$id}." contig id ".$contig->id."\n";
        push(@newseq,$seq);
    }
 
    foreach my $contig ( @oldcontigs ) {
-       $contig->id =~ /\S+\.(\d+)/;
+       #$contig->id =~ /\S+\.(\d+)/;
+       #my $number = $1;
+       #my $version = $oldclone->embl_version;
+       #my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
+       #print STDERR "Created seq with id $version\_$number\n";
+       #push(@oldseq,$seq);
+       $contig->id =~ /\w+\.(\d+\..*)/;
        my $number = $1;
-       my $version = $oldclone->embl_version;
-       my $seq = Bio::PrimarySeq->new( -display_id => "$version\_$number", -seq => $contig->seq);
-       print STDERR "Created seq with id $version\_$number\n";
+       my $id = $self->id_generation;
+       my $version = $newclone->embl_version;
+       $id_hash{$id}= $number;
+       my $seq = Bio::PrimarySeq->new( -display_id => "$id", -seq => $contig->seq);
+       print STDERR "Created seq with id $id for ".$id_hash{$id}." contig id ".$contig->id."\n";
        push(@oldseq,$seq);
    }
    print STDERR "Creating crossmatches for clone ".$self->_acc."\n";
@@ -285,8 +293,8 @@ sub run{
 	   my %id_hash = %$ref;
 	   my $backid = $id_hash{$fp->seqname};
 	   my $sn=$self->_acc.".".$backid;
-           #my $sn=$self->_acc.".".$fp->seqname;
-	   my $hsn=$self->_acc.".".$fp->hseqname;
+	   $backid = $id_hash{$fp->hseqname}; 
+	   my $hsn=$self->_acc.".".$backid;
 	   $sn =~ s/\_/\./g;
 	   $hsn =~ s/\_/\./g;
 	   $fp->seqname($sn);
