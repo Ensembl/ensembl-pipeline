@@ -180,6 +180,35 @@ sub result_quality_tag {
     }
 }
 
+sub write_output {
+   my $self = shift;
+
+   my $fgenesh_runnable = ($self->runnable())[0];
+   my @transcripts = $fgenesh_runnable->each_Fgenesh_Transcript();
+   if( ! @transcripts ) { return; }
+
+   my $ptransAdaptor = $self->dbobj()->get_PredictionTranscriptAdaptor();
+
+   for my $trans ( @transcripts ) {
+     my $ptrans = Bio::EnsEMBL::PredictionTranscript->new();
+     my @exons = $trans->get_all_Exons();
+
+     if ($exons[0]->strand == 1) {
+       @exons = sort {$a->start <=> $b->start } @exons;
+     } else {
+       @exons = sort {$b->start <=> $a->start } @exons;
+     }
+     print "ANALYSIS: ",$self->analysis()->dbID,"\n";
+
+     $ptrans->analysis( $self->analysis() );
+     for my $exon ( @exons ) {
+       $exon->contig( $self->{'contig'} );
+       $ptrans->add_Exon( $exon );
+     }
+     $ptransAdaptor->store( $ptrans );
+   }
+}
+
 1;
 
 

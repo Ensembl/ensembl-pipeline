@@ -88,9 +88,10 @@ print STDOUT "LSF Batch summary\n";
 print STDOUT "Time ", scalar localtime time, " (", time, ")\n";
 # print STDOUT "LSF ID: ", $job_adaptor->fetch_by_dbID($ARGV[0])->LSF_id, "\n";
 print STDOUT "Job ID\tinput ID\tanalysis ID\n";
-
+print STDERR "fetching jobs\n";
 foreach my $id (@ARGV) {
     my $job = $job_adaptor->fetch_by_dbID($id);
+    print STDERR "have ".$job."\n";
     print STDOUT join ("\t", $id, $job->input_id, $job->analysis->logic_name), "\n";
     # print STDOUT $id, "\n";
 }

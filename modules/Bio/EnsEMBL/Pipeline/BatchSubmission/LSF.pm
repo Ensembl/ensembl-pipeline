@@ -16,6 +16,8 @@ sub new{
   my $self = $class->SUPER::new(@args);
 
   $self->{'bsub'} = undef;
+  
+  return $self;
  
 }
 
@@ -43,7 +45,7 @@ sub bsub{
 
 sub construct_command_line{
   my($self, $command, $stdout, $stderr) = @_; 
-
+  #print STDERR "creating the command line\n";
 #command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
   if(!$command){
     $self->throw("cannot create bsub if nothing to submit to it : $!\n");
@@ -53,27 +55,29 @@ sub construct_command_line{
   if($stdout){
     $bsub_line = "bsub -o ".$stdout;
   }else{
-    $bsub_line = "bsub -o ".$self->stdout;
+    $bsub_line = "bsub -o ".$self->stdout_file;
   }
   if($self->nodes){
+    my $nodes = $self->nodes;
     # $nodes needs to be a space-delimited list
-    $self->nodes =~ s/,/ /;
-    $self->nodes =~ s/ +/ /;
+    $nodes =~ s/,/ /;
+    $nodes =~ s/ +/ /;
     # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
-    $bsub_line .= " -m '".$self->nodes."' ";
+    $bsub_line .= " -m '".$nodes."' ";
   }
   $bsub_line .= " -q ".$self->queue    if defined $self->queue;
   $bsub_line .= " -J ".$self->jobname  if defined $self->jobname;
-  $bsub_line .= $self->parameters  if defined $self->parameters;
+  $bsub_line .= " ".$self->parameters." "  if defined $self->parameters;
   if($stderr){
-    $bsub_line .= "bsub -e ".$stderr;
+    $bsub_line .= " -e ".$stderr;
   }else{
-    $bsub_line .= "bsub -e ".$self->stderr;
+    $bsub_line .= " -e ".$self->stderr_file;
   }
-  $bsub_line .= "-E \"".$self->pre_exec."\"" if defined $self->pre_exec; 
+  $bsub_line .= " -E \"".$self->pre_exec."\"" if defined $self->pre_exec; 
   ## must ensure the prexec is in quotes ##
-  $bsub_line .= $command;
+  $bsub_line .= " ".$command;
   $self->bsub($bsub_line);
+  #print "have command line\n";
 }
 
 
@@ -81,13 +85,17 @@ sub construct_command_line{
 sub open_command_line{
   my ($self)= @_;
 
-  print $self->bsub."\n";
-  
-  open(SUB, $self->bsub."2>&1 |");
-
+  print STDERR $self->bsub."\n";
+  print STDERR "opening command line\n";
+  open(SUB, $self->bsub." 2>&1 |");
+  my $lsf;
   while(<SUB>){
     if (/Job <(\d+)>/) {
-      $self->id($1);
+      $lsf = $1;
     }
   }
+  print STDERR "have opened ".$self->bsub."\n";
+  print STDERR "lsf ".$lsf."\n";
+  $self->id($lsf);
+  close(SUB);
 }

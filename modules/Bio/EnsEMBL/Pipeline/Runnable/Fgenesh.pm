@@ -328,6 +328,7 @@ sub add_Fgenesh_Protein {
   
 
 =cut
+
 sub each_Fgenesh_Protein {
     my ($self, $protien) =@_;
    
@@ -337,6 +338,7 @@ sub each_Fgenesh_Protein {
     
     return @{$self->{'_proteins'}};
 }
+
 =head2 add_Fgenesh_Transcript
 
   Title : add_Fgenesh_Transcript
@@ -347,7 +349,7 @@ sub each_Fgenesh_Protein {
 
 =cut
 
-sub add_Transcript{
+sub add_Fgenesh_Transcript{
     my ($self, $transcript) =@_;
     if ($transcript)
     {
@@ -366,7 +368,7 @@ sub add_Transcript{
   
 
 =cut
-sub each_Transcript {
+sub each_Fgenesh_Transcript {
   my ($self) = @_;
 
   if (!defined($self->{'_transcripts'})) {
@@ -654,6 +656,8 @@ sub create_genes {
 	  $gene->add_sub_SeqFeature($exon, '');
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
+	my $tran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($gene,$self->query);
+	$self->add_Fgenesh_Transcript($tran);
     }
     #print "created the genes\n";
 }

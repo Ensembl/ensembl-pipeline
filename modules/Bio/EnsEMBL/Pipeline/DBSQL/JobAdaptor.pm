@@ -75,10 +75,10 @@ sub new {
 sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
-
+  print STDERR "fetching job by ".$id."\n";
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, class, analysis_id, lsf_id,
-           object_file, stdout_file, stderr_file, retry_count
+           stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  job_id = ?
   });
@@ -88,8 +88,9 @@ sub fetch_by_dbID {
   if( ! defined $rowHashRef ) {
     return undef;
   }
-
-  return $self->_objFromHashref( $rowHashRef );
+  my $job = $self->_objFromHashref( $rowHashRef );
+  print "have got back ".$job."\n";
+  return $job;
 }
 
 
@@ -112,8 +113,8 @@ sub fetch_by_dbID_list {
   local $" = ',';   # are you local?
 
   my $sth = $self->prepare( qq{
-    SELECT job_id, input_id, class, analysis_id, LSF_id, object_file,
-      stdout_file, stderr_file, retry_count
+    SELECT job_id, input_id, class, analysis_id, LSF_id,
+           stdout_file, stderr_file, retry_count
     FROM job
     WHERE job_id in (@id) } );
 
@@ -149,7 +150,7 @@ sub fetch_by_Status_Analysis {
 
     my $query = q{
 	SELECT   j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id,
-	         j.stdout_file, j.stderr_file, j.object_file, j.retry_count
+	         j.stdout_file, j.stderr_file, j.retry_count,
                  j.status_file
 	FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
@@ -195,7 +196,7 @@ sub fetch_by_Age {
 
     my $sth = $self->prepare(q{
 	SELECT j.job_id, j.input_id, j.class, j.analysis_id, j.LSF_id
-               j.stdout_file, j.stderr_file, j.object_file
+               j.stdout_file, j.stderr_file,
                j.retry_count
 	FROM   job j, job_status js
 	WHERE  j.job_id = js.job_id
@@ -233,7 +234,7 @@ sub fetch_by_inputId {
   my @result;
 
   my $sth = $self->prepare(q{
-    SELECT job_id, input_id, class, analysis_id, LSF_id, object_file,
+    SELECT job_id, input_id, class, analysis_id, LSF_id,
            stdout_file, stderr_file, retry_count
     FROM   job
     WHERE  input_id = ?
@@ -268,18 +269,17 @@ sub store {
 
   my $sth = $self->prepare(q{
     INSERT into job (input_id, class, analysis_id,
-                     lsf_id, stdout_file, stderr_file, object_file,
+                     lsf_id, stdout_file, stderr_file, 
                      retry_count)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    VALUES (?, ?, ?, ?, ?, ?, ?)
   });
 
   $sth->execute( $job->input_id,
                  $job->class,
                  $job->analysis->dbID,
-                 $job->LSF_id,
+                 $job->submission_id,
                  $job->stdout_file,
                  $job->stderr_file,
-                 $job->input_object_file,
                  $job->retry_count );
 
   $sth = $self->prepare("SELECT LAST_INSERT_ID()");
@@ -367,7 +367,7 @@ sub remove_by_dbID {
             $jobAdaptor->update(@jobs)
   Function: a job which is already in db can update its contents
             it only updates stdout_file, stderr_file, retry_count
-            and LSF_id
+            and submission_id
   Returns : throws exception when something goes wrong.
   Args    : an array of Pipeline::Job objects
 
@@ -376,13 +376,12 @@ sub remove_by_dbID {
 sub update {
   my ($self, @jobs) = @_;
 
-  # only stdout, stderr, retry, LSF_id and status are likely to be updated
+  # only stdout, stderr, retry, submission_id and status are likely to be updated
 
   my $sth = $self->prepare(q{
     UPDATE job
     SET    stdout_file = ?,
            stderr_file = ?,
-           object_file = ?,
            retry_count = ?,
            LSF_id = ?
     WHERE  job_id = ?
@@ -391,9 +390,8 @@ sub update {
   foreach my $job (@jobs) {
     $sth->execute( $job->stdout_file,
 		   $job->stderr_file,
-		   $job->input_object_file,
 		   $job->retry_count,
-		   $job->LSF_id,
+		   $job->submission_id,
 		   $job->dbID );
   }
 }
@@ -427,16 +425,15 @@ sub _objFromHashref {
       '-dbobj'     => $self->db,
       '-adaptor'   => $self,
       '-id'        => $hashref->{'job_id'},
-      '-lsf_id'    => $hashref->{'lsf_id'},
+      '-submission_id' => $hashref->{'submission_id'},
       '-input_id'  => $hashref->{'input_id'},
       '-class'     => $hashref->{'class'},
       '-stdout'    => $hashref->{'stdout_file'},
       '-stderr'    => $hashref->{'stderr_file'},
-      '-input_object_file' => $hashref->{'object_file'},
       '-analysis'  => $analysis,
       '-retry_count' => $hashref->{'retry_count'}
   );
-
+  print "have created ".$job." from hash ref\n";
   return $job;
 }
 
@@ -738,7 +735,6 @@ sub create_tables {
       lsf_id       mediumint(10) unsigned NOT NULL,
       stdout_file  varchar(100) NOT NULL,
       stderr_file  varchar(100) NOT NULL,
-      object_file  varchar(100) NOT NULL,
       retry_count  tinyint(2) unsigned default 0,
 
       PRIMARY KEY (job_id),

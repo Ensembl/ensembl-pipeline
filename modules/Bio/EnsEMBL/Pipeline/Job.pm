@@ -48,7 +48,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-
+use Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
 
@@ -63,21 +63,20 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
 
-    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count) 
+    my ($adaptor,$dbID,$submission_id,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
-				LSF_ID
+				SUBMISSION_ID
 				INPUT_ID
 				CLASS
 				ANALYSIS
 				STDOUT
 				STDERR
-				INPUT_OBJECT_FILE
 				RETRY_COUNT
 				)],@args);
 
     $dbID    = -1 unless defined($dbID);
-    $lsfid   = -1 unless defined($lsfid);
+    $submission_id   = -1 unless defined($submission_id);
     $cls     = 'contig' unless defined($cls);
 
     $input_id   || $self->throw("Can't create a job object without an input_id");
@@ -93,9 +92,8 @@ sub new {
     $self->analysis         ($analysis);
     $self->stdout_file      ($stdout);
     $self->stderr_file      ($stderr);
-    $self->input_object_file($input);
     $self->retry_count      ($retry_count );
-    $self->LSF_id           ($lsfid);
+    $self->submission_id           ($submission_id);
 
     return $self;
 }
@@ -255,7 +253,7 @@ sub flush_runs {
   my $queue    = $LSF_params->{'queue'}   || undef;
   my $jobname  = $LSF_params->{'jobname'} || undef;
   my $bsub_opt = $LSF_params->{'bsub'}    || undef;
-
+  print STDERR "running flushruns\n";
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
   }
@@ -274,7 +272,7 @@ sub flush_runs {
   my $username = $db->username;
   my $dbname   = $db->dbname;
   my $pass     = $db->password;
-  my $lsfid;
+  
 
   # runner.pl: first look in pipeConf.pl,
   # then in same directory as Job.pm,
@@ -300,43 +298,33 @@ sub flush_runs {
       $self->throw( "Last batch job not in db" );
     }
   
+    my $pre_exec = $runner." -check";
+    my $LSF = Bio::EnsEMBL::Pipeline::BatchSubmission::LSF->new(-STDOUT => $lastjob->stdout_file,
+								-STDERR => $lastjob->stderr_file,
+								-PARAMETERS => $bsub_opt,
+								-PRE_EXEC => $pre_exec,
+								-QUEUE => $queue,
+								-JOBNAME => $jobname,
+								-NODES => $nodes);
     my $cmd;
   
-    $cmd = "bsub -o ".$lastjob->stdout_file;
-    if ($nodes) {
-	# $nodes needs to be a space-delimited list
-	$nodes =~ s/,/ /;
-	$nodes =~ s/ +/ /;
-	# undef $nodes unless $nodes =~ m{(\w+\ )*\w};
-        $cmd .= " -m '$nodes' ";
-    }
-    $cmd .= " -q $queue "   if defined $queue;
-    $cmd .= " -J $jobname " if defined $jobname;
-    $cmd .= " $bsub_opt "   if defined $bsub_opt;
-    $cmd .= " -r -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
+    
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly (otherwise -pass gets the
     # first job id as password, instead of remaining undef)
-
+    print STDERR "have to submit these jobs @{$batched_jobs{$queue}}\n";
     if ($pass) {
-      $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
     }
     else {
-      $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+      $cmd = $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
     }
-    
-    print STDERR "$cmd\n";
-    open (SUB,"$cmd 2>&1 |");
-  
-    while (<SUB>) {
-      if (/Job <(\d+)>/) {
-        $lsfid = $1;
-      }
-    }
-    close(SUB);
+    print STDERR "giving ".$cmd." to lsf\n";
+    $LSF->construct_command_line($cmd);
+    $LSF->open_command_line();
 
-    if( ! defined $lsfid ) {
+    if( ! defined $LSF->id ) {
       print STDERR ( "Couldnt submit ".join( " ",@{$batched_jobs{$queue}} )." to LSF" );
       foreach my $jobid ( @{$batched_jobs{$queue}} ) {
         my $job = $adaptor->fetch_by_dbID( $jobid );
@@ -352,8 +340,7 @@ sub flush_runs {
             open( FILE, ">".$_ ); close( FILE );
           }
         }
-	$job->LSF_id( $lsfid );
-        # $job->create_lsflogfile;
+	$job->submission_id( $LSF->id );
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
       }
@@ -385,6 +372,7 @@ sub batch_runRemote {
   # should check job->analysis->runtime
   # and add it to batched_jobs_runtime
   # but for now just
+  print STDERR "adding to array, job id = ".$self->dbID."\n";
   push( @{$batched_jobs{$queue}}, $self->dbID );
   if ( scalar( @{$batched_jobs{$queue}} ) >= $batchsize ) {
     $self->flush_runs( $self->adaptor, $LSF_params );
@@ -431,81 +419,6 @@ sub runLocally {
   $self->runInLSF();
 }
 
-sub runRemote {
-  my ($self, $queue, $useDB) = @_;
-
-  local *SUB;
-  local *FILE;
-
-  if( !defined $self->adaptor ) {
-    $self->throw( "Cannot run remote without db connection" );
-  }
-
-  my $db       = $self->adaptor->db;
-  my $host     = $db->host;
-  my $username = $db->username;
-  my $dbname   = $db->dbname;
-  my $cmd;
-
-  # runner.pl: first look in same directory as Job.pm
-  # if it's not here use file defined in pipeConf.pl
-  # otherwise fail
-
-  my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
-
-  unless (-x $runner) {
-    $runner = $::pipeConf{'runner'} || undef;
-    $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
-  }
-
-  $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
-#    " -q acarichunky " .
-#    " -R osf1 ".
-    " -e ".$self->stderr_file." -E \"$runner -check\" ";
-
-
-  if( ! defined $useDB ) {
-    $useDB = 1;
-  }
-
-  if( $self->retry_count > 0 ) {
-    for ( $self->stdout_file, $self->stderr_file ) {
-      open( FILE, ">".$_ ); close( FILE );
-    }
-  }
-
-  if( $useDB ) {
-    # find out db details from adaptor
-    # generate the lsf call
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".$self->dbID;
-    
-  } else {
-    # make the object
-    # call its get input method..
-    # freeze it
-    $self->throw( "useDB=0 not implemented yet." );
-  }
-  print STDERR "$cmd\n";
-  open (SUB,"$cmd 2>&1 |");
-  
-  while (<SUB>) {
-    if (/Job <(\d+)>/) {
-      $self->LSF_id($1);
-      # print (STDERR $_);
-    }
-  }
-  close(SUB);
-
-  if( $self->LSF_id == -1 ) {
-    print STDERR ( "Couldnt submit ".$self->dbID." to LSF" );
-  } else {
-    $self->retry_count( $self->retry_count + 1 );
-    $self->set_status( "SUBMITTED" );
-  }
-
-  $self->adaptor->update( $self );
-}
 
 # question, when to submit the success report to the db?
 # we have to parse the output of LSF anyway....
@@ -598,39 +511,6 @@ sub runInLSF {
   }
 }
 
-
-=head2 resultToDb
-
-  Title   : resultToDB
-  Usage   : $self->resultToDb;
-  Function: Find if job finished by looking at STDOUT and STDERR
-            try set current_status according to what you find.
-            write_output on the runnablDB is recommended way of 
-            putting results into the DB.
-            DONT use when job started with db connection.
-  Returns : false, if job seems not to be finished on the remote side..
-  Args    : 
-
-=cut
-
-sub resultToDb {
-  my $self = shift;
-  $self->throw( "Not implemented yet." );
-}
-
-
-sub write_object_file {
-    my ($self, $arg) = @_;
-
-    $self->throw("No input object file defined") unless defined($self->input_object_file);
-
-    if (defined($arg)) {
-	my $str = FreezeThaw::freeze($arg);
-	open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
-	print(OUT $str);
-	close(OUT);
-    }
-}
 
 
 =head2 set_status
@@ -740,83 +620,13 @@ sub make_filenames {
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
   $stub .= time().".".int(rand(1000));
-#   $stub .= time().".".int(rand(1000)) . '.0';
 
-#  my @files = $self->get_files( $self->input_id,"obj","out","err" );
-#  for (@files) {
-#    open( FILE, ">".$_ ); close( FILE );
-#  }
  
-  $self->input_object_file($dir.$stub.".obj");
   $self->stdout_file($dir.$stub.".out");
   $self->stderr_file($dir.$stub.".err");
 }
 
 
-sub create_lsflogfile {
-  my ($self) = @_;
-  
-  my $num = int(rand(10));
-  my $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
-  if( ! -e $dir ) {
-    system( "mkdir $dir" );
-  }
-
-  my $stub = $self->LSF_id.".";
-  $stub .= time().".".int(rand(1000));
-
-  $self->LSF_out($dir.$stub.".out");
-  $self->LSF_err($dir.$stub.".err");
-}
-
-
-sub get_files {
-  my ($self, $stub, @exts) = @_;
-  my @result;
-  my @files;
-  my $dir;
-
-  my $count = 0;
-
-  while( 1 ) {
-    my $num = int(rand(10));
-    $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
-    if( ! -e $dir ) {
-      system( "mkdir $dir" );
-    }
-    opendir( DIR, $dir );
-    @files = readdir( DIR );
-    if( scalar( @files ) > 10000 ) {
-      if( $count++ > 10 ) {
-	$self->throw("10000 files in directory. Can't make a new file");
-      } else {
-	next;
-      }
-    } else {
-      last;
-    }
-  }
-  $count = 0;
-  # Should check disk space here.
-  
- OCCU: while( $count++ < 10 ) { 
-    my $rand  = int(rand(100000));
-    @result = ();
-    foreach my $ext ( @exts ) {
-      my $file  = $dir . $stub . "." . $rand . "." . $ext;
-      if( -e $file ) {
-	next OCCU;
-      }
-      push( @result, $file );
-    }
-    last;
-  }
-
-  if( $count > 9 ) {
-    $self->throw( "File generation problem in $dir" );
-  }
-  return @result;
-}
 
 
 
@@ -858,28 +668,10 @@ sub stderr_file {
     return $self->{'_stderr_file'};
 }
 
-=head2 input_object_file
 
-  Title   : input_object_file
-  Usage   : my $file = $self->input_object_file
-  Function: Get/set method for the input object file
-  Returns : string
-  Args    : string
+=head2 submission_id
 
-=cut
-
-sub input_object_file {
-    my ($self, $arg) = @_;
-
-    if (defined($arg)) {
-	$self->{'_input_object_file'} = $arg;
-    }
-    return $self->{'_input_object_file'};
-}
-
-=head2 LSF_id
-
-  Title   : LSF_id
+  Title   : submission_id
   Usage   : 
   Function: Get/set method for the LSF_id
   Returns : 
@@ -887,29 +679,15 @@ sub input_object_file {
 
 =cut
 
-sub LSF_id {
+sub submission_id {
   my ($self, $arg) = @_;
 
-  (defined $arg) &&
-    ( $self->{'_lsfid'} = $arg );
-  $self->{'_lsfid'};
+  if(defined $arg){
+    $self->{'_submission_id'} = $arg ;
+  }
+  return $self->{'_submission_id'};
 }
 
-sub LSF_out {
-  my ($self, $arg) = @_;
-
-  (defined $arg) &&
-    ( $self->{'_lsfout'} = $arg );
-  $self->{'_lsfout'};
-}
-
-sub LSF_err {
-  my ($self, $arg) = @_;
-
-  (defined $arg) &&
-    ( $self->{'_lsferr'} = $arg );
-  $self->{'_lsferr'};
-}
 
 =head2 retry_count
 
@@ -933,7 +711,7 @@ sub remove {
   
   if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
   if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
-  if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
+  
 
    if( defined $self->adaptor ) {
    $self->adaptor->remove( $self );
