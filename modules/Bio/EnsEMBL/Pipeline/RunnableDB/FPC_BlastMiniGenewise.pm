@@ -146,88 +146,89 @@ sub write_output {
     my %contighash;
     my $gene_obj = $db->gene_Obj;
 
-    # this now assummes that we are building on a single VC.
-
 
     my @newgenes = $self->output;
     return unless ($#newgenes >= 0);
 
+    # get new ids
     eval {
 
-      GENE: foreach my $gene (@newgenes) {	
+	my $genecount  = 0;
+	my $transcount = 0;
+	my $translcount = 0;
+	my $exoncount  = 0;
 
-	    # do a per gene eval...
-	    eval {
+	# get counts of each type of ID we need.
 
-		my @exons = $gene->each_unique_Exon();
+	foreach my $gene ( @newgenes ) {
+	    $genecount++;
+	    foreach my $trans ( $gene->each_Transcript ) {
+		$transcount++;
+		$translcount++;
+	    }
+	    foreach my $exon ( $gene->each_unique_Exon() ) {
+		$exoncount++;
+	    }
+	}
 
-		next GENE if (scalar(@exons) == 1);
-    
-		$gene->type('genewise');
-		
-		my ($geneid) = $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,1);
-		
-		$gene->id($geneid);
-		print (STDERR "Writing gene " . $gene->id . "\n");
-		
-		# Convert all exon ids and save in a hash
-		my %namehash;
+	# get that number of ids. This locks the database
 
-		my @exonids = $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,scalar(@exons));
-		my $count = 0;
-		foreach my $ex (@exons) {
-		    $namehash{$ex->id} = $exonids[$count];
-		    $ex->id($exonids[$count]);
-		    print STDERR "Exon id is ".$ex->id."\n";
-		    $count++;
-		}
-		
-		my @transcripts = $gene->each_Transcript;
-		my @transcript_ids = $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,scalar(@transcripts));
-		my @translation_ids = $gene_obj->get_New_external_id('translation',$PROTEIN_ID_SUBSCRIPT,scalar(@transcripts));
-		$count = 0;
-		foreach my $tran (@transcripts) {
-		    $tran->id             ($transcript_ids[$count]);
-		    $tran->translation->id($translation_ids[$count]);
-		    $count++;
-		    
-		    my $translation = $tran->translation;
-		    
-		    print (STDERR "Transcript  " . $tran->id . "\n");
-		    print (STDERR "Translation " . $tran->translation->id . "\n");
-		    
-		    foreach my $ex ($tran->each_Exon) {
-			my @sf = $ex->each_Supporting_Feature;
-			print STDERR "Supporting features are " . scalar(@sf) . "\n";
-			
-			if ($namehash{$translation->start_exon_id} ne "") {
-			    $translation->start_exon_id($namehash{$translation->start_exon_id});
-			}
-			if ($namehash{$translation->end_exon_id} ne "") {
-			    $translation->end_exon_id  ($namehash{$translation->end_exon_id});
-			}
-			print(STDERR "Exon         " . $ex->id . "\n");
-		    }
-		    
-		}
-		
-		$gene_obj->write($gene);
-	    }; 
-	    if( $@ ) {
-		print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+	@geneids  =  $gene_obj->get_New_external_id('gene',$GENE_ID_SUBSCRIPT,$genecount);
+	@transids =  $gene_obj->get_New_external_id('transcript',$TRANSCRIPT_ID_SUBSCRIPT,$transcount);
+	@translids =  $gene_obj->get_New_external_id('translation',$TRANSLATION_ID_SUBSCRIPT,$translcount);
+	@exonsid  =  $gene_obj->get_New_external_id('exon',$EXON_ID_SUBSCRIPT,$exoncount);
+
+	# database locks are over.
+
+	# now assign ids. gene and transcripts are easy. Exons are harder.
+	# the code currently assummes that there is one Exon object per unique
+	# exon id. This might not always be the case.
+
+	foreach my $gene ( @newgenes ) {
+	    $gene->id(shift(@geneids));
+	    my %exonhash;
+	    foreach my $exon ( $gene->each_unique_Exon() ) {
+		my $tempid = $exon->id;
+		$exon->id(shift(@exonsid));
+		$exonhash{$tempid} = $exon->id;
+	    }
+	    foreach my $trans ( $gene->each_Transcript ) {
+		$trans->id(shift(@transids));
+		$trans->translation->id(shift(@translids));
+		$trans->translation->start_exon_id($exonhash{$trans->translation->start_exon_id});
+		$trans->translation->end_exon_id($exonhash{$trans->translation->end_exon_id});
 	    }
 	    
 	}
-    };
-    if ($@) {
 
-      $self->throw("Error writing gene for " . $self->input_id . " [$@]\n");
-    } else {
-      # nothing
+	# paranoia!
+	if( scalar(@geneids) != 0 || scalar(@exonids) != 0 || scalar(@transids) != 0 || scalar (@translids) != 0 ) {
+	    $self->throw("In id assignment, left with unassigned ids ".scalar(@geneids)." ".scalar(@transids)." ".scalar(@translids)." ".scalar(@exonids));
+	}
+
+    };
+    if( $@ ) {
+	$self->throw("Exception in getting new ids. Exiting befor write\n\n$@" );
     }
 
 
+    # this now assummes that we are building on a single VC.
+
+
+
+  GENE: foreach my $gene (@newgenes) {	
+      # do a per gene eval...
+      eval {
+	  
+	  $gene_obj->write($gene);
+      }; 
+      if( $@ ) {
+	  print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      }
+	    
   }
+   
+}
 
 =head2 fetch_input
 
