@@ -1,13 +1,12 @@
 #!/usr/local/ensembl/bin/perl
 
-
 =head1 NAME
 
 comapre_Exons
  
 =head1 DESCRIPTION
 
-reads the config options from Bi::Ensembl::Pipeline::GeneComparison::GeneCompConf
+reads the config options from Bio::Ensembl::Pipeline::GeneComparison::GeneCompConf
 and reads as input an input_id in the style of other Runnables, i.e. -input_id chr_name.chr_start-chr_end
 
 =head1 OPTIONS
@@ -39,23 +38,19 @@ my $path2   = $PATH2;
 my $type2   = $GENETYPES2;
 my $user2   = $DBUSER2;
 
-# reference db
+# reference db (where the dna is)
 my $ref_host   = $REF_DBHOST;
 my $ref_dbname = $REF_DBNAME;
 my $ref_path   = $REF_PATH;
 my $ref_user   = $REF_DBUSER;
 
-
-my $runnable;
 my $input_id;
 my $write  = 0;
 my $check  = 0;
-my $params;
 my $pepfile;
-
 my $gff_file;
 
-# can override db options on command line
+# options
 &GetOptions( 
 	    'input_id:s'  => \$input_id,
 	    'gff_file:s'  => \$gff_file,
@@ -63,6 +58,7 @@ my $gff_file;
 
 unless( $input_id){     
   print STDERR "Usage: run_GeneComparison.pl -input_id < chrname.chrstart-chrend >\n";
+  print STDERR "                             -gff_file <file_name> (optional)\n";
   exit(0);
 }
     
@@ -81,18 +77,23 @@ my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host,
 					       -user  => $ref_user,
 					       -dbname=> $ref_dbname);
 $dna_db->static_golden_path_type($ref_path); 
+print STDERR "Connected to dna database $ref_dbname : $ref_host : $ref_user\n";
 
 
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
-					    -dbname=> $dbname1);
+					    -dbname=> $dbname1,
+					    -dnadb => $dna_db,
+					   );
+
 print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 
 
 my $db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host2,
 					    -user  => $user2,
 					    -dbname=> $dbname2,
-					    -dnadb => $dna_db);
+					    -dnadb => $dna_db,
+					   );
 
 print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
 
@@ -104,15 +105,13 @@ $db2->static_golden_path_type($path2);
 
 my $sgp1 = $db1->get_StaticGoldenPathAdaptor;
 my $sgp2 = $db2->get_StaticGoldenPathAdaptor;
-my $sgp3 = $dna_db->get_StaticGoldenPathAdaptor;
 
 # get a virtual contig with a piece-of chromosome #
 my ($vcontig1,$vcontig2);
 
 print STDERR "Fetching region $chr, $chrstart - $chrend\n";
-$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end("chr20",$chrstart,$chrend);
+$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
 $vcontig2 = $sgp2->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
-my $vcontig3 = $sgp3->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
 
 # get the genes of type @type1 and @type2 from $vcontig1 and $vcontig2, respectively #
 my (@genes1,@genes2);
@@ -142,21 +141,9 @@ foreach my $type ( @{ $type2 } ){
   print STDERR "with ".scalar(@more_trans)." transcripts\n";
 }
 
-#my @extra_genes = $vcontig3->get_Genes_by_Type("ensembl");
-#my @extra_trans = ();
-#foreach my $gene ( @extra_genes ){
-#  push ( @extra_trans, $gene->each_Transcript );
-#}
-#print STDERR scalar(@extra_genes)." genes of type ensembl found\n";
-#print STDERR "with ".scalar(@extra_trans)." transcripts\n";
-#push( @genes2, @extra_genes );
-
-
 # get a GeneComparison object 
 my $gene_comparison = 
   Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(					     
-							      '-annotation_db'    => $db1,
-							      '-prediction_db'    => $db2,
 							      '-annotation_genes' => \@genes1,
 							      '-prediction_genes' => \@genes2,
 							      '-input_id'         => $input_id,
@@ -201,11 +188,17 @@ print STDERR scalar(@gene_clusters)." gene clusters formed\n";
 print STDERR scalar(@unclustered1)." genes of type @$type1 left unclustered\n";
 print STDERR scalar(@unclustered2)." genes of type @$type2 left unclustered\n";
 
-if ( $gff_file ){  
-  $gene_comparison->gff_file($gff_file);
+
+### if you want to print to GFF, include a gff_file in command line options
+if ($gff_file){
+  $gene_comparison->annotation_db( $db1 );
+  $gene_comparison->prediction_db( $db2 );
+  $gene_comparison->gff_file( $gff_file );
 }
 
 # run the analysis
 $gene_comparison->compare_Exons(\@gene_clusters,0,'verbose');
 
+# If you remove the string 'verbose', it'll print out less stuff
+# If you want to look at coding exons only, change the 0 for any defined value
 
