@@ -242,7 +242,7 @@ sub SeqFeature_to_Transcript {
       $exon->end_phase($exon_pred->end_phase);
     }
     
-    $exon->contig   ($contig); 
+    $exon->slice   ($contig); 
     $exon->adaptor  ($ea);
     
     # sort out supporting evidence for this exon prediction
@@ -259,7 +259,7 @@ sub SeqFeature_to_Transcript {
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
       
       $align->seqname($contig->dbID);
-      $align->contig($contig);
+      $align->slice($contig);
       $align->adaptor($prot_adp);
       $align->score(100); # Hmm!!!!
       $align->analysis($analysis_obj);
