@@ -70,8 +70,11 @@ sub run{
 
   
   $runnabledb->fetch_input;
-  $runnabledb->run;  
+  $runnabledb->run; 
 
+  # the following is only necessary for testing this runnableDB, because
+  # the write_output method delegates to the child runnable db
+  $self->output($runnabledb->output);
 }
 
 sub write_output{
@@ -79,3 +82,24 @@ sub write_output{
 
   $self->exonerate_runnabledb->write_output;
 }
+
+
+############################################################
+
+# must override RunnableDB::output()
+
+sub output {
+  my ($self, @output) = @_;
+  if (@output){
+    push( @{$self->{_output} }, @output);
+  }
+  
+  my @ret_output;
+  if($self->{_output}){
+    @ret_output = @{$self->{_output}};
+  }
+
+  return @ret_output;
+}
+
+1;
