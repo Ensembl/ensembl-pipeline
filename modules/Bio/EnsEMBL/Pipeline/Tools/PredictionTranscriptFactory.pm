@@ -55,9 +55,7 @@ sub fset2transcript {
     unless ($genscan->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$genscan must be Bio::EnsEMBL::SeqFeatureI\n";}
      
-    my $transcript = new Bio::EnsEMBL::PredictionTranscript;
-    $transcript->temporary_id($contig->id . "." . $genscan->seqname);
-        
+    my $transcript = new Bio::EnsEMBL::PredictionTranscript; 
     my @exons;
     my $count= 1;
     
@@ -65,7 +63,7 @@ sub fset2transcript {
   
 	my $exon  = new Bio::EnsEMBL::Exon;
 	$transcript->add_Exon($exon);
-        $exon->contig   ($contig);
+        $exon->slice   ($contig);
 	$exon->start    ($f->start);
 	$exon->end      ($f->end  );
 	$exon->strand   ($f->strand);
@@ -122,50 +120,47 @@ sub fset2transcript_guess_phases {
 
     my $transcript = new Bio::EnsEMBL::PredictionTranscript;
 
-    $transcript->temporary_id($contig->id . "." . $fset->id);
-
 
     my @exons;
     my $count    = 1;
-
+    my $endphase = 0;
     foreach my $f ($fset->sub_SeqFeature) {
 
-	my $exon  = new Bio::EnsEMBL::PredictionExon;
-        $exon->contig   ($contig);
-	$exon->start    ($f->start);
-	$exon->end      ($f->end  );
-	$exon->strand   ($f->strand);
-	$exon->score($f->score);
-	$exon->p_value($f->p_value);
-	$exon->slice($contig);
-	$exon->phase($f->phase); 
-	push(@exons,$exon);
-	$count++;
-	
+      my $exon  = new Bio::EnsEMBL::PredictionExon;
+      $exon->slice   ($contig);
+      $exon->start    ($f->start);
+      $exon->end      ($f->end  );
+      $exon->strand   ($f->strand);
+      $exon->score($f->score);
+      $exon->p_value($f->p_value);
+      $exon->slice($contig);
+      $exon->phase($f->phase); 
+      push(@exons,$exon);
+      $count++;
+      $exon->phase   ($endphase);
+      $transcript->add_Exon($exon);
+      $endphase = $exon->end_phase();
     }
 	
     my $translation = new Bio::EnsEMBL::Translation;
 	
     if ($exons[0]->strand == 1) {
-	@exons = sort {$a->start <=> $b->start} @exons;
+      @exons = sort {$a->start <=> $b->start} @exons;
     } else {
-	@exons = sort {$b->start <=> $a->start} @exons;
+      @exons = sort {$b->start <=> $a->start} @exons;
     }
 	
     $translation->start        (1);
     $translation->end          ($exons[$#exons]->end - $exons[$#exons]->start + 1);
     $translation->start_Exon($exons[0]);
     $translation->end_Exon($exons[$#exons]);
-    $transcript->translation($translation);
     
-    my $endphase = 0;
+    
+    
     
     foreach my $exon (@exons) {
 	
-	$exon      ->phase   ($endphase);
-	$transcript->add_Exon($exon);
-
-	$endphase = $exon->end_phase();
+      
 	
     }
 
@@ -199,7 +194,6 @@ sub fset2transcript_guess_phases {
 
 sub fset2transcript_3frame {
   my ($fset,$contig) = @_;
-
   my @f = $fset->sub_SeqFeature;
   
   if ($f[0]->strand == 1) {
@@ -218,21 +212,17 @@ sub fset2transcript_3frame {
     my $transcript = new Bio::EnsEMBL::PredictionTranscript;
 
     push(@transcripts,$transcript);
-
-    $transcript->temporary_id($contig->id . "." . $endphase);
-
     my $count    = 1;
     my @exons;
 
-   
+    #print STDERR "Dealing with ".@f." exons\n";
     foreach my $f (@f) {
-      #print "exon seqname = ".$f->seqname."\n";
+     
       my $exon  = new Bio::EnsEMBL::PredictionExon;
-      #print STDERR "exon ".$f->gffstring."\n";
+     
       push(@exons,$exon);
       $exon->seqname($f->seqname);
-      $exon->temporary_id ($contig->id . ".$count");
-      $exon->contig   ($contig);
+      $exon->slice   ($contig);
       $exon->start    ($f->start);
       $exon->end      ($f->end  );
       $exon->strand   ($f->strand);
@@ -246,7 +236,10 @@ sub fset2transcript_3frame {
       $transcript->add_Exon($exon);
       $count++;
 
-      #print STDERR "Added exon start " . $exon->start . " end " . $exon->end . " strand " . $exon->strand . " score " . $exon->score . " pvalue " . $exon->p_value . "\n";
+      #print STDERR "exon ".$exon->start." ".$exon->end ." phase ".
+      #  $exon->phase."\n";
+      #print STDERR "Exon length ".($exon->end - $exon->start +1)."\n";
+      #Bio::EnsEMBL::Pipeline::Tools::PredictionTranscriptFactory::display_exon($exon);
     }
        
     my $translation = new Bio::EnsEMBL::Translation;
@@ -254,14 +247,13 @@ sub fset2transcript_3frame {
     my $contig_id = "";
     my $fset_id   = "";
 
-    if (defined($contig->id)) {
-       $contig_id = $contig->id;
+    if ($contig->name) {
+       $contig_id = $contig->name;
     }
     if (defined($fset->id)) {
        $fset_id = $fset->id;
     }
 
-    $translation->temporary_id($contig_id . "." . $fset_id);
     $translation->start        (1);
     $translation->end          ($exons[$#exons]->end - $exons[$#exons]->start + 1);
     $translation->start_Exon($exons[0]);
@@ -288,7 +280,7 @@ sub fset2transcript_with_seq {
 
     #print STDERR "running fset2transcript\n";
     my $transcript = new Bio::EnsEMBL::PredictionTranscript;
-    $transcript->temporary_id($seq->id . "." . $genscan->seqname);
+    
         
     my @exons;
     my $count= 1;
@@ -296,7 +288,7 @@ sub fset2transcript_with_seq {
     foreach my $f ($genscan->sub_SeqFeature) {
   
 	my $exon  = new Bio::EnsEMBL::PredictionExon;
-        $exon->contig   ($seq);
+  $exon->slice   ($seq);
 	$exon->start    ($f->start);
 	$exon->end      ($f->end  );
 	$exon->strand   ($f->strand);
@@ -319,6 +311,23 @@ sub fset2transcript_with_seq {
     }
     return $transcript;
    
+}
+
+
+sub display_exon{
+  my ($e) = @_;
+
+  #print "exon ".$e->start." ".$e->end." ".$e->strand."\n";
+  my $seq = $e->seq;
+  my $pep0 = $seq->translate('*', 'X', 0);
+  my $pep1 = $seq->translate('*', 'X', 1);
+  my $pep2 = $seq->translate('*', 'X', 2);
+  #print "exon sequence :\n".$e->seq->seq."\n\n";
+  #print $e->seqname." ".$e->start." : ".$e->end." translation in 0 frame\n ".$pep0->seq."\n\n";
+  #print $e->seqname." ".$e->start." : ".$e->end." translation in 1 phase\n ".$pep2->seq."\n\n";
+  #print $e->seqname." ".$e->start." : ".$e->end." translation in 2 phase\n ".$pep1->seq."\n\n";
+  #print "\n\n";
+  
 }
 
 

@@ -370,8 +370,6 @@ sub create_feature {
     $tss->display_label('');
     if ($tss)
       {
-	$tss->validate();
-
 	# add to _flist
 	push(@{$self->{'_flist'}}, $tss);
       }

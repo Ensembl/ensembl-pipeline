@@ -305,45 +305,28 @@ sub diskspace {
 # FeaturePair methods:
 
 sub create_FeaturePair {
-    my ($self, $feat1, $feat2) = @_;
-    #create analysis object
-    my $analysis_obj = new Bio::EnsEMBL::Analysis
-                        (   -db              => $feat2->{db},
-                            -db_version      => $feat2->{db_version},
-                            -program         => $feat2->{program},
-                            -program_version => $feat2->{p_version},
-                            -gff_source      => $feat2->{source},
-                            -gff_feature     => $feat2->{primary},
-                            -logic_name      => $feat2->{logic_name} );
+    my ($self, $start, $end, $strand, $hstart, $hend, 
+        $hstrand, $hseqname, $percent_id, $score, $p_value, $seq,
+        $analysis) = @_;
+   
+    my $fp = Bio::EnsEMBL::FeaturePair->new(
+                                            -start    => $start,
+                                            -end      => $end,
+                                            -strand   => $strand,
+                                            -hstart   => $hstart,
+                                            -hend     => $hend,
+                                            -hstrand  => $hstrand,
+                                            -percent_id => $percent_id,
+                                            -score    => $score,
+                                            -p_value  => $p_value,
+                                            -hseqname => $hseqname,
+                                            -analysis => $analysis,
+                                           );
+
+    if($seq &&($seq->isa('Bio::EnsEMBL::Slice'))){
+      $fp->slice($seq);
+    }
     
-    #create and fill Bio::EnsEMBL::Seqfeature objects
-    my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname        => $feat1->{name},
-                            -start          => $feat1->{start},
-                            -end            => $feat1->{end},
-                            -strand         => $feat1->{strand},
-                            -score          => $feat1->{score},
-                            -percent_id     => $feat1->{percent},
-                            -p_value        => $feat1->{p},
-                            -analysis       => $analysis_obj);
-    
-    my $seqfeature2 = new Bio::EnsEMBL::SeqFeature
-                        (   -seqname        => $feat2->{name},
-                            -start          => $feat2->{start},
-                            -end            => $feat2->{end},
-                            -strand         => $feat2->{strand},
-                            -score          => $feat2->{score},
-                            -percent_id     => $feat2->{percent},
-                            -p_value        => $feat2->{p},
-                            -analysis       => $analysis_obj);
-    #create featurepair
-    my $fp = Bio::EnsEMBL::FeaturePair->new  (  -feature1 => $seqfeature1,
-                                                -feature2 => $seqfeature2 ) ;
-
-    #print "Feature pair " . $fp->gffstring . "\n";
-
-    $self->growfplist($fp);                             
-
     return $fp;
 }
 
@@ -521,12 +504,10 @@ sub create_SimpleFeature {
     $sf->display_label($feat->{'hit'});
 
     if ($sf) {
-	$sf->validate();
-
-	# add to _sflist
-	push(@{$self->{'_sflist'}}, $sf);
+      # add to _sflist
+      push(@{$self->{'_sflist'}}, $sf);
     }
-}
+  }
 
 
 =head2 trunc_float_3

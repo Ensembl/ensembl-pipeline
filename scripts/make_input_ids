@@ -92,13 +92,13 @@ use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use strict;
 use Getopt::Long;
 
 my $host;
-my $user = 'ensadmin';
-my $pass = 'ensembl';
+my $user;
+my $pass;
 my $port = 3306;
 my $dbname;
 my $logic_name;
@@ -228,6 +228,7 @@ foreach my $id (@ids) {
       print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
 
       $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis, '');  
+    
     };
     if ($@) {
       print "Input id $id already present $@";

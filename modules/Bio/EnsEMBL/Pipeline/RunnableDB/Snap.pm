@@ -63,20 +63,9 @@ sub fetch_input {
     
 
     $self->throw("No input id") unless defined($self->input_id);
-    
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid) or $self->throw("Unable ot fetch Contig");;
-    
-    my $genseq;
+   
+    $self->fetch_sequence($SNAP_MASKING);
 
-    if (@$SNAP_MASKING) {
-	$genseq = $contig->get_repeatmasked_seq($SNAP_MASKING) or $self->throw("Unable ot fetch seq");
-    }
-    else {
-	$genseq = $contig;
-    }
-    
-    $self->query($genseq);
     
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Snap(
 	      -query   => $self->query,

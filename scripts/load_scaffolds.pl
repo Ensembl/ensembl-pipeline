@@ -94,16 +94,20 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 
 
 my $csa = $db->get_CoordSystemAdaptor();
-my $cs = Bio::EnsEMBL::CoordSystem->new
-  (
-   -NAME            => $cs_name,
-   -VERSION         => $cs_version,
-   -DEFAULT         => $default,
-   -SEQUENCE_LEVEL  => $sequence_level,
-   -TOP_LEVEL       => $top_level,
-  );
 
+my $cs = $csa->fetch_by_name($cs_name);
+
+if(!$cs){
+  $cs = Bio::EnsEMBL::CoordSystem->new
+    (
+     -NAME            => $cs_name,
+     -VERSION         => $cs_version,
+     -DEFAULT         => $default,
+     -SEQUENCE_LEVEL  => $sequence_level,
+     -TOP_LEVEL       => $top_level,
+    );
 $csa->store($cs);
+}
 
 my $sa  = $db->get_SliceAdaptor();
 
@@ -116,7 +120,9 @@ my $seqio = new Bio::SeqIO(
 
 while ( my $seq = $seqio->next_seq ) {
   
-  my ($name) = $seq->id;
+
+  my @values = split /\s+/, $seq->desc;
+  my $name = $values[0];
   my $slice = Bio::EnsEMBL::Slice->new(
                                        -seq_region_name  => $name,
                                        -start            => 1,

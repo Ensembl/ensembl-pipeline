@@ -387,7 +387,7 @@ sub create_feature {
     $cpg->display_label($feat->{'display_label'});
     if ($cpg)
       {
-	$cpg->validate();
+	
 
 	# add to _flist
 	push(@{$self->{'_flist'}}, $cpg);

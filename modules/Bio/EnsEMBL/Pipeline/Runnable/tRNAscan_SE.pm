@@ -315,13 +315,10 @@ sub create_feature {
 
 
     $tRNA->display_label($feat->{'display_label'});
-    if ($tRNA)
-      {
-	$tRNA->validate();
-
-	# add to _flist
-	push(@{$self->{'_flist'}}, $tRNA);
-      }
-}
+    if ($tRNA){
+      # add to _flist
+      push(@{$self->{'_flist'}}, $tRNA);
+    }
+  }
 
 1;

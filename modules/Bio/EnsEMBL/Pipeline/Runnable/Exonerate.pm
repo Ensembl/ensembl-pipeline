@@ -802,12 +802,8 @@ sub _create_featurepair {
 					     -analysis    =>   $analysis_obj );
   #create featurepair
   my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-					   -feature2 => $feat2) ;
+                                           -feature2 => $feat2) ;
   
-  if ($fp) {
-    $self->throw("Can't validate") unless $fp->validate();
-#    push(@{$self->{'_fplist'}}, $fp);
-  }
   return $fp;
 }
 
@@ -850,10 +846,6 @@ sub _create_alignfeature {
 						  -cigar_string => $cigar,
 						 );
   
-  if ($fp) {
-    $self->throw("Can't validate") unless $fp->validate();
-#    push(@{$self->{'_fplist'}}, $fp);
-  }
   return $fp;
 }
 

@@ -58,6 +58,8 @@ $| = 1;
 my $local        = 0;       # Run failed jobs locally
 my @analyses;               # Only run this analysis ids
 my @skip_analyses;
+my @skip_types;
+my $skip_idfile;
 my $submitted;
 my $idlist_file;
 my ($done, $once);
@@ -69,8 +71,10 @@ my %skip_analyses;
 my %skip_input_id_type;
 my %skip_input_id;
 my $verbose;
-my $rerun_sleep = 3600;
-my $overload_sleep = 300;
+my $rerun_sleep = 300;
+my $base_sleep = 180;
+my $max_sleep = 5400;
+my $sleep_per_job = 60;
 my $max_time;
 my $killed_file;
 my @input_id_types;
@@ -86,32 +90,34 @@ my $die_if_broken = 0;
 
 
 GetOptions(
-    'dbhost=s'      => \$dbhost,
-    'dbname=s'      => \$dbname,
-    'dbuser=s'      => \$dbuser,
-    'dbpass=s'      => \$dbpass,
-    'dbport=s'      => \$dbport,
-    'local'         => \$local,
-    'idlist_file=s' => \$idlist_file,
-    'runner=s'      => \$runner,
-    'output_dir=s'  => \$output_dir,
-    'once!'         => \$once,
-    'shuffle!'      => \$shuffle,
-    'analysis=s@'   => \@analyses,
-    'skip_analysis=s@'   => \@skip_analyses,
-    'input_id_types=s@' => \@input_id_types,
-    'start_from=s@' => \@starts_from,	   
-    'v|verbose!'            => \$verbose,
-    'dbsanity!'     => \$db_sanity,
-    'accumulators!' => \$accumulators,
-    'accumulator_die!' => \$die_if_broken,
-    'max_job_time=s' => \$max_time,
-    'killed_file=s' => \$killed_file,
-    'kill_jobs!' => \$kill_jobs,
-    'queue_manager=s' => \$queue_manager,	   
-    'h|help'	    => \$help,
-    'rename_on_retry!' => \$rename_on_retry,	   
-) or useage();
+           'dbhost=s'      => \$dbhost,
+           'dbname=s'      => \$dbname,
+           'dbuser=s'      => \$dbuser,
+           'dbpass=s'      => \$dbpass,
+           'dbport=s'      => \$dbport,
+           'local'         => \$local,
+           'idlist_file=s' => \$idlist_file,
+           'runner=s'      => \$runner,
+           'output_dir=s'  => \$output_dir,
+           'once!'         => \$once,
+           'shuffle!'      => \$shuffle,
+           'analysis=s@'   => \@analyses,
+           'skip_analysis=s@'   => \@skip_analyses,
+           'input_id_types=s@' => \@input_id_types,
+           'skip_id_types=s@' => \@skip_types,
+           'skip_idlist_file=s' => \$skip_idfile,
+           'start_from=s@' => \@starts_from,	   
+           'v|verbose!'            => \$verbose,
+           'dbsanity!'     => \$db_sanity,
+           'accumulators!' => \$accumulators,
+           'accumulator_die!' => \$die_if_broken,
+           'max_job_time=s' => \$max_time,
+           'killed_file=s' => \$killed_file,
+           'kill_jobs!' => \$kill_jobs,
+           'queue_manager=s' => \$queue_manager,	   
+           'h|help'	    => \$help,
+           'rename_on_retry!' => \$rename_on_retry,	   
+          ) or useage();
 
 if(!$dbhost || !$dbname || !$dbuser){
   print STDERR " you must provide a host and a database name and a user".
@@ -122,7 +128,7 @@ if(!$dbhost || !$dbname || !$dbuser){
 useage() if $help;
 my %created_job_hash;
 if($idlist_file || @analyses || @input_id_types || @starts_from || 
-   @skip_analyses){
+   @skip_analyses || @skip_types || $skip_idfile){
   print STDERR " you are running the rulemanager in a fashion which"
     ." will probably break the accumulators so they are being "
       ."turned off\n";
@@ -376,9 +382,20 @@ while (1) {
 	  $alarm = 0;
 	  
 	  # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-                while ($get_pend_jobs && !$term_sig && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
-		  sleep $overload_sleep;
-                }
+    print STDERR "Max pending jobs = $MAX_PENDING_JOBS\n" if($verbose);
+    while ($get_pend_jobs && !$term_sig && 
+           &$get_pend_jobs >= $MAX_PENDING_JOBS) {
+      print STDERR "Sleeping due to too many pending jobs\n" if($verbose);
+		  my $extra_job = (&$get_pend_jobs - $MAX_PENDING_JOBS);
+      my $sleep = $extra_job * $sleep_per_job;
+      if($sleep < $base_sleep){
+        $sleep = $base_sleep;
+      }elsif($sleep > $max_sleep){
+        $sleep = $max_sleep;
+      }
+      print STDERR "Sleeping for $sleep\n";
+      sleep $sleep;
+    }
 	  alarm $wakeup;
 	}
 	

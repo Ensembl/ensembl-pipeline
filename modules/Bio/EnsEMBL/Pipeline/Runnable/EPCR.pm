@@ -340,7 +340,7 @@ sub run_epcr {
 =head2 parse_results
 
 Takes either an ouput file or a file handle and parses output.
-Creates FeaturePair's;
+Creates FeaturePair's';
 
 =cut
 
@@ -507,7 +507,6 @@ sub create_MarkerFeature {
     # $mf->display_label($feat->{'hit'});
 
     if ($mf) {
-	$mf->validate();
 
 	# add to _mflist
 	push(@{$self->{'_mflist'}}, $mf);

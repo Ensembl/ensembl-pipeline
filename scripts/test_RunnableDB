@@ -17,7 +17,7 @@ my $output_dir;
 my $write = 1;
 my $help = 0; 
 my $verbose = 0;
-my $update = 1;
+my $update = 0;
 my $input_type;
 my $module;
 my $analysis;
@@ -112,8 +112,10 @@ if($write){
 my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, created) values( ?, ?, ?, now())";
 
 if($write){
-my $sth = $db->prepare($sql);
-$sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
+  if($update){
+    my $sth = $db->prepare($sql);
+    $sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
+  }
 }
 
 

@@ -77,15 +77,11 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
-        or $self->throw("Unable to find contig ($contigid)\n");
-
-    $self->query($contig);
+    $self->fetch_sequence;
 
     my $pta = $self->db->get_PredictionTranscriptAdaptor;
     #need to get features predicted by genscan
-    my @genscan_peps = @{$pta->fetch_all_by_RawContig($contig, 'Genscan')};
+    my @genscan_peps = @{$pta->fetch_all_by_Slice($self->query, 'Genscan')};
     $self->_transcripts(@genscan_peps);
     my @r;
 
@@ -93,25 +89,26 @@ sub fetch_input {
     my %p = $self->parameter_hash;
 
     if (defined $p{-threshold} && defined $p{-threshold_type}) {
-	$thr      = $p{-threshold};
-	$thr_type = $p{-threshold_type};
+      $thr      = $p{-threshold};
+      $thr_type = $p{-threshold_type};
     }
     else {
-	$thr_type = 'PVALUE';
-	$thr      = 0.001;
+      $thr_type = 'PVALUE';
+      $thr      = 0.001;
     }
-
+    
     foreach my $t (@genscan_peps) {
-        foreach my $db (split ',', ($self->analysis->db_file)) {
-	    $self->runnable(Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new(
-                -genomic        => $self->query,
-	        -peptide        => $t,
-	        -database       => $db,
-                -program        => $self->analysis->program_file,
-                -options        => $self->arguments || undef,
-		-threshold      => $thr,
-		-threshold_type => $thr_type
-            ));
+      foreach my $db (split ',', ($self->analysis->db_file)) {
+        $self->runnable(Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep
+                        ->new(
+                              -genomic        => $self->query,
+                              -peptide        => $t,
+                              -database       => $db,
+                              -program        => $self->analysis->program_file,
+                              -options        => $self->arguments || undef,
+                              -threshold      => $thr,
+                              -threshold_type => $thr_type
+                             ));
         }
     }
     return 1;

@@ -508,8 +508,6 @@ sub create_feature {
     
     $first_exon->display_label($feat->{'display_label'});
 
-    $first_exon->validate();
-
     $self->output($feature);
 
     return 1

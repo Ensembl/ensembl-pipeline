@@ -35,7 +35,7 @@ DnaDnaAlignFeature's.
 
 The appropriate Bio::EnsEMBL::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
-required for database access.
+required for database access.'
 
 =head1 CONTACT
 
@@ -78,15 +78,12 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid)
-        or $self->throw("Unable to find contig ($contigid)\n");
-    my $genseq    = $contig
-        or $self->throw("Unable to fetch contig sequence");
+    $self->fetch_sequence;
 
-    $self->query($genseq);
-    my @genscan_peps = @{$self->db->get_PredictionTranscriptAdaptor->
-      fetch_all_by_RawContig($contig,'Genscan')};
+    my $pta = $self->db->get_PredictionTranscriptAdaptor;
+    print STDERR "Have prediction transcript adaptor $pta\n";
+    #need to get features predicted by genscan
+    my @genscan_peps = @{$pta->fetch_all_by_Slice($self->query, 'Genscan')};
     $self->_transcripts(@genscan_peps);
 
     my ($thr, $thr_type);

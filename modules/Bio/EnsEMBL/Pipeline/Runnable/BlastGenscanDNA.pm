@@ -185,15 +185,15 @@ sub run {
       return;
     }
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $peptide,
-								 -program   => $self->program,
-								 -database  => $self->database,
-								 -threshold => $self->threshold,
-					
-								 -threshold_type => $self->threshold_type,
-								 -ungapped  => 0,
-								 -options   => $self->options,
-                                                                 -filter    => 1);
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  
+      (-query     => $peptide,
+       -program   => $self->program,
+       -database  => $self->database,
+       -threshold => $self->threshold,
+       -threshold_type => $self->threshold_type,
+       -ungapped  => 0,
+       -options   => $self->options,
+       -filter    => 1);
 
    $runnable->run();
   
