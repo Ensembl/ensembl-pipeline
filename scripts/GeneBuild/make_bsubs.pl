@@ -155,7 +155,7 @@ sub make_tbsubs {
     my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name\"";
 
     $command .= "  $runner ";
-    $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
+    $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name";
     $command .= " -input_id $input_id -write";      
     print OUTF "$command\n";
     
@@ -224,7 +224,7 @@ sub make_lbsubs {
       my $errfile  = $chrdir . "/$input_id.err";
       my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name\"";
       $command .= "  $runner ";
-      $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
+      $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name";
       $command .= " -input_id $input_id ";
       $command .= " -write";      
       print OUTF "$command\n";
