@@ -117,6 +117,12 @@ my $prefix='COB';
 	     # similairity genewise specific parameters
 	     GB_SIMILARITY_TYPE      => 'swall',
 	     GB_SIMILARITY_THRESHOLD => 200,
+	     # minimum required parent protein coverage
+	     GB_SIMILARITY_COVERAGE           => 70,
+	     # maximum allowed size of intron 
+	     GB_SIMILARITY_MAX_INTRON         => 150000,
+	     # minimum coverage required to prevent splitting on long introns - keep it high!
+	     GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
 
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
