@@ -286,13 +286,8 @@ sub run {
 sub run_genscan {
     my ($self) = @_;
     print "Running genscan on ".$self->filename."\n";
-    open (OUTPUT, $self->genscan.' '.$self->matrix.' '.$self->filename.' |')
-            or $self->throw("Couldn't open pipe to genscan: $!\n");  
-    open (RESULTS, ">".$self->results)
-            or $self->throw("Couldn't create file for genscan results: $!\n");
-    print RESULTS <OUTPUT>;
-    close OUTPUT;
-    close RESULTS;
+    system ($self->genscan.' '.$self->matrix.' '.$self->filename.' > '.$self->results);
+    $self->throw($self->results." not created by Genscan\n") unless (-e $self->results);
 }
 
 =head2 parsefile
@@ -330,7 +325,7 @@ sub parse_results {
 
     if (<$filehandle> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
     {
-        print "No genes predicted\n";
+        print STDERR "No genes predicted\n";
         return;
     }
 
