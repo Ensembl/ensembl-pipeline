@@ -261,7 +261,7 @@ sub checkdir {
     $self->throw("Not enough disk space ($spacelimit required):$!\n") 
                         unless ($self->diskspace($dir, $spacelimit));
     chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
-    open (PWD, 'pwd|');
+   # open (PWD, 'pwd|');
     #print STDERR "Working directory set to: ".<PWD>;
 }
 

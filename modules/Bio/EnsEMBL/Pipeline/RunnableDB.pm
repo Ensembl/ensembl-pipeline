@@ -87,6 +87,7 @@ sub new {
     
     my $self = {};
     bless $self, $class;
+    #print STDERR "@args\n";
     my ($db,$input_id, $seqfetcher, 
 	$analysis) = $self->_rearrange([qw(DB
 					   INPUT_ID
@@ -230,7 +231,7 @@ sub output {
     
     my @r = $self->runnable;
 
-    if(defined (@r) && scalar(@r)){
+    if(@r && scalar(@r)){
       foreach my $r ($self->runnable){
 	push(@{$self->{'_output'}}, $r->output);
       }
