@@ -119,7 +119,8 @@ sub get_AnalysisAdaptor {
   my ($self) = @_;
 
   if( ! defined $self->{_AnalysisAdaptor} ) {
-    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor->new
+    require Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
+    $self->{_AnalysisAdaptor} = Bio::EnsEMBL::DBSQL::AnalysisAdaptor->new
       ( $self );
   }
 
