@@ -101,9 +101,108 @@ Ensembl - ensembl-dev@ebi.ac.uk
 
 
 package Bio::EnsEMBL::Pipeline::GeneComp;
-
+use vars ('@ISA');
+use Bio::Root::RootI;
 use strict;
 use Carp;
+
+@ISA = ('Bio::Root::RootI');
+
+
+=head2 new
+
+ Title   : new
+ Usage   : $genecomp = Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc, -archive => $archive,-finaldb => $db,-log => $log);
+ Function: Builds a new genecomp object, based around a virtual contig, 
+ Example :
+ Returns : a new genecomp object
+ Args    : 
+
+
+=cut
+
+sub new {
+  my($class,@args) = @_;
+  my $self = {};
+
+  bless ($self,$class);
+
+  my ($vc,$archive,$finaldb,$log) = 
+      $self->_rearrange([qw(VC
+			    ARCHIVE
+			    FINALDB
+			    LOG
+			    )],@args);
+
+
+  if( !defined $vc || !ref $vc || !$vc->isa('Bio::EnsEMBL::Virtual::Contig') ) {
+      $self->throw("must have a virtual contig, got at [$vc]");
+  }
+
+  if( !defined $archive || !ref $archive || !$archive->isa('Bio::EnsEMBL::DBArchive::Obj') ) {
+      $self->throw("must have a archive, got at [$archive]");
+  }
+
+  if( !defined $finaldb || !ref $finaldb || !$finaldb->isa('Bio::EnsEMBL::DBSQL::Obj') ) {
+      $self->throw("must have a final database, got at [$finaldb]");
+  }
+
+  if( !defined $log ) {
+      $self->throw("Must have a log file");
+  }
+
+  $self->vc($vc);
+  $self->archive($archive);
+  $self->finaldb($finaldb);
+  $self->log($log);
+
+
+  # this usually dies if we can't write
+  print $log "Built GeneComp object\n";
+
+  return $self;
+
+
+}
+
+
+=head2 map
+
+ Title   : map
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+
+=cut
+
+sub map{
+   my ($self) = @_;
+   my $log = $self->log;
+
+   print $log "About to map exons";
+   $self->map_temp_Exons_to_real_Exons();
+
+   # deal with dead exons
+
+   foreach my $exon ( $self->{'_untransfered'} ) {
+       $self->archive->write_seq($exon->id,$exon->version,'exon',$exon->seq,$exon->id,$exon->version);
+   }
+
+   print $log "About to map genes";
+   # map the genes
+
+   $self->map_temp_Genes_to_real_Genes();
+
+
+   # deal with dead genes and transcripts
+
+}
+
+
+
 
 
 =head2 map_temp_Exons_to_real_Exons
@@ -119,8 +218,10 @@ use Carp;
 =cut
 
 sub map_temp_Exons_to_real_Exons{
-   my ($vc,$logfile) = @_;
+   my ($self) = @_;
 
+   my $vc = $self->vc();
+   my $logfile = $self->log;
 
    if( !ref $vc || !$vc->isa('Bio::EnsEMBL::Virtual::Contig') ) {
        die("No virtual contig provided - remember you need a virtual contig from the old !");
@@ -268,7 +369,7 @@ sub map_temp_Exons_to_real_Exons{
        } else {
 	   # ok - new Exon
 	   my $tempid = $tempexon->id();
-	   $tempexon->id($vc->dbobj->gene_Obj->get_new_ExonID);
+	   $tempexon->id($self->archive->get_new_stable_id('exon',1));
 	   $tempexon->created($time);
 	   $tempexon->modified($time);
 	   $tempexon->version(1);
@@ -291,7 +392,13 @@ sub map_temp_Exons_to_real_Exons{
        }
    }
 
-   return (%temp_old,\@mapped,\@new,\@untransfered);
+
+   $self->{'_exon_map_hash'} = \%temp_old;
+   $self->{'_mapped_exons'} = \@mapped;
+   $self->{'_new_exons'} = \@new;
+   $self->{'_untransfered'} = \@untransfered;
+
+
 }
 
 
@@ -309,29 +416,34 @@ sub map_temp_Exons_to_real_Exons{
 =cut
 
 sub map_temp_Genes_to_real_Genes{
-    my ($vc,$logfile,%temp_old) = @_;
+    my $self = shift;
+
+    my $vc= $self->vc();
+    my $logfile = $self->log();
+    my $exon_map = $self->{'_exon_map_hash'};
+
+
     
-    print STDERR "In genecomp->map_genes, got $vc, $logfile, %temp_old\n";
     
     if( !defined $vc) {
 	die("Not passing the Virtual Contig to do gene mapping");
     }
-    print STDERR "Getting all new genes... ";
+    print $logfile "Getting all new genes... ";
     my @tempgenes = $vc->get_all_Genes();
     my $size=scalar @tempgenes;
-    print STDERR "got $size new genes\n";
+    print $logfile "got $size new genes\n";
 
-    if (%temp_old) {
-	print STDERR "In gene mapping, started exon renaming\n";
-	foreach my $gene (@tempgenes) {
-	    foreach my $exon ($gene->each_unique_Exon) {
-		if ($temp_old{$exon->id}) {
-		    #print STDERR "In gene mapping, mapping ".$exon->id." to ".$temp_old{$exon->id}."\n";
-		    $exon->id($temp_old{$exon->id});
-		}
+
+    print $logfile "In gene mapping, started exon renaming\n";
+    foreach my $gene (@tempgenes) {
+	foreach my $exon ($gene->each_unique_Exon) {
+	    if ($exon_map->{$exon->id}) {
+		#print STDERR "In gene mapping, mapping ".$exon->id." to ".$temp_old{$exon->id}."\n";
+		$exon->id($exon_map->{$exon->id});
 	    }
 	}
     }
+    
 
     print STDERR "Getting all old genes... ";
     my @oldgenes  = $vc->get_old_Genes();
@@ -495,7 +607,7 @@ sub map_temp_Genes_to_real_Genes{
        my @newtrans = $newg{$newgeneid}->each_Transcript;
        my @oldtrans = $oldg{$oldgeneid}->each_Transcript;
 
-       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($vc,$logfile,\@newtrans,\@oldtrans);
+       my ($should_increment,$additional_dead_transcript_ids) = $self->map_temp_Transcripts_to_real_Transcripts($vc,$logfile,\@newtrans,\@oldtrans);
 
        push(@dead_transcript_ids,@$additional_dead_transcript_ids);
 
@@ -652,7 +764,7 @@ sub map_temp_Genes_to_real_Genes{
 		   next;
 	       }
 	       my $tempid = $newtrans->id; 
-	       $newtrans->id($vc->dbobj->gene_Obj->get_new_TranscriptID);
+	       $newtrans->id($self->archive->get_new_stable_ids('transcript',1));
 	       print $logfile "TRANSCRIPT MAP: SPLIT ",$newgeneid," ",$oldgeneid,"\n";
 
 	       $newtrans->version(1);
@@ -664,7 +776,7 @@ sub map_temp_Genes_to_real_Genes{
 	       my $newgene = $newg{$newgeneid};
 	       my $tempid = $newgene->id();
 	       # it is an unassigned gene...
-	       $newgene->id($vc->dbobj->gene_Obj->get_new_GeneID());
+	       $newgene->id($self->archive->get_new_stable_ids('gene',1));
 
 	       print $logfile "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id,"\n";
 
@@ -688,13 +800,13 @@ sub map_temp_Genes_to_real_Genes{
 
        my $newgene = $newg{$newgene_id};
 
-       $newgene->id($vc->dbobj->gene_Obj->get_new_GeneID());
+       $newgene->id($self->archive->get_new_stable_ids('gene',1));
        $newgene->created($now);
        $newgene->modified($now);
        $newgene->version(1);
 
        foreach my $t ( $newgene->each_Transcript ) {
-	   $t->id($vc->dbobj->gene_Obj->get_new_GeneID());
+	   $t->id($self->archive->get_new_stable_ids('transcript',1));
 	   $t->created($now);
 	   $t->modified($now);
 	   $t->version(1);
@@ -702,14 +814,16 @@ sub map_temp_Genes_to_real_Genes{
 
    }
 
-   foreach my $gene ( @oldgenes ) {
-       if( $has_moved_old{$gene->id} ) {
-	   next;
-       }
-       push(@dead_gene_ids,$gene);
-   }
+    foreach my $gene ( @oldgenes ) {
+	if( $has_moved_old{$gene->id} ) {
+	    next;
+	}
+	push(@dead_gene_ids,$gene);
+    }
+    
+    $self->{'_dead_transcript_ids'} = \@dead_transcript_ids;
+    $self->{'_dead_gene_ids'}       = \@dead_gene_ids;
 
-   return (\@dead_transcript_ids,\@dead_gene_ids);
 }
 
 
@@ -726,7 +840,7 @@ sub map_temp_Genes_to_real_Genes{
 =cut
 
 sub map_temp_Transcripts_to_real_Transcripts{
-   my ($vc,$logfile,$new,$old) = @_;
+   my ($self,$vc,$logfile,$new,$old) = @_;
 
    my @newt = @$new;
    my @oldt = @$old;
@@ -796,7 +910,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
        }
        my $tempid = $newt->id;
        $should_change = 1;
-       $newt->id($vc->dbobj->gene_Obj->get_new_TranscriptID);
+       $newt->id($self->archive->get_new_stable_ids('transcript',1));
        $newt->version(1);
        $newt->created($now);
        $newt->modified($now);
@@ -908,5 +1022,92 @@ sub increment_Transcript{
    return 0;
 }
 
+
+=head1 Get/Set functions
+
+
+=head2 vc
+
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub vc{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'vc'} = $value;
+    }
+    return $obj->{'vc'};
+
+}
+
+=head2 archive
+
+ Title   : archive
+ Usage   : $obj->archive($newval)
+ Function: 
+ Returns : value of archive
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub archive{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'archive'} = $value;
+    }
+    return $obj->{'archive'};
+
+}
+
+=head2 finaldb
+
+ Title   : finaldb
+ Usage   : $obj->finaldb($newval)
+ Function: 
+ Returns : value of finaldb
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub finaldb{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'finaldb'} = $value;
+    }
+    return $obj->{'finaldb'};
+
+}
+
+=head2 log
+
+ Title   : log
+ Usage   : $obj->log($newval)
+ Function: 
+ Returns : value of log
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub log{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'log'} = $value;
+    }
+    return $obj->{'log'};
+
+}
 
 1;
