@@ -313,7 +313,7 @@ sub write_output {
   
   # this now assummes that we are building on a single VC.
   
-      $self->throw("Bailing before real write\n");
+#      $self->throw("Bailing before real write\n");
   
  GENE: foreach my $gene (@newgenes) {	
     # do a per gene eval...
