@@ -74,10 +74,10 @@ sub new {
 
 
 
-  $minscore  = -100000 if !defined $minscore;
-  $maxevalue = 0.1     if !defined $maxevalue;
-  $coverage  = 10      if !defined $coverage;
-  $prune     = 0       if !defined $prune;
+  $minscore  = -100000 unless $minscore;
+  $maxevalue = 0.1     unless $maxevalue;
+  $coverage  = 10      unless $coverage;
+  $prune     = 0       unless $prune;
 
   $self->minscore($minscore);
   $self->maxevalue($maxevalue);
@@ -130,6 +130,11 @@ sub run{
   foreach my $f ( @input ) {
     
     if( $f->score > $minscore ) {
+      
+      unless ( $validhit{$f->hseqname} ){
+	$validhit{$f->hseqname} = 0;
+      }
+      
       if( $f->can('evalue') && defined $f->evalue ) {
 	if( $f->evalue < $maxevalue ) {
 	  
@@ -141,7 +146,9 @@ sub run{
 	  }
 	  	  
 	}
-      } else {
+      }
+
+      else {
 	if( $validhit{$f->hseqname} < $f->score ) {
 	  $validhit{$f->hseqname} = $f->score;
 	}
@@ -186,6 +193,10 @@ sub run{
 	# only mark if this feature is valid
 	if( $f->score > $minscore || ($f->can('evalue') && defined $f->evalue && $f->evalue<$maxevalue ) ) {
 	  for my $i ( $f->start .. $f->end ) {
+	    unless( $list[$i] ){
+	      $list[$i] = 0;
+	    }
+
 	    if( $list[$i] < $coverage ) {
 	      # accept!
 	      $hole = 1;
@@ -262,7 +273,6 @@ sub prune_features {
 
   # sort the features by start coordinates, this is crucial
   @input = sort {$a->start <=> $b->start} @input;
-
 
   ## this is handy to compare the two clustering methods quickly
   #my $old_method = 0;
