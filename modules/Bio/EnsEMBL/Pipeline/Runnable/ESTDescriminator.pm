@@ -60,16 +60,7 @@ sub run {
   my %hash_of_ests_and_gene_mapping = 
     %{$self->_cluster_ests_with_genes};
 
-  ### This is were I fell asleep
-print STDERR "ESTs matched to their most appropriate gene:\n";
-foreach my $est_id (keys %hash_of_ests_and_gene_mapping){
-  print STDERR "EST : $est_id\tGene(s) : ";
-  foreach my $gene_id (@{$hash_of_ests_and_gene_mapping{$est_id}}){
-    print STDERR $gene_id . ' ';
-  }
-  print STDERR "\n";
-}
-
+  return \%hash_of_ests_and_gene_mapping
 }
 
 sub print_shared_ESTs {
@@ -138,7 +129,7 @@ sub _cluster_ests_with_genes {
       # EST vs gene distances
 
     foreach my $gene_id (@$genes_that_share_this_est){
-print STDERR "Est-gene pairwise distance [".$gene_id."][".$est_id."] " . $self->_pairwise_distance($gene_id, $est_id, undef, 1) . "\n";
+#print STDERR "Est-gene pairwise distance [".$gene_id."][".$est_id."] " . $self->_pairwise_distance($gene_id, $est_id, undef, 1) . "\n";
       my %pairwise_comparison = 
 	('type'     => 'est_vs_gene',
 	 'gene_ids'  => [$gene_id],
@@ -148,15 +139,11 @@ print STDERR "Est-gene pairwise distance [".$gene_id."][".$est_id."] " . $self->
 
       # Inter-gene distances
 
-print STDERR "Genes that share EST [$est_id] : @$genes_that_share_this_est\n";
+#print STDERR "Genes that share EST [$est_id] : @$genes_that_share_this_est\n";
 
     for (my $i = 0; $i < scalar @$genes_that_share_this_est; $i++) {
       for (my $k = $i + 1; $k < scalar @$genes_that_share_this_est; $k++) {
 
-print STDERR "Gene-gene pairwise distance [".$genes_that_share_this_est->[$i]."][".$genes_that_share_this_est->[$k]."] " . $self->_pairwise_distance($genes_that_share_this_est->[$i],
-						   $genes_that_share_this_est->[$k],
-						   undef,
-						   1) . "\n";
 	my %pairwise_comparison = 
 	  ('type'     => 'inter_gene',
 	   'gene_ids' => [$genes_that_share_this_est->[$i], 
@@ -754,7 +741,7 @@ sub _pairwise_distance {
   my $dist_set = $inf ? 'inf' : 'norm';
 
   if (defined $distance){
-print STDERR "Storing [$dist_set][$id1][$id2][$distance]\n";
+#print STDERR "Storing [$dist_set][$id1][$id2][$distance]\n";
     $self->{_pairwise_distances}->{$dist_set}->{$id1}->{$id2} = $distance;
     return $distance
   }
@@ -786,7 +773,7 @@ sub _build_id_lookup {
 sub _find_shared_ests_by_gene_id {
   my ($self, $gene_id) = @_;
 
-  my $shared_ests = undef;
+  my $shared_ests = [];
 
   if (defined ($self->{_id_lookup}->{$gene_id})) {
     $shared_ests = $self->{_id_lookup}->{$gene_id}
@@ -798,7 +785,7 @@ sub _find_shared_ests_by_gene_id {
 sub _find_genes_by_est_id {
   my ($self, $est_id) = @_;
 
-  my $genes = undef;
+  my $genes = [];
 
   if (defined ($self->{_id_lookup}->{$est_id})) {
     $genes = $self->{_id_lookup}->{$est_id}
