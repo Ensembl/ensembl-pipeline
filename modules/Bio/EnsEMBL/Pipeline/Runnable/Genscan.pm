@@ -294,10 +294,10 @@ sub run_genscan {
     $self->throw($self->results." not created by Genscan\n") unless (-e $self->results);
 }
 
-=head2 parsefile
+=head2 parse_results
 
-    Title   :  parsefile
-    Usage   :   $obj->parsefile($filename)
+    Title   :  parse_results
+    Usage   :   $obj->parse_results($filename)
     Function:   Parses Genscan output to give a set of seqfeatures
                 parsefile can accept filenames, filehandles or pipes (\*STDIN)
                 NOTE: genscan can not assign phases to exons from the output
