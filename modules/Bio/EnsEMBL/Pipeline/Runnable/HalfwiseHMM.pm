@@ -382,7 +382,7 @@ sub get_pfam_ids {
     eval {
         my $user     = 'pfam';
         my $password = 'mafp1';
-        my $host     = 'webdbsrv1';
+        my $host     = 'pfam';
         my $dbname   = 'pfamlive';
         my $port     = 3306;
 
