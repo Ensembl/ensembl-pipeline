@@ -1158,7 +1158,11 @@ sub compare_Exons{
       $self->throw("something went wrong, a cluster with 2 genes is classified as unclustered!");
     }
     my @transcripts = @{$genes[0]->get_all_Transcripts};
+    
     my $type = $genes[0]->type;
+    foreach my $tran (@transcripts){
+      $tran->type($type);
+    }
     my @annotation;
     my @prediction;
     push( @annotation, grep /^$type$/, @{ $self->{'_annotation_types'} } );
@@ -1199,14 +1203,8 @@ sub compare_Exons{
 
   print STDERR "\nTranscripts unpaired from annotation:\n";
   foreach my $tran ( @total_ann_unpaired ){
-    my $id;
-    if ( $tran->stable_id ){
-      $id = $tran->stable_id;
-    }
-    elsif ( $tran->dbID ){
-      $id = $tran->dbID;
-    }
-    print STDERR $id."\t";
+    my $id = $tran->stable_id || $tran->dbID;
+    print STDERR $id."\t".$tran->type."\n";
     
     # print the unpaired transcripts to gff_file if available
     if ($self->gff_file){
@@ -1215,14 +1213,8 @@ sub compare_Exons{
   }
   print STDERR "\nTranscripts unpaired from prediction:\n";
   foreach my $tran ( @total_pred_unpaired ){
-    my $id;
-    if ( $tran->stable_id ){
-      $id = $tran->stable_id;
-    }
-    elsif ( $tran->dbID ){
-      $id = $tran->dbID;
-    }
-    print STDERR $id."\t";
+    my $id = $tran->stable_id || $tran->dbID;
+    print STDERR $id."\t".$tran->type."\n";
     if ($self->gff_file){
       $self->toGFF($tran,"prediction","unpaired");
     }
@@ -1359,7 +1351,7 @@ sub _match_Exons{
     
     # get only the CDS from the exons... if there is a translation
     if ( $annotation->translation ){
-      @ann_exons = $annotation->translateable_exons;
+      @ann_exons = @{$annotation->get_all_translateable_Exons};
     }
     else{
       print STDERR "transcript ".$annotation->stable_id." has no translation, skipping this pair:\n";
@@ -1367,7 +1359,7 @@ sub _match_Exons{
       next PAIR;
     }
     if ( $prediction->translation ){
-      @pred_exons= $prediction->translateable_exons;
+      @pred_exons= @{$prediction->get_all_translateable_Exons};
     }
     else{
       print STDERR "transcript ".$prediction->stable_id." has no translation, skipping this pair:\n";
@@ -2163,13 +2155,14 @@ sub get_unmatched_Genes {
   my $self = shift @_;
   
   # if we have already the unclustered genes, we can read them out from $self->{'_unclustered_genes'}
-  if ($self->unclustered ){
+  if ($self->unclustered_Genes ){
     my @types1 = @{ $self->{'_annotation_types'} };
     my @types2 = @{ $self->{'_prediction_types'} };
-    my @unclustered = $self->unclustered; 
+    my @unclustered = $self->unclustered_Genes; 
     my (@array1,@array2);
     foreach my $cluster (@unclustered){
-      my $gene = ${ $cluster->get_Genes }[0]; 
+      my @genes = $cluster->get_Genes; 
+      my $gene = $genes[0];
       foreach my $type1 ( @{ $self->{'_annotation_types'} } ){
 	if ($gene->type eq $type1){
 	  push ( @array1, $gene );
@@ -2181,12 +2174,22 @@ sub get_unmatched_Genes {
 	}
       }
     }
+    
+    foreach my $gene ( @array1 ){
+      my $id = $gene->stable_id || $gene->dbID;
+      print STDERR "UNMATCHED ".$id."\t".$gene->type."\n";
+    }
+    foreach my $gene ( @array2 ){
+      my $id = $gene->stable_id || $gene->dbID;
+      print STDERR "UNMATCHED ".$id."\t".$gene->type."\n";
+    }
+    
     return (\@array1,\@array2);
   }
-
+  
   # if not, we can compute them directly
   my (%found1,%found2);
-
+  
   foreach my $gene1 ( $self->annotation_Genes ){
     foreach my $gene2 ( $self->prediction_Genes ){
       if ( _compare_Genes($gene1,$gene2)){
@@ -2213,8 +2216,23 @@ sub get_unmatched_Genes {
       push (@unmatched2, $new_cluster);
     }
   }
+
+  foreach my $cluster ( @unmatched1 ){
+    foreach my $gene ( $cluster->get_Genes ){
+      my $id = $gene->stable_id || $gene->dbID;
+      print STDERR "UNMATCHED ".$id."\t".$gene->type."\n";
+    }
+  }
+  foreach my $cluster ( @unmatched2 ){
+    foreach my $gene ( $cluster->get_Genes ){
+      my $id = $gene->stable_id || $gene->dbID;
+      print STDERR "UNMATCHED ".$id."\t".$gene->type."\n";
+    }
+  } 
   return (\@unmatched1,\@unmatched2);
+  
 }
+
 
 #########################################################################
 
@@ -2430,11 +2448,11 @@ sub exon_Coverage{
   # first get all exons
   my @ann_exons;
   my @pred_exons;
-  foreach my $tran ( @$ann_genes ){
-    push ( @ann_exons, @{$tran->get_all_Exons} );
+  foreach my $gene ( @$ann_genes ){
+    push ( @ann_exons, @{$gene->get_all_Exons} );
   }
-  foreach my $tran ( @$pred_genes ){
-    push ( @pred_exons, @{$tran->get_all_Exons} );
+  foreach my $gene ( @$pred_genes ){
+    push ( @pred_exons, @{$gene->get_all_Exons} );
   }
 
   if (defined($lower_bound)){
@@ -2480,7 +2498,97 @@ sub exon_Coverage{
   printf STDERR "               Specificity: %.2f\n",$specificity3;
   print STDERR "\n";
   }
-}  
+}
+
+############################################################
+
+=head2
+  
+  This method compares the coding exons from both gene sets and find the overlaps above a certain
+  threshold. This threshold represents the minimum length of the annotation exon covered by
+  the prediction
+
+=cut
+
+sub coding_exon_Coverage{
+  my ($self,$ann_genes,$pred_genes,$lower_bound) = @_;
+  
+  # first get all translateable exons
+  my @ann_exons;
+  my @pred_exons;
+  my %seen;
+  foreach my $gene ( @$ann_genes ){
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      next unless ( $transcript->translation);
+      foreach my $exon ( @{$transcript->get_all_translateable_Exons} ){
+	unless( $seen{$exon} ){
+	  push ( @ann_exons, $exon );
+	  $seen{$exon}++;
+	}
+      }
+    }
+  }
+  foreach my $gene ( @$pred_genes ){
+    foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+      next unless ( $transcript->translation);
+      foreach my $exon ( @{$transcript->get_all_translateable_Exons} ){
+	unless( $seen{$exon} ){
+	  push ( @pred_exons, $exon );
+	  $seen{$exon}++;
+	}
+      }
+    }
+  }
+  
+  if (defined($lower_bound)){
+    my %seen_exon3;
+    my $count_covered_exons3 = 0;
+    my %perc_overlap_distribution3;
+    
+  ANN_EXON:
+    foreach my $ann_exon ( @ann_exons ){
+      
+      if ( $seen_exon3{ $ann_exon } ){
+	next ANN_EXON;
+      }
+      
+    PRED_EXON:
+      foreach my $pred_exon ( @pred_exons ){
+
+	next PRED_EXON if ( $seen_exon3{ $pred_exon } );
+	next PRED_EXON if ( $pred_exon->strand != $ann_exon->strand  
+			    || $pred_exon->start > $ann_exon->end
+			    || $pred_exon->end < $ann_exon->start );
+	
+	if ( $ann_exon->overlaps( $pred_exon ) ){
+	  my $overlap_length = $self->_exon_Overlap($ann_exon, $pred_exon);
+	  my $ann_length     = $ann_exon->length;
+	  my $perc_overlap   = 100 * ( $overlap_length / $ann_length);
+	  if ( $perc_overlap >= $lower_bound ){
+	    $seen_exon3{ $ann_exon }  = 1;
+	    $seen_exon3{ $pred_exon } = 1;
+	    $count_covered_exons3++;
+	    next ANN_EXON;
+	  }
+	}
+      }
+    }
+    
+
+  print STDERR "EXON COVERAGE ACCORDING TO EXON-OVERLAP >= $lower_bound %\n";
+  print STDERR "Total predicted exons: ".scalar(@pred_exons)."\n";
+  print STDERR "Total annotated exons: ".scalar(@ann_exons)."\n";
+  print STDERR "Found annotated exons: ".$count_covered_exons3."\n";
+  
+  my $sensitivity3 = $count_covered_exons3/scalar(@ann_exons);
+  my $specificity3 = $count_covered_exons3/scalar(@pred_exons);
+
+  printf STDERR "               Sensitivity: %.2f\n",$sensitivity3;
+  printf STDERR "               Specificity: %.2f\n",$specificity3;
+  print STDERR "\n";
+  }
+}
+
 
 ############################################################
 
@@ -2707,15 +2815,17 @@ sub toGFF{
 
   my $genetype;
   if ( $gene_type eq "annotation" ){
-    my $gene_adaptor = $self->annotation_db->get_GeneAdaptor;
-    $genetype = $gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
+    #my $gene_adaptor = $self->annotation_db->get_GeneAdaptor;
+    $genetype = $transcript->type;
+    #gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
     unless ( $genetype ){
       $genetype = "ann_undetermined";
     }
   }
   elsif ( $gene_type eq "prediction" ){
-    my $gene_adaptor = $self->prediction_db->get_GeneAdaptor;
-    $genetype = $gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
+    #my $gene_adaptor = $self->prediction_db->get_GeneAdaptor;
+    $genetype = $transcript->type;
+    #$gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
     unless ( $genetype ){
       $genetype = "pred_undetermined";
     }
@@ -2808,6 +2918,7 @@ sub prediction_db{
 }
 
 ############################################################
+
 
 
 1;
