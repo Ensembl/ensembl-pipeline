@@ -41,7 +41,7 @@ use strict;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
-use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 #use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 #use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
@@ -157,7 +157,12 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-  my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor( $self->db );
+  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-dbname => $self->db->dbname,
+								-user => $self->db->username,
+								-pass => $self->db->password,
+								-host => $self->db->host);
+  my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
+  #print STDERR "have ".$pmfa." adaptor\n";
   my $input_id = $self->input_id;
   my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
   $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
@@ -233,7 +238,7 @@ sub targetted_runnable{
 
 sub run {
   my ($self) = @_;
-
+  my $count = 0;
   #print STDERR "***Running targetted build***\n";
  TGE:   
   foreach my $tge($self->targetted_runnable){
@@ -257,7 +262,8 @@ sub run {
     }
     
     eval{
-      $tge->write_output;
+     my @genes = $tge->write_output;
+     $count += @genes;
     };
 
     if($@){
@@ -265,7 +271,8 @@ sub run {
       next TGE;
     }
   }
-
+  
+  print "there were ".$count." genes produce\n";
   $self->{'_targetted_runnables'} = [];
 
 }
