@@ -255,7 +255,7 @@ sub uniquify{
  # print STDERR "UNIQUFY\n";
   open (OUT, ">".$file);
   foreach my $hit(@features) {
-    #print OUT $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
+    print OUT $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
   #  print STDERR $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
   }
   #print STDERR "UNIQUFY\n";
