@@ -33,15 +33,15 @@ while(<LS>){
   if ( $file_name =~/\/(\S+):$/ ){
     $dir = $1;
   }
-  #next unless ( $file_name  =~/(\S+\.\d+-\d+)\.err$/
-  #|| $file_name  =~/(\S+\.\d+-\d+)\.out$/ );
+  next unless ( $file_name  =~/(\S+\.\d+-\d+)\./ );
+  
 
-  unless ( $exception || $memory ){
-    next unless ( $file_name  =~/(\S+\.\d+-\d+)\.out$/ );
-  }
-  unless ( $exit ){
-    next unless ( $file_name  =~/(\S+\.\d+-\d+)\.err$/ );
-  }
+  #unless ( $exception || $memory ){
+  # next unless ( $file_name  =~/(\S+\.\d+-\d+)\.out$/ );
+  #}
+  #unless ( $exit ){
+  # next unless ( $file_name  =~/(\S+\.\d+-\d+)\.err$/ );
+  #}
   my $name = $1;
 
   open(IN, "<$dir/$file_name") or die "Can't open file [$file_name]\n";
