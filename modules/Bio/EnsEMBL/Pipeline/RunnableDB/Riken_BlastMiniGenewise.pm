@@ -173,13 +173,13 @@ sub write_output {
 		$exoncount++;
 		foreach my $sf($exon->each_Supporting_Feature) {
 		  print STDERR "***sub_align: " . 
-		    $sf->seqname . "\t" .
-		      $sf->start . "\t" .
-			$sf->end . "\t" .
-			  $sf->strand . "\t" .
-			    $sf->hseqname . "\t" .
-			      $sf->hstart . "\t" .
-				$sf->hend . "\n";
+		               $sf->seqname . "\t" .
+		               $sf->start . "\t" .
+			       $sf->end . "\t" .
+			       $sf->strand . "\t" .
+			       $sf->hseqname . "\t" .
+			       $sf->hstart . "\t" .
+			       $sf->hend . "\n";
 	  }
 
 	    }

@@ -425,17 +425,7 @@ sub convert_output {
       my $excount = 1;
       my @exons;
       
-      foreach my $subf ($tmpf->sub_SeqFeature) {
-	$subf->feature1->source_tag('genewise');
-	$subf->feature1->primary_tag('similarity');
-	$subf->feature1->score(100);
-	$subf->feature1->analysis($analysis);
-	
-	$subf->feature2->source_tag('genewise');
-	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->score(100);
-	$subf->feature2->analysis($analysis);
-	
+      foreach my $exon_pred ($tmpf->sub_SeqFeature) {
 	my $exon = new Bio::EnsEMBL::Exon;
 	
 	$exon->id($self->input_id . ".genewise.$count.$excount");
@@ -444,15 +434,30 @@ sub convert_output {
 	$exon->modified($time);
 	$exon->version(1);
 	
-	$exon->start($subf->start);
-	$exon->end  ($subf->end);
-	$exon->strand($subf->strand);
+	$exon->start($exon_pred->start);
+	$exon->end  ($exon_pred->end);
+	$exon->strand($exon_pred->strand);
 	
-	print STDERR "\tFeaturePair " . $subf->gffstring . "\n";
+	print STDERR "\tFeaturePair " . $exon_pred->gffstring . "\n";
 	
-	$exon->phase($subf->feature1->{_phase});
+	$exon->phase($exon_pred->{_phase});
 	$exon->attach_seq($self->{$runnable}->primary_seq);
-	$exon->add_Supporting_Feature($subf);
+	
+	# sort out supporting evidence for this exon prediction
+	foreach my $subf($exon_pred->sub_SeqFeature){
+	  $subf->feature1->source_tag('genewise');
+	  $subf->feature1->primary_tag('similarity');
+	  $subf->feature1->score(100);
+	  $subf->feature1->analysis($exon_pred->analysis);
+	  
+	  $subf->feature2->source_tag('genewise');
+	  $subf->feature2->primary_tag('similarity');
+	  $subf->feature2->score(100);
+	  $subf->feature2->analysis($exon_pred->analysis);
+	  
+	  #	print STDERR "*subf " . $subf->gffstring . "\n";
+	  $exon->add_Supporting_Feature($subf);
+	}
 	
 	my $seq   = new Bio::Seq(-seq => $exon->seq->seq);
 	
