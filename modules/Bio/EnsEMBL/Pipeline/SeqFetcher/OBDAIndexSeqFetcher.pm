@@ -68,56 +68,51 @@ sub new {
   my ($db, $format) = $self->_rearrange(['DB', 'FORMAT'], @args);
   
   # expect an array of dbs
-  print STDERR "you have passed a ".ref($db)."\n";
-$self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
 
-  # $db is a reference to an array of databases:
-  if ($db) {
-    $self->db($db);
-  }
-  else{
-    $self->throw("Sorry, you must specify a database");
-  }
+  $self->throw("Sorry, you must specify a database") unless defined($db);
+  print STDERR "You passed a " . ref($db) . "\n";
+  $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
+  
+  $self->db($db);
+
   
   foreach my $database ( $self->db ){
+  	# Prepend $ENV{BLASTDB} if not given a full path
+  	if ( $database !~ /^\// ){
+    	$database = $ENV{BLASTDB} . "/" . $database;
+    }
     # we want the form '/path/to/index/dir', so remove the last if there is any '/'
     if ( $database =~/(\S+)\/$/ ){
       print STDERR "changing $database to $1\n";
       $database = $1;
     }
-
-    $self->index_name( $database);
-
+    
     # get the index name and the index directory out of $database
     my @path = split /\//, $database;
 
     # the db_name is the last name in the path
     my $db_name = pop( @path );
-    if ( $db_name =~/(\S+)\.fa/){
+    if ( $db_name =~/(\S+)\.fa/ ){
       $db_name = $1;
     }
-    if ( !defined( $db_name ) ){
-      $self->throw("cannot define db_name");
-    }
-
+    
+	$self->throw("Cannot define db_name") unless ( $db_name );
+    
     # the index_dir is the directory path where the db sits
     my $index_dir = join '/', @path;
-    if ( !defined( $index_dir ) ){
-      $self->throw("cannot define index_dir");
-    }
-
+    $self->throw("Cannot define index_dir") unless ( $index_dir );
+	$self->index_name( $index_dir );
+	
     # we take as default format = 'FASTA';
-    unless ( $format ){
-      $format = 'FASTA';
-    }
+    $format = 'FASTA' unless ( $format );
 
-    print STDERR "making a OBDAIndex fetcher with db_name = $db_name, index_dir = $index_dir, format = $format\n"; 
+    print STDERR "Making an OBDAIndex fetcher with db_name: <$db_name>, index_dir: <".$self->index_name.">, format: <$format>\n"; 
 
-    my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $index_dir,
-						   -dbname    => $db_name,
-						   -format    => $format
-						 );
-
+    my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $self->index_name,
+						   						   -dbname    => $db_name,
+						   						   -format    => $format
+						   						   );
+						   						   
     $self->_seqfetcher($OBDAfetcher);
   }
 
@@ -152,20 +147,14 @@ sub _seqfetcher{
 =cut
 
 sub db {
-
   my ($self, $dbs) = @_;
-  if (!defined($self->{'_db'})) {
-    $self->{'_db'} = [];
+  $self->{'_db'} ||= [];
+  if (ref($dbs) eq 'ARRAY') {
+  	foreach my $db( @$dbs ){
+  		push (@{$self->{'_db'}},$db);
+  	}	
   }
-  if (defined $dbs){
-    if (ref($dbs) eq 'ARRAY') {
-      foreach my $db(@$dbs){
-	push (@{$self->{'_db'}},$db);
-      }
-    }
-  }
-  return (@{$self->{'_db'}});  
-  
+  return (@{$self->{'_db'}});
 }
 
 =head2 get_Seq_by_acc
