@@ -443,6 +443,18 @@ sub parse_results {
 sub split_gapped_feature {
     my ($self, $feat1, $feat2) = @_;
     
+    #There's a strange bug in wublastn where a gap is inserted at the end of an alignment
+    #The alignment is trimmed of any terminal gaps so that the alignment ends on a valid feature
+    while ($feat1->{'alignment'} =~ /-$/ || $feat2->{'alignment'} =~ /-$/)
+    {
+        $feat1->{'alignment'} =~ s/.$//;
+        $feat2->{'alignment'} =~ s/.$//;
+    }
+    #The terminal gap bug is so odd, it's probably worth checking for an initial gap
+    $self->throw("Alignment starts with a gap! F1\n"
+                .$feat1->{'alignment'}."\nF2\n".$feat2->{'alignment'}."\n")
+                if ($feat1->{'alignment'} =~ /^-/ || $feat2->{'alignment'} =~ /^-/);
+    
     my (@masked_f1, @masked_f2);
     #replace bases and gaps with positions and mask number
     @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'});
@@ -490,10 +502,16 @@ sub split_gapped_feature {
                     $feat2->{'end'}     = $f2_start;
                 }
                 
+                #print STDERR "Subfeat1: ".$feat1->{'start'}." - ".$feat1->{'end'}
+                #             ."\tSubfeat2: ".$feat2->{'start'}." - ".$feat2->{'end'}."\n";
+                
                 my $f1_len = $feat1->{'end'} - $feat1->{'start'} +1;
                 my $f2_len = $feat2->{'end'} - $feat2->{'start'} +1; 
-                $self->throw("FeaturePair lengths don't match! F1 ($f1_len) F2 ($f2_len)\n") 
-                        if ( $f1_len != $f2_len ); 
+                
+                $self->throw("FeaturePair lengths don't match! ".
+                        "F1 $f1_start - $f1_end ($f1_len) F2 $f2_start - $f2_end ($f2_len)\n") 
+                        if ( $f1_len != $f2_len );
+                 
                         
                 $self->createfeaturepair($feat1, $feat2);
                 $building_feature = 0;
@@ -521,6 +539,8 @@ sub mask_alignment {
     $_ = $alignment;
     my $valid_bases = tr/A-Za-z//;
     
+    #print STDERR "Start: $start Strand: $strand Len ".scalar(@array)." Valids $valid_bases\n";
+    
     my $base_count = ($strand == 1) ? $start : $start + ($valid_bases -1);
     
     foreach my $base (@array)
@@ -535,6 +555,8 @@ sub mask_alignment {
             push (@masked_array, -1);
         }   
     }
+    
+    #print STDERR "@masked_array\n";
     
     return @masked_array;
 }
