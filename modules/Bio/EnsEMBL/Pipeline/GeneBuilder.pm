@@ -219,7 +219,7 @@ sub build_Genes{
   print STDERR "pruning transcripts...\n";
   my @pruned_transcripts = $self->prune_Transcripts(@transcript_clusters);
   print STDERR scalar(@pruned_transcripts)." transcripts obtained\n";
-
+  
   # cluster transcripts into genes
   print STDERR "clustering into genes...\n";
   my @genes = $self->cluster_into_Genes(@pruned_transcripts);
@@ -228,11 +228,11 @@ sub build_Genes{
   print STDERR "Final_results:\n";
   my $count = 0;
   foreach my $gene ( @genes ){
-      $count++;
-      print STDERR "Gene $count:\n";
-      foreach my $tran ( @{$gene->get_all_Transcripts} ){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-      }
+    $count++;
+    print STDERR "Gene $count:\n";
+    foreach my $tran ( @{$gene->get_all_Transcripts} ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+    }
   }
 
   # final_genes is not working, check it!!
@@ -344,7 +344,14 @@ sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
 
   # first sort the transcripts
-  my @transcripts = sort by_transcript_high @mytranscripts;
+  my @transcripts = sort sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+				 if ($result){
+				     return $result;
+				 }
+				 else{
+				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+				 }
+			     } @mytranscripts;
 
   # create a new cluster 
   my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
@@ -757,10 +764,17 @@ sub cluster_into_Genes{
   print STDERR "clustering $num_trans transcripts into genes\n";
 
   
-  # flush old genes
+  # flusold genes
   #$self->flush_Genes;
   
-  my @transcripts = sort by_transcript_high @transcripts_unsorted;
+  my @transcripts = sort sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+				 if ($result){
+				     return $result;
+				 }
+				 else{
+				     return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+				 }
+			     } @transcripts_unsorted;
   my @clusters;
   
   # clusters transcripts by whether or not any exon overlaps with an exon in 
