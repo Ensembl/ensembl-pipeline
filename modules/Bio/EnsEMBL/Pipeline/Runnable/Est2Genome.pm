@@ -332,34 +332,47 @@ sub _createfeatures {
     my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
         $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
     
+
     #create analysis object
+#VAC this analysis object is causing no end of trouble bevause of its attributes ...
+
+#    my $analysis_obj    = new Bio::EnsEMBL::Analysis
+#                                (-db              => undef,
+#                                 -db_version      => undef,
+#                                 -program         => "est_genome",
+#                                 -program_version => "unknown",
+#                                 -gff_source      => $f1source,
+#                                 -gff_feature     => $f1primary,);
+ 
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
-                                (-db              => undef,
-                                 -db_version      => undef,
+                                (-db              => "none",
+                                 -db_version      => "none",
                                  -program         => "est_genome",
-                                 -program_version => "unknown",
+                                 -program_version => "none",
                                  -gff_source      => $f1source,
                                  -gff_feature     => $f1primary,);
     
 
     #create features
-    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>   $f1start,
-                                              -end =>      $f1end,
-                                              -seqname =>  $f1id,
-                                              -strand =>   $f1strand,
-                                              -score =>    $f1score,
-                                              -source_tag =>   $f1source,
-                                              -primary_tag =>  $f1primary,
-                                              -analysis => $analysis_obj );
+    my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
+                                              -end         =>   $f1end,
+                                              -seqname     =>   $f1id,
+                                              -strand      =>   $f1strand,
+                                              -score       =>   $f1score,
+					      -percent_id  =>   $f1score, 
+					      -source_tag  =>   $f1source,
+                                              -primary_tag =>   $f1primary,
+                                              -analysis    =>   $analysis_obj );
      
-   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start =>    $f2start,
-                                                -end =>      $f2end,
-                                                -seqname =>  $f2id,
-                                                -strand =>   $f2strand,
-                                                -score =>    $f1score,
-                                                -source_tag =>   $f2source,
-                                                -primary_tag =>  $f2primary,
-                                                -analysis => $analysis_obj );
+   my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
+                                              -end         =>   $f2end,
+                                              -seqname     =>   $f2id,
+                                              -strand      =>   $f2strand,
+                                              -score       =>   $f1score,
+					      -percent_id  =>   $f1score, 
+                                              -source_tag  =>   $f2source,
+                                              -primary_tag =>   $f2primary,
+                                              -analysis    =>   $analysis_obj );
     #create featurepair
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
