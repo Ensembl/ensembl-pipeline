@@ -40,7 +40,7 @@ Describe the object here
 
 Ensembl - ensembl-dev@ebi.ac.uk
 
-=head1 APPENDIX
+=head APPENDIX
 
 The rest of the documentation details each of the object
 methods. Internal methods are usually preceded with a _
@@ -74,14 +74,17 @@ sub new {
 }
 
 =head2 run
+ 
+      Arg: no argument
+Function : runs genomewise using as evidence the transcript stored in $self->each_Transcript and as sequence
+  the one stored in $self->seq. These are populated when the Runnable is created (see for instance EST_GeneBuilder
+  where MiniGenomewise runnables are created, or in Minigenomewise where Genomewise runnables are created in a 
+  miniseq.)
 
- Title   : run
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
+Returntype: it does not return anything, but instead it populates the get/set container $self->output with
+  a transcript with translation and UTRs (and exons, of course).
+  Exception : throws if in the reverse strand, genomewise cannot handle this. Also throws if the output
+  of does not make sense or if it calls an empty container.
 
 =cut
 
@@ -91,9 +94,12 @@ sub run{
   if( !defined $self->workdir ) {
     $self->workdir('/tmp');
   }
-  
   my $dir = $self->workdir();
+  
+  # file with the genomic sequence
   my $genome_file = "$dir/gowise_seq.$$";
+  
+  # file with the evidence
   my $evi_file    = "$dir/gowise_evi.$$";
   
   open(F,">$genome_file") || $self->throw("Could not open $genome_file $!");
@@ -105,13 +111,35 @@ sub run{
   $seqout = undef;
   close(F);
   
-  foreach my $t ( $self->each_Transcript ) {
-    foreach my $e ( $t->get_all_Exons ) {
+  #### collect info from transcripts and put it in evidence file
+  my %supp_evidence;
+  foreach my $transcript ( $self->each_Transcript ) {
+    
+    print STDERR "In Genomewise, before going through genomewise\n";
+    my $excount = 0;
+    foreach my $exon ( $transcript->get_all_Exons ) {
+      $excount++;
 
-      if( $e->strand == -1 ) {
+      # store supporting evidence
+      my @evi = $exon->each_Supporting_Feature;
+      #print STDERR "Exon $excount: ".scalar(@evi)." features\n";
+
+      $supp_evidence{ $exon } = \@evi;
+
+      ## test
+      if (@evi){
+	#foreach my $evi ( @evi ){
+	#  print STDERR $evi." - ".$evi->gffstring."\n";
+	#}
+      }
+      else{
+	print STDERR "No supporting evidence\n";
+      }
+      
+      if( $exon->strand == -1 ) {
 	$self->throw("Genomewise cannot handle reverse strand exons. Must flip outside");
       }
-      print E "exon ",$e->start," ",$e->end,"\n";
+      print E "exon ",$exon->start," ",$exon->end,"\n";
     }
     print E "//\n";
   }
@@ -123,6 +151,7 @@ sub run{
 #  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
 #  open(GW,"</tmp/test.out");
   
+
 # in acari, genomewise is in '/nfs/acari/birney/prog/wise2/src/bin/'
 # or in '/usr/local/ensembl/bin/genomewise'
 
@@ -133,9 +162,8 @@ sub run{
 #### Steve's version (fixed)
 
   open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
-  
-  # we try now without -smell 4
 
+  
   # parse gff output for start, stop, strand, phase
   my $genename = '';
 
@@ -145,135 +173,221 @@ sub run{
 
       /\/\// && last;
       if( /Gene/ ) {
-
-	  my $t = Bio::EnsEMBL::Transcript->new();
-	  my $trans = Bio::EnsEMBL::Translation->new();
-	  $t->translation($trans);
-	  push(@{$self->{'_output_array'}},$t);
-
-	  my $seen_cds = 0;
-	  my $seen_utr3 = 0;
-	  my $prev = undef;
-	  while( <GW> ) {
-	    print STDERR "$_";
-	      chomp;
-	      #print "Seen $_\n";
-	      if( /End/ ) {
-		  if( $seen_utr3 == 0 ) {
-		  #  print STDERR "Seen utr - setting end to prev\n";
-		      # ended on a cds 
-		      $trans->end_exon($prev);
-		      $trans->end($prev->length);
-		  }
-		  next GENE;
-	      }
-
-	      if( /utr5\s+(\d+)\s+(\d+)/) {
-		  my $start = $1;
-		  my $end   = $2;
-		  my $strand = 1;
-
-		  my $exon = Bio::EnsEMBL::Exon->new();
-		  $exon->start($start);
-		  $exon->end  ($end);
-		  $exon->strand($strand);
-		  # there isn't really a phase in teh UTR exon, but we set it to -1 otherwise later stages fail
-		  $exon->phase(-1); 
-		  $t->add_Exon($exon);
-		  $prev = $exon;
-		  next;
-	      }
-	      if( /cds\s+(\d+)\s+(\d+)\s+phase\s+(\d+)/ ) {
-		  my $start = $1;
-		  my $end   = $2;
-		  my $strand = 1;
-		  my $phase = $3;
-
-		  my $cds_start = $start;
-		  my $exon;
-		  if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
-		      # we have an abutting utr5
-		      $start = $prev->start();
-		      $exon  = $prev;
-		    } else {
-		    # make a new Exon
-		      $exon  = Bio::EnsEMBL::Exon->new();
-		      $t->add_Exon($exon);
-		  }
-		  $exon->start($start);
-		  $exon->end  ($end);
-		  $exon->strand($strand);
-		  $exon->phase($phase);
-
-		  if( $seen_cds == 0 ) {
-		    $trans->start_exon($exon);
-		    $trans->start($cds_start-$start+1);
-		  }
-		  $seen_cds = 1;
-		  $prev = $exon;
-		  next;
-	      }
-
-	      if( /utr3\s+(\d+)\s+(\d+)/ ) {
-	#	print "Found utr3\n";
-		  my $start = $1;
-		  my $end   = $2;
-		  my $strand = 1;
-		  
-		  my $orig_end;
-		  my $exon;
-		  if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
-
-		    #   abutting 3utr
-		    #      _____________
-		    #...--|______|______|--...
-		    #   cds($prev) utr3
-
-		    $orig_end = $prev->end;
-		    $exon     = $prev;
-		    $start    = $prev->start;
-
-		  } else {
-
-		    #   not abutting; should be fine.
-		    $exon =  Bio::EnsEMBL::Exon->new();
-		    $t->add_Exon($exon);
-		    $exon->phase(-1); 
-		  }
-		  
-		  # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
-
-		  $exon->start($start);
-		  $exon->end  ($end);
-		  $exon->strand($strand);
-
-		  if( $seen_utr3 == 0 ) {
-		      if( !defined $orig_end ) {
-			  $self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
-		      } else {
-			  $trans->end_exon($exon);
-			  
-			  # position of the end of translation in exon-local coordinates
-			  $trans->end($orig_end - $start + 1);
-		      }
-		  }
-		  $seen_utr3 = 1;
-		  next;
-		}
-	    
-	    # else - worrying 
-	    
-	    chomp;
-	    $self->throw("Should not able to happen - unparsable line in geneutr $_");
+	
+	my $t = Bio::EnsEMBL::Transcript->new();
+	my $trans = Bio::EnsEMBL::Translation->new();
+	$t->translation($trans);
+	$self->output($t);
+	#push(@{$self->{'_output_array'}},$t);
+	
+	my $seen_cds = 0;
+	my $seen_utr3 = 0;
+	my $prev = undef;
+	while( <GW> ) {
+	  print STDERR "$_";
+	  chomp;
+	  #print "Seen $_\n";
+	  if( /End/ ) {
+	    if( $seen_utr3 == 0 ) {
+	      #  print STDERR "Seen utr - setting end to prev\n";
+	      # ended on a cds 
+	      $trans->end_exon($prev);
+	      $trans->end($prev->length);
+	    }
+	    next GENE;
 	  }
+	  
+	  if( /utr5\s+(\d+)\s+(\d+)/) {
+	    my $start = $1;
+	    my $end   = $2;
+	    my $strand = 1;
+	    
+	    my $exon = Bio::EnsEMBL::Exon->new();
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->strand($strand);
+	    # there isn't really a phase in teh UTR exon, but we set it to -1 otherwise later stages fail
+	    $exon->phase(-1); 
+	    $t->add_Exon($exon);
+	    $prev = $exon;
+	    next;
+	  }
+	  if( /cds\s+(\d+)\s+(\d+)\s+phase\s+(\d+)/ ) {
+	    my $start = $1;
+	    my $end   = $2;
+	    my $strand = 1;
+	    my $phase = $3;
+	    
+	    my $cds_start = $start;
+	    my $exon;
+	    if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
+	      # we have an abutting utr5
+	      $start = $prev->start();
+	      $exon  = $prev;
+	    } else {
+	      # make a new Exon
+	      $exon  = Bio::EnsEMBL::Exon->new();
+	      $t->add_Exon($exon);
+	    }
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->strand($strand);
+	    $exon->phase($phase);
+	    
+	    if( $seen_cds == 0 ) {
+	      $trans->start_exon($exon);
+	      $trans->start($cds_start-$start+1);
+	    }
+	    $seen_cds = 1;
+	    $prev = $exon;
+	    next;
+	  }
+	  
+	  if( /utr3\s+(\d+)\s+(\d+)/ ) {
+	    #	print "Found utr3\n";
+	    my $start = $1;
+	    my $end   = $2;
+	    my $strand = 1;
+	    
+	    my $orig_end;
+	    my $exon;
+	    if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
+	      
+	      #   abutting 3utr
+	      #      _____________
+	      #...--|______|______|--...
+	      #   cds($prev) utr3
+	      
+	      $orig_end = $prev->end;
+	      $exon     = $prev;
+	      $start    = $prev->start;
+	      
+	    } else {
+	      
+	      #   not abutting; should be fine.
+	      $exon =  Bio::EnsEMBL::Exon->new();
+	      $t->add_Exon($exon);
+	      $exon->phase(-1); 
+	    }
+	    
+	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
+	    
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->strand($strand);
+	    
+	    if( $seen_utr3 == 0 ) {
+	      if( !defined $orig_end ) {
+		$self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
+	      } else {
+		$trans->end_exon($exon);
+		
+		# position of the end of translation in exon-local coordinates
+		$trans->end($orig_end - $start + 1);
+	      }
+	    }
+	    $seen_utr3 = 1;
+	    next;
+	  }
+	  
+	  # else - worrying 
+	  
+	  chomp;
+	  $self->throw("Should not able to happen - unparsable line in geneutr $_");
 	}
+      }
       chomp;
       #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
       $self->throw("Should not able to happen - unparsable in between gene line $_");
     }
-  print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
-# foreach my $t ( @{ $self->{'_output_array'} } ){
-#    print STDERR "\nIn Genomewise.run\n";
+  #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
+  
+
+  ##### need to put back the supporting evidence
+  # since exons have been created anew, need to check overlaps
+  my @trans_out = $self->output;
+  my @trans_in  = $self->each_Transcript;
+  
+  # let's try to make it fast:
+  if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
+    my @exons_in  = $trans_in[0] ->get_all_Exons;
+    my @exons_out = $trans_out[0]->get_all_Exons;
+    
+    # most of the time the numbers of exons doesn't vary
+    if ( scalar( @exons_in ) == scalar ( @exons_out ) ){
+      print STDERR "passing evi info between 2 transcripts with same number of exons\n";
+      while ( scalar ( @exons_in ) > 0 ){
+	my $exon_in  = shift( @exons_in  );
+	my $exon_out = shift( @exons_out );  
+	
+	# check just in case
+	if ( $exon_in->overlaps( $exon_out ) ){
+	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	    $exon_out->add_Supporting_Feature( $feature );
+	  }
+	}
+	else{
+	  $self->throw("Try to pass evidence between exons that do not overlap, this is not good!");
+	}
+      }
+    }
+    else{
+      # if not the same number of exons, we cannot know how the split happened
+      print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+      foreach my $exon_in ( @exons_in ){
+	foreach my $exon_out( @exons_out ){
+	  if ( $exon_out->overlaps($exon_in) ){
+	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	      $exon_out->add_Supporting_Feature( $feature );
+	    }
+	  }
+	}
+      }
+    }
+
+  }
+  else{
+    # if we have more than one transcript at one or both sides, we also have to check them all
+    print STDERR "passing evi info between more than 2 transcripts\n";
+    foreach my $tran_in ( @trans_in){
+      my @exons_in  = $trans_in[0] ->get_all_Exons;
+      
+      foreach my $tran_out ( @trans_out ){
+	my @exons_out = $trans_out[0]->get_all_Exons;
+	
+	foreach my $exon_in ( @exons_in ){
+	  
+	  foreach my $exon_out( @exons_out ){
+	    if ( $exon_out->overlaps($exon_in) ){
+	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+		$exon_out->add_Supporting_Feature( $feature );
+	      }
+	    }
+	  }
+	}
+      }
+    }   
+  }
+    
+  ## now we check that all the evi info has been correctly passed
+  foreach my $tran_out ( @trans_out ){
+    print STDERR "In Genomewise, AFTER going through genomewise\n";
+    my $count = 0;
+    foreach my $exon_out ( $tran_out->get_all_Exons ) {
+      $count++;
+      my @evi = $exon_out->each_Supporting_Feature;
+      #print "Exon $count: ".scalar(@evi)." features\n";
+      if (@evi){
+  	#foreach my $evi ( @evi ){
+        #print STDERR $evi." - ".$evi->gffstring."\n";
+  	#}
+      }
+      else{
+  	print STDERR "No supporting evidence\n";
+      }
+    }
+  }
+
 #    print STDERR " Transcript  : ".$t."\n";
 #    print STDERR " Translation : ".$t->translation."\n";
 #    print STDERR " translation starts: ".$t->translation->start."\n";
@@ -306,9 +420,14 @@ sub run{
 =cut
 
 sub output{
-   my ($self,@args) = @_;
-
-   return @{$self->{'_output_array'}};
+  my ($self,@args) = @_;
+  unless ( $self->{'_output_array'} ){
+    $self->{'_output_array'} = [];
+  }
+  if ( @args ){
+    push ( @{$self->{'_output_array'}}, @args );
+  }
+  return @{$self->{'_output_array'}};
 }
 
 
