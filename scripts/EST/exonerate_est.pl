@@ -43,7 +43,7 @@ my $tmpoutfile;
 
 my $estfile = $estfiledir . "/" . $chunkname;
 
-my $command = "$runner -runnable $runnable -dbname $dbname -dbuser $dbuser -host $host -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
+my $command = "$runner -runnable $runnable -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
 
 print STDERR "command is $command\n";
 
@@ -104,7 +104,7 @@ sub get_variables {
   }
 
   # output directories have been created by make_bsubs.pl
-  $outdir .= "/exonerate_est/result/";
+  $outdir .= "/exonerate_est/results/";
   my $errdir = $outdir . "stderr/";
   $outdir .= "stdout/";
 
