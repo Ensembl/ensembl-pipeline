@@ -1,6 +1,6 @@
 #
 # Written by Jan-Hinnerk Vogel
-#
+# jhv [at] sanger.ac.uk
 # Copyright GRL/EBI 2004
 #
 # You may distribute this module under the same terms as perl itself
@@ -28,9 +28,6 @@ use Bio::EnsEMBL::Analysis;
 
 
 sub new {
-#  my ($class,@args) = @_;
-#  my $self = $class->SUPER::new(@args);
-
   my ($class,@args) = @_;
   my $self={};  #construct empty hash
   bless $self,$class;
