@@ -46,6 +46,7 @@ use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
 use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+use Bio::Root::Object;
 
 use FreezeThaw qw(freeze thaw);
 
