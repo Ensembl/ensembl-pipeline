@@ -41,6 +41,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 					                     GB_DBNAME
 					                     GB_DBUSER
 					                     GB_DBPASS
+							     GB_DBPOT
                                                             );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts  qw  (
@@ -54,6 +55,7 @@ my $port   = undef;
 my $dbname = $GB_DBNAME;
 my $dbuser = $GB_DBUSER;
 my $dbpass = $GB_DBPASS;
+my $dbport = $GB_DBPORT;
 
 my $runnable;
 my $input_id;
@@ -89,6 +91,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $dbpass,
+    -port             => $dbport,
     -perlonlyfeatures => 0,
 );
 

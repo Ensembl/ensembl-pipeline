@@ -37,6 +37,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_DBUSER
 							     GB_DBHOST
 							     GB_DBPASS
+							     GB_DBPORT
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
@@ -49,6 +50,7 @@ my $dbname = $GB_DBNAME;
 my $dbuser = $GB_DBUSER;
 my $host   = $GB_DBHOST;
 my $pass   = $GB_DBPASS;
+my $port   = $GB_DBPORT;
 my $pmfile = $GB_PM_OUTPUT;
 if(defined $pmfile && $pmfile ne ''){
   $pmfile .= "/pm_best.out";
@@ -77,6 +79,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $pass,
+    -port             => $port,
 );
 
 #$db->assembly_type($path);
