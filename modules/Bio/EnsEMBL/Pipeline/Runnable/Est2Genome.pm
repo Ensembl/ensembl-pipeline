@@ -59,9 +59,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis;
-#compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
+use Bio::EnsEMBL::Analysis; 
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
@@ -105,16 +103,17 @@ sub new {
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
     print STDERR "Genomic $genomic\n"; 
-    $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
-    $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
+    $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq    
+   $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
+
     {   $self->est_genome($est_genome) ;}
-    else
-    {   
+   else
+  {   
         eval 
         { $self->est_genome($self->locate_executable('est_genome')); };
         if ($@)
-        { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
+        { $self->est_genome('/usr/local/ensembl/bin/est_genome'); }
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}

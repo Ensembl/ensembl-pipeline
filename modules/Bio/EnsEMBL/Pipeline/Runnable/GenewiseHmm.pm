@@ -89,9 +89,23 @@ sub run {
 
 sub output {
     my ($self) = @_;
+    print "output from genewiseHmm\n";
+    my @out = $self->eachGene;
+    print "there are ".scalar(@out)." results\n"; 
+   # my @exons = $self->eachExon;
+    
+#    foreach my $exon (@exons){
+#      print "made exon ".$exon->seqname." from ".$exon->id." start = ".$exon->start." end = ".$exon->end." strand = ".$exon->strand." phase = ".$exon->phase."\n"; 
+      
+#      my @feat = $exon->sub_SeqFeature();
+#      foreach my $f (@feat){
+#	print $f->gffstring . "\n";
+#      }
 
-#    return $self->eachGene;
-    return $self->eachExon;
+#    }
+
+#    return $self->eachExon;
+    return @out;
 }
 
 # Now the blastwise stuff
@@ -127,7 +141,9 @@ sub _wise_init {
 =cut
 
 
+
 sub _align_protein {
+ 
   my ($self, $dir) = @_;
   my $memory   = $self->memory;
   $self->workdir('/tmp') unless ($self->workdir($dir));
@@ -137,11 +153,11 @@ sub _align_protein {
   
   my $genio  = Bio::SeqIO->new (-file   => ">$genfile",
 			      '-format' => 'fasta');
-  
+  my $gene_count = 0;
+
   $genio->write_seq($self->genomic);
   $genio = undef;
-  print "running genewisehmm\n";
-  system('pwd');
+  
   my ($hmmname) = $self->hmmfile =~ /PF\d+/g;
 
   my $genewise = $self->genewise;
@@ -164,28 +180,30 @@ sub _align_protein {
   # for genesf parsing
   my @genesf_exons;
   my $curr_exon;
-  my $curr_gene;
-
-  # making assumption of only 1 gene prediction ... this will change once we start using hmms
+  my $curr_gene  = new Bio::EnsEMBL::SeqFeature;
+  
+ #print "parseing output\n"; # making assumption of only 1 gene prediction ... this will change once we start using hmms
  GENESF: while (<GW>) {
     chomp;
     my @f = split;
 
-    
-
-    next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting'));
+    next unless (defined $f[0] && ($f[0] eq 'Gene' || $f[0] eq 'Exon' || $f[0] eq 'Supporting') && ($f[1] ne 'Paras:'));
     
     if($f[0] eq 'Gene'){
+      # flag a frameshift - ultimately we will do something clever here but for now ...
+      if($f[0] eq 'Gene'){
 	if (/^(Gene\s+\d+)$/){
-	  print STDERR "1: $1\n";
-	if(!defined($curr_gene)){
-	  $curr_gene = $1;
+	  $curr_gene->seqname($1);
 	  print STDERR "CURRENT GENE: $curr_gene\n";
+	  $curr_gene->start(1);
+	  $curr_gene->end($self->genomic->length());
+	  print "adding gene to output\n";
+	  $self->addGene($curr_gene);
+	  $gene_count++;
 	}
       }
-    }
 
-    elsif($f[0] eq 'Exon'){
+    }elsif($f[0] eq 'Exon'){
       #      make a new "exon"
       $curr_exon = new Bio::EnsEMBL::SeqFeature;
       $curr_exon->seqname  ($self->genomic->id);
@@ -208,7 +226,7 @@ sub _align_protein {
       $curr_exon->end($end);
       $curr_exon->strand($strand);
 
-      $self->addExon($curr_exon);
+      $curr_gene->add_sub_SeqFeature($curr_exon, '');
       push(@genesf_exons, $curr_exon);
     }
     
@@ -252,15 +270,14 @@ sub _align_protein {
 	  $curr_exon->add_sub_SeqFeature($fp,'');
     }
 
-  } 
+  }
   
   close(GW) or $self->throw("Error running genewise:$!\n");
-  
+  #print "there are ",$gene_count." genes predicted using ".$hmmname." hmm\n";
   unlink $genfile;
   unlink $gwfile;
+  
 }
-
-
 # These all set/get or initializing methods
 
 sub is_reverse {
@@ -332,6 +349,26 @@ sub hmmfile{
     }
     return $obj->{'hmmfile'};
 
+}
+
+sub addGene {
+    my ($self,$arg) = @_;
+    #print "adding ".$arg."to ouput\n";
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
+      }
+    push(@{$self->{'_output'}},$arg);
+    #print "there are ".scalar(@{$self->{'_output'}})." genes\n";
+}
+
+sub eachGene {
+    my ($self) = @_;
+    #print "returing all genes\n";
+    if (!defined($self->{'_output'})) {
+	$self->{'_output'} = [];
+    }
+    #print "there are ".scalar(@{$self->{'_output'}})." genes\n";
+    return @{$self->{'_output'}};
 }
 
 sub addExon {

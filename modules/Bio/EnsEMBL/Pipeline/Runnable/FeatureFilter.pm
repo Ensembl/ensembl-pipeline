@@ -68,7 +68,7 @@ sub new {
 							 @args);
 
 
-
+  #print "@args\n";
   $minscore  = -100000 if !defined $minscore;
   $maxevalue = 0.1     if !defined $maxevalue;
   $coverage  = 10      if !defined $coverage;
@@ -99,7 +99,7 @@ sub new {
 
 sub run{
    my ($self,@input) = @_;
-
+   #print "running feature filter\n";
    my ($minscore,$maxevalue,$coverage);
 
    $minscore = $self->minscore;
