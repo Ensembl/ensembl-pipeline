@@ -30,7 +30,7 @@ Exonerate is a fast EST:genomic alignment program written by Guy Slater.
 This object runs exonerate over input EST and genomic sequences, and stores the 
 exonerate matches as an array of Bio::EnsEMBL::FeaturePair
 
-The passed in $genseq and $estseq are references to arrays of Bio::Seq; exonerate 
+The passed in $genseq and $estseq can be filenames or references to arrays of Bio::Seq; exonerate 
 runs faster if given multiple query sequences at once. 
 
 =head2 Methods:
@@ -80,7 +80,7 @@ sub new {
   $self->{'_clone'}     = undef;        #location of Bio::Seq object
   $self->{'_exonerate'} = undef;     #location of exonerate
   $self->{'_workdir'}   = undef;     #location of temp directory
-  $self->{'_filename'}  =undef;      #file to store Bio::Seq object
+  $self->{'_genfilename'}  =undef;      #file to store Bio::Seq object
   $self->{'_estfilename'} = undef;   #file to store EST Bio::Seq object
   $self->{'_results'}     = undef;      #file to store results of analysis
   $self->{'_protected'}   = [];         #a list of files protected from deletion
@@ -93,18 +93,18 @@ sub new {
 
   # allow it to take a filename or an array ref
   $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
-  if ($exonerate) 
-  {   $self->exonerate($exonerate) ;}
-  else
-  {   
-      eval 
+  if ($exonerate) {   
+    $self->exonerate($exonerate) ;
+  }
+  else {   
+    eval 
       { $self->exonerate($self->locate_executable('exonerate')); };
-      if ($@)
-	  # need a central installation ...
+    if ($@)
+      # need a central installation ...
       { $self->throw("Can't find exonerate!"); }
   }
   if ($arguments) 
-  {   $self->arguments($arguments) ;}
+    {   $self->arguments($arguments) ;}
   
   return $self;
 }
@@ -113,12 +113,12 @@ sub new {
 # get/set methods 
 #################
 =head2 genomic_sequence
-
+  
     Title   :   genomic_sequence
     Usage   :   $self->genomic_sequence($seq)
     Function:   Get/set method for genomic sequences
-    Returns :   Bio::PrimarySeqI
-    Args    :   Bio::PrimarySeqI
+    Returns :   Bio::PrimarySeqI, or filename
+    Args    :   Bio::PrimarySeqI, or filename
 
 =cut
 
@@ -126,12 +126,18 @@ sub genomic_sequence {
   my( $self, $value ) = @_;    
   
   if (defined $value) {
-    $self->throw("Input isn't a Bio::PrimarySeqI") unless $value->isa("Bio::PrimarySeqI");
-    $self->{'_genomic_sequence'} = $value;
-    $self->filename($value->id.".$$.seq");
-    $self->results($self->filename.".exonerate.out");
+    if( $value->isa("Bio::PrimarySeqI") ){
+      $self->{'_genomic_sequence'} = $value;
+      $self->genfilename("/tmp/genfile_.$$.fn");
+    }
+    else {
+      # assume it's a filename - check the file exists
+      $self->throw("[$value] : file does not exist\n") unless -e $value;
+      $self->genfilename($value);
+      $self->{'_genomic_sequence'} = $value;
+    }
   }
-  # returns a Bio::Seq
+  
   return $self->{'_genomic_sequence'};
 }
 
@@ -223,23 +229,36 @@ sub estfilename {
   return $self->{'_estfilename'};
 }
 
+
+=head2 genfilename
+
+    Title   :   genfilename
+    Usage   :   $self->genfilename($filename)
+    Function:   Get/set method for genfilename
+    Returns :   
+    Args    :   
+
+=cut
+
+sub genfilename {
+  my ($self, $genfilename) = @_;
+  $self->{'_genfilename'} = $genfilename if ($genfilename);
+  return $self->{'_genfilename'};
+}
+
 =head2 run
 
   Title   : run
   Usage   : $self->run()
-            or
-            $self->run("genomic.seq", "est.seq")
   Function: Runs exonerate and stores results as FeaturePairs
   Returns : TRUE on success, FALSE on failure.
-  Args    : Temporary filenames for genomic and est sequences
+  Args    : 
 
 =cut
 
 sub run {
   my ($self, @args) = @_;
-  $self->workdir('/tmp');
-  
-  # this method needs serious tidying
+
   #check inputs
   my $genomicseq = $self->genomic_sequence ||
     $self->throw("Genomic sequences not provided");
@@ -247,22 +266,21 @@ sub run {
     $self->throw("EST sequences not provided");
   
   #extract filenames from args and check/create files and directory
-  my $genfile = "/tmp/genfile_$$.fn";
+  my $genfile = $self->genfilename;
   my $estfile = $self->estfilename;
   
-  #use appropriate Bio::Seq method to write fasta format files
-  {
+  # do we need to write out the genomic sequence?
+  if($genomicseq->isa("Bio::PrimarySeqI")){
     my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
-       #fill inputs
+    
     $genOutput->write_seq($genomicseq);
   }
-  
+    
   # do we need to write out the est sequences?
   if(ref($estseq) eq 'ARRAY'){
     my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
       or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
-    
     
     foreach my $eseq(@$estseq) {
       $estOutput->write_seq($eseq);
@@ -270,151 +288,136 @@ sub run {
   }
   
   # finally we run the beast.
-
-  $self->results($self->workdir()."/".$self->results());
-  my $exonerate_command = $self->exonerate() . " -w 14 -t 65 -H 100 -D 15 -m 768 -n yes -A false --cdna $estfile --genomic $genfile >" . $self->results();
+  my $command = $self->exonerate() . " -w 14 -t 65 -H 100 -D 15 -m 500 -n yes -A false -G yes --cdna $estfile --genomic $genfile";
   
   eval {
-    # better to do this as a pipe?
-    print (STDERR "Running command $exonerate_command\n");
-    $self->throw("Error running exonerate on ".$self->filename."\n") 
-      if (system ($exonerate_command)); 
-    $self->parse_results();
+    print (STDERR "Running command $command\n");
+    open(EXONERATE, "$command |") or $self->throw("Error running exonerate on ".$self->genfilename."\n"); 
+
+    # some constant strings
+    my $source_tag  = "exonerate";
+    
+    #read output
+    my $estname   = undef;
+    my $genname   = "";
+    my %gff;
+    my $prevstate = "cigar";
+
+    # exonerate output is split up by est.
+    # gff comes first, then all the cigar lines
+    # so we can process all the gff, then all the cigar lines.
+    # if we keep track of when we flip from cigar to gff, we know we're moving on to the next est.
+    while(<EXONERATE>){
+      # gff
+      if(/\S+\s+exonerate\s+exon\s+\d+/){
+
+	# is this the first gff? ie have we moved onto a new est?
+	if($prevstate eq 'cigar') {
+	  $prevstate = 'gff';
+	  $estname = undef;
+	  foreach my $entry( keys %gff) {
+	    delete $gff{$entry};
+	  }
+	}
+
+	# M93650  exonerate       exon    14193   14292   .       +       .       gene_id 8       ;       
+	# exon_id 1       ;       insertions      0       ;       deletions 0       ;       
+	# percent_id      100.000
+	my @cols = split /;/;
+	my $pid = $cols[$#cols];
+	$pid =~ /(\d+)\./;
+	$pid = $1;
+	
+	my @coords = split /\s+/, $cols[0];
+	$estname = $coords[0] unless defined $estname;
+	$self->throw("$coords[0] does not match $estname") unless $coords[0] eq $estname;
+
+	# key by start-end-strand
+	my $start = $coords[3]; 
+	$start--;# presently off by one wrt cigar
+	my $idstring = $start . "-" . $coords[4] . "-" . $coords[6];
+	$gff{$idstring} = $pid;
+      }
+
+      #cigar
+      elsif ($_ =~ /cigar/) {
+	next if($_ =~ /^Message/);
+	
+	$prevstate = 'cigar';
+
+	#split on whitespace
+	my @elements = split;
+	
+	next unless $elements[0] eq 'cigar:';
+	
+	my $primary_tag    = 'exonerate';
+	my $source_tag     = 'exonerate';
+	my $genomic_start  = $elements[6];
+	my $genomic_end    = $elements[7];
+	my $genomic_id     = $elements[5];
+	my $est_id         = $elements[1];
+	my $est_start      = $elements[2];
+	my $est_end        = $elements[3];
+	
+	# can we continue?
+	$self->throw("$estname(gff) and $est_id(cigar) do not match!") unless $estname eq $est_id;
+
+	# find percent id from %gff
+	my $querystr = $genomic_start . "-" . $genomic_end . "-" . $elements[4];
+	my $pid = $gff{$querystr};
+
+	# not every cigar prediction has a correspinding gff exon
+	if(!defined($pid)) { $pid = -1; }
+
+	# est seqname
+	my $genomic_score  = $elements[9];
+	if ($genomic_score eq ".") { $genomic_score = 0; } 
+	my $est_score = $genomic_score;
+	
+	my $genomic_source = $source_tag;
+	my $est_source = $source_tag;
+	
+	my $genomic_strand = 1;
+	if ($elements[4] eq '-') {
+	  $genomic_strand = -1;
+	}
+	my $est_strand = 1;
+	if ($elements[8] eq '-') {
+	  $est_strand = -1;
+	}
+
+	my $genomic_primary = $primary_tag;
+	my $est_primary = $primary_tag;
+
+	$self->_createfeatures ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
+				$est_start, $est_end, $est_id, 
+				$genomic_source, $est_source, 
+				$genomic_strand, $est_strand, 
+				$genomic_primary, $est_primary);
+      }    
+    }
+    
+    
+    close (EXONERATE);
+    
     $self->convert_output();
   };  
   
   #clean up temp files
-  if(ref($estseq) eq 'ARRAY'){
-    $self->_deletefiles($genfile, $estfile, $self->results);
+  if(ref($estseq) eq 'ARRAY' ) {
+    $self->_deletefiles($estfile);
   }
-  else {
-    $self->_deletefiles($genfile, $self->results);
+  
+  if($genomicseq->isa("Bio::PrimarySeqI")) {
+    $self->_deletefiles($genfile);
   }
+  
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
   else {
     return (1);
   }
-}
-
-=head2 parse_results
-  
-    Title   :   parse_results
-    Usage   :   $obj->parse_results($filename)
-    Function:   Parses exonerate output to give a set of features
-                parsefile can accept filenames, filehandles or pipes (\*STDIN)
-    Returns :   none
-    Args    :   optional filename
-
-=cut
-
-sub parse_results {
-  my ($self, $filehandle) = @_;
-
-  # some constant strings
-  my $source_tag  = "exonerate";
-  #  my $primary_tag = "similarity";
-  my $resfile = $self->results();
-  if (-e $resfile) {
-    open (EXONERATE, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
-    $filehandle = \*EXONERATE;
-  }
-  else { #it'a a filehandle
-    $filehandle = $resfile;
-  }
-  
-  #read output
-  my $queryname = "";
-  while (<$filehandle>) {
-    
-# VAC temporary-ish changes - we're not using exonerate fully at the moment.
-# output parsing needs to be rahashed once exonerate is stable
-
-#    if ($_ =~ /exonerate/) {
-    if ($_ =~ /cigar/) {
-      next if($_ =~ /^Message/);
-
-      #split on whitespace
-      my @elements = split;
-
-#      if( $elements[1] ne 'exonerate' ) { next; }
-      next unless $elements[0] eq 'cigar:';
-
-      if($_ =~ /query\s+\"(\w+)\"/) {
-	$queryname = $1;
-      }
-
-# cigar parsing needs a LOT of looking at
-      # cigar: gi|550092|dbj|D29023.1|D29023 0 311 + static0 1996 2307 + 1555.00 M 311
-      #extract values from output line [0] - [7]
-
-#      my $primary_tag = $elements[2];
-      my $primary_tag = 'Gene';
-
-      my $genomic_start  = $elements[6];
-      my $genomic_end    = $elements[7];
-      my $genomic_id     = $elements[5];
-      # start & end on EST sequence are not currently given by exonerate output ...
-      my $est_id     = $elements[1];
-      my $est_start  = $elements[2];
-      my $est_end    = $elements[3];
-      
-      # est seqname
-      my $genomic_score  = $elements[9];
-      if ($genomic_score eq ".") { $genomic_score = 0; } 
-      my $est_score = $genomic_score;
-
-      my $genomic_source = $source_tag;
-      my $est_source = $source_tag;
-
-      my $genomic_strand = 1;
-      if ($elements[4] eq '-') {
-	$genomic_strand = -1;
-      }
-      my $est_strand = 1;
-      if ($elements[8] eq '-') {
-	$est_strand = -1;
-      }
-
-      # currently doesn't deal well with - strand ... genes
-      my $genomic_primary = $primary_tag;
-      my $est_primary = $primary_tag;
-      
-
-#      my $primary_tag = $elements[2];
-#      my $f1score  = $elements[5];
-#      if ($f1score eq ".") { $f1score = 0; } # only genes have a score
-#      my $f1start  = $elements[3];
-#      my $f1end    = $elements[4];
-#      my $f1id     = $elements[0];
-#      # start & end on EST sequence are not currently given by exonerate output ...
-#      my $f2start  = 1;
-#      my $f2end    = 1;
-      
-#      # est seqname
-#      my $f2id     = $queryname;
-#      my $f1source = $source_tag;
-#      my $f2source = $source_tag;
-#      my $f1strand = 1;
-#      if ($elements[6] eq '-') {
-#	$f1strand = -1;
-#      }
-#      # currently doesn't deal well with - strand ... genes
-#      #	  my $f2strand = $estOrientation;
-#      my $f2strand = $f1strand;
-#      my $f1primary = $primary_tag;
-#      my $f2primary = $primary_tag;
-      
-      #create array of featurepairs              
-      $self->_createfeatures ($genomic_score, $genomic_start, $genomic_end, $genomic_id, 
-			      $est_start, $est_end, $est_id, 
-			      $genomic_source, $est_source, 
-			      $genomic_strand, $est_strand, 
-			      $genomic_primary, $est_primary);
-    }    
-  }
-  close($filehandle);
 }
 
 =head2 convert_output
@@ -478,13 +481,14 @@ sub output {
 # TEMPORARY FIXME
 #  return @{$self->{'_output'}};
 #  return @{$self->{'_fplist'}};
-  return $self->{'_fplist'}; # ref to an array
+#  return $self->{'_fplist'}; # ref to an array
+  return @{$self->{'_fplist'}}; 
 }
 
 =head2 _create_features
 
   Title   : _create_features
-  Usage   : $self->_create_features($f1score, $f1start, $f1end, $f1id, 
+  Usage   : $self->_create_features($f1score, $f1pid$f1start, $f1end, $f1id, 
 				    $f2start, $f2end, $f2id, $f1source, 
 				    $f2source, $f1strand, $f2strand, 
 				    $f1primary, $f2primary)
@@ -495,7 +499,7 @@ sub output {
 =cut
 
 sub _createfeatures {
-  my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
+  my ($self, $f1score, $f1pid, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
       $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary) = @_;
 
   #create analysis object
@@ -509,15 +513,12 @@ sub _createfeatures {
   
   
   #create features
-
-  #print STDERR "Creating with $f1start $f1end \n";
-
   my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
 					     -end         =>   $f1end,
 					     -seqname     =>   $f1id,
 					     -strand      =>   $f1strand,
 					     -score       =>   $f1score,
-					     -percent_id  =>   $f1score, 
+					     -percent_id  =>   $f1pid, 
 					     -source_tag  =>   $f1source,
 					     -primary_tag =>   $f1primary,
 					     -analysis    =>   $analysis_obj );
@@ -527,7 +528,7 @@ sub _createfeatures {
 					     -seqname     =>   $f2id,
 					     -strand      =>   $f2strand,
 					     -score       =>   $f1score,
-					     -percent_id  =>   $f1score, 
+					     -percent_id  =>   $f1pid, 
 					     -source_tag  =>   $f2source,
 					     -primary_tag =>   $f2primary,
 					     -analysis    =>   $analysis_obj );
