@@ -168,7 +168,7 @@ sub run {
 
     #parse output and create features
     $self->parse_results();
-    $self->deletefiles();
+    #$self->deletefiles();
   }
 
 =head2 run_analysis
@@ -189,12 +189,50 @@ sub run_analysis {
 		                                   $self->filename . ' ' .
 		                                   $self->options  . ' > ' .
 		                                   $self->results."\n");
-    
-    $self->throw("Failed during blast run $!\n")
 
-      unless (system ($self->program.' '.$self->database.' '.$self->filename
-		      .' '.$self->options .' > '.$self->results) == 0) ;
-  }
+    # This routine expands the database name into $db-1 etc for
+    # split databases
+    my @databases = $self->fetch_databases;
+
+    foreach my $database (@databases) {
+	$self->throw("Failed during blast run $!\n")
+	    
+	    unless (system ($self->program.' '.$database.' '.$self->filename
+			    .' '.$self->options .' > '.$self->results) == 0) ;
+    }
+}
+
+sub fetch_databases {
+    my ($self) = @_;
+
+    my @databases;
+
+    my $fulldbname;
+
+    if ($self->database =~ /\//) {
+	$fulldbname = $self->database;
+    } else {
+	$fulldbname = $ENV{BLASTDB} . "/" .$self->database;
+    }
+
+    if (-e $fulldbname) {
+	push(@databases,$self->database);
+    } else {
+	my $count = 1;
+
+	while (-e $fulldbname . "-$count") {
+	    push(@databases,$fulldbname . "-$count");
+	    $count++;
+	}
+    }
+
+    if (scalar(@databases) == 0) {
+	$self->throw("No databases exist for " . $self->database);
+    }
+
+    return @databases;
+
+}
 
 =head2 parse_results
 
@@ -208,16 +246,18 @@ sub run_analysis {
 
 
 sub parse_results {
-  my ($self) = @_;
+  my ($self,$fh) = @_;
 
   my $filehandle;
 
-  if (ref ($self->results) !~ /GLOB/) {
-    open (BLAST, "<".$self->results)
-      or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-    $filehandle = \*BLAST;
+  if (defined($fh)) {
+      $filehandle = $fh;
+  } elsif (ref ($self->results) !~ /GLOB/) {
+      open (BLAST, "<".$self->results)
+	  or $self->throw ("Couldn't open file ".$self->results.": $!\n");
+      $filehandle = \*BLAST;
   } else {
-    $filehandle = $self->results;
+      $filehandle = $self->results;
   }    
 
   unless (<$filehandle>) {
@@ -313,8 +353,10 @@ sub parse_results {
       #if alignments contain gaps, the feature needs to be split
       $feat1 {alignment} = $hsp->queryAlignment;
       $feat2 {alignment} = $hsp->sbjctAlignment;
-      
-      
+            
+      print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
+      print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
+
       if ($feat1 {alignment} =~ /-/ or $feat2 {alignment} =~ /-/) {
 	  $self->split_gapped_feature(\%feat1, \%feat2); 
       } else {                    
@@ -322,6 +364,7 @@ sub parse_results {
       }
     }
   } 
+  return $self->output;
 }
 
 
@@ -364,6 +407,7 @@ sub split_gapped_feature {
   my (@masked_f1, @masked_f2);
 
   #replace bases and gaps with positions and mask number
+
   if ($type1 eq 'pep' && $type2 eq 'dna') {
       @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
       @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
@@ -371,7 +415,6 @@ sub split_gapped_feature {
       @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
       @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
   } else {
-      # dna-dna
       @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
       @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
   }
@@ -393,12 +436,24 @@ sub split_gapped_feature {
         {
             #One of the alignments contains an insertion.
             if ($building_feature)
-            {            
+            {    
+
+		my $f1_end;
+		my $f2_end;
+
                 #feature ended at previous position unless alignment end
-                my $f1_end     = ($index == $mask_len -1) 
-                                        ? $masked_f1[$index] : $masked_f1[$index-1];
-                my $f2_end     = ($index == $mask_len -1) 
-                                        ? $masked_f2[$index] :$masked_f2[$index-1];
+
+		if ($index == $mask_len -1)  {
+		    $f1_end = $masked_f1[$index];
+		} else {
+		    $f1_end = $masked_f1[$index-1];
+		}
+
+		if ($index == $mask_len -1) {
+		    $f2_end =  $masked_f2[$index];
+		} else {
+		    $f2_end = $masked_f2[$index-1];
+		}
                 
                 if ($feat1->{'strand'} == 1)
                 {
@@ -432,6 +487,7 @@ sub split_gapped_feature {
 #                        if ( $f1_len != $f2_len );
                  
                         
+		$feat1->{strand} = $feat2->{strand}; 
                 $self->createfeaturepair($feat1, $feat2);
                 $building_feature = 0;
             }
@@ -453,12 +509,14 @@ sub split_gapped_feature {
 #Fills gapped alignment with base position number or -1 for insertions. 
 sub mask_alignment {
     my ($self, $start, $strand, $alignment,$inc) =@_;
+
     my @masked_array;
     my @array = split (//,$alignment);
+
     $_ = $alignment;
     my $valid_bases = tr/A-Za-z//;
     
-    #print STDERR "Start: $start Strand: $strand Len ".scalar(@array)." Valids $valid_bases\n";
+    print STDERR "Start: $start Strand: $strand Len ".scalar(@array)." Valids $valid_bases\n";
     
     my $base_count = ($strand == 1) ? $start : $start + ($valid_bases -1);
     
@@ -476,7 +534,7 @@ sub mask_alignment {
         }   
     }
     
-    #print STDERR "@masked_array\n";
+    print STDERR "Masked array @masked_array\n";
     
     return @masked_array;
   }
