@@ -146,7 +146,8 @@ sub new {
 
   ############################################################
   # options
-  my $basic_options = " --exhaustive no --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
+  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
+  #my $basic_options = "  --ryo \"RESULT: %S %p %g %V\\n\" "; 
   
   # can add extra options as a string
   if ($options){
@@ -223,7 +224,7 @@ sub run {
       $self->options.
 	  " --querytype $query_type --targettype $target_type --query $query --target $target |";
 
-  #print STDERR "running exonerate: $command\n";
+  print STDERR "running exonerate: $command\n" if $verbose;
 
   open( EXO, $command ) || $self->throw("Error running exonerate $!");
   
