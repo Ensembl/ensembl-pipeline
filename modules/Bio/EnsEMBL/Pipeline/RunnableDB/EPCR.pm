@@ -70,11 +70,17 @@ sub fetch_input {
 
     $self->query($contig);
 
+    my %parameters = $self->parameter_hash;
+
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::EPCR(
 	    -query   => $self->query,
             -sts     => $self->analysis->db_file,
-	    -pcr     => $self->analysis->program,
-	    -options => $self->arguments);
+            -pcr     => $self->analysis->program_file,
+            -nmin  => $parameters{'-NMIN'},
+            -nmax  => $parameters{'-NMAX'},
+            -w     => $parameters{'-W'},
+            -m     => $parameters{'-M'}
+    );
 
     $self->runnable($runnable);
 
