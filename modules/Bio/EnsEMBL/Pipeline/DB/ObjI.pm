@@ -38,12 +38,11 @@ package Bio::EnsEMBL::Pipeline::ObjI;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
 
 use Bio::Root::Object;
+use Bio::EnsEMBL::DB::ObjI;
 
-# Inherits from the base bioperl object
-@ISA = qw(Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::DB::ObjI Bio::Root::Object);
 
 
 =head2 get_Job {
