@@ -295,13 +295,13 @@ sub run_analysis {
         } else {
             $command .= " $database $filename ";
         }
-        $command .= ' -gi '.$self->options. ' > '.$self->results . ".$db";
+        $command .= ' -gi '.$self->options. ' > '.$self->results . ".$db ";
 
- 	# Add the result file to our clean-up list.
- 	$self->file($self->results . ".$db");
+        # Add the result file to our clean-up list.
+        $self->file($self->results . ".$db");
 
-	#print STDERR "running ".$command."\n";
-        $self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
+        #print STDERR "running cmd: <".$command.">\n";
+		$self->throw("Failed during blast run: ". ($?/256) . " ". $!) unless (system ($command) == 0);
       }
   
 }
