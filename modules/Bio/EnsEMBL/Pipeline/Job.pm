@@ -1,5 +1,3 @@
-
-
 # Object for storing details of an analysis job
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -63,6 +61,22 @@ use Bio::EnsEMBL::Pipeline::DB::JobI;
 my %batched_jobs;
 my %batched_jobs_runtime;
 
+
+=head2 new
+
+ Arg [1]   : InputId (contig_id)  
+ Function  : Creates a new Bio::EnsEMBL::Pipeline::Job
+ Returntype: Bio::EnsEMBL::Pipeline::Job
+ Exceptions: Throws if not passed an inputId or a Bio::EnsEMBL::Analysis object 
+ Caller    : Bio::EnsEMBL::Pipeline::Job->new();
+ Example   : my $job = Bio::EnsEMBL::Pipeline::Job->new( -input_id => $contig->id,
+	       					         -analysis => $analysis);
+
+=cut
+
+#this method creates the Job object it requires an input id and an analysis object
+#it also can take a jobadaptor, lsf id, class, job id, stderr, stdout, input_object_file and retry count
+
 sub new {
     my ($class, @args) = @_;
     my $self = bless {},$class;
@@ -105,16 +119,21 @@ sub new {
 }
 
 
+
 =head2 create_by_analysis_inputId
 
-  Title   : create_by_analysis_inputId
-  Usage   : $class->create_by.....
-  Function: Creates a job given an analysis object and an inputId
-            Recommended way of creating job objects!
-  Returns : a job object, not connected to db
-  Args    : 
+  Arg [1]   : Analysis object 
+  Function  : creates an job given an input_id and analysis object
+  Returntype: Bio::EnsEMBL::Pipeline::Job
+  Exceptions: None
+  Caller    : Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId($analysis, $contig->id);
+  Example   : 
 
 =cut
+
+
+#this method calls the new method creating a new job object with the given contig id and analysis object
+#this is the recommended way of creating jobs without db connections
 
 sub create_by_analysis_inputId {
   my $dummy = shift;
@@ -134,13 +153,21 @@ sub create_by_analysis_inputId {
 
 
 
-=head2 dbID
 
-  Title   : dbID
-  Usage   : $self->dbID($id)
-  Function: get set the dbID for this object, only used by Adaptor
-  Returns : int
-  Args    : int
+
+#################
+#get/set methods#
+#################
+
+
+=head2 accessor methods
+
+  Arg [1]   : what ever is being set 
+  Function  : to set return appropriate variable
+  Returntype: the appropriate value
+  Exceptions: only the Analysis method throws if it hasn't been passed an analysis object'
+  Caller    : Bio::EnsEMBL::Job
+  Example   : $dbId = $self->dbID();
 
 =cut
 
@@ -155,17 +182,6 @@ sub dbID {
 
 }
 
-=head2 adaptor
-
-  Title   : adaptor
-  Usage   : $self->adaptor
-  Function: get database adaptor, set only for constructor and adaptor usage. 
-  Returns : 
-  Args    : 
-
-=cut
-
-
 sub adaptor {
     my ($self,$arg) = @_;
 
@@ -176,17 +192,14 @@ sub adaptor {
 
 }
 
+sub class {
+    my ($self,$arg) = @_;
 
-
-=head2 input_id
-
-  Title   : input_id
-  Usage   : $self->input_id($id)
-  Function: Get/set method for the id of the input to the job
-  Returns : string
-  Args    : string
-
-=cut
+    if (defined($arg)) {
+        $self->{'_class'} = $arg;
+    }
+    return $self->{'_class'};
+}
 
 
 sub input_id {
@@ -197,37 +210,6 @@ sub input_id {
     }
     return $self->{'_input_id'};
 }
-
-=head2 class
-
-  Title   : class
-  Usage   : $self->class($class)
-  Function: Get/set method for the class of the input to the job
-            typically contig/clone
-  Returns : string
-  Args    : string
-
-=cut
-
-
-sub class {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-        $self->{'_class'} = $arg;
-    }
-    return $self->{'_class'};
-}
-
-=head2 analysis
-
-  Title   : analysis
-  Usage   : $self->analysis($anal);
-  Function: Get/set method for the analysis object of the job
-  Returns : Bio::EnsEMBL::Analysis
-  Args    : Bio::EnsEMBL::Analysis
-
-=cut
 
 sub analysis {
     my ($self,$arg) = @_;
@@ -241,18 +223,85 @@ sub analysis {
 
 }
 
+sub stdout_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_stdout_file'} = $arg;
+    }
+    return $self->{'_stdout_file'};
+}
+
+sub stderr_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_stderr_file'} = $arg;
+    }
+    return $self->{'_stderr_file'};
+}
+
+sub input_object_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{'_input_object_file'} = $arg;
+    }
+    return $self->{'_input_object_file'};
+}
+
+sub LSF_id {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{'_lsfid'} = $arg );
+  $self->{'_lsfid'};
+}
+
+##used for redirecting lsf output to stderr and stdout files###
+
+sub LSF_out {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{'_lsfout'} = $arg );
+  $self->{'_lsfout'};
+}
+
+sub LSF_err {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{'_lsferr'} = $arg );
+  $self->{'_lsferr'};
+}
+
+sub retry_count {
+  my ($self, $arg) = @_;
+  (defined $arg) &&
+    ( $self->{'_retry_count'} = $arg );
+  $self->{'_retry_count'};
+}
+
+
+
+#############
+#RUN METHODS#
+#############
+
+
 
 =head2 flush_runs
 
-  Title   : flush_runs
-  Usage   : $job->flush_runs( jobadaptor, [queue] );
-  Function: Issue all jobs in the queue and empty the queue.
-    Set LSF id in all jobs. Uses the given adaptor for connecting to
-    db. Uses last job in queue for stdout/stderr. 
-  Returns : 
-  Args    : 
+  Arg [1]   : Job adaptor object
+  Function  : When there are a defined number of jobs ready to run (set in pipeconf or RuleManger) this submits them to lsf using the adaptor to connect to the database. If there is more than one job being submitted the last job is used for stdout/stderr
+  Returntype: none 
+  Exceptions: throws if has no job adaptor or if no runner script is defined in pipeconf.pl
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $self->flush_runs( $self->adaptor, $LSF_params );
 
 =cut
+
+#This checks if more than one queue should be used then if there is a runner script defined
+#once this has been established for each queue jobs should be run on the last job id is got and the bsub line constructed and submitted 
+#and the job status is set to submitted or failed depending on whether the job has an lsfId
 
 sub flush_runs {
   my $self = shift;
@@ -272,6 +321,7 @@ sub flush_runs {
   local *SUB;
   local *FILE;
 
+#not sure why this does as %batched_jobs is  created using lsf_params in the first place
   if( ! defined $queue ) {
     @queues = keys %batched_jobs;
   } else {
@@ -290,7 +340,7 @@ sub flush_runs {
   # and fail if not found
 
   my $runner = $::pipeConf{'runner'} || undef;
-
+##checking if runner is defined
   unless (-x $runner) {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
@@ -298,7 +348,7 @@ sub flush_runs {
   }
 
   for my $queue ( @queues ) {
-
+##for each queue jobs are to be submitted to get the la
     if (! (defined $batched_jobs{$queue}) || ! scalar (@{$batched_jobs{$queue}})) {
       next;
     }
@@ -310,7 +360,7 @@ sub flush_runs {
     }
   
     my $cmd;
-  
+  ## -C 0 important as it prevents core dumps from filling up /tmp/
     $cmd = "bsub -C 0 -o ".$lastjob->stdout_file;
     if ($nodes) {
         # $nodes needs to be a space-delimited list
@@ -374,14 +424,16 @@ sub flush_runs {
 
 =head2 batch_runRemote
 
-  Title   : batch_runRemote
-  Usage   : $job->batch_runRemote
-  Function: Issue more than one small job in one LSF job because 
-    job submission is very slow
-  Returns : 
-  Args    : Is static, private function, dont call with arrow notation.
+  Arg [1]   : reference to hash of LSF_parameters
+  Function  : create hash of jobids for a particular queue and submit these to flush_run
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $cj->batch_runRemote($LSF_params) (from RuleManger3.pl)
 
 =cut
+
+
 
 sub batch_runRemote {
   my $self = shift;
@@ -400,24 +452,18 @@ sub batch_runRemote {
 }
 
 
-
-
-
 =head2 runLocally
-=head2 runRemote( boolean withDB, queue )
-=head2 runInLSF
 
-  Title   : running
-  Usage   : $self->run...;
-  Function: runLocally doesnt submit to LSF
-            runInLSF is like runLocally, but doesnt redirect STDOUT and 
-            STDERR. 
-            runRemote submits to LSF via the runner.pl script.
-  Returns : 
-  Args    : 
+  Arg [1]   : none 
+  Function  : Runs a job locally rather than submitting to LSF
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio:EnsEMBL::Pipeline::Job
+  Example   : $job->runLocally;
 
 =cut
 
+#if jobs are to be run locally it can be defined in rulemanager or pipeconf
 sub runLocally {
   print STDERR "Running locally\n"; 
   my $self = shift;
@@ -439,6 +485,21 @@ sub runLocally {
        print STDERR "Running inLSF\n"; 
   $self->runInLSF();
 }
+
+
+
+=head2 runRemote
+
+  Arg [1]   : $queue, scalar of which queue should be used 
+  Function  : submit single jobs to lsf
+  Returntype: none
+  Exceptions: thorws if has no job adaptor, no runner script or if useDB is set to 0
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $self->runRemote($queue, $useDB);
+
+=cut
+
+#this does bacially the same things as flush_run but for one job with one queue but is probably never used
 
 sub runRemote {
   my $self = shift;
@@ -470,7 +531,7 @@ sub runRemote {
     $self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
-  $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
+  $cmd = "bsub -C0 -q ".$queue." -o ".$self->stdout_file.
 #    " -q acarichunky " .
 #    " -R osf1 ".
     " -e ".$self->stderr_file." -E \"$runner -check\" ";
@@ -518,8 +579,20 @@ sub runRemote {
   $self->adaptor->update( $self );
 }
 
-# question, when to submit the success report to the db?
-# we have to parse the output of LSF anyway....
+
+=head2 runInLSF
+
+  Arg [1]   : name of runnabledb to be used 
+  Function  : This creates and tries run a RunnableDB for the specified analysis
+  Returntype: none
+  Exceptions: throws if problem in any stage of running the RunnableDB or setting the status 
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $self->runInLSF;
+
+=cut
+
+
+
 sub runInLSF {
   my $self = shift;
   my $module = $self->analysis->module;
@@ -610,49 +683,23 @@ sub runInLSF {
 }
 
 
-=head2 resultToDb
-
-  Title   : resultToDB
-  Usage   : $self->resultToDb;
-  Function: Find if job finished by looking at STDOUT and STDERR
-            try set current_status according to what you find.
-            write_output on the runnablDB is recommended way of 
-            putting results into the DB.
-            DONT use when job started with db connection.
-  Returns : false, if job seems not to be finished on the remote side..
-  Args    : 
-
-=cut
-
-sub resultToDb {
-  my $self = shift;
-  $self->throw( "Not implemented yet." );
-}
+################
+#SETTING STATUS#
+################
 
 
-sub write_object_file {
-    my ($self,$arg) = @_;
 
-    $self->throw("No input object file defined") unless defined($self->input_object_file);
+=head2 setting statuses
 
-    if (defined($arg)) {
-        my $str = FreezeThaw::freeze($arg);
-        open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
-        print(OUT $str);
-        close(OUT);
-    }
-}
-
-
-=head2 set_status
-
-  Title   : set_status
-  Usage   : my $status = $job->set_status
-  Function: Sets the job status
-  Returns : nothing
-  Args    : Bio::EnsEMBL::Pipeline::Status
+  Arg [1]   : scalar of status to be set 
+  Function  : calls status setting methods in jobadaptor
+  Returntype: a status object or an array of status objects  
+  Exceptions: thows if no db connection or no status is passed
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $self->set_status( "FAILED" );
 
 =cut
+
 
 sub set_status {
   my ($self,$arg) = @_;
@@ -668,17 +715,6 @@ sub set_status {
   return $self->adaptor->set_status( $self, $arg );
 }
 
-
-=head2 current_status
-
-  Title   : current_status
-  Usage   : my $status = $job->current_status
-  Function: Get/set method for the current status
-  Returns : Bio::EnsEMBL::Pipeline::Status
-  Args    : Bio::EnsEMBL::Pipeline::Status
-
-=cut
-
 sub current_status {
   my ($self,$arg) = @_;
   
@@ -688,16 +724,6 @@ sub current_status {
  
   return $self->adaptor->current_status( $self, $arg );
 }
-
-=head2 get_all_status
-
-  Title   : get_all_status
-  Usage   : my @status = $job->get_all_status
-  Function: Get all status objects associated with this job
-  Returns : @Bio::EnsEMBL::Pipeline::Status
-  Args    : @Bio::EnsEMBL::Pipeline::Status
-
-=cut
 
 sub get_all_status {
   my ($self) = @_;
@@ -710,16 +736,6 @@ sub get_all_status {
 }
 
 
-=head2 get_last_status
-
-  Title   : get_last_status
-  Usage   : my @status = $job->get_all_status ($status)
-  Function: Get latest status object associated with this job
-  Returns : Bio::EnsEMBL::Pipeline::Status
-  Args    : status string
-
-=cut
-
 sub get_last_status {
   my ($self) = @_;
   
@@ -729,6 +745,22 @@ sub get_last_status {
     return undef;
   }
 }
+
+####################
+#OUTPUTFILE METHODS#
+####################
+
+=head2 make_filenames
+
+  Arg [1]   : none 
+  Function  : creates the stdout and stderr file names
+  Returntype: none
+  Exceptions: none
+  Caller    : $self;
+  Example   : $self->make_filenames;
+
+=cut
+
 
 
 sub make_filenames {
@@ -764,6 +796,66 @@ sub make_filenames {
 }
 
 
+
+
+=head2 remove
+
+  Arg [1]   : none
+  Function  : deletes the output files
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::Job
+  Example   : $job->remove 
+
+=cut
+
+
+sub remove {
+  my $self = shift;
+  
+  if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
+  if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
+  if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
+
+   if( defined $self->adaptor ) {
+   $self->adaptor->remove( $self );
+   }
+}
+
+################
+#UNUSED METHODS#
+################
+
+
+#this was used when complex data structure were to be stored in file similariy to the web ini file but it never actually worked 
+
+
+sub write_object_file {
+    my ($self,$arg) = @_;
+
+    $self->throw("No input object file defined") unless defined($self->input_object_file);
+
+    if (defined($arg)) {
+        my $str = FreezeThaw::freeze($arg);
+        open(OUT,">" . $self->input_object_file) || $self->throw("Couldn't open object file " . $self->input_object_file);
+        print(OUT $str);
+        close(OUT);
+    }
+}
+
+
+####appears to be never used and obviously was never implemented 
+##Simon not sure what it was for and why it was never implemented
+
+sub resultToDb {
+  my $self = shift;
+  $self->throw( "Not implemented yet." );
+}
+
+
+
+#no  longer used so could potentially be removed as make_filenames seems to do the same thing
+
 sub create_lsflogfile {
   my ($self) = @_;
   
@@ -780,6 +872,7 @@ sub create_lsflogfile {
   $self->LSF_err($dir.$stub.".err");
 }
 
+# creates fileanames and does something else i don't understand be doesn't seem to be used at all
 
 sub get_files {
   my ($self,$stub,@exts) = @_;
@@ -829,123 +922,5 @@ sub get_files {
   return @result;
 }
 
-
-
-=head2 stdout_file
-
-  Title   : stdout_file
-  Usage   : my $file = $self->stdout_file
-  Function: Get/set method for stdout.
-  Returns : string
-  Args    : string
-
-=cut
-
-sub stdout_file {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-        $self->{'_stdout_file'} = $arg;
-    }
-    return $self->{'_stdout_file'};
-}
-
-=head2 stderr_file
-
-  Title   : stderr_file
-  Usage   : my $file = $self->stderr_file
-  Function: Get/set method for stderr.
-  Returns : string
-  Args    : string
-
-=cut
-
-sub stderr_file {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-        $self->{'_stderr_file'} = $arg;
-    }
-    return $self->{'_stderr_file'};
-}
-
-=head2 input_object_file
-
-  Title   : input_object_file
-  Usage   : my $file = $self->input_object_file
-  Function: Get/set method for the input object file
-  Returns : string
-  Args    : string
-
-=cut
-
-sub input_object_file {
-    my ($self,$arg) = @_;
-
-    if (defined($arg)) {
-        $self->{'_input_object_file'} = $arg;
-    }
-    return $self->{'_input_object_file'};
-}
-
-=head2 LSF_id
-
-  Title   : LSF_id
-  Usage   : 
-  Function: Get/set method for the LSF_id
-  Returns : 
-  Args    : 
-
-=cut
-
-sub LSF_id {
-  my ($self, $arg) = @_;
-  (defined $arg) &&
-    ( $self->{'_lsfid'} = $arg );
-  $self->{'_lsfid'};
-}
-
-sub LSF_out {
-  my ($self, $arg) = @_;
-  (defined $arg) &&
-    ( $self->{'_lsfout'} = $arg );
-  $self->{'_lsfout'};
-}
-
-sub LSF_err {
-  my ($self, $arg) = @_;
-  (defined $arg) &&
-    ( $self->{'_lsferr'} = $arg );
-  $self->{'_lsferr'};
-}
-
-=head2 retry_count
-
-  Title   : retry_count
-  Usage   : 
-  Function: Get/set method for the retry_count
-  Returns : 
-  Args    : 
-
-=cut
-
-sub retry_count {
-  my ($self, $arg) = @_;
-  (defined $arg) &&
-    ( $self->{'_retry_count'} = $arg );
-  $self->{'_retry_count'};
-}
-
-sub remove {
-  my $self = shift;
-  
-  if( -e $self->stdout_file ) { unlink( $self->stdout_file ) };
-  if( -e $self->stderr_file ) { unlink( $self->stderr_file ) };
-  if( -e $self->input_object_file ) { unlink( $self->input_object_file ) };
-
-   if( defined $self->adaptor ) {
-   $self->adaptor->remove( $self );
-   }
-}
 
 1;

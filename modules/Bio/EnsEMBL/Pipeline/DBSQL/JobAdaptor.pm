@@ -53,6 +53,19 @@ use strict;
 
 @ISA = qw( Bio::Root::RootI );
 
+
+=head2 new
+
+  Arg [1]   : dbadpator object 
+  Function  : makes a new Jobadaptor object
+  Returntype: Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
+  Exceptions: none 
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::Jobadaptor
+  Example   : Bio::EnsEMBL::Pipeline::DBSQL::Jobadaptor->new($db);
+
+=cut
+
+
 sub new {
   my ($class,$dbobj) = @_;
   my $self = $class->SUPER::new();
@@ -61,16 +74,21 @@ sub new {
   return $self;
 }
 
+###############
+#fetching jobs#
+###############
+
 =head2 fetch_by_dbID
 
-  Title   : fetch_by_dbID
-  Usage   : my $job = $adaptor->fetch_by_dbID
-  Function: Retrieves a job from database by internal id
-  Returns : throws exception when something goes wrong.
-            undef if the id is not in the db.
-  Args    : 
+  Arg [1]   : dbId 
+  Function  : gets all the information about a particualr job from the job table
+  Returntype: hash ref
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
 
 =cut
+
 
 sub fetch_by_dbID {
   my $self = shift;
@@ -91,16 +109,19 @@ sub fetch_by_dbID {
   return $self->_objFromHashref( $rowHashRef );
 }
 
-=head2 fetch_by_Status_Analysis {
 
-  Title   : fetch_by_Status_Analysis
-  Usage   : my @jobs = $adaptor->fetch_by_Status_Analysis($id, $status)
-  Function: Retrieves all jobs in the database matching status and 
-            an analysis id
-  Returns : @Bio::EnsEMBL::Pipeline::Job
-  Args    : Analysis obj, string status, and optional start and end limits
+=head2 fetch_by_Status_Analysis
+
+  Arg [1]   : scalar of status
+  Function  : returns an array of hashes about each jobs with a particular status and analysis type
+  Returntype: array of Bio::EnsEMBL::Pipeline::Job
+  Exceptions: throws if no analysis object or status given
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
 
 =cut
+
+
 
 sub fetch_by_Status_Analysis {
     my ($self,$status, $analysis, $start, $end) = @_;
@@ -138,16 +159,17 @@ sub fetch_by_Status_Analysis {
 }
 
 
-=head2 fetch_by_Age {
+=head2 fetch_by_Age
 
-  Title   : fetch_by_Age
-  Usage   : my @jobs = $db->fetch_by_Age($duration)
-  Function: Retrieves all jobs in the database
-            that are older than than a certain duration given in minutes.
-  Returns : @Bio::EnsEMBL::Pipeline::Job
-  Args    : int
+  Arg [1]   : scalar of age 
+  Function  : selects jobs from database with specified age
+ Returntype: array of Bio::EnsEMBL::Pipeline::Job
+  Exceptions: thows if no ages is defined
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
 
 =cut
+
 
 sub fetch_by_Age {
     my ($self,$age) = @_;
@@ -178,18 +200,6 @@ sub fetch_by_Age {
     return @jobs;
 }
 
-
-=head2 fetch_by_inputId
-
-  Title   : fetch_by_inputId
-  Usage   : my @job = $adaptor->fetch_by_inputId
-  Function: Retrieves all jobs from adaptor with certain input id
-  Returns : list of job objects
-            throws exception when something goes wrong.
-  Args    : 
-
-=cut
-
 sub fetch_by_inputId {
   my $self = shift;
   my $inputid = shift;
@@ -209,223 +219,25 @@ sub fetch_by_inputId {
   return @result;
 }
 
-=head2 store
 
-  Title   : store
-  Usage   : $job->store
-  Function: puts a job in the db and gives it an internal id
-            expects analysis to be already in db.
-  Returns : throws exception when something goes wrong.
-  Args    : 
 
-=cut
+################
+#SETTING STATUS#
+################
 
-sub store {
-  my $self = shift;
-  my $job = shift;
 
-  if( ! defined( $job->analysis->dbID )) {
-    $self->throw( "Need to store analysis first" );
-  }
+=head2 setting statuses
 
-  my $sth = $self->prepare( q{
-    INSERT into job( input_id, class, analysisId,
-      LSF_id, stdout_file, stderr_file, object_file,
-      retry_count ) 
-    VALUES ( ?, ?, ?, ?, ?, ?, ?, ? ) } );
-
-  $sth->execute( $job->input_id,
-                 $job->class,
-                 $job->analysis->dbID,
-                 $job->LSF_id,
-                 $job->stdout_file,
-                 $job->stderr_file,
-                 $job->input_object_file,
-                 $job->retry_count );
-
-  $sth = $self->prepare( "SELECT LAST_INSERT_ID()" );
-  $sth->execute;
-
-  my $dbId = ($sth->fetchrow_arrayref)->[0];
-  $job->dbID( $dbId );
-  $job->adaptor( $self );
-
-  $self->set_status( $job, "CREATED" );
-}
-=head2 remove
-
-  Title   : remove
-  Usage   : $jobadaptor->remove( $job )
-  Function: deletes entries for job from database tables.
-            deletes also history of status.
-  Returns : throws exception when something goes wrong.
-  Args    : 
+  Arg [1]   : job object  
+  Function  : the following methods set the status of single jobs or return the status of many jobs depending on the arguments passed in
+ Returntype: single or array of Bio::EnsEMBL::Pipeline::Status object
+  Exceptions: they throw errors if no job object or no status object are passed in
+  Caller    : Bio::EnsEMBL::Pipeline::JobAdaptor
+  Example   : $self->adaptor->set_status($self, 'submitted'); (from job.pm)
 
 =cut
 
 
-sub remove {
-  my $self = shift;
-  my $job = shift;
-
-  if( ! defined $job->dbID ) {
-    $self->throw( "Cant remove job without dbID" );
-  }
-  my $dbID = $job->dbID;
-
-  my $sth = $self->prepare( qq{
-    DELETE FROM job
-     WHERE jobId = $dbID } );
-  $sth->execute;
-
-  $sth = $self->prepare( qq{
-    DELETE FROM current_status
-     WHERE jobId=$dbID } );
-  $sth->execute;
-
-  $sth = $self->prepare( qq{
-    DELETE FROM jobstatus
-     WHERE jobId = $dbID } );
-  $sth->execute;
-}
-
-
-=head2 remove_by_dbID
-
-  Title   : remove_by_dbID
-  Usage   : $jobadaptor->remove_by_dbID( $dbID )
-  Function: deletes entries for job from database tables.
-            deletes also history of status. Can take a list of ids.
-  Returns : throws exception when something goes wrong.
-  Args    : 
-
-=cut
-
-sub remove_by_dbID {
-  my $self = shift;
-  my @dbIDs = @_;
-  
-  if( $#dbIDs == -1 ) { return }
-  
-  my $inExpr = "(".join( ",",@dbIDs ).")";
-  
-  my $sth = $self->prepare( qq{
-    DELETE FROM job
-     WHERE jobId IN $inExpr } );
-  $sth->execute;
-
-  $sth = $self->prepare( qq{
-    DELETE FROM current_status
-     WHERE jobId IN $inExpr } );
-  $sth->execute;
-  $sth = $self->prepare( qq{
-    DELETE FROM jobstatus
-     WHERE jobId IN $inExpr } );
-  $sth->execute;
-}
-
-
-=head2 update
-
-  Title   : update
-  Usage   : $job->update; $jobAdaptor->update( $job )
-  Function: a job which is already in db can update its contents
-            it only updates stdout_file, stderr_file, retry_count
-            and LSF_id
-  Returns : throws exception when something goes wrong.
-  Args    : 
-
-=cut
-
-sub update {
-  my $self = shift;
-  my $job = shift;
-  
-  # only stdout, stderr, retry, LSF_id and status are likely to be updated
-
-  my $sth = $self->prepare( q{
-    UPDATE job
-       SET stdout_file = ?,
-           stderr_file = ?,
-           object_file = ?,
-           retry_count = ?,
-           LSF_id = ?
-     WHERE jobId = ? } );
-
-  $sth->execute( $job->stdout_file,
-                 $job->stderr_file,
-                 $job->input_object_file,
-                 $job->retry_count,
-                 $job->LSF_id,
-                 $job->dbID );
-}
-
-
-
-=head2 _objFromHashref
-
-  Title   : _objFromHashref
-  Usage   : my $job = $self->objFromHashref( $queryResult )
-  Function: Creates a Job object from given hash reference.
-            The hash contains column names and content of the column. 
-  Returns : the object or undef if that wasnt possible
-  Args    : a hash reference
-
-=cut
-
-sub _objFromHashref {
-  # create the appropriate job object
-
-  my $self = shift;
-  my $hashref = shift;
-  my $job;
-  my $analysis;
-
-  $analysis = 
-    $self->db->get_AnalysisAdaptor->
-      fetch_by_dbID( $hashref->{analysisId} );
-
-  $job = Bio::EnsEMBL::Pipeline::Job->new
-  (
-   '-dbobj'    => $self->db,
-   '-adaptor'  => $self,
-   '-id'       => $hashref->{'jobId'},
-   '-lsf_id'   => $hashref->{'LSF_id'},
-   '-input_id' => $hashref->{'input_id'},
-   '-class'    => $hashref->{'class'},
-   '-stdout'   => $hashref->{'stdout_file'},
-   '-stderr'   => $hashref->{'stderr_file'},
-   '-input_object_file' => $hashref->{'object_file'},
-   '-analysis' => $analysis,
-   '-retry_count' => $hashref->{'retry_count'}
-  );
-
-  return $job;
-}
-
-
-# provide a hashref
-# each value in it used for a combined query, if the described object is in
-# returns a job object, if it is in, else undef
-
-sub exists {
-  my $self = shift;
-  my $hashref = shift;
-
-  $self->throw( "Not implemented yet" );
-}
-
-# Code directly from Michele
-
-=head2 set_status
-
-  Title   : set_status
-  Usage   : my $status = $job->set_status
-  Function: Sets the job status
-  Returns : nothing
-  Args    : Pipeline::Job Bio::EnsEMBL::Pipeline::Status
-
-=cut
 
 sub set_status {
     my ($self,$job,$arg) = @_;
@@ -477,15 +289,7 @@ sub set_status {
 }
 
 
-=head2 current_status
 
-  Title   : current_status
-  Usage   : my $status = $job->current_status
-  Function: Get/set method for the current status
-  Returns : Bio::EnsEMBL::Pipeline::Status
-  Args    : Bio::EnsEMBL::Pipeline::Status
-
-=cut
 
 sub current_status {
     my ($self, $job, $arg) = @_;
@@ -525,15 +329,7 @@ sub current_status {
     return $job->{'_status'};
 }
 
-=head2 get_all_status
 
-  Title   : get_all_status
-  Usage   : my @status = $job->get_all_status
- Function: Get all status objects associated with this job
-  Returns : @Bio::EnsEMBL::Pipeline::Status
-  Args    : Bio::EnsEMBL::Pipeline::Job
-
-=cut
 
 sub get_all_status {
   my ($self, $job) = @_;
@@ -563,15 +359,6 @@ sub get_all_status {
   return @status;
 }
 
-=head2 get_last_status
-
-  Title   : get_last_status
-  Usage   : my @status = $job->get_all_status
-  Function: Get most recent status object associated with this job
-  Returns : Bio::EnsEMBL::Pipeline::Status
-  Args    : Bio::EnsEMBL::Pipeline::Job, status string
-
-=cut
 
 sub get_last_status {
   my ($self, $job) = @_;
@@ -600,6 +387,8 @@ sub get_last_status {
                                                      );
   return $statusobj;
 }
+
+#these both return a list of jobids depending on the status and for the 2nd method the age of the job
 
 sub list_jobId_by_status {
   my ($self,$status) = @_;
@@ -644,35 +433,187 @@ sub list_jobId_by_status_age {
   return @result;
 }
 
+###################
+#database editting#
+###################
 
-sub db {
-  my ( $self, $arg )  = @_;
-  if(  defined $arg ) {
-      $self->{'_db'} = $arg;
+
+=head2 store
+
+  Arg [1]   : Job object 
+  Function  : stores a job object to the database
+  Returntype: none
+  Exceptions: throws if job doesn't have an analysis object or analysis object doesn't have an id
+  Caller    : Bio::EnsEMBL::Pipeline:DBSQL::JobAdaptor
+  Example   : 
+
+=cut
+
+
+sub store {
+  my $self = shift;
+  my $job = shift;
+
+  if( ! defined( $job->analysis->dbID )) {
+    $self->throw( "Need to store analysis first" );
   }
-  $self->{'_db'};
+
+  my $sth = $self->prepare( q{
+    INSERT into job( input_id, class, analysisId,
+      LSF_id, stdout_file, stderr_file, object_file,
+      retry_count ) 
+    VALUES ( ?, ?, ?, ?, ?, ?, ?, ? ) } );
+
+  $sth->execute( $job->input_id,
+                 $job->class,
+                 $job->analysis->dbID,
+                 $job->LSF_id,
+                 $job->stdout_file,
+                 $job->stderr_file,
+                 $job->input_object_file,
+                 $job->retry_count );
+
+  $sth = $self->prepare( "SELECT LAST_INSERT_ID()" );
+  $sth->execute;
+
+  my $dbId = ($sth->fetchrow_arrayref)->[0];
+  $job->dbID( $dbId );
+  $job->adaptor( $self );
+
+  $self->set_status( $job, "CREATED" );
 }
 
-sub prepare {
-  my ( $self, $query ) = @_;
-  $self->db->prepare( $query );
+
+=head2 remove
+
+  Arg [1]   : Job object 
+  Function  : removes given job from db
+  Returntype: none
+  Exceptions: throws if job doesn't have a dbid '
+  Caller    : Bio:EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
+
+=cut
+
+
+
+sub remove {
+  my $self = shift;
+  my $job = shift;
+
+  if( ! defined $job->dbID ) {
+    $self->throw( "Cant remove job without dbID" );
+  }
+  my $dbID = $job->dbID;
+
+  my $sth = $self->prepare( qq{
+    DELETE FROM job
+     WHERE jobId = $dbID } );
+  $sth->execute;
+
+  $sth = $self->prepare( qq{
+    DELETE FROM current_status
+     WHERE jobId=$dbID } );
+  $sth->execute;
+
+  $sth = $self->prepare( qq{
+    DELETE FROM jobstatus
+     WHERE jobId = $dbID } );
+  $sth->execute;
 }
 
-sub deleteObj {
-  my ($self) = @_;
-  my @dummy = values %{$self};
-  foreach my $key ( keys %$self ) {
-    delete $self->{$key};
-  }
-  foreach my $obj ( @dummy ) {
-    eval {
-      $obj->deleteObj;
-    }
-  }
+
+
+=head2 remove_by_dbID
+
+  Arg [1]   : array of dbIds
+  Function  : delete jobs of given dbId from db
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
+
+=cut
+
+
+
+sub remove_by_dbID {
+  my $self = shift;
+  my @dbIDs = @_;
+  
+  if( $#dbIDs == -1 ) { return }
+  
+  my $inExpr = "(".join( ",",@dbIDs ).")";
+  
+  my $sth = $self->prepare( qq{
+    DELETE FROM job
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
+
+  $sth = $self->prepare( qq{
+    DELETE FROM current_status
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
+  $sth = $self->prepare( qq{
+    DELETE FROM jobstatus
+     WHERE jobId IN $inExpr } );
+  $sth->execute;
 }
 
-# creates all tables for this adaptor - job, jobstatus and current_status
-# if they exist they are emptied and newly created
+
+=head2 update
+
+  Arg [1]   : Job object 
+  Function  : updates the stdout, stderr, retry, LSF_id of a job in the job table
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
+
+=cut
+
+
+
+sub update {
+  my $self = shift;
+  my $job = shift;
+  
+  # only stdout, stderr, retry, LSF_id and status are likely to be updated
+
+  my $sth = $self->prepare( q{
+    UPDATE job
+       SET stdout_file = ?,
+           stderr_file = ?,
+           object_file = ?,
+           retry_count = ?,
+           LSF_id = ?
+     WHERE jobId = ? } );
+
+  $sth->execute( $job->stdout_file,
+                 $job->stderr_file,
+                 $job->input_object_file,
+                 $job->retry_count,
+                 $job->LSF_id,
+                 $job->dbID );
+}
+
+#######################
+#MISCELLANEOUS METHODS#
+#######################
+
+
+=head2 create_tables
+
+  Arg [1]   :none 
+  Function  :drops existing job tables and creates new ones
+  Returntype: none
+  Exceptions: none
+  Caller    : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+  Example   : 
+
+=cut
+
+
 sub create_tables {
   my $self = shift;
   my $sth;
@@ -730,5 +671,76 @@ sub create_tables {
   $sth->finish;
 }
 
-1;
+#accessor method which defines the db adaptor
 
+sub db {
+  my ( $self, $arg )  = @_;
+  if(  defined $arg ) {
+      $self->{'_db'} = $arg;
+  }
+  $self->{'_db'};
+}
+
+#calls the prepare method of the adaptor
+sub prepare {
+  my ( $self, $query ) = @_;
+  $self->db->prepare( $query );
+}
+
+#was used when object files were being used is no longer required
+
+sub deleteObj {
+  my ($self) = @_;
+  my @dummy = values %{$self};
+  foreach my $key ( keys %$self ) {
+    delete $self->{$key};
+  }
+  foreach my $obj ( @dummy ) {
+    eval {
+      $obj->deleteObj;
+    }
+  }
+}
+
+#presumable was to check if a job existed but hasn't been implemented
+
+sub exists {
+  my $self = shift;
+  my $hashref = shift;
+
+  $self->throw( "Not implemented yet" );
+}
+
+#creates a job object given an hashref from the job table
+
+sub _objFromHashref {
+  # create the appropriate job object
+
+  my $self = shift;
+  my $hashref = shift;
+  my $job;
+  my $analysis;
+
+  $analysis = 
+    $self->db->get_AnalysisAdaptor->
+      fetch_by_dbID( $hashref->{analysisId} );
+
+  $job = Bio::EnsEMBL::Pipeline::Job->new
+  (
+   '-dbobj'    => $self->db,
+   '-adaptor'  => $self,
+   '-id'       => $hashref->{'jobId'},
+   '-lsf_id'   => $hashref->{'LSF_id'},
+   '-input_id' => $hashref->{'input_id'},
+   '-class'    => $hashref->{'class'},
+   '-stdout'   => $hashref->{'stdout_file'},
+   '-stderr'   => $hashref->{'stderr_file'},
+   '-input_object_file' => $hashref->{'object_file'},
+   '-analysis' => $analysis,
+   '-retry_count' => $hashref->{'retry_count'}
+  );
+
+  return $job;
+}
+
+1;
