@@ -26,6 +26,7 @@
      '-threshold'      => 1e-3,
      '-threshold_type' => 'PVALUE'
      '-filter'         => 1,
+     '-analysis'       => $anal,
      '-options'        => 'V=1000000');
 
   $blast->run();
@@ -97,23 +98,30 @@ sub new {
     $self->{'_workdir'}   = undef;        # location of tmp directory
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
     $self->{'_results'}   = undef;        # file to store results of seg run
+    $self->{'_analysis'}  = undef;        # a Bio::EnsEMBL::Analysis
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $program, $database,
+    my ($clone, $analysis,
         $threshold,  $threshold_type, $options, $filter) = $self->_rearrange([qw(CLONE 
-                                                                                 PROGRAM
-                                                                                 DATABASE
+                                                                                 ANALYSIS
                                                                                  THRESHOLD
                                                                                  THRESHOLD_TYPE
                                                                                  OPTIONS         
                                                                                  FILTER)], 
                                                                               @args);
   
+    if ($analysis) {
+        $self->analysis($analysis);
+    } else {
+        $self->throw("BlastWorm needs an analysis");
+    }
+
     $self->clone ($clone) if ($clone);       
-    $self->program ($self->find_executable ($program));
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
   
-    if ($database) {
-        $self->database($database);
+    if ($self->analysis->db_file) {
+        $self->database($self->analysis->db_file);
     } else {
         $self->throw("BlastWorm needs a database");
     }
@@ -182,14 +190,16 @@ sub program {
 }
 
 
+
+
 =head2 database
 
  Title    : database
  Usage    : $self->database ($database);
- Function : get/set method for the analysisId
+ Function : get/set method for the database
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : database
+ Args     : database (optional)
  Throws   :
 
 =cut
@@ -203,24 +213,25 @@ sub database {
 } 
 
 
-=head2 threshold
+=head2 analysis
 
- Title    : threshold
- Usage    : $self->threshold ($threshold);
- Function : get/set method for the analysisId
+ Title    : analysis
+ Usage    : $self->analysis ($analysis);
+ Function : get/set method for the analysis
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : analysis
+ Args     : analysis (optional)
  Throws   :
 
 =cut
 
-sub threshold {
+sub analysis {
     my $self = shift;
     if (@_) {
-        $self->{'_threshold'} = shift;
+        $self->{'_analysis'} = shift;
+        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))             || $self->throw("Input isn't a Bio::EnsEMBL::AnalysisI or Bio::EnsEMBL::Analysis");
     }
-    return $self->{'_threshold'};
+    return $self->{'_analysis'};
 } 
 
 
@@ -228,10 +239,10 @@ sub threshold {
 
  Title    : threshold_type
  Usage    : $self->threshold_type ($threshold_type);
- Function : get/set method for the analysisId
+ Function : get/set method for the threshold_type
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : threshold_type
+ Args     : threshold_type (optional)
  Throws   :
 
 =cut
@@ -249,10 +260,10 @@ sub threshold_type {
 
  Title    : options
  Usage    : $self->options ($options);
- Function : get/set method for the analysisId
+ Function : get/set method for the options
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : options
+ Args     : options (optional)
  Throws   :
 
 =cut
@@ -270,10 +281,10 @@ sub options {
 
  Title    : filter
  Usage    : $self->filter ($filter);
- Function : get/set method for the analysisId
+ Function : get/set method for the filter
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : filter
+ Args     : filter (optional)
  Throws   :
 
 =cut
@@ -526,7 +537,7 @@ sub parse_results {
 
             # Each HSP is a gapped alignment:
 	    # split the gapped alignment into ungapped subalignments
-  	    my @align_coordinates = $self->split_HSP($hsp);
+  	    my ($align_coordinates, $cigar_string) = $self->split_HSP($hsp);
 
             my %feature;
             ($feature{name}) = $parser->query =~ /^(\S+)/;
@@ -542,10 +553,7 @@ sub parse_results {
             $feature{hstrand} = $hstrand;
             ($feature{source}) = $self->program =~ /([^\/]+)$/;
             $feature{primary} = 'similarity';
-            ($feature{program}) = $self->program =~ /([^\/]+)$/;
-            ($feature{db}) = $self->database =~ /([^\/]+)$/;
-            ($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
-            $feature {align_coor} = \@align_coordinates;
+            $feature {cigar} = $cigar_string;
             $self->create_feature (\%feature);
         }
     }
@@ -745,10 +753,23 @@ sub split_HSP {
     if ($found == 1) {
         push (@align_coordinates, [$qstart, $hstart]);
     }
+    # make the cigar string
+    my $cigar_string = "";
+    my $last = $#align_coordinates;
+    if ($last >= 0) {
+        for (my $i = 0 ; $i < $last ; $i++) {
+            my $ql = (($align_coordinates[$i+1]->[0])-($align_coordinates[$i]->[0])-1)*$qinc;
+            $ql = ($ql > 0) ? $ql : -$ql;
+            my $tl = (($align_coordinates[$i+1]->[1])-($align_coordinates[$i]->[1])-1)*$hinc;
+            $tl = ($tl > 0) ? $tl : -$tl;
+            my $length = ($ql > $tl) ? $ql-$tl : $tl-$ql;
+            $cigar_string .= $align_coordinates[$i]->[0].",".$align_coordinates[$i]->[1].",$length:";
+        }
+        # add the final block
+        $cigar_string .= $align_coordinates[$#align_coordinates]->[0].",".$align_coordinates[$#align_coordinates]->[1].",0";
+    }
 
-    # take the HDP start coordinates off the array
-    shift @align_coordinates;
-    return @align_coordinates;
+    return (\@align_coordinates, $cigar_string);
 }
 
 
@@ -814,14 +835,6 @@ sub _findTypes {
 sub create_feature {
     my ($self, $feat) = @_;
 
-    # create analysis object (will end up in the analysis table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ();
-    $analysis->db ($feat->{db});
-    $analysis->program ($feat->{program});
-    $analysis->gff_source ($feat->{source});
-    $analysis->gff_feature ($feat->{primary});
-    $analysis->logic_name ($feat->{logic_name});
-
     # create featurepair object
     my $feature1 = Bio::EnsEMBL::SeqFeature->new ();
     $feature1->seqname ($feat->{name});
@@ -833,9 +846,9 @@ sub create_feature {
     $feature1->percent_id ($feat->{percent_id});
     $feature1->source_tag ($feat->{source});
     $feature1->primary_tag ($feat->{primary});
-    $feature1->analysis ($analysis);
+    $feature1->analysis ($self->analysis);
 
-    $feature1->add_tag_value ('align_coor', $feat->{align_coor});
+    $feature1->add_tag_value ('cigar', $feat->{cigar});
 
     my $feature2 = Bio::EnsEMBL::SeqFeature->new ();
     $feature2->seqname ($feat->{hname});
@@ -847,7 +860,7 @@ sub create_feature {
     $feature2->percent_id ($feat->{percent_id});
     $feature2->source_tag ($feat->{source});
     $feature2->primary_tag ($feat->{primary});
-    $feature2->analysis ($analysis);
+    $feature2->analysis ($self->analysis);
 
     my $featurepair = Bio::EnsEMBL::FeaturePair->new ();
     $featurepair->feature1 ($feature1);
