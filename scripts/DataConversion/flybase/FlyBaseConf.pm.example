@@ -1,0 +1,109 @@
+package FlyBaseConf;
+
+use strict;
+use vars qw( %FlyBaseConf );
+
+
+%FlyBaseConf = (
+		 #location of gff files
+		 FB_CHR_INFO => [
+				 {
+				  chr_name => '2L',
+				  gff_file => 'short.gff',
+				 },
+			       ],
+
+
+                # details for db-connection are stored in registry-file
+                FB_DBNAME => 'jhv_droso_3_2',
+                FB_DBHOST => 'ecs4',
+                FB_DBUSER => 'ensadmin',
+                FB_DBPASS => 'ensembl',
+                FB_DBPORT => '3351',
+
+
+                # parameters for analysis object (logic_name is set in flybase_to_ensembl.pl
+                ANA_DB => 'Flybase',
+                ANA_DB_VERSION => '3.2',
+                ANA_DB_FILE => '',
+                ANA_PROGRAM => '',
+                ANA_PROGRAM_VERSION => '',
+                ANA_PROGRAM_FILE => '',
+                ANA_GFF_SOURCE => 'Flybase-GFF v3.0',
+                ANA_GFF_FEATURE => '',
+                ANA_MODULE => '',
+                ANA_MODULE_VERSION => '',
+                ANA_PARAMETERS => '',
+                ANA_CREATED => '',
+
+
+
+                # if want the debug statements in wormbase to ensembl scripts printed
+                FB_DEBUG => 1,
+
+                # list of simple-features which have to be stored (type must match the type-field (column 3) in gff 
+                SIMPLE_FEATURES => [
+                                    {
+                                     type => 'oligo' ,
+                                     label => 'oligo' ,
+                                     logic_name => 'oligo_annotation'
+                                    },
+                                    {
+                                     type => 'aberration_junction',
+                                     label => 'aberration_junction',
+                                     logic_name => 'abberation_annotation'
+                                    },
+                                    {
+                                     type => 'enhancer',
+                                     label => 'enhancer',
+                                     logic_name => 'enhancer_annotation'
+                                    },
+                                    {
+                                     type => 'ncRNA',
+                                     label => 'ncRNA',
+                                     logic_name => 'ncRNA_annotation'
+                                    },
+                                    {
+                                     type => 'regulatory_region',
+                                     label => 'regulatory_region',
+                                     logic_name => 'regulatory_region_annotation'
+                                    },
+                                   ],
+
+               );
+
+
+
+
+
+sub import {
+    my ($callpack) = caller(0); # Name of the calling package
+    my $pack = shift; # Need to move package off @_
+
+    # Get list of variables supplied, or else
+    # all of GeneConf:
+    my @vars = @_ ? @_ : keys( %FlyBaseConf );
+    return unless @vars;
+
+    # Predeclare global variables in calling package
+    eval "package $callpack; use vars qw("
+         . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $FlyBaseConf{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$FlyBaseConf{ $_ };
+	} else {
+	    die "Error: FlyBaseConf: $_ not known\n";
+	}
+    }
+}
+
+1;
+
+
