@@ -913,14 +913,15 @@ sub find_transcripts_by_protein_evidence{
   
   my $transcript_sql;
   $transcript_sql = "SELECT distinct(t.transcript_id) ". 
-    "FROM transcript t, exon_transcript et, exon e, ".
-      "supporting_feature sf, ";
-  $transcript_sql .= "gene g " if($type);
+                    "FROM transcript t, exon_transcript et, exon e, ".
+                     "supporting_feature sf ";
+  $transcript_sql .= ", gene g " if($type);
   $transcript_sql .= "WHERE  sf.feature_id in (".$id_list.") and ".
     "e.exon_id=et.exon_id and et.transcript_id=t.transcript_id and ".
       "sf.exon_id=e.exon_id and sf.feature_type= 'protein_align_feature' ";
   $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
 
+  print STDERR $transcript_sql."\n";
   my $transcript_sth = $db->prepare($transcript_sql);
 
   $transcript_sth->execute;
