@@ -96,40 +96,59 @@ my $prefix='COB';
 	     GB_FINALDBPASS                  => 'TyhRv',
 	    
 	     GB_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
+
+	     ############################################################
 	     # general variables
+	     ############################################################
+
 	     # path to run_GeneBuild_RunnableDB
 	     GB_RUNNER      => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
 	     GB_OUTPUT_DIR      => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
+
 	     # LSF queue plus any options you want to use
 	     GB_QUEUE       => 'acari',
 	     GB_TBLASTN     => '/usr/local/ensembl/bin/wutblastn',
 	     
+	     ############################################################
 	     # pmatch related variables - for Targetted build
+	     ############################################################
+
 	     # path to refseq fasta file
 	     GB_REFSEQ      => '/usr/local/ensembl/data/blastdb/Worms/wormpep88.pep',
+
 	     # path to swissprot fasta file
 	     GB_SPTR        => '',
+
 	     # path to swissprot "evidence kill list" file
 	     GB_KILL_LIST   => '/acari/work5a/lec/code/main_trunk/ensembl-pipeline/scripts/GeneBuild/kill_list.txt',
 	     # path to file where we'll write cleaned up  proteome data
 	     #GB_PFASTA      => '/acari/work4a/lec/cDNAs/prepare_cdnas.fa',
 	     #GB_PFASTA      => '/ecs2/work2/lec/proteome88.fa',
 	     GB_PFASTA => '/data/blastdb/Worms/proteome88.fa',
+
 	     # path pmatch executable
 	     GB_PMATCH      => '/usr/local/ensembl/bin/pmatch',
 	     GB_PMATCH_MAX_INTRON => '50000',
+
 	     # path to directory where fpc/chromosoaml sequences are 
 	     GB_FPCDIR      => '/acari/scratch4/ensembl/lec/super_contigs/',
+
 	     # directory to write pmatch results
 	     GB_PM_OUTPUT   => '/acari/scratch4/ensembl/lec/pmatch_out/',
 
 	     # eg TargettedGeneE2G
-	     GB_TARGETTED_RUNNABLES   => [''],
+	     # array of hashes, each has contains the runnable class name and the analysis logic name
+	     GB_TARGETTED_RUNNABLES   => [
+					  { 
+					   runnable => '',
+					   analysis => '',
+					  }
+					 ],
 	     
 	     # array of hashes, each has contains the runnable class name and the analysis logic name
 	     GB_LENGTH_RUNNABLES      => [
 					  {
-					   runnable => 'FPC_BlastMiniGenewise', 
+					   runnable => 'FPC_BlastMiniGenewise',
 					   analysis => 'TGE_gw',
 					  },
 					  {
@@ -150,7 +169,10 @@ my $prefix='COB';
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '1000000',
 
+	     ############################################################
 	     # targetted genewise/geneE2G specific parameters
+	     ############################################################
+
 	     # species specific protein index
 	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Worms/proteome88.fa',
 #	     GB_TARGETTED_PROTEIN_INDEX => '/acari/work5a/lec/briggsae_sequence/proteome87.fa',
@@ -166,22 +188,18 @@ my $prefix='COB';
 	     # genetype for Targetted_GeneWise
 	     #GB_TARGETTED_GW_GENETYPE              => 'targetted_cdna',
 	     GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',
-	     #for est2genome runnabledb
+	     
+	     #for est2genome runnabledb (This should probably be in ESTConf.pm)
 	     GB_EST_DATABASES => [
                                   # fill in one complete hash for each database from which blast 
                                   # features are to be retrieved
-                                  {                                  
-                                   'type'       => '',
-                                   'threshold'  => '',
-                                   'index'      => ''
+                                  { 
+				   'type'       => '', # logic name
+                                   'threshold'  => '', # threshold
+                                   'index'      => '', # '/full/path/to/index_name'
                                   },
-				  
-                                  #                                         {
-                                  #                                          'type'       => 'dbEST', #logic name of analysis type
-                                  #                                          'threshold'  => '100',
-                                  #                                          'index'      => '/full/path/to/dbEST'
-                                  #                                         },
-                                        ],
+				 ],
+	     
 	     GB_EST_GENETYPE => 'est2genome',
 	     # similairity genewise specific parameters
 	     GB_SIMILARITY_DATABASES => [
@@ -215,13 +233,18 @@ my $prefix='COB';
 	     # gene type for FPC_BlastMiniGenewise
 	     GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
 
+	     ############################################################
 	     # Combine Genewises_and_E2Gs specific parameters
+	     ############################################################
+
 	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
 	     GB_cDNA_GENETYPE               => 'exonerate_e2g',
 	     GB_COMBINED_MAX_INTRON         => 100000,
 	    	     
+	     ############################################################
 	     # GeneBuilder parameters
+	     ############################################################
 
 	     GB_ABINITIO_TYPE           => 'ab_initio',
 	     GB_ABINITIO_SUPPORTED_TYPE => 'ab_initio_supported',
