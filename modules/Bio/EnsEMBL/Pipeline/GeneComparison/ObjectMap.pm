@@ -45,7 +45,7 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 
-use diagnostics;
+#use diagnostics;
 use vars qw(@ISA);
 use strict;
 
