@@ -138,7 +138,7 @@ sub _cluster_ests_with_genes {
       # EST vs gene distances
 
     foreach my $gene_id (@$genes_that_share_this_est){
-
+print STDERR "Est-gene pairwise distance [".$gene_id."][".$est_id."] " . $self->_pairwise_distance($gene_id, $est_id, undef, 1) . "\n";
       my %pairwise_comparison = 
 	('type'     => 'est_vs_gene',
 	 'gene_ids'  => [$gene_id],
@@ -148,8 +148,15 @@ sub _cluster_ests_with_genes {
 
       # Inter-gene distances
 
+print STDERR "Genes that share EST [$est_id] : @$genes_that_share_this_est\n";
+
     for (my $i = 0; $i < scalar @$genes_that_share_this_est; $i++) {
       for (my $k = $i + 1; $k < scalar @$genes_that_share_this_est; $k++) {
+
+print STDERR "Gene-gene pairwise distance [".$genes_that_share_this_est->[$i]."][".$genes_that_share_this_est->[$k]."] " . $self->_pairwise_distance($genes_that_share_this_est->[$i],
+						   $genes_that_share_this_est->[$k],
+						   undef,
+						   1) . "\n";
 	my %pairwise_comparison = 
 	  ('type'     => 'inter_gene',
 	   'gene_ids' => [$genes_that_share_this_est->[$i], 
@@ -184,13 +191,19 @@ sub _cluster_ests_with_genes {
 
     my $closest_gene_id;
     my @closely_related_genes;
+    my $last_dist;
     foreach my $comparison (@est_gene_distances){
       if ($comparison->{type} eq 'est_vs_gene') {
 	$closest_gene_id = $comparison->{gene_ids}->[0];
-	last
+	last 
+	  if (defined $last_dist && 
+	      $last_dist < $comparison->{distance})
       } elsif ($comparison->{type} eq 'inter_gene') {
-	push @closely_related_genes, $comparison;
+	push (@closely_related_genes, $comparison)
+	  unless (defined $last_dist && 
+		  $last_dist < $comparison->{distance})
       }
+      $last_dist = $comparison->{distance}
     }
 
     throw("Failed to find most closely related gene.")
@@ -326,6 +339,7 @@ sub _calculate_inf_site_gene_vs_est_distances {
       next if $seen_est{$est_id};
 
       foreach my $other_gene (@{$self->_find_genes_by_est_id($est_id)}){
+	next if $other_gene eq $gene_id;
 	$gene_vs_gene{$gene_id}->{$other_gene}++;
 	if ($gene_vs_gene{$gene_id}->{$other_gene} == 1){
 	  push @gene_pair, [$gene_id, $other_gene];
@@ -391,12 +405,9 @@ sub _calculate_inf_site_gene_vs_est_distances {
 
       # Store newly computed distances.
 
-print STDERR "Gene-gene inf pairwise distances : \n";
     for (my $row = 1; $row < scalar @$distances; $row++) {
       next unless defined $distances->[$row];
-      for (my $column = $row + 1; $column < scalar @{$distances->[$row]}; $column++){
-print STDERR "Inf pairwise distance : [". $sequence_order->[$column - 1] ."] [". 
-$sequence_order->[$row - 1] ."] : " . $distances->[$row]->[$column] . "\n";
+      for (my $column = 1; $column < scalar @{$distances->[$row]}; $column++){
 	$self->_pairwise_distance($sequence_order->[$column - 1], 
 				  $sequence_order->[$row - 1], 
 				  $distances->[$row]->[$column],
@@ -411,18 +422,26 @@ $sequence_order->[$row - 1] ."] : " . $distances->[$row]->[$column] . "\n";
       my ($distances, $sequence_order) = 
 	$self->_compute_distances($hr_inf_site_aligns->{$gene_id});
 
-      # Store result of first column of result matrix (ie. gene vs ests)
-print STDERR "Inf pairwise distances between gene sequence [$gene_id] and ESTs : \n";
       for (my $row = 1; $row < scalar @$distances; $row++) {
-	next if (($sequence_order->[$row-1] eq 'exon_sequence')||
-		 ($sequence_order->[$row-1] eq 'genomic_sequence'));
 	next unless defined $distances->[$row];
-print STDERR "Inf pairwise distance : [" . $sequence_order->[$row-1] . "] : " . $distances->[$row]->[1] . "\n";
-	$self->_pairwise_distance($gene_id, 
-				  $sequence_order->[$row-1], 
-				  $distances->[$row]->[1],
-				  1)
+	for (my $column = 1; $column < scalar @{$distances->[$row]}; $column++){
+	  my $est_id;
+
+	  if ($sequence_order->[$row - 1] eq $gene_id){
+	    $est_id = $sequence_order->[$column - 1];
+	  } elsif ($sequence_order->[$column - 1] eq $gene_id){
+	    $est_id = $sequence_order->[$row - 1];
+	  } else {
+	    next
+	  }
+
+	  $self->_pairwise_distance($gene_id, 
+				    $est_id, 
+				    $distances->[$row]->[$column],
+				    1);
+	}
       }
+
     }
   }
 
@@ -446,19 +465,17 @@ sub _compute_distances {
     push @sequence_order, $align_seq->name;
   }
 
-print STDERR "Have seqs : @sequence_order\n";
-
   my @distances;
-print STDERR "Calculating identity : \n";
+
   for (my $i = 0; $i < (scalar @sequence_order) - 1; $i++) {
     my @seq1 = split //, $seqs{$sequence_order[$i]};
-print STDERR "Seq 1 : @seq1\n";
+
     warning("Informative site alignments are length zero.  Try something different.")
       if scalar @seq1 < 1;
 
     for (my $j = $i + 1; $j < scalar @sequence_order; $j++) {
       my @seq2 = split //, $seqs{$sequence_order[$j]};
-print STDERR "  Seq 2 : @seq2\n";
+
       my $matching_bases = 0;
 
       throw("Informative site sequences not the same length")
@@ -470,7 +487,7 @@ print STDERR "  Seq 2 : @seq2\n";
       }
 
       my $distance = 1 - ($matching_bases/(scalar @seq1));
-print STDERR "Distance calculated as : " . $distance . "\n";
+
       $distances[$j+1][$i+1] = sprintf("%4.2f", $distance);
     }
   }
@@ -737,6 +754,7 @@ sub _pairwise_distance {
   my $dist_set = $inf ? 'inf' : 'norm';
 
   if (defined $distance){
+print STDERR "Storing [$dist_set][$id1][$id2][$distance]\n";
     $self->{_pairwise_distances}->{$dist_set}->{$id1}->{$id2} = $distance;
     return $distance
   }
