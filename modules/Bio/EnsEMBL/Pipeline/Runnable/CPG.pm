@@ -273,6 +273,7 @@ sub run_cpg {
     print "Running cpg\n";
     $self->throw("Error running cpg on ".$self->filename."\n") 
         if (system ($self->cpg.' '.$self->filename." > ".$self->results)); 
+    $self->file($self->results);
 }
 
 =head2 parse_results
