@@ -1,4 +1,4 @@
-#! /usr/local/ensembl/bin/perl
+#! /usr/local/bin/perl
 #
 #This script run after snp_cross_match.pl. snp_cross_match.pl generate a list of refsnpid for which none of the clones #are on GP. snp_ssaha_match.pl by using ssaha method to locate the contigs on GP and then use cross_match to find
 #snp position
@@ -11,28 +11,25 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::ExternalData::SNPSQL::DBAdaptor; 
 use Bio::EnsEMBL::DBLoader;
 use Data::Dumper;
-use Bio::SeqIO;
 
 #use Getopt::Long;
 
-my $host   = 'ecs2f';
+my $host   = 'ecs1d';
 my $host_snp = 'ecs1e';
-#my $port       = '3310';
+my $port       = '3310';
 my $user   = 'ensro';
-my $dbname_snp = 'hum_snp_116';
+my $dbname_snp = 'hum_snp_112';
 #my $dbname     = 'otter_merged_end_jul';
-#my $dbname     = 'fish_zv3_core';
-#my $dbname     = 'human_ncbi34_raw';
-#my $dbname     = 'homo_sapiens_core_18_34';
+#my $dbname     = 'human_chr10_comp';
+my $dbname     = 'homo_sapiens_core_16_33_new';
 #my $dbname     = 'anopheles_research_core_10_2';
-my $dbname     = 'rattus_norvegicus_core_20_3a';
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(-host =>$host,
 					     -user  =>$user,
 		                             #-port => $port,
 					     -dbname=>$dbname);
 
-#$db->assembly_type('VEGA');
+$db->assembly_type('VEGA');
 
 my $snp_db;
 
@@ -56,25 +53,21 @@ my $score =20;
 my $masklevel = 80;
 my $minmatch = 20;
 my $debug=1;
-my $chr = 7;
+my $chr = 10;
 my $flank_base = 500;
 
-my ($file,$id_file,$first,$file_num,$first,$input,$search_file,$non_ensembl,$start_internal_id,$diff,$seq_file,$ssaha_out,$feature_out,$mouse,%inseq);
+my ($file,$est,$first,$file_num,$first,$input,$search_file,$start_internal_id,$diff,$seq_file,$ssaha_out,$feature_out,$mouse,%inseq);
 
-###use following if a species only have RefSNP table and without mapping info (i.e. Hit, ContigHit tables)
-###the initial mouse dbSNP was like that, so the following code
-#if ($dbname_snp =~ /mouse|mus_musculus/i) {
-#  $mouse=1;
-#}
+if ($dbname_snp =~ /mouse|mus_musculus/i) {
+  $mouse=1;
+}
 
-####if $ARGV[0] eq "seq_file", the file contains a list of flanking sequences to be mapped###
-if ($ARGV[0] eq "seq_file") {
+####if use $ARGV[0] eq "file", $input_seq has to be in same dir as $input###
+if ($ARGV[0] eq "file") {
   $file=1;
   $input = $ARGV[1];
-  ($chr) = $input =~ /\d+\-ch(\d+)\_query_seq$/;
   $search_file = $ARGV[2];
-  $non_ensembl=1 if ($ARGV[3] eq "non_ensembl");
-  $seq_file = $input;
+  $est   = $ARGV[3];
 }
 #####the first round check to see how many snps are already mapped in clones which is in GP
 elsif ($ARGV[0] eq "first") {
@@ -83,17 +76,38 @@ elsif ($ARGV[0] eq "first") {
   $input =~ /\_(\d+)/;
   $start_internal_id = $1;
 }
-######read input file, the input file contains a list of refsnpids to be mapped
-elsif ($ARGV[0] eq "id_file") {
-  $id_file = 1;
-  $input = $ARGV[1];
-  $search_file = $ARGV[2];
+######read input file to mapped them
+elsif ($ARGV[0] =~/^\d+|\d+$|all$/ and !$ARGV[1]) {
+  $input = $ARGV[0];
+}
+
+open FILE, "$input" || die "Can not open input file: $! \n";
+if ($file) {
+  $seq_file = $input;
+}
+else {
   $seq_file = "$input\_seq";
 }
 
-my (%done, %input_id, %find, %rec ,%snppos);
+my @input_names = split /\//, $input;
+$input = $input_names[-1];
+open DIFF, ">DIFF\_$input" || die "Can not open diff file: $! \n";###added /tmp dir
+$ssaha_out = "$input\_ssaha";
+$feature_out = "$input\_features";
 
-open FILE, "$input" or die "Can not open input file: $! \n";
+
+my $ssaha_command;
+
+if ($input =~ /no\_match/ or $ARGV[4]==1) {
+  $ssaha_command = "/usr/local/ensembl/bin/ssaha $seq_file $search_file -qf fasta -sf fasta -da 0 -mp 1 -sm 5 -ms 100 -mg 5 -mi 5 -pf > $ssaha_out";
+}
+else { 
+  $ssaha_command = "/usr/local/ensembl/bin/ssaha_zn_old $seq_file $search_file -hit 10 -len 12 -cut 100 > $ssaha_out";
+}
+
+
+
+my (%done, %input_id, %find, %rec ,%snppos);
 
 while (<FILE>) {
   my $refsnpid ;
@@ -105,29 +119,9 @@ while (<FILE>) {
     $input_id{$refsnpid}=1;
   }
 }
-
+  
 my $clone_count = keys %input_id;
 print "Total key is $clone_count\n";
-
-my @input_names = split /\//, $input;
-$input = $input_names[-1];
-open DIFF, ">DIFF\_$input" || die "Can not open diff file: $! \n";###added /tmp dir
-$ssaha_out = "$input\_ssaha";
-$feature_out = "$input\_features";
-
-
-my $ssaha_command;
-
-###this ssaha is slower and catch more hits with lower standard, I will limit score >0.5 for this
-if ($input =~ /no\_match/ or $ARGV[3]==1) {
-  $ssaha_command = "/usr/local/ensembl/bin/ssaha $seq_file $search_file -qf fasta -sf fasta -da 0 -mp 1 -sm 5 -ms 100 -mg 5 -mi 5 -pf > $ssaha_out";
-}
-###ssaha_zn is quicker and more strict, but will miss some hits. I use this first, then use ssaha with no_matched ones
-else { 
-  $ssaha_command = "/usr/local/ensembl/bin/ssaha_zn $seq_file $search_file -hit 10 -len 12 -cut 100 > $ssaha_out";
-  #$ssaha_command = "/nfs/acari/yuan/ensembl/perl/ssaha_zn_old $seq_file $search_file -hit 10 -len 12 -cut 100 > $ssaha_out";
-}
-
 
 if ($first) {
   my $crossmap = Bio::EnsEMBL::Pipeline::RunnableDB::CrossSNPMap->new(-snpdb=>$snpdb, 
@@ -153,17 +147,17 @@ if ($first) {
     if (!$same_version{$refsnpid}) {
       print NO_CLONE "$refsnpid\n";
     }
-   else {
+    else {
       print SAME_CLONE "$refsnpid\n";
     }
   }
   exit;
 }
 
-my ($snp_seq_all,@searchseqs);
+my $snp_seq_all;
 
 ####generate snp query sequence file############
-if ($ARGV[0] eq "id_file" and !(-e $seq_file)) {
+if ($ARGV[0] ne "file" and !(-e $seq_file)) {
   foreach my $refsnpid (sort numeric keys %input_id) {
     $refsnpid =~ s/\s+//g;
     ##get rid off duplicated contigs
@@ -179,13 +173,24 @@ if ($ARGV[0] eq "id_file" and !(-e $seq_file)) {
       my $seq5 = $info->upStreamSeq;
       my $seq3 = $info->dnStreamSeq;
       #print STDERR "seq5 is $seq5 and seq3 is $seq3\n";
-
+      my $snp_pos = (length $seq5) +1;
       my $snp_seq = lc($seq5).uc($observed).lc($seq3);
       $snp_seq =~ s/\s+//g;
-
-      $inseq{$refsnpid} = $snp_seq;
-
-      $snp_seq_all .=">$refsnpid\n$snp_seq\n";
+      #print "the length of query sequence is ", length($snp_seq), "\n";
+      if (length $snp_seq <40 ) {
+	#my $crossmap = Bio::EnsEMBL::Pipeline::RunnableDB::CrossCloneMap->new(-crossdb=>$crossdb, -score =>80, -debug=>$debug);
+	#my $snp_clone_seq = $crossmap->get_seq_from_embl($acc,$version);
+	#undef $crossmap;
+	#my $snp_seq;
+	#if ($snp_clone_seq) {
+	#  $snp_seq = substr ($$snp_clone_seq, $start-100, 200);
+	#}
+	print "SHORT FLANK SEQ FOR $refsnpid\n";
+	#$snp_pos = 100;
+      }
+      $snppos{$refsnpid} = $snp_pos;
+      $rec{$refsnpid} = $info;
+      $snp_seq_all .=">$refsnpid-$snp_pos\n$snp_seq\n";
       #print "this is $snp_seq_all\n";
     }
     else {
@@ -198,7 +203,7 @@ if ($ARGV[0] eq "id_file" and !(-e $seq_file)) {
   close FASTA;
   #exit; ##if only want flanking sequences generated from refsnpids
 }
-elsif ($file or ($id_file and -e $seq_file)) { ###it is useful for snp mapping###
+elsif ($file) { ###it is useful for snp mapping###
   open SEQ, "$seq_file" || die "Can not open $seq_file: $! \n";
   my $name;
   while (<SEQ>) {
@@ -213,38 +218,18 @@ elsif ($file or ($id_file and -e $seq_file)) { ###it is useful for snp mapping##
   }
 }
 
-if ($non_ensembl) {
-
-  my $in = Bio::SeqIO->new(
-			   -FILE   => $search_file,
-			   -FORMAT => 'FASTA',
-			  );
-  
-  while (my $seq = $in->next_seq) {       
-    print STDERR $seq->display_id,"\n"; 
-    push @searchseqs, $seq;
-  }
-}
-
-
 sub numeric {$a<=>$b}
 
 #print STDERR "The query seq is $snp_seq_all\n";
 
-my $ssaha_gz = $ssaha_out."\.gz";
-
-print "my ssaha_gz is $ssaha_gz\n";
-
 ####if total_ssaha_out is exist, always use it to save run ssaha many times####
 if (!(-e "total_ssaha_out")) {
-  if (((!(-e $ssaha_out) and !(-e $ssaha_gz)) or (-z $ssaha_out and -z $ssaha_gz)) and -e $seq_file) {
+  if ((!(-e $ssaha_out) or -z $ssaha_out) and -e $seq_file) {
     my $date1 = `date`;
     print "This is before ssaha $date1\n";
     print "seq file is $seq_file\n";
     
     system ($ssaha_command);  ### ||  die "OPEN SSAHA failed :$!\n";
-
-    system ("gzip $ssaha_out") if (!(-z $ssaha_out));
     
     my $date2 = `date`;
     print "This is after ssaha $date2\n";
@@ -252,8 +237,6 @@ if (!(-e "total_ssaha_out")) {
   if (-e $ssaha_out) {
     open IN, "$ssaha_out" || die "$ssaha_out can not open :$!\n";
   }
-  elsif (-e $ssaha_gz) {
-    open IN, "gzip -dc $ssaha_gz |" || die "$ssaha_out can not open :$!\n";  }
 }
 elsif (-e "total_ssaha_out") {
   open IN, "total_ssaha_out" || die "$ssaha_out can not open :$!\n";
@@ -262,32 +245,25 @@ elsif (-e "total_ssaha_out") {
 #open TEST, ">$input\_diff_ssaha";
 
 my (%rec_find, $qname, $zn_ssaha);
-		    
+
 while (<IN>) {
   chomp;
   if (/^FF|RF/) {#####matching tony cox's ssaha
     my ($dir, $qname, $qstart, $qend, $sname, $sstart, $ssend, $num, $perc) = split (/\s+/, $_);
     #print "this is line $_ and $qname, $qstart, $qend, $sname, $sstart, $ssend, $num, $perc\n";
-    if ($sname =~ /^(\S+)\-\d+\-\d+$/ | $sname =~ /^\d+\-\d+$/) {
-      $chr = $1 if ($1);
-      $chr = give_chr_name($db,$sname) if (!$chr);
-
-      ###for chr6 and haplotypes, vega use different chr No. I need map snps on them at the same time.
-      #$chr = give_chr_name($db,$sname);
-       #if ($sname eq "1-4641698") {
-       #   $chr = 25;
-       #}
-       #elsif ($sname eq "1-4754829") {
-       #   $chr = 26;
-       #}
-       #elsif ($sname eq "1-170730988") {
-       #   $chr = 6;
-       #}
-      #print "chr_name is $chr\n" if ($chr !~ /^\d+/);
-      $sname = "$chr-$sstart-$ssend"; ### if ($sstart >32600000 and $ssend < 32620000);###for HAP
-      #print "$qname, $sname\n" if ($sname !~ /^\d+/);
+    if ($sname =~ /^\d+\-\d+$/) {
+       if ($sname eq "1-4641698") {
+          $chr = 25;
+       }
+       elsif ($sname eq "1-4754829") {
+          $chr = 26;
+       }
+       elsif ($sname eq "1-170730988") {
+          $chr = 6;
+       }
+       $sname = "$chr-$sstart-$ssend";
     }
-    push (@{$find{$qname}}, $sname) ;###if ($sname =~ /\S+\-\d+\-\d+/);
+    push (@{$find{$qname}}, [$sname,$sstart,$ssend]);
   }
   #if (/^\d+\s+\S+\s+\S+\s+\d+\s+\d+\s+\d+\s+\d+\s+[FC]{1}\s+\d+\s+\S+$/) {####matching ssaha2
     #my ($score,$qname,$sname,$qstart,$qend,$sstart, $ssend,$dir,$num,$perc) = split (/\s+/, $_); 
@@ -298,36 +274,35 @@ while (<IN>) {
   elsif (/^\S+\s+\d+\s+\d+\s+\d+\s+[+C]{1}\s+\d+\s+\d+\s+\d+\s+\d+\s+\d+$/) {####match zn's ssaha
     my ($sname,$index,$length,$match,$rc,$qstart,$qend,$sstart, $ssend,$slength) = split (/\s+/, $_); 
     #print "this is line $_ and snp_pos = $snppos{$qname}\n";
-    if ($sname =~ /^(\S+)\-\d+\-\d+$/ | $sname =~ /^\d+\-\d+$/) {
-      $chr = $1 if ($1);
-      $chr = give_chr_name($db,$sname) if (!$chr);
-      
-       #if ($sname eq "1-4641698") {
-       #   $chr = 25;
-       #}
-       #elsif ($sname eq "1-4754829") {
-       #   $chr = 26;
-       #}
-       #elsif ($sname eq "1-170730988") {
-       #   $chr = 6;
-       #}
-      #print "chr_name is $chr\n" if ($chr !~ /^\d+/);
+    if ($sname =~ /^\d+\-\d+$|^\d+/) {
+       if ($sname eq "1-4641698") {
+          $chr = 25;
+       }
+       elsif ($sname eq "1-4754829") {
+          $chr = 26;
+       }
+       elsif ($sname eq "1-170730988") {
+          $chr = 6;
+       }
+
       if ($rc eq "+") {
-	$sname = "$chr-$sstart-$ssend"; ### if ($sstart > 32000000 and $ssend < 32200000); ###for HAP
+	$sname = "$chr-$sstart-$ssend";
       }
       elsif ($rc eq "C") {
 	my $start = $sstart;
 	$sstart = $slength-$ssend;
 	$ssend = $slength-$start;
-	$sname = "$chr-$sstart-$ssend"; ### if ($sstart > 32000000 and $ssend < 32200000);###for HAP
+	$sname = "$chr-$sstart-$ssend";
       }
     }
     my $h={};
     $h->{'qname'} = $qname;
     $h->{'sname'} = $sname;
     $h->{'match'} = $match;
-    #print "$qname, $sname, $match\n" if ($sname !~ /^\d+/);
-    push (@{$rec_find{$qname}}, $h); ### if ($sname =~ /\S+\-\d+\-\d+/);
+    $h->{'sstart'} = $sstart;
+    $h->{'send'} = $send;
+    #print "$qname, $sname, $match\n" if ($qname == 193385);
+    push (@{$rec_find{$qname}}, $h);
   }
 }
 
@@ -337,7 +312,7 @@ if ($zn_ssaha) {
     @h = sort {$b->{'match'}<=>$a->{'match'}} @h;
     foreach my $h (@h[0..2]) {
       #print "qname is $qname and match is ",$h->{'match'},"\n" if ($qname == 193385);
-      push @{$find{$qname}}, $h->{'sname'};
+      push @{$find{$qname}}, [$h->{'sname'},$h->{'sstart'},$h->{'send'}];
     }
   }
 }
@@ -350,8 +325,7 @@ print "This is after parsing ssaha file $date\n";
 #exit;
 
 FIND : foreach my $refsnpid (keys %input_id) { ##only table id from input file not ssaha output
-  my (@contigs, @raw_contigs); 
-  print "this is refsnpid $refsnpid\n";
+  my (@contigs, @raw_contigs); print "this is refsnpid $refsnpid\n";
   @contigs = @{$find{$refsnpid}} if ($find{$refsnpid}); ##only ssaha output for the id is exist
   print "this is contigs @contigs\n";
 
@@ -360,84 +334,61 @@ FIND : foreach my $refsnpid (keys %input_id) { ##only table id from input file n
 								      -score =>$score, 
 								      -minmatch =>$minmatch,
 								      -masklevel =>$masklevel,
-								      #-est       =>$est,
+								      -est       =>$est,
 								      -debug => $debug,
 								     );
   ##get rid off duplicated contigs
-  my %uniq_contig;
-  CONTIGS : foreach my $contig (@contigs) {
-    if ($non_ensembl) {
-      foreach my $seq (@searchseqs) {
-	if (!$uniq_contig{$contig} and $contig =~ /^(\S+)\-(\d+)\-(\d+)$/) {
-	  $uniq_contig{$contig}=1;
-	  my ($name,$start,$end) = ($1,$2,$3);
-	  my $start_slice = $start-$flank_base;
-	  $start_slice = 0 if ($start_slice <=0);
-	  my $end_slice = $end+$flank_base;
-	  my $display_id = $name."."."$start_slice"."-"."$end_slice";
-	  my $sub_seq = $seq->subseq ($start_slice,$end_slice);
-	  my $sub_seq_obj = Bio::PrimarySeq->new( -display_id => "$display_id", -seq => $sub_seq);
-	  push (@raw_contigs, $sub_seq_obj);
-	}
-	elsif (!$uniq_contig{$contig} and $seq->display_id eq $contig) {
-	  $uniq_contig{$contig}=1;
-	  push (@raw_contigs, $seq);
-	}
+  my (%uniq_contig,$slice,$coord_system_name,$seq_region_name,$start,$end,$strand,$version);
+
+  CONTIGS : foreach my $contig_ref (@contigs) {
+    $contig_name = $contig_ref->[0];
+    $start = $contig_ref->[1];
+    $end = $contig_ref->[2];
+
+    $contig_name =~ s/^Contig\://;
+    if (!$uniq_contig{$contig_name} and $contig_name) {
+      $uniq_contig{$contig_name}=1;
+      
+      #print "contig_name is $contig_name\n";
+      
+      if ($contig_name =~/^\w+\.\d+\.\d+\.\d+$/) {
+	$coord_system_name = "contig";
       }
-    }
-    else {
-      $contig =~ s/^Contig\://;
-      if (!$uniq_contig{$contig} and $contig) {
-	$uniq_contig{$contig}=1;
-	my $rc;
-	#print "contig is $contig\n";
-	eval {
-	  $rc = $db->get_RawContigAdaptor->fetch_by_name($contig);
-	  #$rc = $db->get_Contig($contig); ####using old_schema
-	};
-	if ($rc) {
-	  push (@raw_contigs, $rc);
-	  if (@raw_contigs>10) {###only take first 10 contigs
-	    #print STDEER "More than 3 hits found for this query---discard the later contigs\n";
-	    last CONTIGS;
-	  }
-	}
-	else {
-	  print "$contig for $refsnpid is not in db $@\n";#incase ssaha searched wrong db
-	  if ($contig =~/(\w+)\.\d+\.\d+\..*/) {
-	    my $clone = $1;
-	    my $clone_obj;
-	    print "Try $clone if no raw_contigs...\n";
-	    eval {
-	      $clone_obj = $db->get_CloneAdaptor->fetch_by_name($clone);
-	    };
-	    if ($clone_obj) {
-	      my @contigs = $clone_obj->get_all_Contigs();
-	      push (@raw_contigs, @contigs);
-	    }
-	    else {
-	      print "$contig or $clone for $refsnpid is no in db $@\n";
-	    }
-	  }####this is the case sequence mapped to chr
-	  elsif ($contig =~/^\S+\-\d+\-\d+/) {
-	    my $slice;
-	    my ($chr, $start, $end) = split /\-/, $contig;
-	    my $start_slice = $start-$flank_base;
-	    $start_slice = 1 if ($start_slice <0);
-	    $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start_slice, $end+$flank_base);
-	    #$slice->name($contig); ####slice will have a name defined for me like : 13.31482005-31483556
-	    push (@raw_contigs, $slice);
-	  }
+      elsif ($contig_name =~/^\w+\.\d+$/) {
+	$coord_system_name = "clone";
+      }
+      elsif ($contig_name =~/\S+\-\d+\-\d+/) {
+	($contig_name, $start, $end) = split /\-/, $contig_name;
+	$coord_system_name = "chromosome";
+	$start = $start-$flank_base;
+	$start = 0 if ($start <0);
+	$end = $end + $flank_base;
+      }
+
+      eval {
+	$slice = $db->get_SliceAdaptor->fetch_by_region($coord_system_name, $contig_name, $start, $end,$strand,$version);
+      };
+      if ($slice) {
+	push (@raw_contigs, $slice);
+	if (@raw_contigs>10) {###only take first 10 contigs
+	  #print STDEER "More than 3 hits found for this query---discard the later contigs\n";
+	  last CONTIGS;
 	}
       }
     }
   }
+  
   print "this is raw_contigs @raw_contigs\n";
   
   print STDERR "fetching input for clone $refsnpid\n";
   
-  $crossmap->seq_map($refsnpid,\$inseq{$refsnpid},\@raw_contigs);
-    
+  if ($file) {
+    $crossmap->seq_map($refsnpid,\$inseq{$refsnpid},\@raw_contigs);
+  }
+  else {
+    $crossmap->fetch_input($refsnpid, \@raw_contigs,$mouse);
+  }
+  
   print STDERR "Running for snp $refsnpid\n";
   $crossmap->run;
   print STDERR "Writing output for clone $refsnpid\n";
@@ -479,21 +430,7 @@ foreach my $refsnpid (keys %input_id) {
 print STDERR "final $clone_mapped_count mapped and $no_clone_count do not mapped\n";
 
 
-sub give_chr_name {
-  
-  my ($db,$name) = @_;
-  #print "name is $name\n";
-  
-  my ($start,$length) = split /\-/,$name;
-  my $query = "select name from chromosome where length = $length";
 
-  my $sth = $db->prepare($query);
-  $sth->execute();
- 
-  while (my ($chr_name) = $sth->fetchrow) {
-    return ($chr_name);
-  }
-}
 
 
 
