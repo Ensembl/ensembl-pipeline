@@ -212,5 +212,11 @@ sub get_Seq_by_id {
     return undef;
 }
 
+sub write_descriptions {
+    my $self = @_;
+    warn("cannot write descriptions if using index file and OBDAIndexSeqFetcher");
+    return undef;
+}
+
 1;
 
