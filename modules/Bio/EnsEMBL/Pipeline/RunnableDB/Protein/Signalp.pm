@@ -83,24 +83,7 @@ sub new {
     $self->throw ("Analysis object required") unless ($self->analysis);
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
-    
-    # set up signalp specific parameters,
-    # my $params = $self->parameters;  # we don't have to read the parameters column from the database
-                                       # in this case; no parameters are passed on to the Runnable 
 
-#    my $params;
-#    if ($params ne "") { $params .= ","; }
-    # get the path to the binaries from the Analysis object (analysisprocess table)
-#    $params .= "-analysis=>".$self->analysis."\n";
-
-#    print STDERR "PROGR0: ".$self->analysis->program."\n";
-    #$params .= "-program=>".$self->analysis->program.",";
-    # get the analysisId from the Analysis object (analysisprocess table)
-    #$params .= "-analysisid=>".$self->analysis->dbID;
-    
-#    $self->parameters($params);
-
-#    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp');
     return $self;
 }
 

@@ -156,7 +156,6 @@ sub write_output {
 
 
     if (@features) { 
-#        print STDERR "Features: ".$features[0]->feature1->start."\n";
         foreach my $feat(@features) {
 	    $proteinFeatureAdaptor->write_Protein_feature($feat);
         }
