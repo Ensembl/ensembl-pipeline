@@ -201,4 +201,46 @@ Q8CDH6 hypothetical protein - multiple pmatches vac
 Q9QUJ6 L1 element - multiple pmatches vac
 Q9R225 Mus musculus L1 retrotransposon - multiple pmatches vac
 Q9QUR4 Mus musculus L1 retrotransposon - multiple pmatches vac
+O75029 FUT1 (Fragment). - multiple pmatches vac
+Q8TE30 Hypothetical protein. - multiple pmatches vac
+O00361 P40. - multiple pmatches vac
+O00369 P40.
+Q15605 ORF1  - multiple pmatches vac
+Q9UN81 Hypothetical protein ORF1. - multiple pmatches vac
+Q9BXE6 FKSG49. - multiple pmatches vac
+Q9BZ63 FKSG60. - multiple pmatches vac
+Q9BZ53 FKSG64. - multiple pmatches vac
+Q9BXE2 FKSG53. - multiple pmatches vac
+Q9P074 HSPC308 (Fragment). - multiple pmatches vac
+Q9BZ65 FKSG58. - multiple pmatches vac
+Q07826 X-linked retinopathy protein protein (Fragment). - multiple pmatches vac
+Q86YP3 Polymerase (Fragment). - multiple pmatches vac
+Q9BZ55 FKSG69. - multiple pmatches vac
+Q9BZ57 FKSG67. - multiple pmatches vac
+P61583 HERV-K_3q12.3 provirus Np9 protein  - multiple pmatches vac
+P61581 HERV-K_22q11.21 provirus Np9 protein - multiple pmatches vac
+Q9BXD8 FKSG57. - multiple pmatches vac
+Q9NPS7 Hypothetical protein. - multiple pmatches vac
+Q9BYU5 Keratin associated protein (Fragment). - multiple pmatches vac
+Q9BYT5 Keratin associated protein KAP2.2 (Fragment). - multiple pmatches vac
+Q9BYS0 Keratin associated protein 2.1b (Fragment.) - multiple pmatches vac
+Q86VU6 RBMY1A1 protein. - multiple pmatches vac
+Q15379 Y-chromosome RNA recognition motif protein (Fragment). - multiple pmatches vac
+Q8NFC8 CYorf16 protein (Fragment). - multiple pmatches vac
+P61571 HERV-K_12q14.1 provirus Rec protein. - multiple pmatches vac
+O60358 Hypothetical protein A-575C2.4. - multiple pmatches vac
+P61572 HERV-K_19q12 provirus Rec protein  - multiple pmatches vac.
+P61573 HERV-K_6q14.1 provirus Rec protein  - multiple pmatches vac.
+P61574 HERV-K_19p13.11 provirus Rec protein  - multiple pmatches vac.
+P61575 HERV-K_8p23.1 provirus Rec protein  - multiple pmatches vac.
+P61579 HERV-K_11q22.1 provirus Rec protein.  - multiple pmatches vac.
+Q69383 HERV-K_7q22.1 provirus Rec protein   - multiple pmatches vac.
+Q9BV49 Hypothetical protein.  - multiple pmatches vac.
+Q8NF61 FLJ00326 protein (Fragment).  - multiple pmatches vac.
+Q9UBX2 Double homeobox protein DUX10.  - multiple pmatches vac.
+Q14546 Homeobox-like sequence. Part of tandem repeat (Fragment)  - multiple pmatches vac..
+Q8N747 Hypothetical protein.  - multiple pmatches vac.
+O95746 PMS2L16 protein.  - multiple pmatches vac.
+Q86WY7 Similar to Williams Beuren syndrome chromosome region 19.  - multiple pmatches vac.
+Q15157 PMS4 protein (HPMS4 protein) (Fragment).  - multiple pmatches vac.
 O62658 Canis familiaris LINE-1 element ORF2.
