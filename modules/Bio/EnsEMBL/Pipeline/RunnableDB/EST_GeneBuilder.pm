@@ -100,7 +100,6 @@ sub new {
 						   -user             => $EST_REFDBUSER,
 						   -dbname           => $EST_REFDBNAME,
 						   -pass             => $EST_REFDBPASS,
-						   -perlonlyfeatures => 0,
 						  );
     
     my $est_e2g_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -401,29 +400,28 @@ sub _process_Transcripts {
   # first check transcripts and hold info about est_evidence, etc...
   my @transcripts = $self->_check_Transcripts($alltranscripts,$strand);
   print STDERR scalar(@transcripts)." transcripts returned from _check_Transcripts\n";
-
-  if ( scalar(@transcripts) == 0 ){
-    print STDERR "No transcripts created, process stopped\n";
-    return;
+  
+  # reject ests/cdnas if they have more than one non-standard intron splice site consensus sequence
+  # (GT-AG, AT-AC, GC-AG) or if the only intron they have is non standard.
+  my @checked_transcripts = $self->check_splice_sites( \@transcripts , $strand );
+  
+  if ( scalar(@checked_transcripts) == 0 ){
+      print STDERR "No transcripts left from the splice-site check\n";
+      return;
   }
- 
   my $merge_object 
-    = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
-							  -transcripts => \@transcripts,
-							 );
+      = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge->new(
+							    -transcripts => \@checked_transcripts,
+							    );
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
   
-  # before checking the splice sites, reject the single exon transcripts
+  # reject the single exon transcripts
   my @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};
-
-  # check the splice_sites
-  # at the moment we do not modify anything in this method
-  $self->_check_splice_Sites(\@filtered_transcripts,$strand);
-  print STDERR scalar(@merged_transcripts)." transcripts returned from _check_splice_Sites\n";
-
-  return @merged_transcripts;
+  print STDERR scalar(@filtered_transcripts)." transcripts left after rejecting single-exon transcripts\n";
+  
+  return @filtered_transcripts;
 }
 
 ############################################################
@@ -825,10 +823,113 @@ sub print_FeaturePair{
       $fp->end . " " .
 	$fp->strand . " " .
 	  $fp->hseqname . " " .
-	    $fp->hstart . " " .
-	      $fp->hend . "\n";
+	      $fp->hstart . " " .
+		  $fp->hend . "\n";
 }
 
+
+############################################################
+
+sub check_splice_sites{
+    my ($self,$transcripts_ref,$strand) = @_;
+    my @checked_transcripts;    
+
+  TRANSCRIPT:
+    foreach my $transcript ( @$transcripts_ref ){
+	
+	# all transcripts are in forward coordinates
+	my @exons  = sort{ $a->start <=> $b->start } @{$transcript->get_all_Exons};
+	
+	#print STDERR "checking splice sites in transcript:\n";
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+	
+	my $introns  = scalar(@exons) - 1 ; 
+	if ( $introns <= 0 ){
+	    push ( @checked_transcripts, $transcript );
+	    next TRANSCRIPT;
+	}
+	
+	my $correct  = 0;
+	my $other    = 0;
+	
+	# in the forward strand, exons are on the original slice
+	my $slice = $self->query;
+	
+      INTRON:
+	for (my $i=0; $i<$#exons; $i++ ){
+	    my $upstream_exon   = $exons[$i];
+	    my $downstream_exon = $exons[$i+1];
+	    my $upstream_site;
+	    my $downstream_site;
+	    if ($strand == 1){
+		eval{
+		    $upstream_site = 
+			$self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		    $downstream_site = 
+			$self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		};
+		unless ( $upstream_site && $downstream_site ){
+		    print STDERR "problems retrieving sequence for splice sites\n$@";
+		    next INTRON;
+		}
+	    }
+	    elsif( $strand == -1 ){
+		# in the reverse strand, exon coords are forward in the revcomp_slice
+		#
+		#  example:
+		#  exons originaly in - strand:       this is how we read the exons:
+		#
+		#     ------CT...AC---...            ---> 5...#exon1#CA...TC#exon2#...3'
+		#  3' #exon2#GA...TG#exon1#...5'               ------GT...AG-----...
+		#
+		# we calculate CA..TC in the revcomp_query and 
+		# make the complementary to get GT..AG (we do not need to apply the reverse)
+		
+		eval{
+		    $upstream_site = 
+			$self->query->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+		    $downstream_site = 
+			$self->query->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+		};
+		unless ( $upstream_site && $downstream_site ){
+		    print STDERR "problems retrieving sequence for splice sites\n$@";
+		    next INTRON;
+		}
+		$upstream_site   =~ tr/ACGTacgt/TGCAtgca/;
+		$downstream_site =~ tr/ACGTacgt/TGCAtgca/;
+	    }
+	    
+	    #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
+	    ## good pairs of upstream-downstream intron sites:
+	    ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
+	    if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
+		  ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
+		  ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
+		$correct++;
+	    }
+	    else{
+		$other++;
+	    }
+	} # end of INTRON
+	
+	unless ( $introns == $other + $correct ){
+	    print STDERR "STRANGE: introns:  $introns, correct: $correct, other: $other\n";
+	}
+	
+	if ( $other > 1 || $other > $correct ){
+	    print STDERR "rejected - splice sites correct = $correct, other = $other";
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
+	    next TRANSCRIPT;
+	}
+	else{
+	    push ( @checked_transcripts, $transcript );
+	}
+	
+    } # end of TRANSCRIPT
+    
+    return @checked_transcripts;
+}
 
 ############################################################
  
@@ -943,7 +1044,7 @@ sub _check_splice_Sites{
 	#  in the reverse strand we're looking at coordinates in the reversed-complement slice:
 	#
 	#        $slice : --------------------TG----GA------------>  forward strand
-	#                                      AC    CT               reverse strand 
+	#                                     AC    CT               reverse strand 
 	#                           downstream   EXON   upstream
 	#
 	#
