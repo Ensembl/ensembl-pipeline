@@ -126,7 +126,7 @@ the analysis object does not have a type.
 =cut
 
 sub store_input_id_analysis {
-  my ($self, $inputId, $analysis, $save_runtime_info ) = @_;
+  my ($self, $inputId, $analysis, $host, $save_runtime_info ) = @_;
 
   $self->throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
    unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
@@ -141,8 +141,6 @@ sub store_input_id_analysis {
 # -----------------------------------------------------------------
   if($save_runtime_info){
   	print "Saving runtime info\n";
-  	my $hostname = [ split(/\./, hostname()) ];
-  	my $host = shift(@$hostname);
   	print join("\t",($inputId, $analysis->dbID, $host, $analysis->db_version)) . "\n";
       my $sth = $self->prepare(qq{
       	REPLACE INTO input_id_analysis
@@ -153,10 +151,10 @@ sub store_input_id_analysis {
   }else{
       my $sth = $self->prepare(qq{
       	INSERT INTO input_id_analysis
-      	(input_id, input_id_type, analysis_id, created)
-      	values (?, ?, ?, now())
+      	(input_id, input_id_type, analysis_id, created, runhost)
+      	values (?, ?, ?, now(), ?)
       	});
-      $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID);
+      $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host);
   }
 #-----------------------------------------------------------------
 }

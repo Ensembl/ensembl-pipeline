@@ -178,32 +178,6 @@ sub get_pending_jobs {
 }
 
 
-# the next two methods are used together in the RuleMAnager_Genebuild script
-# if you implement one you must implement the other
-
-#sub get_job_time{
-#  my ($self, $job) = @_;
-#  my $command = "bjobs -l ".$job->submission_id;
-#  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
-
-#  while(<BJOB>){
-#    chomp;
-#    if($_ =~ /The CPU time used/){
-#      my ($time) = $_ =~ /The CPU time used is (\d+)/;
-#      return $time;
-#    }elsif($_ =~ /is not found/){
-#      print STDERR "job ".$job->submission_id." doesn't appear to be ".
-#	"found\n";
-#      print STDERR $_."\n";
-#      return($job);
-#    }else{
-#      next;
-#    }
-#  }
-#  close(BJOB) or $self->throw("couldn't close pipe to bjobs");
-#  print STDERR "CPU time isn't yet reported for job ".$job->submission_id."\n";
-#  return undef;
-#}
 
 sub get_job_time{
   my ($self, $ids) = @_;
@@ -225,36 +199,33 @@ sub get_job_time{
       $id_times{$job_id} = $time;
     }
   }
-  #close(BJOB);
+  close(BJOB);
   #or $self->throw("couldn't close pipe to bjobs");
   return \%id_times;
 }
 
+
+
 sub check_existance{
-  my ($self, $ids, $verbose) = @_;
-  my $command = "bjobs";
-  my @table_ids = @$ids;
-  my @lsf_ids;
-  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
-  
+  my ($self, $id, $verbose) = @_;
+  my $command = "bjobs -l ".$id."\n";
+  my $flag = 0; 
+  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
   while(<BJOB>){
+    print STDERR if($verbose);
     chomp;
+    if ($_ =~ /No unfinished job found/) {
+      #print "Set flag\n";
+      $flag = 1;
+    } 
     my @values = split;
     if($values[0] =~ /\d+/){
-      push(@lsf_ids, $values[0]);
+      return $values[0];
     }
   }
   close(BJOB) or $self->throw("couldn't close pipe to bjobs");
-  my %seen;
-  my @lost;
-  foreach my $id(@table_ids){$seen{$id}++};
- ID:foreach my $id(@lsf_ids){
-    if(exists($seen{$id})){
-      next ID;
-    }
-    push(@lost, $id);
-  }
-  return \@lost;
+  print STDERR "Have lost ".$id."\n" if($verbose);
+  return undef;
 }
 
 
@@ -264,5 +235,135 @@ sub kill_job{
   my $command = "bkill ".$job_id;
   system($command);
 }
+
+sub stdout_file{
+   my ($self, $arg) = @_;
+
+   if($arg){
+     $self->{'stdout'} = $arg;
+   }
+
+   if(!$self->{'stdout'}){
+     $self->{'stdout'} ='/dev/null'
+   }
+   return $self->{'stdout'};
+}
+
+
+
+sub stderr_file{
+   my ($self, $arg) = @_;
+
+   if ($arg){
+     $self->{'stderr'} = $arg;
+   }
+   if(!$self->{'stderr'}){
+     $self->{'stderr'} ='/dev/null'
+   }
+   return $self->{'stderr'};
+}
+
+
+
+sub temp_filename{
+  my ($self) = @_;
+
+  $self->{'lsf_jobfilename'} = $ENV{'LSB_JOBFILENAME'};
+  return $self->{'lsf_jobfilename'};
+}
+
+
+sub temp_outfile{
+  my ($self) = @_;
+
+  $self->{'_temp_outfile'} = $self->temp_filename.".out";
+
+  return $self->{'_temp_outfile'};
+}
+
+sub temp_errfile{
+  my ($self) = @_;
+
+  $self->{'_temp_errfile'} = $self->temp_filename.".err";
+  
+
+  return $self->{'_temp_errfile'};
+}
+
+
+sub submission_host{
+  my ($self) = @_;
+
+  $self->{'_submission_host'} = $ENV{'LSB_SUB_HOST'};
+  
+
+  return $self->{'_submission_host'};
+}
+
+sub lsf_user{
+  my ($self) = @_;
+
+ 
+  $self->{'_lsf_user'} = $ENV{'LSFUSER'};
+  
+
+  return $self->{'_lsf_user'};
+}
+
+
+sub copy_output{
+  my ($self, $stderr_file, $stdout_file) = @_;
+
+  $stderr_file = $self->stderr_file if(!$stderr_file);
+  $stdout_file = $self->stdout_file if(!$stdout_file);
+  my $err_file = $self->temp_errfile;
+  my $out_file  = $self->temp_outfile;
+
+  if(!$self->temp_filename){
+    my ($p, $f, $l) = caller;
+    $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
+                " we can't copy the output files which don't exist $f:$l");
+    return;
+  }
+  my $command = $self->copy_command;
+  if(-e $err_file){
+    
+    my $err_copy = $command." ".$err_file." ".$self->lsf_user."@".$self->submission_host.":".$stderr_file." 2>&1 ";
+   
+
+    if(system($err_copy)){
+      $self->throw("Couldn't execute ".$err_copy);
+    }
+  }
+  if(-e $out_file){
+    my $out_copy = $command." ".$out_file." ".$self->lsf_user."@".$self->submission_host.":".$stdout_file." 2>&1";
+   
+    if(system($out_copy)){
+      $self->throw("Couldn't execute ".$out_copy);
+    }
+   
+  }
+
+}
+
+
+sub delete_output{
+  my ($self) = @_;
+  
+  unlink $self->temp_errfile if(-e $self->temp_errfile);
+  unlink $self->temp_outfile if(-e $self->temp_outfile);
+  unlink $self->temp_filename if(-e $self->temp_filename);
+}
+
+sub copy_command{
+  my ($self, $arg) = @_;
+
+  if($arg){
+    $self->{'_copy_command'} = $arg;
+  }
+
+  return $self->{'_copy_command'} || 'lsrcp';
+}
+
 
 1;
