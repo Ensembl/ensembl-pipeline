@@ -83,7 +83,6 @@ sub new {
 
 ############################################################
 
-
 =head2 run
 
     Usage   :   $self->run
@@ -104,27 +103,14 @@ sub run {
   my @merged_transcripts  = $self->_merge_Transcripts(\@transcript_clusters);
   print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
 
-  # check the splice_sites
-  # at the moment we do not modify anything in this method
-  #$self->_check_splice_Sites(\@merged_transcripts,$strand);
-  #print STDERR scalar(@merged_transcripts)." transcripts returned from _check_splice_Sites\n";
-
-  #return @merged_transcripts;
-
+  $self->output(@merge_transcripts);
 }
-
-############################################################
-
-
 
 ############################################################
 #
 # METHODS CALLED BY THE RUN METHOD
 #
 ############################################################
-
-
-###########################################################c
 
 =head2 cluster_Transcripts
 
@@ -486,6 +472,12 @@ sub _merge_Transcripts{
     # we process again the transcripts for possible residual merges
     my @merged_transcripts = $self->_check_for_residual_Merge(\@created_transcripts,$strand);
 
+    ############################################################
+    # why do we still get residual merge?
+    # maybe we need to refine the algorithm so that it comes
+    # clean first time around
+    ############################################################
+
     # We put here yet another check, to make sure that we really get rid of redundant things
     
     # if we have produce more than one transcript, check again
@@ -499,14 +491,15 @@ sub _merge_Transcripts{
       } 
   
     # check for the single exon transcripts ( dandruff ), they are no good
+    print STDERR "Eliminating single exon transcripts this shouldn't be in ClusterMerge, it should be in EST_GeneBuilder\n";
     my @final_merged_transcripts;
     foreach my $tran ( @merged_transcripts ){
-      if ( scalar ( @{$tran->get_all_Exons} ) == 1 ){
-	next;
-      }
-      else{
-	push( @final_merged_transcripts, $tran );
-      }
+	if ( scalar ( @{$tran->get_all_Exons} ) == 1 ){
+	    next;
+	}
+	else{
+	    push( @final_merged_transcripts, $tran );
+	}
     }
     
     # keep track of everything it is created for every cluster
@@ -524,9 +517,7 @@ sub _merge_Transcripts{
 
 #########################################################################
 
-=head2
-
- Title   : _check_for_residual_Merge
+=head2 _check_for_residual_Merge
  Function: this function is called from _merge_Transcripts and checks whether after merging the transcript
            there is any residual merge
  Returns : It returns two numbers ($merge,$overlaps), where
@@ -629,9 +620,7 @@ sub _check_for_residual_Merge{
 
 #########################################################################
 
-=head2
-
- Title   : _test_for_Merge
+=head2 _test_for_Merge
  Function: this function is called from _merge_Transcripts and actually checks whether two transcripts
            inputs merge.
  Returns : It returns two numbers ($merge,$overlaps), where
@@ -738,9 +727,7 @@ EXON1:
 
 ############################################################
 
-=head2
-
- Title   : _produce_Transcript
+=head2 _produce_Transcript
  Function: reads all the est2genome transcripts that can be merged and make a single transcript
            out of them
 =cut
@@ -816,15 +803,435 @@ sub _produce_Transcript{
 
 ############################################################
 
+=head2 _cluster_Exons
+ 
+ Function: it cluster exons according to overlap,
+           it returns a Bio::EnsEMBL::SeqFeature, where the sub_SeqFeatures
+           are exon_clusters, which are at the same time Bio::EnsEMBL::SeqFeatures,
+           whose sub_SeqFeatures are exons
+=cut
+
+sub _cluster_Exons{
+  my ($self, @exons) = @_;
+
+  #print STDERR "EST_GeneBuilder: clustering exons...\n";
+  
+  # no point if there are no exons!
+  return unless ( scalar( @exons) > 0 );   
+
+  # keep track about in which cluster is each exon
+  my %exon2cluster;
+  
+  # main cluster feature - holds all clusters
+  my $cluster_list = new Bio::EnsEMBL::SeqFeature; 
+  
+  # sort exons by start coordinate
+  @exons = sort { $a->start <=> $b->start } @exons;
+
+  # Create the first exon_cluster
+  my $exon_cluster = new Bio::EnsEMBL::SeqFeature;
+  
+  # Start off the cluster with the first exon
+  $exon_cluster->add_sub_SeqFeature($exons[0],'EXPAND');
+
+  $exon_cluster->strand($exons[0]->strand);    
+  $cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');
+  
+  # Loop over the rest of the exons
+  my $count = 0;
+  
+ EXON:
+  foreach my $exon (@exons) {
+    if ($count > 0) {
+      my @overlap = $self->match($exon, $exon_cluster);    
+      
+      # Add to cluster if overlap AND if strand matches
+      if ( $overlap[0] && ( $exon->strand == $exon_cluster->strand) ) { 
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+      }  
+      else {
+	# Start a new cluster
+	$exon_cluster = new Bio::EnsEMBL::SeqFeature;
+	$exon_cluster->add_sub_SeqFeature($exon,'EXPAND');
+	$exon_cluster->strand($exon->strand);
+		
+	# and add it to the main_cluster feature
+	$cluster_list->add_sub_SeqFeature($exon_cluster,'EXPAND');	
+      }
+    }
+    $count++;
+  }
+  return $cluster_list;
+}
+
+############################################################
 
 
+=head2 _set_splice_Ends
 
+    Usage   :   $cluster_list = $self->_set_splice_Ends($cluster_list)
+    Function:   Resets the ends of the clusters to the most frequent coordinate
+   
+=cut
 
+sub _set_splice_Ends {
+  my ($self, $cluster_list, $ref_exon2transcript_hash, $ref_is_first, $ref_is_last, $strand) = @_;
 
+  # hash having exons as keys and mother-transcript as value
+  my %exon2transcript = %$ref_exon2transcript_hash;
 
+  # keep track of whether the exon is first or last in the transcript
+  my %is_first = %$ref_is_first;
+  my %is_last  = %$ref_is_last;
 
+  #print STDERR "EST_GeneBuilder: setting common ends...\n";
 
+  # get the exon clusters
+  my @exon_clusters = $cluster_list->sub_SeqFeature;
+
+  # sort clusters according to their start coord.
+  @exon_clusters = sort { $a->start <=> $b->start  } @exon_clusters;
+  my $count =  0;
+
+  # check whether a cluster has fused two separate exons from the same transcript
+  my $position_is = 0;
+  my @exon_list;
+  my $need_to_recluster = 0;		      
+
+ CLUSTERS:		      
+  foreach my $cluster ( @exon_clusters ){
+    $position_is++;
+    my $fused  = 0;
+
+    # keep track of the transcripts used in this cluster
+    my %seen_transcript;
+    my %exons_from_transcript;
     
+    foreach my $exon ( $cluster->sub_SeqFeature ){
+
+      push ( @{ $exons_from_transcript{ $exon2transcript{ $exon } } }, $exon );  
+
+      if ( $seen_transcript{ $exon2transcript{$exon} } && 1 == $seen_transcript{ $exon2transcript{$exon} } ){
+	#print STDERR "There is more than one exon from transcript $exon2transcript{ $exon }\n"; 
+	$fused = 1;
+	$need_to_recluster = 1;
+      }
+      $seen_transcript{ $exon2transcript{ $exon } } = 1;
+    } # end of exon loop
+
+    # if it is not fused, simply collect the exons
+    if ( $fused != 1 ){
+      push( @exon_list, $cluster->sub_SeqFeature);
+    }    
+    # if there is fussion going on (be-bop?), get rid of the bad guys and re-cluster
+    elsif ( $fused == 1 ){
+
+      my @exons = sort{ $b->length <=> $a->length } $cluster->sub_SeqFeature;
+      
+    EXONS:
+      foreach my $exon ( @exons ){
+	
+      TRANS_IN_CLUSTER:
+	foreach my $tran ( keys( %exons_from_transcript ) ){
+	  if ( $exon2transcript{$exon} eq $tran ){
+	    next;
+	  }	  
+	  my $overlap_count = 0;
+	  foreach my $exon2 ( @{ $exons_from_transcript{ $tran } } ){
+	    if ( $exon->overlaps($exon2) ){
+	      $overlap_count++;
+	    }
+	  }
+	  # if  $exon overlaps 2 or more exons from the same transcript, in this cluster ...
+	  if ( $overlap_count >= 2 ){
+	    
+	    # ... and $exon is the only one from its transcript in this cluster
+	    if ( scalar( @{ $exons_from_transcript{ $exon2transcript{$exon} } } ) == 1 ){
+	      
+	      # ... and $exon is at the edge of its transcript
+	      if ( $is_first{ $exon } == 1 || $is_last{ $exon } == 1 ){
+	         
+		#print STDERR "ditching one exon\n";
+		# then we ditch it and continue ...
+		next EXONS;
+	      }
+	    }
+	  }
+	} # end of TRANS_IN_CLUSTER
+			   
+	# if it is good, it gets here
+        push ( @exon_list, $exon );
+      
+      }   # end of EXONS
+      
+    }     # end of 'if fused == 1'
+    
+  }       # end of CLUSTERS
+
+  # if needed, re-cluster
+  if ( $need_to_recluster == 1){
+    @exon_clusters   = ();
+    #print STDERR " *** Reclustering ***\n";
+    $cluster_list  = $self->_cluster_Exons( @exon_list );
+    @exon_clusters = $cluster_list->sub_SeqFeature;
+  }
+
+  # at this point we (hopefully) have got rid of the bad fussion, we can set the splice ends on the new clusters
+      
+  # there is a GOTCHA, however. Once we have reclustered the exons, exons that were together before may be 
+  # separated in different clusters, which means they will be part of different potential exons, for the same
+  # transcript! However, it is possible that we have lost the actual connection between those two exons,
+  # creating then a fake exon.
+  # SOLUTION: to introduce here a check for links between the exons clusters, if every two neighbouring
+  # clusters share a est2genome transcript, then it is o.k., otherwise, we should then split the transcript.
+  # This means that we need to return two (or maybe more!) differentiated sets of clusters which will
+  # be then used to create two ( or more ) new transcripts.
+
+  # keep track of the cluster position
+  my $position = 0;
+
+CLUSTER:		     
+  foreach my $cluster (@exon_clusters) {
+    $position++;
+    my %start;
+    my $new_start;
+    my $max_start = 0;
+    
+  #### set first the start-coordinates ####
+  
+  EXON:
+    foreach my $exon ($cluster->sub_SeqFeature){
+
+      # for a start-coord in the middle 
+      if ( $position > 1 && $position <= scalar( @exon_clusters ) ){
+	
+	# don't use the exon if it is the first of a transcript
+	if ( $is_first{ $exon } == 1 ){
+	  next EXON;
+	}
+      }
+      $start{$exon->start}++;
+    }
+    # we can as well sort them:
+    my @starts = sort{ $start{ $b } <=> $start{ $a } } keys( %start );
+
+    # take the most common start (note that we do not resolve ambiguities here)
+    # at some point we could resolve them by checking for the splice site consensus sequence
+
+    ## test:
+    #print STDERR "starts: ";
+    #foreach my $s (@starts){
+    #  print STDERR $s."\t";
+    #}
+    #print STDERR "\n";
+
+    $new_start = shift( @starts );
+    $max_start = $start{ $new_start };
+
+    # if we have too little exons to obtain the start, take the original value
+    if ( $max_start == 0 ){
+      $new_start = $cluster->start;
+    }
+
+    # the first cluster is a special case - potential UTRs, take the longest one.
+    if( $position == 1) {
+      $new_start = $cluster->start;  
+    }
+
+    #### now set the end coordinate ####
+
+    my %end;
+    my $new_end;
+    my $max_end = 0;
+    
+  EXON:
+    foreach my $exon ($cluster->sub_SeqFeature){
+      
+      # for an end-coord in the middle 
+      if ( $position >= 1 && $position < scalar( @exon_clusters ) ){
+	
+	# don't use the exon if it is the last of a transcript
+	if ( $is_last{ $exon } == 1 ){
+	  next EXON;
+	}
+      }
+      $end{$exon->end}++;
+    }
+    my @ends = sort{ $end{ $b } <=> $end{ $a } } keys( %end );
+    
+    # take the most common end (note that we do not resolve ambiguities here)
+    
+    ## test:
+    #print STDERR "ends: ";
+    #foreach my $e (@ends){
+    #  print STDERR $e."\t";
+    #}
+    #print STDERR "\n";
+    
+    $new_end = shift( @ends );
+    $max_end = $end{ $new_end };
+    
+    # if we have too little exons to obtain the end, take the original value
+    if ( $max_end == 0 ){
+      print STDERR "In last position, cluster end wins!\n";
+      $new_end = $cluster->end;
+    }
+    
+    # the last cluster is a special case - potential UTRs, take the longest one.
+    if( $position == scalar( @exon_clusters ) ) {
+      $new_end = $cluster->end;  
+    }
+    
+    #    print STDERR "new_start: $new_start\n";
+    #    print STDERR "start array:\n";
+    #    foreach my $s ( sort{ $start{ $b } <=> $start{ $a } } keys( %start ) ){
+    #      print STDERR "start: $s\tnum_times: ".$start{ $s }."\t";
+    #    }
+    #    print STDERR "\n";
+    #    print STDERR "new_end: $new_end\n";
+    #    print STDERR "end array:\n";
+    #    foreach my $e ( sort{ $end{ $b } <=> $end{ $a } } keys( %end ) ){
+    #      print STDERR "end: $e\tnum_times: ".$end{ $e }."\t";
+    #    }
+    #    print STDERR "\n";
+    
+
+    ######  if new_start> new_end change them in turns until we get start < end ######
+    # this can happen when there are many exons in a cluster but they vary greatly in size
+    my $other_start = $new_start;
+    my $other_end   = $new_end;
+    my $trouble     = 0;
+    my $stop_start  = 0;
+    my $stop_end    = 0;
+
+    while ( $other_start >= $other_end ){
+      print STDERR "*** Trouble: $new_start >= $new_end ***\n";
+      $trouble = 1;
+
+      # take the next one
+      if ( $stop_start == 0 ){
+	my $re_start = shift( @starts );
+	if ( $re_start ){
+	  $other_start = $re_start;
+	}
+	else{
+	  $stop_start = 1;
+	}
+      }
+      if ( $other_start >= $other_end ){
+	if ( $stop_end == 0 ){
+	  my $re_end = shift( @ends );
+	  if ( $re_end ){
+	    $other_end = $re_end;
+	  }
+	  else{
+	    $stop_end = 1;
+	  }
+	}
+      }
+      if ( $stop_start == 1 && $stop_end ==1 ){
+	last;
+      }
+    }
+
+    if ($trouble == 1 ){
+      if ($other_end && $other_start && $other_start < $other_end ){
+	$new_start = $other_start;
+	$new_end   = $other_end;
+	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+      }
+      else{
+	## ok, you tried to change, but you got nothing, what can we do about it?
+	print STDERR "Could not reset the start and end coordinates\n";
+	if ( $other_end <= $other_start ){
+	  print STDERR "Sorry will have to put the end= ens of cluster\n";
+	  $new_end   = $cluster->end;
+	  if ( $new_start >= $new_end ){
+	    print STDERR "Last resort: I'm afraid we'll also have to put start = start of cluster, good luck\n";
+	  }
+	}
+      }
+    }
+
+    # reset the cluster start (that's the coordinate used in _produce_Transcript() )
+    #print STDERR "reseting cluster start to: $new_start\n";
+    $cluster->start($new_start);
+
+    # reset the cluster end (that's the coordinate used in _produce_Transcript() )
+    #print STDERR "reseting cluster end to: $new_end\n";
+    $cluster->end($new_end);
+    
+  }
+  return $cluster_list;
+}
+
+############################################################
+
+=head2 _transfer_Supporting_Evidence
+
+ Usage   : $self->transfer_supporting_evidence($source_exon, $target_exon)
+ Function: Transfers supporting evidence from source_exon to target_exon, 
+           after checking the coordinates are sane and that the evidence is not already in place.
+ Returns : nothing, but $target_exon has additional supporting evidence
+
+=cut
+
+sub _transfer_Supporting_Evidence{
+  my ($self, $source_exon, $target_exon) = @_;
+  
+  # this method fails when first called in a new exon without any evidence
+  my $target_sf;
+  eval{
+    $target_sf = $target_exon->get_all_supporting_features;
+  };   
+
+  # keep track of features already transferred, so that we do not duplicate
+  my %unique_evidence;
+  my %hold_evidence;
+
+ SOURCE_FEAT:
+  foreach my $feat (@{$source_exon->get_all_supporting_features}){
+    next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
+    
+    # skip duplicated evidence objects
+    next SOURCE_FEAT if ( $unique_evidence{ $feat } );
+    
+    # skip duplicated evidence 
+    if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
+      #print STDERR "Skipping duplicated evidence\n";
+      #$self->print_FeaturePair($feat);
+      next SOURCE_FEAT;
+    }
+
+    #$self->print_FeaturePair($feat);
+    
+    if ( (scalar @$target_sf) > 0){
+   TARGET_FEAT:
+     foreach my $tsf (@$target_sf){
+       next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
+      
+       if($feat->start    == $tsf->start &&
+	  $feat->end      == $tsf->end &&
+	  $feat->strand   == $tsf->strand &&
+	  $feat->hseqname eq $tsf->hseqname &&
+	  $feat->hstart   == $tsf->hstart &&
+	  $feat->hend     == $tsf->hend){
+	
+ 	#print STDERR "feature already in target exon\n";
+        #$self->print_FeaturePair($feat);
+	next SOURCE_FEAT;
+      }
+     }
+    }
+    #print STDERR "transfering evidence\n";
+    #$self->print_FeaturePair($feat);
+    #$feat->analysis($self->analysis);
+    $target_exon->add_supporting_features($feat);
+    $unique_evidence{ $feat } = 1;
+    $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
+  }
+}
+
 ############################################################    
 #
 # GET/SET METHODS
