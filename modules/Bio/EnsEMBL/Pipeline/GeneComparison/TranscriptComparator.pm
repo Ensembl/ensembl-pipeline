@@ -104,13 +104,13 @@ sub new{
 		      @args);
   
   if (defined $comparison_level){
-      print STDERR "############### comparison level $comparison_level ###################\n";
-      $self->comparison_level($comparison_level);
+    #print STDERR "############### comparison level $comparison_level ###################\n";
+    $self->comparison_level($comparison_level);
   }
   else{
     $self->throw("you must define a comparison_level. See documentation for more info");
   }
-
+  
   if ( defined $exon_match ){
     $self->exon_match($exon_match);
   }
@@ -336,10 +336,12 @@ sub _test_for_fuzzy_semiexact_Merge{
   if ( defined $self->splice_mismatch ){
     $allowed_mismatch =  $self->splice_mismatch;
   }
+
+  my $verbose = 0;
   
   #print STDERR "=========== comparing ================\n";
-  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran );
-  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran );
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran ) if $verbose;
   
   my @exons1 = @{$est_tran->get_all_Exons};
   my @exons2 = @{$ens_tran->get_all_Exons};	
@@ -357,8 +359,8 @@ sub _test_for_fuzzy_semiexact_Merge{
     
   EXON2:
     for (my $k=$start; $k<=$#exons2; $k++){
-      #print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
-      #  " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+      print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
+        " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n" if $verbose;
       
       # we allow some mismatches at the extremities
       #                        ____     ____     ___   
@@ -368,12 +370,12 @@ sub _test_for_fuzzy_semiexact_Merge{
       
       # if there is no overlap, go to the next EXON2
       if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	#print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
+	print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n" if $verbose;
 	next EXON2;
       }
       # if there is no overlap and we had found a link, there is no merge
       elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
-	#print STDERR "foundlink = 1 and no overlap --> leaving\n";
+	print STDERR "foundlink = 1 and no overlap --> leaving\n" if $verbose;
 	$merge = 0;
 	last EXON1;
       }	
@@ -388,8 +390,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  $foundlink = 1;
 	  $overlaps++;
 	  $merge = 1;
-	  #print STDERR "found link\n";
-	  #print STDERR "merged single exon transcript\n";
+	  print STDERR "merged single exon transcript\n" if $verbose;
 	  last EXON1;
 	}
 	elsif ( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
@@ -398,7 +399,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  $foundlink = 1;
 	  $overlaps++;
 	  $start = $k+1;
-	  #print STDERR "found link\n";
+	  print STDERR "found link\n" if $verbose;
 	  next EXON1;
 	}
       }
@@ -423,7 +424,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	    ){
 	$overlaps++;
 	$start = $k+1;
-	#print STDERR "continue link\n";
+	print STDERR "continue link\n" if $verbose;
 	next EXON1;
       }
       
@@ -444,7 +445,13 @@ sub _test_for_fuzzy_semiexact_Merge{
       return ( 0, $overlaps );
     }
   }
-
+  if ($merge ){
+    print STDERR "MERGE\n" if $verbose;
+  }
+  else{
+    print STDERR "NO MERGE\n" if $verbose;
+  }
+  
   return ($merge, $overlaps);
 }
 
@@ -610,18 +617,19 @@ sub _difuse_small_introns{
     my $exon_count = 0;
     my $current_exon;
     for (my $i=0; $i<=$#exons; $i++){
+      my $exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $exons[$i] );
       if ( $i>0 ){
-	if ( $exons[$i]->start - $current_exon->end - 1 <= $self->intron_mismatch ){
-	  $current_exon->end( $exons[$i]->end );
+	if ( $exon->start - $current_exon->end - 1 <= $self->intron_mismatch ){
+	  $current_exon->end( $exon->end );
 	  $modified++;
 	}
 	else{
-	  $current_exon = $exons[$i];
+	  $current_exon = $exon;
 	  $newtran->add_Exon( $current_exon );
 	}
       }
       else{
-	$current_exon = $exons[$i];
+	$current_exon = $exon;
 	$newtran->add_Exon( $current_exon );
       }
     }
