@@ -1,0 +1,36 @@
+use strict;
+use warnings;
+package Bio::EnsEMBL::Pipeline::Task::RDB::Genscan;
+
+use vars qw(@ISA);
+
+use Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant;
+
+@ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::ContigRepeatMaskerDependant');
+
+
+
+#this should beable to use the new method from RDB
+
+
+
+
+sub name{
+  my $self = shift;
+  return 'genscan_task';
+}
+
+sub logic_name{
+  my $self = shift;
+  return 'Genscan';
+}
+
+sub module{
+  my $self = shift;
+  return 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
+}
+
+sub description{
+  my $self = @_;
+  print STDERR $self->name." ".$self->logic_name." runs the runnabledb Genscan and is dependant on RepeatMasker being finished\n";
+}

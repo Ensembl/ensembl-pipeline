@@ -1,6 +1,6 @@
 use strict;
 use warnings;
-package Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMasker;
+package Bio::EnsEMBL::Pipeline::Task::RDB::tRNAscan_SE;
 
 use vars qw(@ISA);
 
@@ -9,28 +9,23 @@ use Bio::EnsEMBL::Pipeline::Task::RDB::NoDependancies;
 
 @ISA = ('Bio::EnsEMBL::Pipeline::Task::RDB::NoDependancies');
 
-
-
 #this should beable to use the new method from RDB
-
-
-
 
 sub name{
   my $self = shift;
-  return 'repeatmasker_task';
+  return 'tRNAscan_task';
 }
 
 sub logic_name{
   my $self = shift;
-  return 'RepeatMask';
+  return 'tRNAscan';
 }
 
 sub module{
   my $self = shift;
-  return 'Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker';
+  return 'Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE';
 }
 
 sub description{
-  print STDERR "RepeatMasker runs the runnabledb RepeatMasker and has no dependancies\n";
+  print STDERR "tRNAscan runs the runnable tRNAscan_SE and has no dependancies\n";
 }
