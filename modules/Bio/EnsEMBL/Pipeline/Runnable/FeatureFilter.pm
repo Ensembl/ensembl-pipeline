@@ -36,6 +36,10 @@ effect, a separate, final prune-like step is performed across all
 features, to ensure no genomic base is covered to more than the
 specified depth per strand.
 
+Feature score is assumed to be meaningful and comparable between
+features. Hence, only features. Only features resulting from the
+same database search should be filtered together.
+
 Coverage filtering is compulsory and is intended to reduce excessive
 coverage of each strand of the query. In detail, coverage filtering
 does this:
@@ -135,8 +139,6 @@ sub new {
   $self->prune($prune);
   $self->hardprune($hardprune);
   
-  $self->{'_output'} = [];
-
   return $self;
 }
 
@@ -219,7 +221,7 @@ sub run{
     
   }
 
-  @input = ();	# free some memory
+  @input = ();	# free some memory?
   
   # sort the HID list by highest score per feature, then by highest
   # total score, and alphabetically as a last resort
@@ -228,8 +230,8 @@ sub run{
 			or $a cmp $b
 		      } keys %validhit;
   
-  # This will hold the accepted hids for both strands.
-  # Hash not array to avoid duplication if same hid accepted on both
+  # This will hold the accepted HIDs for both strands.
+  # Hash not array to avoid duplication if same HID accepted on both
   # strands, but the keys (HIDs) are the only important part.
   my %accepted_hids;
 
@@ -415,8 +417,9 @@ sub _prune_features_by_strand {
    }
 
    # put the worst features first, so they get removed with priority
-   # we use score, which assumes they're from the same database search
    @sorted_fs = sort { $a->score <=> $b->score } @input_for_strand;
+
+   @input_for_strand = ();	# free some memory?
 
    # over_covered_bases: list of base numbers where coverage must be
    # reduced, listed worst-case-first
@@ -428,7 +431,7 @@ sub _prune_features_by_strand {
        push @over_covered_bases, $base;
      }
    }
-   @over_covered_bases = reverse sort { $fs_per_base[$a] <=> $fs_per_base[$b] }
+   @over_covered_bases = sort { $fs_per_base[$b] <=> $fs_per_base[$a] }
      @over_covered_bases;
 
    foreach my $base (@over_covered_bases) {
@@ -447,29 +450,6 @@ sub _prune_features_by_strand {
      }
    }
    return @sorted_fs;
-}
-
-=head2 output
-
- Title   : output
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub output{
-   my ($self,@args) = @_;
-   unless ( $self->{'_output'} ){
-     $self->{'_output'} = [];
-   }
-   if ( @args ){
-     push( @{ $self->{'_output'} }, @args);
-   } 
-   return @{$self->{'_output'}};
 }
 
 =head2 minscore
