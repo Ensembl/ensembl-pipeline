@@ -65,12 +65,40 @@ sub new{
 ############################################################
 
 sub match{
-    my ($self, $obj1, $obj2 ) = @_;
-    $self->add_to_list1( $obj1 );
-    $self->add_to_list2( $obj2 );
-    $self->partners( $obj1, $obj2 );
-    $self->partners( $obj2, $obj1 );
+  my ($self, $obj1, $obj2 , $score) = @_;
+  $self->add_to_list1( $obj1 );
+  $self->add_to_list2( $obj2 );
+  $self->partners( $obj1, $obj2 );
+  $self->partners( $obj2, $obj1 );
+  if ($score){
+    $self->{_score}{$obj1}{$obj2} = $score;
+    $self->{_score}{$obj2}{$obj1} = $score;
+  }
 }
+
+############################################################
+
+# stored the score of a match between two elements
+
+sub score{
+  my ($self, $obj1, $obj2 , $score) = @_;
+  unless ($obj1 && $obj2 && $score){
+    $self->throw("lacking arguments in score()");
+  }
+  #unless ( $self->{_score}{$obj1}{$obj2} && $self->{_score}{$obj2}{$obj1} ){
+  #  $self->{_score}{$obj1}{$obj2} = 0;
+  #  $self->{_score}{$obj2}{$obj1} = 0;
+  #}
+  if ($score){
+    $self->{_score}{$obj1}{$obj2} = $score;
+    $self->{_score}{$obj2}{$obj1} = $score;
+  }
+  return $self->{_score}{$obj1}{$obj2};
+}    
+
+
+
+############################################################
 
 sub add_to_list1{
     my ($self,$obj) = @_;
@@ -80,6 +108,7 @@ sub add_to_list1{
     return @{$self->{_list1}};
 }
 
+############################################################
 
 sub add_to_list2{
     my ($self,$obj) = @_;
@@ -88,6 +117,8 @@ sub add_to_list2{
     }
     return @{$self->{_list2}};
 }
+
+############################################################
 
 sub list1{
     my ($self) = @_;
@@ -99,6 +130,7 @@ sub list1{
     return @list;
 }
 
+############################################################
 
 sub list2{
     my ($self) = @_;
@@ -110,11 +142,12 @@ sub list2{
     return @list;
 }
 
+############################################################
 
 sub partners{
     my ($self,$obj1,$obj2) = @_;
     unless ($obj1){
-	$self->warn("caling method without argument");
+	$self->warn("calling method without argument");
 	return;
     }
     unless ( $self->{_partners}{$obj1} ){
@@ -125,6 +158,117 @@ sub partners{
     }
     return @{$self->{_partners}{$obj1}};
 }    
+
+############################################################
+# condition for solution:
+# there is no two elements that they're not paired-up to each other but
+# they have better score with each other ( $score_matrix is higher ) 
+# than with their current corresponding partners
+
+sub stable_marriage{
+  my ($self) = @_;
+
+  my @list1 = $self->list1;
+  my %married_object1;
+  my %married_object2;
+  my %candidates_in_list2;
+  my %partner;
+
+  foreach my $e1 ( @list1 ){
+    push( @{$candidates_in_list2{ $e1 }}, $self->partners( $e1 ) );
+  }
+  
+  my @unmarried_ones = @list1;
+
+ MARRIAGE:
+  while ( @unmarried_ones ){
+
+    my $object1 = shift @unmarried_ones;
+ 
+    # sort the potential partners by score in descending order
+    @{ $candidates_in_list2{ $object1 } } =  
+      map  { $_->[1] }
+    sort { $b->[0] <=> $a->[0] }
+    map  { [ $self->score( $object1, $_ ), $_] } @{ $candidates_in_list2{ $object1 } };
+    
+    # go over the partners until you get married or run out of partners  
+  PARTNER:
+    while( @{ $candidates_in_list2{ $object1 }} && !defined($married_object1{$object1}) ){
+      
+      #print STDERR "checking partner list for $this_target\n";
+      my $potential_partner_in_list2 = shift( @{ $candidates_in_list2{ $object1 } } );
+      
+      #print STDERR "looking at $potential_partner_in_list2\n";
+      # check whether it is already married
+      if ( $married_object2{ $potentia_partner_in_list2 } 
+	   && $married_object2{ $potential_partner_in_list2 } == 1 ){
+	
+	# is it married to another target?
+	if ( $partner{$potential_partner_in_list2} 
+	     &&  !( $partner{ $potential_partner_in_list2 } eq $object1 ) ){
+	  
+	  # is it a 'worse' marriage?
+	  if ( $self->score( $partner{ $potential_partner_in_list2 }, $potential_partner_in_list2) 
+	       < $self->score( $object1, $potential_partner_in_list2 ) ){
+	    
+	    # put the divorced one back into the pool only if it has more potential partners
+	    if ( @{ $candidates_in_list2{ $partner{ $potential_partner_in_list2} } } ){
+	      push ( @unmarried_ones, $partner{ $potential_partner_in_list2} );
+	    }
+
+	    # divorce the 'worse partner'
+	    #print STDERR "divorcing ".$partner{ $potential_partner_in_list2}."\n";
+	    delete $married_object1{ $partner{ $potential_partner_in_list2 } };
+	    delete $partner{ $partner{ $potential_partner_in_list2 } };
+	    delete $partner{ $potential_partner_in_list2 };
+
+	    # let be happier marriage
+	    $married_object1{ $object1 } = 1;
+	    $married_object2{ $potential_partner_in_list2 } = 1;
+	    $partner{ $potential_partner_in_list2 } = $object1;
+	    $partner{ $object1 } = $potential_partner_in_list2;
+	    #print STDERR "new marriage: $object1 -- $potential_partner_in_list2\n";
+	    next MARRIAGE;
+	    
+	  }
+	  else{
+	    # look at the next potential partner in list2
+	    next PARTNER;
+	  }
+	}
+	# hmm, this object2 ( in list2)  is married, to whom?
+	elsif ( $partner{ $potential_partner_in_list2 } eq $object1 ) {
+	  # hey, we have already a happy couple
+	  $partner{ $object1 } = $potential_partner_in_list2;
+	  next MARRIAGE;
+	}
+	elsif ( !defined( $partner{ $potential_partner_in_list2 } ) ){
+	  # we have a cheater!
+	  $married_object2{ $potential_partner_in_list2 } = 0;
+	  next PARTNER;
+	}
+      }
+      else{
+	
+	# this object2 ( in list 2 ) is still single, let be marriage:
+	$married_object1{ $object1 } = 1;
+	$married_object2{ $potential_partner_in_list2 } = 1;
+	$partner{ $potential_partner_in_list2 } = $object1;
+	$partner{ $object1 } = $potential_partner_in_list2;
+	#print STDERR "setting partner{ $object1 } = $potential_partner_in_list2\n";
+	next MARRIAGE;
+      }
+      
+    } # end of PARTNER
+    
+  }   # end of MARRIAGE
+ 
+  foreach my $object1 ( keys %married_object1 ){
+    #create here a new object map with the happy pairs
+    #  print OUT $target."\t".$partner{ $target }."\t".$score_matrix{ $target }{ $partner{$target} }."\n";
+  }
+}
+############################################################
 
 1;
 
