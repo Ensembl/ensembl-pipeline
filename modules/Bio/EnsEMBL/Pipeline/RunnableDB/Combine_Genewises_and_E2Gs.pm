@@ -174,8 +174,8 @@ sub fetch_input{
   $self->query($slice);
 
   # get genewise genes
-  my @similarity_genes = @{$self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE,'evidence')};
-  my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE,'evidence')};
+  my @similarity_genes = @{$self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE)};
+  my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
   print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
   print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
   $self->gw_genes( @similarity_genes, @targetted_genes );
@@ -186,7 +186,7 @@ sub fetch_input{
   $self->cdna_vc($cdna_vc);
   
   # get cdnas 
-  my @e2g = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE,'evidence')};
+  my @e2g = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
   print STDERR "got " . scalar(@e2g) . " cdnas ($GB_cDNA_GENETYPE)\n";
   
   # filter cdnas

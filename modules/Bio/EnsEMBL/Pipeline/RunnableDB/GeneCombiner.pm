@@ -304,11 +304,11 @@ sub run{
 
   # get estgenes ( from EST_GeneBuilder )
   print STDERR "getting genes of type $ESTGENE_TYPE\n";
-  my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE, 'evidence' ) };
+  my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE ) };
   
   # get ensembl genes (from GeneBuilder)
   print STDERR "getting genes of type $ENSEMBL_TYPE\n";
-  my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE, 'evidence' ) };
+  my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE ) };
 
   # if there are no genes, we finish earlier
   unless ( @est_genes ){
