@@ -135,4 +135,14 @@ CREATE TABLE clone (
         PRIMARY KEY (disk_id)
 );
  
+#
+# Table structure for table 'contig'
+#
+CREATE TABLE contig (
+  id varchar(40) DEFAULT '' NOT NULL,
+  internal_id int(10) DEFAULT '0' NOT NULL auto_increment,
+  PRIMARY KEY (internal_id),
+  KEY id_index (id)
+);
+
 
