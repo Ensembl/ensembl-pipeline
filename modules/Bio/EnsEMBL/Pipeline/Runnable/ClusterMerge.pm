@@ -496,10 +496,10 @@ sub link_Transcripts{
 			      }
 			  } @transcripts;
 	
-	#print STDERR "Cluster: (sorted transcripts)\n";
-	#foreach my $t ( @transcripts ){
-	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-	#}
+	print STDERR "Cluster: (sorted transcripts)\n";
+	foreach my $t ( @transcripts ){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+	}
 	
 	# for each transcript
 	# try to find al the linked lists that start in this transcript
@@ -526,7 +526,12 @@ sub link_Transcripts{
 	      LIST:
 		foreach my $list ( @current_lists ){
 		    
-		    # check whether this trans can be linked to this list or to a proper sublist
+		    # test
+                    print STDERR "-- comparing: ".Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$j] );
+                    print STDERR "with list:\n";
+                    $self->_print_List($list);
+
+                    # check whether this trans can be linked to this list or to a proper sublist
 		    my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
 		    
 		    # maybe it does not link to this one
@@ -551,7 +556,9 @@ sub link_Transcripts{
 		# if we have complete lists, we add $transcripts[$j] to the end of all of them
 		if ( @complete_lists ){
 		    foreach my $list ( @complete_lists ){
-			push ( @$list, $transcripts[$j] );
+		       print STDERR "ADDING transcript to complete list:\n";
+                       $self->_print_List($list);
+                       push ( @$list, $transcripts[$j] );
 		    }
 		    next TRAN2;
 		}
@@ -560,12 +567,25 @@ sub link_Transcripts{
 		    my @sorted_sublists = sort { scalar( @$b ) <=> scalar( @$a ) } @sublists;
 		    
 		    # add it to the longest sublist:
-		    my $longer_sublist  = $sorted_sublists[0];
-		    push ( @$longer_sublist , $transcripts[$j] );
-		    
+		    my $longest_sublist  = shift( @sorted_sublists );
+		    push ( @$longest_sublist , $transcripts[$j] );
+		    print STDERR "ADDING transcript to complete list:\n";
+                    $self->_print_List($longest_sublist);
+
 		    # add this new list to the set $lists{$i}
-		    push ( @current_lists, $longer_sublist );
-		    next TRAN2;
+		    push ( @current_lists, $longest_sublist );
+		    
+                    my $max = scalar( @$longest_sublist);
+                    my $next_sublist = shift( @sorted_sublists); 
+                    while( defined $next_sublist && scalar(@$next_sublist) == $max ){
+                      push ( @$next_sublist , $transcripts[$j] );
+		      print STDERR "ADDING transcript to sub list:\n";
+                      $self->_print_List($next_sublist);
+
+		      # add this new list to the set $lists{$i}
+		      push ( @current_lists, $next_sublist );
+                    }
+                  next TRAN2;
 		}
 		
 	    }   # end of TRAN2
@@ -1434,6 +1454,16 @@ sub _transfer_Supporting_Evidence{
     $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
   }
 }
+
+############################################################
+
+sub _print_List{
+  my ($self,$list) = @_;
+  foreach my $t ( @$list ){
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+  }
+}
+
 
 ############################################################    
 #
