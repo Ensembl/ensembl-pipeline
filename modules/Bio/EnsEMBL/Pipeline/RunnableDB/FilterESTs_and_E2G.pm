@@ -18,6 +18,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G->new(
 									  -dbobj     => $db,
 									  -input_id  => $id,
+									  -seq_index => $index,
 									 );
     $obj->fetch_input
     $obj->run
@@ -26,11 +27,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 
 
 =head1 DESCRIPTION
-Reads in all files with given subscript from given directory, parses out features, refilters and
-passes them to MiniEst2Genome for alignment.
-NB This relies on you having previously run ExonerateESTs OVER THE SAME GENOMIC CHUNK.
-
-All a bit of a kludge at the moment :-(
 
 =head1 CONTACT
 
@@ -71,7 +67,12 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
     Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db
                            -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);
+                           -ANALYSIS      => $analysis
+			   -ESTDBNAME     => $estdbname
+			   -ESTDBHOST     => $estdbhost
+			   -ESTDBUSER     => $estdbuser
+			   -SEQ_INDEX     => $seq_index
+);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
@@ -91,19 +92,19 @@ sub new {
     # dbobj, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
-    my( $estdbname, $estdbhost, $estdbuser) = $self->_rearrange([qw(ESTDBNAME
-								    ESTDBHOST
-   							            ESTDBUSER)],
-								 @args);
+     my( $estdbname, $estdbhost, $estdbuser, $estpass, $seq_index) = $self->_rearrange([qw(ESTDBNAME
+											   ESTDBHOST
+											   ESTDBUSER
+											   ESTPASS
+											   SEQ_INDEX)],
+										       @args);
 
     if(!defined $self->seqfetcher) {
-      # hard code to humanest blast2 databases for the moment - v naughty.
+     $self->throw("no seqfetcher, and no seq_index provided\n") unless defined $seq_index;
 
-     my @dbs = qw ( /data/blastdb/humanest );
-     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs(
-								'-db'    => \@dbs,
-							       );
-      $self->seqfetcher($seqfetcher);
+     my @dbs = ( $seq_index );
+     my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::getseqs( '-db'    => \@dbs, );
+     $self->seqfetcher($seqfetcher);
     }
 
     # if we have all the parameters for a estdb, make one
@@ -112,6 +113,7 @@ sub new {
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
+								    -pass   => $estpass,
 								   );
       my $est_ext_feature_factory = $estdb->get_EstAdaptor();
       $self->dbobj->add_ExternalFeatureFactory($est_ext_feature_factory);
@@ -120,9 +122,10 @@ sub new {
       my $edba = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $estdbhost,		
 						    -user   => $estdbuser,
 						    -dbname => $estdbname,
+						    -pass   => $estpass,
+						    -dnadb  => $self->dbobj,
 						   );
       $self->estdb($edba);
-
     }
     else { $self->throw("expecting exonerate data in an external feature factory\n"); };
 
@@ -169,18 +172,13 @@ sub write_output {
     #    $self->throw("exiting before write");
     
     my $estdb = $self->estdb;
-    my $refdb = $self->dbobj;
 
     if( !defined $estdb ) {
       $self->throw("unable to make write db");
     }
     
-    if( !defined $refdb ) {
-      $self->throw("unable to make ref db");
-    }
-
     $self->write_genes();
-    $self->write_exons_as_features();
+#    $self->write_exons_as_features();
 }
 
 =head2 write_genes
