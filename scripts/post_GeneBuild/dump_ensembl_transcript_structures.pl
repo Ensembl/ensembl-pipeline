@@ -55,6 +55,8 @@ foreach my $gene_id( @ids) {
   if ($genetype){
     next GENE unless( $genetype eq $gene->type );
   }
+
+ TRANS:
   foreach my $trans ( @{$gene->get_all_Transcripts} ) {
     
     my $trans_id   = $trans->stable_id || $trans->dbID;
@@ -62,7 +64,15 @@ foreach my $gene_id( @ids) {
     my $slice     = $exons[0]->contig;
     my $strand    = $exons[0]->strand;
     my $chr_name  = $slice->chr_name;
-
+    
+    eval{
+      my $tseq = $trans->translate();
+      if ( $tseq->seq =~ /\*/ ) {
+	print STDERR "translation of ".$trans->dbID." has stop codons. Skipping!\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+	next TRANS;
+      }
+    }
     print OUT $geneid."\t".$trans_id."\t".$chr_name."\t".$strand."\t";
 
     foreach my $exon ( @exons ){

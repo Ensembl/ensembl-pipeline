@@ -86,6 +86,7 @@ foreach my $gene_id(@ids) {
   my $gene_id = $gene->dbID();
   my $chr = $gene->chr_name;
 
+ TRANS:
   foreach my $trans ( @{$gene->get_all_Transcripts} ) {
     my $gene_id = $gene->stable_id || $gene->dbID;
     my $tran_id = $trans->stable_id || $trans->dbID;
@@ -107,6 +108,13 @@ foreach my $gene_id(@ids) {
     
     eval {      
       my $tran_seq = $trans->seq;
+      
+      my $tseq = $trans->translate();
+      if ( $tseq->seq =~ /\*/ ) {
+	print STDERR "translation of ".$trans->dbID." has stop codons. Skipping!\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+	next TRANS;
+      }
       $tran_seq->display_id("Gene:$gene_id Transcript:$tran_id");
       $tran_seq->desc("HMM:@evidence Chr:$chr Strand:$strand Start:$start End:$end");
       my $result = $seqio->write_seq($tran_seq);
