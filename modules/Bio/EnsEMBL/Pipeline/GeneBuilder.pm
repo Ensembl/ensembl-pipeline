@@ -1167,6 +1167,8 @@ sub make_Genes {
   push(@transcripts,$self->genewise);
   
   # reject non translators before we try clustering
+  # MC also check for folded transcripts.
+
   my $valid = 1;
   
  TRANSCRIPT:
@@ -1186,7 +1188,31 @@ sub make_Genes {
       $valid = 0;
       next TRANSCRIPT;
     }
- 
+
+    # Now check for folded transcripts;
+
+    my $current = 0;
+    my @exons = $tran->get_all_Exons;
+    if ($#exons > 0) {
+      my $i;
+      for ($i = 1; $i < $#exons; $i++) {
+        if ($exons[0]->strand == 1) {
+          if ($exons[$i]->start < $exons[$i-1]->end) {
+              print STDERR "ERROR:  Transcript folds back on itself. Tran : " . $tran->{'temporary_id'} . "\n";
+              $valid = 0;
+          } 
+        } elsif ($exons[0]->strand == -1) {
+          if ($exons[$i]->end > $exons[$i-1]->start) {
+              print STDERR "ERROR:  Transcript folds back on itself. Tran : " . $tran->{'temporary_id'} . "\n";
+              $valid = 0;
+          } 
+        } else {
+          print STDERR "EEEK:In transcript  " . $tran->{'temporary_id'} . " No strand for exon - can't check for folded transcript\n";
+
+          $valid = 0;
+        }
+      }
+    }
     # if we get here, the transcript should be fine
     next TRANSCRIPT unless $valid;
     
@@ -1200,7 +1226,7 @@ sub make_Genes {
     EXON: foreach my $gene_exon ($gene->get_all_Exons) {
 	
 	foreach my $exon ($tran->get_all_Exons) {
-	  next EXON if ($exon->contig_id ne $gene_exon->contig_id);
+	  #next EXON if ($exon->contig_id ne $gene_exon->contig_id);
 	  
 	  if ($exon->overlaps($gene_exon)) {
 	    if ($exon->strand == $gene_exon->strand) {
@@ -2461,7 +2487,6 @@ sub prune {
 	    
 	    $gene->type('pruned');
 	    $gene->add_Transcript($transcripts[0]);
-
 
 	    next CLUS;
 	}
