@@ -23,7 +23,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
     $obj->fetch_input
     $obj->run
 
-    my @genes = $obj->output;
+    mc @genes = $obj->output;
 
 
 =head1 DESCRIPTION
@@ -451,24 +451,33 @@ sub fetch_input {
     if (defined($feat->analysis)      && defined($feat->score) && 
 	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
       # only take high scoring ests
-      if($feat->percent_id >= 97){
-	if(!defined $exonerate_ests{$feat->hseqname}){
+      if($feat->percent_id >= 80){
+      	if(!defined $exonerate_ests{$feat->hseqname}){
 	  push (@{$exonerate_ests{$feat->hseqname}}, $feat);
 	}
 	push (@exonerate_features, $feat);
       }
+    }
+    else{
+      print STDERR "something went wrong:\n";
+      print STDERR "analysis: ".$feat->analysis." analysis_db: ".$feat->analysis->db." =? est_source: ".$est_source."\n";
     }
   }
 
   # empty out massive arrays
   @allfeatures = ();
 
-  print STDERR "exonerate features left with percent_id > 97 : " . scalar(@exonerate_features) . "\n";
+  print STDERR "exonerate features left with percent_id >= 80 : " . scalar(@exonerate_features) . "\n";
   print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
+  
+  unless( @exonerate_features ){
+    print STDERR "No exonerate features left, exiting...\n";
+    exit(0);
+  }
   
   # filter features, current depth of coverage 10, and group successful ones by est id
   my %filtered_ests;
-
+  
   #my @time1 = times();
   # use coverage 5 for now.
   my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
@@ -498,10 +507,8 @@ sub fetch_input {
   my @blast_features = $self->blast(@ids);
   print STDERR "back from blast with " . scalar(@blast_features) . " features\n";
   
-
-
   # make sure we can go on before we try to dosomething stupid
-  if(!defined @blast_features) {
+  unless (@blast_features) {
     $self->warn("Odd - no exonerate features, cannot make runnables\n");
     return;
   }
@@ -554,10 +561,9 @@ sub fetch_input {
       next ID;
     }
 
-
     my $coverage = ceil(100 * ($hitlength/($estlength)));
-    if($coverage < 90){
-      print STDERR "rejecting $id for insufficient coverage: $coverage %\n";
+    if($coverage < 75){
+      print STDERR "rejecting $id for insufficient coverage ( < 75 ): $coverage %\n";
       if(scalar(@{$final_ests{$id}}) == 1){
 	$single++;
       }
@@ -761,6 +767,7 @@ sub make_transcript{
     $exon->strand($exon_pred->strand);
     
     $exon->phase($exon_pred->phase);
+    $exon->end_phase( $exon_pred->end_phase );
     $exon->attach_seq($contig);
     $exon->score($exon_pred->score);
 
@@ -783,7 +790,7 @@ sub make_transcript{
   }
   
   if ($#exons < 0) {
-    print STDERR "Odd.  No exons found\n";
+    print STDERR "Odd.  No exons foundn";
   } 
   else {
     
@@ -909,7 +916,7 @@ sub output {
      $self->{'_output'} = [];
    }
     
-   if(defined @feat){
+   if(@feat){
      push(@{$self->{'_output'}},@feat);
    }
 
@@ -945,32 +952,6 @@ sub estfile {
 
 }
 
-=head2 output
-
- Title   : output
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub output{
-   my ($self,@genes) = @_;
-
-   if (!defined($self->{'_output'})) {
-     $self->{'_output'} = [];
-   }
-    
-   if(defined @genes){
-     push(@{$self->{'_output'}},@genes);
-   }
-
-   return @{$self->{'_output'}};
-}
-
 =head2 blast
 
  Title   : blast
@@ -987,7 +968,12 @@ sub blast{
    my ($self, @allids) = @_;
 
    print STDERR "retrieving ".scalar(@allids)." EST sequences\n";
-   
+   #print STDERR "for Ids:\n";
+   #foreach my $id (@allids){
+   #  print STDERR $id." ";
+   #}
+   #print STDERR "\n";
+      
    my $time1 = time();
    my @estseq = $self->get_Sequences(\@allids);
    my $time2 = time();
@@ -1056,6 +1042,14 @@ sub get_Sequences {
 #      $self->{'_seq_cache'}{$acc} = $seq;
       push(@estseq, $seq);
     }
+
+    #if ( $seq ){
+    # print STDERR "ID: ".$seq->display_id."\n";
+    # print STDERR $seq->seq."\n";
+    #}
+
+
+
   }
 
   return (@estseq);
@@ -1121,7 +1115,7 @@ sub run_blast {
   # set B here to make sure we can show an alignment for every EST
   my $command   = "wublastn $estdb $seqfile B=" . $numests . " -hspmax 1000  2> /dev/null >  $blastout";
   #print STDERR "Running BLAST:\n";
-  #print STDERR "$command\n";
+  print STDERR "$command\n";
   my $status = system( $command );
   
   my $blast_report = new Bio::Tools::BPlite(-file=>$blastout);
@@ -1208,10 +1202,10 @@ sub make_seqfetcher {
   my $seqfetcher;
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    #$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
   
     ## SeqFetcher to be used with 'indicate' indexing:
-    # $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher('-db' => \@db, );
     
   }
   #else{
