@@ -53,13 +53,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 
 use strict;
 
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA;
 use Bio::PrimarySeq;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
 
@@ -99,8 +99,11 @@ sub new {
     $self->throw("No input id provided")     unless (defined($input_id));
     $self->throw("Analysis object required") unless (defined($analysis));
 
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj")  
-                unless ($dbobj->isa ('Bio::EnsEMBL::Pipeline::DBSQL::Obj'));
+    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj")  
+                unless ($dbobj->isa ('Bio::EnsEMBL::DBSQL::Obj'));
+
+    # $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj")  
+    #             unless ($dbobj->isa ('Bio::EnsEMBL::Pipeline::DBSQL::Obj'));
 
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
@@ -194,7 +197,7 @@ sub run {
 									    -peptide   => $transcript,
 									    -database  => $self->analysis->db,
 									    -program   => $self->analysis->program,
-									    -threshold => 1);
+									    -threshold => 1e-10);
 
       $runnable->run();
       $self->runnable($runnable);                                        
@@ -239,7 +242,9 @@ sub write_output {
 
     my $db       = $self->dbobj();
     my @features = $self->output();
-    
+
+    return if scalar(@features == 0);
+      
     my $contig;
     eval 
     {
