@@ -62,7 +62,7 @@ while(<>){
   }
   
   # need to print out tab delimited line suitable for mysql. Autogenerate feature internal_id
-  print "\\N\t$contig\t$analysis\t$contig_start\t$contig_end\t$contig_strand\t$est_start\t$est_end\t$est_id\t$est_strand\tNULL\t$cigar\t0\t$percent_id\t$score\n";
+  print "\\N\t$contig\t$contig_start\t$contig_end\t$contig_strand\t$analysis_id\t$est_start\t$est_end\t$est_strand\t$est_strand\t$cigar\t0\t$percent_id\t$score\n";
 
 }
 
