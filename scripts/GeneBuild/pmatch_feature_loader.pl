@@ -122,9 +122,9 @@ sub process_proteins {
       $chr_name  = $1;
       $chr_start = $2;
       $chr_end   = $3;
-    }
-    $chr = $chr_name;
-    
+      $chr = $chr_name;
+ }   
+
     # not used anymore, we deal with cDNAs separately
     my $cdna_id = $pmfa->get_cdna_id($protein);
 
