@@ -38,10 +38,10 @@ sub new{
 				       NODES)],@args);
 
   if(defined($stdout)){
-    $self->stdout($stdout);
+    $self->stdout_file($stdout);
   }
   if(defined($stderr)){
-    $self->stderr($stderr);
+    $self->stderr_file($stderr);
   }
   if(defined($parameters)){
     $self->parameters($parameters);
@@ -58,13 +58,15 @@ sub new{
   if(defined($jobname)){
     $self->jobname($jobname);
   }
+
+  return $self;
 }
 
 ##################
 #accessor methods#
 ##################
 
-sub stdout{
+sub stdout_file{
    my ($self, $arg) = @_;
 
    if(defined($arg)){
@@ -76,7 +78,7 @@ sub stdout{
 
 
 
-sub stderr{
+sub stderr_file{
    my ($self, $arg) = @_;
 
    if(defined($arg)){
