@@ -15,11 +15,13 @@ package main;
 %pipeConf = ( 
     'nfstmp.dir' => '/work1/scp/out_m',
     'DBI.driver' => 'mysql',
-    'dbhost'      => 'ecs1a',
-    'dbname'      => 'simonmouse',
+    'dbhost'      => 'ensrv3',
+    'dbname'      => 'simon_oct07',
     'dbuser'      => 'ensadmin',
     'queue'       => 'acarichunky',
     'batchsize'   => 1,
+    'bindir'      => '/usr/local/ensembl/bin',
+	     
 );
 }
 

@@ -273,8 +273,8 @@ sub flush_runs {
 
     my $cmd;
   
-    $cmd = "bsub -mecsnodes -o ".$lastjob->stdout_file.
-    #$cmd = "bsub -q ".$queue." -m ecsnodes -o ".$lastjob->stdout_file.
+   # $cmd = "bsub -mecsnodes -o ".$lastjob->stdout_file.
+    $cmd = "bsub -q ".$queue."  -o ".$lastjob->stdout_file.
 #    " -R osf1 ".
     " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
@@ -476,7 +476,8 @@ sub runInLSF {
   if ($@) {
       print (STDERR "Lost the will to live Error : [$@]");
       $self->set_status( "FAILED" );
-      die "Problems creating runnable $module for " . $self->input_id . " [$@]\n";
+      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$@]\n");
+      return;
   }
   eval {   
       $self->set_status( "READING" );
@@ -485,7 +486,8 @@ sub runInLSF {
   if ($@) {
       $self->set_status( "FAILED" );
       print (STDERR "Lost the will to live Error : [$@]");
-      die "Problems with $module fetching input for " . $self->input_id . " [$@]\n";
+      $self->throw ("Problems with $module fetching input for " . $self->input_id . " [$@]\n");
+      return;
   }
   eval {
       $self->set_status( "RUNNING" );
@@ -494,7 +496,8 @@ sub runInLSF {
   if ($@) {
       $self->set_status( "FAILED" );
       print (STDERR "Lost the will to live Error : [$@]");
-      die "Problems running $module for " . $self->input_id . " [$@]\n";
+      $self->throw( "Problems running $module for " . $self->input_id . " [$@]\n");
+      return;
   }
   eval {
       $self->set_status( "WRITING" );
@@ -504,7 +507,8 @@ sub runInLSF {
   if( $@ ) {
       $self->set_status( "FAILED" );
       print (STDERR "Lost the will to live Error : [$@]");
-      die "Problems for $module writing output for " . $self->input_id . " [$@]" ;
+      $self->throw( "Problems for $module writing output for " . $self->input_id . " [$@]") ;
+      return;
   }
 }
 

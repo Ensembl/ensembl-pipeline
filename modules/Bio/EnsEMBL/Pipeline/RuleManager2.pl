@@ -152,7 +152,7 @@ while( 1 ) {
 	    if ($@) {
 		print ("ERROR: comparing to current jobs. Skipping analysis for " . $id->[0] . " [$@]\n");
 		next JOBID;
-	    }
+	      }
 	    $jobcount++;    
 	    my $job = Bio::EnsEMBL::Pipeline::Job->create_by_analysis_inputId( $anal, $id->[0] ); 
 
@@ -169,8 +169,13 @@ while( 1 ) {
                    print STDERR "ERROR running job " . $job->dbID .  " "  . $job->stderr_file . "[$@]\n";
                 }
             } else {
+	      eval {
 	        print "\tBatch running job\n";
 	        $job->batch_runRemote($queue);
+	      };
+	      if ($@) {
+		rpint STDERR "ERROR rnning job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
+	      }
             }
 
 	}
@@ -186,7 +191,6 @@ while( 1 ) {
     $completeRead = 0;
     $currentStart = 0;
     @idList = ();
-    exit(0);
     print( "Waking up and run again!\n" );
 	
 }
