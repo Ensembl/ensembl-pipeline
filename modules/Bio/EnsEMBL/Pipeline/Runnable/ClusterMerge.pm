@@ -141,7 +141,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order) 
+  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $use_score) 
       = $self->_rearrange([qw(
 			      TRANSCRIPTS
 			      COMPARISON_LEVEL
@@ -149,6 +149,7 @@ sub new {
 			      INTRON_MISMATCH
 			      EXON_MATCH
 			      MINIMUM_ORDER
+			      USE_SCORE
 			      )], 
 			  @args);
   
@@ -167,6 +168,10 @@ sub new {
   # to get some blah,blah
   $self->verbose(0);
 
+
+  if ( $use_score ){
+      $self->use_score($use_score);
+  }
 
   if ( $comparison_level ){
     $self->_comparison_level($comparison_level);
@@ -1170,27 +1175,48 @@ sub flush_visited_tags{
 sub run {
   my $self = shift;
   my @transcripts = $self->input_transcripts;
-	 
+	
+  ############################################################
   # cluster the transcripts
   my @transcript_clusters = $self->_cluster_Transcripts(@transcripts);
   print STDERR scalar(@transcript_clusters)." clusters returned from _cluster_Transcripts\n";
 	 
+  ############################################################
   # restrict the number of ESTs per cluster, for the time being, to avoid deep recursion 
   #my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1,100);
 
+  ############################################################
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
   print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
 
+  ############################################################
   # merge each list into a putative transcript
   my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
   print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
   
+  ############################################################
+  # we can score the predictions:
+  my @final_transcripts;
+  if ( $self->use_score ){
+      my $score_model = 
+	Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel
+	    ->new(
+		  -hold_list   => $self->hold_list,
+		  -transcripts => \@merged_transcripts,
+		  );
+      @final_transcripts = $score_model->score_Transcripts;
+  }
+  else{
+      @final_transcripts = @merged_transcripts;
+  }
+  
+  @merged_transcripts = ();
   #foreach my $tran ( @more_merged_transcripts ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
   #}
   
-  $self->output(@merged_transcripts);
+  $self->output(@final_transcripts);
 }
 
 ############################################################
@@ -1499,12 +1525,13 @@ sub _merge_Transcripts{
     print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
     my $verbose = $self->verbose;
-   
-
+    
+    
     # $list is an arrayref of the ests/cdnas that we can merge
     my @merged_transcripts;
-
+    
     my $count = 0;
+  
   LIST:
     foreach my $list ( @$lists ){
       $count++;
@@ -1528,7 +1555,7 @@ sub _merge_Transcripts{
       
       # collect all exons
       foreach my $tran (@{ $list }){
-	
+	  
 	my @exons = @{$tran->get_all_Exons};
 	
 	# sort them in genomic order regardless of the strand
@@ -1563,7 +1590,7 @@ sub _merge_Transcripts{
       # we turn each cluster into an exon and create a new transcript with these exons
       my $transcript    = Bio::EnsEMBL::Transcript->new();
       $transcript->type( "merged_".$count );
-
+      
       my @exon_clusters = $cluster_list->sub_SeqFeature;
       
       my $exon_count = 0;
@@ -1596,13 +1623,16 @@ sub _merge_Transcripts{
       }
       
       if ($verbose){
-	print STDERR "Produced transcript:\n";
+	  print STDERR "Produced transcript:\n";
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcript );
       }
-
+      
+      if ( $self->use_score ){
+	  $self->hold_list( $transcript, $list );
+      }
       push ( @merged_transcripts, $transcript );
-    
-    } # end of LIST
+      
+  } # end of LIST
     return @merged_transcripts;
     
 }
@@ -2036,6 +2066,27 @@ sub _print_List{
 #
 ############################################################
 
+############################################################
+# $list is an arrayref with the transcripts that make up the transcript $tran
+sub hold_list{
+    my ($self,$tran,$list) = @_;
+
+    if ($tran){
+	unless ( $self->{_hold_list}{$tran} ){
+	    $self->{_hold_list}{$tran} = [];
+	}
+	if ( $list ){
+	    $self->{_hold_list}{$tran} = $list;
+	}
+	return $self->{_hold_list}{$tran};
+    }
+    else{
+	return $self->{_hold_list};
+    }
+}
+
+############################################################
+
 sub _minimum_order{
   my ($self,$minimum_order) = @_;
   if ($minimum_order) {
@@ -2135,6 +2186,16 @@ sub verbose{
   }
   return $self->{_verbose};
 }
+############################################################
+
+sub use_score{
+    my ($self,$boolean) = @_;
+    if ( $boolean ){
+	$self->{_use_score} = $boolean;
+    }
+    return $self->{_use_score};
+}
+
 ############################################################
 
 #sub check_tree{
