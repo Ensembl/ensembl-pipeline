@@ -15,11 +15,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Genomewise.pm - Runs Genomewise and makes a se
 
 =head1 SYNOPSIS
 
-my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq    => $primary_seq,
-                                                                    -switch => $switch,
-                                                                    -smell  => $smell,
-                                                                    -cds    => $cds_transcript
-								    -skip_small_exons => $exon_size,
+my $genomewise = Bio::EnsEMBL::Pipeline::Runnable::Genomewise->new( -seq              => $primary_seq,
+                                                                    -switch           => $switch,
+                                                                    -smell            => $smell,
+                                                                    -cds              => $cds_transcript
+								    -skip_small_exons => $min_exon_size,
                                                                   );
 
 where 
@@ -411,8 +411,8 @@ sub run{
 	  
 	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
 	  my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
-		
-	  print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+	  
+	  print STDERR "passing evi info between 2 transcripts with non-consecutive overlaping exons\n";
 	  foreach my $exon_in ( @exons_in ){
 	      foreach my $exon_out( @exons_out ){
 		  if ( $exon_out->overlaps($exon_in) ){
@@ -422,8 +422,17 @@ sub run{
 		  }
 	      }
 	  }
+	  # test:
+	  print STDERR "before genomewise\n:";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_in[0] );
+	  print STDERR "after genomewise\n:";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_out[0] );
       }
       
+      
+      
+
+
   }
   else{
       # if we have more than one transcript at one or both sides, we also have to check them all
@@ -448,23 +457,8 @@ sub run{
       }   
   }
   
-  ## now we check that all the evi info has been correctly passed
-  foreach my $tran_out ( @trans_out ){
-      my $count = 0;
-      foreach my $exon_out ( @{$tran_out->get_all_Exons} ) {
-	  $count++;
-	  my @evi = @{$exon_out->get_all_supporting_features};
-	  #print "Exon $count: ".scalar(@evi)." features\n";
-	  if (@evi){
-	      #foreach my $evi ( @evi ){
-	      #print STDERR $evi." - ".$evi->gffstring."\n";
-	      #}
-	  }
-	  else{
-	      ;#print STDERR "No supporting evidence\n";
-	  }
-      }
-  }
+
+
   unlink $genome_file;
   unlink $evi_file;
 }
