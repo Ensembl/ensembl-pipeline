@@ -1,0 +1,123 @@
+#!/usr/local/bin/perl
+
+BEGIN {
+
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/ensembl-pipeline/modules");
+unshift (@INC,"/nfs/disk89/michele/pogdir/ensembl/modules");
+unshift (@INC,"/nfs/disk89/michele/bioperl-live");
+
+}
+
+=head1 NAME
+
+Job_creator - takes a list of input_ids and an analysis id
+and creates a job in the analysis database.
+
+=head1 SYNOPSIS
+
+    Job_creator
+
+=head1 DESCRIPTION
+
+
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -analysis  The analysis id
+
+    -infile    A file containing a list of input ids
+
+=cut
+
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::Job;
+
+my $host     = 'obi-wan';
+my $port     = '410000';
+my $dbname   = 'analysis';
+my $dbuser   = 'root';
+my $pass     =  undef;
+my $queue    = 'blast_farm';
+
+my $analysis_id;
+my @input_ids;
+my $infile;
+
+&GetOptions(
+	    'host:s'     => \$host,
+	    'port:n'     => \$port,
+	    'dbname:s'   => \$dbname,
+	    'dbuser:s'   => \$dbuser,
+	    'pass:s'     => \$pass,
+	    'infile=s'   => \$infile,
+	    'analysis=n' => \$analysis_id,
+	    'queue:s'    => \$queue,
+	    );
+
+
+
+my @input_ids = get_input_ids($infile,@ARGV);
+
+$analysis_id     || die "No analysis id input";
+$#input_ids >= 0 || die "No input ids";
+
+my $db  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $host,
+						 -port   => $port,
+						 -dbname => $dbname,
+						 -user   => $dbuser,
+						 -pass   => $pass);
+
+
+my $analysis = $db->get_Analysis($analysis_id) || die "No analysis object [$analysis_id] found";
+
+foreach my $id (@input_ids) {
+
+    print(STDERR "Creating job for $id\n");
+
+    my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $db,
+							  -input_id => $id,
+							  -analysis => $analysis,
+							  -queue    => $queue,
+							  -create   => 1,
+							  );
+    
+    $job->make_filenames;
+
+    print(STDERR "Created job object for  $id\n");
+    
+    $job->store($job);
+
+    print(STDERR "Stored job object for $id\n");
+}
+
+sub get_input_ids {
+    my ($infile,@input) = @_;
+
+    my @input_ids;
+
+    if (defined($infile)) {
+	open(IN,"<$infile");
+	while (<IN>) {
+	    chomp;
+	    push(@input_ids,$_);
+	}
+    }
+
+    push(@input_ids,@input);
+
+    return @input_ids;
+}
