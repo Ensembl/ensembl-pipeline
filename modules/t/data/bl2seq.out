@@ -1,0 +1,101 @@
+Query= 
+         (558 letters)
+
+>Hsa_RLN2
+          Length = 558
+
+ Score =  642 bits (324), Expect = 0.0
+ Identities = 435/472 (92%)
+ Strand = Plus / Plus
+
+                                                                       
+Query: 1   atgcctcgcctgttcttgttccacctgctagaattctgtttactactgaaccaattttcc 60
+           |||||||||||||| || ||||||||||||| | ||||||||||||||||||||||||||
+Sbjct: 1   atgcctcgcctgttttttttccacctgctaggagtctgtttactactgaaccaattttcc 60
+
+                                                                       
+Query: 61  agagcagtcgcggccaaatggaaggacgatgttattaaattatgcggccgcgaattagtt 120
+           ||||||||||||| |  ||||| ||| || ||||||||||||||||||||||||||||||
+Sbjct: 61  agagcagtcgcggactcatggatggaggaagttattaaattatgcggccgcgaattagtt 120
+
+                                                                       
+Query: 121 cgcgcgcagattgccatttgcggcatgagcacctggagcaaaaggtctctgagccaggaa 180
+           ||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+Sbjct: 121 cgcgcgcagattgccatttgcggcatgagcacctggagcaaaaggtctctgagccaggaa 180
+
+                                                                       
+Query: 181 gatgctcctcagacacctagaccagtggcagaaattgtaccatccttcatcaacaaagat 240
+           |||||||||||||||||||||||||||||||||||||| |||||||||||||||||||||
+Sbjct: 181 gatgctcctcagacacctagaccagtggcagaaattgtgccatccttcatcaacaaagat 240
+
+                                                                       
+Query: 241 acagaaactataattatcatgttggaattcattgctaatttgccaccggagctgaaggca 300
+           |||||||| |||| ||| ||||  |||||  ||||||||||||||| ||||||||||  |
+Sbjct: 241 acagaaaccataaatatgatgtcagaatttgttgctaatttgccacaggagctgaagtta 300
+
+                                                                       
+Query: 301 gccctatctgagaggcaaccatcattaccagagctacagcagtatgtacctgcattaaag 360
+            |||| ||||||| ||| ||| |||||||| ||||||| ||  ||||||||| |||||| 
+Sbjct: 301 accctgtctgagatgcagccagcattaccacagctacaacaacatgtacctgtattaaaa 360
+
+                                                                       
+Query: 361 gattccaatcttagctttgaagaatttaagaaacttattcgcaataggcaaagtgaagcc 420
+           ||||||| ||||  ||||||||||||||||||||||||||||||||| ||||||||||||
+Sbjct: 361 gattccagtcttctctttgaagaatttaagaaacttattcgcaatagacaaagtgaagcc 420
+
+                                                               
+Query: 421 gcagacagcaatccttcagaattaaaatacttaggcttggatactcattctc 472
+           |||||||||| |||||||||||||||||||||||||||||||||||||||||
+Sbjct: 421 gcagacagcagtccttcagaattaaaatacttaggcttggatactcattctc 472
+
+
+
+ Score = 54.0 bits (27), Expect = 2e-11
+ Identities = 45/51 (88%)
+ Strand = Plus / Plus
+
+                                                              
+Query: 508 aaatgttgcctaattggttgtaccaaaaggtctcttgctaaatattgctga 558
+           ||||||||||   |||||||||||||||| |||||||||| || |||||||
+Sbjct: 508 aaatgttgccatgttggttgtaccaaaagatctcttgctagattttgctga 558
+
+
+
+ Score = 24.3 bits (12), Expect = 0.015
+ Identities = 12/12 (100%)
+ Strand = Plus / Plus
+
+                       
+Query: 531 caaaaggtctct 542
+           ||||||||||||
+Sbjct: 159 caaaaggtctct 170
+
+
+Lambda     K      H
+    1.37    0.711     1.31 
+
+Gapped
+Lambda     K      H
+    1.37    0.711     1.31 
+
+
+Matrix: blastn matrix:1 -3
+Gap Penalties: Existence: 5, Extension: 2
+Number of Hits to DB: 3
+Number of Sequences: 0
+Number of extensions: 3
+Number of successful extensions: 3
+Number of sequences better than 10.0: 1
+length of query: 558
+length of database: 558
+effective HSP length: 9
+effective length of query: 549
+effective length of database: 549
+effective search space:   301401
+effective search space used:   301401
+T: 0
+A: 30
+X1: 6 (11.9 bits)
+X2: 15 (29.7 bits)
+S1: 12 (24.3 bits)
+S2: 8 (16.4 bits)
