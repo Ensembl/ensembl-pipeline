@@ -281,7 +281,17 @@ sub prune {
   return $self->{_prune};
 }
 
-# prune_features: something to handle rare akward cases
+=head2 prune_features
+
+ Title   : prune_features
+ Usage   : @pruned_fs = $self->prune_features(@f_array);
+ Function: reduce coverage of each base to a maximum of
+           $self->coverage features on each strand, by
+	   removing low-scoring features as necessary.
+ Returns : array of features
+ Args    : array of features
+
+=cut
 
 sub prune_features {
   my ($self, @input) = @_;
@@ -289,7 +299,6 @@ sub prune_features {
 
   $self->warn('experimental new prune_features method!');
 
-    # print "XXX prune_features: total ".@input." in\n";
     my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
     my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
     @input = ();
@@ -297,6 +306,18 @@ sub prune_features {
     push @input, @minus_strand_fs;
     return @input;
 }
+
+=head2 _prune_features_by_strand
+
+ Title   : _prune_features_by_strand
+ Usage   : @pruned_neg = $self->prune_features(-1, @f_array);
+ Function: reduce coverage of each base to a maximum of
+           $self->coverage features on the specified strand;
+	   all features not on the specified strand are discarded
+ Returns : array of features
+ Args    : strand, array of features
+
+=cut
 
 sub _prune_features_by_strand {
    my ($self, $strand, @in) = @_;
@@ -307,7 +328,7 @@ sub _prune_features_by_strand {
      push @input_for_strand, $f if $f->strand eq $strand;
    }
 
-   return if !@input_for_strand;
+   return () if !@input_for_strand;
 
    # get the genomic first and last bases covered by any features
    my @sorted_fs = sort{ $a->start <=> $b->start } @input_for_strand;
@@ -315,7 +336,7 @@ sub _prune_features_by_strand {
    my @sorted_fs = sort{ $a->end <=> $b->end } @input_for_strand;
    my $last_base = $sorted_fs[$#sorted_fs]->end;
 
-   # $fs: set element i to the number of features covering base i
+   # fs_per_base: set element i to the number of features covering base i
    my @fs_per_base = ();
    foreach  my $base ($first_base..$last_base) {
      $fs_per_base[$base] = 0;	# initialise
@@ -326,37 +347,38 @@ sub _prune_features_by_strand {
      }
    }
 
-   #print "XXX coverage vector:\n  ";
-   #foreach my $covered_base ($first_base..$last_base) {
-   #  print $fs_per_base[$covered_base];
-   #}
-   #print "\n";	# XXX
-
    # put the worst features first, so they get removed with priority
-   # using score assumes they're from the same database search
+   # we use score, which assumes they're from the same database search
    @sorted_fs = sort { $a->score <=> $b->score } @input_for_strand;
 
+   # over_covered_bases: list of base numbers where coverage must be
+   # reduced, listed worst-case-first
    my $max_coverage = $self->coverage;
+   my @over_covered_bases = ();
    foreach my $base ($first_base..$last_base) {
      my $excess_fs = $fs_per_base[$base] - $max_coverage;
      if ($excess_fs > 0) {
-       my $f_no = 0;
-       while ($excess_fs) {
-         my $start = $sorted_fs[$f_no]->start;
-         my $end = $sorted_fs[$f_no]->end;
-         if ($start <= $base and $end >= $base) {	# cut this feature
-           splice @sorted_fs, $f_no, 1;	# same index will give next feature
-           foreach my $was_covered ($start..$end) {
-             $fs_per_base[$was_covered]--;
-           }
-           $excess_fs--;
-         } else {	# didn't overlap this base, move on to next feature
-           $f_no++;
+       push @over_covered_bases, $base;
+     }
+   }
+   @over_covered_bases = reverse sort { $fs_per_base[$a] <=> $fs_per_base[$b] }
+     @over_covered_bases;
+
+   foreach my $base (@over_covered_bases) {
+     my $f_no = 0;
+     while ($fs_per_base[$base] > $max_coverage) {
+       my $start = $sorted_fs[$f_no]->start;
+       my $end = $sorted_fs[$f_no]->end;
+       if ($start <= $base and $end >= $base) {	# cut this feature
+         splice @sorted_fs, $f_no, 1;	# same index will give next feature
+         foreach my $was_covered ($start..$end) {
+           $fs_per_base[$was_covered]--;
          }
+       } else {	# didn't overlap this base, move on to next feature
+         $f_no++;
        }
      }
    }
-
    return @sorted_fs;
 }
 
