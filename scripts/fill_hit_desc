@@ -13,7 +13,7 @@ use Data::Dumper;
     my $dbhost = 'otterpipe1';
     my $dbname = 'human_finished';
     my $dbuser = 'ottadmin';
-    my $dbpass = 'lutralutra';
+    my $dbpass = undef;
     my $dbport = 3302;
     my $table  = 'dna';
     my $query  = undef;
@@ -72,30 +72,10 @@ use Data::Dumper;
         }
     }
 
-    my $cached = array_as_cache(\@ids, 200);
-
     my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
 
-    while(my @first = first_of_cache($cached)){
-        print STDERR map "$_\n", @first;
-        $seqfetcher->write_descriptions( $db, [@first] );
-    }
+	$seqfetcher->write_descriptions( $db, [@ids] );
 }
-
-sub array_as_cache{
-    my ($a, $size, $b) = @_;
-    while(@$a){ 
-	push(@{$b}, [ splice(@$a,0,$size) ]);
-    }
-    return $b;
-}
-sub first_of_cache{
-    my ($cache) = @_;
-
-    my $first = shift(@$cache) || [];
-    return @$first;
-}
-
 
 sub useage{
     exec('perldoc', $0);

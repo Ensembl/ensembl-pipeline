@@ -270,13 +270,13 @@ sub fetch_descriptions_by_accession {
         my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
         $embl_parser->parse($entry);
 
-		my $name_without_version = (split('.',$full_name))[0];
+		my $name_without_version = (split(/\./,$full_name))[0];
 
 		my $found = 0;
 		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
 			if ($name_without_version eq $one_of_names) {
 				$found = 1;
-				warn "Found '$name_without_version'";
+				# warn "Found '$name_without_version'";
 
 					# NB: do not redefine any of these if already defined
 				$descriptions->{$full_name}{description}||= $embl_parser->description;
