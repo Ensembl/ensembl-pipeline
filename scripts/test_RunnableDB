@@ -44,7 +44,6 @@ use Getopt::Long;
 
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
 my $host   = 'ecs1c';
@@ -64,7 +63,7 @@ my $params;
 	     'port:n'      => \$port,
 	     'dbname:s'    => \$dbname,
 	     'dbuser:s'    => \$dbuser,
-	     'dbpass:s'    => \$pass,
+	     'pass:s'      => \$pass,
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,
@@ -74,6 +73,11 @@ my $params;
 	     );
 
 $| = 1;
+
+die "No runnable entered" unless defined ($runnable);
+(my $file = $runnable) =~ s/::/\//g;
+require "$file.pm";
+
 if ($check) {
    exit(0);
 }
@@ -84,10 +88,7 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
     -perlonlyfeatures => 0
 );
 
-# FIXME: should not be hardwired to pfetch...
-my $sf = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
-die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
 
 (my $file = $runnable) =~ s/::/\//g;
@@ -107,7 +108,6 @@ foreach my $p(split /,/, $params){
 my $runobj = "$runnable"->new(-dbobj    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
-			      -seqfetcher => $sf,
 			      %hparams,
 			     );
 
@@ -134,4 +134,5 @@ sub make_locator_string {
     return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass;perlonlyfeatures=1";
 
 }
+
 
