@@ -213,10 +213,16 @@ sub run {
   # we write each Bio::Seq sequence in the fasta file $query
   my %length;
   foreach my $query_seq ( @query_seqs ){
-      ## calculate the length
-      #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
-      $length{ $query_seq->display_id} = $query_seq->length;
-      $seqout->write_seq($query_seq);
+    ## calculate the length
+    #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
+    if ( $query_seq->display_id ){
+      $length{ $query_seq->display_id } = $query_seq->length;
+    }
+    else{
+      $query_seq->display_id("no id");
+      $length{ $query_seq->display_id } = $query_seq->length;
+    }
+    $seqout->write_seq($query_seq);
   }
   close( QUERY_SEQ );
   
@@ -475,12 +481,13 @@ sub run {
     }
     $transcript->add_Exon($exon);
 
-
+    
     ############################################################
     # compute coverage
     # q_start reported by the sugar/cigar lines is one less 
     # as exonerate counts between lines
     my $aligned_length = $q_end - ($q_start + 1) + 1;
+
     my $coverage = sprintf "%.2f", 100 * ( $aligned_length - $target_gap_length ) / $length{$q_id};
     
     print STDERR "coverage = ( $aligned_length - $target_gap_length ) / ".$length{$q_id}." =  $coverage\n" if $verbose;
