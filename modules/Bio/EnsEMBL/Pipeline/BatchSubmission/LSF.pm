@@ -1,8 +1,5 @@
 package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
-BEGIN {
-  require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
@@ -94,3 +91,31 @@ sub open_command_line{
   $self->id($lsf);
   close(SUB);
 }
+
+
+sub get_pending_jobs {
+  my($self, %args) = @_;
+
+  my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
+  my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
+
+  my $cmd = "bjobs -p";
+  $cmd   .= " -q $queue" if $queue;
+  $cmd   .= " -u $user"  if $user;
+  $cmd   .= " | grep PEND";
+
+  open CMD, "$cmd 2>&1 |" or do {
+    return undef;
+  };
+
+  my @lines = <CMD>;
+
+  close CMD or do {
+    return undef;
+  };
+
+  return 0 if $lines[0] =~ /No pending job found/;
+  return scalar @lines;
+}
+
+1;
