@@ -16,6 +16,11 @@ and a stable-marriage optimization procedure. Then it
 takes each of the found transcript-pairs and pair up the exons by
 using a Needlemann-Wusch method on the exon space, using as score matrix the
 tblastx comparison between exons.
+Alternatively, the exons can be paired up
+using blastz on the genomic extent (plus some external padding)
+of the transcripts to be compared. Then exon alignments are calculated from the
+blastz alignments. In this way, a possible use of non orthologous
+exons can be resolved as they would not overlap in the genomic comparison.
 
 =head1 CONTACT
 
@@ -98,14 +103,6 @@ sub compare{
 	  # blast transcripts
 	  my ($score,$pair) = $self->blast_isoforms( $human_t, $mouse_t, $coding_exons );
 	  
-	  ############################################################
-	  # blastz genomic extent of transcripts
-	  my ($exon_pairs, $all_exons_match) = $self->blast_genomic_isoforms( $human_t, $mouse_t, $coding_exons );
-	  
-	  if ( $all_exons_match ){
-	      print STDERR "ALL EXONS MATCH\n";
-	  }
-
 	  if ( $score && $pair ){
 	      $object_map->match($human_t, $mouse_t, $score );
 	  }
@@ -206,16 +203,20 @@ sub find_exact_matches{
 	  
 	  ############################################################
 	  # blastz genomic extent of transcripts
-	  my ($exon_pairs, $all_exons_match) = $self->blast_genomic_isoforms( $human_t, $mouse_t, $coding_exons );
+	  my $id1 = $human_t->stable_id || $human_t->dbID;
+	  my $id2 = $mouse_t->stable_id || $mouse_t->dbID;
+	  print STDERR "comparing genomic extent of $id1 and $id2:\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($human_t);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($mouse_t);
 	  
-	  if ( $all_exons_match ){
-	      $object_map->match($human_t, $mouse_t, 1); 
-	      my $id1 = $human_t->stable_id || $human_t->dbID;
-	      my $id2 = $mouse_t->stable_id || $mouse_t->dbID;
-	      print STDERR "Pair ( $id1 , $id2 ) all exons match\n";
-	      $exon_pairs{$human_t} = $exon_pairs;
-	      next HUMAN;
-	  }
+	  my ($missing_terminal_exons, $exon_skipping, $all_conserved) = $self->blast_genomic_isoforms( $human_t, $mouse_t, $coding_exons );
+	  
+	  #if ( $all_exons_match ){
+	  #    $object_map->match($human_t, $mouse_t, 1); 
+	  #    print STDERR "Pair ( $id1 , $id2 ) all exons match\n";
+	  #    $exon_pairs{$human_t} = $exon_pairs;
+	  #    next HUMAN;
+	  #}
       } 
   }
   my $best_pairs_object = $object_map;
@@ -440,7 +441,7 @@ sub blast_isoforms{
 sub blast_genomic_isoforms{
   my ( $self,$tran1,$tran2, $coding_exons , $padding) = @_;
   
-  $padding = 200 unless $padding;
+  $padding = 300;
   # query
   my $id1;
   if ( $tran1->dbID ){
@@ -488,9 +489,9 @@ sub blast_genomic_isoforms{
 	$slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start-$padding,$chr_end+$padding);
     my $id  = "reverse_".$seq->display_id;
     $seq1   = $seq->invert;
-    $seq1->display_id($id);
-    $seq1->name($id);
-    $seq1->desc('');
+    #$seq1->display_id($id);
+    #$seq1->name($id);
+    #$seq1->desc('');
   }
 
   my $chr_start2 = $exons2[0]->start;
@@ -507,9 +508,9 @@ sub blast_genomic_isoforms{
     my $seq = $slice_adaptor2->fetch_by_chr_start_end($chr_name2,$chr_start2,$chr_end2);
     my $id  = "reverse_".$seq->display_id;
     $seq2   = $seq->invert;
-    $seq2->display_id($id);
-    $seq2->name($id);
-    $seq2->desc('');
+    #$seq2->display_id($id);
+    #$seq2->name($id);
+    #$seq2->desc('');
   }
   my $length1 = $seq1->length;
   my $length2 = $seq2->length;
@@ -550,27 +551,11 @@ sub blast_genomic_isoforms{
   my $copy2 = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($tran2);
   my $transcript1 = $self->map_to_slice( $copy1,$seq1 );
   my $transcript2 = $self->map_to_slice( $copy2,$seq2 );
-
+  
   my @exon_pairs;
-  foreach my $f ( @featurepairs ){
-      my @pairs = $self->get_exon_pairs( $transcript1, $transcript2, $f,$coding_exons);
-      unless ( @pairs ){
-	  next;
-      }
-      push( @exon_pairs, @pairs );
-  }
+  my ($exon_object_map, $exon_map) = $self->get_exon_pairs( $transcript1, $transcript2, \@featurepairs ,$coding_exons);
   
-  my $all_exons_match = 0;
-  if ( scalar(@exon_pairs) == scalar(@exons) && scalar(@exon_pairs) == scalar(@exons2) ){
-      $all_exons_match = 1;
-  }
-
-  print STDERR "MATCH\t".
-      "$id1\thuman_exons:".scalar(@exons)."\t".
-	  "id2\tmouse_exons:".scalar(@exons2)."\t".
-	      "exact_matches:".scalar(@exon_pairs)."\n";
-  
-  return (\@exon_pairs, $all_exons_match);
+  return ($exon_object_map, $exon_map);
 }
 
 ############################################################
@@ -582,147 +567,569 @@ sub map_to_slice{
   $gene->add_Transcript($tran);
   $gene->transform($slice);
   my @transcripts = @{$gene->get_all_Transcripts};
-  print STDERR scalar(@transcripts)." transcripts returned\n";
   return $transcripts[0];
 }
 
 ############################################################
 
 sub get_exon_pairs{
-  my ($self, $tran1, $tran2, $feat, $coding ) = @_;
-
+  my ($self, $tran1, $tran2, $features, $coding ) = @_;
+    
+  my @features = @$features;
   my @exons1 = @{$self->get_Exons( $tran1,$coding)};
   my @exons2 = @{$self->get_Exons( $tran2,$coding)};
   
-  my @pairs;
-  
-  # which exons from tran1 are included in feat?
- EXON1:
-  foreach my $exon1 ( @exons1 ){
-      if ( $exon1->start > $feat->end || $exon1->end < $feat->start ){
-	next EXON1;
-    }
-    if ( $exon1->start <= $feat->end && $exon1->end >= $feat->start ){
+  my $verbose = 0;
+  my %exon_map;
+
+  my $start = 0;
+ FEATURE:
+  for ( my $k = 0; $k<scalar(@features); $k++){
+      my $feat = $features->[$k];
       
-    EXON2:
-	foreach my $exon2 ( @exons2 ){
-	    if ( $exon2->start > $feat->hend || $exon2->end < $feat->hstart ){
-		next EXON2;
-	    }
-	    if ( $exon2->start <= $feat->hend && $exon2->end >= $feat->hstart ){
+      # which exons from tran1 overlap with feat?
+    EXON1:
+      for ( my $i=0; $i< scalar( @exons1); $i++ ){
+	  my $exon1 = $exons1[$i];
+	  if ( $exon1->start > $feat->end || $exon1->end < $feat->start ){
+	      next EXON1;
+	  }
+	  if ( $exon1->start <= $feat->end && $exon1->end >= $feat->start ){
+	      
+	      # which exons from tran2 are in feat?
+	    EXON2:
+	      for (my $j=$start; $j< scalar( @exons2 ); $j++ ){
+		  my $exon2 = $exons2[$j];
+		  if ( $exon2->start > $feat->hend || $exon2->end < $feat->hstart ){
+		      next EXON2;
+		  }
+		  if ( $exon2->start <= $feat->hend && $exon2->end >= $feat->hstart ){
+		      
+		      ############################################################
+		      # potential pair - are these overlapping?
+		      my $start1 = $exon1->start;
+		      my $end1   = $exon1->end;
+		      
+		      my $start2 = $exon2->start;
+		      my $end2   = $exon2->end;
+		      
+		      print STDERR "potential pair:  exon1($i): $start1-$end1  feature: (".
+			  $feat->start."-".$feat->end."):(".
+			      $feat->hstart."-".$feat->hend.")  exon2($j): $start2-$end2\n";
+		      
+		      my $cigar_string = $feat->cigar_string;
+		      my @blocks = ( $cigar_string =~ /(\d*[MDI])/g );
+		      #print STDERR "parsing string: ",join ( ",", @blocks ),"\n";
+		      
+		      my $start_1 = $exon1->start - $feat->start + 1;
+		      my $end_1   = $exon1->end   - $feat->start + 1;
+		      my $start_2 = $exon2->start - $feat->hstart + 1;
+		      my $end_2   = $exon2->end   - $feat->hstart + 1;
+		      
+		      my $pos1 = 0;
+		      my $pos2 = 0;
+		      my @sub_blocks;
 		
-		############################################################
-		# potential pair - are these overlapping?
-		my $start1 = $exon1->start;
-		my $end1   = $exon1->end;
-		
-		my $start2 = $exon2->start;
-		my $end2   = $exon2->end;
-		
-		print STDERR "potential pair:  exon1: $start1-$end1  feature: (".
-		    $feat->start."-".$feat->end."):(".
-			$feat->hstart."-".$feat->hend.") exon2: $start2-$end2\n";
-		
-		
-		my $cigar_string = $feat->cigar_string;
-		my @blocks = ( $cigar_string =~ /(\d*[MDI])/g );
-		#print STDERR "parsing string: ",join ( ",", @blocks ),"\n";
-		
-		my $start_1 = $exon1->start - $feat->start + 1;
-		my $end_1   = $exon1->end   - $feat->start + 1;
-		my $start_2 = $exon2->start - $feat->hstart + 1;
-		my $end_2   = $exon2->end   - $feat->hstart + 1;
-		
-		my $pos1 = 0;
-		my $pos2 = 0;
-		my @sub_blocks;
-		my ($s1,$e1,$s2,$e2) = (0,$feat->start - 1,0,$feat->hstart - 1);
-		foreach my $block ( @blocks ){
-		    my ($length) = ( $block =~ /^(\d*)/ );
-		    $length =1 if $length eq "";
-		    
-		    if ( $block =~ /M$/ ){
-			$s1 = $e1 + 1;
-			$e1 = $s1 + $length - 1;
-			$s2 = $e2 + 1;
-			$e2 = $s2 + $length - 1 ;
-			#print STDERR "block: $block\tfeat1: $s1-$e1 feat2: $s2-$e2\n";
-		    }
-		    if ( $block =~ /I$/ ){
-			$s1 = $e1 + 1;
-			$e1 = $s1 + $length - 1;
-			#print STDERR "block: $block\tfeat1: $s1-$e1\n";
-		    }
-		    if ( $block =~ /D$/ ){
-			$s2 = $e2 + 1;
-			$e2 = $s2 + $length - 1;
-			#print STDERR "block: $block\t               feat2: $s2-$e2\n";
-		    }
-		    
-		    # simplest case: both exons coincide on a match block:
-		    if ( $block =~ /M$/ ){
-			my ($start1,$end1,$start2,$end2);
-			if ( $exon1->start >= $s1 && $exon1->start <= $e1 ){
-			    $start1 = $exon1->start - $s1 + 1;
-			    print STDERR "exon1 starts at pos $start1\n";
-			}
-			if ( $exon1->end >= $s1 && $exon1->end <= $e1 ){
-			    $end1 = $exon1->end - $s1 + 1;
-			    print STDERR "exon1 ends at pos $end1\n";
-			}
-			if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
-			    $start2 = $exon2->start - $s2 + 1;
-			    print STDERR "exon2 starts at pos $start2\n";
-			}
-			if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
-			    $end2 = $exon2->end - $s2 + 1;
-			    print STDERR "exon2 ends at pos $end2\n";
-			}
-			if ( $start1 && $start2 && $end1 && $end2 
-			     && $start1 == $start2 && $end1 == $end2 ){
-			    print STDERR "MATCH\n";
-			    my @pair = ( $exon1, $exon2 );
-			    push( @pairs, \@pair);
-			    next EXON1;
-			}
-		    }
-		    
-		
-		    if ( $block =~ /I$/ ){
-			if ( $exon1->start >= $s1 && $exon1->start <= $e1 ){
-			    my $start1 = $exon1->start - $s1 + 1;
-			    print STDERR "exon1 starts at pos $start1\n";
-			}
-			if ( $exon1->end >= $s1 && $exon1->end <= $e1 ){
-			    my $end1 = $exon1->end - $s1 + 1;
-			    print STDERR "exon1 ends at pos $end1\n";
-			}
-		    }
-		    if ( $block =~ /D$/ ){
-			if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
-			    my $start2 = $exon2->start - $s2 + 1;
-			    print STDERR "exon2 starts at pos $start2\n";
-			}
-			if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
-			    my $end2 = $exon2->end - $s2 + 1;
-			print STDERR "exon2 ends at pos $end2\n";
-			}
-		    }
-		}
-		
-	    }
-	}
-    }
+		      # flag when we are in an exon-match
+		      my $in_exon = 0;
+		      
+		      ############################################################
+		      # coordinates of the blocks on the sequences system:
+		      # (s1,e1) is on the seq1 system
+		      # (s2,e2) is on the seq2 system
+		      my ($s1,$e1,$s2,$e2) = (0,$feat->start - 1,0,$feat->hstart - 1);
+		      foreach my $block ( @blocks ){
+			  my ($length) = ( $block =~ /^(\d*)/ );
+			  $length =1 if $length eq "";
+			  
+			  if ( $block =~ /M$/ ){
+			      $s1 = $e1 + 1;
+			      $e1 = $s1 + $length - 1;
+			      $s2 = $e2 + 1;
+			      $e2 = $s2 + $length - 1 ;
+			      print STDERR "block: $block\tfeat1: $s1-$e1\tfeat2: $s2-$e2\n" if $verbose;
+			  }
+			  if ( $block =~ /I$/ ){
+			      $s1 = $e1 + 1;
+			      $e1 = $s1 + $length - 1;
+			      print STDERR "block: $block\tfeat1: $s1-$e1\n" if $verbose;
+			  }
+			  if ( $block =~ /D$/ ){
+			      $s2 = $e2 + 1;
+			      $e2 = $s2 + $length - 1;
+			      print STDERR "block: $block\t\t\t\tfeat2: $s2-$e2\n" if $verbose;
+			  }
+			  
+			  ############################################################
+			  # match state
+			  # simplest case: both exons coincide on a match block:
+			  if ( $block =~ /M$/ ){
+			      my ($start1,$end1,$start2,$end2);
+			      if ( $exon1->start >= $s1 && $exon1->start <= $e1 ){
+				  $start1 = $exon1->start - $s1 + 1;
+				  print STDERR "exon1 starts at pos $start1\n" if $verbose;
+			      }
+			      if ( $exon1->end >= $s1 && $exon1->end <= $e1 ){
+				  $end1 = $exon1->end - $s1 + 1;
+				  print STDERR "exon1 ends at pos $end1\n" if $verbose;
+			      }
+			      if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
+				  $start2 = $exon2->start - $s2 + 1;
+				  print STDERR "exon2 starts at pos $start2\n" if $verbose;
+			      }
+			      if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
+				  $end2 = $exon2->end - $s2 + 1;
+				  print STDERR "exon2 ends at pos $end2\n" if $verbose;
+			      }
+			      
+			      ############################################################
+			      # check if they fall entirely on the M state
+			      if ( $start1 && $start2 && $end1 && $end2 ){
+				  
+				  ############################################################
+				  # do they overlap?
+				  if ( $start1 > $end2 || $end1 < $start2 ){
+				      print STDERR "they do not overlap - skipping\n";
+				      next EXON2;
+				  }
+				  
+				  
+				  ############################################################
+				  # exact match?
+				  if ( $start1 == $start2 && $end1 == $end2 ){
+				      print STDERR "MATCH\n";
+				      
+				      $exon_map{$i}{$j} = ($end2 - $start2 + 1 )."M";
+				      print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+				      $start = $j + 1;
+				      next EXON1;
+				  }
+				  
+				  ############################################################
+				  # overlap
+				  elsif( !( $start1>$end2 || $end1<$start2 ) ){
+				      my $overlap = $self->min ($end1, $end2 ) 
+					  - $self->max($start1,$start2) + 1; 
+				      $exon_map{$i}{$j} = '';
+				      my $left = $start2 - $start1;
+				      if ($left){
+					  $exon_map{$i}{$j} .=      $left."I" if $left>0;
+					  $exon_map{$i}{$j} .= abs($left)."D" if $left<0;
+				      }
+				      $exon_map{$i}{$j} .= $overlap."M";
+				      my $right = $end1 - $end2;
+				      if ($right){
+					  $exon_map{$i}{$j} .=      $right."I" if $right>0;
+					  $exon_map{$i}{$j} .= abs($right)."D" if $right<0;
+				      }
+				      print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+				  }
+			      }
+			      ############################################################
+			      # if one has the start outside the match state
+			      # or both are but we are at the first feature:
+			      elsif( $end1 && $end2 && ( $start1 || $start2 || $k==0 ) ){ 
+				  my $mismatch1 = ($s1 - $exon1->start);
+				  my $mismatch2 = ($s2 - $exon2->start);
+				  my $left = ($mismatch1 - $mismatch2 );
+				  if ($left){
+				      my $mismatch = ( $self->max($mismatch1,$mismatch2) -
+						       $self->min($mismatch1,$mismatch2) );
+				      $exon_map{$i}{$j} .=      $mismatch."I" if $left>0;
+				      $exon_map{$i}{$j} .= abs($mismatch)."D" if $left<0;
+				  }
+				  # potentially alignable bases
+				  # not aligned by blastz
+				  my $extra_bases = max( 0, $self->min($mismatch1,$mismatch2) );
+				  
+				  #$exon_map{$i}{$j} .= $self->min($mismatch1,$mismatch2)."m"
+				  #    if ( $self->min($mismatch1,$mismatch2) > 0);
+				  
+				  
+				  # same end?
+				  if ( $end1 == $end2 ){
+				      $exon_map{$i}{$j} .= ($end2 + $extra_bases)."M";
+				  }
+				  else{
+				      $exon_map{$i}{$j} .= 
+					  ($self->min($end1,$end2) + $extra_bases)."M";
+				      my $right = $end1 - $end2;
+				      if ($right){
+					  $exon_map{$i}{$j} .=      $right."I" if $right>0;
+					  $exon_map{$i}{$j} .= abs($right)."D" if $right<0;
+				      }
+				  }
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+				  next EXON1;
+				  $start = $j + 1;
+			      }
+			      ############################################################
+			      # if both have the start outside the block
+			      elsif( $end1 && $end2 && ! ( $start1 || $start2 ) ){
+				  # same end?
+				  if ( $end1 == $end2 ){
+				      $exon_map{$i}{$j} .= $end2."M";
+				  }
+				  else{
+				      $exon_map{$i}{$j} .= $self->min($end1,$end2)."M";
+				      my $right = $end1 - $end2;
+				      if ($right){
+					  $exon_map{$i}{$j} .=      $right."I" if $right>0;
+					  $exon_map{$i}{$j} .= abs($right)."D" if $right<0;
+				      }
+				  }
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+				  next EXON1;
+				  $start = $j + 1;
+			      }
+			      ############################################################
+			      # if one has the end outside the feature block
+			      # or they are at the last feature
+			      elsif ($start1 && $start2 
+				     && 
+				     ( $end1 || $end2 || $k==$#features ) ){
+				  my $mismatch1 = $exon1->end - $e1;
+				  my $mismatch2 = $exon2->end - $e2;
+				  
+				  # alignable bases not aligned by blastz
+				  my $extra_bases = max(0, $self->min($mismatch1,$mismatch2) );
+				  my $Match = min(
+						  min($exon1->length,$exon2->length),
+						  min($e1 - $exon1->start + 1,
+						      $e2 - $exon2->start + 1
+						      )
+						  );
+				  if ( $start1 == $start2 ){
+				      $exon_map{$i}{$j} .= ($Match + $extra_bases)."M";
+				  }
+				  else{
+				      my $left = $start1 - $start2;
+				      if ($left){
+					  $exon_map{$i}{$j} .=      $left."I" if $left>0;
+					  $exon_map{$i}{$j} .= abs($left)."D" if $left<0;
+				      }
+				      $exon_map{$i}{$j} .= ($Match + $extra_bases)."M";
+				  }
+				  
+				  
+				  #$exon_map{$i}{$j} .= $self->min($mismatch1,$mismatch2)."m"
+				  #    if ( $self->min($mismatch1,$mismatch2) > 0 );
+				  
+				  my $right = ($mismatch1 - $mismatch2 );
+				  if ($right){
+				      my $mismatch = ( $self->max($mismatch1,$mismatch2) -
+						       $self->min($mismatch1,$mismatch2) );
+				      $exon_map{$i}{$j} .=      $mismatch."I" if $right>0;
+				      $exon_map{$i}{$j} .= abs($mismatch)."D" if $right<0;
+				  }
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			      ############################################################
+			      # if both have the end outside the feature block
+			      # or they are at the last feature
+			      elsif ($start1 && $start2 && !( $end1 || $end2 ) ){
+				  $in_exon = 1;
+				  my $Match = min(
+						  min($exon1->length,$exon2->length),
+						  min($e1 - $exon1->start + 1,
+						      $e2 - $exon2->start + 1
+						      )
+						  );
+				  if ( $start1 == $start2 ){
+				      $exon_map{$i}{$j} .= $Match."M";
+				  }
+				  else{
+				      my $left = $start1 - $start2;
+				      if ($left){
+					  $exon_map{$i}{$j} .=      $left."I" if $left>0;
+					  $exon_map{$i}{$j} .= abs($left)."D" if $left<0;
+				      }
+				      $exon_map{$i}{$j} .= $Match."M";
+				  }
+				  
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			  }
+			  
+			  ############################################################
+			  # insert state
+			  if ( $block =~ /I$/ ){
+			      my ($start1,$end1);
+			      if ( $exon1->start >= $s1 && $exon1->start <= $e1 ){
+				  $start1 = $exon1->start - $s1 + 1;
+				  print STDERR "exon1 starts at pos $start1 in I-state\n";
+			      }
+			      if ( $exon1->end >= $s1 && $exon1->end <= $e1 ){
+				  $end1 = $exon1->end - $s1 + 1;
+				  print STDERR "exon1 ends at pos $end1 in I-state\n";
+			      }
+			      if ( !($start1 || $end1 ) && $in_exon ){
+				  $exon_map{$i}{$j} .= ($e1 - $s1 + 1)."I";
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			      elsif( $start1 && !$end1 ){
+				  $exon_map{$i}{$j} .= ($e1 - $exon1->start + 1 )."I";
+				  $in_exon = 1;
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			      elsif( !$start1 && $end1 && $in_exon ){
+				  $exon_map{$i}{$j} .= ($exon1->end - $s1 + 1 )."I";
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			  }
+			  ############################################################
+			  # delete state
+			  if ( $block =~ /D$/ ){
+			      my ($start2,$end2);
+			      if ( $exon2->start >= $s2 && $exon2->start <= $e2 ){
+				  $start2 = $exon2->start - $s2 + 1;
+				  print STDERR "exon2 starts at pos $start2 in D-state\n";
+			      }
+			      if ( $exon2->end >= $s2 && $exon2->end <= $e2 ){
+				  $end2 = $exon2->end - $s2 + 1;
+				  print STDERR "exon2 ends at pos $end2 in D-state\n";
+			      }
+			      
+			      if ( !($start2 || $end2 ) && $in_exon ){
+				  $exon_map{$i}{$j} .= ($e2 - $s2 + 1)."D";
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			      elsif( $start2 && !$end2 ){
+				  $exon_map{$i}{$j} .= ($e2 - $exon2->start + 1 )."D";
+				  $in_exon = 1;
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			      elsif( !$start2 && $end2 && $in_exon ){
+				  $exon_map{$i}{$j} .= ($exon2->end - $s2 + 1 )."D";
+				  print STDERR "exon_map($i)($j): ".$exon_map{$i}{$j}."\n";
+			      }
+			  }
+		      }
+		  }
+	      } # end of EXON2
+	  }
+      }         # end of EXON1
+      
+  }             # end of FEATURE
+  
+  
+  my $exon_object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+  print STDERR "pairs found:\n";
+  foreach my $i ( keys %exon_map ){
+      print STDERR "matches for exon $i\n";
+      foreach my $j ( keys %{$exon_map{$i}} ){
+
+	  my $match    = ( $exon_map{$i}{$j} =~ /(\d*M)/g );
+	  my $mismatch = ( $exon_map{$i}{$j} =~ /(\d*[DI])/g );
+	  my $flag = '';
+	  if ( $match && !$mismatch ){
+	      $exon_object_map->match( $exons1[$i], $exons2[$j], +1 );
+	      $flag = "match";
+	  }
+	  elsif( $mismatch ){
+	      $exon_object_map->match( $exons1[$i], $exons2[$j], -1 );
+	      $flag = "mismatch";
+	  }
+	  print STDERR $self->exon_string($exons1[$i]).
+	      "\t<---->\t".
+		  $self->exon_string($exons2[$j])."\t".$exon_map{$i}{$j}."\t[$flag]\n";
+	  
+      }
   }
-  print STDERR "found pairs:\n";
-  foreach my $pair ( @pairs ){
-      print STDERR $self->exon_string($pair->[0]).
-	  "\t<---->\t".
-	      $self->exon_string($pair->[1])."\n";
+  my ($human_list,$mouse_list) = $self->get_exon_pair_alignment(\@exons1,\@exons2,\%exon_map);
+
+  my $human_missing = 0;
+  my $mouse_missing = 0;
+  my $human_internal_missing = 0;
+  my $mouse_internal_missing = 0;
+  my $exon_skipping = 0;
+  my $conserved     = 0;
+  my $same_length   = 0;
+  my $same_phases   = 0;
+
+  for ( my $i=0 ; $i< scalar(@$human_list); $i++ ){
+      if ( $human_list->[$i] eq 'gap' ){
+	  $human_missing++;
+      }
+      if ( $mouse_list->[$i] eq 'gap'){
+	  $mouse_missing++;
+      }
+      if ( !( $human_list->[$i] eq 'gap' || $mouse_list->[$i] eq 'gap') ){
+	  $conserved++;
+	  my $human_length = $human_list->[$i]->end - $human_list->[$i]->start + 1;
+	  my $mouse_length = $mouse_list->[$i]->end - $mouse_list->[$i]->start + 1;
+	  if ( $human_length == $mouse_length ){
+	      $same_length++;
+	  }
+	  if ( $human_list->[$i]->phase == $mouse_list->[$i]->phase 
+	       &&
+	       $human_list->[$i]->end_phase == $mouse_list->[$i]->end_phase ){
+	      $same_phases++;
+	  }
+      }
+      if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
+	  if ( $self->haspredecessor( $human_list, $i) 
+	       && 
+	       $self->hassuccessor( $human_list, $i )
+	       &&
+	       $self->haspredecessor( $mouse_list, $i )
+	       && 
+	       $self->hassuccessor( $mouse_list, $i )
+	       ){
+	      if ( $human_list->[$i] eq 'gap' ){ 
+		  $exon_skipping++;
+		  $human_internal_missing++;
+	      }
+	      if( $mouse_list->[$i] eq 'gap'){
+		  $exon_skipping++;
+		  $mouse_internal_missing++;
+	      }
+	  }
+      }
   }
-  return @pairs;
+  
+  my $human_terminal_missing = $human_missing - $human_internal_missing;
+  my $mouse_terminal_missing = $mouse_missing - $mouse_internal_missing;
+  
+  my $human_id = $tran1->stable_id || $tran1->dbID;
+  my $mouse_id = $tran2->stable_id || $tran2->dbID;
+  
+  my $human_count = scalar(@exons1);
+  my $mouse_count = scalar(@exons2);
+
+  ############################################################
+  # summary line
+  print STDERR "TRANS_PAIR\t".
+      "$human_id\thuman_exons:$human_count\thuman_miss_term_exons:$human_terminal_missing\thuman_miss_int_exons:$human_internal_missing\t".
+	  "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
+	      "$mouse_id\tmouse_exons:$mouse_count\tmouse_miss_term_exons:$mouse_terminal_missing\tmouse_miss_int_exons:$mouse_internal_missing\n";
+  
+  ############################################################
+  # summary line for exact matches
+  if ( $human_count == $mouse_count && $conserved == $same_length && $human_count == $conserved ){
+      my $cigars;
+      foreach my $i ( keys %exon_map ){
+	  foreach my $j ( keys %{$exon_map{$i}} ){
+	      $cigars .= $exon_map{$i}{$j}."\t";
+	  }
+      }
+      print STDERR "TRANS_EXACT_MATCH\t".
+	  "$human_id\thuman_exons:$human_count\t".
+	      "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
+		  "$mouse_id\tmouse_exons:$mouse_count\t".$cigars."\n";
+  }
+  ############################################################
+  # summary line for semi_exact matches
+  elsif ( $human_count == $mouse_count && $human_count == $conserved ){
+      my $cigars;
+      foreach my $i ( keys %exon_map ){
+	  foreach my $j ( keys %{$exon_map{$i}} ){
+	      $cigars .= $exon_map{$i}{$j}."\t";
+	  }
+      }
+      print STDERR "TRANS_SEMI_MATCH\t".
+	  "$human_id\thuman_exons:$human_count\t".
+	      "conserved_exons:$conserved\twith_same_length:$same_length\twith_same_phase:$same_phases\t".
+		  "$mouse_id\tmouse_exons:$mouse_count\t".$cigars."\n";
+  }
+  
+  my $missing_terminal_exons = 0;
+  if ( $human_terminal_missing || $mouse_terminal_missing ){
+      $missing_terminal_exons = 1;
+  }
+  my $all_conserved = 0;
+  if ( $same_length == scalar( @$human_list ) ){
+      $all_conserved = 1;
+  }
+  
+  return ($missing_terminal_exons, $exon_skipping, $all_conserved);
 }
 
+
+
+############################################################
+
+sub get_exon_pair_alignment{
+  my ($self,$human_list, $mouse_list, $exon_map ) = @_;
+  my %exon_map = %$exon_map;
+  my @human_list = @$human_list;
+  my @mouse_list = @$mouse_list;
+
+  my $human_length = scalar( @human_list );
+  my $mouse_length = scalar( @mouse_list );
+
+  unless( $human_length ){
+      for ( my $i=1; $i<= $mouse_length; $i++ ){
+	  push( @human_list, "gap" );
+      }
+      return ( \@human_list, \@mouse_list );
+  }
+  unless( $mouse_length ){
+      for ( my $j=1; $j<= $human_length; $j++ ){
+	  push( @mouse_list, "gap" );
+      }
+      return ( \@human_list, \@mouse_list );
+  }
+  
+  my $human_last = $human_list[-1];
+  my $mouse_last = $mouse_list[-1];
+  
+  ############################################################
+  # last exons 
+  if ( defined( $exon_map{$human_length-1}{$mouse_length-1} ) &&
+       $exon_map{$human_length-1}{$mouse_length-1} ){
+      pop @human_list;
+      pop @mouse_list;
+      my ( $human_list2, $mouse_list2) = 
+	  $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+      push ( @{$human_list2}, $human_last );
+      push ( @{$mouse_list2}, $mouse_last );
+      return ( $human_list2, $mouse_list2 );
+  }
+  ############################################################
+  # last exon of the first list is paired-up with a gap
+  elsif( !defined( $exon_map{$human_length-1}{$mouse_length-1} ) &&
+	 defined(  $exon_map{$human_length-2}{$mouse_length-1} ) &&
+	 $exon_map{$human_length-2}{$mouse_length-1} ){
+      pop @human_list;
+      my ( $human_list2, $mouse_list2) =
+	  $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+      push ( @{$human_list2}, $human_last );
+      push ( @{$mouse_list2}, "gap" );
+      return ( $human_list2, $mouse_list2 );
+  }
+  ############################################################
+  # last exons of the second list is paired up with a gap
+  else{
+      pop @mouse_list;
+      my ( $human_list2, $mouse_list2) =
+	  $self->get_exon_pair_alignment( \@human_list, \@mouse_list, $exon_map );
+      push ( @{$human_list2}, "gap" );
+      push ( @{$mouse_list2}, $mouse_last );
+      return ( $human_list2, $mouse_list2 );
+  }
+} 
+
+############################################################
+
+
+
+
+sub max{
+    my ($self, $max, @values ) = @_;
+    for (my $i=0; $i<@values; $i++ ){
+	$max = $values[$i] if $values[$i]>$max;
+    }
+    return $max;
+}
+
+sub min{
+    my ($self, $min, @values ) = @_;
+    for (my $i=0; $i<@values; $i++ ){
+	$min = $values[$i] if $values[$i]<$min;
+    }
+    return $min;
+}
 
 
 
@@ -930,20 +1337,22 @@ sub process_query{
 ############################################################
 
 sub print_Feature{
-  my ($self,$f) = @_;
-  print STDERR
-    $f->seqname."\t".
-	  $f->start."-".$f->end."\t".
-	      ($f->end - $f->start + 1)."\t".
-		  $f->strand."\t".
-		      $f->hseqname."\t".
-			  $f->hstart."-".$f->hend."\t".
-			      ($f->hend - $f->hstart + 1 )."\t".
-				  $f->strand."\t".
-				      "score:".$f->score."\t".
-					  "perc_id:".$f->percent_id.
-					      "cigar:".$f->cigar_string."\n";
-  
+    my ($self,$f, $cigar) = @_;
+    my $string =
+	$f->seqname."\t".
+	    $f->start."-".$f->end."\t".
+		($f->end - $f->start + 1)."\t".
+		    $f->strand."\t".
+			$f->hseqname."\t".
+			    $f->hstart."-".$f->hend."\t".
+				($f->hend - $f->hstart + 1 )."\t".
+				    $f->strand."\t".
+					"score:".$f->score."\t".
+					    "perc_id:".$f->percent_id;
+    if ($cigar){
+	$string .= "\t".$f->cigar_string;
+    }
+    print STDERR $string."\n";
 }
 	    
 ############################################################
@@ -964,6 +1373,7 @@ sub compare_Exons{
   
   my @score_matrix;
   my %comparison_score;
+  my %features;
 
   my $human_length = scalar(@human_exons);
   my $mouse_length = scalar(@mouse_exons);
@@ -977,8 +1387,9 @@ sub compare_Exons{
   
   foreach my $i ( 1..$human_length ){
     foreach my $j ( 1..$mouse_length ){
-	$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} = 
-	    $self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
+	($comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]},
+	 $features{$human_exons[$i-1]}{$mouse_exons[$j-1]}) =
+	     $self->blast_Exons( $human_exons[$i-1], $mouse_exons[$j-1] );
 	
 	#print STDERR "comparison( ".$human_exons[$i-1]->stable_id."-".$mouse_exons[$j-1]->stable_id." ) = ".
 	#$comparison_score{$human_exons[$i-1]}{$mouse_exons[$j-1]} ."\n";
@@ -1023,29 +1434,29 @@ sub compare_Exons{
       }
     }
     if ( $i > 0 && $i< ( scalar(@$human_list) - 1 ) ){
-      if ( $self->haspredecessor( $human_list, $i) 
-	   && 
-	   $self->hassuccessor( $human_list, $i )
-	   &&
-	   $self->haspredecessor( $mouse_list, $i )
-	   && 
-	   $self->hassuccessor( $mouse_list, $i )
-	 ){
-	if ( $human_list->[$i] eq 'gap' ){ 
-	  $exon_skipping++;
-	  $human_internal_missing++;
+	if ( $self->haspredecessor( $human_list, $i) 
+	     && 
+	     $self->hassuccessor( $human_list, $i )
+	     &&
+	     $self->haspredecessor( $mouse_list, $i )
+	     && 
+	     $self->hassuccessor( $mouse_list, $i )
+	     ){
+	    if ( $human_list->[$i] eq 'gap' ){ 
+		$exon_skipping++;
+		$human_internal_missing++;
+	    }
+	    if( $mouse_list->[$i] eq 'gap'){
+		$exon_skipping++;
+		$mouse_internal_missing++;
+	    }
 	}
-	if( $mouse_list->[$i] eq 'gap'){
-	  $exon_skipping++;
-	  $mouse_internal_missing++;
-	}
-      }
     }
-  }
+}
   
   my $human_terminal_missing = $human_missing - $human_internal_missing;
   my $mouse_terminal_missing = $mouse_missing - $mouse_internal_missing;
-
+  
   my $human_id = $human_t->stable_id || $human_t->dbID;
   my $mouse_id = $mouse_t->stable_id || $mouse_t->dbID;
   
@@ -1056,33 +1467,36 @@ sub compare_Exons{
   
   my $print_report = 1;
   if ( $print_report ){
-    for ( my $i=0; $i<scalar(@$human_list); $i++ ){
-      my $human_string;
-      my $mouse_string;
-      if ( $human_list->[$i] eq 'gap'){
-	$human_string = "             ####GAP####";
+      for ( my $i=0; $i<scalar(@$human_list); $i++ ){
+	  my $human_string;
+	  my $mouse_string;
+	  my $cigars = '';
+	  my $score  = 0;
+	  if ( $human_list->[$i] eq 'gap'){
+	      $human_string = "             ####GAP####";
+	      }
+	  else{
+	      $human_string = $self->exon_string( $human_list->[$i] );
+	  }
+	  if ( $mouse_list->[$i] eq 'gap'){
+	      $mouse_string = "             ####GAP####";
+	      }
+	  else{
+	      $mouse_string = $self->exon_string( $mouse_list->[$i] );
+	  }
+	  if( !($human_string eq "gap" || $mouse_string eq "gap") ){
+	      print STDERR "score (".$human_list->[$i]->stable_id.",".$mouse_list->[$i]->stable_id.")=".$comparison_score{$human_list->[$i]}{$mouse_list->[$i]}."\n";
+	      $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
+	      
+	      foreach my $feat ( @{ $features{$human_list->[$i]}{$mouse_list->[$i]} } ){
+		  $cigars = $feat->cigar_string ."|";
+	      }
+	  }
+	  $score = 0 unless $score;
+	  $score = sprintf "%.2f", $score;
+	  print STDERR $human_string."\t<---->\t".$mouse_string.
+	      "\t score= ".$score."\t$cigars\n";
       }
-      else{
-	$human_string = $self->exon_string( $human_list->[$i] );
-      }
-      if ( $mouse_list->[$i] eq 'gap'){
-	$mouse_string = "             ####GAP####";
-      }
-      else{
-	$mouse_string = $self->exon_string( $mouse_list->[$i] );
-      }
-      my $score;
-      if( !($human_string eq "gap" || $mouse_string eq "gap") ){
-	  #print STDERR "score (".$human_list->[$i]->stable_id.",".$mouse_list->[$i]->stable_id.")=".$comparison_score{$human_list->[$i]}{$mouse_list->[$i]}."\n";
-	  $score = $comparison_score{$human_list->[$i]}{$mouse_list->[$i]};
-      }
-      unless ($score){
-	$score = 0;
-      }
-      $score = sprintf "%.2f", $score;
-      print STDERR $human_string."\t<---->\t".$mouse_string.
-	"\t score= ".$score."\n";
-    }  
   }
   my $missing_terminal_exons = 0;
   if ( $human_terminal_missing || $mouse_terminal_missing ){
@@ -1140,6 +1554,7 @@ sub get_Exons{
 }
 
 ############################################################
+
 sub haspredecessor{
     my ($self,$list,$i) = @_;
     for( my $j=$i-1; $j>0; $j-- ){
@@ -1150,6 +1565,7 @@ sub haspredecessor{
     return 0;
 }
 ############################################################
+
 sub hassuccessor{
     my ($self,$list,$i) = @_;
     for( my $j=$i+1; $j< scalar(@$list); $j++ ){
@@ -1239,16 +1655,6 @@ sub exon_string{
 
 ############################################################
 
-sub max{
-  my ($self,$max, @others ) = @_;
-  foreach my $other (@others){
-    $max = $other if $other > $max;
-  }
-  return $max;
-}
-
-############################################################
-
 sub blast_Exons{
   my ($self,$exon1, $exon2) =@_;
   
@@ -1312,17 +1718,20 @@ sub blast_Exons{
   system("pressdb $database > /dev/null 2>&1");
   
   ############################################################
-  my $options = 'altscore="* any na" altscore="any * na" S2=13';
+  # Ian's parameters:
+  my $options = "W=5 M=1 N=-1 Q=3 R=3";
+  
+  #my $options = 'altscore="* any na" altscore="any * na" S2=13';
   #$options .= " V=200 B=200 ";
   #$options .= " -nogap ";
-  $options .= " W=$word ";
+  #$options .= " W=$word ";
   #print STDERR "options: $options\n";
   #my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
   #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
-						  #'-program'        => 'wutblastx',
-						  '-program'        => 'wublastn',
+						  '-program'        => 'wutblastx',
+						  #'-program'        => 'wublastn',
 						  '-database'       => $database,
 						  '-threshold_type' => "PVALUE",
 						  #'-threshold'      => 1e-10,
@@ -1338,29 +1747,29 @@ sub blast_Exons{
   my @featurepairs = $blast->output();
   
   if ( @featurepairs ){
-    #my @pos_strand = grep { $_->strand == 1} @featurepairs;  
-    #my @neg_strand = grep { $_->strand == -1} @featurepairs;  
-    #foreach my $fp (sort{ $a->hstart <=> $b->hstart} @pos_strand) {
-    #  print $fp->gffstring . "\n";
-    #}
-    #foreach my $fp (sort{ $a->hstart <=> $b->hstart} @neg_strand) {
-    #  print $fp->gffstring . "\n";
-    #}
-    my $score = 0;
-    foreach my $fp ( @featurepairs ){
-      $score += $fp->score;
-    }
-    $score = $score/scalar(@featurepairs);
-    return $score;
-    
-    #my @feat_by_score = sort { $b->score <=> $a->score } @featurepairs;
-    #return $feat_by_score[0]->score;
+      #my @pos_strand = grep { $_->strand == 1} @featurepairs;  
+      #my @neg_strand = grep { $_->strand == -1} @featurepairs;  
+      #foreach my $fp (sort{ $a->hstart <=> $b->hstart} @pos_strand) {
+      #  print $fp->gffstring . "\n";
+      #}
+      #foreach my $fp (sort{ $a->hstart <=> $b->hstart} @neg_strand) {
+      #  print $fp->gffstring . "\n";
+      #}
+      my $score = 0;
+      foreach my $fp ( @featurepairs ){
+	  $score += $fp->score;
+      }
+      $score = $score/scalar(@featurepairs);
+      return ($score,\@featurepairs);
+      
+      #my @feat_by_score = sort { $b->score <=> $a->score } @featurepairs;
+      #return $feat_by_score[0]->score;
   }
   else{
-    #print STDERR "no hits for:\n";
-    #print STDERR "$id1:\t".$seq1->seq."\n";
-    #print STDERR "$id2:\t".$seq2->seq."\n";
-    return 0;
+      #print STDERR "no hits for:\n";
+      #print STDERR "$id1:\t".$seq1->seq."\n";
+      #print STDERR "$id2:\t".$seq2->seq."\n";
+      return (0);
   }
 }
   
