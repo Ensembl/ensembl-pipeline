@@ -289,11 +289,11 @@ sub _greedy_filter {
 
 sub write_output {
   my ($self) = @_;
-  
 
-  if (! scalar($self->output)){
-      return undef;
+  if (! scalar($self->output)) {
+      return 1;
   } 
+
   my @features = _greedy_filter($self->output);
 
   my $db = $self->dbobj();
