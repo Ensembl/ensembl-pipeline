@@ -73,6 +73,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_MAX_LOW_COMPLEXITY 
 							      GB_SIMILARITY_MASKING
 							      GB_SIMILARITY_SOFTMASK
+							      GB_SIMILARITY_GENETYPEMASKED
 							      
 							    );
 
@@ -197,9 +198,24 @@ sub write_output {
       $seq = $slice;
     }
     
-    
+    #No similarity genes will be build overlapping the gene type put in this listGB_SIMILARITY_GENETYPEMASKED . If nothing is put, the default will be to take Targetted genewise genes
+    my @genes;
 
-    my @genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+    if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+	foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+	    print STDERR "FETCHING GENE TYPE : $type\n";
+	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
+		push (@genes,$mask_genes);
+	    }
+	}
+    }
+    else {
+	print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
+	@genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+    }
+    
+    
+#    my @genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
     
     DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       
