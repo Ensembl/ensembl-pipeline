@@ -67,8 +67,8 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Root;
 
-use Bio::EnsEMBL::PerlDB::Contig;
-use Bio::EnsEMBL::PerlDB::Clone;
+use Bio::EnsEMBL::RawContig;
+use Bio::EnsEMBL::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use FileHandle;
@@ -307,7 +307,6 @@ sub writeClones {
 
   print STDERR "Writing clones\n";
 
-  my $sic = $self->dbobj->get_StateInfoContainer;
   my @analysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_logic_name('SubmitContig');
 
   if ($#analysis != 0) {
@@ -318,13 +317,13 @@ sub writeClones {
     print STDERR "\nWriting clone ". $clone->id . "\n";
 
     eval {
-      $self->dbobj->write_Clone($clone);
+      $self->dbobj->get_CloneAdaptor->store($clone);
     };
-    if (!$@) {
-      foreach my $contig ($clone->get_all_Contigs) {
-	$sic->store_input_id_class_analysis($contig->id,'contig',$analysis[0]);
-      }
-    } else {
+#    if (!$@) {
+#      foreach my $contig ($clone->get_all_Contigs) {
+#	$sic->store_input_id_class_analysis($contig->id,'contig',$analysis[0]);
+#      }
+    if($@) {
       $self->warn("Couldn't write clone " . $clone->id . " [$@]");
     }
   }
@@ -442,7 +441,7 @@ sub readFile {
     open(CC,"gunzip -c $dir/embl_files/$ccfile |") || $self->throw("Can't unzip file [$ccfile]\n");
   }
   
-  open(IN,"gunzip -c $dir/embl_files/$file   |") || $self>throw("Can't unzip file [$file]\n");
+  open(IN,"gunzip -c $dir/embl_files/$file   |") || $self->throw("Can't unzip file [$file]\n");
   
   my $seqio = new Bio::SeqIO(-fh     => \*IN,
 			     -format => 'fasta');
@@ -561,7 +560,7 @@ sub makeClones {
     if (defined($clones->{$acc}{'seq'})) {
       print "\nProcessing $acc\n\n";
       
-      my $clone     = new Bio::EnsEMBL::PerlDB::Clone;      
+      my $clone     = new Bio::EnsEMBL::Clone;      
       
       $self->clones($clone);
 
@@ -601,20 +600,16 @@ sub makeClones {
 	my $count = 1;
 	print STDERR "\nContigs : " . scalar(@contigs) . "\n";
 	foreach my $contig (@contigs) {
-
 	  my $seqstr    = $seq->subseq($contig->{'start'},$contig->{'end'});
 	  my $offset    = $contig->{'start'};
 	  
-	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
+	  my $newcontig    = new Bio::EnsEMBL::RawContig;
 	  
 	  my $contigid  = "$acc.$ver.$offset." . $contig->{'end'};
 	  
-	  $newcontig->id          ($contigid);
-	  $newcontig->seq         (new Bio::Seq(-id => $id, -seq =>$seqstr));    
+	  $newcontig->name          ($contigid);
+	  $newcontig->seq         ($seqstr);
 	  $newcontig->embl_offset ($offset);
-	  $newcontig->version     (1);
-	  $newcontig->embl_version($ver);
-	  $newcontig->embl_order  ($count);
 	  # $newcontig->chromosome  ($chr);
 
 #	  print (STDERR "\tContig " . $newcontig->id . "\t : " . $newcontig->embl_offset . "\t" . ($newcontig->offset+$newcontig->length-1) . "\n");
@@ -623,17 +618,14 @@ sub makeClones {
 	  $count++;
 	}
       } else {
-	  my $newcontig = new Bio::EnsEMBL::PerlDB::Contig;
+	  my $newcontig = new Bio::EnsEMBL::RawContig;
 
 	  my $contigid  = "$acc.$ver.1." . $seq->length;
 
-	  $newcontig->id          ($contigid);
-	  $newcontig->seq         ($seq);    
+	  $newcontig->name        ($contigid);
+	  $newcontig->seq         ($seq->seq);    
 	  $newcontig->embl_offset (1);
-	  $newcontig->version     ($ver);
-	  $newcontig->embl_version($ver);
 	  # $newcontig->chromosome  ($chr);
-	  $newcontig->embl_order  (1);
 
 #	  print (STDERR "\tContig " .$newcontig->id . "\t : " . $newcontig->embl_offset . "\t" . ($newcontig->offset+$newcontig->length-1) . "\n");
 
@@ -722,8 +714,8 @@ sub mirror_dir {
     Title   :   clones
     Usage   :   @clones = $obj->clones
     Function:   Get/set method for adding a clone and returning all clones
-    Returns :   Bio::EnsEMBL::PerlDB::Clone
-    Args    :   Bio::EnsEMBL::PerlDB::Clone
+    Returns :   Bio::EnsEMBL::Clone
+    Args    :   Bio::EnsEMBL::Clone
 
 =cut
 
