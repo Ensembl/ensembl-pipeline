@@ -62,6 +62,7 @@ my $lower_bound = 0;
 	
 unless( $input_id){     
   print STDERR "Usage: exon_Coverage.pl -input_id <chrname>.<chrstart>-<chrend>\n";
+  print STDERR "                        -lower_bound <lower_bound> (defaults to zero)\n";
   exit(0);
 }
     
@@ -85,7 +86,9 @@ $dna_db->static_golden_path_type($ref_path);
 
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
-					    -dbname=> $dbname1);
+					    -dbname=> $dbname1,
+					    -dnadb => $dna_db,
+					   );
 print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 
 
@@ -111,12 +114,8 @@ my $sgp3 = $dna_db->get_StaticGoldenPathAdaptor;
 my ($vcontig1,$vcontig2);
 
 print STDERR "Fetching region $chr, $chrstart - $chrend\n";
-$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end("chr20",$chrstart,$chrend);
+$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
 $vcontig2 = $sgp2->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
-
-### extra genes
-my $vcontig3 = $sgp3->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
-
 
 # get the genes of type @type1 and @type2 from $vcontig1 and $vcontig2, respectively #
 my (@genes1,@genes2);
@@ -146,26 +145,15 @@ foreach my $type ( @{ $type2 } ){
   print STDERR "with ".scalar(@more_trans)." transcripts\n";
 }
 
-my @extra_genes = $vcontig3->get_Genes_by_Type("ensembl");
-my @extra_trans = ();
-foreach my $gene ( @extra_genes ){
-  push ( @extra_trans, $gene->each_Transcript );
-}
-print STDERR scalar(@extra_genes)." genes found\n";
-print STDERR "with ".scalar(@extra_trans)." transcripts\n";
-push( @genes2, @extra_genes );
 
-
-# get a GeneComparison object 
 # get a GeneComparison object 
 my $gene_comparison = 
   Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(					     
-							      '-annotation_db'    => $db1,
-							      '-prediction_db'    => $db2,
 							      '-annotation_genes' => \@genes1,
 							      '-prediction_genes' => \@genes2,
 							      '-input_id'         => $input_id,
 							     );
+
 
 #########################################################
 
