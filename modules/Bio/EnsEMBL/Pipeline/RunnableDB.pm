@@ -535,4 +535,38 @@ sub input_is_void {
 
 }
 
+
+=head failiing_job_status
+
+    Title   :  failing_job_status
+    Useage  :  $self->failing_job_status('OUT OF MEMORY');
+    Function:  Get/Set a status message to go into the job_status
+               table of the pipeline.  
+    Returns :  String or undef
+               N.B. currently only 40 chars are stored in db
+    Args    :  String
+               N.B. currently only 40 chars are stored in db
+    Caller  :  Bio::EnsEMBL::Pipeline::Job::run_module()
+    Why     :  Because neither the runnable nor the runnabledb have
+               enough information to do $job_adap->set_status($job)
+
+               i.e. no jobID. to get a job from the adaptor.
+
+               Ok it could get it using fetch_by_input_id looping through
+               that list until it find the right one. that gets alot of 
+               useless data from the db.  They probably shouldn\'t be doing
+               that anyway.  So this lets the Job->run_module do it when
+               and if the RunnableDB::xyz->run populates $@ (throws/dies)
+    Example :  See RunnableDB::Finished_Blast::run
+
+=cut
+
+sub failing_job_status{
+    my ($self, $error) = @_;
+    $self->{'_error_status'} = $error if $error;
+    #return ($@ ? $self->{'_error_status'} : undef); # not convinced this was sensible
+    return $self->{'_error_status'};
+}
+
+
 1;
