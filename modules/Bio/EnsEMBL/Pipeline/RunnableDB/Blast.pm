@@ -54,12 +54,14 @@ use vars qw(@ISA);
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
 my %UNGAPPED;
+my %UNMASKED;
 
 foreach my $db (@$DB_CONFIG) {
-  my ($name, $ungapped) = ($db->{'name'}, $db->{'ungapped'});
+  my ($name, $ungapped, $unmasked) = ($db->{'name'}, $db->{'ungapped'}, $db->{min_unmasked});
   
   if($db && $name){
-    $UNGAPPED{$name} = $ungapped if $db && $name;
+    $UNGAPPED{$name} = $ungapped;
+    $UNMASKED{$name} = $unmasked;
   }else{
     my($p, $f, $l) = caller;
     warn("either db ".$db." or name ".$name." isn't defined so can't work $f:$l\n");
@@ -82,13 +84,22 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
-    
-    $self->query($genseq);
+    my $genseq;
+    if(@$PIPELINE_REPEAT_MASKING){
+      my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
+      $self->query($genseq);
+    }else{
+      $self->query($contig);
+    }
   
     my $seq = $self->query->seq;
-
-    if ($seq =~ /[CATG]{3}/) {
+    my $unmasked;
+    if($UNMASKED{$self->analysis->db_file}){
+      $unmasked = 1;
+    } else {
+      $unmasked = 3;
+    }
+    if ($seq =~ /[CATG]{$unmasked}/) {
         $self->input_is_void(0);
     } else {
         $self->input_is_void(1);
@@ -102,7 +113,7 @@ sub fetch_input {
     } else {
       $ungapped = undef;
     }
-
+    
     my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query          => $self->query,
 							   -database       => $self->analysis->db_file,
 							   -program        => $self->analysis->program,
