@@ -153,15 +153,28 @@ sub run{
 
     # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
+
     for my $subseqs (@cuts) {
+
       # store the subslices in 2nd array of arrays
       my ($start1, $end1) = @{$subseqs}[0,1];
       my ($start2, $end2) = @{$subseqs}[2,3];
 
 
-      if ( ($end2-$start2 > $SLAM_MAXLENGTH) || ($end1-$start1 > $SLAM_MAXLENGTH) ) { #are the subslices bigger than maxlength
+      # calculation for allowing bigger slices
+
+      my $diff1 = $end1-$start1;
+      my $diff2 = $end2-$start2;
+
+
+      my $allow_oversize = 50000;
+
+      if (     (($diff1-$SLAM_MAXLENGTH)>$allow_oversize) && (($diff2-$SLAM_MAXLENGTH)>$allow_oversize)) {
+        print "NOT OK. We have too large slices\n";
+
 
         # region is bigger than SLAM_MAXLENGTH ---> we need to re-cut !!!
+
         my $lseq1 = $end2-$start2; my $lseq2 = $end1-$start1;
         my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
         my $subslice2 = ${$self->slices}[1] -> sub_Slice( $start2, $end2 );
@@ -170,8 +183,9 @@ sub run{
 
         my $e1_start = $subslice1->start;    my $e1_end = $subslice1->end;    my $e1_chr = $subslice1->seq_region_name;
         my $e2_start = $subslice2->start;    my $e2_end = $subslice2->end;    my $e2_chr = $subslice2->seq_region_name;
-        print "LOG: region >>slam_max_size.. SKIPPING REGION:\t " ;
+        print "LOG: region >> slam_max_size ( $SLAM_MAXLENGTH bp) .. SKIPPING REGION:\t " ;
         print "$e1_chr-$e1_start-$e1_end---$e2_chr-$e2_start-$e2_end\n" ;
+        print "The region has to be re-calculated\n";
       }else{
         # region fits, so let's get subslices and store them
         my $subslice1 = ${$self->slices}[0] -> sub_Slice( $start1, $end1 );
@@ -184,7 +198,7 @@ sub run{
     push @subslices, $self->slices;
   }
 
-  ##################### SEQUENCE IS SPLITTED IN SUBSICES, NOW RUN ANALYSIS ! ##############################
+##################### SEQUENCE IS SPLITTED IN SUBSICES, NOW RUN ANALYSIS ! ##############################
 
   $alltranscripts{$SLAM_ORG1_NAME} = ();
   $alltranscripts{$SLAM_ORG2_NAME} = ();
@@ -503,6 +517,9 @@ sub fetch_input {
 
 # fetching slices for each org out of specified db
 
+############################################################
+
+
 sub slices{
   my ($self ,$db) = @_;
 
@@ -511,8 +528,8 @@ sub slices{
     my @coords = @{$self->regions};
     for (my $i=0;$i<=1;$i++) {
       my $sa = ${$db}[$i]->get_SliceAdaptor();
-      my ($chr,$start,$end) = splice(@coords, 0,3);
-      my $slice = $sa->fetch_by_region('chromosome' , $chr, $start, $end) ;
+      print "fetching slice $coords[$i]\n";
+      my $slice = $sa->fetch_by_name($coords[$i]);
       push @slices, $slice;
     }
     $self->{_slices}=\@slices;
@@ -525,10 +542,11 @@ sub regions {
   my ($self,$input_id) = @_;
 
   if (defined $input_id) {
-    my @input = split /---/,$input_id; # format chr2-start1-end1---chr2-start2-end2
-    my ($chr1, $start1, $end1) = split/-/, $input[0];
-    my ($chr2, $start2, $end2) = split/-/, $input[1];
-    $self->{_regions}=[$chr1, $start1, $end1, $chr2, $start2, $end2];
+
+    ### NEW FORMAT: chromosome:NCBI35:1:1:245442847:1---chromosome:NCBI35:1:1:245442847:-1
+
+    my @input = split /---/,$input_id;
+   $self->{_regions}=\@input;
   }
   return $self->{_regions};
 }

@@ -192,7 +192,7 @@ sub new {
 
 sub DESTROY {
   my $self = shift;
-#     $self->deletefiles;
+     $self->deletefiles;
 }
 
 =pod
