@@ -98,7 +98,39 @@ sub new {
 
     my $self = $class->SUPER::new(@args);    
 
+    $self->{'_genomic_seq'} = undef;
+    $self->{'_input_features'} = [];
+    $self->{'_forward_features'} = [];
+    $self->{'_reverse_features'} = [];
+    $self->{'_output_features'} = [];
+    $self->{'_pfam_ids') = [];
+    $self->{'_hmmfetch'} = undef;
+    $self->{'_uniquepfamids'} = [];
+    $self->{'_hmmdb'} = undef;
+    print "args = @args\n";
+    my ($genomic, $features, $hmmfetch, $hmmdb) = $self->_rearrange([qw(GENOMIC
+									FEATURES
+									HMMFETCH
+									HMMDB)], @args);
+    $self->throw("No genomic sequence input") unless defined($genomic);
+    $self->genomic_sequence($genomic);
+    $self->add_input_features($features);
     
+    if ($hmmfetch){
+	$self->hmmfetch($hmmfetch);
+    } else {
+	$self->hmmfetch('hmmfetch');
+    }
+    
+    if($hmmdb){
+	$self->hmmdb($hmmdb);
+    } else {
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensemb/Pfam');
+	
+    }
+    
+    $self->sort_input_features();
+
     return $self; # success - we hope!
 }
 
@@ -108,60 +140,74 @@ sub new {
 #################
 #GET/SET METHODS#
 #################
+=head2 genomic_sequence
 
-=head2 clone
-
-    Title   :   clone
-    Usage   :    $HalfwiseHMM->clone($seq);
-    Function:   sets the sequence the halfwisehmm object will run on
-  and checks it is a Bio::Seq
-    Returns :   a seq
-    Args    :   A Bio::Seq object 
-                
+    Title   :   genomic_sequence
+    Usage   :   $self->genomic_sequence($seq)
+    Function:   Get/set method for genomic sequence
+    Returns :   Bio::Seq object
+    Args    :   Bio::Seq object
 
 =cut
 
-sub clone {
-    my ($self, $seq) = @_;
-    if ($seq)
-    {
-        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
-        {
-            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
-        }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
-        $self->results($self->filename.".hlf");
-	$self->hmmfilename($self->filename."dbhmm.$$");
-	$self->errorfile($self->filename."err.$$");
+sub genomic_sequence {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        #need to check if passed sequence is Bio::Seq object
+        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+        $self->{'_genomic_sequence'} = $value;
     }
-    return $self->{'_clone'};
+    return $self->{'_genomic_sequence'};
 }
 
 
+sub add_input_features{
+    
+    my ($self, $features) = @_;
+    
+    if (ref($features) eq "ARRAY") {
+      push(@{$self->{'_input_features'}},@$ids);
+    } else {
+      $self->throw("[$ids] is not an array ref.");
+    }
+      
 
 
-=head2 options
+}
 
- Title    : options
- Usage    : $self->options($options);
- Function : gets and sets the options which may be passed to genewise
- Returns  : the options
- Args     : the options
+sub all_input_features{
 
-=cut
+  my ($self) = @_;
 
-sub options {
-  my ($self, $args) = @_;
+  return @{$self->{'_input_features'}};
+
+}
+
+
+sub sort_input_features{
+
+  my ($self) = @_;
+
+  @features = $self->all_input_features();
+
   
-  if (defined($args)) {
-    $self->{'_options'} = $args ;
-  }
-  return $self->{'_options'};
+
 }
 
+sub forward_features{
+}
 
+sub reverse_features{
 
+  my ($self, $f) = @_;
+ 
+  if (defined($f))
+    {
+	push(@{$self->{'_reverse_features'}}, $f);
+    }
+
+  return @{$self->{'_reverse_features'}};
+}
 
 =head2 hmmfetch 
 
