@@ -131,7 +131,7 @@ my $prefix='COB';
                                   #                                          'index'      => '/full/path/to/dbEST'
                                   #                                         },
                                         ],
-	     GB_EST_GENETYPE => 'est2genome'
+	     GB_EST_GENETYPE => 'est2genome',
 	     # similairity genewise specific parameters
 	     GB_SIMILARITY_DATABASES => [
 					 # fill in one complete hash for each database from which blast 
