@@ -60,7 +60,7 @@ sub get_seq_ids{
   while(<$fh>){
    chomp;
    #I	47490	107680	3	F	AC024796.1	1	60191	+
-   #print;
+   ##print;
    #print "\n";
    my ($status, $contig) =
     (split)[4, 5];
@@ -230,7 +230,7 @@ sub parse_gff{
     push(@genes, $gene);
   }
   close(FH);
-  #print "PARSE_GFF ".@genes." genes\n";
+  ##print "PARSE_GFF ".@genes." genes\n";
   return \@genes;
 }
 
@@ -707,7 +707,7 @@ sub write_genes{
     }
   }
   my %non_transforming;
-  
+  my %stored;
  GENE: foreach my $gene(@$genes){
     eval{
       $gene->transform;
@@ -728,14 +728,29 @@ sub write_genes{
     #&display_exons(@{$gene->get_all_Exons});
     if($stable_id_check){
       if($stable_ids{$gene->stable_id}){
-	print STDERR $gene->stable_id." already exists\n";
+	#print STDERR $gene->stable_id." already exists\n";
 	my $id = $gene->stable_id;
 	$id .= '.pseudo';
 	$gene->stable_id($id);
+	foreach my $transcript(@{$gene->get_all_Transcripts}){
+	  my $trans_id = $transcript->stable_id;
+	  $trans_id .= '.pseudo';
+	  $transcript->stable_id($trans_id);
+	  foreach my $e(@{$transcript->get_all_Exons}){
+	    my $id = $e->stable_id;
+	    $id .= '.pseudo';
+	    $e->stable_id($id);
+	  }
+	}
       }
+    }
+    if($stored{$gene->stable_id}){
+      print STDERR "we have stored ".$gene->stable_id." already\n";
+      next GENE;
     }
     my $gene_adaptor = $db->get_GeneAdaptor;
     eval{
+      $stored{$gene->stable_id} = 1;
       $gene_adaptor->store($gene);
     };
     if($@){
@@ -859,7 +874,7 @@ sub insert_agp_line{
   my ($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type, $db) = @_;
 
   if(!$contig){
-    print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
+    #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
     die "contig id must be defined for this to work\n";
   }
   my $sql = "insert into assembly(chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";

@@ -17,6 +17,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -user => $WB_DBUSER,
 					    -dbname => $WB_DBNAME,
 					    -pass  => $WB_DBPASS,
+	                                    -port  => $WB_DBPORT,
 					   );
 
 

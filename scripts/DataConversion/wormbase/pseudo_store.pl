@@ -12,6 +12,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -user => $WB_DBUSER,
 					    -dbname => $WB_DBNAME,
 					    -pass  => $WB_DBPASS,
+					    -port => $WB_DBPORT,
 					   );
 my $analysis_adaptor = $db->get_AnalysisAdaptor;
 my $analysis = $analysis_adaptor->fetch_by_logic_name($WB_PSEUDO_LOGIC_NAME);

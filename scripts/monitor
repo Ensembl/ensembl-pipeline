@@ -27,6 +27,7 @@ my $ft_ana_id       = undef; # shows clones with no hits in:with feature_table:a
 my $assembly_type   = undef; # shows unfinished input_ids & analyses in the assembly of type 
 my $input_id        = undef; # shows unfinished analyses for input_id
 my $lock            = 0;
+my $no_submit = 0;
 
 &GetOptions( 
 	    'dbhost:s'          => \$host,
@@ -45,6 +46,7 @@ my $lock            = 0;
 	    'nohits=s'          => \$ft_ana_id,
 	    'assembly=s'        => \$assembly_type,
 	    'input_id=s'        => \$input_id,
+            'no_submit!' => \$no_submit,
 	    'h|help'				=> \$help,
 	    'lock'              => \$lock
 	   ) or useage();
@@ -80,7 +82,7 @@ my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 $monitor->lock_status($lock);
 $monitor->show_current_status                 if ($current);
 $monitor->show_current_status_summary         if ($current_summary);
-$monitor->show_finished_summary               if ($finished);
+$monitor->show_finished_summary($no_submit)   if ($finished);
 $monitor->show_analysisprocess                if ($analysis);
 $monitor->show_Rules                          if ($rules);
 $monitor->show_Rules_and_Conditions           if ($conditions);

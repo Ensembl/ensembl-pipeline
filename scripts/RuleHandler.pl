@@ -91,12 +91,14 @@ if ($help) {
     exec('perldoc', $0);
 }
 
+print STDERR $host." ".$dbname." ".$pass ." ".$dbuser." ".$port."\n";
+
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
-  ( -host   => $host,
-    -dbname => $dbname,
-    -user   => $dbuser,
-    -pass   => $pass,
-    -port   => $port
+( -host   => $host,
+  -dbname => $dbname,
+  -user   => $dbuser,
+  -pass   => $pass,
+  -port   => $port
   );
 
 my $anaAdaptor     = $db->get_AnalysisAdaptor();

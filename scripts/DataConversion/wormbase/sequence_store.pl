@@ -17,6 +17,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -user => $WB_DBUSER,
 					    -dbname => $WB_DBNAME,
 					    -pass  => $WB_DBPASS,
+					    -port => $WB_DBPORT,
 					   );
 
 
@@ -87,7 +88,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
       die("couldn't store ".$clone->id." ".$clone->embl_id." $@");
     }
     $contig_id{$id} = $contig->dbID;
-    if(!$WB_RAW_CONTIGS){
+    if(!$WB_RAW_COMPUTES){
       my $sql = "insert into input_id_analysis(input_id, analysis_id,  created) values('$contig_id', $WB_SUBMIT_CONTIG_ID, now())";
       my $sth = $db->prepare($sql);
       $sth->execute($contig_id, $WB_SUBMIT_CONTIG_ID);
