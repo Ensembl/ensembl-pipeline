@@ -220,6 +220,8 @@ sub run {
     #parse output of repeat masker 
     $self->parse_results();
     $self->deletefiles();
+
+    return 1;
 }
 
 =head2 parsefile
@@ -247,7 +249,7 @@ sub run_repeatmasker {
     if (defined($self->filename)) {   
        $filename = $self->filename;
     }
-    print "cmd: ", $self->repeatmasker.' '.$arguments.' '.$filename, "\n";
+    print STDERR "cmd: ", $self->repeatmasker.' '.$arguments.' '.$filename, "\n";
     $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
     if (system ($self->repeatmasker.' '.$arguments.' '.$filename)); 
 
@@ -272,23 +274,32 @@ sub parse_results {
         $filehandle = $self->results;
     } 
     
-    
-    #check if no repeats found
-    if (<$filehandle> =~ /no repetitive sequences detected/)
-    {
-        print STDERR "RepeatMasker didn't find any repetitive sequences\n";
-        close $filehandle;
-        return;
-    }
-    #extract values
-    
     while (<$filehandle>)
     {  
+        if (/no repetitive sequences detected/) {
+            print STDERR "RepeatMasker didn't find any repetitive sequences\n";
+            close $filehandle;
+            return;
+        }
         if (/\d+/) #ignore introductory lines
         {
-            my @element = split;
+            my @columns = split;
+	    my $have_cls;   # flag for the presence of the family/class column
+
+	    if (@columns == 15) {
+		$have_cls = 1;
+	    }
+	    elsif (@columns == 14) {
+		$have_cls = 0;
+	    }
+	    else {
+		print STDERR "Unexpected number of fields in output:\n$_";
+		next;
+	    }
+
             # ignore features with negatives 
-            next if ($element[11-13] =~ /-/); 
+            # next if ($columns[11-13] =~ /-/); 
+
             my (%feat1, %feat2);
 
 	    my ($score, $query_name, $query_start, $query_end, $strand,
@@ -296,15 +307,22 @@ sub parse_results {
 
             (
 	        $score, $query_name, $query_start, $query_end, $strand,
-	        $repeat_name, $repeat_class
-	    ) = (split)[0, 4, 5, 6, 8, 9, 10];
+	        $repeat_name
+	    ) = @columns[0, 4, 5, 6, 8, 9];
+
+	    if ($have_cls) {
+		$repeat_class = $columns[10];
+	    }
+	    else {
+		$repeat_class = 'UNK';
+	    }
 
 	    if ($strand eq '+') {
-	        ($hit_start, $hit_end) = (split)[11, 12];
+	        ($hit_start, $hit_end) = @columns[10 + $have_cls, 11 + $have_cls];
 		$strand = 1;
 	    }
             elsif ($strand eq 'C') {
-	        ($hit_start, $hit_end) = (split)[13, 12];
+	        ($hit_start, $hit_end) = @columns[12 + $have_cls, 11 + $have_cls];
 		$strand = -1;
 	    }
 
