@@ -307,7 +307,8 @@ sub run {
     }
     
     my @seq         = $self->get_Sequences(@mrnafeatures);
-    my $blastdb     = $self->make_blast_db(@seq);
+    my @valid_seq   = $self->validate_sequence(@seq);
+    my $blastdb     = $self->make_blast_db(@valid_seq);
     my @newfeatures = $self->run_blast($genseq,$blastdb);
 
     print STDERR "Number of features post blast is " . scalar(@newfeatures) . "\n";
@@ -449,6 +450,29 @@ sub check_disk_space {
     } else {
 	return 0;
     }
+}
+
+sub validate_sequence {
+    my ($self, @seq) = @_;
+    my @validated;
+    foreach my $seq (@seq)
+    {
+        print STDERR ("mrna feature $seq is not a Bio::PrimarySeq\n") 
+                                    unless ($seq->isa("Bio::PrimarySeq") ||
+                                            $seq->isa("Bio::Seq"));
+        if ($seq->seq !~ /[^acgtn]/i)
+        {
+            push (@validated, $seq);
+        }
+        else 
+        {
+            $self->warn($seq->display_id().
+                " contains odd nucleotide codes (type returns "
+                .$seq->moltype().")\n");
+        }
+    } 
+    return @validated;  
+
 }
 
 sub run_blast {
