@@ -81,7 +81,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);    
   
-  $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
+  $self->{'_flist'}     = [];    # an array of Bio::EnsEMBL::SimpleFeatures
   $self->{'_sequence'}  = undef; # location of Bio::Seq object
   $self->{'_cpg'}       = undef; # location of cpg executable
   $self->{'_workdir'}   = undef; # location of temp directory
