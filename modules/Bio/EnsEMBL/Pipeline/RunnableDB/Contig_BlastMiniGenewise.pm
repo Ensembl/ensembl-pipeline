@@ -113,14 +113,6 @@ sub new {
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
 
-=head2 output
-
-    Title   :   output
-    Usage   :   $self->output()
-    Function:   
-    Returns :   Array of Bio::EnsEMBL::FeaturePair
-    Args    :   None
-
 =head2 vc
 
  Title   : vc
@@ -130,22 +122,6 @@ sub new {
  Args    : newvalue (optional)
 
 =head1 Contig_BlastMiniGenewise implemented methods
-
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
-
-sub fetch_output {
-    my($self,$output) = @_;
-    
-}
 
 =head2 write_output
 
@@ -373,15 +349,7 @@ sub convert_output {
     my @results = $runnable->output;
     my @genes = $self->make_genes($count,$time,$genetype, \@results);
 
-    # already using rawcontig coords - no need to remap
-    # my @remapped = $self->remap_genes($runnable,$genetype, @genes);
-
-    # store the genes
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    }
-    
-    push(@{$self->{_output}},@genes);
+    $self->output(@genes);
   }
 }
 
@@ -492,71 +460,32 @@ sub make_genes {
   return @genes;
 }
 
-sub remap_genes {
-  my ($self,$runnable,$genetype,@genes) = @_;
-  my $contig = $self->vc;
+=head2 output
 
-  my @newf;
-  my $trancount=1;
-  foreach my $gene (@genes) {
-    eval {
-      my $newgene = $contig->convert_Gene_to_raw_contig($gene);
-      $newgene->type($genetype);
-      foreach my $tran ($newgene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
-	  print STDERR $exon->contig_id . "\tgenewise\texon\t" . $exon->start . "\t" . $exon->end . "\t100\t" . $exon->phase . "\n";
-	  foreach my $sf($exon->each_Supporting_Feature) {
-	    print STDERR "sub_align: " . 
-	    $sf->seqname . "\t" .
-	    $sf->start . "\t" .
-	    $sf->end . "\t" .
-	    $sf->strand . "\t" .
-	    $sf->hseqname . "\t" .
-	    $sf->hstart . "\t" .
-	    $sf->hend . "\n";
-	  }
-	}
-      }
-      push(@newf,$newgene);
-
-    };
-    if ($@) {
+ Title   : output
+ Usage   :
+ Function:
+ Example :
+ Returns : 
+ Args    :
 
 
-      print STDERR "contig: $contig\n";
-      foreach my $tran ($gene->each_Transcript) {
-	foreach my $exon($tran->each_Exon) {
-	  foreach my $sf($exon->each_Supporting_Feature) {
-	    print STDERR "hid: " . $sf->hseqname . "\n";
-	  }
-	}
-      }
+=cut
 
+sub output{
+   my ($self,@genes) = @_;
 
-      print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
-    }
+   if (!defined($self->{'_output'})) {
+     $self->{'_output'} = [];
+   }
     
+   if(defined @genes){
+     push(@{$self->{'_output'}},@genes);
+   }
 
-  }
-
-  return @newf;
-
+   return @{$self->{'_output'}};
 }
 
-
-sub check_splice {
-    my ($self,$f1,$f2) = @_;
-    
-    my $splice1 = substr($self->{_genseq}->seq,$f1->end,2);
-    my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
-    
-    if (abs($f2->start - $f1->end) > 50) {
-	print ("Splices are " . $f1->hseqname . " [" . 
-	                        $splice1      . "][" . 
-	                        $splice2      . "] " . 
-	       ($f2->start - $f1->end)        . "\n");
-    }
-}
 
 1;
 
