@@ -114,69 +114,111 @@ if($submission_id_not){
 
 my $hostname = [ split(/\./, hostname()) ];
 $host = shift(@$hostname);
-JOB:foreach my $job(@jobs) {
 
-  my $job_id = $job->dbID;
-
-  $job->execution_host($host);
-
-  eval{
-    $job_adaptor->update($job);
-  };
-
-  if($@){
-    print STDERR "Job $job_id failed: [$@]";
-    if($batch_q_object->can('copy_output')){
-      $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
-    }else{
-      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
-        " the copy_output method\n";
-    }
-    #if($batch_q_object->can('delete_output')){
-    #  $batch_q_object->delete_output() unless(!$cleanup);
-    #}
-  }
-  if( !$job) {
-    print STDERR ( "Couldnt recreate job $job_id\n" );
-    next;
-  }
-  print STDERR "Running job $job_id\n";
-  print STDERR "Module is " . $job->analysis->module . "\n";
-  print STDERR "Input id is " . $job->input_id . "\n";
-  print STDERR "Analysis is ".$job->analysis->logic_name."\n";
-  print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
-
-  eval {
-    $job->run_module;
-  };
-  $pants = $@;
-  print STDERR "have batchqueue module ".$batch_q_object."\n";
-  if ($pants) {
-    print STDERR "Job $job_id failed: [$pants]";
-    if($batch_q_object->can('copy_output')){
-      $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
-    }else{
-      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
-        " the copy_output method\n";
-    }
-    next JOB;
-  }
-  if(!$cleanup){
-    if($batch_q_object->can('copy_output')){
-      $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
-    }else{
-      print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
-        " the copy_output method\n";
-    }
-  }
-  if ($job->current_status->status eq "SUCCESSFUL"){
-    $job->adaptor->remove( $job );
-  }
-  print STDERR "Finished job $job_id\n";
-}
 
 #if($batch_q_object->can('delete_output')){
 #  $batch_q_object->delete_output();
 #}
 
 
+if($cleanup){
+  &run_jobs_with_selfcopy(\@jobs, $host);
+}else{
+  &run_jobs_with_lsfcopy(\@jobs, $host);
+}
+
+sub run_jobs_with_selfcopy{
+  my ($jobs, $host) = @_;
+ 
+ JOB:foreach my $job(@$jobs) {
+    
+    my $job_id = $job->dbID;
+    
+    $job->execution_host($host);
+    
+    eval{
+      $job_adaptor->update($job);
+    };
+    
+    if($@){
+      print STDERR "Job $job_id failed: [$@]";
+      if($batch_q_object->can('copy_output')){
+        $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
+      }else{
+        print STDERR "the batch_q_object ".$queue_manager.
+          " needs to implement  the copy_output method\n";
+      }
+      #if($batch_q_object->can('delete_output')){
+      #  $batch_q_object->delete_output() unless(!$cleanup);
+      #}
+    }
+    if( !$job) {
+      print STDERR ( "Couldnt recreate job $job_id\n" );
+      next;
+    }
+    print STDERR "Running job $job_id\n";
+    print STDERR "Module is " . $job->analysis->module . "\n";
+    print STDERR "Input id is " . $job->input_id . "\n";
+    print STDERR "Analysis is ".$job->analysis->logic_name."\n";
+    print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
+    
+    eval {
+      $job->run_module;
+    };
+    $pants = $@;
+    print STDERR "have batchqueue module ".$batch_q_object."\n";
+    if ($pants) {
+      print STDERR "Job $job_id failed: [$pants]";
+      if($batch_q_object->can('copy_output')){
+        $batch_q_object->copy_output($job->stderr_file, $job->stdout_file);
+      }else{
+        print STDERR "the batch_q_object ".$queue_manager." needs to implement ".
+          " the copy_output method\n";
+      }
+      next JOB;
+    }
+    if ($job->current_status->status eq "SUCCESSFUL"){
+      $job->adaptor->remove( $job );
+    }
+    print STDERR "Finished job $job_id\n";
+  }
+}
+
+sub run_jobs_with_lsfcopy{
+  my ($jobs, $host) = @_;
+
+ JOB:foreach my $job(@$jobs) {
+    
+    my $job_id = $job->dbID;
+    
+    $job->execution_host($host);
+    
+    eval{
+      $job_adaptor->update($job);
+    };
+    if($@){
+      print STDERR "Job update ".$job->dbID." failed: [$@]";  
+    }
+    print STDERR "Running job $job_id\n";
+    print STDERR "Module is " . $job->analysis->module . "\n";
+    print STDERR "Input id is " . $job->input_id . "\n";
+    print STDERR "Analysis is ".$job->analysis->logic_name."\n";
+    print STDERR "Files are " . $job->stdout_file . " " .
+      $job->stderr_file . "\n";
+    
+    eval {
+      $job->run_module;
+    };
+    $pants = $@;
+    
+    if ($pants) {
+      print STDERR "Job $job_id failed: [$pants]";
+    }
+    
+    print STDERR "Finished job $job_id\n";
+    if ($job->current_status->status eq "SUCCESSFUL"){
+      $job->adaptor->remove( $job );
+    }
+  }
+  
+}

@@ -316,7 +316,9 @@ sub flush_runs {
        -RESOURCE   => $queue->{'resource'}
       );
     my $cmd;
-  
+    if(!$self->cleanup){
+      $batch_job->stderr_file($lastjob->stderr_file);
+    }
     
 
     # check if the password has been defined, and write the
@@ -474,7 +476,7 @@ sub run_module {
     $perl_path = $runnable_db_path."/".$module;
   }
   print STDERR "have perlpath ".$perl_path."\n";
-  STATUS: 
+ STATUS: 
   { 
     eval {
       require $perl_path.".pm";
@@ -483,31 +485,12 @@ sub run_module {
                               -input_id => $self->input_id,
                               -db => $self->adaptor->db );
     };
-    # "SUBMITTED"
-    # eval {
-    #	  if( $module =~ /::/ ) {
-    #      $module =~ s/::/\//g;
-    #      require "${module}.pm";
-    #      $module =~ s/\//::/g;
-    
-    #      $rdb = "${module}"->new
-    #        ( -analysis => $self->analysis,
-    #          -input_id => $self->input_id,
-    #          -db => $self->adaptor->db );
-    #    } else {
-    #      require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
-    #      $module =~ s/\//::/g;
-    #      $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-    #        ( -analysis => $self->analysis,
-    #          -input_id => $self->input_id,
-    #          -db => $self->adaptor->db );
-    #	  }
-    #  };
       
     if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
-      $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
+      $self->throw( "Problems creating runnable $module for " . 
+                    $self->input_id . " [$err]\n");
     }
     
     # "READING"
@@ -518,76 +501,82 @@ sub run_module {
     if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "READING: Lost the will to live Error\n");
-      $self->throw( "Problems with $module fetching input for " . $self->input_id . " [$err]\n");
+      $self->throw( "Problems with $module fetching input for " . 
+                    $self->input_id . " [$err]\n");
     }
+    
+    if ($rdb->input_is_void) {
+      $self->set_status( "VOID" );
+    }
+    else {
+      # "RUNNING"
       
-      if ($rdb->input_is_void) {
-	  $self->set_status( "VOID" );
+      eval {
+        $self->set_status( "RUNNING" );
+        $rdb->db->disconnect_when_inactive(1); 
+        $rdb->run;
+        $rdb->db->disconnect_when_inactive(0); 
+      };
+      
+      if ($err = $@) {
+        if(my $err_state = $rdb->failing_job_status){
+          $self->set_status( $err_state );
+        }else{
+          $self->set_status( "FAILED" ); # default to just failed these jobs get retried
+        }
+        print (STDERR "RUNNING: Lost the will to live Error\n");
+        $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
       }
-      else {
-	  # "RUNNING"
-	  eval {
-	      $self->set_status( "RUNNING" );
-	      $rdb->run;
-	  };
-	  if ($err = $@) {
-      if(my $err_state = $rdb->failing_job_status){
-        $self->set_status( $err_state );
-      }else{
-        $self->set_status( "FAILED" ); # default to just failed these jobs get retried
-      }
-      print (STDERR "RUNNING: Lost the will to live Error\n");
-      $self->throw("Problems running $module for " . $self->input_id . " [$err]\n");
-	  }
-	  
-	  # "WRITING"
-	  eval {
-	      $self->set_status( "WRITING" );
-	      $rdb->write_output;
-	      # -------------------------------------------------------------------
+      
+      # "WRITING"
+      eval {
+        
+        $self->set_status( "WRITING" );
+        $rdb->write_output;
 	      if($rdb->can('db_version_searched')){
-		  my $new_db_version = $rdb->db_version_searched();
-		  my $analysis = $self->analysis();
-		  my $old_db_version = $analysis->db_version();
-		  $analysis->db_version($new_db_version);
-		  # where is the analysisAdaptor??
-		  # $self->adaptor->get_AnalysisAdaptor->store($analysis);# if $new_db_version gt $old_db_version;
+          my $new_db_version = $rdb->db_version_searched();
+          my $analysis = $self->analysis();
+          my $old_db_version = $analysis->db_version();
+          $analysis->db_version($new_db_version);
+          # where is the analysisAdaptor??
+          # $self->adaptor->get_AnalysisAdaptor->store($analysis);
+          # if $new_db_version gt $old_db_version;
 	      } else {
-		  $SAVE_RUNTIME_INFO = 0;
+          $SAVE_RUNTIME_INFO = 0;
 	      }
-	      # -------------------------------------------------------------------
 	      $self->set_status( "SUCCESSFUL" );
-	  }; 
-	  if ($err = $@) {
+      }; 
+      if ($err = $@) {
 	      $self->set_status( "FAILED" );
 	      print (STDERR "WRITING: Lost the will to live Error\n");
 	      $self->throw("Problems for $module writing output for " . $self->input_id . " [$err]" );
-	  }
       }
-      
+    }
+    
   }    
   
   # update job in StateInfoContainer
   if ($autoupdate) {
-	eval {
+    eval {
 	    my $sic = $self->adaptor->db->get_StateInfoContainer;
 	    # -------------------------------------------------------------
 	    $sic->store_input_id_analysis(
-					  $self->input_id,
-					  $self->analysis,
-					  $self->execution_host,
-					  $SAVE_RUNTIME_INFO
-					  );
+                                    $self->input_id,
+                                    $self->analysis,
+                                    $self->execution_host,
+                                    $SAVE_RUNTIME_INFO
+                                   );
 	    # -------------------------------------------------------------
-	};
-	if ($err = $@) {
-	    print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
-	    $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
-	}
-	else {
-	    print STDERR "Updated successful job ".$self->dbID."\n";
-	}
+    };
+    if ($err = $@) {
+	    print STDERR "Error updating successful job ".$self->dbID .
+        "[$err]\n";
+	    $self->throw("Problems for updating sucessful job for " . 
+                   $self->input_id . " [$err]" );
+    } else {
+      print STDERR "Updated successful job ".$self->dbID."\n";
     }
+  }
 }
 
 
@@ -607,7 +596,7 @@ sub set_status {
   $self->throw("No status input" ) unless defined($arg);
   
   
-  if (!(defined($self->adaptor))) {
+  if (!$self->adaptor) {
     $self->warn("No database connection.  Can't set status to $arg");
     return;
   }
