@@ -232,7 +232,6 @@ sub fetch_input {
 	}
     
     	my @ids = keys %idhash;
-	$bioperldb='nr_parsed';
 	$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
 	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
