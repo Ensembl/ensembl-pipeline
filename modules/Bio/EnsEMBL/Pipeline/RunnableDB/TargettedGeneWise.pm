@@ -328,9 +328,14 @@ sub convert_output {
 	    $exon->end  ($subf->end);
 	    $exon->strand($subf->strand);
 	    
-	    # This is dummy phase
-	    $exon->phase(0);
+
+	    $exon->phase($subf->feature1->{_phase});
+	    $exon->attach_seq($self->vc->primary_seq);
+	    $exon->add_Supporting_Feature($subf);
+
 	    push(@exons,$exon);
+
+
 
 	    $excount++;
 	}
@@ -340,6 +345,7 @@ sub convert_output {
 	} else {
 	    @exons = sort {$a->start <=> $b->start} @exons;
 	}
+
 
 	foreach my $exon (@exons) {
 	    $tran->add_Exon($exon);
