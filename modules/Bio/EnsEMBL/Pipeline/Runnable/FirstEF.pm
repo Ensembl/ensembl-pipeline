@@ -48,13 +48,13 @@ sub new {
   
   my( $query_seq,
       $db,
-      $rm_seq,
+      $repeatmask,
       $analysis,
       $firstef_dir,
       $param_dir,
       $workdir) = $self->_rearrange([qw(QUERY
 					DB
-					REPEATMASKED_SEQ
+					REPEATMASK
 					ANALYSIS
 					FIRSTEF_DIR
 					PARAM_DIR
@@ -63,12 +63,16 @@ sub new {
 
   $self->_query_seq($query_seq)     if $query_seq;
   $self->_db($db)                   if $db;
-#  $self->_repeatmasked_seq($rm_seq) if $rm_seq;
   $self->_firstef_dir($firstef_dir) if $firstef_dir;
   $self->_param_dir($param_dir)     if $param_dir;
   $self->workdir($workdir)          if $workdir;
   $self->_analysis($analysis)       if $analysis;
 
+  if (defined $repeatmask){
+    $self->_repeatmask($repeatmask);
+  } else {
+    $self->_repeatmask(1);
+  }
 
   return $self
 }
@@ -106,23 +110,17 @@ sub _query_seq {
   return $self->{_query_seq}
 }
 
-#sub _repeatmasked_seq {
-#  my $self = shift;
-  
-#  if (@_) {
-   
-#    $self->{_repeatmasked_seq} = shift;
+sub _repeatmask {
+  my $self = shift;
+ 
+  if (@_) {
+    $self->{_repeatmask} = shift;
 
-#    return unless $self->{_repeatmasked_seq}; # Allows us to set to undef.
-    
-#    $self->throw("Repeatmasked Input isnt a Bio::SeqI or Bio::PrimarySeqI")
-#      unless ($self->{_repeatmasked_seq}->isa("Bio::PrimarySeqI") || 
-#	      $self->{_repeatmasked_seq}->isa("Bio::SeqI"));
-    
-#  }
-  
-#  return $self->{_repeatmasked_seq}
-#}
+    return unless $self->{_repeatmask}; # Allows us to set to undef.
+  }
+
+  return $self->{_repeatmask}
+}
 
 sub _db {
   my $self = shift;
@@ -157,8 +155,12 @@ sub _write_seqs_for_firstef {
 				  -format => 'fasta');
 
      # NOTE, this little backwater is where the repeatmasked 
-     # sequence is plonked in.
-  $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
+     # sequence is plonked in, or not.
+  if ($self->_repeatmask) {
+    $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
+  } else {
+    $seqio_out->write_seq($self->_query_seq
+  }
 
   $self->_seqfile($seqfile);
 
