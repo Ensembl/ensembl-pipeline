@@ -150,7 +150,7 @@ sub fetch_input{
   # filter cdnas
   my $newcdna = $self->_filter_cdnas(\@cdna);
   $self->cdna_genes($newcdna);
-  print STDERR "got " . scalar(@{$self->cdna_genes}) . " cdnas after filtering\n";
+  print STDERR "got " . scalar($self->cdna_genes) . " cdnas after filtering\n";
   $self->genewise_db->disconnect_when_inactive(1);
   $self->cdna_db->disconnect_when_inactive(1);
   $self->blessed_db->disconnect_when_inactive(1);
@@ -176,7 +176,7 @@ sub run_merging{
 
   # merge exons with frameshifts into a big exon
   my @merged_genes = $self->_merge_genes($genesref);
-  print STDERR "got " . scalar(@merged_genes) . " merged genes\n";  
+  print STDERR "got " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n";  
 
   # first of all, sort genewises by exonic length and genomic length  
   @merged_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
@@ -223,7 +223,7 @@ sub run_merging{
     if(!@matching_cdnas){
       # store non matched genewise
       #print STDERR "no matching cDNA for " . $gw->dbID ."\n";
-      $self->unmatched_genewise_genes($cds);
+      $self->unmatched_genes($cds);
       next CDS;
   }
 
@@ -383,6 +383,8 @@ sub write_output {
   # write genes in the database: GB_COMB_DBNAME@GB_COMB_DBHOST
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
 
+print STDERR "Have " . scalar ($self->output) . "genes to write\n";
+
  GENE:
   foreach my $gene ($self->output) {	
     if(!$gene->analysis ||
@@ -397,7 +399,7 @@ sub write_output {
       #      }
     };
     if( $@ ) {
-      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+      print STDERR "UNABLE TO WRITE GENE " . $gene->dbID. "of type " . $gene->type  . "\n\n$@\n\nSkipping this gene\n";
       #      foreach my $t ( @{$gene->get_all_Transcripts} ){
       #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
       #      }
@@ -1932,7 +1934,7 @@ sub gw_genes {
     push(@{$self->{'_gw_genes'}},@{$genes});
   }
 
-  return @{$self->{'_gw_genes'}};
+  return $self->{'_gw_genes'};
 }
 
 
@@ -2006,7 +2008,7 @@ sub combined_genes {
     push(@{$self->{'_combined_genes'}},@{$genes});
   }
 
-  return @{$self->{'_combined_genes'}};
+  return $self->{'_combined_genes'};
 }
 
 # Function: get/set for unmatched gene array
