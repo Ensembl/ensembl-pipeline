@@ -79,6 +79,10 @@ use Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Blessed   qw (
+							       GB_BLESSED_GENETYPES
+							      );
+
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted   qw (
 							       GB_TARGETTED_GW_GENETYPE
 							      );
@@ -128,12 +132,14 @@ sub new {
     $self->throw("Must input a slice to GeneBuilder") unless defined($slice);
     $self->{_final_genes} = [];
     $self->{_gene_types}  = [];
-        
+
     $self->query($slice);
     $self->gene_types($GB_COMBINED_GENETYPE);
     $self->gene_types($GB_TARGETTED_GW_GENETYPE);
     $self->gene_types($GB_SIMILARITY_GENETYPE);
-
+    foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+      $self->gene_types($bgt->{'type'});
+    }
 
     unless ( $input_id =~ /$GB_INPUTID_REGEX/ ){
       $self->throw("format of the input is not defined in Config::GeneBuild::General::GB_INPUTID_REGEX = $GB_INPUTID_REGEX");
@@ -181,10 +187,10 @@ sub build_Genes{
   
   # get all genes of type defined in gene_types() on this slice
   $self->get_Genes;
-  print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n";
+  print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
   
   #test
-  #foreach my $t ( $self->genewise_combined_Transcripts ){
+  #foreach my $t ( $self->combined_Transcripts ){
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
   #}
 
@@ -200,7 +206,7 @@ sub build_Genes{
   }
   
   my @supported_predictions;
-  my @annotations = $self->genewise_combined_Transcripts;
+  my @annotations = $self->combined_Transcripts;
   
   if ($GB_USE_ABINITIO ){
     # process PredictionTranscripts using the features and the annotations:
@@ -282,17 +288,26 @@ sub build_Genes{
 sub _select_best_transcripts{
   my ( $self, @genes ) = @_;
   my @selected_transcripts;
-  
+
+
+  # make sure we don't discard blessed transcripts
+  my %blessed_genetypes;
+  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+    $blessed_genetypes{$bgt->{'type'}} = 1;
+  }
+
  GENE:
   foreach my $gene ( @genes ){
-    
-    # sort the transcripts, get the longest CDS + UTR first (like in prune_Transcripts() )
+    # sort the transcripts, get the longest CDS + UTR first (like in prune_Transcripts(); 
+    # blessed transcripts come at the top )
     my @sorted_transcripts = $self->_bin_sort_transcripts( @{$gene->get_all_Transcripts} );
     my $count = 0;
   TRAN:
     foreach my $transcript( @sorted_transcripts ){
       $count++;
-      next GENE if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
+      unless ($blessed_genetypes{$transcript->type}){
+	next GENE if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
+      }
       push ( @selected_transcripts, $transcript );
     }
   }
@@ -322,7 +337,7 @@ sub _make_shared_exons_unique{
 
  Description: retrieves genewise and combined gene annotations with supporting evidence. 
               Splits transcripts with very long introns, discards transcripts with strand problems etc.
- ReturnType : none, but $self->genewise_combined_Transcripts is filled
+ ReturnType : none, but $self->combined_Transcripts is filled
  Args       : none
 
 =cut
@@ -361,7 +376,7 @@ sub get_Genes {
       }
     }
   }
-  $self->genewise_combined_Transcripts(@transcripts);
+  $self->combined_Transcripts(@transcripts);
 }
 
 
@@ -503,14 +518,18 @@ sub _cluster_Transcripts_by_genomic_range{
 sub prune_Transcripts {
   my ($self, @transcript_clusters) = @_;
   my @newtran;
-  
+  my %blessed_genetypes;
+  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+    $blessed_genetypes{$bgt->{'type'}} = 1;
+  }
+
   my $cluster_count = 0;
  CLUSTER:
   foreach my $transcript_cluster ( @transcript_clusters ){
     $cluster_count++;
     print STDERR "Cluster $cluster_count\n";
     my @mytranscripts = @{$transcript_cluster->get_Transcripts};
-    
+
     ########################
     #
     # sort the transcripts
@@ -526,7 +545,7 @@ sub prune_Transcripts {
     #
     ##############################
     my @maxexon = @{$transcripts[0]->get_all_Exons};
-    
+
     # do we really just want to take the first transcript only? What about supporting evidence from other transcripts?
     # also, if there's a very long single exon gene we will lose any underlying multi-exon transcripts
     # this may increase problems with the loss of valid single exon genes as mentioned below. 
@@ -536,7 +555,7 @@ sub prune_Transcripts {
     ## we are done with this cluster
     #  next CLUSTER;
     #}
-    
+
     my $maxexon_number = 0;
     foreach my $t (@transcripts){
       if ( scalar(@{$t->get_all_Exons}) > $maxexon_number ){
@@ -553,20 +572,26 @@ sub prune_Transcripts {
       my @es = @{$tran->get_all_Exons};
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
-	foreach my $exon ( @{$transcript->get_all_Exons} ){
-	  $self->transfer_supporting_evidence($exon, $e);
+	# make sure we keep it if it's blessed
+	if($blessed_genetypes{transcript->type}){
+	  push(@newtran, $tran);
+	}
+	else{
+	  foreach my $exon ( @{$transcript->get_all_Exons} ){
+	    $self->transfer_supporting_evidence($exon, $e);
+	  }
 	}
       }
       next CLUSTER;
     }
     # otherwise we need to deal with multi exon transcripts and reject duplicates.
-    
+
     # links each exon in the transcripts of this cluster with a hash of other exons it is paired with
     my %pairhash;
-    
+
     # allows retrieval of exon objects by exon->id - convenience
     my %exonhash;
-    
+
     # keep track of single exon transcripts (automatically rejected if the "top" transcript is multi exon), 
     # so we can check their supporting evidence at the very end.
     my %single_exon_rejects;    
@@ -576,25 +601,30 @@ sub prune_Transcripts {
     # prune redundant transcripts
     #
     ##############################
-  
+  TRANSCRIPT:
     foreach my $tran (@transcripts) {
+      # if it's blessed, we keep it and there's nothing more to do
+      if($blessed_genetypes{$tran->type}){
+	push (@newtran, $tran);
+	next TRANSCRIPT;
+      }
+
       $tran->sort;
       my @exons = @{$tran->get_all_Exons};
-            
+
       #print STDERR "\ntranscript: ".$tran->dbID."\n";
       #foreach my $exon ( @exons ){
       #  print STDERR $exon->start."-".$exon->end." ";
       #}
       #print STDERR "\n";
-      
-      
+
       my $i     = 0;
       my $found = 1;
-      
+
       # if this transcript has already been seen, this
       # will be used to transfer supporting evidence
       my @evidence_pairs;
-      
+
       # 10.1.2002 VAC we know there's a potential problem here - single exon transcripts which are in a 
       # cluster where the longest transcriopt has > 1 exon are not going to be considered in 
       # this loop, so they'll always be marked "transcript already seen"
@@ -607,7 +637,7 @@ sub prune_Transcripts {
       # any valid non-frameshifted single exon transcripts will get rejected - which is definitely not right.
       # We need code to represent frameshifted exons more sensibly so the frameshifted one doesn't 
       # get through the check for single exon genes above.
-      
+
     EXONS:
       for ($i = 0; $i < $#exons; $i++) {
 	my $foundpair = 0;
@@ -618,7 +648,7 @@ sub prune_Transcripts {
 	my $intron;
 	if ($exon1->strand == 1) {
 	  $intron = abs($exon2->start - $exon1->end - 1);
-	} 
+	}
 	else {
 	  $intron = abs($exon1->start - $exon2->end - 1);
 	}
@@ -626,19 +656,19 @@ sub prune_Transcripts {
 	if ($intron < $GB_MAXSHORTINTRONLEN && $intron > $GB_MINSHORTINTRONLEN ) {
 	  print STDERR "Intron too short: $intron bp. Transcript will be rejected\n";
 	  $foundpair = 1;	# this pair will not be compared with other transcripts
-	} 
+	}
 	else {
-	  
+	
 	  # go through the exon pairs already stored in %pairhash. 
 	  # If there is a pair whose exon1 overlaps this exon1, and 
 	  # whose exon2 overlaps this exon2, then these two transcripts are paired
-	  
+	
 	  foreach my $first_exon_id (keys %pairhash) {
 	    my $first_exon = $exonhash{$first_exon_id};
-	    
+
 	    foreach my $second_exon_id (keys %{$pairhash{$first_exon}}) {
 	      my $second_exon = $exonhash{$second_exon_id};
-	      
+
 	      if ( $exon1->overlaps($first_exon) && $exon2->overlaps($second_exon) ) {
 		$foundpair = 1;
 		
@@ -653,10 +683,10 @@ sub prune_Transcripts {
 		# transfer evidence between exons, assuming the suppfeat coordinates are OK.
 		# currently not working as the supporting evidence is not there - 
 		# can get it for genewsies, but why not there for genscans?
-			      $self->transfer_supporting_evidence($exon1, $first_exon);
-			      $self->transfer_supporting_evidence($first_exon, $exon1);
-			      $self->transfer_supporting_evidence($exon2, $second_exon);
-			      $self->transfer_supporting_evidence($second_exon, $exon2);
+		$self->transfer_supporting_evidence($exon1, $first_exon);
+		$self->transfer_supporting_evidence($first_exon, $exon1);
+		$self->transfer_supporting_evidence($exon2, $second_exon);
+		$self->transfer_supporting_evidence($second_exon, $exon2);
 	      }
 	    }
 	  }
@@ -664,29 +694,28 @@ sub prune_Transcripts {
 	
 	if ($foundpair == 0) {	# ie this exon pair does not overlap with a pair yet found in another transcript
 	  $found = 0;		# ie currently this transcript is not paired with another
-	  
+
 	  # store the exons so they can be retrieved by id
 	  $exonhash{$exon1} = $exon1;
 	  $exonhash{$exon2} = $exon2;
-	  
+
 	  # store the pairing between these 2 exons
 	  $pairhash{$exon1}{$exon2} = 1;
 	}
       }				# end of EXONS
-      
+
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
 	#print STDERR "found new transcript:\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
-
+	
 	push(@newtran,$tran);
 	@evidence_pairs = ();
-      } 
+      }
       elsif ($found == 1 && $#exons == 0){
 	# save the transcript and check though at the end to see if we can transfer supporting
 	# evidence; if we try it now we may not (yet) have any exons that overlap in %exonhash
 	$single_exon_rejects{$tran} = $tran;
-
       }
       else {
 	#print STDERR "transcript already seen:\n";
@@ -698,11 +727,11 @@ sub prune_Transcripts {
 	## transfer supporting feature data. We transfer it to exons
 	foreach my $pair ( @evidence_pairs ){
 	  my @pair = @$pair;
-	  
+	
 	  # first in the pair is the 'already seen' exon
 	  my $source_exon = $pair[0];
 	  my $target_exon = $pair[1];
-	  
+	
 	  #print STDERR "\n";
 	  $self->transfer_supporting_evidence($source_exon, $target_exon)
 	}
@@ -712,10 +741,10 @@ sub prune_Transcripts {
     # check to see if we can transfer evidence from rejected single exon transcripts
     foreach my $reject(values %single_exon_rejects){
       my @exons = @{$reject->get_all_Exons};
-      
+
       # is there any supporting evidence?
       my @sf = @{$exons[0]->get_all_supporting_features};
-      
+
       foreach my $stored_exon(values %exonhash){
 	
 	if($exons[0]->overlaps($stored_exon)){
@@ -723,45 +752,45 @@ sub prune_Transcripts {
 	  # two exons in a multi exon transcript, so the supporting evidence would be transferred in 
 	  # entirety to both exons.
 	  $self->transfer_supporting_evidence($exons[0], $stored_exon);
-	  
+	
 	}
       }
     }
-  
-  } #end CLUSTER 
-    
+
+  } #end CLUSTER
+
   return @newtran;
 }
- 
+
 ############################################################
 
 sub _bin_sort_transcripts{
 
   my ($self,@transcripts) = @_;
-  
-  my %lengths;    
+
+  my %lengths;
   my $max_num_exons = 0;
-  
+
   # sizehash holds transcript length - based on sum of exon lengths
   my %sizehash;
-  
+
   # orfhash holds orf length - based on sum of translateable exon lengths
   my %orfhash;
-  
+
   my %tran2orf;
   my %tran2length;
-  
+
   # keeps track of to which transcript(s) this exon belong
   my %exon2transcript;
-  
+
   foreach my $tran (@transcripts) {
-    
+
     # keep track of number of exons in multiexon transcripts
     my @exons = @{ $tran->get_all_Exons };
-    if(scalar(@exons) > $max_num_exons){ 
-      $max_num_exons = scalar(@exons); 
+    if(scalar(@exons) > $max_num_exons){
+      $max_num_exons = scalar(@exons);
     }
-    
+
     # total exon length
     my $length = 0;
     foreach my $e ( @exons ){
@@ -770,7 +799,7 @@ sub _bin_sort_transcripts{
     }
     $sizehash{$tran} = $length;
     $tran2length{ $tran } = $length;
-    
+
     # now for ORF length
     $length = 0;
     foreach my $e(@{$tran->get_all_translateable_Exons}){
@@ -778,8 +807,8 @@ sub _bin_sort_transcripts{
     }
     $tran2orf{ $tran } = $length;
     push(@{$orfhash{$length}}, $tran);
-  }  
-  
+  }
+
   # VAC 15/02/2002 sort transcripts based on total exon length - this
   # introduces a problem - we can (and have) masked good transcripts
   # with long translations in favour of transcripts with shorter
@@ -790,16 +819,16 @@ sub _bin_sort_transcripts{
   ##########
   @transcripts = ();
   ##########
-  
+
   # sort first by orfhash{'length'}
   my @orflengths = sort {$b <=> $a} (keys %orfhash);
-  
+
   # strict sort by translation length is just as wrong as strict sort by UTR length
   # bin translation lengths - 4 bins (based on 25% length diff)? 10 bins (based on 10%)?
   my %orflength_bin;
   my $numbins = 4;
   my $currbin = 1;
-  
+
   foreach my $orflength(@orflengths){
     last if $currbin > $numbins;
     my $percid = ($orflength*100)/$orflengths[0];
@@ -808,14 +837,14 @@ sub _bin_sort_transcripts{
     }
     my $currthreshold = $currbin * (100/$numbins);
     $currthreshold    = 100 - $currthreshold;
-    
+
     if($percid <$currthreshold) { 
       $currbin++; 
     }
     my @tmp = @{$orfhash{$orflength}};
     push(@{$orflength_bin{$currbin}}, @{$orfhash{$orflength}});
   }
-  
+
   # now, foreach bin in %orflengthbin, sort by exonlength
   $currbin = 1;
  EXONLENGTH_SORT:
@@ -828,14 +857,36 @@ sub _bin_sort_transcripts{
     push(@transcripts, @sorted_transcripts);
     $currbin++;
   }
-  
+
+
+  # post filter - we want blessed transcripts to be at the top of the list so that 
+  # identical build transcripts get properly pruned.
+  my %blessed_genetypes;
+  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
+    $blessed_genetypes{$bgt->{'type'}} = 1;
+  }
+
+  my @blessed_transcripts;
+  my @heathen_transcripts;
+  foreach my $transcript(@transcripts){
+    if($blessed_genetypes{$transcript->type}){
+      push(@blessed_transcripts, $transcript);
+    }
+    else{
+      push(@heathen_transcripts, $transcript);
+    }
+
+    @transcripts = ();
+    push(@transcripts, @blessed_transcripts);
+    push(@transcripts, @heathen_transcripts);
+  }
+
   #test
   my $debug = 0;
   if ($debug == 1 ){
-    
+
     print STDERR "2.- sorted transcripts:\n";
-    
-    
+
     foreach my $tran (@transcripts){
       if ( $tran->dbID ){
 	print STDERR $tran->dbID." ";
@@ -1404,7 +1455,7 @@ sub genes_db{
 
 ############################################################
 
-sub genewise_combined_Transcripts {
+sub combined_Transcripts {
     my ($self,@transcripts) = @_;
 
     if (!defined($self->{_genewise_andthelike_transcripts})) {
