@@ -82,23 +82,23 @@ sub new {
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
     $self->{'_results'}   = undef;        # file to store results of program run
     $self->{'_protected'} = [];           # a list of files protected from deletion
-  
-    my ($clone, $program, $analysisid) = $self->_rearrange([qw(CLONE 
-					                       PROGRAM
-                                                               ANALYSISID)], 
-					                    @args);
+    $self->{'_analysis'} = undef;
 
-    print STDERR "PROGR: $program\n";
+    my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
+						   ANALYSIS)], 
+							 @args);
+
+    print STDERR "PROGREEE: ".$analysis->program."\n";
   
     $self->clone ($clone) if ($clone);       
-    $self->analysisid ($analysisid) if ($analysisid);
+    $self->analysis ($analysis) if ($analysis);
 
-    if (!defined $program) {
-	$self->program ($self->find_executable ($program));
-    }
-    else {
-	$self->program($program);
-    }
+    #if (!defined $program) {
+	#$self->program ($self->find_executable ($program));
+    #}
+    #else {
+	#$self->program($program);
+    #}
 
     return $self;
 }
@@ -122,6 +122,9 @@ iprscan/bin/scanregexpf.pl       | /analysis/iprscan/data/confirm.patterns | NUL
 
 sub clone {
     my ($self, $seq) = @_;
+
+    print STDERR "CLONE: $seq\n";
+    
     if ($seq) {
 	if ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")) {
 	    $self->{'_sequence'} = $seq ;
@@ -133,8 +136,7 @@ sub clone {
 	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
 	    $self->{'_sequence'} = $seq ;
 	    $self->filename ("$$.tmp.seq");
-
-	    print STDERR "FILENAMEN: ".$self->filename."\n";
+	   
 	    $self->results ("sigp.$$.out");
 	    
 	}
@@ -143,46 +145,27 @@ sub clone {
 }
 
 
-=head2 analysisid
+=head2 analysis
 
- Title    : analysisid
- Usage    : $self->analysisid ($analysisid);
- Function : get/set method for the analysisId
+ Title    : analysis
+ Usage    : $self->analysis ($analysis);
+ Function : get/set method for the analysis
  Example  :
- Returns  : analysisId
- Args     : analysisId (optional)
+ Returns  : analysis
+ Args     : analysis (optional)
  Throws   :
 
 =cut
 
-sub analysisid {
+sub analysis {
     my $self = shift;
     if (@_) {
-        $self->{'_analysisid'} = shift;
+        $self->{'_analysis'} = shift;
     }
-    return $self->{'_analysisid'};
+    return $self->{'_analysis'};
 } 
 
 
-=head2 program
-
- Title    : program
- Usage    : $self->program ('/usr/local/pubseq/bin/signalp');
- Function : get/set method for the path to the executable
- Example  :
- Returns  : File path
- Args     : File path (optional)
- Throws   :
-
-=cut
-
-sub program {
-    my $self = shift;
-    if (@_) {
-        $self->{'_program'} = shift;
-    }
-    return $self->{'_program'};
-}
 
 ###################
 # analysis methods
@@ -292,7 +275,7 @@ sub run {
 sub run_program {
     my ($self) = @_;
     
-    print STDERR "RUNNING: ".$self->program." -t euk ".$self->filename." > ".$self->results."\n";
+    print STDERR "RUNNING: ".$self->analysis->program." -t euk ".$self->filename." > ".$self->results."\n";
     
     my $filename = $self->filename;
 
@@ -300,10 +283,10 @@ sub run_program {
     
 
     # run program
-    print STDERR "running ".$self->program."\n";
+    print STDERR "running ".$self->analysis->program."\n";
     
-    $self->throw ("Error running ".$self->program." on ".$self->filename) 
-        unless ((system ($self->program." -t euk ".$self->filename. " > ".$self->results)) == 0); 
+    $self->throw ("Error running ".$self->analysis->program." on ".$self->filename) 
+        unless ((system ($self->analysis->program." -t euk ".$self->filename. " > ".$self->results)) == 0); 
 }
 
 
@@ -364,9 +347,9 @@ sub parse_results {
 	        $feature{name} = $id;
        	        $feature{start} = 1;
 	        $feature{end} = $end;
-                ($feature{source}) = $self->program =~ /([^\/]+)$/;
+                ($feature{source}) = $self->analysis->program =~ /([^\/]+)$/;
 	        $feature{primary}= 'signal_peptide';
-	        ($feature{program}) = $self->program =~ /([^\/]+)$/;
+	        ($feature{program}) = $self->analysis->program =~ /([^\/]+)$/;
                 $feature{logic_name} = 'signal_peptide';
   	        $self->create_feature (\%feature);
 	    }
@@ -391,12 +374,7 @@ sub parse_results {
 sub create_feature {
     my ($self, $feat) = @_;
 
-    # create analysis object (will end up in the analysis table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ( -program         => $feat->{program},
-                                                 -gff_source      => $feat->{source},
-                                                 -gff_feature     => $feat->{primary},
-                                                 -logic_name      => $feat->{logic_name},
-                                               );
+    my $analysis = $self->analysis;
 
     # create feature object
     my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
