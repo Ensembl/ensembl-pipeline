@@ -813,7 +813,7 @@ sub job_time_check{
 sub job_existance{
   my ($batch_q_module, $verbose, $job_adaptor, $id) = @_;
   
-  my $job = $job_adaptor->fetch_by_dbID;
+  my $job = $job_adaptor->fetch_by_dbID($id);
   if(!$job){
     return;
   }

@@ -346,7 +346,8 @@ sub flush_runs {
         $job->set_status( "FAILED" );
       }
     } else {
-    
+      #print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
+      #."\n";
       my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
       foreach my $job (@jobs) {
         if( $job->retry_count > 0 ) {
@@ -354,11 +355,12 @@ sub flush_runs {
             open( FILE, ">".$_ ); close( FILE );
           }
         }
-	$job->submission_id( $batch_job->id );
+        #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
+        $job->submission_id( $batch_job->id );
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
-	$job->stdout_file($lastjob->stdout_file);
-	$job->stderr_file($lastjob->stderr_file);
+        $job->stdout_file($lastjob->stdout_file);
+        $job->stderr_file($lastjob->stderr_file);
       }
       $adaptor->update(@jobs);
     }
