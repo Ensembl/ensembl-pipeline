@@ -32,6 +32,21 @@ Username for database access.
 -dbport :
 (optional) Database access port number.
 
+-dnadbname :
+(optional) Name of core ensembl database containing DNA for the species in question.
+
+-dnadbhost :
+(optional) Name of machine that hosts the DNA database.
+
+-dnadbuser :
+(optional) Username for database access to DNA database.
+
+-dnadbpass :
+(optional) Database password for DNA databse.
+
+-dnadbport :
+(optional) Database access port number for DNA databse.
+
 -transcript_stable_id :
 Stable identifier of transcript to display.
 
@@ -78,6 +93,11 @@ my ($dbname,
     $dbpass,
     $dbuser,
     $dbport,
+    $dnadbname,
+    $dnadbhost,
+    $dnadbpass,
+    $dnadbuser,
+    $dnadbport,
     $transcript_stable_id,
     $transcript_dbid,
     $remove_introns,
@@ -92,6 +112,11 @@ my ($dbname,
 		  'DBPASS',
 		  'DBUSER',
 		  'DBPORT',
+                  'DNADBNAME',
+		  'DNADBHOST',
+		  'DNADBPASS',
+		  'DNADBUSER',
+		  'DNADBPORT',
 		  'TRANSCRIPT_STABLE_ID',
 		  'TRANSCRIPT_DBID',
 		  'REMOVE_INTRONS',
@@ -115,6 +140,11 @@ unless (@ARGV) {
 	     " -dbuser :               Username for database access.",
 	     " -dbpass :               (optional) Database password.",
 	     " -dbport :               (optional) Database access port number.",
+	     " -dnadbname :            (optional) Name of core ensembl database containing DNA.",
+	     " -dnadbhost :            (optional) Name of machine that hosts DNA database.",
+	     " -dnadbuser :            (optional) Username for DNA database access.",
+	     " -dnadbpass :            (optional) DNA Database password.",
+	     " -dnadbport :            (optional) DNA Database access port number.",
 	     " -transcript_stable_id : Stable identifier of transcript to display.",
 	     " -transcript_dbid :      If you dont have a stable id, use the dbID.",
 	     " -remove_introns :       (optional) Truncate intron sequences to display a",
@@ -176,6 +206,16 @@ my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 	    -port   => $dbport,
 	    -user   => $dbuser,
 	    -pass   => $dbpass);
+
+if (defined($dnadbname)) {
+  my $dnadb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+  	    -dbname => $dnadbname,
+  	    -host   => $dnadbhost,
+  	    -port   => $dnadbport,
+  	    -user   => $dnadbuser,
+  	    -pass   => $dnadbpass);
+  $db->dnadb($dnadb);
+}
 
 my $ta = $db->get_TranscriptAdaptor;
 
