@@ -72,7 +72,7 @@ if(!defined $dbname    ||
    !defined $end       ||
    !defined $path    
   ){
-  print  "USAGE: dump_vc_seq.pl -dbname dbname -host host -chrname chr -start start_pos -end end_pos -path path\n optional:\n -masked, for repmasked sequence;\n -outfile to specify a filename other than out.fa\n";
+  print  "USAGE: dump_slice_seq.pl -dbname dbname -host host -chrname chr -start start_pos -end end_pos -path path\n optional:\n -masked, for repmasked sequence;\n -outfile to specify a filename other than out.fa\n";
   exit(1);
 }
 
