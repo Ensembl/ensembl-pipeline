@@ -304,5 +304,15 @@ sub get_all_Evidence {
 }
 
 
+sub splice_seq {
+    my ($self,$seq) = @_;
+
+    if (defined($seq)) {
+	$self->{_spliceseq} = $seq;
+    }
+
+    return $self->{_spliceseq};
+}
+
 1;
 

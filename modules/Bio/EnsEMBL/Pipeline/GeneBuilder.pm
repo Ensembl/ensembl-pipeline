@@ -93,24 +93,22 @@ sub _initialize {
 
     my $make = $self->SUPER::_initialize(@args);
 
-    my ($contigs) = $self->_rearrange([qw(CONTIGS
-					  )],@args);
+    my ($contig) = $self->_rearrange([qw(CONTIG
+					 )],@args);
 
 
-    $self->throw("Must input an array ref of contigs to GeneBuilder") unless defined(@$contigs);
+    $self->throw("Must input a contig to GeneBuilder") unless defined($contig);
     
-    foreach my $contig (@$contigs) {
-	$self->add_Contig($contig);
-    }
+    $self->contig($contig);
 
     return $make; # success - we hope!
 }
 
 
-=head2 add_Contig
+=head2 contig
 
  Title   : 
- Usage   : $self->add_Contig($contig);
+ Usage   : $self->contig($contig);
  Function: 
  Example : 
  Returns : nothing
@@ -120,46 +118,19 @@ sub _initialize {
 
 =cut
 
-sub add_Contig {
+sub contig {
     my ($self,$contig) = @_;
     
-    if (!defined($self->{_contigs})) {
-	$self->{_contigs} = [];
+    if (defined($contig)) {
+	if ($contig->isa("Bio::EnsEMBL::DB::RawContigI")) {
+	    $self->{_contig} = $contig;
+	} else {
+	    $self->throw("[$contig] is not a Bio::EnsEMBL::DB::RawContigI");
+
+	}
     }
-    
-    if (defined($contig) && $contig->isa("Bio::EnsEMBL::DB::RawContigI")) {
-	push(@{$self->{_contigs}},$contig);
-    } else {
-	$self->throw("[$contig] is not a Bio::EnsEMBL::DB::RawContigI");
-    }
+    return $self->{_contig};
 }
-
-
-
-=head2 get_all_Contigs
-
- Title   : 
- Usage   : my @contigs = $self->get_all_Contigs;
- Function: 
- Example : 
- Returns : 
- Args    : 
-           
-
-
-=cut
-
-sub get_all_Contigs {
-    my ($self,$contig) = @_;
-    
-    if (!defined($self->{_contigs})) {
-	$self->{_contigs} = [];
-    }
-    
-    return (@{$self->{_contigs}});
-
-}
-
 
 
 =head2 build_Genes
@@ -179,7 +150,9 @@ sub build_Genes {
     my ($self) = @_;
 
     print STDERR "Buildling genes\n";
+
     my ($features,$genscan) = $self->get_Features;
+    
     my @exons               = $self->make_Exons    ($features,$genscan);
     my @pairs               = $self->make_ExonPairs(@exons);
     
@@ -190,6 +163,7 @@ sub build_Genes {
     my @genes               = $self->make_Genes    (@transcripts);
 
     $self->print_Genes(@genes);
+    $self->print_gff(\@genes,$features,$genscan);
 }
 
 =head2 get_Features
@@ -212,22 +186,38 @@ sub get_Features {
     my @features;
     my @genscan;
 
-    foreach my $contig ($self->get_all_Contigs) {
-	# This is just working with all the similarity features here
-	# When EST2genome features are in we need to be more selective
+    my $contig = $self->contig;
 
-	my @tmp = $contig->get_all_SimilarityFeatures;
-	
-	foreach my $f (@tmp) {
-	    if ($f->source_tag eq "genscan") {
-		push(@genscan,$f);
-	    } elsif ($f->primary_tag eq "similarity") {
-		push(@features,$f);
-	    }
+    # This is just working with all the similarity features here
+    # When EST2genome features are in we need to be more selective
+    
+    my @tmp = $contig->get_all_SimilarityFeatures;
+    
+    foreach my $f (@tmp) {
+
+	if ($f->source_tag eq "genscan") {
+	    push(@genscan,$f);
+	    $self->set_genscan_phases($f,$contig);
+	} elsif ($f->primary_tag eq "similarity") {
+	    $f->seqname($contig->id);
+	    push(@features,$f);
 	}
     }
-
+    
+    $self->predictions(@genscan);
+    
     return (\@features,\@genscan);
+}
+
+sub predictions {
+    my ($self,@pred) = @_;
+
+    if (defined(@pred)) {
+	$self->{_pred} = [];
+	push(@{$self->{_pred}},@pred);
+    }
+
+    return @{$self->{_pred}};
 }
 
 =head2 make_Exons
@@ -259,9 +249,10 @@ sub make_Exons {
 
 	my $excount    = 1;
 	my $contigid   = $gs->seqname;
-	my $contig     = $self->get_ContigByID($contigid);
+	my $contig     = $self->contig;
 
 	foreach my $f ($gs->sub_SeqFeature) {
+
 	    my $exon  = new Bio::EnsEMBL::MappedExon;
 	    $exon->id       ($contigid . ".$gscount.$excount");
 	    $exon->seqname  ($contigid . ".$gscount.$excount");
@@ -278,6 +269,7 @@ sub make_Exons {
     }
     
     foreach my $ex (@exons) {
+	$ex->contig_id($self->contig->id);
 	$ex->find_supporting_evidence($features);
 	my @support = $ex->each_Supporting_Feature;
 
@@ -910,7 +902,7 @@ sub print_ExonPairs {
     my ($self) = @_;
 
     foreach my $pair ($self->get_all_ExonPairs) {
-	print(STDERR "\nExon Pair\n");
+	print(STDERR "\nExon Pair (splice - " . $pair->splice_seq->seq . ")\n");
 	$self->print_Exon($pair->exon1);
 	$self->print_Exon($pair->exon2);
 	foreach my $ev ($pair->get_all_Evidence) {
@@ -925,25 +917,77 @@ sub print_Genes {
 
     foreach my $gene (@genes) {
 	print(STDERR "\nNew gene - " . $gene->id . "\n");
+	my $contig;
 
 	foreach my $tran ($gene->each_Transcript) {
 	    print STDERR "\nTranscript - " . $tran->id . "\n";
 	    my $cdna;
 	    foreach my $exon ($tran->each_Exon) {
+		$contig = $exon->contig_id;
 		$self->print_Exon($exon);
 		$self->translate_Exon($exon);
 		$cdna .= $exon->seq->seq;
 	    }
-	    print STDERR "\nTranslation is " . $tran->translate->seq . "\n";
+	    print STDERR "\nTranslation is " . $contig . " " . $tran->translate->seq . "\n";
 
-	    my $dna = new Bio::PrimarySeq(-id => "cdna" ,-seq => $cdna);
+#	    my $dna = new Bio::PrimarySeq(-id => "cdna" ,-seq => $cdna);
 	    
-	    print ("Tran 0 " . $dna->translate('*','X',0)->seq . "\n");
-	    print ("Tran 1 " . $dna->translate('*','X',1)->seq . "\n");
-	    print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
+#	    print ("Tran 0 " . $dna->translate('*','X',0)->seq . "\n");
+#	    print ("Tran 1 " . $dna->translate('*','X',1)->seq . "\n");
+#	    print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
 	}
     }
 }
+
+sub print_gff {
+    my ($self,$genes,$features,$genscan) = @_;
+    
+    open (POG,">pog.gff");
+    
+    foreach my $gene (@$genes) {
+	foreach my $tran ($gene->each_Transcript) {
+	    foreach my $exon ($tran->each_Exon) {
+		print POG $exon->id . "\tSPAN\texon\t" . 
+		    $exon->start . "\t" . $exon->end . "\t100\t" ;
+		if ($exon->strand == 1) {
+		    print POG "+\t.\t";
+		} else {
+		    print POG ("-\t.\t");
+		}
+		print POG $tran->id . "\n";
+	    }
+	}
+    }
+
+    foreach my $f (@$features) {
+	print POG $f->seqname . "\t" . $f->source_tag . "\tsimilarity\t" .
+	    $f->start . "\t" . $f->end . "\t" . $f->score . "\t";
+	if ($f->strand == 1) {
+	    print POG "+\t.\t";
+	} else {
+	    print POG ("-\t.\t");
+	}
+	if (ref($f) =~ "FeaturePair") {
+	    print (POG $f->hseqname . "\t" . $f->hstart . "\t" . $f->hend . "\n");
+	}
+
+    }
+
+    foreach my $gen (@$genscan) {
+	foreach my $ex ($gen->sub_SeqFeature) {
+	    print POG  $ex->id . "\tgenscan\texon\t" . 
+		$ex->start . "\t" . $ex->end . "\t100\t";
+	    if ($ex->strand == 1) {
+		print POG "+\t.\t";
+	    } else {
+		print POG ("-\t.\t");
+	    }
+	    print POG $gen->id . "\n";
+	}
+    }
+    close(POG);
+}
+
 sub translate_Exon {
     my ($self,$exon) = @_;
 
@@ -954,15 +998,6 @@ sub translate_Exon {
     print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
 }
 
-sub get_ContigByID {
-    my ($self,$id) = @_;
-
-    foreach my $contig ($self->get_all_Contigs) {
-	if ($contig->id eq $id) {
-	    return $contig;
-	}
-    }
-}
 sub make_Translation{
     my ($self,$transcript) = @_;
 
@@ -1046,41 +1081,47 @@ sub threshold {
 	$self->{_threshold} = $arg;
     }
 
-    return $self->{_threshold} || 80;
+    return $self->{_threshold} || 100;
 }
 
 
 sub set_ExonEnds {
     my ($self,$exon) = @_;
 
-    my $contig  = $self->get_ContigByID($exon->contig_id);
-    my @genscan = $contig->get_all_PredictionFeatures;
+    my @genscan = @{$self->{_pred}};
+    my $contig  = $self->contig;
 
     # find genscan ends if poss
     my $leftend;
     my $rightend;
 
     my $gap = 10;
+    my $fover;
 
-    foreach my $genscan (@genscan) {
-	if ($genscan->overlaps($exon)) {
-	    print (STDERR "Found overlap : " . $genscan->id . "\t" . $exon->id . "\n");
-	    print(STDERR $genscan->start . "\t" . $genscan->end . "\t" . $genscan->strand . "\n");
-	    print(STDERR $exon->start    . "\t" . $exon->end    . "\t" . $exon->strand    . "\n");
-	    
-	    if (abs($genscan->start - $exon->start) < $gap) {
-		$leftend = $genscan->start;
+    foreach my $gs (@genscan) {
+
+	foreach my $genscan ($gs->sub_SeqFeature) {
+
+	    if ($genscan->overlaps($exon)) {
+		print (STDERR "Found overlap : " . $genscan->id . "\t" . $exon->id . "\n");
+
+		$fover = $genscan;
+
+		if (abs($genscan->start - $exon->start) < $gap) {
+		    $leftend = $genscan->start;
+		}
+		
+		if (abs($genscan->end - $exon->end) < $gap) {
+		    $rightend = $genscan->end;
+		}
+		
 	    }
-
-	    if (abs($genscan->end - $exon->end) < $gap) {
-		$rightend = $genscan->end;
-	    }
-
 	}
     }
-
+    return unless defined($fover);
     # else find average ends
     if (!defined($leftend)) {
+	
 	my %lefthash;
 
 	foreach my $f ($exon->each_Supporting_Feature) {
@@ -1096,12 +1137,13 @@ sub set_ExonEnds {
 		$maxpos   = $start;
 	    }
 	}
-    }
+    } 
+       
 
     if (!defined($rightend)) {
 	my %righthash;
 
-	foreach my $f ($exon->each_supporting_feature) {
+	foreach my $f ($exon->each_Supporting_Feature) {
 	    $righthash{$f->end}++;
 	}
 
@@ -1116,10 +1158,17 @@ sub set_ExonEnds {
 	}
     }
 
-    print(STDERR "New exon start end = $leftend\t$rightend\n");
+    $leftend  = $fover->start;
+    $rightend = $fover->end;
+
+    $exon->phase($fover->{phase});
+
+    print(STDERR "New exon start end = $leftend\t$rightend\t" . $exon->translate->seq . "\n");
 
     $exon->start($leftend);
     $exon->end  ($rightend);
+
+    return;
 
     my $seq = $exon->seq;
 
@@ -1175,6 +1224,34 @@ sub check_ExonPair {
     my $frame1 = $self->each_ExonFrame($exon1);
     my $frame2 = $self->each_ExonFrame($exon2);
 
+
+
+    my $trans1 = $pair->exon1->translate();
+    my $trans2 = $pair->exon2->translate();
+
+    my $splice1;
+    my $splice2;
+
+    my $spliceseq;
+
+    if ($pair->exon1->strand == 1) {
+	$splice1 = $exon1->{_gsf_seq}->subseq($exon1->end+1,$exon1->end+2);
+	$splice2 = $exon2->{_gsf_seq}->subseq($exon2->start-2,$exon2->start-1);
+	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice1$splice2");
+    } else {
+	$splice1 = $exon1->{_gsf_seq}->subseq($exon1->start-2,$exon1->start-1);
+	$splice2 = $exon2->{_gsf_seq}->subseq($exon2->end+1,$exon2->end+2);
+	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice2$splice1");
+	$spliceseq = $spliceseq->revcom;
+    }
+
+    $pair->splice_seq($spliceseq);
+
+    print ("Splice " . $spliceseq->seq ."\n");
+    return 0 if ($spliceseq ->seq ne "GTAG");
+    return 1 if ($pair->exon1->end_phase == $pair->exon2->phase);
+    return 0;
+
     my $match  = 0;
     my $oldphase1 = $exon1->phase;
     my $oldphase2 = $exon2->phase;
@@ -1208,7 +1285,7 @@ sub check_ExonPair {
     }
 
 
-    # Should check correct splice sites here.
+
 
     return $match;
 }
@@ -1255,6 +1332,48 @@ sub add_ExonPhase {
 
 
 }
+
+sub set_genscan_phases {
+    my ($self,$gs,$contig) = @_;
+    my $strand;
+
+    $gs->attach_seq($contig->primary_seq);
+    my $mrna = "";
+
+    foreach my $f ($gs->sub_SeqFeature) {
+	$mrna .= $f->seq->seq;
+	$strand = $f->strand;
+    }
+    
+    my $dnaseq = new Bio::PrimarySeq(-id  => "mrna",
+				     -seq => $mrna);
+    
+    my $phase;
+    if ($dnaseq->translate('*','X',0)->seq !~ /\*/) {
+	$phase = 0;
+    } elsif ($dnaseq->translate('*','X',2)->seq !~ /\*/) {
+	$phase = 1;
+    } elsif ($dnaseq->translate('*','X',1)->seq !~ /\*/) {
+	$phase = 2;
+    } else {
+	$self->warn("No translateable frame for genscan prediction");
+    }
+
+    print("genscan translation = " . $dnaseq->translate('*','X',(3-$phase)%3)->seq . "\n");
+    foreach my $f ($gs->sub_SeqFeature) {
+	$f->{phase} = $phase;
+	my $len   = $f->end() - $f->start() + 1;
+	my $left_overhang = (3 - $phase)%3;
+
+	$phase = ($len - $left_overhang)%3;
+
+	$f->{'end_phase'} = $phase;
+	
+    }
+
+
+}
+
 1;
 
 
