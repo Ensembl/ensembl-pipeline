@@ -66,7 +66,7 @@ sub fetch_input {
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
 
-    my $genseq;
+
     if(@$PIPELINE_REPEAT_MASKING){
       my $genseq    = $contig->get_repeatmasked_seq($PIPELINE_REPEAT_MASKING) or $self->throw("Unable to fetch contig");
       $self->query($genseq);
@@ -74,13 +74,11 @@ sub fetch_input {
       $self->query($contig);
     }
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Fgenesh(
-	      -query   => $self->query,
-              -fgenesh => $self->analysis->program_file,
-              -matrix  => $self->analysis->db_file,
-	      -param    => $self->arguments
-    );
-
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Fgenesh(-query   => $self->query,
+                                                                 -fgenesh => $self->analysis->program_file,
+                                                                 -matrix  => $self->analysis->db_file,
+                                                                 -param   => $self->arguments
+															    );
     $self->runnable($runnable);
 
     return 1;
