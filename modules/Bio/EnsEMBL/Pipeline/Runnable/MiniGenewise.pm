@@ -427,6 +427,7 @@ ID:    foreach my $id (@id) {
 	next ID unless defined($newid);
 	print(STDERR "New id :  is $newid [$id]\n");
 
+
 	open(IN,"pfetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
 
 	my $seq;
@@ -436,26 +437,30 @@ ID:    foreach my $id (@id) {
 	    $seq .= $_;
 	}
 	
-	if (!defined($seq) || $seq eq "no match") {
-	    open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
-           
-	   $seq = "";
+	if (!defined($seq) || $seq eq "no match" || $seq =~ /No available pfetch servers/) {
+	    $self->warn("Couldn't find sequence for [$id] using pfetch ");
 	    
+	    close(IN);
+	    open(IN,"efetch -f $id |");
 	    while (<IN>) {
 		chomp;
-		$seq .= $_;
+		if ($_ !~ /^>/) {
+		    $seq .= $_;
+		}
 	    }
-	}
+	} 
+	
+	print ("Seqstring for $id is $seq\n");
 
 	if (!defined($seq)) {
 	    $self->throw("Couldn't find sequence for $newid [$id]");
 	}
-    
+	
 	$seq = new Bio::PrimarySeq(-id  => $newid,
-				      -seq => $seq);
+				   -seq => $seq);
 	
 	$self->{_seq_cache}{$id} = $seq;
-
+	
 	return $seq;
     }
 }
@@ -467,60 +472,8 @@ sub get_all_Sequences {
     my @newid;
 
     foreach my $id (@id) {
-	my $newid = $self->parse_Header($id);
-	push(@newid,$newid);
-
-	print(STDERR "New id is $newid [$id]\n");
-
-	$seqstr .= $newid . " ";
+	$self->get_Sequence($id);
     }
-
-    open(IN,"pfetch -q $seqstr |") || $self->throw("Error fetching sequence for id [$seqstr]");
-	
-    my $count = 0;
-    foreach my $id (@id) {
-	my $seq = <IN>;
-	chomp($seq);
-	if ($seq ne "no match") {
-	    $self->{_seq_cache}{$id} = new Bio::PrimarySeq(-seq => $seq,
-							   -id  => $newid[$count]);
-	}
-	$count++;
-    }
-	
-    SEQ: foreach my $id (@id) {
-	my $seq   = $self->{_seq_cache}{$id};
-
-	next SEQ unless !defined($seq);
-	
-
-	my $newid = $self->parse_Header($id);
-
-	next SEQ unless defined($newid);
-	next SEQ if $newid eq "";
-	print(STDERR "New id :$newid:$id\n");
-
-	open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
-	    
-	$seq = "";
-	    
-	while (<IN>) {
-	    chomp;
-	    $seq .= $_;
-	}
-	
-	if (!defined($seq)) {
-	    $self->warn("Couldn't find sequence for $newid [$id]");
-	}
-	
-	$seq = new Bio::PrimarySeq(-id  => $newid,
-				      -seq => $seq);
-
-	print("Found seq for $id  $seq\n");
-
-	$self->{_seq_cache}{$id} = $seq;
-    }
-
 }
 
 =head2 run
@@ -532,47 +485,6 @@ sub get_all_Sequences {
   Args    : 
 
 =cut
-
-sub run {
-    my ($self) = @_;
-    
-
-    my @ids = $self->get_all_FeatureIds;
-
-#    $self->get_all_Sequences(@ids);
-    my $analysis_obj    = new Bio::EnsEMBL::Analysis
-	(-db              => 'genewise',
-	 -db_version      => 1,
-	 -program         => "genewise",
-	 -program_version => 1,
-	 -gff_source      => 'genewise',
-	 -gff_feature     => 'exon',);
-
-    foreach my $id (@ids) {
-	my $hseq = $self->get_Sequence(($id));
-
-	if (!defined($hseq)) {
-	    $self->throw("Can't fetch sequence for id [$id]\n");
-	}
-
-	
-	my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(-genomic => $self->genomic_sequence,
-								-protein => $hseq,
-								-memory  => 400000);
-
-	$eg->run;
-
-	my @f = $eg->output;
-
-	foreach my $f (@f) {
-	    #print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
-	    print $f;
-	}
-
-	push(@{$self->{_output}},@f);
-
-    }
-}
 
 sub minirun {
     my ($self) = @_;
@@ -586,6 +498,7 @@ sub minirun {
     }
 
     $self->get_all_Sequences(@ids);
+
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
 	(-db              => undef,
 	 -db_version      => undef,
@@ -600,6 +513,7 @@ sub minirun {
 	my @exons;
 
 	print(STDERR "Processing $id\n");
+
 	next ID unless (ref($features) eq "ARRAY");
 
 	print(STDERR "Features = " . scalar(@$features) . "\n");
@@ -620,6 +534,7 @@ sub minirun {
 	    my $reverse = $self->is_reversed(@$features);
 
 	    print STDERR "Reverse 2 $reverse\n";
+
 	    print("Hseq $id " . $hseq->seq . "\n");
 	    print("cdna " . $miniseq->get_cDNA_sequence . "\n");
 
@@ -630,7 +545,7 @@ sub minirun {
 	    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -genomic => $miniseq->get_cDNA_sequence,
 								      -protein => $hseq,
 								      -memory  => 400000,
-	                                                              "-reverse" => $reverse);
+								      "-reverse" => $reverse);
 	    
 	    $eg->run;
 	    
@@ -657,6 +572,7 @@ sub minirun {
 		
 		my $phase = $f->feature1->{_phase};
 		print STDERR "Phase 1 " . $phase . ":"  . $f->feature2->{_phase} . "\n";
+
         #BUG: Bio::EnsEMBL::Analysis seems to lose seqname for feature1 
 		my @newfeatures = $miniseq->convert_FeaturePair($f);         
 
