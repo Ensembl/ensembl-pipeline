@@ -2,7 +2,7 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 6;}
+BEGIN { $| = 1; plan test => 7;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::CPG;
 use Bio::PrimarySeq;
@@ -10,30 +10,29 @@ use Bio::Seq;
 use Bio::SeqIO;
 
 ok(1);
-ok(my ($seq) =  set_seq());
+ok(my $seq =  set_seq());
 
 
-my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
-                                    -id          => 'HSAC74',
-                                    -accession   => 'ACOOOO74',
-                                    -moltype     => 'dna');
+ok(my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
+				       -id          => 'HSAC74',
+				       -accession   => 'ACOOOO74',
+				       -moltype     => 'dna'));
 
-ok($clone);
-ok(my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $clone, -GC => 75, -LENGTH => 50));
- 
-$cpg->run();
+ok(my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY  => $clone, 
+							 -GC     => 75, 
+							 -LENGTH => 50));
 
-ok(1);
+ok($cpg->run);
 
 ok(my @results = $cpg->output());
 
-display(@results);
+ok(display(@results));
 
 
 sub display {
   my @results = @_;
   my @methods = qw( seqname start end score strand );
-
+  
   foreach my $obj (@results)
     {
       printf STDERR "\n";
@@ -42,373 +41,374 @@ sub display {
         printf STDERR ("%10s = $value\n", $method_name);
       }
     }
+  return 1;
 }
 
 sub set_seq {
   #embedded sequence! Because I can't create Bio::PrimarySeqs from files
-my $seq = 
-'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
-'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.
-'gcacaaggctggcatttctgaaccttgcccctctgcaaacacaagggggcgatggtggcactccaagcaaaggggcg'.
-'tgtgggtgctgcaggaggagcacagagcactggcgcccctcccctcccgccctgcagatgccggaggccccgcctct'.
-'gctgttggcagctgtgttgctgggcctggtgctgctggtggtgctgctgctgcttctgaggcactggggctggggcc'.
-'tgtgccttatcggctggaacgagttcatcctgcagcccatccacaacctgctcatgggtgacaccaaggagcagcgc'.
-'atcctgaaccatgtgctgcagcatgcggagcccgggaacgcacagagcgtgctggaggccattgacacctactgcga'.
-'gcagaaggagtgggccatgaacgtgggcgacaagaaaggtggggtccgggccagcaggtgctcagctctgggacagg'.
-'gacccaggaccaggcatcaaagcccttacaggagaagctgttatcaccccatttccagggggctgggaaccctggga'.
-'tatgcccagatagggctggggggctcctctggagtcccagggtgccagggtccctgatgacccctgcaggccctgct'.
-'gcctgctgccccaggacaacaggcccccacactcacagggtctgacggtggtgcagttccccttgaactctgttctg'.
-'gccaccatgggacctgcctggggaccagtcagacaggttctcctgggcccgcctcccgcttgaacttcagcctgggg'.
-'cacaggatgtgttaccgggctcacggagtgactcagggaactagtgccgccccagggccccaaggtgggcggttcgg'.
-'tgattcagagagggcagctctgtgttaggacacactggggccagccaggaagggtggaaaagatagggaccagcgtg'.
-'agcatagaggctaagggaccatgggagctccaagcgcgctcacagtggggaccaggtcctgggggctggggacacca'.
-'gggaggtgaaatacccctccagcgggtagggagggtgggcagaggagggccagcggccaggcatttgggaggggctc'.
-'ctgctctttgggagaggtggggggccgtgcctggggatccaagttcccctctctccacctgtgctcacctctcctcc'.
-'gtccccaaccctgcacaggcaagatcgtggacgccgtgattcaggagcaccagccctccgtgctgctggagctgggg'.
-'gcctactgtggctactcagctgtgcgcatggcccgcctgctgtcaccaggggcgaggctcatcaccatcgagatcaa'.
-'ccccgactgtgccgccatcacccagcggatggtggatttcgctggcatgaaggacaaggtgtgcatgcctgacccgt'.
-'tgtcagacctggaaaaagggccggctgtgggcagggagggcatgcgcactttgtcctccccaccaggtgttcacacc'.
-'acgttcactgaaaacccactatcaccaggcccctcagtgcttcccagcctggggctgaggaaagacccccccagcag'.
-'ctcagtgagggtctcacagctctgggtaaactgccaaggtggcaccaggaggggcagggacagagtggggccttgtc'.
-'atcccagaaccctaaagaaaactgatgaatgcttgtatgggtgtgtaaagatggcctcctgtctgtgtgggcgtggg'.
-'cactgacaggcgctgttgtataggtgtgtagggatggcctcctgtctgtgaggacgtgggcactgacaggcgctgtt'.
-'ccaggtcacccttgtggttggagcgtcccaggacatcatcccccagctgaagaagaagtatgatgtggacacactgg'.
-'acatggtcttcctcgaccactggaaggaccggtacctgccggacacgcttcttttggaggtgagccccaaccaggat'.
-'ggcatccgtgccagctgctgcccagagcccattcagtcagcctcagcctctccaaagagccaggcattccagtagag'.
-'ccctgtgtggacacagctcgctctggaggcaccacctgaggtctgggagtgtgggggactgaggaggccctgtggtg'.
-'ggtggagatgggtggggagctgggccaggggcctggctgggtggcctgttgggaactggggagccagctgcctgtgc'.
-'aggtgcaaaatgggtggcagaagtggggtgcacaccccagaccagacaccagggcagaaacggcacaggaccaagga'.
-'gatggggtggggaagggccgctctgggcccagcctgctctcccccaagcaagccactgctcgtgcaaagaaagcatg'.
-'tgtctcctgcagatcttcctcctgaggccccatcttgtgcattcccccaacccagccccactggcgaggaccctgag'.
-'tgccccgagtgaggctagacagcgggtggggctgtcctcgcttccctggggggcgtggggcactggtggcccttcac'.
-'agactgatgcttaaggagcctcacatcagtgacacactgccccatccctccctggtggtcagcgacactgagtggct'.
-'ctgtgatcctccactgggcttgggacacccaccctcacggcctctccacctggtgctcgctcacctgcagctctccc'.
-'agaaactggacactgctgttagcagccagactaggagcacgaggggcacagcccccatgcctggctaggtagggccg'.
-'ctggaccctggacacggattggaaggaaccagcactagcagaagcctgaggtgtgaaagggcagagaatgttccagg'.
-'aacaatgggagtcagggcacacaggactttgggcaggtgaggatgaggttagacctgtcttctggagctgggctcag'.
-'gggctcatgcctgtaacccttgcactttgggaggctacggcaggaggagcgcttgaggccaggagagttcgagacca'.
-'gcctgggcaacatggcaaaagaaaaaatatatatatatattttagatggagtcttgctctgtcaccaggctggagtg'.
-'cagtggcacgatcacggctcactgcaacctccacctcttgggttcaagcgattaccctgccttagcctcctgagtag'.
-'ctgggactacaggcgcgcgctgccacacccggctagttttttgtagtttagtagagatggggtctcaccacattggc'.
-'caggatggtctcaatatcctgacttcgtgatccgcccgcctcggcctcccaaagtgctgggattacaggcgtgagcc'.
-'actgcgtccggccgtattccagcttttaaaacaacaaaaaacaacaaaaacttttctggaaagatccctgtcagcct'.
-'tgtggagtgtggagagggctgtggggagggcatttcagatgccctgaactcacgaggaggcactgaaccctggccgt'.
-'ggagagggaggacctgtagtggccaagggggtgggcattgggagggtgggagggagacctacaggccaagacagggt'.
-'agctggaggggggctcacccctgacaaaggagcatgatgctggcaattgggtattgatggcagagagctggcactca'.
-'gccagatgggcttcacttgggcaggaaagacacccacagctgggcctgcgttactgcggccgagtttcagcagctgt'.
-'gatgtgggtgctaattacaggggcctgccttcatagaaaagtagcaaacattgcagtttagtaactaggaaactaat'.
-'agttttctcagtgctgcttgcgcaaagctggtaattatctcaaaagaagcaaagtcatgaagtgggaagtcatgaat'.
-'tgggaatgggtgtccttgttaaacgcacatctgcacactcagggctggggccctgtgcccccttgtggagggttagg'.
-'ggacaacctggctcttgtgagggtctagccatcccctcagtgggttctgtgagcatcggaggcacggggggtgaggg'.
-'gctcaggagcaggttgcaattcaaaatcaagggctgctttgaggaggcctctccaccgggctgctgtagtcaccaag'.
-'tccagcccatgcccaaaggaagaggaatgagttcccccttaaaaaaaaaaaaaaaaagaaaaagacagagtcttgct'.
-'ctgtgcccaggctggagtgcagtgatgacatcatagctcactgtagcctcaaactcctgagctccagtgatcctccc'.
-'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
-'ggggtctccctatgttgcccagactggtctcaaactcctggcctcaagcgatcctcttgcctcaacctcccaaagtg'.
-'ctgggagtacaggtgtgtgcttggtctgaggctccaactttttgttgttgtttctcgagacagtctctcgctctgtt'.
-'gcccaggctggagtgcagtggcgcgatcttggctccctgcaacctctgtgaggctccaactcttgaagggaggagag'.
-'tctaaggagggtgggccagatgaaaaccacctcagcatagtgtcacctgctcctctgacactgtcgcttctccatgg'.
-'cattagattttcagtcctgctcagacgctgatgcatgtttagccagttctccaggtggtctgagtagctggtaggag'.
-'gcttgcagtgtcgggcgacaggcaggacaggtgctgccttctttcccctcttgaccagtttcgtaaaggagtgggcc'.
-'cctggcagcctccaaaggtgacccatgctcctttctgcccttccctccttctttcctgtttaactcgtgcaggtgca'.
-'gtggtctggtgtctttcagtccgctgacgtcttctgtatccctgatgaccagattgggctcctgagtcccctggcgc'.
-'aacccgagaagtccaggagcccaggcccctcactcatgcattccctggcccagactggaaggcagccgccctgctca'.
-'aggcctaggccattgtcctcctcccgggtggcgctttgttctacgtcttttcagctgacattgctaggacatttttt'.
-'tttttttctaaatgaaaacacatcatgattcatggtggtacttcctgctcaactccggaccttggggctgtcccctg'.
-'acctcactgaccttgcagccgtgtggtgtccatactgtcacatgaaagccccctgctttctctgcagcatacaggct'.
-'ggaaacgaccgccacccaccaccaggacagctgcaagccctgtgggactctccaggcccatcccagaggcatgtggg'.
-'gtcggataccagtgtttcaaggcacctgcctgcaaattgattttattatactttagatgtttgagattgcttgttaa'.
-'cttttgtttggtgactaagtcaaatttccaagacaaggtgactggggtgtcccttgccctggtaggtccttcctccc'.
-'cataggcaaacacttcctctcaaggtttcttgtttatgtgatgtaagcaaacccttttctgatagcatagataggca'.
-'agcatcctatgaggtttctcccgatagtggaccccacgggccatgccctatggctgcgtgtccagtaacaactcctt'.
-'ccttctgcacagaacccaggcagaggaactctgtgtcctcccagggcccaggcactggtgaagatggggggtctgca'.
-'aatgcaggagcttggggatgtccagaactgaccccaaggggcaggcttgttgatgggaggtctgccccacctcagcc'.
-'ctgcagggtcaccctggtcaggccaatattgtctccagggaccataccagcaacccctctccttgggtgcctctccc'.
-'tcataggcctgagttcctggcactgggtgttgagggccccattgtttccactcacccagctagcatttattgagcac'.
-'ctactgtgtgccacatgctgttctaagggatggatactcctgagatggatacaggagttgatgagagaaaggtccct'.
-'gtcctcacggggcccatgttctgaaggtggcacccaagtcttgtacagtcctttcctgcaggagtcacgctgggcag'.
-'aaagtggaaacctggccccaggggctaggcacaggcgtggtgccgtggcctagtgaggagcacccatcctggtttgg'.
-'ggcaggttctctgggcacctctgaccctcacctcccccaccccccggtctgtttgcaggaatgtggcctgctgcgga'.
-'aggggacagtgctactggctgacaacgtgatctgcccaggtgcgccagacttcctagcacacgtgcgcgggagcagc'.
-'tgctttgagtgcacacactaccaatcgttcctggaatacagggaggtggtggacggcctggagaaggccatctacaa'.
-'gggcccaggcagcgaagcagggccctgactgccccccccggcccccctctcgggctctctcacccagcctggtactg'.
-'aaggtgccagacgtgctcctgctgaccttctgcggctccgggctgtgtcctaaatgcaaagcacacctcggccgagg'.
-'cctgcgccctgacatgctaacctctctgaactgcaacactggattgttcttttttaagactcaatcatgacttcttt'.
-'actaacactggctagctatattatcttatatactaatatcatgttttaaaaatataaaatagaaattaagaatctaa'.
-'atatttagatataactcgacttagtacatccttctcaactgccattcccctgctgcccttgacttgggcaccaaaca'.
-'ttcaaagctccccttgacggacgctaacgctaagggcggggcccctagctggctgggttctgggtggcacgcctggc'.
-'ccactggcctcccagccacagtggtgcagaggtcagccctcctgcagctaggccaggggcacctgttagccccatgg'.
-'ggacgactgccagcctgggaaacgaagaggagtcagccagcattcacacctttctgaccaagcaggcgctggggaca'.
-'ggtggaccccgcagcagcaccagcccctctgggccccatgtggcacagagtggaagcatctccttccctactcccca'.
-'ctgggccttgcttacagaagaggcaatggctcagaccagctcccgcatccctgtagttgcctccctggcccatgagt'.
-'gaggatgcagtgctggtttctgtccacctacacctagagctgtccccatctcctccaaggggtcagactgctagcca'.
-'cctcagaggctccaagggcccagttcccaggcccaggacaggaatcaaccctgtgctagctgagttcacctgcaccg'.
-'agaccagcccctagccaagattctactcctgggctcaaggcctggctagcccccagccagcccactcctatggatag'.
-'acagaccagtgagcccaagtggacaagtttggggccacccagggaccagaaacagagcctctgcaggacacagcaga'.
-'tgggcacctgggaccacctccacccagggccctgccccagacgcgcagaggcccgacacaagggagaagccagccac'.
-'ttgtgccagacctgagtggcagaaagcaaaaagttcctttgctgctttaatttttaaattttcttacaaaaatttag'.
-'gtgtttaccaatagtcttattttggcttatttttaatgctttttctcagtgtttttcttctgtttctgagtcacgaa'.
-'cagcaggcactgaaagcagtcccccagccactgccgaaggtcagtcccggaggtgctgcccaggctccaggcagatg'.
-'cggcagccccggccacagccagcatgggctggagaaaggctctctactgcacaggggcctcacgtgactgcagggct'.
-'ctggggaggtggggcacctgtagcctgacccccaccttgctgcttccaaagcttccttgcccagggctgagccttgt'.
-'ggggcaccccccacactgtggtctgcctgcctgcagggtgcccagggagaccctccgcctttagaagtccaagttct'.
-'ttcccagccccctccctgcctagctgcctgcccctggcgccagacctggcccgcaccactggggcactgtgttccca'.
-'ggggcaccctcctatcccaccagccccaaagcccagccaggcacccttccctgccacctccctgggccctgccccag'.
-'cagcccagtcggcctcctcgggccttctgtcactcgctcacacacagcaccatgtcagtaaacagctaactcaggcc'.
-'tagggagttaggtaggatggggggagtggggtgggggggcaggagggtgtccccaaagtcaggcttggctggggcga'.
-'ggcgctgccaacccctgccgccagggggctccaagctccacggcacgatctgctcagggtggcccttcttccacgat'.
-'ccaagccctaagaacaagaggctgggcctgggccctgcagagggaaaggggatggtggacgctgcagccactgagtg'.
-'gcacaggaccacgtgtaacctcagggcagggcagccaactccacaggctacatggatggagatgtggatagaagcat'.
-'ctgccctgggtggtgtgggctgaccccaagggtcttggcaccagggctgatcctgacttgctggtccccgaagggcg'.
-'ttggagggtatggtgcccatccctactctggtcccatttcctcaggcccctgatcccacagtgcctgggacagggct'.
-'gtgggcccagggagcaccctccctctctgacctctgcctggtctttccgggaatgggccactgggctgctggactgg'.
-'aggccaaagtcctgcggggaacgtgcgggaagagcagagcgtgcaggcagcagagactaacaagaagccctggccca'.
-'gagggcaggaacaggtggacgaacaaccagatgagagaacgtaccaggcatgcaagctagacccaggaatcaacggg'.
-'ctgaggcttagcgtcccctacggcgtccaccagcctgaccgcgggcctgctgggcccggggggaggggccttcctgc'.
-'tggggtcgagctgcagcgcacgggtgggcattagaggcacaatagagcaggttagttagagctcctggggggacagg'.
-'gcaggggcagggccgaggctggcgatgtaagggttggcctgccaggacagcacaggtagcaccaagggcgcagggag'.
-'ccggaaacgtgtggctcacacgggcccagggcgggcacgtgcacacacacaggcctgcacaggaagccaggggattg'.
-'gcacacagcaggcagcaggtcctgccatcgctggtggaccctggtgggctctcacacgcacatgcacagaagggtgc'.
-'acacacactagctcacaggctctggcccatgcagggtgtggccgggcagtgttgtccccagtgggtgggagctgcaa'.
-'acttgtcagtacccacagactgactggcgtgaaggggctgcttcctgggcttggccccacaacccagctgtacccca'.
-'gggcccagaccagacccagcatggcctaggctgctctccagcaacccctagacacagggcctcaccggggacctgcc'.
-'cacagccacatgaccacttactttcaagggttccttctcagaggcctctcctgcagagctggcgccccgtggcctcc'.
-'gctccctctggtccaccgtggagtatccgtctgtagatggggtaaggtggggcatgaggggcgctctgagggaggcc'.
-'ctgtaggagcagatctccctctcagcccagacacaggggactcgtgggacaggggctttgggagacagcccccaccc'.
-'accctgtcctggagatccaggctggtgccagctctcaccaacaccctgccaactctccagactcccctccacttgtg'.
-'ggtcagagcccctggctgagcactaatccctctctagctgccctgtacctcaccctctaagcacccctaaaccaaat'.
-'atctctcctccacccagcaccatctacaccccataaaaccagcaggcccacttcaggccttggtcccctcccggcac'.
-'agaaaaccaaccacactgcatctgcactcacctgggcccagcgcatccatggggatcacatcccggctgccagtttt'.
-'ctcgccctctgcaaggcaggaggaggaggcgggctgcatgtggcagccaggggggatcggggcagagaagcccacac'.
-'agggctggcccaggtagccctagaggctctctgtcactaaggtgcccaacctctgccagctggcagcctcaccccag'.
-'cttgacaacagcgcggatgctgtgggaagggagtagccaagaggcagagggcagggaaagtggcctatggaagccgt'.
-'ctcagtgggaggcctgactcctccttcaccctcacccaagggtcaggcaactggggcagctggggtcgccaccctct'.
-'aggctccctaagctccaccactcaccaaggctcttgtccaccagtggcagcgtgctgtcatcgaagcccccaggact'.
-'cagtgctcccttaggccccttggcagtagcagcagctgactgagacataaaacacagacacagggtgggtgaagcac'.
-'atggagtgggaataaggcaaagtgagcagggaatggaaggaaggccagggaagccgcacctggaagcgcgccttggt'.
-'ccaaccatctttctgcaaggtaccacgcagctccttgtagctccacactgtctgcagcacgtgtgacgccgccttcg'.
-'cttcgcgtaccgattggctgtggggccgggggcggggtcagtggtggcccctcccccacctccgcggctccccaagc'.
-'caccgaccccgcccctccacacctggaggccacgagagccaccaacgctggcaccccgcgtgcctgcaggagcgagc'.
-'gcgcgttatccaggctgtcggacacgatttcgtggatggtgttgagcaccgccaccacggtgtcttcctccaggcag'.
-'gcccccggtcgcggcggagcctgtgcattgcgcacattccgcacaagctcagccatggcgtagctccctgaggggca'.
-'ggactaggtgtcagaacacacctctgccccacctctccaggaaggagcagggatcccgcgagggcgaggggcactgc'.
-'caggagagcccctggagaccgcctgtgtgcaggcggtcacaggagcccctgtgagcagggcgctgagcttcagagac'.
-'agggccggggggactggagctacctccagttgggacagcgcccaagcgagagggccggggcctggactcccaaacca'.
-'ctcatcctccaagcccctccgatgggaccccaaagctgcaggcacagttcggtgcccaggcgtgggctttgcaggcg'.
-'tcctcaccgatgaggtctttgttgcgccggtccagcgagaggttgcgcagagcgatggcgacggcgcgcaccacctt'.
-'gtcggtctcagactgcagcagttccacaagcaccggcagcccgcgctctttgcgcactgtggcgcggatgtacgtgg'.
-'cccactgcggaggcggggagagggttgctcagacatacatgccaggcactctcccacctccagacgctgaccgctct'.
-'ctccagctggaccttcctgctcccgtgcccgacaaagccctaccccaaaagctcaacggcacctccaccgaggtttt'.
-'cccaccgtccagggtgcacgcattgcccgcagcccatacacctcttggatcctggggtggtggtgtggcccctcctt'.
-'tccccgccagccgaggcaggagctgcaccagtgaggtgcctgggattccctctctcaggacttgcccaccctgcccg'.
-'acctggtccctcaccatccagttgccggcactgaggttctgcagagcgccggcggcagcctccagggtgttgaagtt'.
-'ccggctctccgtgaggagggagaggtagagacgtaccacctcgggctggtacagcagctcaaagcctaggtgcaggg'.
-'caaccgccacccacggtcacccagaatctgctctcatccatcatacccctcccgcttcccgcttcagagctcccagg'.
-'gcgtgggtgagctggggccagggatgggtgtggatgagtcacgtaatatttactatcaacatatagtcacccaaggg'.
-'gaaaagcgttcccatttcacagaggagcaaactgaggctcaaatcagttggacctgcctggcagcaggagcatccag'.
-'gaggcctggggtggggagggaggtgtcaaccaggaacgctctcctagcaacaagacccgcatttcccggtaggtccc'.
-'tgaagctatgcatcctggccacgcccctggtaatagggcccaccctccctggcaacaagaccagcattggccagtaa'.
-'ctgagagttgtataaccaaggccacacccctagcaagaggacctgctttcaccagtaactgaagctgtgcagagagc'.
-'tacgccccctagcaacagggcccaccctcccccactgacaatagagcccaccctctgtaagtcaactgatgcagtgc'.
-'aaccagggcagctgccctagcaacaggaggcactcttcctggcaaccactccaagttcccgggcaattgaggcgccg'.
-'tcctgctgctctgcccagtgctccagaaatgaggggtcaaaacagccttccaagcttgcctgtctccaaactggggc'.
-'ttcagcctggcttgggtactacctcgatctcccctgtacccacccagtgacatttcatcacaccctcgccagtcctc'.
-'atgccccatgctccctctactcctgccctgctgggctttctgctccaacacactccaagcacactccccgctggggt'.
-'atctgcatcagccctgctctgcctgtaatactcccccacagccctcctgcggctggagccctccaccctggtgacat'.
-'gcaggctcttccaactggctaggccccaccaggacagacctctctctcaagccagatcccagcatacagctcaatag'.
-'gcactgccctgcccctgcaggtgttcgtctggcccagcctctgaacctggatgtgagcatgcccgcctggctcccag'.
-'ccccctcagataactcagctttgtggctaacacaggaggccctgcctccactggaggcgtccctccaaaccttccca'.
-'cctcttacgcaccgtgaggccgagcaagccctctgcctctctgtgcctgtctcccccaaccttgcctgacatgaccc'.
-'atggcacttcctcccattctaaaccctcagcaggtgtcctggtgctgaatcaccctccaggaaatcctgcacctagg'.
-'ggcctgtttccccatctgttccctgaggccctccaggcctgcttgatggctcaaagcttcactaccagggcaatcct'.
-'gagcccagacatcccccagtggagctggcttcatctcagcccactcacctttggcggcctcagttcgcttgggcagg'.
-'tctagcgtgtcaaagttccggtccatctcaccatccttctttcctggaagggaaaggtggtgggaggtgaggcagac'.
-'cccatatggggaatgggtgtatcaggagagttgggcacagttctctcctacccaggccccaaaaggcacccccatgt'.
-'ccaggcctgggcacctgtgggagtggagcaccgttgtcagagtttgggcagacagtttagcctaggggtaggagttg'.
-'gtggcagtggggcctggggatgtcccagccctgcccctaggactcatctcccaccaggtgctgggagctgtaccaca'.
-'gaccctcccggtggctcccttgcaactgccaggtatgtagactgagggaagccaggagccctggctggatggtaggt'.
-'ggatacaagccaagaaactgaaggctgaccaggacaagactcatttgggtcacacagtaaggcagaactagggggaa'.
-'actcccccagctggggtcaggacattgtcccaggatctactagccaggagaaaccccacagcagcccacctaacatt'.
-'tgtgtagccctggcttgcacacgtctgtgacagtgagcccactgtcaaccactctccccatgtcagatgatgcttct'.
-'accccttcagaaggcagcagagtggagccagatgacctggggtccctgccctgctcaccctcatgggacccttgtat'.
-'ccctccgagccacatgatgccccattctatcagagaaacagactgctccttggtgcccctagagataagtacccccg'.
-'ggccctgcccactcttggctctgcccaactctgcccaggtaggcaagtctgaggttacagaatgagccccgtggcct'.
-'tcccacctgccactgtcataaagatggcagcccgagtgatgaagccaggggtggggcagggccctggggctggaacg'.
-'tgctcgcctcttcccaggtacccactgcacacgccaggcctggagagcaggataaaaagggactcaccttggtggaa'.
-'ccactcctctgggaggccggaggaagcagaggagagaggagaggagcctgaacaggcagcactcatcacccccccat'.
-'gccctcccggaagcctcaggttcccactgcacaccctggatcaagcaggcagcatgtggaacctcatcccatcactt'.
-'ctgggcactgagcacccaccagggggacaagaagagggaggcctggggtcagtggggcaggggcaggtggcgtacag'.
-'gtcccccacagctgctggggaggtcctgggaacctacaccctgctagtgcagtagagaaggtgtgcagggcatcttg'.
-'cccaggcagatgggggctgccccacaggttggtggcagtctacagctattctgtgaacagtgagcaggcagcagcca'.
-'tggctccttcccaactcatgggcaagtggaactctccccggagtagaaagactgggtctgggcattggttggtttcc'.
-'cttgtgtactccctgggggtcccacagtgtagatggggaaggttggacctgggtcccatcaaccatgtgacccaggg'.
-'cagtccagcctccttgactcctggcttccctgcctgcctgttgggggctgaccaggtgtcctctagcctccatgatg'.
-'ggctgctgtgggtgtacagagagccttccgctggggcaggagttgagatggtagagatgataccccagtccgcccca'.
-'cccacctttggccttcttgcctccaaagcagctggcatcatcccgcctccggcgctgggagcctacagcactgccca'.
-'ggggcccgggctcggcctcctggtacctgtcggccccgggcacctccttgtgcacgtggtaggacaggttccgcatg'.
-'atgcacacgcagttctccaccgactgcagggagaggtgagtgggtggggcagggcaccctaggcacagggctggccc'.
-'tcaggaaagactggccacagctggtgtgcatgagggcaccgggagcaaaggaacagggagtcctcagtggaggggag'.
-'caaaagggcggtaaccgccaggaagggtccatgggaggaagcctctgccctcacggcacaccttctgcctgcaggac'.
-'ggtgcccacttcagtgtggtcactgcgaggcgggccacacccagaacgccaccccagacccacaagcccattcccct'.
-'gtgctgctcccacagttccagcctcctgggacctgcatgatcgtctctccagcccttggtatgaggctgtgaccgtc'.
-'cctgcccaccttgttgtcagtgtccttccggcccacagccgactgcagggcatgcaggagcgcgtccaccagccctt'.
-'cacactcccggagtcgccgccgggcctcagcaccatcggagctcacattcctgtgtggccaagagcaggccaggtga'.
-'cccctggctaccagaaactccctggctccaccctggccttgtgggcttgtcttcatctgcaaaataggccctgctgc'.
-'tgccctcctagcactaatgggaaaggaccccacagtctggagctcagtgaagggggagaagctaactgcccccaggc'.
-'ctcaggaggggagccctggcagacaactatcttggctggggatagctgggcagggaaagacagggtttccctgcctc'.
-'ccagctgacctggaaagggacaggtgcactctcagagagacctgaacctgtgcaagggcaattctgggtccctcgcc'.
-'accccaatggcagctctgggccccaccttaccccaaggtcaagagcctgcagggctgcgcgggaacaccctgatgga'.
-'caagcaggactgtggggacccaggactctgtggggtcagcagggcctcccaggggtaggaggggaagggcagaggtc'.
-'acaggtggctgggatgagcctcccaggcagatgaacaggaaggtcccagctccccctctggctgtcaagtgatggga'.
-'aggtaggtgagagctgggcagggctacggtaccacagagacccctccagagggtgcccctgggaagactgggacacc'.
-'acttgggggtgaggacagctccatcaggccccacttctcatccacaggacttgtgccacagctctgaagctcctaag'.
-'ctctggcgctcctaagctcgccgccatcttccacactatctgggaccacgaggacggggcctggtgtgcatgtgggc'.
-'tttagcaccaggtctggtccacacctcaggcagcccgacgtgttcttgaagacagttgtccactcggcgtcccgtgg'.
-'cttggagtcctcgttgggctcacgctcccatcctgagtggggcacgatcacctcgtgggtcagcgtctgcaggccat'.
-'ggtcaatgatgaccatcttcaggggctcataggatgacaggttccacagggtgcctgtggggtgcgattggccaatc'.
-'tgtgctgaccatatgcaccgcctgcctacctccccaggtggccacgctcaggacctgtcccactctcctcatgtccc'.
-'agctcatgcagaacagtaggaagtaacaaaagccgtgagtggttccgggggacacccagtactggtttccagctagg'.
-'aaggagccccaaaggggaggaggtgcagaggagggtgtggcagtgctgtcccgtcccacccattccctgccatgtgg'.
-'caggtggcactaacactcctgaggccacagggcctcacagagacacggtgaccctacctgtccctcagctctcacaa'.
-'ggcacaagccccaccactgcacggttggggtgggaaccaaggaggtgggtcccaggagagtttctgtgggggcagga'.
-'ggtgtgaaggcaggaggtgaggggacatgcccgaggggcgcagcgtcagcctccctactatggtagagactggggaa'.
-'cctgtcacagtgtctgggcctgatgcctggctcctggggcaagcgtctcagcagctgcactcctgcctaccgggtgc'.
-'tttcccaggcggtcgcaggccgagtggcctcgttcctcccgggttgagcctcacactcttctcttcccaggggatgt'.
-'gagcatggccaggtcccactcaccagtgacaagctcacggacctcgttgtcccgggcagccctcagcaggcgcacca'.
-'gggcaggcacaccaccgcagtcccggatggcggccttgttgtcagtgtcgcggccataggagaggttgcgcagtgcc'.
-'ccacaggcccggcgccgcacctcagcccgcgggtggtccagcagtgccacaagcagcggcagcccccgcaactgccg'.
-'tacacgccgcttgacaccctcgttctcaaagcacagatgctgcaggtaggcggccgcattggccttcacggggtcca'.
-'cggggtgccgcagcatggccagcacctcaggcagctcagggtcccgccagcgcggctccttgcgggcgctatccact'.
-'gagggcgagcgccgcaccagccggtccaggctgcccatgctgccccgttcaggctgggccaggggcgccgtcaccat'.
-'tgggaacgcaggccgctcgtccgccagctcgccgccatcatctgctgtgtcctcgtaggccctgcacaggcaagtgg'.
-'ggcgcgtggacatcgtcacagcagccgccagccctgcctctgagctgccccatcacaccttcttcaggactgcaaac'.
-'tcacccagcagcgctgggctgagagcacctgtatcttggcccggagcatggtggggacacagagagtcatgcaccag'.
-'cccagtgagaaccaattcagagccaaatgccaaaccccagccagcggctaccaggacccaggcaaccctcccaggac'.
-'agcaaactcactcactgctgtcaccgggcagtttcccaatcccgagcaaaacaagtttctgtgagacatctgctatg'.
-'gctgctggagagaccgtctcacctcccttccacaaaaccaccccatcttccatgaggcccatctctggctgtgccag'.
-'gatgtagggggagtaaatggccctctccgcatgaagccatcccagtaggaccacctgaggagtattcaggccaccag'.
-'ccccttggggcacaagatctccttagctctcagtagccctgtgggttgctgtcatcaaaccgcctgccctgaggcta'.
-'ggagtgacggtcaggtgacttggccagggtcacacaacaaaatcctgacccgggctgtggtcacatccccactccag'.
-'agatgcagaaactgagggcaatggggacagaaccaggggctgtgacaagggccagggctctgggttctggttaccca'.
-'gagtgtggctggagcaaggccagtggccggcactcttcccagctttcctgggccctgggcctgcaggacagtgccca'.
-'gccgaactcctaccaccccagggtccacctttcttctgtccctgacgagagccaaggccaattcaaactaacatgca'.
-'tgactaactcaactgcgccacttgacaagtggggcactctgtagttggggggtggagggcagacttcccagaggagg'.
-'tagccacaggggacggggtgcagctcacctggtatgaaggccccgcccacactcaggcctcctccttgtggccgtgc'.
-'catagtcaggctccagctcagggccaccctcgtcatcagcggccaggctgcgcgtgtcatcctccaagccatacggc'.
-'tctgcctggaagcgctcgggcagggagcggccacctggtggcccaggctcaggacccaccgggaaggcttcccggtg'.
-'gccaggcagtgtgaagcagccatcaccagggcctgggccaagggggccagcacgtgggggccgcatgcccagccctc'.
-'gggacaggctgccatagctggggctgtcccggggctcggggccttcgggaaagccacccccgctgctgaggtaggct'.
-'cgagagagtgtggccactgggccaccaccacgcagcaggaaatgccggtccagggcaccatctgcaaaagggcctag'.
-'tggggggccgccatccagcagggggagtccatctgggcccacgggcacctggcgtactgtccgagtggtcaccgtct'.
-'tgacagtcttggtgacctggtggatggataggcaggtaggtggggtagcacgagaggcctagaaactgctttgctgg'.
-'ggtctggctggccttaatttcccactcgagcaatgagaggccccacgtggcaagcttccatgtccactctgcaggtg'.
-'ggacagctgcagcagcctggccctgctcacccacccactgcctgggcctggccataccttggtctcggtgcgccggg'.
-'ttgtgccatcttcggatgtgacaatagacacatgggaagtgggtgtgccggggtcctcctccaccgtcacggtctcc'.
-'tccagcacatcaggtgcctccggcatcgtggccagtgaggcctggctgcctgggctctgctcctggggcaaggaggg'.
-'acattggtgggcaggcctgctgctcagtcacccctggagtgcaggtctccacacacagcagctctgcctcagctcat'.
-'gctggccagcacaccagggtgccttcctcctggtcctgaacccacccaccccaaggcctgtttcggcccaagctgac'.
-'aaggacagcaataagttcttgccctctgaacatcgaggtgctaaccctgccccggcaccccatcctggggggaccct'.
-'ggggctggacccccatctcaggtctcctcaggctgagttggcagataaggacatagaccctggggggtgaagtcttc'.
-'agggccctccccaagctgcatggccttgctgccacaggctcctccaggccccaggaggtgccagtgagacctgcagg'.
-'atgccttcctgatgtcaaccaccacccctagctgggacatcatggtgtcctggggcctcctccctcacctgccccag'.
-'acaccttgagtatagaagccttgtgggggctgtttcagcactgcctactgactcctgtggccacactaaggttcccg'.
-'ccaccaacgccagccagacgccctcaagggacagaaatacgcagttcccagaacaccccatgcacctgcagcaccag'.
-'tatgtccttattccttccagcccagacattcttgagtgttgtgtaggcacaggtttgccctacctcgggccagtggc'.
-'tggcgcccccagtgactgagactctgggcatcatatcagagaccagacacagtagatttgagcctatgggtgccctt'.
-'gccaccattctgcatggggtgacgacactggaattctaggcaagacaactctggactgagacttttctatccacatg'.
-'cctactgactggacttgccagtgggaaaactgaggctcaaagaggataggctggcccacatcagagccaggcccaac'.
-'ccctgccgcgctgagtggcttgaggacctaagactcacagcctgccccgggcctctgactgcacaggtgcctggccc'.
-'cagggccacatggcaccaacatccggggatcggcatctagccaggatgggcaggagctgaaacccaagccctggtgg'.
-'gtgggtcaggcggagcacattcccaggcagccagggcagggtcagcaggaggacaggtcctgctttgtggcccaggc'.
-'ccctggtccctgcacaatgggtcccttgcctgggccccctggggcctgcacagacactaagctctgccaggctccag'.
-'aggcagactctgcccattcttgggcctgggaggtgagccaggttagatgctcagcgctgccctcaggacctgcctgc'.
-'caaggctcgtgggctgggaagcctccccaggtcagggtcctatcctgggggaatacttgacccccaaatgcatgcag'.
-'tgcaggtgtccaggaaggggcctgcaccaacatgttaggacaggtgtatccctcaggctgacagaggaaagaagtgg'.
-'ccacagaaggcacctccccctctcccacaggcagggtcttggaggatgacagataactttatagatggggaaactga'.
-'ggcctggcagggggaagaggatttacctagaacttcacagtccaagtgggatttcaagcacccccagagaaggcaat'.
-'ctggcaaggaaggctttgggcctcatctcgccctcagtcttgagatgtaggtggaatgcctgctgtggacctggcta'.
-'ggaaaaggggacctgttccctgggaaaaagaaatagactgaggcctagagtggggacaactggcacgctgccaggca'.
-'gggcaggctgggctcttctccaaaggcactggggagctgggactgctctgaagcaggagaaggcttgtgtggcccat'.
-'cactgctggggctgggctgccccatctgtatctggcaaatgtgtgtcaggccctgagctctctctgctgggccctgg'.
-'gcggggctcatctgagttcaagcaggggcccaggcactgaggggctgcagttctggcgacagagtgaggagggtata'.
-'aagcaagactgaggaaacgttacccaggactctgccagtgggatgtagcccctcatatatgtatatatttacatcta'.
-'ttaaaaactcagagaaaaaccccctcttccctagctaggcagtgggggtaagcgggagaggaaaaggggaggacatc'.
-'tcaggaccccgatgccactctgtggcccagcttatccctcccaccaaggctgtggtgagggtctgacaggcagagct'.
-'ggggtggtccaggagagccacgcccccgcagcaagacctggcaaccctgcggcaccacccatcagccccggcctagc'.
-'agccccgcagtaggatccagaggccccaagagtccctgctggcaaatgacctcagggagctaaaaacgagggatgac'.
-'ttcacccgggtggcaggtgcatgagtcagccagtgatcacaggaaagcccggcccctgctacacatgcccaggcaca'.
-'cacacatgcatatacatgacccctcagacagggacacatgcatgtacatacacgtgtgcaagtacccagcccggcac'.
-'aggccgagcacatcaacccgtgtgctctaacagcaccccaagggcacggcgcccactgttcccagaggcacactcgt'.
-'gagcacacatcctcccgtcctccaccgtgtatcggagacccttatccatgcagggcctcacagagtctcaacacaca'.
-'gggacaggggccaccaactctgccaatcatctgcccagcatccactctgggagtctcagagctggctggcagatgga'.
-'gaaactgaggtgtagagtagtgagaggcccatagccagctggtggctcagctctctgcaacatctttagggtggggc'.
-'tgtggaatggtgggctgactctcaacaggagttggctgcagtccctggatccctgtctggccccagtgtccatgtct'.
-'gacgtgcacctgcccaggctggcccactctcagggaccctggccctgcagccccacacagcctctgcctcagaccca'.
-'actctgggctgctcccctctgtaccctagacatgggctctaccctgaacaccccacctccagcccaatcccacatgc'.
-'tgcatcctgtcagtcgtctctcatcaccccctccccagctggggccccatccttgctcctcttgcaccccgcccggc'.
-'ctcccagcactcatccctcccttggctcttcaatctctggtgcaccaggtctggggcccccaggactggcccagaaa'.
-'caggctgctgcccaggcctggggtttcccatgagctcccttgggcttgtgggaggggccagagtgaccagggaggta'.
-'gaccacctacccctgctcacaagagggtcccgggaacacagggctgagcccagcataggggctctgggccccatcac'.
-'gcaccttcggctcagcttcttcacaaggaggtgagaaggacagagggggctggggtcgtgggacgtgctgggtagca'.
-'tcagtctcacttttgtggcaaaatgcaaggaacacagggagcagaaaagcaagattggaccaacacacagagggatg'.
-'ctggggcacaggtggctgggccctggtcccatattacttatctacccaaaccaccggacttcacagatgcaccacgg'.
-'tctgtgtcctgaagaacagactgcaggggcaggcccctcccctgtccaaggcctggctagcacacacagagaatgag'.
-'ttaaggtgagattgcacacctggatcccacacctgcaggccaggctcccagagggcaggaggtggctgctgtccgat'.
-'ggatgaatgaatgaatcttctccatccccattatggccctcccaggtagagtccaggacaagccaggctggcatctc'.
-'tcaccaggcagcaagcccttggccaccacaaaatgccctttcccttggtgccacagcctctgaccagtctccaagac'.
-'ctggagcttacttctccacacagcagtgcacctgccagggcgtggccccaggcagagatgccaaaaagccaagctgg'.
-'gggagcaaacttggggtgggagagcagggctgactgtcatccacctcagcttccccaagctcagcttggggtcatca'.
-'gacacactgtgaccatggatttcccaaaaactggtccctccacctctgagggccagaccctgggggccacaccaggg'.
-'ccgtaggacaggcaggggcctagttgcccaggtagcaggtgtgtgggagacctgcctcccaccacagagggtcttgg'.
-'ctggtctctcctctgctcagtttccctgcctgttactgaacccagcactgctctgagcagaggacaaactgcctatg'.
-'cctccccccacctcaatgctgagagggggaggatcccgttttccttagagatctcctccagcatccattagtgggca'.
-'gggcctgtctctatccctcccatcacgtgcgcctcggaggcagagaagacttccattaaagctccggaagctccttt'.
-'gcaggtcccgggagtcagagccggcgtatggggtgtggaggggagaggaggaaccctctcagggagcagaaggccta'.
-'cccgggcttccctcttcagacttcagcctccttcctgcacagacagaagccgctcaggaaggccctggctctccacc'.
-'cgtgtccccaggcacctgtcctgggcgctggccaagaagcgtccatccggtccgggccggtgccaagaggagggtca'.
-'aactgccaggggtcccgacccccccaggccccgcggatgggctccagagaccctgcggcccgccctgcatacccggg'.
-'ggcaccgcgctcacaccgccacccgcccggccctggccccagcctgacgcagcccagccaggggcgcaagacaatag'.
-'ctgcctcgggccagcggctccgcggaacaaaagcgggtcctcccgggcaggccgacgccccgccctctgcctccgac'.
-'cccgggccagggtccccccaagccaacttccctccaacctgtctgagttcggccggcatcgggccgggactcggggg'.
-'gcgctggccagcagcgggggaggcggtggctggaccaggctcggctccggcgcctcggccgctcgggctcaggctcg'.
-'gcggactcgctccccgcgggggcggatctggcggcggtcacggcgagcagccaatcgggcggggccgcgcccaggtg'.
-'gggcgtggcgggggccggggtgggcgtggcgggcggggggcgggcaatgtgaggtcccgccccccagagacaggggg'.
-'cggggccctgcagccccgggtcgccccctgtccccccacttcccaccacctccccccacccactgccggcctggact'.
-'tctgctccctccccctccctgcggcaggggtgtcactttcccgccgaaagactttggccaagtccttcccaggcctc'.
-'ggtttggcctcggtttatgaccacacttcagtccgcctgcaaagggggaaacagttccggcagggcaggtgcccgtg'.
-'ctgcgatgcacagagcacaaggcctccctcactggcacaaacctggctgcgactcagtttcacctgccatgaaatgg'.
-'gggccgatgagacagtagtcacggctctgtgagatctctccagtctcccagatcccccctcaccctcctgcccagcc'.
-'gccactctgaatgggcctgcgaagaactgtccccacagagttcgatggggacctggaaaagggccctgcaggggacc'.
-'cccactttgtatcttgggttctccccatcgaggcacagaagccccgaatgcacccccactgctcccccaggccagcc'.
-'tcaatgtgggccacaccctagggaatctagttctgctgcagtgaaaaatgggaggggaagggccaggctggagccac'.
-'cttcttatgtcaaaccccacaaaggccaagccaatggctccagcatcacgaacagggaaacaggttctgagattaaa'.
-'tgagctgagaccaacccagggagactcagtgggtctggcaagagaaagggctcgggcccaggcctcccactggcttc'.
-'tccgcagacccctcagaaaacagcctccgcagggaccactccctgctgccctgagcgccatatacagaggccactcg'.
-'gctagcatgctcaagattctaggtacccaccatgtgcccctctgagcctcagttcccccacctgcagaggggtgagc'.
-'taccctaccactggctggacccctgtatcttgcatctagggccaacctgcctggaacccctggagcagagcgcagaa'.
-'gaccagacactgcgccaaaaacgcgcccgcatcttatctttaagctggctccatcttctcaactgcaccagcagcta'.
-'gtgccccagccacctatccacctaagacgagcccaaggcaagttccctgatggcacccctccccactgggtgggcgt'.
-'cagccctgtttcagctggctgtctagaggaggggccccttcctgctggaagatgaagggcaggtagccaggaccctg'.
-'gagcagcccagtgagtgcagcagcactccccctagcctggttccccagcctcagcccccagctacctgccttgccat'.
-'tgccctggcttcccaaagcccgggctctgaccctgtggctcagcaggtagatcgctaggcacttcctactgaaacca'.
-'atctgggaaacctggccagcccaaggaggccctgcctcccctagtatcctcatcagcccagccagttgagctgcagc'.
-'cctggcaacacatgctctcttcaatcccagcctgagaaaatcaagggtagggggtcggggggagagttcaggggcag'.
-'gggtggtaggtggaggggcagtagcctgaggtcttgaagtcttttgcctgaggaggtcagggtagctccaggctgtg'.
-'ggaacatcttcccaccagggcatcaaccctccggggtgccttgggtcctcccacactgcctgtccgaggacagttcc'.
-'ggtctgggagggttggactgagcacactggcgcctgagaggcggcctcggggtcactggcttccactgtccctatat'.
-'ggcccagctgggcccagcgttctgcttccccgcctcaagtttgagggtagaggcctcacattttggagtatctcaag'.
-'tctgagggctgtgagagtggccccagcaccgagacccaccagaggcctctgagcaccaggggccatgaaaaagggcc'.
-'ccctagtgagtctcggaccctctggggacattaatttgactctgaccatgcactggtgctgggctgggccttctatg'.
-'tgggtctcatgagcagacgtaggaagcatgacgcctgctggccgacaccaagtctggacaccaagactcaaggagta'.
-'gtcaccaaccccaggtccctcggcctgacacaggctgctggttctgagccccacatgccccagccaggtgaggagag'.
-'cccatggggctgcctcaacagagaccagcgtttgctccctttctctctagatgagaagggccaggctgccccaagct'.
-'cctggcatgtgtgtgccaggcgcaggtccccagagtcagggcccagcaggaccaaagaagggcgggtggaggtgcag'.
-'gtgctgggagtatgctggggggaggtctggctgctgggtttagcggggcagggagctgagccagggagacaggactc'.
-'tgcagggagagccctctagggtcactctgtgaagaacccagaggccgcagcaggaggcaacccccccagcctctaag'.
-'ctgggtggtgaggagagcccccttccccgtggctgctgggacagctccaccctgactccccactgtgctagccctca'.
-'gtcagtaacaggaaccatgataatcacaccacatcccaagtctccctgcatgtacttgttccggcctcctaacccca'.
-'agccaggggctcttgctgtttcatctacaggttagagcactggggtgctgggaatggggtgtcccagtggtctaact'.
-'gctcactgcataccccaactttagagttcttagggcctggccatggaacacagaaggctctatacctcctgaggctg'.
+  my $seq = 
+    'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
+      'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.
+	'gcacaaggctggcatttctgaaccttgcccctctgcaaacacaagggggcgatggtggcactccaagcaaaggggcg'.
+	  'tgtgggtgctgcaggaggagcacagagcactggcgcccctcccctcccgccctgcagatgccggaggccccgcctct'.
+	    'gctgttggcagctgtgttgctgggcctggtgctgctggtggtgctgctgctgcttctgaggcactggggctggggcc'.
+	      'tgtgccttatcggctggaacgagttcatcctgcagcccatccacaacctgctcatgggtgacaccaaggagcagcgc'.
+		'atcctgaaccatgtgctgcagcatgcggagcccgggaacgcacagagcgtgctggaggccattgacacctactgcga'.
+		  'gcagaaggagtgggccatgaacgtgggcgacaagaaaggtggggtccgggccagcaggtgctcagctctgggacagg'.
+		    'gacccaggaccaggcatcaaagcccttacaggagaagctgttatcaccccatttccagggggctgggaaccctggga'.
+		      'tatgcccagatagggctggggggctcctctggagtcccagggtgccagggtccctgatgacccctgcaggccctgct'.
+			'gcctgctgccccaggacaacaggcccccacactcacagggtctgacggtggtgcagttccccttgaactctgttctg'.
+			  'gccaccatgggacctgcctggggaccagtcagacaggttctcctgggcccgcctcccgcttgaacttcagcctgggg'.
+			    'cacaggatgtgttaccgggctcacggagtgactcagggaactagtgccgccccagggccccaaggtgggcggttcgg'.
+			      'tgattcagagagggcagctctgtgttaggacacactggggccagccaggaagggtggaaaagatagggaccagcgtg'.
+				'agcatagaggctaagggaccatgggagctccaagcgcgctcacagtggggaccaggtcctgggggctggggacacca'.
+				  'gggaggtgaaatacccctccagcgggtagggagggtgggcagaggagggccagcggccaggcatttgggaggggctc'.
+				    'ctgctctttgggagaggtggggggccgtgcctggggatccaagttcccctctctccacctgtgctcacctctcctcc'.
+				      'gtccccaaccctgcacaggcaagatcgtggacgccgtgattcaggagcaccagccctccgtgctgctggagctgggg'.
+					'gcctactgtggctactcagctgtgcgcatggcccgcctgctgtcaccaggggcgaggctcatcaccatcgagatcaa'.
+					  'ccccgactgtgccgccatcacccagcggatggtggatttcgctggcatgaaggacaaggtgtgcatgcctgacccgt'.
+					    'tgtcagacctggaaaaagggccggctgtgggcagggagggcatgcgcactttgtcctccccaccaggtgttcacacc'.
+					      'acgttcactgaaaacccactatcaccaggcccctcagtgcttcccagcctggggctgaggaaagacccccccagcag'.
+						'ctcagtgagggtctcacagctctgggtaaactgccaaggtggcaccaggaggggcagggacagagtggggccttgtc'.
+						  'atcccagaaccctaaagaaaactgatgaatgcttgtatgggtgtgtaaagatggcctcctgtctgtgtgggcgtggg'.
+						    'cactgacaggcgctgttgtataggtgtgtagggatggcctcctgtctgtgaggacgtgggcactgacaggcgctgtt'.
+						      'ccaggtcacccttgtggttggagcgtcccaggacatcatcccccagctgaagaagaagtatgatgtggacacactgg'.
+							'acatggtcttcctcgaccactggaaggaccggtacctgccggacacgcttcttttggaggtgagccccaaccaggat'.
+							  'ggcatccgtgccagctgctgcccagagcccattcagtcagcctcagcctctccaaagagccaggcattccagtagag'.
+							    'ccctgtgtggacacagctcgctctggaggcaccacctgaggtctgggagtgtgggggactgaggaggccctgtggtg'.
+							      'ggtggagatgggtggggagctgggccaggggcctggctgggtggcctgttgggaactggggagccagctgcctgtgc'.
+								'aggtgcaaaatgggtggcagaagtggggtgcacaccccagaccagacaccagggcagaaacggcacaggaccaagga'.
+								  'gatggggtggggaagggccgctctgggcccagcctgctctcccccaagcaagccactgctcgtgcaaagaaagcatg'.
+								    'tgtctcctgcagatcttcctcctgaggccccatcttgtgcattcccccaacccagccccactggcgaggaccctgag'.
+								      'tgccccgagtgaggctagacagcgggtggggctgtcctcgcttccctggggggcgtggggcactggtggcccttcac'.
+									'agactgatgcttaaggagcctcacatcagtgacacactgccccatccctccctggtggtcagcgacactgagtggct'.
+									  'ctgtgatcctccactgggcttgggacacccaccctcacggcctctccacctggtgctcgctcacctgcagctctccc'.
+									    'agaaactggacactgctgttagcagccagactaggagcacgaggggcacagcccccatgcctggctaggtagggccg'.
+									      'ctggaccctggacacggattggaaggaaccagcactagcagaagcctgaggtgtgaaagggcagagaatgttccagg'.
+										'aacaatgggagtcagggcacacaggactttgggcaggtgaggatgaggttagacctgtcttctggagctgggctcag'.
+										  'gggctcatgcctgtaacccttgcactttgggaggctacggcaggaggagcgcttgaggccaggagagttcgagacca'.
+										    'gcctgggcaacatggcaaaagaaaaaatatatatatatattttagatggagtcttgctctgtcaccaggctggagtg'.
+										      'cagtggcacgatcacggctcactgcaacctccacctcttgggttcaagcgattaccctgccttagcctcctgagtag'.
+											'ctgggactacaggcgcgcgctgccacacccggctagttttttgtagtttagtagagatggggtctcaccacattggc'.
+											  'caggatggtctcaatatcctgacttcgtgatccgcccgcctcggcctcccaaagtgctgggattacaggcgtgagcc'.
+											    'actgcgtccggccgtattccagcttttaaaacaacaaaaaacaacaaaaacttttctggaaagatccctgtcagcct'.
+											      'tgtggagtgtggagagggctgtggggagggcatttcagatgccctgaactcacgaggaggcactgaaccctggccgt'.
+												'ggagagggaggacctgtagtggccaagggggtgggcattgggagggtgggagggagacctacaggccaagacagggt'.
+												  'agctggaggggggctcacccctgacaaaggagcatgatgctggcaattgggtattgatggcagagagctggcactca'.
+												    'gccagatgggcttcacttgggcaggaaagacacccacagctgggcctgcgttactgcggccgagtttcagcagctgt'.
+												      'gatgtgggtgctaattacaggggcctgccttcatagaaaagtagcaaacattgcagtttagtaactaggaaactaat'.
+													'agttttctcagtgctgcttgcgcaaagctggtaattatctcaaaagaagcaaagtcatgaagtgggaagtcatgaat'.
+													  'tgggaatgggtgtccttgttaaacgcacatctgcacactcagggctggggccctgtgcccccttgtggagggttagg'.
+													    'ggacaacctggctcttgtgagggtctagccatcccctcagtgggttctgtgagcatcggaggcacggggggtgaggg'.
+													      'gctcaggagcaggttgcaattcaaaatcaagggctgctttgaggaggcctctccaccgggctgctgtagtcaccaag'.
+														'tccagcccatgcccaaaggaagaggaatgagttcccccttaaaaaaaaaaaaaaaaagaaaaagacagagtcttgct'.
+														  'ctgtgcccaggctggagtgcagtgatgacatcatagctcactgtagcctcaaactcctgagctccagtgatcctccc'.
+														    'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
+														      'ggggtctccctatgttgcccagactggtctcaaactcctggcctcaagcgatcctcttgcctcaacctcccaaagtg'.
+															'ctgggagtacaggtgtgtgcttggtctgaggctccaactttttgttgttgtttctcgagacagtctctcgctctgtt'.
+															  'gcccaggctggagtgcagtggcgcgatcttggctccctgcaacctctgtgaggctccaactcttgaagggaggagag'.
+															    'tctaaggagggtgggccagatgaaaaccacctcagcatagtgtcacctgctcctctgacactgtcgcttctccatgg'.
+															      'cattagattttcagtcctgctcagacgctgatgcatgtttagccagttctccaggtggtctgagtagctggtaggag'.
+																'gcttgcagtgtcgggcgacaggcaggacaggtgctgccttctttcccctcttgaccagtttcgtaaaggagtgggcc'.
+																  'cctggcagcctccaaaggtgacccatgctcctttctgcccttccctccttctttcctgtttaactcgtgcaggtgca'.
+																    'gtggtctggtgtctttcagtccgctgacgtcttctgtatccctgatgaccagattgggctcctgagtcccctggcgc'.
+																      'aacccgagaagtccaggagcccaggcccctcactcatgcattccctggcccagactggaaggcagccgccctgctca'.
+																	'aggcctaggccattgtcctcctcccgggtggcgctttgttctacgtcttttcagctgacattgctaggacatttttt'.
+																	  'tttttttctaaatgaaaacacatcatgattcatggtggtacttcctgctcaactccggaccttggggctgtcccctg'.
+																	    'acctcactgaccttgcagccgtgtggtgtccatactgtcacatgaaagccccctgctttctctgcagcatacaggct'.
+																	      'ggaaacgaccgccacccaccaccaggacagctgcaagccctgtgggactctccaggcccatcccagaggcatgtggg'.
+																		'gtcggataccagtgtttcaaggcacctgcctgcaaattgattttattatactttagatgtttgagattgcttgttaa'.
+																		  'cttttgtttggtgactaagtcaaatttccaagacaaggtgactggggtgtcccttgccctggtaggtccttcctccc'.
+																		    'cataggcaaacacttcctctcaaggtttcttgtttatgtgatgtaagcaaacccttttctgatagcatagataggca'.
+																		      'agcatcctatgaggtttctcccgatagtggaccccacgggccatgccctatggctgcgtgtccagtaacaactcctt'.
+																			'ccttctgcacagaacccaggcagaggaactctgtgtcctcccagggcccaggcactggtgaagatggggggtctgca'.
+																			  'aatgcaggagcttggggatgtccagaactgaccccaaggggcaggcttgttgatgggaggtctgccccacctcagcc'.
+																			    'ctgcagggtcaccctggtcaggccaatattgtctccagggaccataccagcaacccctctccttgggtgcctctccc'.
+																			      'tcataggcctgagttcctggcactgggtgttgagggccccattgtttccactcacccagctagcatttattgagcac'.
+																				'ctactgtgtgccacatgctgttctaagggatggatactcctgagatggatacaggagttgatgagagaaaggtccct'.
+																				  'gtcctcacggggcccatgttctgaaggtggcacccaagtcttgtacagtcctttcctgcaggagtcacgctgggcag'.
+																				    'aaagtggaaacctggccccaggggctaggcacaggcgtggtgccgtggcctagtgaggagcacccatcctggtttgg'.
+																				      'ggcaggttctctgggcacctctgaccctcacctcccccaccccccggtctgtttgcaggaatgtggcctgctgcgga'.
+																					'aggggacagtgctactggctgacaacgtgatctgcccaggtgcgccagacttcctagcacacgtgcgcgggagcagc'.
+																					  'tgctttgagtgcacacactaccaatcgttcctggaatacagggaggtggtggacggcctggagaaggccatctacaa'.
+																					    'gggcccaggcagcgaagcagggccctgactgccccccccggcccccctctcgggctctctcacccagcctggtactg'.
+																					      'aaggtgccagacgtgctcctgctgaccttctgcggctccgggctgtgtcctaaatgcaaagcacacctcggccgagg'.
+																						'cctgcgccctgacatgctaacctctctgaactgcaacactggattgttcttttttaagactcaatcatgacttcttt'.
+																						  'actaacactggctagctatattatcttatatactaatatcatgttttaaaaatataaaatagaaattaagaatctaa'.
+																						    'atatttagatataactcgacttagtacatccttctcaactgccattcccctgctgcccttgacttgggcaccaaaca'.
+																						      'ttcaaagctccccttgacggacgctaacgctaagggcggggcccctagctggctgggttctgggtggcacgcctggc'.
+																							'ccactggcctcccagccacagtggtgcagaggtcagccctcctgcagctaggccaggggcacctgttagccccatgg'.
+																							  'ggacgactgccagcctgggaaacgaagaggagtcagccagcattcacacctttctgaccaagcaggcgctggggaca'.
+																							    'ggtggaccccgcagcagcaccagcccctctgggccccatgtggcacagagtggaagcatctccttccctactcccca'.
+																							      'ctgggccttgcttacagaagaggcaatggctcagaccagctcccgcatccctgtagttgcctccctggcccatgagt'.
+																								'gaggatgcagtgctggtttctgtccacctacacctagagctgtccccatctcctccaaggggtcagactgctagcca'.
+																								  'cctcagaggctccaagggcccagttcccaggcccaggacaggaatcaaccctgtgctagctgagttcacctgcaccg'.
+																								    'agaccagcccctagccaagattctactcctgggctcaaggcctggctagcccccagccagcccactcctatggatag'.
+																								      'acagaccagtgagcccaagtggacaagtttggggccacccagggaccagaaacagagcctctgcaggacacagcaga'.
+																									'tgggcacctgggaccacctccacccagggccctgccccagacgcgcagaggcccgacacaagggagaagccagccac'.
+																									  'ttgtgccagacctgagtggcagaaagcaaaaagttcctttgctgctttaatttttaaattttcttacaaaaatttag'.
+																									    'gtgtttaccaatagtcttattttggcttatttttaatgctttttctcagtgtttttcttctgtttctgagtcacgaa'.
+																									      'cagcaggcactgaaagcagtcccccagccactgccgaaggtcagtcccggaggtgctgcccaggctccaggcagatg'.
+																										'cggcagccccggccacagccagcatgggctggagaaaggctctctactgcacaggggcctcacgtgactgcagggct'.
+																										  'ctggggaggtggggcacctgtagcctgacccccaccttgctgcttccaaagcttccttgcccagggctgagccttgt'.
+																										    'ggggcaccccccacactgtggtctgcctgcctgcagggtgcccagggagaccctccgcctttagaagtccaagttct'.
+																										      'ttcccagccccctccctgcctagctgcctgcccctggcgccagacctggcccgcaccactggggcactgtgttccca'.
+																											'ggggcaccctcctatcccaccagccccaaagcccagccaggcacccttccctgccacctccctgggccctgccccag'.
+																											  'cagcccagtcggcctcctcgggccttctgtcactcgctcacacacagcaccatgtcagtaaacagctaactcaggcc'.
+																											    'tagggagttaggtaggatggggggagtggggtgggggggcaggagggtgtccccaaagtcaggcttggctggggcga'.
+																											      'ggcgctgccaacccctgccgccagggggctccaagctccacggcacgatctgctcagggtggcccttcttccacgat'.
+																												'ccaagccctaagaacaagaggctgggcctgggccctgcagagggaaaggggatggtggacgctgcagccactgagtg'.
+																												  'gcacaggaccacgtgtaacctcagggcagggcagccaactccacaggctacatggatggagatgtggatagaagcat'.
+																												    'ctgccctgggtggtgtgggctgaccccaagggtcttggcaccagggctgatcctgacttgctggtccccgaagggcg'.
+																												      'ttggagggtatggtgcccatccctactctggtcccatttcctcaggcccctgatcccacagtgcctgggacagggct'.
+																													'gtgggcccagggagcaccctccctctctgacctctgcctggtctttccgggaatgggccactgggctgctggactgg'.
+																													  'aggccaaagtcctgcggggaacgtgcgggaagagcagagcgtgcaggcagcagagactaacaagaagccctggccca'.
+																													    'gagggcaggaacaggtggacgaacaaccagatgagagaacgtaccaggcatgcaagctagacccaggaatcaacggg'.
+																													      'ctgaggcttagcgtcccctacggcgtccaccagcctgaccgcgggcctgctgggcccggggggaggggccttcctgc'.
+																														'tggggtcgagctgcagcgcacgggtgggcattagaggcacaatagagcaggttagttagagctcctggggggacagg'.
+																														  'gcaggggcagggccgaggctggcgatgtaagggttggcctgccaggacagcacaggtagcaccaagggcgcagggag'.
+																														    'ccggaaacgtgtggctcacacgggcccagggcgggcacgtgcacacacacaggcctgcacaggaagccaggggattg'.
+																														      'gcacacagcaggcagcaggtcctgccatcgctggtggaccctggtgggctctcacacgcacatgcacagaagggtgc'.
+																															'acacacactagctcacaggctctggcccatgcagggtgtggccgggcagtgttgtccccagtgggtgggagctgcaa'.
+																															  'acttgtcagtacccacagactgactggcgtgaaggggctgcttcctgggcttggccccacaacccagctgtacccca'.
+																															    'gggcccagaccagacccagcatggcctaggctgctctccagcaacccctagacacagggcctcaccggggacctgcc'.
+																															      'cacagccacatgaccacttactttcaagggttccttctcagaggcctctcctgcagagctggcgccccgtggcctcc'.
+																																'gctccctctggtccaccgtggagtatccgtctgtagatggggtaaggtggggcatgaggggcgctctgagggaggcc'.
+																																  'ctgtaggagcagatctccctctcagcccagacacaggggactcgtgggacaggggctttgggagacagcccccaccc'.
+																																    'accctgtcctggagatccaggctggtgccagctctcaccaacaccctgccaactctccagactcccctccacttgtg'.
+																																      'ggtcagagcccctggctgagcactaatccctctctagctgccctgtacctcaccctctaagcacccctaaaccaaat'.
+																																	'atctctcctccacccagcaccatctacaccccataaaaccagcaggcccacttcaggccttggtcccctcccggcac'.
+																																	  'agaaaaccaaccacactgcatctgcactcacctgggcccagcgcatccatggggatcacatcccggctgccagtttt'.
+																																	    'ctcgccctctgcaaggcaggaggaggaggcgggctgcatgtggcagccaggggggatcggggcagagaagcccacac'.
+																																	      'agggctggcccaggtagccctagaggctctctgtcactaaggtgcccaacctctgccagctggcagcctcaccccag'.
+																																		'cttgacaacagcgcggatgctgtgggaagggagtagccaagaggcagagggcagggaaagtggcctatggaagccgt'.
+																																		  'ctcagtgggaggcctgactcctccttcaccctcacccaagggtcaggcaactggggcagctggggtcgccaccctct'.
+																																		    'aggctccctaagctccaccactcaccaaggctcttgtccaccagtggcagcgtgctgtcatcgaagcccccaggact'.
+																																		      'cagtgctcccttaggccccttggcagtagcagcagctgactgagacataaaacacagacacagggtgggtgaagcac'.
+																																			'atggagtgggaataaggcaaagtgagcagggaatggaaggaaggccagggaagccgcacctggaagcgcgccttggt'.
+																																			  'ccaaccatctttctgcaaggtaccacgcagctccttgtagctccacactgtctgcagcacgtgtgacgccgccttcg'.
+																																			    'cttcgcgtaccgattggctgtggggccgggggcggggtcagtggtggcccctcccccacctccgcggctccccaagc'.
+																																			      'caccgaccccgcccctccacacctggaggccacgagagccaccaacgctggcaccccgcgtgcctgcaggagcgagc'.
+																																				'gcgcgttatccaggctgtcggacacgatttcgtggatggtgttgagcaccgccaccacggtgtcttcctccaggcag'.
+																																				  'gcccccggtcgcggcggagcctgtgcattgcgcacattccgcacaagctcagccatggcgtagctccctgaggggca'.
+																																				    'ggactaggtgtcagaacacacctctgccccacctctccaggaaggagcagggatcccgcgagggcgaggggcactgc'.
+																																				      'caggagagcccctggagaccgcctgtgtgcaggcggtcacaggagcccctgtgagcagggcgctgagcttcagagac'.
+																																					'agggccggggggactggagctacctccagttgggacagcgcccaagcgagagggccggggcctggactcccaaacca'.
+																																					  'ctcatcctccaagcccctccgatgggaccccaaagctgcaggcacagttcggtgcccaggcgtgggctttgcaggcg'.
+																																					    'tcctcaccgatgaggtctttgttgcgccggtccagcgagaggttgcgcagagcgatggcgacggcgcgcaccacctt'.
+																																					      'gtcggtctcagactgcagcagttccacaagcaccggcagcccgcgctctttgcgcactgtggcgcggatgtacgtgg'.
+																																						'cccactgcggaggcggggagagggttgctcagacatacatgccaggcactctcccacctccagacgctgaccgctct'.
+																																						  'ctccagctggaccttcctgctcccgtgcccgacaaagccctaccccaaaagctcaacggcacctccaccgaggtttt'.
+																																						    'cccaccgtccagggtgcacgcattgcccgcagcccatacacctcttggatcctggggtggtggtgtggcccctcctt'.
+																																						      'tccccgccagccgaggcaggagctgcaccagtgaggtgcctgggattccctctctcaggacttgcccaccctgcccg'.
+																																							'acctggtccctcaccatccagttgccggcactgaggttctgcagagcgccggcggcagcctccagggtgttgaagtt'.
+																																							  'ccggctctccgtgaggagggagaggtagagacgtaccacctcgggctggtacagcagctcaaagcctaggtgcaggg'.
+																																							    'caaccgccacccacggtcacccagaatctgctctcatccatcatacccctcccgcttcccgcttcagagctcccagg'.
+																																							      'gcgtgggtgagctggggccagggatgggtgtggatgagtcacgtaatatttactatcaacatatagtcacccaaggg'.
+																																								'gaaaagcgttcccatttcacagaggagcaaactgaggctcaaatcagttggacctgcctggcagcaggagcatccag'.
+																																								  'gaggcctggggtggggagggaggtgtcaaccaggaacgctctcctagcaacaagacccgcatttcccggtaggtccc'.
+																																								    'tgaagctatgcatcctggccacgcccctggtaatagggcccaccctccctggcaacaagaccagcattggccagtaa'.
+																																								      'ctgagagttgtataaccaaggccacacccctagcaagaggacctgctttcaccagtaactgaagctgtgcagagagc'.
+																																									'tacgccccctagcaacagggcccaccctcccccactgacaatagagcccaccctctgtaagtcaactgatgcagtgc'.
+																																									  'aaccagggcagctgccctagcaacaggaggcactcttcctggcaaccactccaagttcccgggcaattgaggcgccg'.
+																																									    'tcctgctgctctgcccagtgctccagaaatgaggggtcaaaacagccttccaagcttgcctgtctccaaactggggc'.
+																																									      'ttcagcctggcttgggtactacctcgatctcccctgtacccacccagtgacatttcatcacaccctcgccagtcctc'.
+																																										'atgccccatgctccctctactcctgccctgctgggctttctgctccaacacactccaagcacactccccgctggggt'.
+																																										  'atctgcatcagccctgctctgcctgtaatactcccccacagccctcctgcggctggagccctccaccctggtgacat'.
+																																										    'gcaggctcttccaactggctaggccccaccaggacagacctctctctcaagccagatcccagcatacagctcaatag'.
+																																										      'gcactgccctgcccctgcaggtgttcgtctggcccagcctctgaacctggatgtgagcatgcccgcctggctcccag'.
+																																											'ccccctcagataactcagctttgtggctaacacaggaggccctgcctccactggaggcgtccctccaaaccttccca'.
+																																											  'cctcttacgcaccgtgaggccgagcaagccctctgcctctctgtgcctgtctcccccaaccttgcctgacatgaccc'.
+																																											    'atggcacttcctcccattctaaaccctcagcaggtgtcctggtgctgaatcaccctccaggaaatcctgcacctagg'.
+																																											      'ggcctgtttccccatctgttccctgaggccctccaggcctgcttgatggctcaaagcttcactaccagggcaatcct'.
+																																												'gagcccagacatcccccagtggagctggcttcatctcagcccactcacctttggcggcctcagttcgcttgggcagg'.
+																																												  'tctagcgtgtcaaagttccggtccatctcaccatccttctttcctggaagggaaaggtggtgggaggtgaggcagac'.
+																																												    'cccatatggggaatgggtgtatcaggagagttgggcacagttctctcctacccaggccccaaaaggcacccccatgt'.
+																																												      'ccaggcctgggcacctgtgggagtggagcaccgttgtcagagtttgggcagacagtttagcctaggggtaggagttg'.
+																																													'gtggcagtggggcctggggatgtcccagccctgcccctaggactcatctcccaccaggtgctgggagctgtaccaca'.
+																																													  'gaccctcccggtggctcccttgcaactgccaggtatgtagactgagggaagccaggagccctggctggatggtaggt'.
+																																													    'ggatacaagccaagaaactgaaggctgaccaggacaagactcatttgggtcacacagtaaggcagaactagggggaa'.
+																																													      'actcccccagctggggtcaggacattgtcccaggatctactagccaggagaaaccccacagcagcccacctaacatt'.
+																																														'tgtgtagccctggcttgcacacgtctgtgacagtgagcccactgtcaaccactctccccatgtcagatgatgcttct'.
+																																														  'accccttcagaaggcagcagagtggagccagatgacctggggtccctgccctgctcaccctcatgggacccttgtat'.
+																																														    'ccctccgagccacatgatgccccattctatcagagaaacagactgctccttggtgcccctagagataagtacccccg'.
+																																														      'ggccctgcccactcttggctctgcccaactctgcccaggtaggcaagtctgaggttacagaatgagccccgtggcct'.
+																																															'tcccacctgccactgtcataaagatggcagcccgagtgatgaagccaggggtggggcagggccctggggctggaacg'.
+																																															  'tgctcgcctcttcccaggtacccactgcacacgccaggcctggagagcaggataaaaagggactcaccttggtggaa'.
+																																															    'ccactcctctgggaggccggaggaagcagaggagagaggagaggagcctgaacaggcagcactcatcacccccccat'.
+																																															      'gccctcccggaagcctcaggttcccactgcacaccctggatcaagcaggcagcatgtggaacctcatcccatcactt'.
+																																																'ctgggcactgagcacccaccagggggacaagaagagggaggcctggggtcagtggggcaggggcaggtggcgtacag'.
+																																																  'gtcccccacagctgctggggaggtcctgggaacctacaccctgctagtgcagtagagaaggtgtgcagggcatcttg'.
+																																																    'cccaggcagatgggggctgccccacaggttggtggcagtctacagctattctgtgaacagtgagcaggcagcagcca'.
+																																																      'tggctccttcccaactcatgggcaagtggaactctccccggagtagaaagactgggtctgggcattggttggtttcc'.
+																																																	'cttgtgtactccctgggggtcccacagtgtagatggggaaggttggacctgggtcccatcaaccatgtgacccaggg'.
+																																																	  'cagtccagcctccttgactcctggcttccctgcctgcctgttgggggctgaccaggtgtcctctagcctccatgatg'.
+																																																	    'ggctgctgtgggtgtacagagagccttccgctggggcaggagttgagatggtagagatgataccccagtccgcccca'.
+																																																	      'cccacctttggccttcttgcctccaaagcagctggcatcatcccgcctccggcgctgggagcctacagcactgccca'.
+																																																		'ggggcccgggctcggcctcctggtacctgtcggccccgggcacctccttgtgcacgtggtaggacaggttccgcatg'.
+																																																		  'atgcacacgcagttctccaccgactgcagggagaggtgagtgggtggggcagggcaccctaggcacagggctggccc'.
+																																																		    'tcaggaaagactggccacagctggtgtgcatgagggcaccgggagcaaaggaacagggagtcctcagtggaggggag'.
+																																																		      'caaaagggcggtaaccgccaggaagggtccatgggaggaagcctctgccctcacggcacaccttctgcctgcaggac'.
+																																																			'ggtgcccacttcagtgtggtcactgcgaggcgggccacacccagaacgccaccccagacccacaagcccattcccct'.
+																																																			  'gtgctgctcccacagttccagcctcctgggacctgcatgatcgtctctccagcccttggtatgaggctgtgaccgtc'.
+																																																			    'cctgcccaccttgttgtcagtgtccttccggcccacagccgactgcagggcatgcaggagcgcgtccaccagccctt'.
+																																																			      'cacactcccggagtcgccgccgggcctcagcaccatcggagctcacattcctgtgtggccaagagcaggccaggtga'.
+																																																				'cccctggctaccagaaactccctggctccaccctggccttgtgggcttgtcttcatctgcaaaataggccctgctgc'.
+																																																				  'tgccctcctagcactaatgggaaaggaccccacagtctggagctcagtgaagggggagaagctaactgcccccaggc'.
+																																																				    'ctcaggaggggagccctggcagacaactatcttggctggggatagctgggcagggaaagacagggtttccctgcctc'.
+																																																				      'ccagctgacctggaaagggacaggtgcactctcagagagacctgaacctgtgcaagggcaattctgggtccctcgcc'.
+																																																					'accccaatggcagctctgggccccaccttaccccaaggtcaagagcctgcagggctgcgcgggaacaccctgatgga'.
+																																																					  'caagcaggactgtggggacccaggactctgtggggtcagcagggcctcccaggggtaggaggggaagggcagaggtc'.
+																																																					    'acaggtggctgggatgagcctcccaggcagatgaacaggaaggtcccagctccccctctggctgtcaagtgatggga'.
+																																																					      'aggtaggtgagagctgggcagggctacggtaccacagagacccctccagagggtgcccctgggaagactgggacacc'.
+																																																						'acttgggggtgaggacagctccatcaggccccacttctcatccacaggacttgtgccacagctctgaagctcctaag'.
+																																																						  'ctctggcgctcctaagctcgccgccatcttccacactatctgggaccacgaggacggggcctggtgtgcatgtgggc'.
+																																																						    'tttagcaccaggtctggtccacacctcaggcagcccgacgtgttcttgaagacagttgtccactcggcgtcccgtgg'.
+																																																						      'cttggagtcctcgttgggctcacgctcccatcctgagtggggcacgatcacctcgtgggtcagcgtctgcaggccat'.
+																																																							'ggtcaatgatgaccatcttcaggggctcataggatgacaggttccacagggtgcctgtggggtgcgattggccaatc'.
+																																																							  'tgtgctgaccatatgcaccgcctgcctacctccccaggtggccacgctcaggacctgtcccactctcctcatgtccc'.
+																																																							    'agctcatgcagaacagtaggaagtaacaaaagccgtgagtggttccgggggacacccagtactggtttccagctagg'.
+																																																							      'aaggagccccaaaggggaggaggtgcagaggagggtgtggcagtgctgtcccgtcccacccattccctgccatgtgg'.
+																																																								'caggtggcactaacactcctgaggccacagggcctcacagagacacggtgaccctacctgtccctcagctctcacaa'.
+																																																								  'ggcacaagccccaccactgcacggttggggtgggaaccaaggaggtgggtcccaggagagtttctgtgggggcagga'.
+																																																								    'ggtgtgaaggcaggaggtgaggggacatgcccgaggggcgcagcgtcagcctccctactatggtagagactggggaa'.
+																																																								      'cctgtcacagtgtctgggcctgatgcctggctcctggggcaagcgtctcagcagctgcactcctgcctaccgggtgc'.
+																																																									'tttcccaggcggtcgcaggccgagtggcctcgttcctcccgggttgagcctcacactcttctcttcccaggggatgt'.
+																																																									  'gagcatggccaggtcccactcaccagtgacaagctcacggacctcgttgtcccgggcagccctcagcaggcgcacca'.
+																																																									    'gggcaggcacaccaccgcagtcccggatggcggccttgttgtcagtgtcgcggccataggagaggttgcgcagtgcc'.
+																																																									      'ccacaggcccggcgccgcacctcagcccgcgggtggtccagcagtgccacaagcagcggcagcccccgcaactgccg'.
+																																																										'tacacgccgcttgacaccctcgttctcaaagcacagatgctgcaggtaggcggccgcattggccttcacggggtcca'.
+																																																										  'cggggtgccgcagcatggccagcacctcaggcagctcagggtcccgccagcgcggctccttgcgggcgctatccact'.
+																																																										    'gagggcgagcgccgcaccagccggtccaggctgcccatgctgccccgttcaggctgggccaggggcgccgtcaccat'.
+																																																										      'tgggaacgcaggccgctcgtccgccagctcgccgccatcatctgctgtgtcctcgtaggccctgcacaggcaagtgg'.
+																																																											'ggcgcgtggacatcgtcacagcagccgccagccctgcctctgagctgccccatcacaccttcttcaggactgcaaac'.
+																																																											  'tcacccagcagcgctgggctgagagcacctgtatcttggcccggagcatggtggggacacagagagtcatgcaccag'.
+																																																											    'cccagtgagaaccaattcagagccaaatgccaaaccccagccagcggctaccaggacccaggcaaccctcccaggac'.
+																																																											      'agcaaactcactcactgctgtcaccgggcagtttcccaatcccgagcaaaacaagtttctgtgagacatctgctatg'.
+																																																												'gctgctggagagaccgtctcacctcccttccacaaaaccaccccatcttccatgaggcccatctctggctgtgccag'.
+																																																												  'gatgtagggggagtaaatggccctctccgcatgaagccatcccagtaggaccacctgaggagtattcaggccaccag'.
+																																																												    'ccccttggggcacaagatctccttagctctcagtagccctgtgggttgctgtcatcaaaccgcctgccctgaggcta'.
+																																																												      'ggagtgacggtcaggtgacttggccagggtcacacaacaaaatcctgacccgggctgtggtcacatccccactccag'.
+																																																													'agatgcagaaactgagggcaatggggacagaaccaggggctgtgacaagggccagggctctgggttctggttaccca'.
+																																																													  'gagtgtggctggagcaaggccagtggccggcactcttcccagctttcctgggccctgggcctgcaggacagtgccca'.
+																																																													    'gccgaactcctaccaccccagggtccacctttcttctgtccctgacgagagccaaggccaattcaaactaacatgca'.
+																																																													      'tgactaactcaactgcgccacttgacaagtggggcactctgtagttggggggtggagggcagacttcccagaggagg'.
+																																																														'tagccacaggggacggggtgcagctcacctggtatgaaggccccgcccacactcaggcctcctccttgtggccgtgc'.
+																																																														  'catagtcaggctccagctcagggccaccctcgtcatcagcggccaggctgcgcgtgtcatcctccaagccatacggc'.
+																																																														    'tctgcctggaagcgctcgggcagggagcggccacctggtggcccaggctcaggacccaccgggaaggcttcccggtg'.
+																																																														      'gccaggcagtgtgaagcagccatcaccagggcctgggccaagggggccagcacgtgggggccgcatgcccagccctc'.
+																																																															'gggacaggctgccatagctggggctgtcccggggctcggggccttcgggaaagccacccccgctgctgaggtaggct'.
+																																																															  'cgagagagtgtggccactgggccaccaccacgcagcaggaaatgccggtccagggcaccatctgcaaaagggcctag'.
+																																																															    'tggggggccgccatccagcagggggagtccatctgggcccacgggcacctggcgtactgtccgagtggtcaccgtct'.
+																																																															      'tgacagtcttggtgacctggtggatggataggcaggtaggtggggtagcacgagaggcctagaaactgctttgctgg'.
+																																																																'ggtctggctggccttaatttcccactcgagcaatgagaggccccacgtggcaagcttccatgtccactctgcaggtg'.
+																																																																  'ggacagctgcagcagcctggccctgctcacccacccactgcctgggcctggccataccttggtctcggtgcgccggg'.
+																																																																    'ttgtgccatcttcggatgtgacaatagacacatgggaagtgggtgtgccggggtcctcctccaccgtcacggtctcc'.
+																																																																      'tccagcacatcaggtgcctccggcatcgtggccagtgaggcctggctgcctgggctctgctcctggggcaaggaggg'.
+																																																																	'acattggtgggcaggcctgctgctcagtcacccctggagtgcaggtctccacacacagcagctctgcctcagctcat'.
+																																																																	  'gctggccagcacaccagggtgccttcctcctggtcctgaacccacccaccccaaggcctgtttcggcccaagctgac'.
+																																																																	    'aaggacagcaataagttcttgccctctgaacatcgaggtgctaaccctgccccggcaccccatcctggggggaccct'.
+																																																																	      'ggggctggacccccatctcaggtctcctcaggctgagttggcagataaggacatagaccctggggggtgaagtcttc'.
+																																																																		'agggccctccccaagctgcatggccttgctgccacaggctcctccaggccccaggaggtgccagtgagacctgcagg'.
+																																																																		  'atgccttcctgatgtcaaccaccacccctagctgggacatcatggtgtcctggggcctcctccctcacctgccccag'.
+																																																																		    'acaccttgagtatagaagccttgtgggggctgtttcagcactgcctactgactcctgtggccacactaaggttcccg'.
+																																																																		      'ccaccaacgccagccagacgccctcaagggacagaaatacgcagttcccagaacaccccatgcacctgcagcaccag'.
+																																																																			'tatgtccttattccttccagcccagacattcttgagtgttgtgtaggcacaggtttgccctacctcgggccagtggc'.
+																																																																			  'tggcgcccccagtgactgagactctgggcatcatatcagagaccagacacagtagatttgagcctatgggtgccctt'.
+																																																																			    'gccaccattctgcatggggtgacgacactggaattctaggcaagacaactctggactgagacttttctatccacatg'.
+																																																																			      'cctactgactggacttgccagtgggaaaactgaggctcaaagaggataggctggcccacatcagagccaggcccaac'.
+																																																																				'ccctgccgcgctgagtggcttgaggacctaagactcacagcctgccccgggcctctgactgcacaggtgcctggccc'.
+																																																																				  'cagggccacatggcaccaacatccggggatcggcatctagccaggatgggcaggagctgaaacccaagccctggtgg'.
+																																																																				    'gtgggtcaggcggagcacattcccaggcagccagggcagggtcagcaggaggacaggtcctgctttgtggcccaggc'.
+																																																																				      'ccctggtccctgcacaatgggtcccttgcctgggccccctggggcctgcacagacactaagctctgccaggctccag'.
+																																																																					'aggcagactctgcccattcttgggcctgggaggtgagccaggttagatgctcagcgctgccctcaggacctgcctgc'.
+																																																																					  'caaggctcgtgggctgggaagcctccccaggtcagggtcctatcctgggggaatacttgacccccaaatgcatgcag'.
+																																																																					    'tgcaggtgtccaggaaggggcctgcaccaacatgttaggacaggtgtatccctcaggctgacagaggaaagaagtgg'.
+																																																																					      'ccacagaaggcacctccccctctcccacaggcagggtcttggaggatgacagataactttatagatggggaaactga'.
+																																																																						'ggcctggcagggggaagaggatttacctagaacttcacagtccaagtgggatttcaagcacccccagagaaggcaat'.
+																																																																						  'ctggcaaggaaggctttgggcctcatctcgccctcagtcttgagatgtaggtggaatgcctgctgtggacctggcta'.
+																																																																						    'ggaaaaggggacctgttccctgggaaaaagaaatagactgaggcctagagtggggacaactggcacgctgccaggca'.
+																																																																						      'gggcaggctgggctcttctccaaaggcactggggagctgggactgctctgaagcaggagaaggcttgtgtggcccat'.
+																																																																							'cactgctggggctgggctgccccatctgtatctggcaaatgtgtgtcaggccctgagctctctctgctgggccctgg'.
+																																																																							  'gcggggctcatctgagttcaagcaggggcccaggcactgaggggctgcagttctggcgacagagtgaggagggtata'.
+																																																																							    'aagcaagactgaggaaacgttacccaggactctgccagtgggatgtagcccctcatatatgtatatatttacatcta'.
+																																																																							      'ttaaaaactcagagaaaaaccccctcttccctagctaggcagtgggggtaagcgggagaggaaaaggggaggacatc'.
+																																																																								'tcaggaccccgatgccactctgtggcccagcttatccctcccaccaaggctgtggtgagggtctgacaggcagagct'.
+																																																																								  'ggggtggtccaggagagccacgcccccgcagcaagacctggcaaccctgcggcaccacccatcagccccggcctagc'.
+																																																																								    'agccccgcagtaggatccagaggccccaagagtccctgctggcaaatgacctcagggagctaaaaacgagggatgac'.
+																																																																								      'ttcacccgggtggcaggtgcatgagtcagccagtgatcacaggaaagcccggcccctgctacacatgcccaggcaca'.
+																																																																									'cacacatgcatatacatgacccctcagacagggacacatgcatgtacatacacgtgtgcaagtacccagcccggcac'.
+																																																																									  'aggccgagcacatcaacccgtgtgctctaacagcaccccaagggcacggcgcccactgttcccagaggcacactcgt'.
+																																																																									    'gagcacacatcctcccgtcctccaccgtgtatcggagacccttatccatgcagggcctcacagagtctcaacacaca'.
+																																																																									      'gggacaggggccaccaactctgccaatcatctgcccagcatccactctgggagtctcagagctggctggcagatgga'.
+																																																																										'gaaactgaggtgtagagtagtgagaggcccatagccagctggtggctcagctctctgcaacatctttagggtggggc'.
+																																																																										  'tgtggaatggtgggctgactctcaacaggagttggctgcagtccctggatccctgtctggccccagtgtccatgtct'.
+																																																																										    'gacgtgcacctgcccaggctggcccactctcagggaccctggccctgcagccccacacagcctctgcctcagaccca'.
+																																																																										      'actctgggctgctcccctctgtaccctagacatgggctctaccctgaacaccccacctccagcccaatcccacatgc'.
+																																																																											'tgcatcctgtcagtcgtctctcatcaccccctccccagctggggccccatccttgctcctcttgcaccccgcccggc'.
+																																																																											  'ctcccagcactcatccctcccttggctcttcaatctctggtgcaccaggtctggggcccccaggactggcccagaaa'.
+																																																																											    'caggctgctgcccaggcctggggtttcccatgagctcccttgggcttgtgggaggggccagagtgaccagggaggta'.
+																																																																											      'gaccacctacccctgctcacaagagggtcccgggaacacagggctgagcccagcataggggctctgggccccatcac'.
+																																																																												'gcaccttcggctcagcttcttcacaaggaggtgagaaggacagagggggctggggtcgtgggacgtgctgggtagca'.
+																																																																												  'tcagtctcacttttgtggcaaaatgcaaggaacacagggagcagaaaagcaagattggaccaacacacagagggatg'.
+																																																																												    'ctggggcacaggtggctgggccctggtcccatattacttatctacccaaaccaccggacttcacagatgcaccacgg'.
+																																																																												      'tctgtgtcctgaagaacagactgcaggggcaggcccctcccctgtccaaggcctggctagcacacacagagaatgag'.
+																																																																													'ttaaggtgagattgcacacctggatcccacacctgcaggccaggctcccagagggcaggaggtggctgctgtccgat'.
+																																																																													  'ggatgaatgaatgaatcttctccatccccattatggccctcccaggtagagtccaggacaagccaggctggcatctc'.
+																																																																													    'tcaccaggcagcaagcccttggccaccacaaaatgccctttcccttggtgccacagcctctgaccagtctccaagac'.
+																																																																													      'ctggagcttacttctccacacagcagtgcacctgccagggcgtggccccaggcagagatgccaaaaagccaagctgg'.
+																																																																														'gggagcaaacttggggtgggagagcagggctgactgtcatccacctcagcttccccaagctcagcttggggtcatca'.
+																																																																														  'gacacactgtgaccatggatttcccaaaaactggtccctccacctctgagggccagaccctgggggccacaccaggg'.
+																																																																														    'ccgtaggacaggcaggggcctagttgcccaggtagcaggtgtgtgggagacctgcctcccaccacagagggtcttgg'.
+																																																																														      'ctggtctctcctctgctcagtttccctgcctgttactgaacccagcactgctctgagcagaggacaaactgcctatg'.
+																																																																															'cctccccccacctcaatgctgagagggggaggatcccgttttccttagagatctcctccagcatccattagtgggca'.
+																																																																															  'gggcctgtctctatccctcccatcacgtgcgcctcggaggcagagaagacttccattaaagctccggaagctccttt'.
+																																																																															    'gcaggtcccgggagtcagagccggcgtatggggtgtggaggggagaggaggaaccctctcagggagcagaaggccta'.
+																																																																															      'cccgggcttccctcttcagacttcagcctccttcctgcacagacagaagccgctcaggaaggccctggctctccacc'.
+																																																																																'cgtgtccccaggcacctgtcctgggcgctggccaagaagcgtccatccggtccgggccggtgccaagaggagggtca'.
+																																																																																  'aactgccaggggtcccgacccccccaggccccgcggatgggctccagagaccctgcggcccgccctgcatacccggg'.
+																																																																																    'ggcaccgcgctcacaccgccacccgcccggccctggccccagcctgacgcagcccagccaggggcgcaagacaatag'.
+																																																																																      'ctgcctcgggccagcggctccgcggaacaaaagcgggtcctcccgggcaggccgacgccccgccctctgcctccgac'.
+																																																																																	'cccgggccagggtccccccaagccaacttccctccaacctgtctgagttcggccggcatcgggccgggactcggggg'.
+																																																																																	  'gcgctggccagcagcgggggaggcggtggctggaccaggctcggctccggcgcctcggccgctcgggctcaggctcg'.
+																																																																																	    'gcggactcgctccccgcgggggcggatctggcggcggtcacggcgagcagccaatcgggcggggccgcgcccaggtg'.
+																																																																																	      'gggcgtggcgggggccggggtgggcgtggcgggcggggggcgggcaatgtgaggtcccgccccccagagacaggggg'.
+																																																																																		'cggggccctgcagccccgggtcgccccctgtccccccacttcccaccacctccccccacccactgccggcctggact'.
+																																																																																		  'tctgctccctccccctccctgcggcaggggtgtcactttcccgccgaaagactttggccaagtccttcccaggcctc'.
+																																																																																		    'ggtttggcctcggtttatgaccacacttcagtccgcctgcaaagggggaaacagttccggcagggcaggtgcccgtg'.
+																																																																																		      'ctgcgatgcacagagcacaaggcctccctcactggcacaaacctggctgcgactcagtttcacctgccatgaaatgg'.
+																																																																																			'gggccgatgagacagtagtcacggctctgtgagatctctccagtctcccagatcccccctcaccctcctgcccagcc'.
+																																																																																			  'gccactctgaatgggcctgcgaagaactgtccccacagagttcgatggggacctggaaaagggccctgcaggggacc'.
+																																																																																			    'cccactttgtatcttgggttctccccatcgaggcacagaagccccgaatgcacccccactgctcccccaggccagcc'.
+																																																																																			      'tcaatgtgggccacaccctagggaatctagttctgctgcagtgaaaaatgggaggggaagggccaggctggagccac'.
+																																																																																				'cttcttatgtcaaaccccacaaaggccaagccaatggctccagcatcacgaacagggaaacaggttctgagattaaa'.
+																																																																																				  'tgagctgagaccaacccagggagactcagtgggtctggcaagagaaagggctcgggcccaggcctcccactggcttc'.
+																																																																																				    'tccgcagacccctcagaaaacagcctccgcagggaccactccctgctgccctgagcgccatatacagaggccactcg'.
+																																																																																				      'gctagcatgctcaagattctaggtacccaccatgtgcccctctgagcctcagttcccccacctgcagaggggtgagc'.
+																																																																																					'taccctaccactggctggacccctgtatcttgcatctagggccaacctgcctggaacccctggagcagagcgcagaa'.
+																																																																																					  'gaccagacactgcgccaaaaacgcgcccgcatcttatctttaagctggctccatcttctcaactgcaccagcagcta'.
+																																																																																					    'gtgccccagccacctatccacctaagacgagcccaaggcaagttccctgatggcacccctccccactgggtgggcgt'.
+																																																																																					      'cagccctgtttcagctggctgtctagaggaggggccccttcctgctggaagatgaagggcaggtagccaggaccctg'.
+																																																																																						'gagcagcccagtgagtgcagcagcactccccctagcctggttccccagcctcagcccccagctacctgccttgccat'.
+																																																																																						  'tgccctggcttcccaaagcccgggctctgaccctgtggctcagcaggtagatcgctaggcacttcctactgaaacca'.
+																																																																																						    'atctgggaaacctggccagcccaaggaggccctgcctcccctagtatcctcatcagcccagccagttgagctgcagc'.
+																																																																																						      'cctggcaacacatgctctcttcaatcccagcctgagaaaatcaagggtagggggtcggggggagagttcaggggcag'.
+																																																																																							'gggtggtaggtggaggggcagtagcctgaggtcttgaagtcttttgcctgaggaggtcagggtagctccaggctgtg'.
+																																																																																							  'ggaacatcttcccaccagggcatcaaccctccggggtgccttgggtcctcccacactgcctgtccgaggacagttcc'.
+																																																																																							    'ggtctgggagggttggactgagcacactggcgcctgagaggcggcctcggggtcactggcttccactgtccctatat'.
+																																																																																							      'ggcccagctgggcccagcgttctgcttccccgcctcaagtttgagggtagaggcctcacattttggagtatctcaag'.
+																																																																																								'tctgagggctgtgagagtggccccagcaccgagacccaccagaggcctctgagcaccaggggccatgaaaaagggcc'.
+																																																																																								  'ccctagtgagtctcggaccctctggggacattaatttgactctgaccatgcactggtgctgggctgggccttctatg'.
+																																																																																								    'tgggtctcatgagcagacgtaggaagcatgacgcctgctggccgacaccaagtctggacaccaagactcaaggagta'.
+																																																																																								      'gtcaccaaccccaggtccctcggcctgacacaggctgctggttctgagccccacatgccccagccaggtgaggagag'.
+																																																																																									'cccatggggctgcctcaacagagaccagcgtttgctccctttctctctagatgagaagggccaggctgccccaagct'.
+																																																																																									  'cctggcatgtgtgtgccaggcgcaggtccccagagtcagggcccagcaggaccaaagaagggcgggtggaggtgcag'.
+																																																																																									    'gtgctgggagtatgctggggggaggtctggctgctgggtttagcggggcagggagctgagccagggagacaggactc'.
+																																																																																									      'tgcagggagagccctctagggtcactctgtgaagaacccagaggccgcagcaggaggcaacccccccagcctctaag'.
+																																																																																										'ctgggtggtgaggagagcccccttccccgtggctgctgggacagctccaccctgactccccactgtgctagccctca'.
+																																																																																										  'gtcagtaacaggaaccatgataatcacaccacatcccaagtctccctgcatgtacttgttccggcctcctaacccca'.
+																																																																																										    'agccaggggctcttgctgtttcatctacaggttagagcactggggtgctgggaatggggtgtcccagtggtctaact'.
+																																																																																										      'gctcactgcataccccaactttagagttcttagggcctggccatggaacacagaaggctctatacctcctgaggctg'.
 'agtaggggccggagcccagtctgaggataatggccagcagagaaaatgaggctcccaggtcagcctctaagctgcag'.
 'gcagagctctgggcctcctcctggggctgacccaccagtgcatgcaatgaacactgtggcagggttaggcatggtgc'.
 'aggcaaacccctaaagtgtctctaggcagaccaaagagctgcccagaacagaccccatccagctgcctgggccctga'.

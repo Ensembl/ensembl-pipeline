@@ -35,7 +35,7 @@ print "ok 1\n";    # 1st test passes.
     
 my $ens_test = EnsTestDB->new();
 
-$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
+$ens_test->do_sql_file("t/dumps/blastgenscanpepDB.dump");
     
 my $db = $ens_test->get_DBSQL_Obj;
 

@@ -1,26 +1,8 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use Test;
+use strict;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..6\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 6;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::Genscan;
 use Bio::PrimarySeq;
@@ -28,58 +10,38 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Exon;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+ok(1);
+
+ok(my $seq =  set_seq());
+
+ok(my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
+				       -id          => 'HSAC74',
+				       -accession   => 'ACOOOO74',
+				       -moltype     => 'dna'));
 
 
-my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
-                                    -id          => 'HSAC74',
-                                    -accession   => 'ACOOOO74',
-                                    -moltype     => 'dna');
 
-
-unless ($clone) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
-
-#create Genscan object    
-
-my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
+ok(my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
     -QUERY => $clone,
     -GENSCAN => 'genscan',
     -MATRIX  => 'HumanIso.smat'
-);
+));
  
-unless ($genscan)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
 
-#run Genscan 
-#$genscan->protect('.genscan');                                               
-$genscan->run();
-print "ok 4\n"; # 4th test passed
+ok($genscan->run);
 
-#get and store the output
-my @results = $genscan->output();
-display (@results);
+ok(my @results = $genscan->output);
 
-unless (@results) 
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
+ok(display (@results));
 
-#check re-translation of features can be matched within peptides
 my $all_exons_found = 1;
-my @peptides = $genscan->genscan_peptides;
+
+ok(my @peptides = $genscan->genscan_peptides);
 
 foreach my $feat_pair (@results) {
-#  print STDERR "Gene $feat_pair\n";
+
     if ($all_exons_found == 1) {
 
-#      print STDERR "Phase " . $feat_pair->phase . "\n";
       $all_exons_found = 0;
       my $exon = Bio::EnsEMBL::Exon->new();
       $exon->temporary_id ($feat_pair->seqname);
@@ -89,21 +51,18 @@ foreach my $feat_pair (@results) {
       $exon->phase        ($feat_pair->phase);
       $exon->contig_id    ($clone->id);
       $exon->contig       ($clone);
-#      $exon->attach_seq   ($clone);  ## the Bio::EnsEMBL::Exon class does nothing with the attached seq.
-      
-#      print STDERR "\n";
+
       foreach my $full_pep (@peptides) {
 	
-#	print STDERR "$full_pep\n";
 	my $exon_pep = $exon->translate->seq;
 	
 	$exon_pep =~ s/^M//i; # remove leading M's
 	$exon_pep =~ s/\*$//; # remove strailing tops
 	$exon_pep =~ s/X$//;  # remove trailing Xs - should track these
 
-#	print STDERR $exon->phase . " " . "$exon_pep\n";		
+
 	if (index ($full_pep, $exon_pep) > -1) {
-#	  print STDERR "Found exon\n";
+
 	  $all_exons_found = 1;
 	  last;
 	}
@@ -111,29 +70,26 @@ foreach my $feat_pair (@results) {
     }
   }
 
-unless ($all_exons_found)
-{ print "not ok 6\n"; }
-else
-{ print "ok 6\n"; }
+ok($all_exons_found);
 
 sub display {
-    my @results = @_;
-    #Display output
-    foreach my $obj (@results)
-    {
-       print ($obj->gffstring . "\n");
-       if ($obj->sub_SeqFeature)
-       {
-            foreach my $exon ($obj->sub_SeqFeature)
-            {
-                print "Exon: ".$exon->gffstring."\n";
-            }
-       }
+  my @results = @_;
+  
+  foreach my $obj (@results) {
+
+    print ($obj->gffstring . "\n");
+
+    if ($obj->sub_SeqFeature) {
+
+      foreach my $exon ($obj->sub_SeqFeature) {
+	print "Exon: ".$exon->gffstring."\n";
+      }
     }
+  }
 }
 
 sub set_seq {
-#embedded sequence! Because I can't create Bio::PrimarySeqs from files
+  #embedded sequence! Because I can't create Bio::PrimarySeqs from files
 my $seq = 
 'cctgggctgcctggggaagcacccagggccagggagtgtgaccctgcaggctccacacaggactgccagaggcacac'.
 'acctgctctgtctacccgagggcaccagagggcacgagaaggctggctccctggcgctgacacgtcaggcaactgag'.

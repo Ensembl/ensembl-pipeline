@@ -1,76 +1,41 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..5\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 5;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
-my $seqstr =  set_seq();
+ok(1);
+
+ok(my $seqstr =  set_seq);
+
+ok(my $seq =  Bio::PrimarySeq->new(-seq         => $seqstr,
+				   -id          => 'HS97D16',
+				   -accession   => 'AL009179',
+				   -moltype     => 'dna'));
 
 
-my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seqstr,
-					-id          => 'HS97D16',
-					-accession   => 'AL009179',
-					-moltype     => 'dna');
 
-
-unless ($seq) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
-
-
-#create tRNAscan_SE object    
-my $tRNA = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-QUERY => $seq);
+ok(my $tRNA = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-QUERY => $seq));
  
-unless ($tRNA)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+ok($tRNA->run);
 
-#run tRNAscan_SE                                      
-$tRNA->run();
-print "ok 4\n"; # 4th test passed
+ok(my @results = $tRNA->output);
 
-#get and store the output
-my @results = $tRNA->output();
-display(@results);
+ok(display(@results));
 
-unless (@results) 
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
 
 sub display {
   my @results = @_;
+
   my @methods = qw( seqname start end score strand );
 
-  foreach my $obj (@results)
-    {
+  foreach my $obj (@results) {
+
       print "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();

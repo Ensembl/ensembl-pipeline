@@ -85,7 +85,7 @@ else
 
   #create SeqFetcher::Pfetch object    
   my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-								-executable  => '/usr/local/pubseq/bin/pfetch',
+								-executable  => 'pfetch',
 								-bp_index => $index_filename);
 
 unless (defined($seqfetcher))

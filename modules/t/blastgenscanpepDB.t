@@ -11,7 +11,7 @@ use Bio::EnsEMBL::Exon;
 
 ok(1);
 ok(my $ens_test = EnsTestDB->new());
-ok($ens_test->do_sql_file("t/blastgenscanpepDB.dump"));
+ok($ens_test->do_sql_file("t/dumps/blastgenscanpepDB.dump"));
 ok(my $db = $ens_test->get_DBSQL_Obj);
 
 ok(my $runnable    = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep');

@@ -2,7 +2,7 @@ use lib 't';
 use strict;
 use Test;
 
-BEGIN { $| = 1; plan test => 7;}
+BEGIN { $| = 1; plan test => 10;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::SSAHA;
 use Bio::Seq;
@@ -39,7 +39,6 @@ ok(my @output = $ssaha->output);
 foreach my $feat_pair (@output) {
   print $feat_pair->gffstring . "\n";
 }
-
 
 sub get_seqs {
 

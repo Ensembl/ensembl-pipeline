@@ -23,31 +23,33 @@ open(IN,"<$pepfile") || die "Can't open $pepfile";
 ok(my $pepseqio = new Bio::SeqIO(-fh => \*IN));
 
 while (my $pseq = $pepseqio->next_seq) {
-	ok($pseq);
+  ok($pseq);
+  
+  my $reverse = 0;
+  
+  if ($pseq->id eq 'Q91VS1') {
+    $reverse = 1;
+    
+  }
+  
+  ok(my $genewise = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new(-genomic  => $gseq,
+								    -protein  => $pseq,
+								    -reverse  => $reverse,
+								   ));
+  
+  
+  
+  #ok($genewise->run());
+  #ok(my @results = $genewise->output());
+  
+  my @results;
 
-	my $reverse = 0;
-
-	if ($pseq->id eq 'Q91VS1') {
-		$reverse = 1;
-
-	}
-
-	ok(my $genewise = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new(-genomic  => $gseq,
-																																		-protein  => $pseq,
-																																		-reverse  => $reverse,
-																																	 ));
-
-
-
-	ok($genewise->run());
-	ok(my @results = $genewise->output());
-
-	foreach my $res (@results) {
-		print "Feature " . $res->gffstring . "\n";
-		if ($res->sub_SeqFeature) {
-			foreach my $sub ($res->sub_SeqFeature) {
-				print "Sub " . $sub->gffstring . "\n";
-			}
-		}
-	}
+  foreach my $res (@results) {
+    print "Feature " . $res->gffstring . "\n";
+    if ($res->sub_SeqFeature) {
+      foreach my $sub ($res->sub_SeqFeature) {
+	print "Sub " . $sub->gffstring . "\n";
+      }
+    }
+  }
 }

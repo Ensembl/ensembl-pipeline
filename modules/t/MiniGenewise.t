@@ -15,6 +15,7 @@ open(IN,"<$genfile") || die "Can't open $genfile";
 
 ok(my $genseqio = new Bio::SeqIO(-fh => \*IN));
 ok(my $gseq     = $genseqio->next_seq);
+
 close(IN);
 
 open(IN,"<$pepfile") || die "Can't open $pepfile";
@@ -62,16 +63,16 @@ my $f16 = make_feature(12520,12723,-1,'Q91VS1',450,518,1);
 my @features2 = ($f5,$f6,$f7,$f8,$f9,$f10,$f11,$f12,$f13,$f14,$f15,$f16);
 
 my $minigenewise1 = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new('-genomic'    => $gseq,
-																																				'-protein'    => $pepseqio->next_seq,
-																																				'-features'   => [$f1,$f2,$f3,$f4],
-																																			 );
+									'-protein'    => $pepseqio->next_seq,
+									'-features'   => [$f1,$f2,$f3,$f4],
+								       );
 
 my $minigenewise2 = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new('-genomic'    => $gseq,
-																																				'-protein'    => $pepseqio->next_seq,
-																																				'-features'   => \@features2,
-																																			 );
+									'-protein'    => $pepseqio->next_seq,
+									'-features'   => \@features2,
+								       );
 
- 
+
 ok($minigenewise1);
 ok($minigenewise2);
 
@@ -85,33 +86,33 @@ ok(my @results1 = $minigenewise1->output());
 ok(my @results2 = $minigenewise2->output());
 
 foreach my $f (@results1,@results2) {
-	print "Feature " . $f->gffstring . "\n";
-	
-	if ($f->sub_SeqFeature) {
-		foreach my $sub ($f->sub_SeqFeature) {
-			print "Sub " . $sub->gffstring . "\n";
-				if ($sub->sub_SeqFeature) {
-					foreach my $subsub ($sub->sub_SeqFeature) {
-						print "  Sub sub " . $subsub->gffstring . "\n";
-					}
-				}
-			}
-		}
+  print "Feature " . $f->gffstring . "\n";
+  
+  if ($f->sub_SeqFeature) {
+    foreach my $sub ($f->sub_SeqFeature) {
+      print "Sub " . $sub->gffstring . "\n";
+      if ($sub->sub_SeqFeature) {
+	foreach my $subsub ($sub->sub_SeqFeature) {
+	  print "  Sub sub " . $subsub->gffstring . "\n";
 	}
+      }
+    }
+  }
+}
 
 sub make_feature {
-	my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand) = @_;
-
-	my $f1 = new Bio::EnsEMBL::SeqFeature(-start => $start,
-																				-end   => $end,
-																				-strand => $strand);
-	my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
-																				-start   => $hstart,
-																				-end     => $hend,
-																				-hstrand => $hstrand);
-
-	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
-																				 -feature2 => $f2);
-
-	return $fp;
+  my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand) = @_;
+  
+  my $f1 = new Bio::EnsEMBL::SeqFeature(-start => $start,
+					-end   => $end,
+					-strand => $strand);
+  my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
+					-start   => $hstart,
+					-end     => $hend,
+					-hstrand => $hstrand);
+  
+  my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
+					 -feature2 => $f2);
+  
+  return $fp;
 }

@@ -1,92 +1,57 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use Test;
+use strict;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..5\n"; 
- use vars qw($loaded); }
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 8;
+	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+      }
 
 use Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+ok(1);
+
+ok(my $seq =  set_seq());
 
 
-my $clone =  Bio::PrimarySeq->new(
-    -seq         => $seq,
-    -id          => 'AC025422.19.99723.113695',
-    -accession   => 'AC025422.19.99723.113695',
-    -moltype     => 'dna'
-);
-unless ($clone) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
+ok(my $clone =  Bio::PrimarySeq->new(
+				     -seq         => $seq,
+				     -id          => 'AC025422.19.99723.113695',
+				     -accession   => 'AC025422.19.99723.113695',
+				     -moltype     => 'dna'
+				    ));
 
 #create EPCR object    
-my $sts_db = $::pipeConf{'datadir'} . '/mapprimer_maps_130';
-my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
-    -QUERY   => $clone,
-    -STS     => $sts_db,
-    -OPTIONS => 'M=1000'
-);
+ok(my $sts_db = $::pipeConf{'datadir'} . '/mapprimer_maps_130');
+
+ok(my $epcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(
+							  -QUERY   => $clone,
+							  -STS     => $sts_db,
+							  -OPTIONS => 'M=1000'
+							 ));
  
-unless ($epcr)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+ok($epcr->run);
 
-#run EPCR                                                
-$epcr->run();
-print "ok 4\n"; # 4th test passed
+ok(my @results = $epcr->output);
 
-#get and store the output
-my @results = $epcr->output();
-display (@results);
+ok(display (@results));
 
-unless (@results) 
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
 
-#Display output
 sub display {
-    my @results = @_;
-    #Display output
-    foreach my $obj (@results)
-    {
-       print ($obj->gffstring."\n");
-       if ($obj->sub_SeqFeature)
-       {
-            foreach my $exon ($obj->sub_SeqFeature)
-            {
-                print "Sub: ".$exon->gffstring."\n";
-            }
-       }
+  my @results = @_;
+
+  foreach my $obj (@results) {
+    print ($obj->gffstring."\n");
+    if ($obj->sub_SeqFeature) {
+      foreach my $exon ($obj->sub_SeqFeature) {
+	print "Sub: ".$exon->gffstring."\n";
+      }
     }
+  }
+  return 1;
 }
 
 sub set_seq {

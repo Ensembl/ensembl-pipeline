@@ -12,14 +12,17 @@ use Bio::EnsEMBL::RawContig;
 use Bio::SeqIO;
 
 ok(1);
+
 ok(my $dnafile = 't/data/AC099340.fa.masked');
+
 ok(open(IN,"<$dnafile"));
+
 ok(my $seqio = new Bio::SeqIO(-fh => \*IN, -format => 'fasta'));
 
 ok(my $dnaseq = $seqio->next_seq);
 
 ok(my $contig = new Bio::EnsEMBL::RawContig(-id  => $dnaseq->id,
-																						-seq => $dnaseq->seq));
+					    -seq => $dnaseq->seq));
 
 ok(my $analysis = new Bio::EnsEMBL::Analysis(-logic_name => 'gene'));
 
@@ -68,45 +71,47 @@ my $exon5 = make_feature(33932,34045,-1);
 my $sub5  = make_feature(33933,34043,-1,'Q91VS1',148,184,1,287);
 
 my $tranf = new Bio::EnsEMBL::SeqFeature(-start   => 33933,
-																				 -end     => 57017,
-																				 -strand  => -1);
+					 -end     => 57017,
+					 -strand  => -1);
 
 $tranf->add_sub_SeqFeature($exon5,'EXPAND');
 $tranf->add_sub_SeqFeature($exon4,'EXPAND');
 $tranf->add_sub_SeqFeature($exon3,'EXPAND');
 $tranf->add_sub_SeqFeature($exon2,'EXPAND');
+
 ok($tranf->add_sub_SeqFeature($exon1,'EXPAND'));
-print "sog\n";
+
 ok(my ($transcript) = Bio::EnsEMBL::Pipeline::GeneUtils::SeqFeature_to_Transcript($tranf,$contig,$analysis,'',1));
 
 foreach my $exon (@{$transcript->get_all_Exons}) {
 	print "Exon " . $exon->start . " " . $exon->end . " " . $exon->strand . "\n";
 }
+
 print $transcript->translation->start . "\n";
 print $transcript->translation->end   . "\n";
 print $transcript->translate->seq . "\n";
 
 sub make_feature {
-	my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand) = @_;
-
-	my $seqname = 'AC099340';
-
-	my $f1 = new Bio::EnsEMBL::SeqFeature(-seqname  => $seqname,
-																				-start => $start,
-																				-end   => $end,
-																				-strand => $strand);
-
-	if (defined($hid)) {
-		my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
-																					-start   => $hstart,
-																					-end     => $hend,
-																					-hstrand => $hstrand);
-		
-		my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
-																					 -feature2 => $f2);
-
-		return $fp;
-	} else {
-		return $f1;
-	}
+  my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand) = @_;
+  
+  my $seqname = 'AC099340';
+  
+  my $f1 = new Bio::EnsEMBL::SeqFeature(-seqname  => $seqname,
+					-start => $start,
+					-end   => $end,
+					-strand => $strand);
+  
+  if (defined($hid)) {
+    my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
+					  -start   => $hstart,
+					  -end     => $hend,
+					  -hstrand => $hstrand);
+    
+    my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
+					   -feature2 => $f2);
+    
+    return $fp;
+  } else {
+    return $f1;
+  }
 }

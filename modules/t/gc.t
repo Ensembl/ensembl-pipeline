@@ -1,93 +1,38 @@
-## Bioperl Test Harness Script for Modules
-##
+use lib 't';
+use Test;
+use strict;
 
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
-
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..6\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 7;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::GC;
 use Bio::PrimarySeq;
-use strict;
 
-$loaded = 1;
-print "ok 1\n";;    # 1st test passed.
+ok(1);
 
-my $seqstr =  set_seq();
+ok(my $seqstr =  set_seq());
 
-my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seqstr,
-					-id          => 'HSAC74',
-					-accession   => 'ACOOOO74',
-					-moltype     => 'dna');
-
-if ($seq) {
-  print "ok 2\n";
-}else {
-  print "not ok 2\n";
-}
-
-# Get a Bio::EnsEMBL::Pipeline::Runnable::GC object.
-
-my $gc = Bio::EnsEMBL::Pipeline::Runnable::GC->new(-QUERY => $seq);
-
-if ($gc) {
-  print "ok 3\n";
-}else {
-  print "not ok 3\n";
-}
-
-# Fiddle with the window size.
-
-if ($gc->window(1000)) {
-  print "ok 4\n";
-} else {
-  print "not ok 4\n";
-}
+ok(my $seq =  Bio::PrimarySeq->new(-seq       => $seqstr,
+				   -id        => 'HSAC74',
+				   -accession => 'ACOOOO74',
+				   -moltype   => 'dna'));
 
 
-# Run this sucker and see.
+ok(my $gc = Bio::EnsEMBL::Pipeline::Runnable::GC->new(-QUERY => $seq));
 
-$gc->run();
+ok($gc->window(1000));
 
-print "ok 5\n";
+ok($gc->run);
 
-# Retrieve output.
-
-my @output = $gc->output;
-
-if (@output) {
-  print "ok 6\n";
-}else {
-  print "not ok 6\n";
-}
-
-# Display the results.
+ok(my @output = $gc->output);
 
 my @methods = qw(seqname start end strand score);
+
 foreach my $window (@output) {
-    print "\n";
-    foreach my $method_name (@methods) {
-        my $value = $window->$method_name();
-        printf ("%10s = $value\n", $method_name);
-    }
+  print "\n";
+  foreach my $method_name (@methods) {
+    my $value = $window->$method_name();
+    printf ("%10s = $value\n", $method_name);
+  }
 }
 
 

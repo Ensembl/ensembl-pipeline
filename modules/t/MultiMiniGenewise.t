@@ -62,9 +62,9 @@ my $f16 = make_feature(12520,12723,-1,'Q91VS1',450,518,1,291);
 my @features = ($f1,$f2,$f3,$f4,$f5,$f6,$f7,$f8,$f9,$f10,$f11,$f12,$f13,$f14,$f15,$f16);
 
 my $mmgw = Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise->new('-genomic'    => $gseq,
-																																		'-features'   => \@features,
-																																		'-seqfetcher' => $seqfetcher,
-																															);
+								    '-features'   => \@features,
+								    '-seqfetcher' => $seqfetcher,
+								   );
 
 ok($mmgw);
 
@@ -75,35 +75,35 @@ ok(1);
 ok(my @results = $mmgw->output());
 
 foreach my $f (@results) {
-	print "Feature " . $f->gffstring . "\n";
-	
-	if ($f->sub_SeqFeature) {
-		foreach my $sub ($f->sub_SeqFeature) {
-			print "Sub " . $sub->gffstring . "\n";
-				if ($sub->sub_SeqFeature) {
-					foreach my $subsub ($sub->sub_SeqFeature) {
-						print "  Sub sub " . $subsub->gffstring . "\n";
-					}
-				}
-			}
-		}
+  print "Feature " . $f->gffstring . "\n";
+  
+  if ($f->sub_SeqFeature) {
+    foreach my $sub ($f->sub_SeqFeature) {
+      print "Sub " . $sub->gffstring . "\n";
+      if ($sub->sub_SeqFeature) {
+	foreach my $subsub ($sub->sub_SeqFeature) {
+	  print "  Sub sub " . $subsub->gffstring . "\n";
 	}
+      }
+    }
+  }
+}
 
 sub make_feature {
-	my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand,$score) = @_;
-
-	my $f1 = new Bio::EnsEMBL::SeqFeature(-start => $start,
-																				-end   => $end,
-																				-strand => $strand);
-	my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
-																				-start   => $hstart,
-																				-end     => $hend,
-																				-hstrand => $hstrand);
-
-	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
-																				 -feature2 => $f2);
-
-	$fp->score($score);
-
-	return $fp;
+  my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand,$score) = @_;
+  
+  my $f1 = new Bio::EnsEMBL::SeqFeature(-start => $start,
+					-end   => $end,
+					-strand => $strand);
+  my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $hid,
+					-start   => $hstart,
+					-end     => $hend,
+					-hstrand => $hstrand);
+  
+  my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f1,
+					 -feature2 => $f2);
+  
+  $fp->score($score);
+  
+  return $fp;
 }
