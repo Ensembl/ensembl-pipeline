@@ -82,6 +82,7 @@ use Bio::Tools::BPlite;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+    require "Bio/EnsEMBL/Pipeline/Blast_conf.pl";
 }
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -114,7 +115,7 @@ sub new {
     $self->{'_database'}  = undef;     # name of database
     $self->{'_threshold'} = undef;     # Threshold for hit filterting
     $self->{'_options'}   = undef;     # arguments for blast
-    $self->{'_filter'}    = 0;         # Do we filter features?
+    $self->{'_filter'}    = 1;         # Do we filter features?
     $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
 
     $self->{'_workdir'}   = undef;     # location of temp directory
@@ -122,6 +123,7 @@ sub new {
     $self->{'_results'}   = undef;     # file to store results of analysis
     $self->{'_prune'}     = 1;         # 
     $self->{'_coverage'}  = 10;
+    $self->{'_blast_re'}  = undef;
 
     # Now parse the input options and store them in the object
 
@@ -216,7 +218,7 @@ sub run {
     #parse output and create features
     $self->parse_results;
     $self->deletefiles();
-  }
+}
 
 sub databases {
   my ($self,@dbs) = @_;
@@ -262,7 +264,7 @@ sub run_analysis {
 
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
-  }
+}
 
 
 =head2 fetch_databases
@@ -396,33 +398,24 @@ sub parse_results {
     @parsers = $self->get_parsers;
   }
 
+  my $re = $self->blast_re;
+
   foreach my $parser (@parsers) {
-    print STDERR "New parser\n";
+    # print STDERR "New parser\n";
   NAME: while  ( my $sbjct =$parser->nextSbjct) {
       
-    my $name = $sbjct->name ;	  
+    my $fasta_header = $sbjct->name ;	  
 
-    print STDERR "Name " . $name . "\n";
-     if (($self->filter == 1) && !defined($ids{$name})) {
+    print STDERR "Name " . $fasta_header . "\n";
+     if (($self->filter == 1) && !defined($ids{$fasta_header})) {
       next NAME;
     }
 
-    my ($ug) = $name =~ m{/ug=(.*?)\ };
-
-    if ($name =~ /\|UG\|(\S+)/) {
-         # scp - unigene ID 'patch'
-         # there must be a better way of doing this...
-         if (length $ug > 0) { # just in case "/ug=" not in header
-             $name = $ug;
-        }
-         else {
-             $name = $1;
-         }
-      } elsif ($name =~ /\S+\|(\S+)\|\S+/) {
-	  $name = $1;
-	} elsif ($name =~ /^(\S+) (\S+)/) {
-	  $name = $1 || $2;
-      }
+    my ($name) = $fasta_header =~/$re/;
+    unless ($name) {
+	$self->throw("Error getting a valid accession from \"" .
+        $fasta_header . "\"; check your Blast_conf and / or blast headers");
+    }
 
     print "Parsing name $name\n";
     HSP: while (my $hsp = $sbjct->nextHSP) {
@@ -463,7 +456,7 @@ sub parse_results {
 
       my @pruned = $search->run(@allfeatures);
 
-      print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
@@ -680,7 +673,7 @@ sub split_HSP {
 	    if ($found == 1) {
 
 		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-		print "Found " . $fp->gffstring . "\n";		
+		# print "Found " . $fp->gffstring . "\n";		
 		$self->growfplist($fp);                             	    
 	    }
 	
@@ -710,7 +703,7 @@ sub split_HSP {
     # Remember the last feature
     if ($found == 1) {
 	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-	print "Found " . $fp->gffstring . "\n";
+	# print "Found " . $fp->gffstring . "\n";
 	$self->growfplist($fp);                             	    
     }
 
@@ -942,7 +935,7 @@ sub output {
        $self->{'_fplist'} = [];
     }
     return @{$self->{'_fplist'}};
-  }
+}
 
 
 #################
@@ -996,12 +989,20 @@ sub program {
 
 sub database {
     my ($self, $db) = @_;
+    my $re_string;
 
     if (defined($db)) {
-      $self->{'_database'} = $db ;
+      $self->{'_database'} = $db;
+      $db =~ s!.*/!!;   # strip of leading path components
+
+      unless ($re_string = $::fasta_header_re{$db}) {
+        $self->throw("Must define an RE for database $db");
+      }
+      $self->blast_re($re_string);
     }
+
     return $self->{'_database'};
-  }
+}
 
 =head2 options
 
@@ -1071,6 +1072,23 @@ sub get_pars {
 	
   return @{$self->{_hits}};
 
+}
+
+sub blast_re {
+  my ($self, $re_string) = @_;
+  my $re;
+
+  if (defined $re_string) {
+    eval {
+      $re = qr!$re_string!;
+    };
+    if ($@) {
+      $self->throw("Illegal RE string $re_string");
+    }
+    $self->{'_blast_re'} = $re;
+  }
+
+  return $self->{'_blast_re'};
 }
 
 1;
