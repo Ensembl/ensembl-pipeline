@@ -364,10 +364,9 @@ sub parse_results {
             my $count = 1;
             my $total_match = 0;
             my $total_mismatch = 0;
-            my $total_qNumInsert = 0;
-            my $total_qBaseInsert = 0;
-            my $total_tNumInsert = 0;
-            my $total_tBaseInsert = 0;
+            my $total_block_score = 0;
+            my $total_query_insert = 0;
+            my $total_target_insert = 0;
             while ($count <= @chars) {
                 if ($states[$count] =~ /^[123]$/ && $current_state eq "coding") {
                     $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
@@ -391,52 +390,53 @@ sub parse_results {
                     $hsubend = ($hchars[$count] ne '-') ? $hsubend+1 : $hsubend;
                     push (@query_match, $chars[$count]);
                     push (@target_match, $hchars[$count]);
-                    $total_qBaseInsert++;
                 }
                 elsif ($states[$count] =~ /^T$/ && $current_state eq "target") {
                     $subend = ($chars[$count] ne '-') ? $subend+$inc : $subend;
                     push (@query_match, $chars[$count]);
                     push (@target_match, $hchars[$count]);
-                    $total_tBaseInsert++;
                 }
                 else {
                     # query gap
                     if ($substart == $subend) {
-                        $total_qNumInsert++;
+                        my $query_insert = $hsubend-$hsubstart+1;
+                        # adjust $total_block_score;
+                        $total_block_score += 8+4*log($query_insert);
+                        $total_query_insert += $query_insert;
                     }
                     # target gap
                     elsif ($hsubstart == $hsubend) {
-                        $total_tNumInsert++;
+                        my $target_insert = ($subend > $substart) ? $subend-$substart+1 : $substart-$subend+1; 
+                        # adjust $total_block_score;
+                        $total_block_score += 8+4*log($target_insert);
+                        $total_target_insert += $target_insert;
     		    }
                     # coding or high/low conservation
                     else {
-                        my ($align_coordinates, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert) = split_match ($substart, $hsubstart, \@query_match, \@target_match, $inc);
+                        # parse the subalignment
+                        my ($align_coordinates, $cigar_string, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert, $block_score) = split_match ($substart, $hsubstart, \@query_match, \@target_match, $inc);
+                        # increment "total" values
                         $total_match += $match;
                         $total_mismatch += $mismatch;
-                        $total_qNumInsert += $qNumInsert;
-                        $total_qBaseInsert += $qBaseInsert;
-                        $total_tNumInsert += $tNumInsert;
-                        $total_tBaseInsert += $tBaseInsert;
-                        # calculate score
-                        my $score;
-                        if (($qBaseInsert+$tBaseInsert) == 0) {
-                            $score = sprintf ("%.2f", 2*$match-2*$mismatch-8*($qNumInsert+$tNumInsert));
-	   	        }
-                        else {
-                            $score = sprintf ("%.2f", 2*$match-2*$mismatch-8*($qNumInsert+$tNumInsert)-4*log($qBaseInsert+$tBaseInsert));
-	    	        }
+                        $total_block_score += $block_score;
+                        $total_query_insert += $qBaseInsert;
+                        $total_target_insert += $tBaseInsert;
+                        # calculate score and percent identity
+                        my $score = sprintf("%.2f", 2*($match-$mismatch)-$block_score);
                         my $pid = int(100*($match/($match+$mismatch+$qBaseInsert+$tBaseInsert)));
+                        # adjust coordinates depending on strand 
                         if ($strand == -1){
                             my $tmp = $substart;
                             $substart = $subend;
                             $subend = $tmp;
 		        }
+                        # build the featurepair
                         my %feature;
                         $feature{name} = $self->clone->id;
-                        $feature{score} = $score;
                         $feature{percent_id} = $pid;
                         $feature{start} = $substart;
                         $feature{end} = $subend;
+                        $feature{score} = $score;
                         $feature{strand} = $strand;
                         $feature{hname} = $hid;
                         $feature{hstart} = $hsubstart;
@@ -448,9 +448,12 @@ sub parse_results {
                         ($feature{db}) = $self->database =~ /([^\/]+)$/;
                         ($feature{logic_name}) = $self->program =~ /([^\/]+)$/;
                         $feature{state} = $current_state;
-                        $feature{align_coor} = $align_coordinates;
+                        $feature{cigar} = $cigar_string;
                         my $fp = $self->create_feature (\%feature);
                         push (@features, $fp);
+                        if ($count == @chars) {
+                            last;
+		        }
 	       	    }
                     @query_match = $chars[$count];
                     @target_match = $hchars[$count];
@@ -465,11 +468,9 @@ sub parse_results {
 	  	    }
                     elsif ($states[$count] =~ /^Q$/) {
                         $current_state = "query";
-                        $total_qBaseInsert++;
 		    }
                     elsif ($states[$count] =~ /^T$/) {
                         $current_state = "target";
-                        $total_tBaseInsert++;
 		    }
                     if ($chars[$count] ne '-') {$substart = $subend+$inc;}
                     else {$substart = $subend;}
@@ -481,14 +482,8 @@ sub parse_results {
    	        }
     	        $count++;
 	    }
-            my $total_score;
-            if (($total_qBaseInsert+$total_tBaseInsert) == 0) {
-                $total_score = sprintf ("%.2f", 2*$total_match-2*$total_mismatch-8*($total_qNumInsert+$total_tNumInsert));
-	    }
-            else {
-                $total_score = sprintf ("%.2f", 2*$total_match-2*$total_mismatch-8*($total_qNumInsert+$total_tNumInsert)-4*log($total_qBaseInsert+$total_tBaseInsert));
-	    }
-            my $total_pid = int(100*($total_match/($total_match+$total_mismatch+$total_qBaseInsert+$total_tBaseInsert)));
+            my $total_score = sprintf ("%.2f", 2*($total_match-$total_mismatch)-$total_block_score);
+            my $total_pid = int(100*($total_match/($total_match+$total_mismatch+$total_query_insert+$total_target_insert)));
             my %feature;
             $feature{name} = $self->clone->id;
             $feature{score} = $total_score;
@@ -551,8 +546,8 @@ sub create_feature {
     $feature1->primary_tag ($feat->{primary});
     $feature1->analysis ($analysis);
 
-    if ($feat->{align_coor}) {
-        $feature1->add_tag_value ('align_coor', $feat->{align_coor});
+    if ($feat->{cigar}) {
+        $feature1->add_tag_value ('cigar', $feat->{cigar});
     }
     if ($feat->{state}) {
         $feature1->add_tag_value ('state', $feat->{state});
@@ -577,69 +572,6 @@ sub create_feature {
     if ($featurepair) {
         $featurepair->feature1->validate_prot_feature;
         $featurepair->feature2->validate_prot_feature;
-        # add to _flist
-        return $featurepair;
-    }
-    return undef;
-}
-
-=head2 create_total_feature
-
- Title    : create_total_feature
- Usage    : $self->create_feature ($feature)
- Function : creates a Bio::EnsEMBL::FeaturePair object from %feature,
-            and pushes it onto @{$self->{'_flist'}}
- Example  :
- Returns  :
- Args     :
- Throws   :
-
-=cut
-
-sub create_total_feature {
-    my ($self, $feat) = @_;
-
-    # create analysis object (will end up in the analysisprocess table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ();
-    $analysis->db ($feat->{db});
-    $analysis->program ($feat->{program});
-    $analysis->gff_source ($feat->{source});
-    $analysis->gff_feature ($feat->{primary});
-    $analysis->logic_name ($feat->{logic_name});
-
-    # create featurepair object
-    my $feature1 = Bio::EnsEMBL::SeqFeature->new ();
-    $feature1->seqname ($feat->{name});
-    $feature1->start ($feat->{start});
-    $feature1->end ($feat->{end});
-    $feature1->strand ($feat->{strand});
-    $feature1->score ($feat->{score});
-    $feature1->p_value ($feat->{p_value});
-    $feature1->percent_id ($feat->{percent_id});
-    $feature1->source_tag ($feat->{source});
-    $feature1->primary_tag ($feat->{primary});
-    $feature1->analysis ($analysis);
-
-    my $feature2 = Bio::EnsEMBL::SeqFeature->new ();
-    $feature2->seqname ($feat->{hname});
-    $feature2->start ($feat->{hstart});
-    $feature2->end ($feat->{hend});
-    $feature2->strand ($feat->{hstrand});
-    $feature2->score ($feat->{score});
-    $feature2->p_value ($feat->{p_value});
-    $feature2->percent_id ($feat->{percent_id});
-    $feature2->source_tag ($feat->{source});
-    $feature2->primary_tag ($feat->{primary});
-    $feature2->analysis ($analysis);
-
-    my $featurepair = Bio::EnsEMBL::FeaturePair->new ();
-    $featurepair->feature1 ($feature1);
-    $featurepair->feature2 ($feature2);
-
-    if ($featurepair) {
-        $featurepair->feature1->validate_prot_feature;
-        $featurepair->feature2->validate_prot_feature;
-        # add to _flist
         return $featurepair;
     }
     return undef;
@@ -671,7 +603,8 @@ sub split_match {
     my ($qstart, $hstart, $qchars_ref, $hchars_ref, $inc) = @_;
     my @qchars = @$qchars_ref;
     my @hchars = @$hchars_ref;
-    my @align_coordinates;
+    my @align_coordinates = ();
+    my $cigar_string = "";
 
     # define some variable used to calculate the score
     my $match = 0;
@@ -680,6 +613,8 @@ sub split_match {
     my $qBaseInsert = 0;
     my $tNumInsert = 0;
     my $tBaseInsert = 0;
+    my $block_score = 0;
+    my $insert = 0;
 
     # set the ungapped subalignment end
     my $qend   = $qstart;
@@ -704,8 +639,13 @@ sub split_match {
             else {
                 $mismatch++;
 	    }
+            if ($insert > 0) {
+                $block_score += 8+4*log($insert);
+                $insert = 0;
+	    }
+        # We have hit a gapped region
         } else {
-            # We have hit a gapped region. If the subalignment flag is set,
+            # If the subalignment flag is set,
             # push the coordinates on the array, and reset the start and end variables
             if ($found == 1) {
                 push (@align_coordinates, [$qstart, $hstart]);
@@ -716,6 +656,7 @@ sub split_match {
                     $tNumInsert++;
 		}
             }
+            $insert++;
             # We're in a gapped region. We need to increment the sequence that
             # doesn't have the gap in it to keep the coordinates correct.
             # We also need to reset the current end coordinates.
@@ -741,8 +682,20 @@ sub split_match {
     if ($found == 1) {
         push (@align_coordinates, [$qstart, $hstart]);
     }
-    # remove the start coordinates from the array
-    shift @align_coordinates;
+    # make the cigar string
+    my $last = $#align_coordinates;
+    if ($last >= 0) {
+        for (my $i = 0 ; $i < $last ; $i++) {
+            my $ql = ($align_coordinates[$i+1]->[0])-($align_coordinates[$i]->[0]);
+            $ql = ($ql > 0) ? $ql : -$ql;
+            my $tl = ($align_coordinates[$i+1]->[1])-($align_coordinates[$i]->[1]);
+            $tl = ($tl > 0) ? $tl : -$tl;
+            my $length = ($ql > $tl) ? $ql-$tl : $tl-$ql;
+            $cigar_string .= $align_coordinates[$i]->[0].",".$align_coordinates[$i]->[1].",$length:";
+        }
+        # add the final block
+        $cigar_string .= $align_coordinates[$#align_coordinates]->[0].",".$align_coordinates[$#align_coordinates]->[1].",0";
+    }
 
-    return (\@align_coordinates, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert);
+    return (\@align_coordinates, $cigar_string, $match, $mismatch, $qNumInsert, $qBaseInsert, $tNumInsert, $tBaseInsert, $block_score);
 }
