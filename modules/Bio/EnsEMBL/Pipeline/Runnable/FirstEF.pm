@@ -159,7 +159,7 @@ sub _write_seqs_for_firstef {
   if ($self->_repeatmask) {
     $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
   } else {
-    $seqio_out->write_seq($self->_query_seq
+    $seqio_out->write_seq($self->_query_seq)
   }
 
   $self->_seqfile($seqfile);
