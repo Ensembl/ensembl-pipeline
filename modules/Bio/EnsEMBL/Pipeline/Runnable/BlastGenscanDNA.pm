@@ -309,12 +309,12 @@ sub align_hits_to_contig2 {
   for my $feature ( @features ) {
     #print STDERR join
     #  ( "\n", 
-#	( "\n", "Blast result:",
-#	  "Start ".$feature->start." End ".$feature->end,
-#	  "hstart ".$feature->hstart." hend ".$feature->hend,
-#	  "qury: ".$feature->{'qseq'},
-#	  "subj: ".$feature->{'sseq'},
-#	  "\n" ));
+    #( "\n", "Blast result:",
+    #  "Start ".$feature->start." End ".$feature->end,
+    #  "hstart ".$feature->hstart." hend ".$feature->hend,
+    #  "qury: ".$feature->{'qseq'},
+    #  "subj: ".$feature->{'sseq'},
+    #  "\n" ));
 
 
     my %exon_hash = ();
@@ -322,16 +322,18 @@ sub align_hits_to_contig2 {
     for my $ugFeature ( $feature->ungapped_features() ) {
       
       my $f = $ugFeature;
- #     print STDERR "ugfeature: ",join( " ", ( $f->start(), $f->end(), $f->strand(), "-", $f->hstart(), $f->hend(), $f->hstrand() )),"\n";      # ask the $self->peptide to do cdna2genomic
+      #print STDERR "ugfeature: ",join( " ", 
+          #( $f->start(), $f->end(), $f->strand(), "-", 
+          #$f->hstart(), $f->hend(), $f->hstrand() )),"\n";      
+      # ask the $self->peptide to do cdna2genomic
       #   for f->start*3-2 f->end*3
-      my @split = $self->peptide->cdna2genomic
-	(( $ugFeature->start() * 3 -2 ), 
-	 ( $ugFeature->end() * 3 ));
+      my @split = $self->peptide->cdna2genomic(( $ugFeature->start() * 3 -2 ), 
+					       ( $ugFeature->end() * 3 ));
       
       for my $gcoord ( @split ) {
 	
-	my ( $gstart, $gend, $gstrand, $contig, $exon, $cdna_start, $cdna_end ) =
-	  @$gcoord;
+	my ( $gstart, $gend, $gstrand, $contig, 
+	     $exon, $cdna_start, $cdna_end ) = @$gcoord;
 
 	# Take the pieces and make a list of features from it
 	# hash them by exon
@@ -370,12 +372,29 @@ sub align_hits_to_contig2 {
 	    -percent_id =>  $feature->percent_id,
 	    -analysis   =>  $feature->analysis );
 
+
+	#recalculate the hit coordinates.  They may be split up into
+	# seperate features by introns
+	my ($hstrand, $hstart, $hend);
+	$hstrand = $feature->hstrand();
+	if($hstrand == 1) {
+	  $hstart =
+	    $cdna_start - ($ugFeature->start()*3-2) + $ugFeature->hstart();
+	  $hend = 
+	    $cdna_end - ($ugFeature->start()*3-2) + $ugFeature->hstart();
+	} else {
+	  $hend = 
+	    $ugFeature->hend() - $cdna_start + ($ugFeature->start()*3-2);
+	  $hstart =
+	    $ugFeature->hend() - $cdna_end + ($ugFeature->start()*3-2);
+	}
 	
+
 	my $dna_feat2 = Bio::EnsEMBL::SeqFeature->new 
 	  ( -seqname    =>  $feature->hseqname,
-	    -start      =>  $cdna_start - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
-	    -end        =>  $cdna_end - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
-	    -strand     =>  $feature->hstrand,
+	    -start      =>  $hstart,
+	    -end        =>  $hend,
+	    -strand     =>  $hstrand,
 	    -score      =>  $feature->score,
 	    -p_value    =>  $feature->p_value,
 	    -percent_id =>  $feature->percent_id,
@@ -405,6 +424,8 @@ sub align_hits_to_contig2 {
 # peptides
 sub align_hits_to_contig {
     my ($self, @features) = @_;
+
+    print STDERR "Align hits to contig\n";
 
     my (%dna_align, @exon_aligns, @featurepairs); #structure for tracking alignment variables
     
