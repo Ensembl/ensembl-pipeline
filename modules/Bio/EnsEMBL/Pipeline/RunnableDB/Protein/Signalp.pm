@@ -50,48 +50,19 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp;
 use strict;
 use vars qw(@ISA);
 
-use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp;
 use Bio::EnsEMBL::DBSQL::ProteinFeatureAdaptor;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation);
 
 
-=head2 new
-
- Title    : new
- Usage    : $self->new ( -db       => $db
-                         input_id    => $id
-                         -analysis    => $analysis,
-                       );
- Function : creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp object
- Example  : 
- Returns  : a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp object
- Args     : -db    :  a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-            -input_id :  input id
-            -analysis :  a Bio::EnsEMBL::Analysis
- Throws   :
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-
-    # this new method also parses the @args arguments,
-    # and verifies that -db and -input_id have been assigned
-    my $self = $class->SUPER::new(@args);
-    $self->throw ("Analysis object required") unless ($self->analysis);
-    $self->{'_query'}      = undef;
-    $self->{'_runnable'}    = undef;
-
-    return $self;
-}
 
 
 sub runnable {
     my ($self) = @_;
     
-    if (!defined($self->{'_runnable'})) {
+    if (!($self->{'_runnable'})) {
 	print STDERR "QUERY: ".$self->query."\n";
 	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-query     => $self->query,
 									-analysis  => $self->analysis	);
@@ -103,94 +74,5 @@ sub runnable {
     return $self->{'_runnable'};
 }
 
-=head2 run
 
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile->run()
-    Returns :   none
-    Args    :   none
-
-=cut
-
-sub run {
-    my ($self,$dir) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched")      unless ($self->query());
-
-    $self->runnable->run($dir);
-}
-
-
-
-# IO methods
-
-=head2 fetch_input
-
- Title    : fetch_input
- Usage    : $self->fetch_input
- Function : fetches the query sequence from the database
- Example  :
- Returns  :
- Args     :
- Throws   :
-
-=cut
-
-sub fetch_input {
-    my ($self) = @_;
-    my $proteinAdaptor = $self->db->get_ProteinAdaptor;
-    my $prot;
-    my $peptide;
-
-    eval {
-	$prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id);
-    };
-    
-    if (!$@) {
-	#The id is a protein id, that's fine, create a PrimarySeq object
-	my $pepseq    = $prot->seq;
-	$peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
-					    '-id'          => $self->input_id,
-					    '-accession'   => $self->input_id,
-					    '-moltype'     => 'protein');
-    }
-
-    else {
-	#An error has been returned...2 solution, either the input is a peptide file and we can go on or its completly rubish and we throw an exeption.
-	
-	
-	#Check if the file exists, if not throw an exeption 
-	$self->throw ("The input_id given is neither a protein id nor an existing file") unless (-e $self->input_id);
-	$peptide = $self->input_id;
-    }
-
-    
-    $self->query($peptide);
-}
-
-
-=head2 write_output
-
- Title    : write_output
- Usage    : $self->write_output
- Function : writes the features to the database
- Example  :
- Returns  :
- Args     :
- Throws   :
-
-=cut
-
-sub write_output {
-    my ($self) = @_;
-    my $proteinFeatureAdaptor = $self->db->get_ProteinFeatureAdaptor();
-    my @featurepairs = $self->output;
-
-    if (@featurepairs) {
-        foreach my $feat(@featurepairs) {
-   	    $proteinFeatureAdaptor->store($feat);
-        }
-    }
-}
 1;
