@@ -263,9 +263,10 @@ sub run_analysis {
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
 	$command .= ' '.$self->options. ' > '.$self->results . ".$db";
 	#system(pwd);
-	#print $command."\n";
+	print $command."\n";
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
+      
   }
 
 =head2 fetch_databases

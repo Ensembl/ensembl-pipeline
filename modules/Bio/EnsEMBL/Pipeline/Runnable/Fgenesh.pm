@@ -654,7 +654,9 @@ sub create_genes {
     foreach my $exon (@ordered_exons)
     {
         my ($group_number) = ($exon->seqname =~ /(\d+)\./);
-                     
+         
+         warn "group number ",$group_number,"\n";            
+        
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
@@ -682,7 +684,7 @@ sub create_genes {
     #create Bio::SeqFeature objects (genes) with SubSeqFeatures (exons)
     foreach my $gene_number (keys(%genes))
     {
-        #print "start = ".$gene_start{$gene_number}." gene number = ".$gene_number." \n";
+        warn " gene number = ",$gene_number;
         my $gene = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname     => $gene_number,
                             -strand      => $gene_strand   {$gene_number},
@@ -695,8 +697,10 @@ sub create_genes {
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
 
+        
         foreach my $exon (@{$genes {$gene_number}})
         {
+          warn "exon->seqname",$exon->seqname;
           $gene->add_sub_SeqFeature($exon, '');
         }
         $self->add_Fgenesh_Gene($gene); #add gene to main object
