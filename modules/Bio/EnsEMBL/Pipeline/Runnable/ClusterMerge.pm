@@ -101,12 +101,15 @@ sub new {
 
   if ( $EST_GENEBUILDER_SPLICE_MISMATCH ){
     $self->_splice_mismatch( $EST_GENEBUILDER_SPLICE_MISMATCH);
+    print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
   }
   if ( $EST_GENEBUILDER_INTRON_MISMATCH ){
     $self->_intron_mismatch( $EST_GENEBUILDER_INTRON_MISMATCH );
+    print STDERR "intron mismatch ".$self->_intron_mismatch."\n";
   }
   if ( defined $EST_GENEBUILDER_EXON_MATCH ){
     $self->_exon_match( $EST_GENEBUILDER_EXON_MATCH );
+    print STDERR "exon match ".$self->_exon_match."\n";
   }
   
   return $self;
@@ -469,6 +472,7 @@ sub link_Transcripts{
   CLUSTER:
     foreach my $cluster ( @{ $transcript_clusters} ){
 	
+        print STDERR "~~~ CLUSTER ~~~\n";
 	my %overlap_matrix;
 	$self->matrix(\%overlap_matrix);
 	
@@ -570,24 +574,27 @@ sub link_Transcripts{
 	    push ( @lists, @current_lists );
 	    
 	    #print STDERR "current lists:\n";
-	    foreach my $list ( @current_lists ){
-		foreach my $t (@$list){
-		  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-		}
-	    }
+	    #foreach my $list ( @current_lists ){
+	#	foreach my $t (@$list){
+	#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+	#	}
+	#    }
 	    
 	}  
 	
 	# remove 'properly' lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
 	
 	# sort the lists in descending by the number of elements
-	my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
-	
+	print STDERR scalar(@lists)." lists created\n";
+        my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
+		print STDERR scalar(@lists)." sorted lists\n";
 	my @accepted_lists;
 	
 	# accept the longest list
 	push ( @accepted_lists, shift @sorted_lists );
 	
+         
+   
 	# check the rest
       LIST:
 	while ( @sorted_lists ){
@@ -607,7 +614,15 @@ sub link_Transcripts{
 	
 	# store the lists for this cluster into the big final list:
 	push (@final_lists, @accepted_lists);
-	
+	print STDERR scalar( @accepted_lists )." lists accepted in this cluster\n";
+        #my $count = 0;
+        #foreach my $list (@accepted_lists){
+	#$count++;
+	#print STDERR "list $count:\n";
+	#foreach my $t ( @$list ){
+	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
+	#}
+    
     } # end of CLUSTER
     
     
@@ -617,15 +632,15 @@ sub link_Transcripts{
     
     $self->sub_clusters( @final_lists );
     
-    print STDERR "final lists:\n";
-    my $count = 0;
-    foreach my $list (@final_lists){
-	$count++;
-	print STDERR "list $count\n";
-	foreach my $t ( @$list ){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
-	}
-    }
+    #print STDERR "final lists:\n";
+    #my $count = 0;
+    #foreach my $list (@final_lists){
+#	$count++;
+#	print STDERR "list $count\n";
+#	foreach my $t ( @$list ){
+#	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
+#	}
+ #   }
     return @final_lists;	      
 }
 
@@ -662,7 +677,9 @@ sub _test_for_link{
     
     if ( defined( $overlap_matrix{$transcript}{$trans_link} ) ){
 	($merge,$overlaps) = @{$overlap_matrix{$transcript}{$trans_link}};
-	#print STDERR "using cached matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
+	#print STDERR "using cached matrix for comparing ".
+	#    $transcript->dbID."-".$trans_link->dbID ." ( ".
+	#	$trans_link->dbID."-".$transcript->dbID ." ) = ( $merge,$overlaps )\n";
     }
     else{
 	($merge,$overlaps) = $comparator->compare($trans_link, $transcript);
@@ -909,12 +926,24 @@ description: make a transcript for every list built above in link_Transcripts().
 
 sub _merge_Transcripts{
     my ($self,$lists) = @_;
+    print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
+    my $verbose = 1;
+
     # $list is an arrayref of the ests/cdnas that we can merge
     my @merged_transcripts;
 
+    my $count = 0;
   LIST:
     foreach my $list ( @$lists ){
+      $count++;
+      
+      if ($verbose){
+	print STDERR "list $count:\n";
+	foreach my $t ( @$list ){
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
+	}
+      }
       
       my @allexons;
       my %exon2transcript;			
@@ -957,13 +986,15 @@ sub _merge_Transcripts{
       
       # we turn each cluster into an exon and create a new transcript with these exons
       my $transcript    = Bio::EnsEMBL::Transcript->new();
+      $transcript->type( "merged_".$count );
+
       my @exon_clusters = $cluster_list->sub_SeqFeature;
       
       foreach my $exon_cluster (@exon_clusters){
 	
 	my $new_exon = Bio::EnsEMBL::Exon->new();
-	$new_exon->start ($exon_cluster->start );
-	$new_exon->end   ($exon_cluster->end   );
+	$new_exon->start($exon_cluster->start );
+	$new_exon->end  ($exon_cluster->end   );
 	
 	# set the strand to be the same as the exon_cluster
 	$new_exon->strand($exon_cluster->strand);
@@ -977,6 +1008,11 @@ sub _merge_Transcripts{
 	$transcript->add_Exon($new_exon);
       }
       
+      if ($verbose){
+	print STDERR "Produced transcript:\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcript );
+      }
+
       push ( @merged_transcripts, $transcript );
     
     } # end of LIST
