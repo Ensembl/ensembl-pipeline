@@ -51,9 +51,9 @@ use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_INPUTID_REGEX
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
+							   GB_INPUTID_REGEX
+							  );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder);
 
