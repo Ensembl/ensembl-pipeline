@@ -1141,6 +1141,7 @@ sub _check_exon_Skipping{
   @exons2 = sort { $a->start <=> $b->start } @exons2;
 
   # we actually compare ranges:
+  # we create two lists per transcript: exon_list and intron_list
   my @exon_list1;
   my @intron_list1;
   for(my $i=0; $i<scalar(@exons1);$i++){
@@ -1180,39 +1181,63 @@ sub _check_exon_Skipping{
   for (my $i=0; $i<scalar(@exon_list1);$i++){
     for ( my $j=0; $j<scalar(@intron_list2);$j++){
       
-	    # if one exon overlaps one intron
-	    if ( $exon_list1[$i]->overlaps( $intron_list2[$j] ) ){
-		
-		# and the previous OR the next exon overlaps one of the flanking exons
-		if ( ( $i>0            && $exon_list1[$i-1]->overlaps( $exon_list2[$j] ) ) ||
-		     ( $i<$#exon_list1 && 
-		       $j<$#exon_list2 &&
-		       $exon_list1[$i+1]->overlaps( $exon_list2[$j+1] ) )
-		     ){
-		    return 1;
-		}
-	    }
+      # if one exon overlaps one intron
+      if ( $exon_list1[$i]->overlaps( $intron_list2[$j] ) ){
+	
+	# either the exon falls completely in the intron:
+	if ( $exon_list1[$i]->start >= $intron_list2[$j]->start &&
+	     $exon_list1[$i]->end   <= $intron_list2[$j]->end ){
+	  return 1;
 	}
-}
+	# or the exon overlaps the 2 flanking exons
+	elsif ( $exon_list1[$i]->overlaps( $exon_list2[$j]) &&
+		defined( $exon_list2[$j+1] )                &&
+		$exon_list1[$i]->overlaps( $exon_list2[$j+1] ) ){
+	  return 1;
+	}
+	# else, we could allow and exon to partially overlap one intron, but how much overlap?
+	# (the previous OR the next exon overlaps one of the flanking exons )
+	#if ( ( $i>0            && $exon_list1[$i-1]->overlaps( $exon_list2[$j] ) ) ||
+	#     ( $i<$#exon_list1 && 
+	#       $j<$#exon_list2 &&
+	#       $exon_list1[$i+1]->overlaps( $exon_list2[$j+1] ) )
+	#   ){
+	#  return 1;
+	#}
+      }
+    }
+  }
   
   for (my $i=0; $i<scalar(@exon_list2);$i++){
-	for ( my $j=0; $j<scalar(@intron_list1);$j++){
-	    
-	    # if one exon overlaps one intron
-	    if ( $exon_list2[$i]->overlaps( $intron_list1[$j] ) ){
+    for ( my $j=0; $j<scalar(@intron_list1);$j++){
+      
+      # if one exon overlaps one intron
+      if ( $exon_list2[$i]->overlaps( $intron_list1[$j] ) ){
 		
-		# and the previous OR the next exon overlaps one of the flanking exons
-		if ( ( $i>0            && $exon_list2[$i-1]->overlaps( $exon_list1[$j] ) ) ||
-		     ( $i<$#exon_list2 &&
-		       $j<$#exon_list1 &&
-		       $exon_list2[$i+1]->overlaps( $exon_list1[$j+1] ) )
-		     ){
-		    return 1;
-		}
-	    }
+	# either the exon falls completely in the intron:
+	if ( $exon_list2[$i]->start >= $intron_list1[$j]->start &&
+	     $exon_list2[$i]->end   <= $intron_list1[$j]->end ){
+	  return 1;
 	}
+	# or the exon overlaps the 2 flanking exons
+	elsif ( $exon_list2[$i]->overlaps( $exon_list1[$j]) &&
+		defined( $exon_list1[$j+1] )                &&
+		$exon_list2[$i]->overlaps( $exon_list1[$j+1] ) ){
+	  return 1;
+	}
+	# else, we could allow and exon to partially overlap one intron, but how much overlap?
+	# and the previous OR the next exon overlaps one of the flanking exons
+	#if ( ( $i>0            && $exon_list2[$i-1]->overlaps( $exon_list1[$j] ) ) ||
+	#     ( $i<$#exon_list2 &&
+	#       $j<$#exon_list1 &&
+	#       $exon_list2[$i+1]->overlaps( $exon_list1[$j+1] ) )
+	#   ){
+	#  return 1;
+	#}
+      }
     }
-    
+  }
+  
     return 0;
 }
 
