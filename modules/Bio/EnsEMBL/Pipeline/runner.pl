@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
