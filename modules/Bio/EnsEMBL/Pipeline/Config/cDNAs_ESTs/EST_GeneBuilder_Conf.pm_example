@@ -1,4 +1,5 @@
-# Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
+#
+# module Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf
 #
 # Copyright GRL & EBI
 #
@@ -12,7 +13,7 @@ Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf - imports globa
 
 =head1 SYNOPSIS
 
-    use Bio::EnsEMBL::Pipeline::EST_GeneBuilder_Conf;
+    use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf;
  
 =head1 DESCRIPTION
 

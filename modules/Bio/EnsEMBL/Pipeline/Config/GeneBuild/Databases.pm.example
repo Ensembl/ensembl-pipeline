@@ -69,8 +69,6 @@ use vars qw( %Databases );
 	      GB_COMB_DBPASS                  => '',
 	      GB_COMB_DBPORT => '',
 	      # database containing the cdnas mapped, to be combined with the genewises
-	      # by putting this info here, we free up ESTConf.pm so that two analysis can
-	      # be run at the same time
 	      GB_cDNA_DBHOST                  => '',
 	      GB_cDNA_DBNAME                  => '',
 	      GB_cDNA_DBUSER                  => '',

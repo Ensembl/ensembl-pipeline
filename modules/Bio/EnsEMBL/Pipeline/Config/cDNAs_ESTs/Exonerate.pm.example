@@ -1,5 +1,6 @@
-# BioPerl module for Bio::EnsEMBL::Analysis::ESTConf;
 #
+# package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
+# 
 # Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
 #
 # Copyright GRL & EBI
@@ -10,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::ESTConf - imports global variables used by EnsEMBL EST analysis
+Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate - imports global variables used by EnsEMBL EST analysis
 
 =head1 SYNOPSIS
 
@@ -19,7 +20,7 @@ Bio::EnsEMBL::Pipeline::ESTConf - imports global variables used by EnsEMBL EST a
 
 =head1 DESCRIPTION
 
-ESTConf is a pure ripoff of humConf written by James Gilbert.
+This class is a pure ripoff of humConf written by James Gilbert.
 
 humConf is based upon ideas from the standard perl Env environment
 module.

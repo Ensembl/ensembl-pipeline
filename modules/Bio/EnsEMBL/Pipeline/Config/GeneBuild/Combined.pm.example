@@ -55,7 +55,7 @@ use vars qw( %Combined );
 	     # don't allow introns longer than this - transcripts are split
 	     GB_COMBINED_MAX_INTRON         => 10000,	    
 
-	     # for est2genome runnabledb (This should probably be in ESTConf.pm)
+	     # for est2genome runnabledb
 	     GB_EST_DATABASES => [
                                   # fill in one complete hash for each database from which blast 
                                   # features are to be retrieved
