@@ -4,7 +4,7 @@
 
 =head1 DESCRIPTION
 
-dumps in fastaA format the cdnas of all the genes in a database specified
+script to check whether CDSs starts with ATG and end with stop (TAA|TGA|TAG)\n
 
 =head1 OPTIONS
 
@@ -188,8 +188,6 @@ print "stop codons correct : $stop_correct\n";
 print "both correct        : $both_correct\n";
 
 
-
-close (OUT);
 
 sub get_evidence{
   my ($trans) = @_;
