@@ -37,30 +37,48 @@ use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 sub write_PmatchFeatures {
   my ($self,@features) = @_;
 
+  my $sql = "LOCK TABLES protein WRITE, pmatch_feature WRITE";
+  my $lock_st = $self->prepare($sql);
+  $lock_st->execute;
 
-  my %protein;
+  # the eval ensures that we always unlock tables, even on failure
+  eval {
+      my %protein;
 
-  foreach my $f (@features) {
-    if (!defined($protein{$f->protein_id})) {
-      $protein{$f->protein_id} =  $self->write_protein($f->protein_id,$f->cdna_id);
-    }
-    if(!$f->analysis){
-      $self->throw("cant store ".$f." without an analysis\n");
-    }
-    my $protein_internal_id = $protein{$f->protein_id};
+      foreach my $f (@features) {
+	  if (!defined($protein{$f->protein_id})) {
+	      $protein{$f->protein_id} =  $self->write_protein($f->protein_id,$f->cdna_id);
+	  }
+	  if(!$f->analysis){
+	      $self->throw("cant store ".$f." without an analysis\n");
+	  }
+	  my $protein_internal_id = $protein{$f->protein_id};
 
-    if (!defined($protein_internal_id)) {
-      $self->throw("No internal id found for " . $f->protein_id . "\n");
-    }
+	  if (!defined($protein_internal_id)) {
+	      $self->throw("No internal id found for " . $f->protein_id . "\n");
+	  }
+	  
+	  my $query = "insert into pmatch_feature values(null," . 
+	      $protein_internal_id . 
+	      ",'" . $f->chr_name . 
+	      "'," .  $f->start   . 
+	      ","  . $f->end     . 
+	      ","  . $f->coverage . 
+	      ","  .$f->analysis->dbID.")";
+	  
+	  my $sth = $self->prepare($query);
+	  #print STDERR "query = ".$query."\n";
+	  my $res = $sth->execute;
+	  
+      }
+  };
+  my $err = $@;
 
-    my $query = "insert into pmatch_feature values(null," . 
-      $protein_internal_id. ",'" . $f->chr_name . "'," .  $f->start   . ","  . $f->end     . ","  . $f->coverage . ",".$f->analysis->dbID.")";
+  $sql = "UNLOCK TABLES";
+  $lock_st = $self->db->prepare($sql);
+  $lock_st->execute;
 
-    my $sth = $self->prepare($query);
-    #print STDERR "query = ".$query."\n";
-    my $res = $sth->execute;
-
-  }
+  $err and $self->throw("Had trouble putting Pmatch features into database: $err");
 }
 
 sub write_protein {
