@@ -82,6 +82,13 @@ use vars qw( %Databases );
 	      GB_cDNA_DBUSER                  => '',
 	      GB_cDNA_DBPASS                  => '',
               GB_cDNA_DBPORT     => '',
+	      # db to put pseudogenes in
+	      PSEUDO_DBHOST                  => '',
+	      PSEUDO_DBNAME                  => '',
+	      PSEUDO_DBUSER                  => '',
+	      PSEUDO_DBPASS                  => '',
+              PSEUDO_DBPORT     => '',
+	     );
 	      # this db needs to have clone & contig & static_golden_path tables populated
 	      GB_FINALDBHOST                  => '',
 	      GB_FINALDBNAME                  => '',
