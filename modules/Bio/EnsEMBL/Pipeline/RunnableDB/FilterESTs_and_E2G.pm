@@ -1219,7 +1219,7 @@ sub make_seqfetcher {
   #  $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
   #}
   else{
-    $self->throw( "cannot create a seqfetcher BioIndex from $index");
+    $self->throw( "cannot create a seqfetcher from $index");
   }
 
   return $seqfetcher;
