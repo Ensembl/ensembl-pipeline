@@ -24,19 +24,21 @@ Bio::EnsEMBL::Pipeline::Runnable::FindPrimer
   );
   $seq = $seqstream->next_seq();
 
-  # create Bio::EnsEMBL::Pipeline::Runnable::FindPrimer object
-  my $find_primer = Bio::EnsEMBL::Pipeline::Runnable::FindPrimer->new(
-    -CLONE => $seq
-  );
-  $findprimer->run();
+ my $find_primer = Bio::EnsEMBL::Pipeline::Runnable::FindPrimer->new(
+    '-clone'    => $seq,
+    '-analysis' => $self->analysis,
+    );
+    
+
+  $find_primer->run();
 
   # get results
-  my @results = $trf->output();
+  my @results = $find_primer->output();
 
 =head1 DESCRIPTION
 
-FindPrimer takes a Bio::Seq (or Bio::PrimarySeq) object and finds exacdt matches to primers conatined in 
-fastfile. Asolute path must be set in analysisprocess table as db_file. 
+FindPrimer takes a Bio::Seq (or Bio::PrimarySeq) object and finds exact matches to primers contained in 
+fastafile. Asolute path must be set in analysisprocess table as db_file. 
 
 =head2 Methods:
 
@@ -205,7 +207,8 @@ sub find_primer {
                 $feat1{start}   = $start;
                 $feat1{end}     = $end;
                 $feat1{strand}  = $strand;
-                $feat1{score}   = '100';
+                $feat1{score}   = '100
+                ';
                 $feat1{source}  = 'FindPrimer';
                 $feat1{primary} = 'primer';
                 $feat1{percent} = '100';
