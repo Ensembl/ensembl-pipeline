@@ -97,9 +97,9 @@ sub new{
 
 sub _check{
     my ($self, $arg) = @_;
-    print STDERR "TaskStatus:_check ".$arg."\n";
-    if(ref($arg) == 'ARRAY'){
-       print STDERR "TaskStatus:_check  is a listref ".$arg."\n";
+    
+    if(ref($arg) eq 'ARRAY'){
+      
        my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
                                                        -ID_LIST => $arg,
                                                      );
@@ -135,7 +135,7 @@ sub _check{
 
 sub add_created{
     my ($self, $arg) = @_;
-    print STDERR "TaskStatus:add_created ".$arg."\n";
+   
     my $idset = $self->_check($arg);
     if(!$self->{'_created'}){
       $self->{'_created'} = $idset;
@@ -147,7 +147,7 @@ sub add_created{
 
 sub add_submitted{
     my ($self, $arg) = @_;
-    print STDERR "TaskStatus:add_submitted ".$arg."\n";
+   
     my $idset = $self->_check($arg);
     if(!$self->{'_submitted'}){
       $self->{'_submitted'} = $idset;

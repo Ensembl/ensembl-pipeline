@@ -65,10 +65,11 @@ use Bio::EnsEMBL::Root;
 =cut
 
 
-
 sub new{
   my ($class, @args) = @_;
   my $self = bless {}, $class;
+ 
+  
   my ($list) = $self->_rearrange([qw(ID_LIST)], @args);
 
   $self->{'_ID_list'} = [];
@@ -82,6 +83,13 @@ sub new{
   }
   return $self;
 }
+
+
+
+
+
+
+
 
 
 
@@ -224,6 +232,7 @@ sub or{
   
   my %count = %{$self->_calculate($idlist)};
   my @and = keys(%count);
+  my ($p, $f, $l) = caller;
   my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
 						 -ID_LIST => \@and,
 						);
