@@ -39,7 +39,7 @@ Arguments can be passed to e-PCR through the arguments() method.
 
 =item new($seq_obj)
 
-=item repeatmasker($path_to_EPCRHum)
+=item epcr($path_to_EPCR)
 
 =item workdir($directory_name)
 
@@ -95,10 +95,10 @@ sub new {
            
     $self->{'_fplist'}    = [];    # an array of feature pairs
     $self->{'_clone'}     = undef; # location of Bio::Seq object
-    $self->{'_epcr'}      = undef; # location of EPCRHum script
+    $self->{'_epcr'}      = undef; # location of EPCR binary
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
-    $self->{'_results'}   = undef; # file to store results of EPCRHum
+    $self->{'_results'}   = undef; # file to store results of EPCR
     $self->{'_protected'} = [];    # a list of files protected from deletion
     $self->{'_db'}        = undef;
     
@@ -145,7 +145,7 @@ sub clone {
 =head2 epcr
 
     Title   :   epcr
-    Usage   :   $obj->epcr('~humpub/scripts/EPCR');
+    Usage   :   $obj->epcr('~humpub/bin/EPCR');
     Function:   Get/set method for the location of EPCR
     Args    :   File path (optional)
 
@@ -199,7 +199,7 @@ sub db {
 
     Title   :  run
     Usage   :   $obj->run($workdir, $args)
-    Function:   Runs EPCRHum script and creates array of featurepairs
+    Function:   Runs EPCR and creates array of featurepairs
     Returns :   none
     Args    :   optional $workdir and $args (e.g. '-ace' for ace file output)
 
@@ -207,7 +207,7 @@ sub db {
 
 sub run {
     my ($self, $dir, $args) = @_;
-    #set arguments for repeatmasker
+    #set arguments for epcr
     $self->arguments($args) if ($args);
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for EPCR\n");
@@ -217,7 +217,7 @@ sub run {
     #write sequence to file
     $self->writefile();        
     $self->run_epcr();
-    #parse output of repeat masker 
+    #parse output of epcr
     $self->parse_results();
     $self->deletefiles();
 }
@@ -226,7 +226,7 @@ sub run {
 
     Title   :  parsefile
     Usage   :   $obj->parsefile($filename)
-    Function:   Parses EPCRHum output to give a set of feature pairs
+    Function:   Parses EPCR output to give a set of feature pairs
                 parsefile can accept filenames, filehandles or pipes (\*STDIN)
     Returns :   none
     Args    :   optional filename
@@ -235,10 +235,11 @@ sub run {
 
 sub run_epcr {
     my ($self) = @_;
-    #run EPCRHum
+    #run EPCR
     my $command = $self->epcr.' '.$self->db.' '.$self->filename.' > '.$self->results;
     print STDERR "Running EPCR ($command)\n";
-    system ($command); 
+    $self->throw("Error running EPCR on ".$self->filename."\n")
+     if system($command); 
     #or $self->throw("Error running EPCR: $!\n")
     #check results exist
     $self->throw($self->results." not created by EPCR\n") unless (-e $self->results);   
@@ -250,9 +251,9 @@ sub parse_results {
     my $filehandle;
     if (ref ($self->results) !~ /GLOB/)
     {
-        open (REPOUT, "<".$self->results)
+        open (PCROUT, "<".$self->results)
             or $self->throw("Error opening ".$self->results."\n");
-        $filehandle = \*REPOUT;
+        $filehandle = \*PCROUT;
     }
     else
     {
