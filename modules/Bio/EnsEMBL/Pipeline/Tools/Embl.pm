@@ -123,9 +123,9 @@ sub _non_EMBL{
 }
 sub accession{
     my $self = shift;
-    $self->{'_AC'} =~ s/[;\n]//g;
+    $self->{'_AC'} =~ s/[;]//g;
     unless(ref($self->{'_AC'}) eq "ARRAY"){
-        $self->{'_AC'} = [ split(" ", $self->{'_AC'}) ];
+        $self->{'_AC'} = [ split(/\s+/, $self->{'_AC'}) ];
     }
     return $self->{'_AC'};
 }
