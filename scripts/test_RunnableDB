@@ -66,7 +66,7 @@ my $module1  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
 my $module2  = "Bio::EnsEMBL::DBSQL::Obj";
 
 my $locator1 = make_locator_string($dbtype,$module1,$host,$port,$dbname,$dbuser,$pass);
-my $locator2 = make_locator_string($dbtype,$module2,'obi-wan',$port,'ensembl','ensro',$pass);
+my $locator2 = make_locator_string($dbtype,$module2,'localhost',$port,'ensembl07','ensro',$pass);
 
 my $db1      = new Bio::EnsEMBL::DBLoader($locator1);
 my $db2      = new Bio::EnsEMBL::DBLoader($locator2);

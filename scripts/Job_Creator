@@ -43,7 +43,7 @@ my $port     = '410000';
 my $dbname   = 'pipeline';
 my $dbuser   = 'root';
 my $pass     =  undef;
-my $queue    = 'fast_blast_farm';
+my $queue    = 'ultra_blast_farm';
 
 my $analysis_id;
 my @input_ids;
