@@ -329,8 +329,7 @@ sub fetch_input {
 	}
     }
     print STDERR "In EST_GeneBuilfer.fetch_input(): ".scalar(@reverse_transcripts) . " reverse strand genes\n";
-    print STDERR "($single single exon genes THROWN away)\n";
-    
+     
     if(scalar(@reverse_transcripts)){
 	my @transcripts = $self->_process_Transcripts(\@reverse_transcripts,$strand);  
 	foreach my $tran (@transcripts) {
@@ -449,17 +448,17 @@ sub _check_Transcripts {
 
   my $slice;
   if ( $strand == +1 ){
-      $slice = $self->query;
+    $slice = $self->query;
   }
   else{
-      $slice = $self->revcomp_query;
+    $slice = $self->revcomp_query;
   }
-
+  
   #print STDERR "transcripts:\n";
   #foreach my $t (@$ref_transcripts){
   #    print $t->dbID."\n";
   #}
-
+  
  TRANSCRIPT: 
   foreach my $transcript (@$ref_transcripts){
       
@@ -478,6 +477,22 @@ sub _check_Transcripts {
       my $exon_count = 0;
       my $previous_exon;
     
+      ############################################################
+      # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
+      if ( scalar(@exons) == 1 ){
+	
+	if ( $FILTER_ON_SINGLETONS && ( $exons[0]->end - $exons[0]->start + 1) < $FILTER_ON_SINGLETONS ){
+	  next TRANSCRIPT;
+	}
+	if ( $RAISE_SINGLETON_COVERAGE ){
+	  my @evidence = @{$exons[0]->get_all_supporting_features};
+	  my $coverage = $evidence[0]->score;
+	  if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
+	    next TRANSCRIPT;
+	  }
+	}
+      }
+      
     EXON:
       foreach my $exon (@exons){
 	  
@@ -573,12 +588,12 @@ sub _check_Transcripts {
       # check the splice sites
       ############################################################
       if ( $CHECK_SPLICE_SITES ){
-	  next TRANSCRIPT unless $self->check_splice_sites($new_transcript,$strand);
+	next TRANSCRIPT unless $self->check_splice_sites($new_transcript,$strand);
       }
       # if the transcript made it to this point, keep it
       push (@alltranscripts, $new_transcript);
-  
-  }    # end of TRANSCRIPT
+      
+    }    # end of TRANSCRIPT
   return @alltranscripts;
   
 }
@@ -996,12 +1011,12 @@ sub check_splice_sites{
     print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
   }
   if ( $other ){
-      print STDERR "rejecting for having non-canonical splice-sites\n" if $verbose;
-      return  0;
+    print STDERR "rejecting for having non-canonical splice-sites\n" if $verbose;
+    return  0;
   }
   else{
-      #print STDERR "accepting\n" if $verbose;
-      return 1;
+    #print STDERR "accepting\n" if $verbose;
+    return 1;
   }
 }
 
@@ -1219,7 +1234,8 @@ sub analysis {
 
 ############################################################
 # this method set the slice in the exons for each transcript
-# and check the translation
+# and check the translation, and adds the next codon at the end
+# codon if it is inside the transcript and it is a stop codon: taa/tag/tga 
 
 sub _check_Translations {
   my ($self,$transcripts,$strand) = @_;
@@ -1296,14 +1312,19 @@ sub _check_Translations {
       my $peptide = $sequence->seq;
       #print STDERR "peptide: $peptide\n";
       if ( $peptide =~ /\*/ ){
-	print STDERR "TRANSLATION HAS STOP CODONS!!\n";
+	print STDERR "TRANSLATION HAS STOP CODONS!! - skipping\n";
+	next TRANSCRIPT
       }
-      else{
-	push(@good_transcripts, $transcript);
-      }
+
+      ############################################################
+      # put possible stop at the end:
+      $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon( $transcript );
+      
+      push(@good_transcripts, $transcript);
+      
     }
   } # end of TRANSCRIPT
-
+  
   return @good_transcripts;
   
 }
