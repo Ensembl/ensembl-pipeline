@@ -217,19 +217,32 @@ sub flush {
 		open(SUB, $bsub." 2>&1 |") or
 			$self->throw("could not execute command [$bsub]");
 		my $sub_id;
+    my $err;
 		while(<SUB>) {
 			if (/Job <(\d+)>/) {
 				$sub_id = $1;
-			}
+			} else {
+        $err .= $_;
+      } 
 		}
 		close(SUB);
 
-    #update the job table so that the submission id is also stored
-		foreach my $job(@jobs) {
-			$job->submission_id($sub_id);
-			$job_adaptor->update($job);
-		}
-	}
+    #if the bsub failed, set the status of all the jobs to failed
+    #otherwise update them with submission ids
+    if(!$sub_id) {
+      $self->warn("bsub command [$bsub] failed: [$err]");
+      foreach my $job (@jobs) {
+        $job->set_current_status('FAILED');
+      }
+    } else {
+
+      #update the job table so that the submission id is also stored
+      foreach my $job(@jobs) {
+        $job->submission_id($sub_id);
+        $job_adaptor->update($job);
+      }
+    }
+  }
 	
 	return;
 }
@@ -273,7 +286,7 @@ sub submit {
 	#place the job into a queue specific to each task and module
 	$self->_task_queue()->{$taskname} ||= [];
   #print STDERR "SUBMITTED job to taskqueue $taskname\n";
-	#push(@{$self->_task_queue()->{$taskname}}, $job);
+	push(@{$self->_task_queue()->{$taskname}}, $job);
 
 
 	#
@@ -350,7 +363,7 @@ sub _dir_prefix {
 	# get temp dir from config
 	#
 	my $config = $self->get_Config();
-	my $temp_dir = $config->get_parameter('LSF', 'tempdir');
+	my $temp_dir = $config->get_parameter('LSF', 'tmpdir');
 
 	if(!$temp_dir) {
     $self->warn("could not determine temp dir for task [$taskname]" .
