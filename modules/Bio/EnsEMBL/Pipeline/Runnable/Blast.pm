@@ -1154,10 +1154,10 @@ sub threshold_type {
   my %allowed = map { $_, 1 } $self->get_threshold_types;
   
   if ($type) {
-    unless  $allowed{$type}) {
-      $self->throw("Unallowed threshold type $type");
+    unless  ($allowed{$type}) {
+    $self->throw("Unallowed threshold type $type");
     }
-    $self->{'_threshold_type'} = $type;
+  $self->{'_threshold_type'} = $type;
   }
 
   return $self->{'_threshold_type'};
