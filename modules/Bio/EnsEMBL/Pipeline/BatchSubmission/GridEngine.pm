@@ -119,15 +119,25 @@ sub construct_command_line{
     $qsub_line .= " -q ".$nodes." ";
   }
 
-  $qsub_line .= " -l ".$self->queue    if defined $self->queue;
+  if (defined($self->queue) && $self->queue ne "") {$qsub_line .= " -l ".$self->queue;}
 
   $qsub_line .= " -N ".$self->jobname  if defined $self->jobname;
 
   $qsub_line .= " ".$self->parameters." "  if defined $self->parameters;
 
   $qsub_line .= " -v PREEXEC=\"".$self->pre_exec."\"" if defined $self->pre_exec; 
+
   ## must ensure the prexec is in quotes ##
-  $qsub_line .= " ge_wrapper.pl \"".$command . "\"";
+  my $ge_wrapper = "ge_wrapper.pl";
+  unless (-x $ge_wrapper) {
+    $ge_wrapper = __FILE__;
+    $ge_wrapper =~ s:GridEngine.pm:../../../../../scripts/ge_wrapper.pl:;
+    print $ge_wrapper . "\n";
+    my $caller = caller(0);
+    $self->throw("ge_wrapper not found - needs to be set in $caller\n") unless -x $ge_wrapper;
+  }
+
+  $qsub_line .= " $ge_wrapper \"".$command . "\"";
   $self->qsub($qsub_line);
   #print "have command line\n";
 }
