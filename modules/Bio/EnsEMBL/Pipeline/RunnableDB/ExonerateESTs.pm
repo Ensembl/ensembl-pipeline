@@ -78,7 +78,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
-    Args    :   -dbobj:           A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:           A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:        Contig input id (required), or filename
                 -analysis:        A Bio::EnsEMBL::Pipeline::Analysis (optional)
                 -estfile:         filename
@@ -89,8 +89,8 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
 sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
-           
-    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+#    print "@args\n";       
+    # db, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
     my( $estfile, $exonerate, $exargs ) = $self->_rearrange([qw(ESTFILE
@@ -221,7 +221,7 @@ sub fetch_input {
     my $chrstart = $1;
     my $chrend   = $2;
     
-    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
     
     $contig->_chr_name($chrid);
