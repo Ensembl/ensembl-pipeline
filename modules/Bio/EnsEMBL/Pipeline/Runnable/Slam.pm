@@ -384,36 +384,15 @@ sub run {
   if( -e $gcdir){ print "gcdir ok\n"; }else{ print "ERROR gcdir missing\n"; }
 
 
-################################################################################
-    $rc = 0xffff & system @args;
-    printf "system(%s) returned %#04x: ", "@args", $rc;
-    if ($rc == 0) {
-        print "ran with normal exit\n";
-    }
-    elsif ($rc == 0xff00) {
-        print "command failed: $!\n";
-    }
-    elsif ($rc > 0x80) {
-        $rc >>= 8;
-        print "ran with non-zero exit status $rc\n";
-    }
-    else {
-        print "ran with ";
-        if ($rc &   0x80) {
-            $rc &= ~0x80;
-            print "core dump from ";
-        }
-        print "signal $rc\n"
-    }
-    $ok = ($rc != 0);
+
 ################################################################################
 
  my  $status =  system (" $command ");
- print "EXIT-STATUS $status\n";
 
- die "programm exits funny\n" unless $status==0;
 
-# die "\n\nSeems that slam crashed $? " unless $status == 0;
+
+
+
 
   $fasta1=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
   $fasta2=~s/(.+)\.(fasta|fa)/$1/; # get rid of suffix (.fasta or .fa)
