@@ -46,21 +46,20 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::EnsEMBL::Root;
+# Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
-#use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_VCONTIG
-					 GB_GOLDEN_PATH
 					 GB_FINALDBNAME
 					 GB_FINALDBHOST
 					 GB_DBUSER
 					 GB_DBPASS
+					 GB_FINAL_GENETYPE
 					 );
 use Data::Dumper;
 
@@ -72,7 +71,6 @@ use Data::Dumper;
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
-			   -GOLDEN_PATH => $path,
                            -ANALYSIS    => $analysis,
 			   -VCONTIG     => 1,
 			   -EXTEND      => 400);
@@ -97,7 +95,7 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $use_vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
+    my( $use_vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
        
     if (! defined $use_vcontig) {
        $use_vcontig = $GB_VCONTIG;
@@ -106,15 +104,6 @@ sub new {
     $self->use_vcontig($use_vcontig);
     
     $self->extend($extend);
-
-    # golden path
-    if(!defined $path){
-
-    $path = $GB_GOLDEN_PATH;
-    }
-
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
 
     return $self;
 }
@@ -192,18 +181,23 @@ sub write_output {
 						'-user'   => $dbuser,
 						'-dbname' => $dbname,
 						'-pass'   => $dbpass,
-						'-dnadb'  => $self->dbobj,
+						'-dnadb'  => $self->db,
 					       );
     # sort out analysis
-    my $genetype = 'ensembl';
+    my $genetype = $GB_FINAL_GENETYPE;
+    if(!defined $genetype || $genetype eq ''){
+      $genetype = 'ensembl';
+      $self->warn("setting genetype to $genetype\n");
+    }
     my $anaAdaptor = $db->get_AnalysisAdaptor;
+
     my $anal_logic_name = $genetype;
 
-    if(defined $self->analysis){
+    if (defined $self->analysis){
       #use logic name from $self->analysis object is possible, else take $genetype;
       $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
     }
-
+   
     my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     
     my $analysis_obj;
@@ -291,7 +285,7 @@ sub fetch_input {
     my $contig;
 
     if ($self->use_vcontig) {
-      my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+      my $stadaptor = $self->db->get_StaticGoldenPathAdaptor();
       
       $contigid =~ /(.*)\.(.*)\-(.*)/;
       
@@ -307,7 +301,7 @@ sub fetch_input {
       #    print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
     }
     else {
-      $contig = $self->dbobj->get_Contig($contigid);
+      $contig = $self->db->get_Contig($contigid);
     }
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(
 							      '-contig'   => $contig,
@@ -365,7 +359,7 @@ sub get_genebuilders {
 sub check_gene {
    my ($self,$gene) = @_;
 
-   foreach my $tran ($gene->each_Transcript) {
+   foreach my $tran ($gene->get_all_Transcripts) {
       my $seq = $tran->translate->seq;
 
       if ($seq =~ /\*/) {
