@@ -49,24 +49,25 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
-
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
-
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
            
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID'], @args);
+sub new {
+
+  my ($class, @args) = @_;
+  my $self = bless {}, $class;
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input")                 unless defined($dbobj);
     $self->dbobj($dbobj);
@@ -74,6 +75,12 @@ sub _initialize {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
+    if(!defined $seqfetcher) {
+      # will look for pfetch in $PATH - change this once PipeConf up to date
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    }
+    $self->seqfetcher($seqfetcher); 
+
     return $self; # success - we hope!
 }
 sub input_id {
@@ -334,6 +341,7 @@ sub fetch_input {
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
 									   '-ids'      => \@ids,
+									   '-seqfetcher' => $self->seqfetcher,
 									   '-trim'     => 1);
     
     

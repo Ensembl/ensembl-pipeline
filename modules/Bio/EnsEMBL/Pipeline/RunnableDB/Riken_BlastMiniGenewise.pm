@@ -19,9 +19,10 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise->new(
-					     -dbobj     => $db,
-					     -input_id  => $id
-                                             );
+									       -dbobj     => $db,
+									       -input_id  => $id,
+									       -seqfetcher=> $seqfetcher
+									      );
     $obj->fetch_input
     $obj->run
 
@@ -52,33 +53,42 @@ use vars qw(@ISA);
 use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
-
+use Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
-           
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID'], @args);
+sub new {
+    my ($class,@args) = @_;
+    my $self = bless {}, $class;          
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input")                 unless defined($dbobj);
     $self->dbobj($dbobj);
 
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
+
+    if(!defined $seqfetcher) {
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex(
+								    '-index'  =>'/data/blastdb/riken_prot.inx', 
+								    '-format' =>'Fasta',
+								   );
+    }
+    $self->seqfetcher($seqfetcher);
     
     return $self; # success - we hope!
 }
+
 sub input_id {
 	my ($self,$arg) = @_;
 
@@ -309,9 +319,10 @@ sub fetch_input {
 
     print STDERR "Feature ids are @ids\n";
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
-									   '-ids'      => \@ids,
-									   '-trim'     => 1);
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+									   '-ids'        => \@ids,
+									   '-seqfetcher' => $self->seqfetcher,
+									   '-trim'       => 1);
     
     
     $self->add_Runnable($runnable);

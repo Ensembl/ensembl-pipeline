@@ -45,11 +45,9 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 # Object preamble - inheriets from Bio::Root::RootI
-
-
-use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Gene;
 
 BEGIN { print STDERR "\n\n***I'm here!***\n"; };
@@ -62,22 +60,27 @@ sub new {
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
-						 'INPUT_ID'], @args);
+    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
+							      'INPUT_ID',
+							      'SEQFETCHER'], @args);
        
     $self->throw("No database handle input")           unless defined($dbobj);
-#    $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::Pipeline::DB::ObjI");
-    # this not right designwise
-
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::Obj");
     $self->dbobj($dbobj);
     $dbobj->static_golden_path_type('UCSC');
   
     $self->throw("No input id input") unless defined($input_id);
-#    $self->throw("$input_id is not an array ref") unless ref($input_id) eq "ARRAY";
     $self->input_id($input_id);
-    
-    return $self; # success - we hope!
+
+  if (!defined $seqfetcher) {
+    # will look for pfetch in $PATH - change this once PipeConf up to date
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
+  }
+  $self->throw("no seqfetcher\n") unless defined $seqfetcher;
+  print STDERR "seqfetcher: $seqfetcher\n";
+  $self->seqfetcher($seqfetcher); 
+  
+  return $self; # success - we hope!
 }
 
 
@@ -163,9 +166,10 @@ sub fetch_input{
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   
   $self->vc($vc);
-  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( -genomic => $vc->primary_seq,
-								    -ids     => \@fps,
-                                                                    -endbias => 1);
+  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $vc->primary_seq,
+								    '-ids'        => \@fps,
+								    '-seqfetcher' => $self->seqfetcher,
+                                                                    '-endbias'    => 1);
   
   
   
@@ -335,6 +339,26 @@ sub convert_output {
     my $time  = time; chomp($time);
     my @genes = $self->make_genes($count,$time,$self->runnable);
     my @remapped = $self->remap_genes($self->runnable,@genes);
+
+   print STDERR "gere! " . scalar(@remapped)  . "\n";
+
+    # check translations
+    foreach my $gene(@remapped){
+      foreach my $trans ( $gene->each_Transcript ) {
+	eval {
+	  print STDERR "translation: \n";
+	  my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+	  print STDERR "remapped: ";
+	  $seqio->write_seq($trans->translate); 
+	  print STDERR "\n ";
+	};
+	
+	if ($@) {
+	  print STDERR "Couldn't translate: " . $gene->id . "[$@]\n";
+	} 
+      }
+    }    
+    
     $self->{'_output'} = \@remapped;
 }
 
@@ -465,6 +489,16 @@ sub make_genes {
 	$transl->end($endexon->length);
       }
       #$transl->end  ($exons[$#exons]->end - $exons[$#exons]->start + 1);
+
+    }
+  }
+
+  foreach my $gene(@genes){
+    foreach my $trans($gene->each_Transcript){
+      my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+      print STDERR "grargh: ";
+      $seqio->write_seq($trans->translate);
+      print STDERR "\n ";
     }
   }
   return @genes;
@@ -484,6 +518,24 @@ sub remap_genes {
 
   my @newf;
   my $trancount=1;
+
+  # check translations:
+  foreach my $gene(@genes){
+    foreach my $trans ( $gene->each_Transcript ) {
+      eval {
+	print STDERR "translation: \n";
+	my $seqio = Bio::SeqIO->new(-fh => \*STDERR);
+	print STDERR "before remap: ";
+	$seqio->write_seq($trans->translate); 
+	print STDERR "\n ";
+      };
+      
+      if ($@) {
+	print STDERR "Couldn't translate: " . $gene->id . "[$@]\n";
+      } 
+    }
+  }
+
   foreach my $gene (@genes) {
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
