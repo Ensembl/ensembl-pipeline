@@ -75,6 +75,6 @@ sub chunk_ests {
 
 sub index_ests {
   my $inxfile = $estfile . ".jidx";
-  my $output = `makeindex $estfile > $inxfile`;
+  my $output = `$makeindex $estfile > $inxfile`;
   if($output ne '') { print "output from makeindex: $output\n"; }
 }
