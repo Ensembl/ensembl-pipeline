@@ -209,7 +209,7 @@ sub run {
   
   my @features = $self->run_blast;
 
-  #print STDERR "There are ".@features." remaining features after reblasting.\n";
+  #print STDERR "There are ".scalar @features." features remaining after re-blasting.\n";
   unless (@features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
     return;
@@ -224,7 +224,6 @@ sub run {
     push (@$mg_runnables, $runnable); 
   }
 
-  #print STDERR "Running the MultiMiniGenewise runnables.\n";
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
@@ -344,6 +343,17 @@ sub build_runnables {
 
   foreach my $seqname (keys %partitioned_features){
 
+    # Preliminary check to see whether our filtered features
+    # give enough coverage to make it worth continuing.
+
+    my $coverage = $self->check_coverage($seqname, $partitioned_features{$seqname});
+
+    unless ($coverage > 0.75) {
+      my $mmgw = $self->make_mmgw($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
+      push (@mg_runnables, $mmgw);
+      next
+    }
+
      # Now, we attempt to cluster our features into groups of
      # similar exons.
 
@@ -367,30 +377,21 @@ sub build_runnables {
 	}
       }
 
-      if ($number_of_clustered_features  > (0.8 * (scalar @{$partitioned_features{$seqname}}))) {
+      if ($number_of_clustered_features  >= (0.75 * (scalar @{$partitioned_features{$seqname}}))) {
 	$clusters_seem_real = 1;
       }
     }
 
-    # With the sets of clustered blast hits, find those
-    # clusters with the highest number of members.  Choose
-    # one of these clusters and choose the centre-most 
-    # cluster member (in genomic DNA fragment terms).  With
-    # this blast feature, select from each of the other
-    # clusters the nearest member blast feature.  Create a
-    # new array with these features.  Iterate this process
-    # until the original cluster has no more members.  With
-    # the arrays of features created check for clusters that
-    # overlap.  If an overlap is found, discard a feature
-    # from one of the arrays, choosing the feature furthest
-    # from the core of its cluster.  If doing this still
-    # doesn't fix the overlap, throw a nasty-looking warning 
-    # and keep going.
+    # If we have clusters is such numbers that it looks like
+    # there might be repeated genes, break the mini genomic
+    # sequence into fragments and run multiple minigenewises.
+    # Otherwise, default to the normal way of running
+    # multiminigenewise.
     
     if ((@$clustered_features)&&($clusters_seem_real > 0)) {
 
       print STDERR "Minigenomic sequence could contain a number "
-	. " of highly similar genes.  Fragmenting the minigenomic "
+	. "of highly similar genes.  Fragmenting the minigenomic "
 	  . "sequence to try to resolve these genes individually.\n";
 
       my $gene_clusters = $self->form_gene_clusters($clustered_features);
@@ -455,7 +456,19 @@ sub build_runnables {
     }
       
   }
-    return \@mg_runnables;
+
+  # Gah, what if we havent constructed a runnable by this 
+  # late stage?  It means that the homology of the blast
+  # features was so low that we threw them all away.  Had
+  # better just make a default runnable...
+
+  unless (scalar @mg_runnables){
+    my $mmgw = $self->make_mmgw($self->genomic_sequence, \@features);
+    push (@mg_runnables, $mmgw);
+  }
+
+
+  return \@mg_runnables;
 }
 
 =head2 cluster_features
@@ -499,7 +512,7 @@ sub cluster_features {
   my @all_feature_clusters;
   
   while (@sorted_features) {
-    
+
     my $top_feature = shift @sorted_features;
     
     my @similar_features;
@@ -509,7 +522,6 @@ sub cluster_features {
     foreach my $lesser_feature (@sorted_features) {
 
       if ($self->check_overlap($top_feature,$lesser_feature)){
-
 	push (@similar_features, $lesser_feature);
 
       } else {
@@ -697,9 +709,55 @@ sub check_overlap {
     }
   }
     
-return 0;    
+  return 0;    
 }
   
+=head2 check_coverage
+
+  Args [1]   : protein id - id used by seqfetcher to retrieve
+               protein object.
+  Args [2]   : feature listref - reference to list of align features
+               that align to parts of the protein specified in Arg [1]
+  Example    : $self->check_coverage($seqname, $features);
+  Description: Using a protein and a list of corresponding align
+               features, calculates the percentage of the protein
+               that the features cover.
+  Returntype : A real (e.g. a percentage like 0.80)
+  Exceptions : none
+  Caller     : $self->make_runnables
+
+=cut
+
+
+sub check_coverage {
+  my ($self, $seqname, $features) = @_;
+
+  my $protein = $self->get_Sequence($seqname);  
+  my $protein_length = $protein->length;
+
+  my @voider;
+  my @score_keeper;
+
+  foreach my $feature (@$features){
+
+    my $start = $feature->{_gsf_start};
+    my $end = $feature->{_gsf_end};
+
+    ($start, $end) = sort {$a <=> $b} ($start, $end);
+
+    for (my $j = $start; $j <= $end; $j++){
+      $score_keeper[$j] = 1;
+    }
+  }
+
+  my $tally = 0;
+
+  foreach my $score (@score_keeper){
+    $tally++ if $score;
+  }
+
+  return ($tally/$protein_length);
+}
 
 
 sub get_Sequences {
