@@ -1,9 +1,7 @@
 #
-# Object for building genes
+# BioPerl module for PredictionGeneBuilder
 #
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
+# Cared for by EnsEMBL <ensembl-dev@ebi.ac.uk>
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -100,13 +98,6 @@ sub new {
     if ( @$annotations ){
       $self->annotations( @$annotations );
     }
-    $self->{'_final_genes'}          = [];
-    $self->{'_gene_types'}           = [];
-    $self->gene_types($GB_COMBINED_GENETYPE);
-    $self->gene_types($GB_TARGETTED_GW_GENETYPE);
-    $self->gene_types($GB_SIMILARITY_GENETYPE);
-
-
     return $self;
 }
 
@@ -132,16 +123,13 @@ sub run{
 
   print STDERR "\n".scalar(@linked_predictions)." transcripts generated\n";
   
+  return @linked_predictions;
 
-
-  $self->filter_Transcripts;
-  
 }  
 
 ############################################################
 #
 # METHODS DEALING WITH PREDICTION TRANSCRIPTS AND FEATURES
-# ( first step towards the refactorisation of the GeneBuilder )
 #
 ############################################################ 
 
@@ -212,6 +200,25 @@ sub make_Exons {
 
 ############################################################
 
+sub _make_Exon { 
+  my ($self,$exon_prediction,$stub) = @_;
+  
+  my $slice_name = $self->slice->name;
+  my $exon       = new Bio::EnsEMBL::Exon;
+  
+  $exon->{'temporary_id'} = ("TMPE_" . $slice_name . "." . $exon_prediction->seqname . "." . $stub);
+  $exon->seqname   ($exon_prediction->seqname);
+  $exon->contig    ($self->slice);
+  $exon->start     ($exon_prediction->start);
+  $exon->end       ($exon_prediction->end  );
+  $exon->strand    ($exon_prediction->strand);
+  $exon->phase     ($exon_prediction->phase);
+  #$exon->add_supporting_features($exon_prediction);
+  
+  return $exon;
+}
+
+############################################################
 =head2 make_ExonPairs
 
  Description: Links exons with supporting evidence into ExonPairs
@@ -396,114 +403,6 @@ sub makePair {
 
 ############################################################
 
-
-=head2 merge
-
- Description: wicked meethod that merges two or more homol features into one if they are close enough together
-  Returns   : nothing
-  Args      : none
-
-=cut
-
-sub merge {
-  my ($self,$feature_hash,$overlap,$query_gap,$homol_gap) = @_;
-  
-  $overlap   = 20  unless $overlap;
-  $query_gap = 15  unless $query_gap;
-  $homol_gap = 15  unless $homol_gap;
-  
-  my @mergedfeatures;
-  
-  foreach my $id (keys %{ $feature_hash }) {
-    
-    my $count = 0;
-    my @newfeatures;
-    my @features = @{$feature_hash->{$id}};
-    
-    @features = sort { $a->start <=> $b->start} @features;
-    
-    # put the first feature in the new array;
-    push(@newfeatures,$features[0]);
-    
-    for (my $i=0; $i < $#features; $i++) {
-      my $id  = $features[$i]  ->id;
-      my $id2 = $features[$i+1]->id;
-      
-      # First case is if start of next hit is < end of previous
-      if ( $features[$i]->end > $features[$i+1]->start && 
-	  ($features[$i]->end - $features[$i+1]->start + 1) < $overlap) {
-	
-	if ($features[$i]->strand == 1) {
-	  $newfeatures[$count]-> end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hend);
-	} 
-	else {
-	  $newfeatures[$count]-> end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hstart);
-	}
-	
-	# Take the max score
-	if ($features[$i+1]->score > $newfeatures[$count]->score) {
-	  $newfeatures[$count]->score($features[$i+1]->score);
-	}
-	
-	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
-	  $features[$i+1]->strand($features[$i]->strand);
-	}
-	
-	# Allow a small gap if < $query_gap, $homol_gap
-      } elsif (($features[$i]->end < $features[$i+1]->start) &&
-	       abs($features[$i+1]->start - $features[$i]->end) <= $query_gap) {
-	
-	if ($features[$i]->strand eq "1") {
-	  $newfeatures[$count]->end($features[$i+1]->end);
-	  $newfeatures[$count]->hend($features[$i+1]->hend);
-	} else {
-	  $newfeatures[$count]->end($features[$i+1]->end);
-	  $newfeatures[$count]->hstart($features[$i+1]->hstart);
-	}
-	
-	if ($features[$i+1]->score > $newfeatures[$count]->score) {
-	  $newfeatures[$count]->score($features[$i+1]->score);
-	}
-	
-	if ($features[$i+1]->hstart == $features[$i+1]->hend) {
-	  $features[$i+1]->strand($features[$i]->strand);
-	}
-	
-      } else {
-	# we can't extend the merged homologies so start a
-	# new homology feature
-	
-	# first do the coords on the old feature
-	if ($newfeatures[$count]->hstart > $newfeatures[$count]->hend) {
-	  my $tmp = $newfeatures[$count]->hstart;
-	  $newfeatures[$count]->hstart($newfeatures[$count]->hend);
-	  $newfeatures[$count]->hend($tmp);
-	}
-	
-	$count++;
-	$i++;
-	
-	push(@newfeatures,$features[$i]);
-	$i--;
-      }
-    }
-    
-    # Adjust the last new feature coords
-    if ($newfeatures[$#newfeatures]->hstart > $newfeatures[$#newfeatures]->hend) {
-      my $tmp = $newfeatures[$#newfeatures]->hstart;
-      $newfeatures[$#newfeatures]->hstart($newfeatures[$#newfeatures]->hend);
-      $newfeatures[$#newfeatures]->hend($tmp);
-    }
-    
-    my @pruned = $self->prune_features(@newfeatures);
-    
-    push(@mergedfeatures,@pruned);
-  }
-  return @mergedfeatures;
-}
-
 ############################################################
 
 =head2 prune_features
@@ -667,11 +566,8 @@ sub link_ExonPairs {
 
 =head2 _recurseTranscript
 
- Title   : _recurseTranscript
  Usage   : $self->_recurseTranscript($exon,$transcript)
- Function: Follows ExonPairs to form a new transcript
- Example : 
- Returns : nothing
+ Function: Follows ExonPairs recursively to form a new transcript
  Args    : Bio::EnsEMBL::Exon Bio::EnsEMBL::Transcript
 
 =cut
@@ -679,10 +575,12 @@ sub link_ExonPairs {
   
 sub _recurseTranscript {
   my ($self,$exon,$tran) = @_;
+  
   if (defined($exon) && defined($tran)) {
     $self->throw("[$exon] is not a Bio::EnsEMBL::Exon")       unless $exon->isa("Bio::EnsEMBL::Exon");
     $self->throw("[$tran] is not a Bio::EnsEMBL::Transcript") unless $tran->isa("Bio::EnsEMBL::Transcript");
-  } else {
+  } 
+  else {
     $self->throw("Wrong number of arguments [$exon][$tran] to _recurseTranscript");
   }
   
@@ -696,23 +594,20 @@ sub _recurseTranscript {
   foreach my $exon (keys %exonhash) {
     if ($exonhash{$exon} > 1) {
       $self->warn("Eeeek! Found exon " . $exon . " more than once in the same gene. Bailing out");
-      
       $tran = undef;
-      
       return;
     }
   }
   
-  # First copy all the exons into a new gene
+  # First copy all the exons into a new transcript
   my $tmptran = new Bio::EnsEMBL::Transcript;
   $tmptran->type($GB_ABINITIO_SUPPORTED_TYPE);
-
+  
   foreach my $ex (@{$tran->get_all_Exons}) {
     $tmptran->add_Exon($ex);
   }
   
   my $count = 0;
-  
   my @pairs = $self->_getPairs($exon);
   
   #    print STDERR "Pairs are @pairs\n";
@@ -729,11 +624,7 @@ sub _recurseTranscript {
   
   
  PAIR: foreach my $pair (@pairs) {
-    #	print STDERR "Comparing " . $exons[$#exons]->{'temporary_id'} . "\t" . $exons[$#exons]->end_phase . "\t" . 
-    #	    $pair->exon2->{'temporary_id'} . "\t" . $pair->exon2->phase . "\n";
     next PAIR if ($exons[$#exons]->end_phase != $pair->exon2->phase);
-    
-    $self->{'_usedPairs'}{$pair} = 1;
     
     if ($count > 0) {
       my $newtran = new Bio::EnsEMBL::Transcript;
@@ -746,7 +637,8 @@ sub _recurseTranscript {
       
       $newtran->add_Exon($pair->exon2);
       $self->_recurseTranscript($pair->exon2,$newtran);
-    } else {
+    } 
+    else {
       $tran->add_Exon($pair->exon2);
       $self->_recurseTranscript($pair->exon2,$tran);
     }
@@ -760,11 +652,9 @@ sub _recurseTranscript {
 
 =head2 _getPairs
 
- Title   : _getPairs
  Usage   : my @pairs = $self->_getPairs($exon)
  Function: Returns an array of all the ExonPairs 
            in which this exon is exon1
- Example : 
  Returns : @Bio::EnsEMBL::Pipeline::ExonPair
  Args    : Bio::EnsEMBL::Exon
 
@@ -780,13 +670,10 @@ sub _getPairs {
   $self->throw("Input must be Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
   
   foreach my $pair ($self->get_all_ExonPairs) {
-    #        print STDERR "Pairs " . $pair->exon1->{'temporary_id'} . "\t" . $pair->is_Covered . "\n";
-    #        print STDERR "Pairs " . $pair->exon2->{'temporary_id'} . "\t" . $pair->is_Covered . "\n\n";
     if (($pair->exon1->{'temporary_id'} eq $exon->{'temporary_id'}) && ($pair->is_Covered == 1)) {
       push(@pairs,$pair);
     }
-  }
-  
+  } 
   @pairs = sort { $a->exon2->start <=> $b->exon2->start} @pairs;
   return @pairs;
 }
@@ -795,31 +682,26 @@ sub _getPairs {
 	
 =head2 isHead
 
- Title   : isHead
  Usage   : my $foundhead = $self->isHead($exon)
  Function: checks through all ExonPairs to see whether this
-           exon is connected to a preceding exon.
- Example : 
- Returns : 0,1
+           exon is connected to a preceeding exon in a pair, i.e. it returns FALSE if this exon is
+           pair->exon2 in a pair. Returns TRUE otherwise.
+           pair, where head is the 3prime exon or exon2 in the pair
+ Returns : BOOLEAN
  Args    : Bio::EnsEMBL::Exon
 
 =cut
-
-
+  
 sub isHead {
-    my ($self,$exon) = @_;
-
-    my $minimum_coverage = 1;
-
-    foreach my $pair ($self->get_all_ExonPairs) {
-
-	my $exon2 = $pair->exon2;
-	if (($exon->{'temporary_id'}  eq $exon2->{'temporary_id'}) && ($pair->is_Covered == 1)) {
-	    return 0;
-	}
+  my ($self,$exon) = @_;
+  my $minimum_coverage = 1;
+  foreach my $pair ($self->get_all_ExonPairs) {
+    my $exon2 = $pair->exon2;
+    if (($exon == $exon2 && ($pair->is_Covered == 1)) {
+      return 0;
     }
-
-    return 1;
+  }
+  return 1;
 }
 
 ############################################################
@@ -829,29 +711,25 @@ sub isHead {
  Title   : isTail
  Usage   : my $foundtail = $self->isTail($exon)
  Function: checks through all ExonPairs to see whether this
-           exon is connected to a following exon.
- Example : 
- Returns : 0,1
+           exon is connected to a following exon, i.e. it returns FALSE if this
+	   exon is pair->exon1 in a pair. Returns TRUE otherwise.
+ Returns : BOOLEAN
  Args    : Bio::EnsEMBL::Exon
 
 =cut
 
 sub isTail {
-    my ($self,$exon) = @_;
-
-    my $minimum_coverage = 1;
-
-    foreach my $pair ($self->get_all_ExonPairs) {
-	my $exon1 = $pair->exon1;
-
-	if ($exon == $exon1 && $pair->is_Covered == 1) {
-	    return 0;
-	}
+  my ($self,$exon) = @_;
+  
+  my $minimum_coverage = 1;
+  foreach my $pair ($self->get_all_ExonPairs) {
+    my $exon1 = $pair->exon1;
+    if ($exon == $exon1 && $pair->is_Covered == 1) {
+      return 0;
     }
-    
-    return 1;
+  }
+  return 1;
 }
-
 
 ############################################################
 
@@ -1095,5 +973,17 @@ sub add_ExonPair {
 }
 
 #############################################################
+sub threshold {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{'_threshold'} = $arg;
+    }
+
+    return $self->{'_threshold'} || 100;
+}
+
+
+############################################################
 
 1;
