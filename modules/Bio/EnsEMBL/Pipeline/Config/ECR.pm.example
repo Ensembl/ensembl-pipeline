@@ -21,28 +21,19 @@ use vars qw(%ECR_Config);
 
                AXTFILTER_BY_CONFIG => {
 
-                 DEFAULT => {
-                   SOURCE        => undef,
-                   TARGETNIB     => undef,
-                   BEST          => undef,
-                   SUBSET        => undef,
-                   SUBSET_MATRIX => '/blastz/tight/matrix/for/example.mat',
-                   SUBSET_CUTOFF => 3400,
-                   CHAIN         => undef,
-                   NET           => undef,
-                 },
-
-
                  MouseBest => {
                    SOURCE    => 'MouseBlastz',
                    TARGETNIB => '/directory/with/mouse/nib/files',
                    BEST      => 1,
+                   BESTMATRIX => '/blastz/primate/matrix/for/example.mat',
                  },
                  
                  MouseTight => {
                    SOURCE    => 'MouseBest',
                    TARGETNIB => '/directory/with/mouse/nib/files',
                    SUBSET    => 1,
+                   SUBSETMATRIX => '/blastz/tight/matrix/for/example.mat',
+                   SUBSETCUTOFF => 3400,
                  },
 
                  MouseNet => {

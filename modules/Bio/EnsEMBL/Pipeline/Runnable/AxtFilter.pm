@@ -52,9 +52,10 @@ sub new {
   my ($class,@args) = @_;
 
   my $self = $class->SUPER::new(@args);
-  
+
   my ($features, 
       $best,
+      $best_matrix,
       $subset,
       $subset_matrix,
       $subset_cutoff,
@@ -72,6 +73,7 @@ sub new {
       $netToAxt
       ) = $self->_rearrange([qw(FEATURES
                                 BEST
+                                BESTMATRIX
                                 SUBSET
                                 SUBSETMATRIX
                                 SUBSETCUTOFF
@@ -110,6 +112,8 @@ sub new {
   $self->netToAxt($netToAxt) if defined $netToAxt;
 
   $self->best($best) if defined $best;
+  $self->best_matrix($best_matrix) if defined $best_matrix;
+  $self->subset($subset) if defined $subset;
   $self->subset_matrix($subset_matrix) if defined $subset_matrix;
   $self->subset_cutoff($subset_cutoff) if defined $subset_cutoff;
   $self->net($net) if defined $net;
@@ -181,9 +185,16 @@ sub run {
   ##############################
   if ($self->best) {
     my $tmp_axt_file = "$work_dir/$contig_name.$$.res.axt";
-    system($self->axtBest, $axt_file, $contig_name, $tmp_axt_file)
-        and $self->throw("Something went wrong with axtBest\n");
+
+    my $cmd = $self->axtBest ." " . $axt_file . " ".  $contig_name . " ". $tmp_axt_file;
+
+    if ($self->best_matrix) {
+      $cmd .= " -matrix=" . $self->best_matrix;
+    }
+
+    system($cmd) and $self->throw("Something went wrong with axtBest\n");
     rename $tmp_axt_file, $axt_file;
+
   }
 
   
@@ -192,6 +203,7 @@ sub run {
   ##############################
   if ($self->subset) {
     my $tmp_axt_file = "$work_dir/$contig_name.$$.res.axt";
+
     system($self->subsetAxt, $axt_file, $tmp_axt_file, $self->subset_matrix, $self->subset_cutoff)
         and $self->throw("Something went wrong with subsetAxt\n");
     rename $tmp_axt_file, $axt_file;  
@@ -633,6 +645,35 @@ sub best {
 
   return $self->{'_best'};
 }
+
+
+=head2 best_matrix
+
+    Title   :   best_matrix
+    Usage   :   $self->best_matrix($matrix_file)
+    Function:   
+      When this is set to a valid blastz matrix file, 
+      the Runnable will rescore and trim the features with
+      the matrix using axtBest
+    Returns :   
+    Args    :   
+
+=cut
+
+sub best_matrix {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_best_matrix'} = $arg;
+  }
+  
+  if (!exists($self->{'_best_matrix'})) {
+    $self->{'_best_matrix'} = 0;
+  }    
+
+  return $self->{'_best_matrix'};
+}
+
 
 
 =head2 subset

@@ -82,6 +82,9 @@ sub fetch_input {
 
     if ($config->{$logic_name}->{BEST}) {
       $parameters{-best} = 1;
+      if (exists $config->{$logic_name}->{BESTMATRIX}) { 
+        $parameters{-bestmatrix} = $config->{$logic_name}->{BESTMATRIX};
+      }
     }
     if ($config->{$logic_name}->{SUBSET}) {
       $parameters{-subset}  = 1;
