@@ -65,6 +65,8 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
+use Bio::EnsEMBL::Pipeline::SubseqFetcher;
+use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
@@ -156,6 +158,7 @@ sub fetch_input {
   }
   
   my @chr_names = $self->get_chr_names;
+
   foreach my $chr_name ( @chr_names ){
     my $database = $target."/".$chr_name.".fa";
     
@@ -218,8 +221,17 @@ sub run{
   }
   
   ############################################################
+#  # need to convert coordinates?
+#  my @mapped_genes = $self->convert_coordinates( @genes );
+
+
   # need to convert coordinates?
-  my @mapped_genes = $self->convert_coordinates( @genes );
+  my @mapped_genes;
+  if ($EST_USE_DENORM_GENES){
+    @mapped_genes = @genes;
+  } else {
+    @mapped_genes = $self->convert_coordinates( @genes );
+  }
   
   unless ( @mapped_genes ){
     print STDERR "No genes stored - exiting\n";
@@ -427,7 +439,7 @@ sub _percent_id{
 
 sub write_output{
   my ($self,@output) = @_;
-  
+
   ############################################################
   # here is the only place where we need to create a db adaptor
   # for the database where we want to write the genes
@@ -437,7 +449,18 @@ sub write_output{
 					      -dbname           => $EST_DBNAME,
 					      -pass             => $EST_DBPASS,
 					      );
-  my $gene_adaptor = $db->get_GeneAdaptor;
+
+  # Get our gene adaptor, depending on the type of gene tables
+  # that we are working with.
+  my $gene_adaptor;
+
+  if ($EST_USE_DENORM_GENES) {
+    $gene_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($db);
+  } else {
+    $gene_adaptor = $db->get_GeneAdaptor;  
+  } 
+
+
 
   unless (@output){
       @output = $self->output;
@@ -449,11 +472,10 @@ sub write_output{
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       }
       
-      
       eval{
 	$gene_adaptor->store($gene);
-	
       };
+
       if ($@){
 	  $self->warn("Unable to store gene!!\n$@");
       }
@@ -640,6 +662,9 @@ sub check_splice_sites{
   
   # all exons in the transcripts are in the same seqname coordinate system:
   my $slice = $transcript->start_Exon->contig;
+
+  # Use a SubseqFetcher to retrieve splice site nucleotides
+  my $chr_seqfetcher = $self->_get_SubseqFetcher($slice);
   
   if ($strand == 1 ){
     
@@ -649,12 +674,23 @@ sub check_splice_sites{
       my $downstream_exon = $exons[$i+1];
       my $upstream_site;
       my $downstream_site;
+
+      # New way using SubseqFetcher...
       eval{
 	$upstream_site = 
-	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+	  $chr_seqfetcher->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
 	$downstream_site = 
-	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+	  $chr_seqfetcher->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
       };
+
+      # Old  way using database...
+      #eval {
+      #	$upstream_site = 
+      #	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+      #	$downstream_site = 
+      #	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
+      #};
+
       unless ( $upstream_site && $downstream_site ){
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
@@ -701,12 +737,24 @@ sub check_splice_sites{
       my $downstream_site;
       my $up_site;
       my $down_site;
-      eval{
+
+      # New way using SubseqFetcher...
+      eval{	
 	$up_site = 
-	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+	  $chr_seqfetcher->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
 	$down_site = 
-	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+	  $chr_seqfetcher->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
       };
+
+      # Old  way using database...
+      #eval {
+      #  $up_site = 
+      #    $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
+      #  $down_site = 
+      #    $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
+      #};
+
+
       unless ( $up_site && $down_site ){
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
@@ -767,6 +815,29 @@ sub change_strand{
 }
 
 ############################################################
+
+
+=head2 _get_SubseqFetcher
+
+Prototype fast SubseqFetcher to get splice sites.
+
+=cut
+
+sub _get_SubseqFetcher {
+    
+  my ($self, $slice) = @_;
+  
+  if (defined $self->{'_current_chr_name'}  && 
+      $slice->chr_name eq $self->{'_current_chr_name'} ){
+    return $self->{'_chr_subseqfetcher'};
+  } else {
+    
+    $self->{'_current_chr_name'} = $slice->chr_name;
+    my $chr_filename = $EST_GENOMIC . "/" . $slice->chr_name . "\.fa";
+    
+    $self->{'_chr_subseqfetcher'} = Bio::EnsEMBL::Pipeline::SubseqFetcher->new($chr_filename);
+  }
+}
 
 
 
