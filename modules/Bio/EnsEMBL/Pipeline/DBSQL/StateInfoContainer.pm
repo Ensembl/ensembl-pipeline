@@ -220,4 +220,26 @@ sub deleteObj {
   }
 }
 
+sub create_tables {
+  my $self = shift;
+  my $sth;
+
+  $sth = $self->prepare("drop table if exists InputIdAnalysis");
+  $sth->execute();
+
+  $sth = $self->prepare(qq{
+    CREATE TABLE InputIdAnalysis (
+    input_id     varchar(40) not null,
+    class        enum("clone","contig","vc","gene") not null,
+    analysis_id  int not null,
+    created      datetime not null,
+
+    PRIMARY KEY (analysis_id, input_id, class),
+    KEY input_id_created (input_id, created),
+    KEY input_id_class   (input_id, class)
+    );
+  });
+  $sth->execute();
+}
+
 1;

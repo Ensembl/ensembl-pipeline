@@ -670,4 +670,63 @@ sub deleteObj {
   }
 }
 
+# creates all tables for this adaptor - job, jobstatus and current_status
+# if they exist they are emptied and newly created
+sub create_tables {
+  my $self = shift;
+  my $sth;
+
+  $sth = $self->prepare("drop table if exists job");
+  $sth->execute();
+
+  $sth = $self->prepare(qq{
+    CREATE TABLE job (
+    job_id        int(10) unsigned  default 0  not null auto_increment,
+    input_id      varchar(40)       default '' not null,
+    class         enum("clone","contig","vc","gene") not null,
+    analysis_id   int(10) unsigned  default 0  not null,
+    LSF_id        int(10) unsigned  default 0,
+    stdout_file   varchar(100)      default '' not null,
+    stderr_file   varchar(100)      default '' not null,
+    object_file   varchar(100)      default '' not null,
+    retry_count   int               default 0,
+
+    PRIMARY KEY   (job_id),
+    KEY input     (input_id),
+    KEY analysis  (analysis_id)
+    );
+  });
+  $sth->execute();
+
+  $sth = $self->prepare("drop table if exists jobstatus");
+  $sth->execute();
+
+  $sth = $self->prepare(qq{
+    CREATE TABLE jobstatus (
+    job_id     int(10) unsigned  default 0 not null,
+    status     varchar(40)       default 'CREATED' not null,
+    time       datetime          default '0000-00-00 00:00:00' not null,
+
+    KEY job    (job_id),
+    KEY status (status)
+    );
+  });
+  $sth->execute();
+
+  $sth = $self->prepare("drop table if exists current_status");
+  $sth->execute();
+
+  $sth = $self->prepare(qq{
+    CREATE TABLE current_status (
+    job_id  int(10) unsigned  default 0 not null,
+    status  varchar(40)       default '' not null,
+
+    PRIMARY KEY (job_id),
+    KEY status  (status)
+    );
+  });
+  $sth->execute();
+  $sth->finish;
+}
+
 1;
