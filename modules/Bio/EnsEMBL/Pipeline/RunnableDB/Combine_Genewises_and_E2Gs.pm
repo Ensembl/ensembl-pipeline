@@ -62,7 +62,7 @@ use Bio::SeqIO;
 # all the parameters are read from GeneConf.pm
 use Bio::EnsEMBL::Pipeline::GeneConf;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class,@args) = @_;
@@ -1988,19 +1988,18 @@ sub validate_exon{
     $self->warn($msg);
     return 0;
   }
-
+  
   elsif($exon->start > $exon->end){
     my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
     $self->warn($msg);
     return 0;
   }
-
+  
   elsif($exon->start == $exon->end){
     my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - letting it through\n";
     $self->warn($msg);
     return 1;
   }
-  
   return 1;
 }
 
