@@ -75,6 +75,11 @@ sub submit{
       } else {
 	
 	#CHILD
+	
+	my $file_prefix = $self->_generate_file_prefix($job);
+	$job->stdout_file("${file_prefix}.out");
+	$job->stderr_file("${file_prefix}.err");
+
 	print "Executing $job with PID $$\n";
 	$job->submission_id($$);
 	$job->adaptor->update($job);
@@ -193,5 +198,22 @@ sub flush {
 
 }
 
+sub _generate_filename_prefix {
+
+  my $self = shift;
+  my $job  = shift;
+
+  # get temp dir from config
+  my $config = $self->get_Config();
+  my $temp_dir = $config->get_parameter('LOCAL', 'tmpdir');
+  $temp_dir || $self->throw('Could not determine temp dir for job ' . $job->taskname . ' pid ' . $job->submission_id . '\n');
+
+  # don't need to distribute files through subdirectories like in LSF as there will only be a few
+  my $time = localtime(time());
+  $time =~ tr/ :/_./;
+
+  return "$temp_dir/" . $job->taskname . "_job" . $job->dbID() . "$time";
+
+}
 
 1;
