@@ -1,0 +1,191 @@
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes
+
+=head1 SYNOPSIS
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
+    use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes qw(  );
+
+=head1 DESCRIPTION
+
+PseudoGenes is a pure ripoff of humConf written by James Gilbert.
+
+humConf is based upon ideas from the standard perl Env environment
+module.
+
+It imports and sets a number of standard global variables into the
+calling package, which are used in many scripts in the human sequence
+analysis system.  The variables are first decalared using "use vars",
+so that it can be used when "use strict" is in use in the calling
+script.  Without arguments all the standard variables are set, and
+with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%PseudoGenes> hash is asked to be set.
+
+The variables can also be references to arrays or hashes.
+
+Edit C<%PseudoGenes> to add or alter variables.
+
+All the variables are in capitals, so that they resemble environment
+variables.
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
+
+use strict;
+use vars qw( %PseudoGenes );
+
+# Hash containing config info
+%PseudoGenes = (
+	      
+	      TMPDIR     => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/',
+	      BSUBS_FILE => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/pseudogenes_jobs',
+	      SCRIPT     => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl',
+	      PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl -check',
+	      LSF_OPTIONS=> ' -C0 -q acari ',
+		
+	      INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
+	      	      
+	      ############################################################
+	      # database with the syntenic regions. orthologs, etc
+	      #COMPARA_DBUSER => 'ensro',
+	      COMPARA_DBNAME => 'ensembl_compara_12_1',
+	      COMPARA_DBHOST => 'ecs2d',
+	      COMPARA_CONFIG => '/nfs/acari/eae/ensembl/ensembl-compara/modules/Bio/EnsEMBL/Compara/Compara.conf',
+		
+		############################################################
+		# Species we compare to:
+		COMPARATIVE_DBS    => [
+				       {
+					SPECIES => 'Mus musculus',
+					DBHOST  => 'ecs2d',
+					DBNAME  => 'mus_musculus_core_10_3',
+					PATH    => 'MGSC3',
+				       },
+				       {
+					SPECIES => 'Rattus norvegicus',
+					DBHOST  => 'ecs2a',
+					DBNAME  => 'rat_Nov02',
+					PATH    => 'RGSC2',
+				       },
+				      ],
+
+		############################################################
+		# refdb, where the sequence is, sometimes this can be different from genewise_db
+		REF_DBNAME   => 'ens_NCBI_31',
+		REF_DBHOST   => 'ecs2b',
+
+		############################################################
+		# database where we will write the pseudogenes
+		PSEUDO_DBUSER   => 'ensadmin',
+		PSEUDO_DBNAME   => '',
+		PSEUDO_DBHOST   => '',
+		PSEUDO_DBPASS   => '',
+
+	      
+	      #####################
+	      # EXONERATE OPTIONS #
+	      #####################
+	      
+	      # full path fo the dir where we have the masked-dusted chromosomes
+	      GENOMIC                 => '/data/blastdb/Ensembl/NCBI33/genome/',
+      	      # path to file with repeatmasked dusted genomic sequences
+	      # NB this file is huge - distribute it across the farm or 
+	      # be prepared to face the wrath of systems when the network 
+	      # seizes up!
+	
+	      # which version of exonerate      
+	      EXONERATE              => '/usr/local/ensembl/bin/exonerate-0.6.7',
+	      
+	      ### new exonerate options ####
+	      #
+	      # score: min scores to report. 
+	      # Score is here the raw score for the alignment: +5 for every match and -4 for every mismatch 
+	      #
+	      # fsmmemory: memory given for the target sequence ( max memory required for holding the chromosomes )
+	      # In human this could be around 256
+	      #
+	      # here are a few examples of what it can do at this stage:
+	      #
+	      # 1. Aligning cdnas to genomic sequence:
+	      #    exonerate --exhaustive no --model est2genome cdna.fasta genomic.masked.fasta
+	      #    ( this is the default )
+	      #
+	      # 2. Behaving like est2genome:
+	      #    exonerate --exhaustive yes --model est2genome cdna.fasta genomic.masked.fasta
+	      #
+	      # 3. Behaving like blastn:
+	      #    exonerate --model affine:local dna.fasta genomic.masked.fasta
+	      #
+	      # 4. Smith-Waterman:
+	      #    exonerate --exhaustive --model affine:local query.fasta target.fasta
+	      #
+	      # 5. Needleman-Wunsch:
+	      #    exonerate --exhaustive --model affine:global query.fasta target.fasta
+	      #
+	      # 6. Generate ungapped Protein <---> DNA alignments:
+	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
+	      
+	      #optimal options are:
+             	      #EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14',
+	 
+      	      # options for pseudogenes:
+              EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+
+	      # options for structural rnas:
+	      EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
+
+      	      BEST_IN_GENOME => 1,
+	      MIN_COVERAGE            => 90,
+	      MIN_PERCENT_ID          => 97,
+
+	      ############################################################
+	      # each runnable has an analysis
+	      ############################################################
+	      
+	      EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder',
+	      EXONERATE_ANALYSIS     => 'pseudogene',	      
+	      SOURCE                  => 'RefSeq-EMBL',      
+	      	    
+
+		    
+	     );	      
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+  
+  # Get list of variables supplied, or else
+  # all of PseudoGenes:
+  my @vars = @_ ? @_ : keys( %PseudoGenes );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $PseudoGenes{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$PseudoGenes{ $_ };
+	} else {
+	    die "Error: PseudoGenes: $_ not known\n";
+	}
+    }
+}
+
+1;
+
