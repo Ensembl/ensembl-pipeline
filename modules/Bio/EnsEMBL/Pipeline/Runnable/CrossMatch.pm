@@ -122,15 +122,17 @@ sub run{
    close(F);
    
    #build crossmatch factory
-   my $cmf = CrossMatch::Factory->new();
+   my $cmf = CrossMatch::Factory->new($self->score);
    $cmf->dir($self->workdir);
    $cmf->alignments(1);
 
+   print STDERR "About to run crossmatch from runnable...\n";
    #run crossmatch factory
    my $cm;
    eval {
        $cm = $cmf->crossMatch($file1,$file2);
    };
+   print STDEER "Finished crossmatch in runnable...\n";
 
    if( $@ ) {
        unlink($file1);
@@ -163,6 +165,7 @@ sub run{
 
 
        $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
+       #print STDERR "Processing FP with $start-$end to $hstart-$hend\n";
 
        $fp->start($start);
        $fp->end($end);
@@ -346,7 +349,7 @@ use Cwd;
 
 # Makes a new CrossMatch factory object
 sub new {
-    my $pkg = shift;
+    my ($pkg,$score) = @_;
     my( @dir );
 
     # Default to cwd if no directories supplied
@@ -358,8 +361,8 @@ sub new {
 
     return bless {
 	dir => [ @dir ],
-	minMatch  => 50,
-	minScore  => 50,
+	minMatch  => $score,
+	minScore  => $score,
 	maskLevel => 101, # Show all matches
 	alignments => 0,  # don't keep/parse alignments by default
 	_extn => ['']
@@ -504,17 +507,27 @@ sub _save_hit{
 		    $s2a=$seq2;
 		    $s2b=$s2c='';
 		}
+                #print STDERR "heads are ",substr($s1a,0,10),";",substr($s1b,0,10),":",substr($s2a,0,10),";",substr($s2b,0,10),"\n";
+
 		# escape if no more gaps
 		next if(length($s1c)==0 && length($s2c)==0);
 		# do shortest first
 		my $lab;
+                if( length($s1a.$s1b) == 0 ||
+			length($s2a.$s2b) == 0 ) {
+			print STDERR "Dodgy alignment processing catch! Bugging out\n";
+			next;
+		}
 		if(length($s1a.$s1b)<length($s2a.$s2b)){
 		    # update seq1
-		    $st1+=length($s1a);
-		    $seq1=$s1c;
-		    # update seq2
 		    $lab=length($s1a.$s1b);
+		    $st1+=length($s1a);
+                    #print STDERR "st1 is $st1 with $lab\n";
+         	    $seq1=$s1c;
+		    #print STDERR "New head is ",substr($seq1,0,10),"\n";
+		    # update seq2
 		    $seq2=~s/^\S{$lab}//;
+                    #print STDERR "new $lab.. seq2 head is ",substr($seq2,0,10),"\n";
 		}else{
 		    # update seq2
 		    $lab=length($s2a);
@@ -568,15 +581,18 @@ sub crossMatch {
     my @align;
     my $ialign;
     my $match = CrossMatch->new(@seq, $minM, $minS, $mask);
-    my $cross_command="cross_match -minmatch $minM -minscore $minS -masklevel $mask";
+    my $cross_command="/work2/elia/bin/cross_match -minmatch $minM -minscore $minS -masklevel $mask";
     if($matcher->{'alignments'}){
 	$cross_command.=" -alignments";
     }
     $cross_command.=" @seq 2>/dev/null |";
+    print STDERR "opening cross match pipe\n";
     open( CROSS_MATCH, $cross_command )
         or croak "Can't open pipe '$cross_command' : $!";
     while (<CROSS_MATCH>) {
 	# process alignment lines if requested
+        #print STDERR "Processing....$_";
+
 	if($matcher->{'alignments'}){
 	    if(/^(\w*)\s+(\S+)\s+(\d+)\s+(\S+)\s+(\d+)$/){
 		if($2 eq $res[4] && $ialign==1){
@@ -605,7 +621,9 @@ sub crossMatch {
 	@res = split;
 	$ialign=1;
     }
+    print STDERR "About to process...\n";
     &_save_hit($match,\@res,\@align);
+    print STDERR "saved hits \n";
         
     # Check exit status of cross_match
     unless (close CROSS_MATCH) {
