@@ -145,7 +145,7 @@ sub make_tbsubs {
 
     my $outfile  = $resdir . "/$input_id.out";
     my $errfile  = $resdir . "/$input_id.err";
-    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable\"";
+    my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable\"";
     $command .= "  $runner ";
     $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
     $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
