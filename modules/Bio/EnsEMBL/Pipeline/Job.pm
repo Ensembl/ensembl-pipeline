@@ -435,7 +435,8 @@ sub batch_runRemote {
 sub runLocally {
   my $self = shift;
  
-  print STDERR "Running locally " . $self->stdout_file . " " . $self->stderr_file . "\n"; 
+  #print STDERR "Running locally " . $self->stdout_file . " " 
+  #. $self->stderr_file . "\n"; 
 
   local *STDOUT;
   local *STDERR;
@@ -451,6 +452,13 @@ sub runLocally {
   }
        print STDERR "Running inLSF\n"; 
   $self->run_module();
+  if ($self->current_status->status eq "SUCCESSFUL"){
+    $self->adaptor->remove( $self );
+    if($self->cleanup){
+      unlink $self->stderr_file if(-e $self->stderr_file);
+      unlink $self->stdout_file if(-e $self->stdout_file);
+    }
+  }
 }
 
 
