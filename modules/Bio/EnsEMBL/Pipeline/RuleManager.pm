@@ -176,32 +176,22 @@ sub db{
 
 =cut
 
-
-
 sub job_adaptor{
   my ($self, $adaptor) = @_;
 
-  $self->{'job_adaptor'} = shift if(@_);
-
+  if($adaptor){
+    $self->{'job_adaptor'} = $adaptor;
+  }
   if(!$self->{'job_adaptor'}){
-    $self->{'job_adaptor'} = $self->db->get_JobAdaptor;
+    my $job_adaptor = $self->db->get_JobAdaptor;
+    $self->{'job_adaptor'} = $job_adaptor;
   }
   return $self->{'job_adaptor'};
 }
 
-sub rule_adaptor{
-  my ($self, $adaptor) = @_;
-
-  $self->{'rule_adaptor'} = shift if(@_);
-
-  if(!$self->{'rule_adaptor'}){
-    $self->{'rule_adaptor'} = $self->db->get_RuleAdaptor;
-  }
-  return $self->{'rule_adaptor'};
-}
 
 sub analysis_adaptor{
-  my ($self, $adaptor) = @_;
+  my ($self) = @_;
 
   $self->{'analysis_adaptor'} = shift if(@_);
 
@@ -211,18 +201,33 @@ sub analysis_adaptor{
   return $self->{'analysis_adaptor'};
 }
 
+sub rule_adaptor{
+  my ($self, $adaptor) = @_;
+
+  if($adaptor){
+    $self->{'rule_adaptor'} = $adaptor;
+  }
+  if(!$self->{'rule_adaptor'}){
+    my $rule_adaptor = $self->db->get_RuleAdaptor;
+    $self->{'rule_adaptor'} = $rule_adaptor;
+  }
+  return $self->{'rule_adaptor'};
+}
 
 
 sub stateinfocontainer{
   my ($self, $adaptor) = @_;
 
-  $self->{'stateinfocontainer'} = shift if(@_);
-
+  if($adaptor){
+    $self->{'stateinfocontainer'} = $adaptor;
+  }
   if(!$self->{'stateinfocontainer'}){
-    $self->{'stateinfocontainer'} = $self->db->get_StateInfoContainer;
+    my $stateinfocontainer = $self->db->get_StateInfoContainer;
+    $self->{'stateinfocontainer'} = $stateinfocontainer;
   }
   return $self->{'stateinfocontainer'};
 }
+
 
 
 =head2 input_ids
@@ -243,13 +248,18 @@ sub input_ids{
       unless(ref($input_ids) eq 'HASH');
     $self->{'input_ids'} = $input_ids;
   }
-  if(!$self->{'input_ids'}){
+  if(!%{$self->{'input_ids'}}){
     $self->{'input_ids'} = $self->stateinfocontainer->
       get_all_input_id_analysis_sets;
   }
   return $self->{'input_ids'};
 }
 
+
+sub empty_input_ids{
+  my ($self) = @_;
+  $self->{'input_ids'} = {};
+}
 
 =head2 rules
 
@@ -271,13 +281,17 @@ sub rules{
     $self->{'rules'} = $rules;
   }
   if(!$self->{'rules'}){
-    $self->{'rules'} = $self->rule_adaptor->fetch_all;
+    my @rules = $self->rule_adaptor->fetch_all;
+    $self->{'rules'} = \@rules;
   }
   return $self->{'rules'};
 }
 
 
-
+sub empty_rules{
+  my($self) = @_;
+  $self->{'rules'} = @_;
+}
 =head2 boolean toggles 
 
   Arg [1]   : int
@@ -574,11 +588,11 @@ sub can_job_run{
           "$analysis");
   }
   my $job;
-  my %current_jobs = %{$self->get_job_adaptor->fetch_hash_by_input_id
+  my %current_jobs = %{$self->job_adaptor->fetch_hash_by_input_id
                          ($input_id)};
   if($current_jobs{$analysis->dbID}){
     my $cj = $current_jobs{$analysis->dbID};
-    my $status = $cj->status->status;
+    my $status = $cj->current_status->status;
     if(($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry){
       if($self->rename_on_retry){
         $self->rename_files($cj);
@@ -598,8 +612,9 @@ sub can_job_run{
       throw("ERROR running job " . $job->dbID . " ".
             $job->analysis->logic_name." " . $job->stderr_file . " [$@]");
     }
+    return 1;
   }
-  return 1;
+  return 0;
 }
 
 
@@ -869,9 +884,6 @@ sub is_locked{
 }
 
 
-sub setup_accumulators{
-  my ($self) = @_;
-};
 
 
 
@@ -893,8 +905,8 @@ sub fetch_complete_accumulators{
   my ($self) = @_;
   
   $self->{'complete_accumulators'} = {};
-  my @accumulators = $self->stateinfocontainer->
-    fetch_analysis_input_id('ACCUMULATOR');
+  my @accumulators = @{$self->stateinfocontainer->
+    fetch_analysis_by_input_id('ACCUMULATOR')};
   foreach my $analysis(@accumulators){
     if($analysis->input_id_type eq 'ACCUMULATOR'){
       $self->{'complete_accumulators'}->{$analysis->logic_name} = 1;
@@ -952,6 +964,22 @@ sub add_created_jobs_back{
 }
 
 
+=head2 rules_setup
+
+  Arg [1]   : hashref, keyed on analysis_id of analyses which are to run
+  Arg [2]   : hashref keyed on analysis_id of analyses to skip
+  Arg [3]   : arrayref of all rules
+  Arg [4]   : hashref of all accumulator analyses
+  Arg [5]   : hashref of incomplete accumulators
+  Function  : to setup the rules array on the basis of specified analyses
+  to either run or skip
+  Returntype: arrayref
+  Exceptions: throws if no rules are produces at the end
+  Example   : 
+
+=cut
+
+
 sub rules_setup{
   my ($self, $analyses_to_run, $analyses_to_skip, $all_rules,
      $accumulator_analyses, $incomplete_accumulators) =@_;
@@ -974,4 +1002,145 @@ sub rules_setup{
   }else{
     @rules = @$all_rules;
   }
+  if(scalar(@rules) == 0){
+    throw("Something is wrong with the code or your commandline setup ".
+          "rules_setup has returned no rules");
+  }
+  $self->rules(\@rules);
+  return \@rules;
+}
+
+
+
+=head2 logic_name2dbID
+
+  Arg [1]   : arrayref of Bio::EnsEMBL::Pipeline::Analysis
+  Function  : produce a hash keyed on analysis dbID based on array passed 
+  in
+  Returntype: hashref 
+  Exceptions: none
+  Example   : 
+
+=cut
+
+
+sub logic_name2dbID {
+  my ($self, $analyses) = @_;
+  my %analyses;
+  
+  foreach my $ana (@$analyses) {
+    if ($ana =~ /^\d+$/) {
+      $analyses{$ana} = 1;
+    } else {
+      my $id = $self->analysis_adaptor->fetch_by_logic_name($ana)->dbID;
+      if ($id) {
+        $analyses{$id} = 1;
+      } else {
+        print STDERR "Could not find analysis $ana\n";
+      }
+    }
+  }
+  return \%analyses;
+}
+
+
+=head2 input_ids_setup
+
+  Arg [1]   : string, filename pointing file of input_ids to run
+  Arg [2]   : string, filename pointing file of input_ids to skip
+  Arg [3]   : array ref, array of input_id_types to run
+  Arg [4]   : array ref, array of input_id_types to skip
+  Function  : prepare the hash of input_ids to use when running 
+  Returntype: hashref
+  Exceptions: throws if the id_hash is empty
+  Example   : 
+  Notes     :both files are expected in the format input_id input_id_type
+=cut
+
+
+sub input_id_setup{
+  my ($self, $ids_to_run, $ids_to_skip, 
+      $types_to_run, $types_to_skip, $starts_from) = @_;
+  my $id_hash;
+  $self->empty_input_ids;
+  if($ids_to_run){
+    $id_hash = $self->read_id_file($ids_to_run);
+  }elsif(@$starts_from){
+    my @analyses;
+    foreach my $logic_name(@$starts_from){
+      my $analysis = $self->analysisadaptor->
+        fetch_by_logic_name($logic_name);
+      push(@analyses, $analysis);
+    }
+    $id_hash = $self->starts_from_input_ids(\@analyses);
+  }else{
+    $id_hash = $self->input_ids;
+  }
+  
+  if($ids_to_skip){
+    my $skip_id_hash = $self->read_id_file($ids_to_skip);
+    foreach my $type (keys(%$skip_id_hash)){
+      foreach my $id (keys(%{$skip_id_hash->{$type}})){
+        delete($skip_id_hash->{$type}->{$id});
+      }
+    }
+  }
+  if(@$types_to_run){
+    my %types_to_run = map{$_, 1} @$types_to_run;
+    foreach my $type (keys(%$id_hash)){
+      if(!$types_to_run{$type}){
+        delete($id_hash->{$type});
+      }
+    }
+  }
+  if(@$types_to_skip){
+    my %types_to_skip = map{$_, 1} @$types_to_skip;
+    foreach my $type (keys(%$id_hash)){
+      if($types_to_skip{$type}){
+        delete($id_hash->{$type});
+      }
+    }
+  }
+  if(keys(%$id_hash) == 0){
+    throw("Something is wrong with the code or the commandline ".
+          "input_ids_setup has produced no ids\n");
+  }
+  $self->input_ids($id_hash);
+  return $id_hash;
+}
+
+
+
+
+
+=head2 check_if_done
+
+  Arg [1]   : none
+  Function  : check if the pipeline is finished running
+  Returntype: int
+  Exceptions: none
+  Example   : 
+
+=cut
+
+
+sub check_if_done{
+  my ($self) = @_;
+  my @jobs = $self->job_adaptor->fetch_all;
+  my $continue;
+  foreach my $job(@jobs){
+    my $status = $job->current_status->status;
+    if($status eq 'KILLED' || $status eq 'SUCCESSFUL'){
+      next JOB;
+    }elsif($status eq 'FAILED' || $status eq 'AWOL'){
+      if(!$job->can_retry){
+        next JOB;
+      }else{
+        return 1;
+      }
+    }else{
+      return 1;
+    }
+  }
+  return 0;
 }

@@ -106,7 +106,7 @@ sub execute_sanity_check{
 
 sub accumulator_sanity_check{
   my ($self, $rules, $accumulators) = @_;
-
+  
   my $sic = $self->db->get_StateInfoContainer;
   my $aa = $self->db->get_AnalysisAdaptor;
  RULE:foreach my $rule(@$rules){
@@ -147,7 +147,7 @@ sub accumulator_sanity_check{
 
 
 sub rule_type_sanity{
-  my ($self, $rules, $verbose,  $die) = @_;
+  my ($self, $rules, $verbose) = @_;
 
   my $aa = $self->db->get_AnalysisAdaptor;
  RULE:foreach my $rule(@$rules){
@@ -159,11 +159,7 @@ sub rule_type_sanity{
       my $condition = $aa->fetch_by_logic_name($name);
       if(!$condition){
         my $msg = "Can't depend on an analysis which doesn't exist $name";
-        if($die){
-          throw($msg);
-        }else{
-          print STDERR $msg."\n";
-        }
+        throw($msg);
       }
       if($condition->input_id_type eq 'ACCUMULATOR'){
         print STDERR "Skipping ".$name." is an accumulator\n" if($verbose);

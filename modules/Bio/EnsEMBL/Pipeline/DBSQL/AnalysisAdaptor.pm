@@ -45,7 +45,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use vars qw(@ISA);
 use strict;
 
@@ -101,7 +101,7 @@ sub store {
   my $analysis = shift;
   
   if( !$analysis || !($analysis->isa('Bio::EnsEMBL::Pipeline::Analysis'))) {
-    $self->throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
+    throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
   }
 
   $analysis->dbID && $analysis->adaptor && ( $analysis->adaptor() == $self ) && 
@@ -118,10 +118,10 @@ sub store {
   }
  
   if( !$analysis->logic_name ) {
-    $self->throw("Must have a logic name on the analysis object");
+    throw("Must have a logic name on the analysis object");
   }
   if (!$analysis->input_id_type) {
-    $self->throw("Must have an input_id_type");
+    throw("Must have an input_id_type");
   }
  
   if($analysis->created ) {
@@ -297,7 +297,7 @@ sub remove {
   my $analysis = shift;
   
   if( !$analysis || !($analysis->isa('Bio::EnsEMBL::Pipeline::Analysis'))) {
-    $self->throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
+    throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
   }
   my $sql = 'delete from analysis where analysis_id = ?';
   my $sth = $self->prepare($sql);
@@ -309,6 +309,27 @@ sub remove {
     $sth->execute($analysis->dbID);
   }
 
+}
+
+
+sub fetch_by_input_id_type{
+  my ($self, $input_id_type) = @_;
+  
+  my $query = q{ SELECT analysis_id
+                 FROM input_id_type_analysis
+                 WHERE input_id_type = ? };
+  my $sth = $self->prepare($query);
+  $sth->execute($input_id_type);
+  my @analysis_ids;
+  while(my ($id) = $sth->fetchrow){
+    push(@analysis_ids, $id);
+  }
+  my @analyses;
+  foreach my $id(@analysis_ids){
+    my $analysis = $self->fetch_by_dbID($id);
+    push(@analyses, $analysis);
+  }
+  return(\@analyses);
 }
 
 1;

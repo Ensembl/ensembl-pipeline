@@ -100,10 +100,10 @@ sub new {
       $self->make_filenames;
     }else{
       my $dir;
-      if(!$BATCH_QUEUES{$analysis->logic_name}){
+      if(!$BATCH_QUEUES{$analysis->logic_name}{output_dir}){
         $dir =  $DEFAULT_OUTPUT_DIR;
       }else{
-        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir}  || $DEFAULT_OUTPUT_DIR;
+        $dir = $DEFAULT_OUTPUT_DIR;
       }
       $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
       $self->output_dir($dir);
@@ -354,21 +354,21 @@ sub flush_runs {
 	#."\n";
 	my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
 	foreach my $job (@jobs) {
-	    if( $job->retry_count > 0 ) {
-		for ( $job->stdout_file, $job->stderr_file ) {
+    if( $job->retry_count > 0 ) {
+      for ( $job->stdout_file, $job->stderr_file ) {
 		    open( FILE, ">".$_ ); close( FILE );
-		}
-	    }
-	    #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
-	    if ($batch_job->id) {
-		$job->submission_id( $batch_job->id );
-	    } else {
-		# submission seems to have succeeded, but we didnt
-		# get a job ID. Safest NOT to raise an error here,
-		# (a warning would have already issued) but flag
-		print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
-		$job->submission_id( 0 );		
-	    }
+      }
+    }
+    #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
+    if ($batch_job->id) {
+      $job->submission_id( $batch_job->id );
+    } else {
+      # submission seems to have succeeded, but we didnt
+      # get a job ID. Safest NOT to raise an error here,
+      # (a warning would have already issued) but flag
+      print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
+      $job->submission_id( 0 );		
+    }
 	    
 	    $job->retry_count( $job->retry_count + 1 );
 	    $job->set_status( "SUBMITTED" );
@@ -811,7 +811,7 @@ sub retry_count {
   if($arg) {
     $self->{'_retry_count'} = $arg; 
    }
-  $self->{'_retry_count'};
+  $self->{'_retry_count'} || 0;
 }
 
 sub can_retry{

@@ -53,7 +53,8 @@ methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
 use strict;
@@ -98,7 +99,7 @@ sub construct_command_line{
 #command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
   
   if(!$command){
-    $self->throw("cannot create bsub if nothing to submit to it : $!\n");
+    throw("cannot create bsub if nothing to submit to it : $!\n");
   }
   my $bsub_line;
   $self->command($command);
@@ -140,32 +141,31 @@ sub open_command_line{
   my $lsf = '';
 
   if (open(my $pipe, '-|')) {
-      while (<$pipe>) {
-	  if (/Job <(\d+)>/) {
+    while (<$pipe>) {
+      if (/Job <(\d+)>/) {
 	      $lsf = $1;
-	  } else {
-	      $self->warn("DEBUG: unexpected from bsub: '$_'");
-	  }	  
-      }
-      if (close $pipe) {
-	  if ( ($? >> 8) == 0 ){
-	      if ($lsf) {
-		  $self->id($lsf);
-	      } else {
-		  $self->warn("Bsub worked but returned no job ID. Weird");
-	      }
-	  } else {
-	      $self->throw("Bsub failed : exit status " . $? >> 8 . "\n");
-	  }
       } else {
-	  $self->throw("Could not close bsub pipe : $!\n");
-      }      
-  } 
-  else {      
-      # We want STDERR and STDOUT merged for the bsub process
-      # open STDERR, '>&STDOUT'; 
-      # probably better to do with shell redirection as above can fail
-      exec($self->bsub .' 2>&1') || $self->throw("Could not run bsub");
+	      $self->warn("DEBUG: unexpected from bsub: '$_'");
+      }	  
+    }
+    if (close $pipe) {
+      if ( ($? >> 8) == 0 ){
+	      if ($lsf) {
+          $self->id($lsf);
+	      } else {
+          $self->warn("Bsub worked but returned no job ID. Weird");
+	      }
+      } else {
+	      throw("Bsub failed : exit status " . $? >> 8 . "\n");
+      }
+    } else {
+      throw("Could not close bsub pipe : $!\n");
+    }      
+  } else {      
+    # We want STDERR and STDOUT merged for the bsub process
+    # open STDERR, '>&STDOUT'; 
+    # probably better to do with shell redirection as above can fail
+    exec($self->bsub .' 2>&1') || throw("Could not run bsub");
   }  
 }
 
@@ -212,7 +212,7 @@ sub get_job_time{
   my $command = "bjobs -l";
   #print $command."\n";
   my %id_times;
-  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
+  open(BJOB, "$command |") or throw("couldn't open pipe to bjobs");
   my $job_id;
   while(<BJOB>){
     chomp;
@@ -224,7 +224,7 @@ sub get_job_time{
     }
   }
   close(BJOB);
-  #or $self->throw("couldn't close pipe to bjobs");
+  #or throw("couldn't close pipe to bjobs");
   return \%id_times;
 }
 
@@ -236,7 +236,7 @@ sub check_existance{
   my %job_submission_ids = %$id_hash;
   my $command = "bjobs";
   open(BJOB, "$command 2>&1 |") or 
-    $self->throw("couldn't open pipe to bjobs");
+    throw("couldn't open pipe to bjobs");
   my %existing_ids;
  LINE:while(<BJOB>){
     print STDERR if($verbose);
@@ -259,9 +259,30 @@ sub check_existance{
     }
   }
   close(BJOB);
-  #or $self->throw("Can't close pipe to bjobs");
+  #or throw("Can't close pipe to bjobs");
   return \@awol_jobs;
 }
+
+
+
+sub job_stats{
+  my ($self, $verbose) = @_;
+    my $command = "bjobs";
+  open(BJOB, "$command 2>&1 |") or 
+    throw("couldn't open pipe to bjobs");
+  my %jobs;
+ LINE:while(<BJOB>){
+    chomp;
+    if ($_ =~ /No unfinished job found/) {
+      last LINE;
+    }
+    my @values = split;
+    $jobs{$values[0]} = $values[2];
+  }
+  return \%jobs;
+}
+
+
 #sub check_existance{
 #  my ($self, $id, $verbose) = @_;
 #  if(!$id){
@@ -270,7 +291,7 @@ sub check_existance{
 #  my $command = "bjobs ".$id;
 #  #print STDERR "Running ".$command."\n";
 #  my $flag = 0; 
-#  open(BJOB, "$command 2>&1 |") or $self->throw("couldn't open pipe to bjobs");
+#  open(BJOB, "$command 2>&1 |") or throw("couldn't open pipe to bjobs");
 #  while(<BJOB>){
 #    print STDERR if($verbose);
 #    chomp;

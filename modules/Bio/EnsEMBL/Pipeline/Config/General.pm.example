@@ -48,14 +48,11 @@ use vars qw(%Config);
     DATA_DIR => '/usr/local/ensembl/data',
     LIB_DIR  => '/usr/local/ensembl/lib',
 
-    # location of output and error files
-    # (can also be specified on RuleManager command line)
-    PIPELINE_OUTPUT_DIR => '',
 
     # temporary working space (e.g. /tmp)
     PIPELINE_WORK_DIR   => '',
 
-    # default runner script
+    # default runner script 
     PIPELINE_RUNNER_SCRIPT => '',
     
     #regex for spiting up slice input_ids
@@ -71,6 +68,9 @@ use vars qw(%Config);
     KILLED_INPUT_IDS => '', # a path to produse a file of killed
     # input_ids, good to have it local to the machine you running
     # rulemanager on to prevent nfs stress
+    RENAME_ON_RETRY => 1, # toggle to see if you want the stdout/err
+    #files renamed when a job is retried
+    
 );
 
 sub import {

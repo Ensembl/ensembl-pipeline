@@ -70,6 +70,8 @@ package Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -87,16 +89,17 @@ sub new{
   $self->{'nodes'} = undef; #must by a space delimited line of nodes
   $self->{'resource'} = undef;
 
-  my($stdout, $stderr, $parameters, $pre_exec, $command,$queue, $jobname,$resource, $nodes) = $self->_rearrange([qw(STDOUT 
-                                     STDERR 
-                                     PARAMETERS 
-                                     PRE_EXEC 
-                                     COMMAND 
-                                     QUEUE 
-                                     JOBNAME
-                                     RESOURCE
-				       NODES)],@args);
-
+  my($stdout, $stderr, $parameters, $pre_exec, $command,$queue, $jobname,
+     $resource, $nodes) = rearrange([qw(STDOUT
+                                        STDERR
+                                        PARAMETERS
+                                        PRE_EXEC 
+                                        COMMAND 
+                                        QUEUE 
+                                        JOBNAME
+                                        RESOURCE
+                                        NODES)],@args);
+  
   if($stdout){
     $self->stdout_file($stdout);
   }
@@ -244,27 +247,27 @@ sub resource{
 sub construct_command_line{
   my ($self) = @_;
 
-  $self->throw("this method construct command line must be implemented");
+  throw("this method construct command line must be implemented");
 }
 
 
 sub open_command_line{
   my ($self)= @_;
   
-  $self->throw("open_command_line isn't implemented yet");
+  throw("open_command_line isn't implemented yet");
 
 }
 
 sub copy_output{
   my ($self) = @_;
 
-  $self->throw("this method copy_output must be implemented");
+  throw("this method copy_output must be implemented");
 }
 
 sub delete_output{
   my ($self) = @_;
 
-  $self->throw("this method delete_output must be implemented");
+  throw("this method delete_output must be implemented");
 }
 
 1;
