@@ -185,38 +185,111 @@ sub output {
 
     Title   :   write_output
     Usage   :   $self->write_output()
-    Function:   Writes contents of $self->{_output} into $self->dbobj
+    Function:   Writes contents of $self->output into $self->dbobj
     Returns :   1
     Args    :   None
 
 =cut
 
 sub write_output {
-    my ($self) = @_;
+  my ($self) = @_;
+  
+  my @features = $self->output;
 
-    my @features = $self->output;
-    foreach my $f (@features) {
-#        print "Got feature $f\n";
+  my $db = $self->dbobj();
+  my $gadb = $db->get_GenomeDBAdaptor();
+  $db->get_DnaFragAdaptor();
 
-	print $f->seqname."\t".$f->start."\t".$f->end."\t".$f->strand."\tscore:".$f->score."\t".$f->hseqname."\t".$f->hstart."\t".$f->hend."\t".$f->hstrand."\n";
-    }
-    my $db = $self->dbobj();
-    print STDERR "Going to write to ".$db->dbname."\n";
+  my $input_id = $self->input_id();
+  my ($species_tag1,$contig_id1,$species_tag2,$contig_id2);
 
-# Use write.t as an example for building the genomic align datastructure
-# make sure you write back dnafrag objects first into the database.
+  if ($input_id =~ /^(\S+):(\S+)::(\S+):(\S+)$/) {
+    ($species_tag1,$contig_id1,$species_tag2,$contig_id2) = ($1,$2,$3,$4);
+  } else {
+    die "\$input_id should be yadda:contig_id::yadda:contig_id in CrossComparer.pm\n";
+  }
+  
+  # Using $contig_id1 as reference sequence for the reference AlignBlockSet
 
+  my $gdb = $gadb->fetch_by_species_tag($species_tag1);
+  my $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+  $dnafrag->name($contig_id1);
+  $dnafrag->genomedb($gdb);
 
+  # Sorting @feature from maxend to minend of reference sequence
+  # and defining the offset_max for the reference AlignBlockSet
+  
+  @features = sort {$b->start <=> $a->start} @features;
+  my $offset_max = $features[0]->end;
 
-    $self->throw("Have not delt with write back yet");
+  # sorting @feature from minstart to maxstart of reference sequence
+  # and defining the offset_min for the reference AlignBlockSet
+  
+  @features = sort {$a->start <=> $b->start} @features;
+  my $offset_min = $features[0]->start;
 
-#    foreach my $f (@features) {
-#		    my $contig = $contig_hash{$c};
-#	    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-#	    $feat_Obj->write($contig, @features);
-#	}
-#    }
-#    return 1;
+  # Defining the align_row_id for the reference sequence;
+
+  my $current_align_row_id = 1;
+
+  # We know that reference AlignBlockSet only has one AlignBlock
+  
+  my $abs = new Bio::EnsEMBL::Compara::AlignBlockSet;
+  my $ab = new Bio::EnsEMBL::Compara::AlignBlock;
+  my $align_start = 1;
+  my $align_end = $offset_max - $offset_min + 1;
+  $ab->align_start($align_start);
+  $ab->align_end($align_end);
+  
+  $ab->start($align_start);
+  $ab->end($align_end);
+  $ab->strand(1);
+  $ab->dnafrag($dnafrag);
+    
+  $abs->add_AlignBlock($ab);
+  
+  # Defining an alignement and adding the reference AlignBlockSet
+
+  my $aln = Bio::EnsEMBL::Compara::GenomicAlign->new();
+  $aln->add_AlignBlockSet($current_align_row_id,$abs);
+  
+  # Defining the align_row_id for the query sequence;
+
+  $current_align_row_id++;
+  
+  # Using $contig_id2 as query sequence for the reference AlignBlockSet
+
+  $gdb = $gadb->fetch_by_species_tag($species_tag2);
+  $dnafrag = Bio::EnsEMBL::Compara::DnaFrag->new();
+  $dnafrag->name($contig_id2);
+  $dnafrag->genomedb($gdb);
+  
+  $abs = new Bio::EnsEMBL::Compara::AlignBlockSet;
+  
+  foreach my $f (@features) {
+    my $ab = new Bio::EnsEMBL::Compara::AlignBlock;
+    my $align_start = $f->start - $offset_min + 1;
+    my $align_end = $f->end - $offset_min + 1;
+    $ab->align_start($align_start);
+    $ab->align_end($align_end);
+    $ab->start($f->hstart);
+    $ab->end($f->hend);
+    $ab->strand($f->hstrand);
+    $ab->dnafrag($dnafrag);
+    
+    $abs->add_AlignBlock($ab);
+  }
+
+  # Adding the reference AlignBlockSet to the alignment data
+
+  $aln->add_AlignBlockSet($current_align_row_id,$abs);
+
+  # Storing alignment in the corresponding database
+
+  my $galnad = $db->get_GenomicAlignAdaptor();
+  $galnad->store($aln);
+
+  return 1;
 }
 
 =head2 runnable
@@ -302,6 +375,5 @@ sub _c2_id{
     return $obj->{'_c2_id'};
 
 }
-
 
 1;
