@@ -108,17 +108,36 @@ sub new {
 =cut
 
 sub fetch_input {
-    my ($self) = @_;
+ my ($self) = @_;
     my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
+    my $prot;
+    my $peptide;
 
-    my $prot = $proteinAdaptor->fetch_Protein_ligth ($self->input_id)
-	|| $self->throw ("couldn't get the protein sequence from the database");
-    my $pepseq    = $prot->seq;
-    my $peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
-					   '-id'          => $self->input_id,
-					   '-accession'   => $self->input_id,
-					   '-moltype'     => 'protein');
+    eval {
+	$prot = $proteinAdaptor->fetch_Protein_ligth ($self->input_id);
+    };
+    
+    if (!$@) {
+	#The id is a protein id, that's fine, create a PrimarySeq object
+	my $pepseq    = $prot->seq;
+	$peptide  =  Bio::PrimarySeq->new(  '-seq'         => $pepseq,
+					    '-id'          => $self->input_id,
+					    '-accession'   => $self->input_id,
+					    '-moltype'     => 'protein');
+    }
+
+    else {
+	#An error has been returned...2 solution, either the input is a peptide file and we can go on or its completly rubish and we throw an exeption.
+	
+	
+	#Check if the file exists, if not throw an exeption 
+	$self->throw ("The input_id given is neither a protein id nor an existing file") unless (-e $self->input_id);
+	$peptide = $self->input_id;
+    }
+
+    
     $self->genseq($peptide);
+
 }
 
 
@@ -158,25 +177,50 @@ sub write_output {
 =cut
 
 sub runnable {
-    my ($self, $runnable) = @_;
+my ($self) = @_;
     
-    if ($runnable) {
-        # extract parameters into a hash
-        my ($parameter_string) = $self->parameters;
-        my %parameters;
-        if ($parameter_string) {
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs) {
-                my ($key, $value) = split (/=>/, $pair);
-		$key =~ s/\s+//g;
-                # no, we need the spaces for the hmmpfam options
-#                $value =~ s/\s+//g;
-                $parameters{$key} = $value;
-            }
-        }
-        $self->{'_runnable'} = $runnable->new (-analysis => $self->analysis, %parameters);
+    if (!defined($self->{'_runnable'})) {
+	
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::HmmPfam->new(-query     => $self->genseq,
+									  -analysis  => $self->analysis	);
+	
+	
+	$self->{'_runnable'} = $run;
     }
+    
     return $self->{'_runnable'};
+}
+
+
+
+=head2 run
+
+    Title   :   run
+    Usage   :   $self->run();
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::HmmPfam->run()
+    Returns :   none
+    Args    :   none
+
+=cut
+
+sub run {
+    my ($self,$dir) = @_;
+    $self->throw("Runnable module not set") unless ($self->runnable());
+    $self->throw("Input not fetched")      unless ($self->genseq());
+
+    $self->runnable->run($dir);
+}
+
+
+
+
+sub output {
+    my ($self) = @_;
+
+    my $runnable = $self->runnable;
+    $runnable || $self->throw("Can't return output - no runnable object");
+
+    return $runnable->output;
 }
 
 1;
