@@ -15,10 +15,10 @@ Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::GenericTranscriptMatcher->new(
-									      -reference_set => \@transcript_set1,
-									      -match_set => \@transcript_set2,
-									      );
+   my $obj = Bio::EnsEMBL::Pipeline::Runnable::GenericTranscriptMatcher->new(
+									  -reference_set => \@transcript_set1,
+									  -match_set => \@transcript_set2,
+									 );
 
     $obj->run;
    
@@ -43,11 +43,10 @@ Internal methods are usually preceded with a _
 =cut
 
 # Let the code begin...
-
+  
 package Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher;
 
-use diagnostics;
-use vars qw(@ISA);
+#use diagnostics;
 use strict;
 
 use Bio::EnsEMBL::Root;
@@ -55,16 +54,17 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 
+use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw (Bio::EnsEMBL::Root);
 
 ######################################################################
 
 sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-  my( $reference_set, $match_set ) = 
-    $self->_rearrange([qw(REFERENCE_SET MATCH_SET)], @args);
+  
+  my( $reference_set, $match_set ) = $self->_rearrange([qw(REFERENCE_SET MATCH_SET)], @args);
   
   unless( $reference_set && $match_set ){
     $self->warn("lacking of the inputs. Nothing to match");
@@ -90,7 +90,7 @@ sub new{
 #
 #########################################################################
 
-sub reference_set{
+sub _reference_set{
   my ( $self, $listref ) = @_;
   if ( $listref ){
       $self->{_reference_set} = $listref;
@@ -100,10 +100,10 @@ sub reference_set{
 
 ############################################################
 
-sub match_set{
+sub _match_set{
   my ( $self, $listref ) = @_;
   if ( $listref ){
-      $self->{_matach_set} = $listref;
+      $self->{_match_set} = $listref;
   }
   return $self->{_match_set};
 }
@@ -133,7 +133,7 @@ sub matching_map{
 sub output{
   my ($self)= @_;
   
-  return $self->matching_Map
+  return $self->matching_map
 }
 
 #########################################################################
@@ -147,8 +147,8 @@ sub output{
 sub run{
   my ($self,@args) = @_;
 
-  my @reference_trans = @{$self->reference_set};
-  my @match_trans     = @{$self->match_set};
+  my @reference_trans = @{$self->_reference_set};
+  my @match_trans     = @{$self->_match_set};
   
   #  print STDERR "Trying to match ".scalar( @match_trans )." transcripts to ".
   #      scalar(@reference_trans)." reference transcripts\n";
@@ -158,7 +158,7 @@ sub run{
   }
   
   # before returning, check that we have written anything
-  unless( $self->matching_Map ){
+  unless( $self->matching_map ){
     print STDERR "not matches found\n";
     exit(0);
   }
@@ -222,7 +222,7 @@ sub _map_Transcripts{
 												-splice_mismatch          => 10,
 												-intron_mismatch          => 10,
 											       );
-  my $sublist;new();
+  my $sublist;
   
  EST:
   foreach my $est (@$ests){
