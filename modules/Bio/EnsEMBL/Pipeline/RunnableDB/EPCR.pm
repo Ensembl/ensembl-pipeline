@@ -121,12 +121,13 @@ sub runnable {
         my %parameters;
         if ($parameter_string)
         {
-            $parameter_string =~ s/\s+//g;
             my @pairs = split (/,/, $parameter_string);
             foreach my $pair (@pairs)
             {
 		my ($key, $value) = split (/=>/, $pair);
 		if ($key && $value) {
+                    $key =~ s/^\s+//g;
+                    $key =~ s/\s+$//g;
 		    $parameters{$key} = $value;
 		}
 		else
