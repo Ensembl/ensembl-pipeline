@@ -159,7 +159,7 @@ sub run {
     my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
 
     #set directory if provided (MC this should be in a config file somewhere)
-    $self->workdir('/work2/michele') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
 
     #write sequence to file
