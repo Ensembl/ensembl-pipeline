@@ -47,7 +47,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
-
+use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 #use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
@@ -270,7 +270,7 @@ sub parse_Header {
 
   Title   : run
   Usage   : $self->run()
-  Function: Runs blast vs dbEST, and runs a MiniEst2Genome runnable for each appropriate set of blast hits
+  Function: Runs blast vs input seqs, and runs a MiniEst2Genome runnable for each appropriate set of blast hits
   Returns : none
   Args    : 
 
@@ -362,7 +362,7 @@ sub run_exonerate {
   my $exr = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
 							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
 							    '-genomic'   => $self->genomic_sequence,
-							    '-est'      => $self->queryfilename
+							    '-est'       => $self->queryfilename
 							   );
   
   $exr->run;
