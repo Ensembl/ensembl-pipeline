@@ -205,12 +205,12 @@ sub get_tmp_file {
 
     my $num = int(rand(10000));
     my $file = $dir . $stub . "." . $num . "." . $ext;
-
+    #print STDERR "have filename ".$file."\n";
     while (-e $file) {
         $num = int(rand(10000));
-        $file = $stub . "." . $num . "." . $ext;
+        $file = $dir.$stub . "." . $num . "." . $ext;
     }
-
+    #print STDERR "returning filename ".$file."\n";
     return $file;
 }
    
