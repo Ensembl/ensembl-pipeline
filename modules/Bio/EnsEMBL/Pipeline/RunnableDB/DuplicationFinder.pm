@@ -201,7 +201,7 @@ sub _set_options {
   my $id_prefix;
 
   foreach my $prefix (keys %$GD_OPTIONS){
-#print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
+print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
     if ($self->input_id =~ /^$prefix/) {
       $id_prefix = $prefix;
       last
@@ -476,10 +476,13 @@ sub _write_output_as_text {
 
       my $transl_regex = $self->_transl_regex;
 
-      ($alignment{$match->{query_id}})->desc =~ /($transl_regex)/;
+      ($alignment{$match->{query_id}})->desc =~ /($transl_regex\w*)/;
       my $query_translation_id = $1;
-
-      ($alignment{$match->{match_id}})->desc =~ /($transl_regex)/;
+print STDERR "REGEX : " . $transl_regex . "\n";
+print STDERR "DESCRIPTION : " . ($alignment{$match->{query_id}})->desc . "\n";
+print STDERR "QUERY TRANSLATION ID : $query_translation_id\n";
+die;
+      ($alignment{$match->{match_id}})->desc =~ /($transl_regex\w*)/;
       my $match_translation_id = $1;
 
       unless ($query_translation_id ne '' && $match_translation_id ne '') {
