@@ -116,6 +116,26 @@ sub list_conditions {
   return @conditions;
 }
 
+
+sub has_condition_of_input_id_type {
+  my $self = shift;
+  my $id_type = shift;
+  my $ana_adaptor = $self->goalAnalysis->adaptor;
+
+  if (!scalar (@{$self->{'_conditions'}})) {
+      $self->throw("No conditions found for this Rule");
+  }
+  
+  foreach my $cond (@{$self->{'_conditions'}}) {
+      my $cond_anal = $ana_adaptor->fetch_by_logic_name($cond);
+      if ($cond_anal->input_id_type eq $id_type) {
+          print " Condition of " . $cond_anal->logic_name . " is of type $id_type\n";
+          return 1;
+      }
+  }
+  return 0;
+}
+
 =head2 goalAnalysis
 
   Title   : goalAnalysis
@@ -140,34 +160,43 @@ sub goalAnalysis {
 
 sub check_for_analysis {
   my $self = shift;
-  my @analist = @_;
+  my ($analist, $input_id_type, $completed_accumulator_href) = @_;
   my %anaHash;
 
   # reimplement with proper identity check!
   my $goal = $self->goalAnalysis->dbID;
 
-  # print STDERR "My goal is " . $goal . "\n";
+  my $goal_id_type = $self->goalAnalysis->input_id_type;
 
-  for my $analysis ( @analist ) {
-      # print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n";
+#This id isn't of the right type so doesn't satify goal
+  if ($goal_id_type ne 'ACCUMULATOR' &&
+      $goal_id_type ne $input_id_type) {
+    print STDERR " failed input_id_type check\n";
+    return 0;
+  }
+
+
+  print STDERR "\nMy goal is " . $goal . "\n";
+
+  for my $analysis ( @$analist ) {
+    print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n";
     $anaHash{$analysis->logic_name} = $analysis;
     if( $goal == $analysis->dbID ) {
       # already done
+      print STDERR " already done\n";
       return 0;
     }
   }
 
+#the completed_accumulator_href contains input_id_type ACCUMULATOR anals that have completed
   for my $cond ( $self->list_conditions ) {
-    if( ! defined $anaHash{$cond} ) {
+    if ( ! defined $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
+      print STDERR " failed condition check for $cond\n";
       return 0;
     }
   }
   return $self->goalAnalysis;
 }
-
-
-
-
 
 sub dbID {
   my ( $self, $dbID ) = @_;
