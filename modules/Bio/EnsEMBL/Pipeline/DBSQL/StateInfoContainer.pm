@@ -99,12 +99,8 @@ sub store_inputId_class_analysis {
           '$class',
           ?,
           now() )} );
-#    INSERT INTO InputIdAnalysis
-#      SET inputId='$inputId',
-#          class='$class',
-#          created = now(),
-#          analysisId = ? } );
   $sth->execute( $analysis->dbID );
+
 }
 
 sub list_inputId_by_analysis {
@@ -152,9 +148,10 @@ sub list_inputId_class_by_start_count {
   my @row;
 
   my $query = qq{
-    SELECT inputId, class
+    SELECT inputId, class, count(*) as c
       FROM InputIdAnalysis
-     GROUP by inputId, class };
+     GROUP by inputId, class
+     ORDER by c };
 
   if( defined $start && defined $count ) {
     $query .= "LIMIT $start,$count";
@@ -171,12 +168,34 @@ sub list_inputId_class_by_start_count {
 
 sub delete_inputId_class {
   my $self = shift;
-  my ($dbID, $class) = shift;
+  my ($inputId, $class) = @_;
+
+  my $sth = $self->prepare( qq{
+    DELETE FROM InputIdAnalysis
+    WHERE  inputId = ?
+    AND    class = ?} );
+  $sth->execute($inputId, $class);
+}
+
+sub delete_inputId {
+  my $self = shift;
+  my ($inputId) = shift;
 
   my $sth = $self->prepare( qq{
     DELETE FROM InputIdAnalysis
     WHERE  inputId = ?} );
-  $sth->execute($dbID);
+  $sth->execute($inputId);
+}
+
+sub delete_inputId_analysis {
+  my $self = shift;
+  my ($inputId, $analysisId) = @_;
+
+  my $sth = $self->prepare( qq{
+    DELETE FROM InputIdAnalysis
+    WHERE inputId    = ?
+    AND   analysisId = ?} );
+  $sth->execute($inputId, $analysisId);
 }
 
 sub db {
