@@ -54,6 +54,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 							       GB_FINALDBHOST
 							       GB_FINALDBUSER
 							       GB_FINALDBPASS
+							       GB_FINALDBPORT
 							       GB_COMB_DBHOST
 							       GB_COMB_DBNAME
 							       GB_COMB_DBUSER
