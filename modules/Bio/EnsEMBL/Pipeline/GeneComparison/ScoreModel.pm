@@ -49,11 +49,12 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);
     
-    my( $hold_list, $transcripts ) = $self->_rearrange([qw(
-							   HOLD_LIST
-							   TRANSCRIPTS
-							   )], 
-						       @args);
+    my( $hold_list, $transcripts, $label ) = $self->_rearrange([qw(
+								   HOLD_LIST
+								   TRANSCRIPTS
+								   LABEL
+								  )], 
+							       @args);
     
     ############################################################
     # hold_list is a hashref where we hold for each transcript
@@ -62,16 +63,29 @@ sub new {
 	$self->throw("Need the hashref hold_list, cannot work without the lists");
     }
     $self->{_hold_list} = $hold_list;
-
+    
     unless( $transcripts ){
 	$self->throw("Need the list of transcript predictions");
     }
     $self->transcripts($transcripts);
     
+    if ( defined $label ){
+      $self->_label($label);
+    }
+
     $self->verbose(0);
 
     return $self;
-    
+  }
+
+############################################################
+
+sub _label{
+  my ($self,$label) = @_;
+  if ( defined $label ){
+    $self->{_label} = $label;
+  }
+  return $self->{_label};
 }
 
 ############################################################
@@ -89,20 +103,20 @@ sub verbose{
 # $list is an arrayref with the transcripts that make up the transcript $tran
 #
 sub hold_list{
-    my ($self,$tran,$list) = @_;
-
-    if ($tran){
-	unless ( $self->{_hold_list}{$tran} ){
-	    $self->{_hold_list}{$tran} = [];
-	}
-	if ( $list ){
-	    $self->{_hold_list}{$tran} = $list;
-	}
-	return $self->{_hold_list}{$tran};
+  my ($self,$tran,$list) = @_;
+  
+  if ($tran){
+    unless ( $self->{_hold_list}{$tran} ){
+      $self->{_hold_list}{$tran} = [];
     }
-    else{
-	return $self->{_hold_list};
+    if ( $list ){
+      $self->{_hold_list}{$tran} = $list;
     }
+    return $self->{_hold_list}{$tran};
+  }
+  else{
+    return $self->{_hold_list};
+  }
 }
 
 ############################################################
@@ -133,13 +147,19 @@ sub score_Transcripts{
   
   ############################################################
   # get the sites of alt-splicing on each transcript cluster
+  my $cluster_count = 0;
  CLUSTER:
   foreach my $cluster ( @clusters ){
+
+    my $cluster_count++;
+    my $label;
     
     my @trans = @{ $cluster->get_Transcripts };
-    print STDERR "Looking at cluster:\n";
-    foreach my $tran ( @trans ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+    print STDERR "Looking at cluster:\n" if $verbose;
+    if ( $verbose ){
+      foreach my $tran ( @trans ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+      }
     }
     
     if (scalar(@trans)==1 ){
@@ -162,11 +182,20 @@ sub score_Transcripts{
     # those sites and the lengths
     # of the list of ESTs making up the transcript
     # and compare them!
+    my $tran_count = 0;
   TRAN:
     foreach my $tran ( @trans ){
+
+      # invent a tran stable id with the slice id, cluster_id and a number
+      $tran_count++;
+      $label = '';
+      if ( $self->_label ){
+	$label = $self->_label;
+      }
+      my $tran_id = $label."-".$cluster_count."-".$tran_count;
       
-	# list of ESTs:
-	my @list = @{ $self->hold_list($tran) };
+      # list of ESTs:
+      my @list = @{ $self->hold_list($tran) };
 	
        	print STDERR "finding sites in transcript: " if $verbose;
 	if ($verbose ){
@@ -263,20 +292,21 @@ sub score_Transcripts{
 	# TRAN number_ests number_sites max_num_sites_covered:
 	
 	print STDERR "TRAN\t".
-	  "exons:".$exons."\t".
-	    "ests:".scalar(@list)."\t".
+	  $tran_id."\t".
+	    "exons:".$exons."\t".
+	      "ests:".scalar(@list)."\t".
 		"sites:".$n."\t".
-		    "covered:".$covered_sites."\t".
-			"score:".$score."\t".
-			    "s-c:".($n - $covered_sites)."\n";
-	
-	############################################################
-	# put the transcript score in the exons:
-	foreach my $exon ( @{$tran->get_all_Exons} ){
-	    $exon->score( $score );
-	}
+		  "covered:".$covered_sites."\t".
+		    "score:".$score."\t".
+		      "s-c:".($n - $covered_sites)."\n";
+      
+      ############################################################
+      # put the transcript score in the exons:
+      foreach my $exon ( @{$tran->get_all_Exons} ){
+	$exon->score( $score );
+      }
     } # end of TRAN
-        
+    
     my $trans_number  = scalar( @trans );
     
     # we calculate on each site whether it is covered
@@ -318,11 +348,6 @@ sub score_Transcripts{
    
     } # end of SITE
 
-    #foreach my $est ( keys %used_ests ){
-    #  print STDERR "TEST est $est reused: $used_ests{$est}\n";
-    #}
-
-
     ############################################################
     # cluster info:
     my $cluster_sites = scalar( @sites );
@@ -330,14 +355,17 @@ sub score_Transcripts{
     $average_score   /= $trans_number;
     $average_missed_sites /= $trans_number;
 
-    print STDERR "GENE\t".
-	"sites:".$cluster_sites."\t".
-	    "trans:".$trans_number."\t".
-		"2^N:".$max_sites."\t".
-		    "av_score:".$average_score."\t".
-		      "av_missed_sites:".$average_missed_sites."\n";
-		    
+    my $gene_id = $label."-".$cluster_count;
 
+    print STDERR "GENE\t".
+      $gene_id."\t".
+	"sites:".$cluster_sites."\t".
+	  "trans:".$trans_number."\t".
+	    "2^N:".$max_sites."\t".
+	      "av_score:".$average_score."\t".
+		"av_missed_sites:".$average_missed_sites."\n";
+    
+    
   }   # end of CLUSTER
   return @{$self->transcripts};
 }

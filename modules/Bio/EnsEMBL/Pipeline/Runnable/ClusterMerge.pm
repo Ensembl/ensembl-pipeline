@@ -138,7 +138,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $internal_splice_overlap, $use_score, $speed_up) 
+  my( $transcripts, $comparison_level, $splice_mismatch, $intron_mismatch, $exon_match, $minimum_order, $internal_splice_overlap, $use_score, $speed_up, $label) 
       = $self->_rearrange([qw(
 			      TRANSCRIPTS
 			      COMPARISON_LEVEL
@@ -149,6 +149,7 @@ sub new {
 			      INTERNAL_SPLICE_OVERLAP
 			      USE_SCORE
 			      SPEED_UP
+			      LABEL
 			      )], 
 			  @args);
   
@@ -196,6 +197,13 @@ sub new {
   else{
     $self->_speed_up( 0 );
   }
+
+  if ( defined $label ){
+    $self->_label( $label );
+  }
+  else{
+    $self->_label("");
+  }
   
   if ( defined $splice_mismatch ){
     $self->_splice_mismatch( $splice_mismatch );
@@ -217,11 +225,11 @@ sub new {
 
   if ( defined $internal_splice_overlap ){
     $self->_internal_splice_overlap( $internal_splice_overlap );
-    #print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
+    print STDERR "internal_splice_overlap ".$self->_internal_splice_overlap."\n";
   }
   else{
     $self->_internal_splice_overlap( 0 );
-    #print STDERR "defaulting internal_splice_overlap = 0\n";
+    print STDERR "defaulting internal_splice_overlap = 0\n";
   }
 
   if ( defined $exon_match ){
@@ -1261,13 +1269,19 @@ sub run {
   # we can score the predictions:
   my @final_transcripts;
   if ( $self->use_score ){
+    my $label = '';
+    if ( $self->_label ){
+      $label = $self->_label;
+    }
+
     print STDERR "calculating scores\n";
-      my $score_model = 
-	Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel
-	    ->new(
-		  -hold_list   => $self->hold_list,
-		  -transcripts => \@merged_transcripts,
-		  );
+    my $score_model = 
+      Bio::EnsEMBL::Pipeline::GeneComparison::ScoreModel
+	->new(
+	      -hold_list   => $self->hold_list,
+	      -transcripts => \@merged_transcripts,
+	      -label       => $label,  # can use a label to identify a particular ran
+	     );
     @final_transcripts = $score_model->score_Transcripts;
   }
   else{
@@ -2183,6 +2197,16 @@ sub _speed_up{
     $self->{_speed_up} = $boolean;
   }
   return $self->{_speed_up};
+}
+
+############################################################
+
+sub _label{
+  my ($self,$label) = @_;
+  if ( defined $label ){
+    $self->{_label} = $label;
+  }
+  return $self->{_label};
 }
 
 ############################################################
