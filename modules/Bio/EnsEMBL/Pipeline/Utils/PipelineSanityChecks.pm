@@ -132,4 +132,43 @@ sub accumulator_sanity_check{
   }
 }
 
+
+
+sub rule_type_sanity{
+  my ($self, $rules, $die) = @_;
+
+  my $aa = $self->db->get_AnalysisAdaptor;
+ RULE:foreach my $rule(@$rules){
+    my $type = $rule->goalAnalysis->input_id_type;
+    if($type eq 'ACCUMULATOR'){
+      next RULE;
+    }
+  CONDITION:foreach my $name($rule->list_conditions){
+      my $condition = $aa->fetch_by_logic_name($name);
+      if(!$condition){
+        my $msg = "Can't depend on an analysis which doesn't exist $name";
+        if($die){
+          $self->throw($msg);
+        }else{
+          print STDERR $msg."\n";
+        }
+      }
+      if($condition->input_id_type eq 'ACCUMULATOR'){
+        print STDERR "Skipping ".$name." is an accumulator\n";
+        next CONDITION;
+      }
+      if($condition->input_id_type ne $type){
+        my $msg = $rule->goalAnalysis->logic_name."'s type ".$type.
+                     " doesn't match condition ".$condition->logic_name.
+                     "'s type ".$condition->input_id_type;
+        if($die){
+          $self->throw($msg);
+        }else{
+          print STDERR $msg."\n";
+        }
+      }
+    }
+  }
+}
+
 1;
