@@ -149,13 +149,11 @@ sub score_Transcripts{
       }
       next CLUSTER;
     }
-    
-    # we keep track of howmany ests per cluster, which overlap at least
-    # of site of alt-splicing, are sued multiple times.
-    my %used_ests;
-    
+        
     my @sites = $self->get_alternative_sites( $cluster );
     my $average_score = 0;
+    my $average_missed_sites;
+    my %trans_with_site; # counts how many transcripts have this site
 
     ############################################################
     # now get the sites of alternative splicing
@@ -182,27 +180,10 @@ sub score_Transcripts{
 	    my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
 	    if ( !( $site->start > $end) && !( $site->end < $start ) ){
 		push( @these_sites, $site );
+		$trans_with_site{$site}++;
 	    }
 	}
 	
-	# first we calculate how many ests are used more than once
-	
-	my %seen_est;
-      REUSED_EST:
-	foreach my $est ( @list ){
-	  if ( $seen_est{$est} ){
-	    #print STDERR "CHECK $est has been seen already\n";
-	    next REUSED_EST;
-	  }
-	  foreach my $site ( @these_sites ){
-	    my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est ); 
-	    unless (  $est_start > $site->end || $est_end   <  $site->start ){
-	      $used_ests{$est}++;
-	      $seen_est{$est} = 1;
-	      next REUSED_EST;
-	    }
-	  }
-	}
 	
 	############################################################
 	# @these_sites contains now all the sites
@@ -275,6 +256,7 @@ sub score_Transcripts{
 	
 	my $score = sprintf "%.2f", ( 100/$inv_score );
 	$average_score += $score;
+	$average_missed_sites += ( $n - $covered_sites );
 	my $exons = scalar( @{$tran->get_all_Exons} );
 
 	############################################################
@@ -294,7 +276,48 @@ sub score_Transcripts{
 	    $exon->score( $score );
 	}
     } # end of TRAN
+        
+    my $trans_number  = scalar( @trans );
     
+    # we calculate on each site whether it is covered
+    # by the same est in different transcripts
+    my %site_coverage;
+  SITE:
+    foreach my $site ( @sites ){
+      my %used_est;
+      foreach my $tran ( @trans ){
+	my %seen_est;
+	foreach my $est ( @{ $self->hold_list($tran) } ){
+	  next if $seen_est{$est};
+	  my ($est_start, $est_end, $est_strand) = $self->get_start_end_strand_of_transcript( $est ); 
+	  unless (  $est_start > $site->end || $est_end   <  $site->start ){
+	    $used_est{$est}++;
+	    $seen_est{$est} = 1;
+	    $site_coverage{$site}++ unless $used_est{$est}>1;
+	  }
+	}
+      }
+      my %bin_used_est;
+      foreach my $key ( keys %used_est ){
+	$bin_used_est{ $used_est{$key} }++;
+      }
+      my $site_string;
+      my @keys = sort { $a <=> $b } keys %bin_used_est;
+      for (my $i=1; $i<=$keys[-1]; $i++ ){
+	my $string = "ests_used$i:0\t";
+	if ( $bin_used_est{$i} ){
+	  $string = "ests_used$i:$bin_used_est{$i}\t";
+	}
+	$site_string .= $string;
+      }
+      
+      print STDERR "SITE\tcoverage:$site_coverage{$site}\t".
+	"trans:$trans_number\t".
+	  "trans_with_site:$trans_with_site{$site}\t".
+	    "$site_string\n";
+   
+    } # end of SITE
+
     #foreach my $est ( keys %used_ests ){
     #  print STDERR "TEST est $est reused: $used_ests{$est}\n";
     #}
@@ -303,30 +326,16 @@ sub score_Transcripts{
     ############################################################
     # cluster info:
     my $cluster_sites = scalar( @sites );
-    my $trans_number  = scalar( @trans );
     my $max_sites     = 2 ** $cluster_sites;
     $average_score   /= $trans_number;
-    
-    my %bin_used_ests;
-    foreach my $key ( keys %used_ests ){
-      $bin_used_ests{ $used_ests{$key} }++;
-    }
-    my $est_usage_string;
-    my @keys = sort { $a <=> $b } keys %bin_used_ests;
-    for ( my $j=1; $j<= $keys[-1]; $j++ ){
-      my $string  = "used$j:0\t";
-      if ( $bin_used_ests{ $j } ){
-	$string = "used$j:$bin_used_ests{ $j }\t";
-      }
-      $est_usage_string .= $string;
-    }
-    
-    print STDERR "CLUSTER\t".
+    $average_missed_sites /= $trans_number;
+
+    print STDERR "GENE\t".
 	"sites:".$cluster_sites."\t".
 	    "trans:".$trans_number."\t".
 		"2^N:".$max_sites."\t".
 		    "av_score:".$average_score."\t".
-		      $est_usage_string."\n";
+		      "av_missed_sites:".$average_missed_sites."\n";
 		    
 
   }   # end of CLUSTER
