@@ -103,11 +103,8 @@ my ($class, @args) = @_;
 
 sub fetch_input {
  my ($self) = @_;
-    #my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
- #Fetch protein ligth to allow the use of a database without stable IDs
- my $proteinAdaptor = $self->dbobj->fetch_Protein_ligth;
-
-
+ my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
+ 
  my $prot;
     my $peptide;
 
