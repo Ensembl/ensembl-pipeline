@@ -29,7 +29,7 @@ Interface for the connection to the analysis database
 
 =head1 CONTACT
 
-Describe contact details here
+Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -46,10 +46,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use vars qw(@ISA);
 use strict;
-use DBI;
-
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-
 use Bio::EnsEMBL::Root;
 
 # Inherits from the base bioperl object
@@ -170,17 +167,6 @@ sub get_StateInfoContainer {
 }
 
 
-
-sub delete_Job {
-    my ($self,$id) = @_;
-
-    $self->warn(q/You really should use "$job->remove" :)/);
-
-    $self->get_JobAdaptor->fetch_by_dbID($id)->remove
-     or $self->warn("Can't recreate job with ID $id");
-}
-
-
 =head2 _db_handle
 
  Title   : _db_handle
@@ -199,59 +185,6 @@ sub _db_handle {
 	$self->{_db_handle} = $arg;
     }
     return $self->{_db_handle};
-}
-
-
-=head2 _lock_tables
-
- Title   : _lock_tables
- Usage   :
- Function:
- Example :
- Returns :
- Args    :
-
-=cut
-
-sub _lock_tables{
-   my ($self,@tables) = @_;
-
-   my $state;
-   foreach my $table ( @tables ) {
-       if( $self->{'_lock_table_hash'}->{$table} == 1 ) {
-	   $self->warn("$table already locked. Relock request ignored");
-       } else {
-	   if( $state ) { $state .= ","; }
-	   $state .= "$table write";
-	   $self->{'_lock_table_hash'}->{$table} = 1;
-       }
-   }
-
-   my $sth = $self->prepare("lock tables $state");
-   my $rv = $sth->execute();
-   $self->throw("Failed to lock tables $state") unless $rv;
-
-}
-
-
-=head2 _unlock_tables
-
- Title   : _unlock_tables
- Usage   :
- Function:
- Example :
- Returns :
- Args    :
-
-=cut
-
-sub _unlock_tables{
-   my ($self,@tables) = @_;
-
-   my $sth = $self->prepare("unlock tables");
-   my $rv  = $sth->execute();
-   $self->throw("Failed to unlock tables") unless $rv;
-   %{$self->{'_lock_table_hash'}} = ();
 }
 
 
