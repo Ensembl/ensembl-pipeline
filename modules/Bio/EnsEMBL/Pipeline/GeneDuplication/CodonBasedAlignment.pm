@@ -25,18 +25,18 @@ use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 # oddball genetic code, check the Bio::Seq module documentation.
 my $cba =
   Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
-    -genetic_code => 1);
+    -genetic_code => 1,
+    -seqs         => \@seqs);
 
-# Add some sequence to our alignment module.  Pass a reference to
+# The sequences passed to the module should be a reference to
 # an array of Bio::Seq objects.  Everything is going to fall apart
-# if you pass amino acid sequences here, some make sure they are
+# if you pass amino acid sequences here, so make sure they are
 # nucleotide sequences.
 
-$cba->sequences(\@seqs);
-
-# Run the actual alignment process.  The return value is an 
-# array of Bio::Seq objects, that when dumped to a multiple 
-# fasta file or the like, will display a multiple alignment.
+# To run the the actual alignment process do the following.
+# The return value is an array of Bio::Seq objects, that
+# when dumped to a multiple fasta file or the like, will
+# display a multiple alignment.
 
 my $align = $cba->run_alignment;
 
@@ -74,8 +74,10 @@ sub new {
 
   my $self = bless {},$class;
 
-  my ($genetic_code
+  my ($genetic_code,
+      $seqs,
      ) = rearrange([qw(GENETIC_CODE
+		       SEQS
 		      )], @args);
 
   unless (defined $genetic_code){
@@ -85,6 +87,8 @@ sub new {
   }
 
   $self->genetic_code($genetic_code);
+
+  $self->sequences($seqs) if defined $seqs;
 
   return $self;
 }
@@ -119,6 +123,12 @@ sub sequences {
 
   if (@_) {
     $self->{_sequences} = shift;
+
+    foreach my $seq (@{$self->{_sequences}){
+      throw("Unexpected sequence type.  Should be Bio::Seq, " . 
+	    "but was [$seq]")
+	unless $seq->isa("Bio::Seq");
+    }
   }
 
   return $self->{_sequences}
