@@ -137,8 +137,7 @@ sub new {
       $self->cdna_db($cdna_db);
     }
     
-    $self->genetype("estgene_test");
-    #$self->genetype($ESTGENE_TYPE);
+    $self->genetype($ESTGENE_TYPE);
 
     $self->{_reverse_transcripts} = [];
     $self->{_forward_transcripts} = [];
