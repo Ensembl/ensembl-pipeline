@@ -72,7 +72,7 @@ sub new {
 $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
 
   # $db is a reference to an array of databases:
-  if (defined $db) {
+  if ($db) {
     $self->db($db);
   }
   else{
