@@ -1,12 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  use lib $script_dir;
-  require "EST_conf.pl";
-}
+require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 
 =head1 NAME
 
@@ -32,6 +26,7 @@ use Getopt::Long;
 
 my $runner;
 my $runnable;
+my $exonerate;
 my $dbname;
 my $dbuser;
 my $host;
@@ -46,11 +41,11 @@ my $tmpoutfile;
 
 &get_variables();
 
-my $estfile = $estfiledir . $chunkname;
+my $estfile = $estfiledir . "/" . $chunkname;
 
-my $command = "$runner -runnable $runnable -dbname $dbname -dbuser $dbuser -host $host -input_id $input_id -parameters estfile=$estfile 2>$tmperrfile | gzip -9 >$tmpoutfile";
+my $command = "$runner -runnable $runnable -dbname $dbname -dbuser $dbuser -host $host -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
 
-#print STDERR "command is $command\n";
+print STDERR "command is $command\n";
 
 my $output = `$command`;
 #my $output = "";
@@ -85,27 +80,26 @@ else {
 =cut
 
 sub get_variables {
-  my %conf =  %::EST_conf; # from EST_conf.pl
-
   &GetOptions( 
 	      'chunkname:s'      => \$chunkname,
 	     );
 
-  $runner     = $conf{'runner'};
-  $runnable   = $conf{'exonerate_runnable'};
-  $dbname     = $conf{'refdbname'};
-  $dbuser     = $conf{'refdbuser'};
-  $host       = $conf{'refdbhost'};
-  $estfiledir = $conf{'estfiledir'};
-  $input_id   = $conf{'genomic'};
-  $outdir     = $conf{'tmpdir'};
+  $runner     = $::scripts_conf{'runner'};
+  $runnable   = $::exonerate_conf{'exonerate_runnable'};
+  $exonerate  = $::exonerate_conf{'exonerate'};
+  $dbname     = $::db_conf{'refdbname'};
+  $dbuser     = $::db_conf{'refdbuser'};
+  $host       = $::db_conf{'refdbhost'};
+  $estfiledir = $::scripts_conf{'estfiledir'};
+  $input_id   = $::scripts_conf{'genomic'};
+  $outdir     = $::scripts_conf{'tmpdir'};
 
   if(!(defined $host       && defined $dbname    && defined $dbuser &&
-       defined $runner     && defined $runnable  &&
+       defined $runner     && defined $runnable  && defined $exonerate &&
        defined $estfiledir && defined $chunkname && 
        defined $input_id   && defined $outdir)){
     print "Usage: exonerate_est.pl -chunkname\n" .
-      "Additional options to be set in EST_conf.pl: runner, exonerate_runnable, refdbname, refdbuser, refdbhost, estfiledir, genomic and tmpdir\n";
+      "Additional options to be set in EST_conf.pl: runner, exonerate_runnable, exonerate, refdbname, refdbuser, refdbhost, estfiledir, genomic and tmpdir\n";
     exit (1);
   }
 
