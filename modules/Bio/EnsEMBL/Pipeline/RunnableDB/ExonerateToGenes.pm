@@ -281,7 +281,7 @@ sub filter_output{
       my $strand = $exons[0]->strand;
       my $seqname= $exons[0]->seqname;
       $seqname   =~ s/\.\d+-\d+$//;
-      my $extent = $seqname."-".$start."-".$end;
+      my $extent = $seqname.".".$start."-".$end;
       
       my $label;
       if ( $count == 1 ){
@@ -291,7 +291,7 @@ sub filter_output{
 	   && $is_spliced 
 	   && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
 	 ){
-	$label = 'processed_pseudogene';
+	$label = 'potential_processed_pseudogene';
       }
       else{
 	$label = $count;
