@@ -47,27 +47,23 @@ sub new {
   my $self = $class->SUPER::new(@args);    
   
   my( $query_seq,
-      $db,
       $repeatmask,
-      $analysis,
-      $firstef_dir,
+      $firstef_bin,
       $param_dir,
+      $parse_script,
       $workdir) = $self->_rearrange([qw(QUERY
-					DB
 					REPEATMASKED
-					ANALYSIS
-					FIRSTEF_DIR
+					FIRSTEF_BIN
 					PARAM_DIR
+					PARSE_SCRIPT
 					WORK_DIR)],
 				     @args);
 
-  $self->_query_seq($query_seq)     if $query_seq;
-  $self->_db($db)                   if $db;
-  $self->_firstef_dir($firstef_dir) if $firstef_dir;
-  $self->_param_dir($param_dir)     if $param_dir;
-  $self->workdir($workdir)          if $workdir;
-  $self->_analysis($analysis)       if $analysis;
-
+  $self->_query_seq($query_seq)       if $query_seq;
+  $self->_firstef_bin($firstef_bin)   if $firstef_bin;
+  $self->_param_dir($param_dir)       if $param_dir;
+  $self->_parse_script($parse_script) if $parse_script;
+  $self->workdir($workdir)            if $workdir;
 
   if (defined $repeatmask){
     $self->_repeatmask($repeatmask);
@@ -92,28 +88,28 @@ sub DESTROY {
 
 sub _query_seq {
   my $self = shift;
-  
+
   if (@_) {
-   
+
     $self->{_query_seq} = shift;
 
     return unless $self->{_query_seq}; # Allows us to set to undef.
-    
+
     $self->throw("Input isnt a Bio::SeqI or Bio::PrimarySeqI")
       unless ($self->{_query_seq}->isa("Bio::PrimarySeqI") || 
 	      $self->{_query_seq}->isa("Bio::SeqI"));
-    
+
     $self->filename($self->{_query_seq}->id . ".$$.seq");
-    
+
     $self->results($self->filename . ".out");
   }
-  
+
   return $self->{_query_seq}
 }
 
 sub _repeatmask {
   my $self = shift;
- 
+
   if (@_) {
     $self->{_repeatmask} = shift;
 
@@ -122,27 +118,6 @@ sub _repeatmask {
 
   return $self->{_repeatmask}
 }
-
-sub _db {
-  my $self = shift;
-
-  if (@_) {
-    $self->{_dbadaptor} = shift;
-  }
-
-  return $self->{_dbadaptor}
-}
-
-sub _analysis {
-  my $self = shift;
-
-  if (@_) {
-    $self->{_analysis} = shift;
-  }
-
-  return $self->{_analysis}
-}
-
 
 sub _write_seqs_for_firstef {
   my $self = shift;
@@ -243,57 +218,47 @@ sub _parsed_outfile {
 }
 
 
-sub _firstef_dir {
+sub _firstef_bin {
   my $self = shift;
-  
-  if (@_){    
-    $self->{_firstef_dir} = shift;
+
+  if (@_){
+    $self->{_firstef_bin} = shift;
+
+    $self->throw("firstef binary not executable [trying to execute " .
+		 $self->{_firstef_bin} . "]")
+      unless (-x $self->{_firstef_bin});
   }
-  
-  return $self->{_firstef_dir}
+print "Executable : " . $self->{_firstef_bin} . "\n";
+  $self->throw("FirstEF executable has not been set.") 
+    unless defined($self->{_firstef_bin});
+
+  return $self->{_firstef_bin}
 }
 
-
-sub _firstef {
+sub _parse_script {
   my $self = shift;
-  
-  unless ($self->{_firstef}){
-    
-    ### Fiddling around to get the correct executable for the operating system
 
-    open(HOSTTYPE, "echo \$HOSTTYPE |") 
-      or die "Problem determining the runtime hosttype";
+  if (@_){
+    $self->{_parse_script} = shift;
 
-    my $hosttype = <HOSTTYPE>;
-    chomp $hosttype;
-    $hosttype = lc $hosttype;
-    
-    close (HOSTTYPE);
-
-    $self->{_firstef} = $self->_firstef_dir . "/firstef.$hosttype";
-    
-    $self->throw("firstef not found at " . $self->{_firstef} . ": $!\n" .
-		 "Please provide just the _directory_ where the executables are\n" .
-		 "to be found.  The actual executable is determined according\n" .
-		 "to the host operating system at runtime") 
-      unless (-e $self->{_firstef});
-    
-    $self->throw("firstef binary not executable [trying to execute " .  
-		 $self->{_firstef} . "]") 
-      unless (-x $self->{_firstef});
+    $self->throw("FirstEF parser script not executable [trying to execute " .
+		 $self->{_parse_script} . "]")
+      unless (-e $self->{_parse_script});
   }
-  
-  return $self->{_firstef}
-}
 
+  $self->throw("FirstEF parser script location has not been set.") 
+    unless defined($self->{_parse_script});
+
+  return $self->{_parse_script}
+}
 
 sub _param_dir {
   my $self = shift;
-  
+
   if (@_) {
-    
+
     $self->{_param_dir} = shift;
-    
+
     $self->{_param_dir} .= '/' unless $self->{_param_dir} =~ /\/$/;
 
     return unless $self->{_param_dir}; # Allows us to set to undef.
@@ -328,18 +293,18 @@ sub _param_dir {
     my @missing_files;
 
     foreach my $param_file (@known_param_files) {
-      
+
       unless (-e $self->{_param_dir} . "/$param_file"){
 	push (@missing_files, $param_file);
 
 	print "Missing parameter file : " . $self->{_param_dir} . "/$param_file\n";
       }
     }
-    
+
     $self->throw("The above parameter files are missing.") if @missing_files;
-    
+
   }
-  
+
   return $self->{_param_dir}
 }
 
@@ -363,7 +328,7 @@ sub run {
 
   # Put our sequence in the right places and generate input/output files.
   $self->_write_seqs_for_firstef;
-  
+
   # Execute firstef
   $self->run_firstef;
 
@@ -383,7 +348,7 @@ sub run_firstef {
   # firstef insists on writing its output file to the same dir as the
   # listfile - it seems.
 
-  my $command = $self->_firstef . ' 1500 ' . $self->_listfile . ' ' . 
+  my $command = $self->_firstef_bin . ' 1500 ' . $self->_listfile . ' ' . 
     $self->_param_dir . ' 0 0.4 0.4 0.5';
 
   print $command . "\n";
@@ -415,7 +380,7 @@ sub parse_results {
   my $strand;
 
   while (<OUTPUT>) {
-    
+
     $strand = 1 if (/direct strand/);
     $strand = -1 if (/complementary strand/);
 
@@ -440,7 +405,7 @@ sub parse_results {
       $feature{program}         = 'firstef';
       $feature{program_version} = '1';
       $feature{display_label}   = "rank = $4";
-      
+
       $self->create_feature(\%feature);
     }
 
@@ -461,11 +426,11 @@ sub _first_parse {
   my $parsed_output = $self->workdir . '/first_parse.' . $$;
   $self->_parsed_outfile($parsed_output);
 
-  my $command = $self->_firstef_dir . '/FirstEF_parser.pl ' . 
-    $self->_outfile . ' ' . $self->_parsed_outfile;
+  my $command = $self->_parse_script . ' ' . $self->_outfile . ' ' . 
+    $self->_parsed_outfile;
 
   $self->throw("Problem parsing output with external parser [" . 
-	       $self->_firstef_dir . "/FirstEF_parser.pl]")
+	       $self->_parse_script . "]")
     if (system($command));
 
   return $self->_parsed_outfile
@@ -478,46 +443,44 @@ sub _first_parse {
 #############
 
 sub output {
-    my $self = shift;
+  my $self = shift;
 
-    if (!defined $self->{_flist}) {
+  if (!defined $self->{_flist}) {
+    $self->{_flist} = [];
+  }
+
+  if (@_) {
+
+    my $incoming = shift;
+
+    if ($incoming =~ /flush/){
       $self->{_flist} = [];
-    }
-
-
-    if (@_) {
-
-      my $incoming = shift;
-
-      if ($incoming =~ /flush/){
-	$self->{_flist} = [];
-	return 1
-      }
-
-      push (@{$self->{_flist}}, $incoming);
-      
       return 1
     }
 
-    return @{$self->{_flist}};
+    push (@{$self->{_flist}}, $incoming);
+
+    return 1
+  }
+
+  return @{$self->{_flist}};
 }
 
 
 sub create_feature {
-    my ($self, $feat) = @_;
+  my ($self, $feat) = @_;
 
-    my $first_exon = Bio::EnsEMBL::SimpleFeature->new(-seqname =>  $feat->{name},
-						      -start   =>  $feat->{start},
-						      -end     =>  $feat->{end},
-						      -strand  =>  $feat->{strand},
-						      -score   =>  $feat->{score},
-						      -analysis => $self->_analysis);  
-    
-    $first_exon->display_label($feat->{'display_label'});
+  my $first_exon = Bio::EnsEMBL::SimpleFeature->new(-seqname =>  $feat->{name},
+						    -start   =>  $feat->{start},
+						    -end     =>  $feat->{end},
+						    -strand  =>  $feat->{strand},
+						    -score   =>  $feat->{score});
 
-    $first_exon->validate();
+  $first_exon->display_label($feat->{'display_label'});
 
-    $self->output($first_exon);
+  $first_exon->validate();
 
-    return 1
+  $self->output($first_exon);
+
+  return 1
 }
