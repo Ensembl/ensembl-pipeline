@@ -165,7 +165,7 @@ sub run {
     $self->throw("No peptide input");
   }
   
-  #print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
+  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
 
   my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
 				     -seq        => $transcript->translate(),
@@ -177,9 +177,9 @@ sub run {
     return;
   }
   
-  print ::LOG "New BlastGenscanPep Runnable\n";
-  print ::LOG $transcript->_dump();
-  print ::LOG "\n";
+  #print ::LOG "New BlastGenscanPep Runnable\n";
+  #print ::LOG $transcript->_dump();
+  #print ::LOG "\n";
 
   my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blast  (-query     => $peptide,
 							       -program   => $self->program,
@@ -190,8 +190,11 @@ sub run {
 							       -options   => $self->options,
                                                                -filter    => 1);
   $runnable->run();
-  
+
+  print "Output " . $runnable->output. "\n"; 
+
   $self->align_hits_to_contig2($runnable->output);
+  print "Output " . $runnable->output. "\n"; 
 #  $self->align_hits_to_contig($runnable->output);
 #  $self->check_features($transcript->translate->seq,$self->featurepairs);
   
@@ -220,14 +223,14 @@ sub align_hits_to_contig2 {
   # for each feature
   
   for my $feature ( @features ) {
-    print ::LOG join
-      ( "\n", 
-	( "\n", "Blast result:",
-	  "Start ".$feature->start." End ".$feature->end,
-	  "hstart ".$feature->hstart." hend ".$feature->hend,
-	  "qury: ".$feature->{'qseq'},
-	  "subj: ".$feature->{'sseq'},
-	  "\n" ));
+    #print ::LOG join
+    #  ( "\n", 
+#	( "\n", "Blast result:",
+#	  "Start ".$feature->start." End ".$feature->end,
+#	  "hstart ".$feature->hstart." hend ".$feature->hend,
+#	  "qury: ".$feature->{'qseq'},
+#	  "subj: ".$feature->{'sseq'},
+#	  "\n" ));
 
     my %exon_hash = ();
   # for each ungapped piece in it
@@ -354,7 +357,9 @@ sub align_hits_to_contig {
       $stop_codon_present = 1;
     }
     
-    my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
+    $expep = $exon->translate->seq;
+    $expep =~ /[^\*]+/g;
+
     if ($expep =~ s/x$//i) {
       #print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
     }
