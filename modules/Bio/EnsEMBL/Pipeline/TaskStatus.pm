@@ -57,7 +57,11 @@ use Bio::EnsEMBL::Pipeline::IDSet;
 sub new{
   my ($class, @args) = @_;
   my $self = bless {}, $class;
-  my ($created, $submitted, $reading, $running, $writing,$successful, $failed, $fatal, $killed, $existing) = $self->_rearrange([qw(CREATED SUBMITTED READING RUNNING WRITING SUCCESSFUL FAILED FATAL KILLED EXISTING)], @args);
+  my ($created, $submitted, $reading, $running, $writing, $successful, 
+      $failed, $fatal, $killed, $existing, $retried) = 
+    $self->_rearrange([qw(CREATED SUBMITTED READING RUNNING WRITING 
+			  SUCCESSFUL FAILED FATAL KILLED EXISTING RETRIED)], 
+		      @args);
 
   $self->{'_created'} = undef;
   $self->{'_submitted'} = undef; 
@@ -69,6 +73,7 @@ sub new{
   $self->{'_failed'} = undef;
   $self->{'_fatal'} = undef;
   $self->{'_existing'} = undef;
+  $self->{'_retried'} = undef;
   $self->{'is_finished'} = undef;
 
   $self->add_created($created) if($created);
@@ -81,6 +86,7 @@ sub new{
   $self->add_failed($failed) if($failed);
   $self->add_fatal($fatal) if($fatal);
   $self->add_existing($existing) if($existing);
+  $self->add_retried($retried) if($retried);
 
   return $self;
 }
@@ -97,22 +103,23 @@ sub new{
 =cut
 
 sub _check{
-    my ($self, $arg) = @_;
+  my ($self, $arg) = @_;
     
-    if($arg){
-      if(ref($arg) eq 'ARRAY'){
+  if($arg){
+    if(ref($arg) eq 'ARRAY'){
 	
-	my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
-                                                       -ID_LIST => $arg,
-						      );
-	return $idset;
-      }
-      
-      if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
-	return $arg;
-      }
+      my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+						     -ID_LIST => $arg,
+						    );
+      return $idset;
     }
-    $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array refs to TaskStatus add methods not $arg");
+      
+    if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
+      return $arg;
+    }
+  }
+  $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array" .
+	       " refs to TaskStatus add methods not $arg");
     
 
 }
@@ -257,6 +264,17 @@ sub add_existing{
     }
 }
 
+sub add_retried{
+    my ($self, $arg) = @_;
+    my $idset = $self->_check($arg);
+    if(!$self->{'_retried'}){
+      $self->{'_retried'} = $idset;
+    }else{
+      $self->{'_retried'} = ($self->{'_retried'}) ?
+        $self->{'_retried'}->or($idset) : $idset;
+    }
+}
+
 
 =head2 get methods
 
@@ -351,7 +369,13 @@ sub get_existing{
     return $self->{'_existing'};
 }
 
-
+sub get_existing{
+    my ($self) = @_;
+    if(!$self->{'_retried'}){
+      $self->create_existing;
+    }
+    return $self->{'_retried'};
+}
 
 =head2 create_existing
 
@@ -439,6 +463,7 @@ sub status_report{
     print STDERR "Failed tasks\t".$self->get_failed->count."\n" if ($self->get_failed->count);
     print STDERR "Fatal tasks\t".$self->get_fatal->count."\n" if($self->get_fatal->count);
     print STDERR "Killed tasks\t".$self->get_killed->count."\n" if($self->get_killed->count);
+    print STDERR "Retried tasks\t".$self->get_retried->count."\n" if($self->get_retried->count);
     print STDERR "Exisiting tasks\t".$self->get_existing->count."\n" if($self->get_existing->count);
 }
 
