@@ -57,10 +57,10 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::AnalysisI;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 # Inherits from the base bioperl object
-@ISA = qw(Bio::EnsEMBL::AnalysisI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::AnalysisI Bio::EnsEMBL::Root);
 
 =head2 new
 

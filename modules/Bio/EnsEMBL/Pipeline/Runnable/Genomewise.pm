@@ -55,9 +55,9 @@ package Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Transcript;
 

@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					     );
 
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
@@ -60,7 +60,7 @@ use Bio::DB::RandomAccessI;
 #compile time check for executable
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );

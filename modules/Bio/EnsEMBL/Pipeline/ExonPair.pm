@@ -48,10 +48,10 @@ package Bio::EnsEMBL::Pipeline::ExonPair;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Exon;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my($class,@args) = @_;

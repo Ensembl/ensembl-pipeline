@@ -48,7 +48,7 @@ use vars qw(@ISA);
 use strict;
 $|=1;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;

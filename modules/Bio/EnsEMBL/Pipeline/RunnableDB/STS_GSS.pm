@@ -3,7 +3,7 @@
 package Bio::EnsEMBL::Pipeline::RunnableDB::STS_GSS;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use vars qw(@ISA);

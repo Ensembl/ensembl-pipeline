@@ -49,7 +49,7 @@ use vars qw(@ISA);
 use strict;
 use POSIX;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;

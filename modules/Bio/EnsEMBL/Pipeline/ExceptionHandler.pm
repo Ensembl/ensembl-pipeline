@@ -44,11 +44,11 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::ExceptionHandler;
 
 use strict;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 
 =head2 new

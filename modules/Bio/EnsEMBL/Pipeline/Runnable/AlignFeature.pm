@@ -55,14 +55,14 @@ package Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::DB::RandomAccessI;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 

@@ -79,7 +79,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Bl2seq;
 use strict;
 use vars qw(@ISA);
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -673,7 +673,7 @@ use strict;
 use Carp;
 use vars qw(@ISA);
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

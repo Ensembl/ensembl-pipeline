@@ -71,12 +71,12 @@ package Bio::EnsEMBL::Pipeline::Runnable::TRF;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::RepeatFeature;
 use Bio::EnsEMBL::RepeatConsensus;
-use Bio::Root::RootI;
+use Bio::Root::Root;
 use FileHandle;
 
 

@@ -40,13 +40,13 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 
 use strict;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex;
 use Bio::Seq;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my ($class, @args) = @_;

@@ -34,7 +34,7 @@ package Bio::EnsEMBL::Pipeline::ControlDB;
 
 use strict;
 use DBI;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 use vars qw( @ISA );
 
@@ -43,7 +43,7 @@ BEGIN {
   require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 }
 
-@ISA = qw( Bio::Root::RootI );
+@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 new
 

@@ -54,7 +54,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA;
 use Bio::PrimarySeq;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 

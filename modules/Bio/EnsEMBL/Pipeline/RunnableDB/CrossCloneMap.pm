@@ -40,13 +40,13 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::CrossCloneMap;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Root);
 
 sub new {
   my($class,@args) = @_;

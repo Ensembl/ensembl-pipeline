@@ -58,13 +58,13 @@ package Bio::EnsEMBL::Pipeline::MiniSeq;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis::PairAlign;
 use Bio::PrimarySeq;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my($class,@args) = @_;

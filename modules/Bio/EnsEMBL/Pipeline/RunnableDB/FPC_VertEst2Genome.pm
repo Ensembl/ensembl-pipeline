@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_VertEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Analysis::MSPcrunch;

@@ -46,7 +46,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::Programs 'phrap.longreads';
 use Bio::EnsEMBL::ContigOverlap;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use File::Path qw(rmtree);
 use vars qw(@ISA);
 

@@ -344,6 +344,7 @@ sub write_output {
 	print STDERR "Writing features to database\n";
 
         my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	print STDERR $feat_adp." is a feature adpator\n";
 	$feat_adp->store($contig, @features);
     }
     return 1;

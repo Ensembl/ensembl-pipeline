@@ -45,7 +45,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
@@ -55,7 +55,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;

@@ -50,7 +50,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
 # following vars are static and not meaningful on remote side
 # recreation of Job object. Not stored in db of course.

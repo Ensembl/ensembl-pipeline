@@ -66,7 +66,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Repeat;
@@ -75,7 +75,7 @@ use Bio::EnsEMBL::RepeatConsensus;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 #use Data::Dumper;
 

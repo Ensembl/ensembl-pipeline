@@ -49,7 +49,7 @@ made before rules are inserted. Rules cannot be deleted if other rules depend up
 use strict;
 use Getopt::Long;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule;

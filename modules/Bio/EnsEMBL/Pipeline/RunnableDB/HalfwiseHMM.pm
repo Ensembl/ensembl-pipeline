@@ -46,7 +46,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 use strict;

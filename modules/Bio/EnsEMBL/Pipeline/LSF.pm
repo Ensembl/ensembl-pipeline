@@ -38,12 +38,12 @@ package Bio::EnsEMBL::Pipeline::LSF;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::LSFJob;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
 sub new {
     my ($class,@args) = @_;

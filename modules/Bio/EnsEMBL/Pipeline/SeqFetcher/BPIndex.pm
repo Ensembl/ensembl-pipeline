@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
 
 use strict;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 # change these uses as new indices are released in bioperl - these are for 0.6.2
@@ -54,7 +54,7 @@ use Bio::Index::SwissPfam;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI Bio::DB::RandomAccessI);
+@ISA = qw(Bio::EnsEMBL::Root Bio::DB::RandomAccessI);
 
 sub new {
   my ($class, @args) = @_;

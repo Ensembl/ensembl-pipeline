@@ -49,10 +49,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Combine_Genewises_and_E2Gs;
 use vars qw(@ISA);
 use strict;
 use Storable qw(dclone);
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;

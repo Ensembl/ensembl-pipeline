@@ -39,11 +39,11 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Rule;
 
 use vars qw(@ISA);
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use strict;
 
 
-@ISA = qw( Bio::Root::RootI );
+@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 Constructor
 

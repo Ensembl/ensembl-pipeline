@@ -38,7 +38,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Clone_CombinedGeneBuild;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Contig_TargettedGeneE2G;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;

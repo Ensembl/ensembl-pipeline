@@ -45,7 +45,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::RunnableI;

@@ -38,7 +38,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise;
 use vars qw(@ISA);
 use strict;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;

@@ -59,9 +59,9 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
 use Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm;
 
-# Object preamble - inherits from Bio::Root::RootI
+# Object preamble - inherits from Bio::EnsEMBL::Root
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 

@@ -53,10 +53,10 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;

@@ -42,7 +42,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::SeqFetcher;
 
 use strict;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Index::Fasta;
@@ -51,7 +51,7 @@ use Bio::Index::SwissPfam;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my ($class, @args) = @_;

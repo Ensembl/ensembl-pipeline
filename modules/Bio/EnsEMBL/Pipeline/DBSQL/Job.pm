@@ -48,9 +48,9 @@ use Bio::EnsEMBL::Pipeline::LSFJob;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::Status;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::EnsEMBL::Root);
 
 sub new {
     my ($class,@args) = @_;

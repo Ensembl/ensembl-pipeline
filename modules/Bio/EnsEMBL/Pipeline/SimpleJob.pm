@@ -77,7 +77,7 @@ use FreezeThaw qw(freeze thaw);
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI 
 	  Bio::EnsEMBL::Pipeline::DB::JobI 

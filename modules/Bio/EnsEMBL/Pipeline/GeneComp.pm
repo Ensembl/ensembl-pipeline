@@ -104,10 +104,10 @@ Ensembl - ensembl-dev@ebi.ac.uk
 package Bio::EnsEMBL::Pipeline::GeneComp;
 use strict;
 use vars qw(@ISA);
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Carp;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 
 =head2 new

@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Gene;
@@ -95,7 +95,7 @@ sub new {
       $threshold = $GB_EST_THRESHOLD;
     }
 
-    $type = '' unless (defined $type && $type ne '');
+    $type = 'Full_dbEST' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
     $self->type($type);
@@ -189,9 +189,10 @@ sub fetch_input {
   my $genseq   = $contig->get_repeatmasked_seq;
   #print "got dnaseq\n";
   
-  #print "got data\n";
+ 
   my $alignadaptor = $self->dbobj->get_DnaAlignFeatureAdaptor();
   my @features  = $alignadaptor->fetch_by_contig_id_and_logic_name($contig->dbID, $self->type);
+  
   my @filtered_features;
   foreach my $f(@features){
     #print STDERR "features score = ".$f->score." threshold = ".$self->threshold."\n";
@@ -199,7 +200,7 @@ sub fetch_input {
       push(@filtered_features, $f);
     }
   }
-
+  #print "got data\n";
   foreach my $f (@filtered_features) {
     my $hid = $f->hseqname;
     if(!defined $ests{$hid}){
@@ -215,9 +216,10 @@ sub fetch_input {
 
   
   #print "got all unique dbest feature pairs";  
-    
+  #print "fetching sequences = ".$self->seqfetcher."\n";  
   foreach my $id(keys %ests){
     my $est = $self->seqfetcher->get_Seq_by_acc($id);
+    #print $est."\n";
     push(@estseqs, $est);
       
   }
@@ -255,10 +257,10 @@ sub run {
 
     my $runnable = $self->runnable;
     $runnable || $self->throw("Can't run - no runnable object");
-
+    
     $runnable->run;
     $self->_convert_output();
-    
+    #print "have run est2genome\n";
 }
 
 sub output {

@@ -5,10 +5,10 @@ use vars qw(@ISA);
 
 use FileHandle;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
     my($class, @args) = @_;

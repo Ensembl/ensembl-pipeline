@@ -46,8 +46,8 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI
-use Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;

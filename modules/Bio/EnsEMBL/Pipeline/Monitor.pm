@@ -4,7 +4,7 @@ use strict;
 
 use vars qw(@ISA);
 
-@ISA = qw (Bio::Root::RootI);
+@ISA = qw (Bio::EnsEMBL::Root);
 
 =head2 new
 

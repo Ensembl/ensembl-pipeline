@@ -7,7 +7,7 @@ BEGIN {
 use vars qw(@ISA);
 use strict;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new{
   my ($class, @args) = @_;

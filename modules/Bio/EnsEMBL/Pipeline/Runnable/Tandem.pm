@@ -54,20 +54,20 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Runnable::Tandem;
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Analysis::Programs;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Root);
 
 =head2 new
 

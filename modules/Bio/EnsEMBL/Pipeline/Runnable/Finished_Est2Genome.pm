@@ -51,7 +51,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 

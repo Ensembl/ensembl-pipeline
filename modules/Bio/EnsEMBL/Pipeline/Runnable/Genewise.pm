@@ -36,9 +36,9 @@ package Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use strict;  
 use vars   qw(@ISA);
 
-# Object preamble - inherits from Bio::Root::RootI
+# Object preamble - inherits from Bio::EnsEMBL::Root
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Analysis::Programs qw(genewise); 
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;

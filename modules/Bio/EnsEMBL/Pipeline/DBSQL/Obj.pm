@@ -47,12 +47,12 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 # use FreezeThaw qw(freeze thaw);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::EnsEMBL::DBSQL::Obj
-	Bio::Root::RootI );
+	Bio::EnsEMBL::Root );
 
 sub new {
     my ($class,@args) = @_;

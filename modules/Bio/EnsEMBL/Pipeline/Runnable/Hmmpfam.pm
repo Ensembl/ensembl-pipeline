@@ -40,7 +40,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Hmmpfam;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
 use Bio::EnsEMBL::Analysis::Programs qw(hmmpfam); 
 use Bio::EnsEMBL::SeqFeature;

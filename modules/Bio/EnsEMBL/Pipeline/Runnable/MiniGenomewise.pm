@@ -44,7 +44,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
@@ -52,7 +52,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 

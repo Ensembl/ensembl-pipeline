@@ -3,7 +3,7 @@
 package Bio::ensEMBL::Pipeline::RunnableDB::Finished_Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::SeqFeature;

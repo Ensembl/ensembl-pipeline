@@ -43,12 +43,12 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Rule;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use vars qw(@ISA);
 use strict;
 
 
-@ISA = qw( Bio::Root::RootI );
+@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 Constructor
 

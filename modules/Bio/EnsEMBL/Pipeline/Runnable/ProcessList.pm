@@ -45,7 +45,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

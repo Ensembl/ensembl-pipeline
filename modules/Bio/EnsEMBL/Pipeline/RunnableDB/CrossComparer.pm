@@ -77,7 +77,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
@@ -86,7 +86,7 @@ use Bio::PrimarySeq;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);

@@ -8,15 +8,15 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 
-my $host;
+my $host = 'ecs1c';
 my $port;
-my $dbname;
+my $dbname = 'laura_test_newschema';
 my $user = 'ensro';
 my $pass = undef;
 
-my $current;
-my $current_summary;
-my $finished;
+my $current = 1;
+my $current_summary = 1;
+my $finished = 1;
 my $analysis;
 my $rules;
 my $conditions;

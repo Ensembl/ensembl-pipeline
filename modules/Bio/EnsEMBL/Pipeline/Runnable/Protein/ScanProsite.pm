@@ -53,7 +53,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 

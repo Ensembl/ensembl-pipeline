@@ -76,7 +76,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::TranscriptFactory;
 use Bio::Seq;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
 
 

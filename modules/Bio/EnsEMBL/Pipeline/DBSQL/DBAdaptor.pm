@@ -51,7 +51,7 @@ use DBI;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 # Inherits from the base bioperl object
 

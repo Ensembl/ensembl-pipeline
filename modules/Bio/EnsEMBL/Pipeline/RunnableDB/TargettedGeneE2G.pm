@@ -49,10 +49,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G;
 use vars qw(@ISA);
 use strict;
 use Storable qw(dclone);
-# Object preamble - inheriets from Bio::Root::RootI
+# Object preamble - inheriets from Bio::EnsEMBL::Root
 
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;

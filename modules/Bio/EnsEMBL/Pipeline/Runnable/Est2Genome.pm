@@ -54,7 +54,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::FeaturePair;
@@ -64,7 +64,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome); 
 use Bio::PrimarySeq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 #use Data::Dumper;
 

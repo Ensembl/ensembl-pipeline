@@ -60,12 +60,12 @@ package Bio::EnsEMBL::Pipeline::Importer;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::PerlDB::Contig;
 use Bio::EnsEMBL::PerlDB::Clone;
@@ -73,7 +73,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 use FileHandle;
 
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Root);
 
 =head2 new
 

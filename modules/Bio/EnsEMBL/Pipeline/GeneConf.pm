@@ -107,9 +107,10 @@ my $prefix='COB';
 	     GB_TARGETTED_CDNA_INDEX    => '',
 
 	     # similairity genewise specific parameters
-	     GB_SIMILARITY_TYPE      => 'swall',
+	     GB_SIMILARITY_TYPE      => 'Swall',
 	     GB_SIMILARITY_THRESHOLD => 200,
-
+	     GB_EST_TYPE      => 'Full_dbEST',
+	     GB_EST_THRESHOLD => 200,
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,

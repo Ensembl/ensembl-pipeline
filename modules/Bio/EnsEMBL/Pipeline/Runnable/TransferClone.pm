@@ -45,7 +45,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
@@ -56,9 +56,9 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::DBSQL::Clone;
 use Bio::EnsEMBL::Pipeline::DBSQL::Contig;
 
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Root);
 
 sub new {
     my ($class,@args) = @_;

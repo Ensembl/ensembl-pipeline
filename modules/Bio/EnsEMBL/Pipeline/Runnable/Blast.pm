@@ -66,7 +66,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::RootI;
+# Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use FileHandle;
 use Bio::EnsEMBL::Pipeline::RunnableI;
@@ -80,7 +80,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq; 
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Root;
 use Bio::Tools::BPlite;
 
 BEGIN {
@@ -129,7 +129,7 @@ sub new {
     $self->{'_coverage'}  = 10;        # Only return hits to a depth of 10
     $self->{'_ungapped'}  = undef;         # Do we create gapped features or not
     $self->{'_blast_re'}  = undef;
-    print STDERR "@args\n";
+    #print STDERR "@args\n";
     # Now parse the input options and store them in the object
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$ungapped,$options) = 
 	    $self->_rearrange([qw(QUERY 
@@ -191,7 +191,7 @@ sub new {
     if (defined($coverage)) {
       $self->coverage($coverage);
     }
-    print STDERR "setting ungapped = ".$ungapped."\n";
+    
     if (defined($ungapped)) {
       $self->ungapped($ungapped);
     }
@@ -717,11 +717,11 @@ sub split_HSP {
     # Remember the last feature
     if ($found == 1) {
 	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name, $analysis);
-	print "Found " . $fp->gffstring . "\n";
+	#print "Found " . $fp->gffstring . "\n";
 	push(@tmpf,$fp);
 #	$self->growfplist($fp);                             	    
     }
-    print STDERR "ungapped = ".$self->ungapped."\n";
+   
     if ($self->ungapped) {
       foreach my $f (@tmpf) {
 	$self->warn("can't store feature pairs this will fail\n");
@@ -1064,10 +1064,8 @@ sub ungapped {
   my ($self,$arg) = @_;
 
   if (defined($arg)) {
-    print STDERR "setting ungapped = ".$arg."\n";
     $self->{_ungapped} = $arg;
   }
-  print STDERR "ungapped  is = ".$self->{_ungapped}."\n";
   return $self->{_ungapped};
 }
 
