@@ -583,10 +583,6 @@ sub expand_and_merge_features {
         #print "feature ".$hid." has ".scalar(@{$unique_hids{$hid}})." hits\n";
         my $feature_array = $unique_hids{$hid_seq->accession_number};
 
-        #print $self->seqfetcher."\n";
-        #my $hid_seq = $self->seqfetcher->get_Seq_by_acc($hid);
-        
-        
         my $hid_len = $hid_seq->length;
 
         foreach my $feature (@$feature_array) {
