@@ -87,6 +87,12 @@ sub new {
     $self->throw("No blast db specified") unless defined($blastdb);
     $self->blastdb($blastdb);
 
+    if(!defined $seqfetcher) {
+      # will look for pfetch in $PATH - change this once PipeConf up to date
+      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
+    }
+    $self->seqfetcher($seqfetcher);
+
     return $self;
 }
 
@@ -106,6 +112,14 @@ sub write_output {
   
   my @genes    = $self->output();
   my $db       = $self->dbobj();
+
+
+#  my $dbout    = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+#						     -user   => 'ensadmin',
+#						     -dbname => 'val_e2g_test',
+#						     -host   => 'ecs1a',
+#						    );
+#  my $gene_obj = $dbout->gene_Obj;
   my $gene_obj = $db->gene_Obj;
 
   eval {
@@ -173,7 +187,7 @@ sub write_output {
   }
   
   # this now assummes that we are building on a single VC.
-  #      $self->throw("Bailing before real write\n");
+  #        $self->throw("Bailing before real write\n");
   
  GENE: foreach my $gene (@genes) {	
     # do a per gene eval...
@@ -250,9 +264,7 @@ sub run {
   $self->throw("Can't run - no runnable objects") unless defined($self->{_runnables});
   
   foreach my $runnable ($self->runnable) {
-    print STDERR "About to run BME2G\n";
     $runnable->run;
-    print STDERR "Back from BME2G\n\n";
   }
 
   $self->_convert_output();
@@ -274,8 +286,6 @@ sub _convert_output {
   my $count  = 1;
   my $time   = time; chomp($time);
   my @genes;
-
-  print STDERR "About to convert output\n";
 
   # make an array of genes for each runnable
   foreach my $runnable ($self->runnable) {
@@ -309,8 +319,6 @@ sub _make_genes {
   my $contig = $self->vc;
   my $genetype = 'bmeg';
   
-  print STDERR "About to make genes\n";
-
   my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
   print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
   my @genes;
@@ -342,8 +350,6 @@ sub _make_genes {
     my $excount = 1;
     my @exons;
     
-    print STDERR "there shoild be " . scalar($tmpf->sub_SeqFeature) . " exons\n";
-
     foreach my $exon_pred ($tmpf->sub_SeqFeature) {
       # make an exon
       my $exon = new Bio::EnsEMBL::Exon;
@@ -358,8 +364,6 @@ sub _make_genes {
       $exon->end  ($exon_pred->end);
       $exon->strand($exon_pred->strand);
       
-      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
-      
       #	$exon->phase($subf->feature1->{_phase});
       
       $exon->phase($exon_pred->phase);
@@ -367,21 +371,21 @@ sub _make_genes {
       # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
       $exon_pred->source_tag('BME2G');
       $exon_pred->primary_tag('BME2G');
+
       $exon_pred->score(100); # ooooooohhhhhh
       
+      print "num subf: " . scalar($exon_pred->sub_SeqFeature) . "\n";
+
       # sort out supporting evidence for this exon prediction
       foreach my $subf($exon_pred->sub_SeqFeature){
 	$subf->feature1->source_tag($genetype);
 	$subf->feature1->primary_tag('similarity');
-	$subf->feature1->score(100); # eeeeek
 	$subf->feature1->analysis($exon_pred->analysis);
 	
 	$subf->feature2->source_tag($genetype);
 	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->score(100); # eeeeeek
 	$subf->feature2->analysis($exon_pred->analysis);
 	
-#	print STDERR "*subf " . $subf->gffstring . "\n";
 	$exon->add_Supporting_Feature($subf);
       }
       
@@ -465,51 +469,6 @@ sub _remap_genes {
   }
 
   return @remapped;
-}
-
-
-
-=head2 _prepare_runnables
-    Title   :   _prepare_runnables
-    Usage   :   $self->_prepare_runnables($genseq,@new_features)
-    Function:   Makes a Bio::EnsEMBL::Runnable::AlignFeature for plus strand blast 
-                FeaturePairs, and one for minus strand hits as appropriate.
-    Returns :   Nothing, but $self->{_runnables} contains the two runnables
-    Args    :   array of Bio::EnsEMBL::FeaturePair
-
-=cut
-
-sub _prepare_runnables {
-  my ($self, $contig, @new_features) = @_;
-  my $genseq = $contig->get_repeatmasked_seq();
-  my @plusfeat;
-  my @minusfeat;
-   foreach my $f(@new_features) {
-     #Bio:EnsEMBL::MSPCrunch will have made sure every feat1 has strand=1
-     if ($f->hstrand == -1) { push (@minusfeat, $f);  }
-     else { push (@plusfeat,$f); }
-   }
-  
-  if( scalar(@plusfeat) ) {
-    print STDERR scalar(@plusfeat) . "features on plus strand\n";
-    my $prunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
-								       '-features' => \@plusfeat);
-   
-#    $self->add_Runnable($prunnable);
-    $self->runnable($prunnable);
-    $self->{$prunnable} = $contig;
-  }
-  else { print STDERR "no features on plus strand\n"; }
-
-  if( scalar  (@minusfeat) ) {
-    print STDERR scalar(@minusfeat) . "features on minus strand\n";
-    my $mrunnable = new Bio::EnsEMBL::Pipeline::Runnable::AlignFeature('-genomic'  => $genseq,
-								       '-features' => \@minusfeat);
-    
-    $self->runnable($mrunnable);
-    $self->{$mrunnable} = $contig;
-  }
-  else { print STDERR "no features on minus strand\n"; }
 }
 
 =head2 _print_FeaturePair
