@@ -96,21 +96,22 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->set_parameters($analysis);
+    $self->analysis($analysis);
     
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Genscan');
     
     return $self;
 }
 
-sub set_parameters {
+sub analysis {
     my ($self, $analysis) = @_;
     
     if ($analysis)
     {
         $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-        $self->parameters($analysis->parameters());
+        $self->{'_analysis'} = $analysis;
+        $self->parameters($analysis->parameters);
     }
 }
 
@@ -323,12 +324,6 @@ sub write_output {
     }
     elsif (@features) 
     {
-        #should add conditional for evalue here
-	    print STDERR "Writing features to database\n";
-        foreach my $feature (@features)
-        {
-            print STDERR ($feature->seqname()."\t");
-        }
         my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
 	    $feat_Obj->write($contig, @features);
     }
