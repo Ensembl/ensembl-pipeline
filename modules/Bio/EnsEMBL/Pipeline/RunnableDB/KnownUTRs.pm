@@ -1399,7 +1399,7 @@ sub make_gene{
 
   my $genetype = 'KnownUTR';
   unless ( $genetype ){
-    $self->throw("You must define GB_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::GeneConf");
+    $self->throw("You must define GB_GENEWISE_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::Combined");
   }
 
   # an analysis should be passed in via the RunnableDB.m parent class:
