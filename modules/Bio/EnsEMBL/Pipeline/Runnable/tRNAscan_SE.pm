@@ -110,6 +110,7 @@ sub query {
 
 	$self->filename($self->query->id.".$$.seq");
 	$self->results($self->filename.".out");
+	$self->file($self->results);
     }
     return $self->{'_sequence'};
 }
@@ -170,6 +171,7 @@ sub run {
     #parse output of tRNAscan_SE
     $self->parse_results();
     $self->deletefiles();
+    1;
 }
 
 =head2 run_tRNAscan_SE
