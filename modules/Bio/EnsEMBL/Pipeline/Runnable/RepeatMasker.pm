@@ -322,6 +322,19 @@ sub parse_results {
             $feat2 {name} = $element[9];
             $feat2 {score} = $feat1 {score};
             $feat1 {strand} = $feat2 {strand};
+	    # this shouldn't happen, but it does ...
+	    # find hit start and end the wrong way round
+	    # somewhere inside RepeatMasker (eek!)
+	    # fix by swapping back, not sure if this is correct
+	    if ($feat2{start} > $feat2{end}) {
+		$self->warn("Hit start > end");
+		($feat2{start}, $feat2{end}) = ($feat2{end}, $feat2{start});
+	    }
+	    # only seems to happen to the *hit* start/end
+	    # if ($feat1{start} > $feat1{end}) {
+		# $self->warn("Found query seq start > end");
+		# ($feat1{start}, $feat1{end}) = ($feat1{end}, $feat1{start});
+	    # }
             #misc
             $feat2 {db} = undef;
             $feat2 {db_version} = undef;
