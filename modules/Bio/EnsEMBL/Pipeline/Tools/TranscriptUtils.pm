@@ -55,17 +55,6 @@ use Bio::EnsEMBL::PredictionTranscript;
 # parameter slice is optional. It makes sense to use it when working on fixed length slices.
 # If it is not used, the method can still be used to check consistency of the transcript
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
-
-
-###########################################################
-#
-# METHODS DOING CHECKS
-#
-###########################################################
-
-# parameter slice is optional. It makes sense to use it when working on fixed length slices.
-# If it is not used, the method can still be used to check consistency of the transcript
-# although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 # note - intron lengths now checked separately using _check_introns
 
 sub _check_Transcript{
@@ -551,7 +540,12 @@ sub split_Transcript{
       push(@split_transcripts, $curr_transcript);
       next EXON;
     }
-    
+
+    if ($exon->strand != $prev_exon->strand){
+      print STDERR "strand mismatch - cannot split\n";
+      return ($transcript); # original transcript
+    }
+
     # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
     my $intron = 0;
     
@@ -671,8 +665,7 @@ sub _print_SimpleTranscript{
 
 sub _print_Transcript{
   my ($self,$transcript) = @_;
-  my ($p, $f, $l) = caller;
-  print "$f:$l\n";
+
   my @exons = @{$transcript->get_all_Exons};
   my $id;
   if ($transcript->stable_id){
@@ -1089,6 +1082,7 @@ sub _real_introns{
 sub check_splice_sites{
   my ($self, $transcript) = @_;
 
+  $self->throw("no transcript passed in") unless defined $transcript;
   
   my $strand = $transcript->start_Exon->strand;
   my @exons  = @{$transcript->get_all_Exons};
@@ -1113,6 +1107,12 @@ sub check_splice_sites{
       my $downstream_exon = $exons[$i+1];
       my $upstream_site;
       my $downstream_site;
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i+1]->start - $exons[$i]->end - 1 );
+      next if $intron_length <=9;
+
       eval{
 	$upstream_site = 
 	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
@@ -1164,6 +1164,12 @@ print STDERR "check_splice_sites: upstream ".
       my $downstream_site;
       my $up_site;
       my $down_site;
+
+      ############################################################
+      # consider only real introns
+      my $intron_length = ( $exons[$i]->start - $exons[$i+1]->end - 1 );
+      next if $intron_length <=9;
+
       eval{
 	$up_site = 
 	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
@@ -1203,6 +1209,12 @@ print STDERR "check_splice_sites: upstream ".
     return 0;
   }
 }
+
+############################################################
+# this method checks whether the splice sites are canonical
+# it returns 1 if all splice sites are canonical
+# It returns zero if the transcrip has only 1 exon, or some of the splice sites
+# are non-canonical
 
 sub check_canonical_splice_sites{
   my ($self, $transcript) = @_;
