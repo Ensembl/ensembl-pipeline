@@ -359,7 +359,7 @@ sub create_feature {
     my $feat1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
 						-start       => $feat->{start},
 						-end         => $feat->{end},
-						-score       => $feat->{score},
+						-score       => 0,
 						-analysis    => $analysis,
 						-percent_id => 0,
 						-p_value => 0,
