@@ -104,7 +104,7 @@ sub new {
     
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange([qw(GENOMIC EST E2G ARGS)], @args);
-    print STDERR "Genomic $genomic\n"; 
+
     $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
     $self->est_sequence($est) if $est; #create & fill key to Bio::Seq
     if ($est_genome) 
@@ -112,9 +112,9 @@ sub new {
     else
     {   
         eval 
-        { $self->est_genome($self->locate_executable('est_genome')); };
+        { $self->est_genome($self->locate_executable('est2genome')); };
         if ($@)
-        { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
+        { $self->est_genome('/usr/local/ensembl/bin/est2genome'); }
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
@@ -267,10 +267,27 @@ sub run {
     }
         
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-    print STDERR "running for " . $estseq->display_id . "\n";
+
+    # the command to run the beast depends whether we're using est_genome (original version) 
+    # or est2genome (emboss version)
+    my $estgenome = $self->est_genome;
+    my $est_genome_command;
+
+    if($estgenome =~ /est_genome/){
+      # using est_genome
+      $est_genome_command = $self->est_genome . " -reverse -genome $genfile -est $estfile |";
+    }
+    elsif($estgenome =~ /est2genome/){
+      # emboss version has -reverse behaviour on by default 
+      $est_genome_command = $self->est_genome . " -genome $genfile -est $estfile -space 500000 -out stdout |";
+    }
+    else{
+      $self->throw ("cannot determine correct command to use when running " . $self->est_genome . " - bailing out.\n");
+    }
+
+
     eval {
-      print (STDERR "Running command $est_genome_command\n");
+#      print (STDERR "Running command $est_genome_command\n");
       open (ESTGENOME, $est_genome_command) 
 	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
@@ -279,9 +296,9 @@ sub run {
       print STDERR "firstline: \t$firstline\n";
       # typical firstline:  
       # Note Best alignment is between reversed est and forward genome, and splice  sites imply forward gene
-
       # put the gene on the minus strand iff splice sites imply reversed gene
-      if ($firstline =~ /REVERSE/) { print STDERR "***reversed gene***\n"; $estOrientation = -1; }
+      if ($firstline =~ /REVERSE/) { 
+	$estOrientation = -1; }
       else {$estOrientation = 1}
      
       #read output
