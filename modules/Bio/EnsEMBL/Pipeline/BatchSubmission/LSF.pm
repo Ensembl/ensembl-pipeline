@@ -61,6 +61,10 @@ sub construct_command_line{
     # undef $nodes unless $nodes =~ m{(\w+\ )*\w};
     $bsub_line .= " -m '".$nodes."' ";
   }
+  if(my $res = $self->resource){
+    $res = qq{-R $res} unless $res =~ /^-R/;
+    $bsub_line .= " $res ";
+  }
   $bsub_line .= " -q ".$self->queue    if defined $self->queue;
   $bsub_line .= " -J ".$self->jobname  if defined $self->jobname;
   $bsub_line .= " ".$self->parameters." "  if defined $self->parameters;
