@@ -69,7 +69,7 @@ my $this_end    = $current_end;
 my $this_length = $this_end - $this_start + 1;
 my $count = $extra_features;
 
-print OUTPUT "   this range:$chr_name.$this_start-$this_end\tlength:".
+print STDERR "   this range:$chr_name.$this_start-$this_end\tlength:".
     "$this_length\tfeature_count:$extra_features\n";
 
 CLUSTER:
@@ -83,13 +83,16 @@ for (my $i=1; $i<=$#clusters; $i++ ){
     }
     $this_start  = $current_end + 1;
     $this_length = $this_end - $this_start + 1;
-    print OUTPUT "   this range:$chr_name.$this_start-$this_end\tlength:".
+    print STDERR "   this range:$chr_name.$this_start-$this_end\tlength:".
 	"$this_length\tfeature_count:$extra_features\n";
   
     my $new_length = $this_end - $current_start + 1;
     my $new_count  = $count + $extra_features;
     if ( $new_length > $max_length ||  $new_count > $max_feature_count ){
 	print OUTPUT "$chr_name.$current_start-$current_end\tlength:".
+	    ($current_end-$current_start +1)."\tfeature_count:$count\n";
+	
+	print STDERR "SLICE $chr_name.$current_start-$current_end\tlength:".
 	    ($current_end-$current_start +1)."\tfeature_count:$count\n";
 	
 	$current_start = $current_end + 1;
@@ -102,6 +105,7 @@ for (my $i=1; $i<=$#clusters; $i++ ){
     }
     if ( $i==$#clusters ){
 	print OUTPUT "$chr_name.$current_start-$chr_length\tlength:".( $chr_length - $current_start + 1 )."\tfeature_count:$count\n";
+	print STDERR "SLICE $chr_name.$current_start-$chr_length\tlength:".( $chr_length - $current_start + 1 )."\tfeature_count:$count\n";
     }
 }
 
