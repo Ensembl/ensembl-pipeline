@@ -36,7 +36,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
     to be connected to several dbs:
 
     alnprog: string defining the alginment runnable used. Can be 'crossmatch', 
-             'exonerate' or 'bl2seq' (the latter not implemented at the moment).
+             'bl2seq' or 'exonarate' (the latter not implemented at the moment).
              'crossmath' is the default.
 
     dbobj: this is where the output is finally written, 
@@ -53,8 +53,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer
     contig_id1 being considered as the reference contig to define the 
     reference AlignBlockSet
 
-    min_score is an argument for the crossmatch runnable to set the 
-    minimum score used in the crossmatch run
+    min_score is an argument for the 'crossmatch' runnable to set the 
+    minimum score used in the crossmatch run. In the case of 'bl2seq' runnable 
+    it sets the minimum Eval used in bl2seq run.
 
 =head1 CONTACT
 
@@ -78,6 +79,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
+use Bio::EnsEMBL::Pipeline::Runnable::Bl2seq;
 use Bio::PrimarySeq;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
@@ -156,10 +158,13 @@ sub fetch_input {
 								       -minmatch => 14,
 								       -masklevel => 80);
     } elsif ($self->alnprog eq 'bl2seq') {
-      $self->throw("bl2seq aligment runnable not implemented yet");
-#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new();
+      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(-seq1 => $seq1,
+								   -seq2 => $seq2,
+								   -min_score => 40,
+								   -min_eval => $self->min_score);
     } elsif ($self->alnprog eq 'exonerate') {
-      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
+      $self->throw("exonarate aligment runnable not implemented yet");
+#      $alnrunnable = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(-genomic => $seq2,
 								      -est => [$seq1]);
     } 
     
@@ -199,10 +204,53 @@ sub output {
    my ($self,@args) = @_;
    if(@args) {
      push @{$self->{'output'}}, @args;
-    }
-    return @{$self->{'output'}};
+   }
+   return @{$self->{'output'}};
 }
 
+=head2 _greedy_filter
+
+    Title   :   _greedy_filter
+    Usage   :   _greedy_filter(@)
+    Function:   Clean the Array of Bio::EnsEMBL::FeaturePairs in two step, 
+                First, determines the highest scored hit, and fix the expected strand hit
+                Second, hits on expected strand are kept if they do not overlap, 
+                either on query or subject sequence, previous strored, higher scored hits.
+    Returns :   Array of Bio::EnsEMBL::FeaturePairs
+    Args    :   Array of Bio::EnsEMBL::FeaturePairs
+
+=cut
+
+sub _greedy_filter {
+  my (@features) = @_;
+
+  @features = sort {$b->score <=> $a->score} @features;
+
+  my @features_filtered;
+  my $ref_strand;
+  foreach my $fp (@features) {
+    if (! scalar @features_filtered) {
+        push @features_filtered, $fp;
+	$ref_strand = $fp->hstrand;
+        next;
+    }
+    next if ($fp->hstrand != $ref_strand);
+    my $add_fp = 1;
+    foreach my $feature_filtered (@features_filtered) {
+      my ($start,$end,$hstart,$hend) = ($feature_filtered->start,$feature_filtered->end,$feature_filtered->hstart,$feature_filtered->hend);
+      if (($fp->start >= $start && $fp->start <= $end) ||
+	  ($fp->end >= $start && $fp->end <= $end) ||
+	  ($fp->hstart >= $hstart && $fp->hstart <= $hend) ||
+	  ($fp->hend >= $hstart && $fp->hend <= $hend)) {
+	$add_fp = 0;
+	last;
+      }
+    }
+    push @features_filtered, $fp if ($add_fp);
+  }
+
+  return @features_filtered;
+}
 
 =head2 write_output
 
@@ -217,8 +265,8 @@ sub output {
 sub write_output {
   my ($self) = @_;
   
-  my @features = $self->output;
-  
+  my @features = _greedy_filter($self->output);
+
   my $db = $self->dbobj();
   my $gadb = $db->get_GenomeDBAdaptor();
   $db->get_DnaFragAdaptor();
