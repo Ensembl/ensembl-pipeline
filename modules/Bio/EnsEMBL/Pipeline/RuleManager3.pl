@@ -105,6 +105,7 @@ GetOptions(
     'queue=s'     => \$queue,
     'jobname=s'   => \$jobname,
     'usenodes=s'  => \$nodes,
+    'bsub_opt=s'  => \$bsub,
     'once!'       => \$once,
     'retry=i'     => \$retry,
     'analysis=s@' => \@analysis
