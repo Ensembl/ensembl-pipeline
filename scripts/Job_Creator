@@ -1,5 +1,12 @@
 #!/usr/local/bin/perl
 
+BEGIN {
+  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/ensembl-pipeline/modules");
+  unshift (@INC,"/nfs/disk100/humpub/michele/ensembl/modules");
+  unshift (@INC,"/nfs/disk100/humpub/michele/bioperl-live");
+}
+
+
 =head1 NAME
 
 Job_creator - takes a list of input_ids and an analysis id
