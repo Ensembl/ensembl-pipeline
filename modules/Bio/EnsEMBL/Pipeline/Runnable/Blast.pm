@@ -246,7 +246,7 @@ sub databases {
   if (!defined($self->{_databases})) {
      $self->{_databases} = [];
   }
-  if (defined(@dbs)) {
+  if (@dbs) {
      push(@{$self->{_databases}},@dbs);
   }
   return @{$self->{_databases}};
@@ -484,11 +484,7 @@ sub parse_results {
                                          -hardprune => $self->hardprune,
                                          -coverage  => $self->coverage);
       my @pruned = $search->run(@allfeatures);
-
-#      print STDERR "dbg ", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
-      $self->output(@allfeatures);
-      
     }
   }
 
