@@ -4,9 +4,10 @@ use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 
 
-my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'obi-wan',
+my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'ensrv3',
 				      -user   => 'ensro',
-				      -dbname => 'ens500',
+				      -dbname => 'ensembl07',
+                                      -perlonlyfeatures => 1,
 				      );
 
 $| = 1;
@@ -18,3 +19,5 @@ my @contigs     = $clone->get_all_Contigs;
 
 my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contigs => \@contigs);
    $genebuilder->build_Genes;
+
+
