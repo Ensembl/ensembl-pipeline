@@ -115,7 +115,7 @@ sub run{
   my %supp_evidence;
   foreach my $transcript ( $self->each_Transcript ) {
     
-    print STDERR "In Genomewise, before going through genomewise\n";
+    #print STDERR "In Genomewise, before going through genomewise\n";
     my $excount = 0;
     foreach my $exon ( $transcript->get_all_Exons ) {
       $excount++;
@@ -133,7 +133,7 @@ sub run{
 	#}
       }
       else{
-	print STDERR "No supporting evidence\n";
+	;#print STDERR "No supporting evidence\n";
       }
       
       if( $exon->strand == -1 ) {
@@ -315,7 +315,7 @@ sub run{
     
     # most of the time the numbers of exons doesn't vary
     if ( scalar( @exons_in ) == scalar ( @exons_out ) ){
-      print STDERR "passing evi info between 2 transcripts with same number of exons\n";
+      #print STDERR "passing evi info between 2 transcripts with same number of exons\n";
       while ( scalar ( @exons_in ) > 0 ){
 	my $exon_in  = shift( @exons_in  );
 	my $exon_out = shift( @exons_out );  
@@ -371,7 +371,7 @@ sub run{
     
   ## now we check that all the evi info has been correctly passed
   foreach my $tran_out ( @trans_out ){
-    print STDERR "In Genomewise, AFTER going through genomewise\n";
+    #print STDERR "In Genomewise, AFTER going through genomewise\n";
     my $count = 0;
     foreach my $exon_out ( $tran_out->get_all_Exons ) {
       $count++;
@@ -383,7 +383,7 @@ sub run{
   	#}
       }
       else{
-  	print STDERR "No supporting evidence\n";
+  	;#print STDERR "No supporting evidence\n";
       }
     }
   }
