@@ -1,39 +1,39 @@
 P17013
 Q99784
-AK057787
-NP_079244
-O00360
-O00362
-O00363
-O00366
-O00368
-O00372
-O00375
-O00378
-O00549
-P08547
-Q02364
-Q12881
-Q14269
-Q14270
-Q14287
-Q14288
-Q14710
-Q14711
-Q14712
-Q14713
-Q15604
-Q15606
-Q96GQ3
-Q96LU6
-Q96LY4
-Q9BS81
-Q9H3B9
-Q9HA56
-Q9HAG0
-Q9HBW6
-Q9NW74
-Q9NW99
-Q9P1J1
-Q9UN80
-Q9Y5K0
+AK057787	supports transposable elements - Daniel
+NP_079244	supports transposable elements - Daniel
+O00360	supports transposable elements - Daniel
+O00362	supports transposable elements - Daniel
+O00363	supports transposable elements - Daniel
+O00366	supports transposable elements - Daniel
+O00368	supports transposable elements - Daniel
+O00372	supports transposable elements - Daniel
+O00375	supports transposable elements - Daniel
+O00378	supports transposable elements - Daniel
+O00549	supports transposable elements - Daniel
+P08547	supports transposable elements - Daniel
+Q02364	supports transposable elements - Daniel
+Q12881	supports transposable elements - Daniel
+Q14269	supports transposable elements - Daniel
+Q14270	supports transposable elements - Daniel
+Q14287	supports transposable elements - Daniel
+Q14288	supports transposable elements - Daniel
+Q14710	supports transposable elements - Daniel
+Q14711	supports transposable elements - Daniel
+Q14712	supports transposable elements - Daniel
+Q14713	supports transposable elements - Daniel
+Q15604	supports transposable elements - Daniel
+Q15606	supports transposable elements - Daniel
+Q96GQ3	supports transposable elements - Daniel
+Q96LU6	supports transposable elements - Daniel
+Q96LY4	supports transposable elements - Daniel
+Q9BS81	supports transposable elements - Daniel
+Q9H3B9	supports transposable elements - Daniel
+Q9HA56	supports transposable elements - Daniel
+Q9HAG0	supports transposable elements - Daniel
+Q9HBW6	supports transposable elements - Daniel
+Q9NW74	supports transposable elements - Daniel
+Q9NW99	supports transposable elements - Daniel
+Q9P1J1	supports transposable elements - Daniel
+Q9UN80	supports transposable elements - Daniel
+Q9Y5K0	supports transposable elements - Daniel
