@@ -164,9 +164,8 @@ sub verifyExons {
   $self->throw("No exon1 defined") unless $self->exon1;
   $self->throw("No exon2 defined") unless $self->exon2;
   
-  if ($self->exon1->contig_id eq $self->exon2->contig_id) {
-    # Should we check contig version here?
-    if ($self->exon1->strand != $self->exon2->strand) {
+  if ($self->exon1->contig->name eq $self->exon2->contig->name) {
+      if ($self->exon1->strand != $self->exon2->strand) {
       $self->throw("Exons are on opposite strands");
     }
     
