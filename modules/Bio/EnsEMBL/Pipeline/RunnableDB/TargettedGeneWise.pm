@@ -57,15 +57,29 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaPepAlignFeature;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_TARGETTED_PROTEIN_INDEX
-					 GB_TARGETTED_SINGLE_EXON_COVERAGE
-					 GB_TARGETTED_MULTI_EXON_COVERAGE
-					 GB_TARGETTED_MAX_INTRON
-					 GB_TARGETTED_MIN_SPLIT_COVERAGE
-					 GB_TARGETTED_GW_GENETYPE
-					 GB_SIZE
-					 );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_GW_DBNAME
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
+							     GB_TARGETTED_PROTEIN_INDEX
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
+							     GB_TARGETTED_SINGLE_EXON_COVERAGE
+							     GB_TARGETTED_MULTI_EXON_COVERAGE
+							     GB_TARGETTED_MAX_INTRON
+							     GB_TARGETTED_MIN_SPLIT_COVERAGE
+							     GB_TARGETTED_GW_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts   qw (
+							     GB_SIZE
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -78,6 +92,21 @@ sub new {
     my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
     $self->seqfetcher($seqfetcher);
   }
+
+  # IMPORTANT
+  # SUPER creates db, which is a reference to GB_DBHOST@GB_DBNAME containing
+  # features and dna
+  # Here it is used as refdb only and we need to make a connection to GB_GW_DBNAME@GB_GW_DBHOST
+  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						   '-host'   => $GB_GW_DBHOST,
+						   '-user'   => $GB_GW_DBUSER,
+						   '-pass'   => $GB_GW_DBPASS,
+						   '-dbname' => $GB_GW_DBNAME,
+						  );
+  
+  
+  $genewise_db->dnadb($self->db);
+  $self->output_db($genewise_db);
 
   return $self;
 }
@@ -192,6 +221,11 @@ sub fetch_input{
   $self->query($slice);
   $self->protein_id($protein_id);
   print STDERR $protein_id."\n";
+
+  # check slice seq
+#  print ">slice\n" . $slice->seq . "\n";
+  print "trying to fetch $chr_name.$new_start-$new_end\n";
+
   # genewise runnable
   # repmasking?
 
@@ -297,7 +331,7 @@ sub runnable{
 sub write_output {
   my($self) = @_;
   
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
+  my $gene_adaptor = $self->output_db->get_GeneAdaptor;
   my @genes = $self->output;
   print STDERR "have ".@genes." genes\n";
  GENE: foreach my $gene ($self->output) {	
@@ -477,7 +511,7 @@ sub validate_transcript {
        }
 
   if(!defined $threshold){
-    print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in GeneConf.pm\n";
+    print STDERR "You must define GB_TARGETTED_SINGLE_EXON_COVERAGE and GB_TARGETTED_MULTI_EXON_COVERAGE in Config::GeneBuild::Targetted.pm\n";
     return undef;
   }
 
@@ -1027,6 +1061,29 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
 
   return \@final_transcripts;
 
+}
+
+=head2 output_db
+
+ Title   : output_db
+ Usage   : needs to be moved to a genebuild base class
+ Function: 
+           
+ Returns : 
+ Args    : 
+
+=cut
+
+sub output_db {
+    my( $self, $output_db ) = @_;
+    
+    if ($output_db) 
+    {
+	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+	    || $self->throw("Input [$output_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+	$self->{_output_db} = $output_db;
+    }
+    return $self->{_output_db};
 }
 
 

@@ -43,13 +43,15 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
-#use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-#use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_TARGETTED_PROTEIN_INDEX
-					 GB_INPUTID_REGEX
-					 GB_TARGETTED_PROTEIN_SEQFETCHER
-					);
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
+							     GB_TARGETTED_PROTEIN_INDEX
+							     GB_TARGETTED_PROTEIN_SEQFETCHER
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
+							     GB_INPUTID_REGEX
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
