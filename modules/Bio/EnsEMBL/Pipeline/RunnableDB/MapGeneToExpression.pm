@@ -66,6 +66,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw(
+				       EST_INPUTID_REGEX
 				       EST_REFDBHOST
 				       EST_REFDBUSER
 				       EST_REFDBNAME
@@ -237,7 +238,6 @@ sub ests{
     $genes[0]->isa("Bio::EnsEMBL::Gene") || $self->throw("$genes[0] is not a Bio::EnsEMBL::Gene");
     push ( @{ $self->{_ests} }, @genes );
   }
-  print STDERR "returning an ".ref(@{ $self->{_ests} })." with ".ref(${  $self->{_ests} }[0] )."\n";
   return @{ $self->{_ests} };
 }
 
@@ -280,36 +280,34 @@ sub fetch_input {
   my( $self) = @_;
   
   # get genomic region 
-  my $chrid    = $self->input_id;
-  print STDERR "input_id: $chrid\n";
-  if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
-    $self->throw("Not a valid input_id... $chrid");
-  }
-  $chrid       =~ s/\.(.*)-(.*)//;
-  my $chrstart = $1;
-  my $chrend   = $2;
-  print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
+  my $input_id    = $self->input_id;
+  unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
+    $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
+    }
+  my $chrname  = $1;
+  my $chrstart = $2;
+  my $chrend   = $3;
+  
+  print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
   my $ensembl_sa = $self->ensembl_db->get_SliceAdaptor();
   my $est_sa     = $self->est_db->get_SliceAdaptor();
 
-  my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $est_slice      = $est_sa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
+  my $est_slice      = $est_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
 
   $self->ensembl_slice( $ensembl_slice );
   $self->est_slice( $est_slice );
 
   # get ests (mapped with Filter_ESTs_and_E2G )
   print STDERR "getting genes of type $EST_GENEBUILDER_INPUT_GENETYPE\n";
-  print STDERR "getting a ".ref($self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ))."\n";
-  print STDERR "got ".scalar( @{$self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' )} )." ests\n";
-  $self->ests(@{ $self->est_slice->get_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ) });
+  $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ) });
   print STDERR "got ".scalar( $self->ests )." ests\n";
 
 
 
   # get ensembl genes (from GeneBuilder)
-  $self->ensembl_genes(@{ $self->ensembl_slice->get_Genes_by_type( $EST_TARGET_GENETYPE, 'evidence' ) });
+  $self->ensembl_genes(@{ $self->ensembl_slice->get_all_Genes_by_type( $EST_TARGET_GENETYPE, 'evidence' ) });
 
 }
   
