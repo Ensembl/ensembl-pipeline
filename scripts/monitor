@@ -8,9 +8,9 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 
-my $host = 'ecs1c';
+my $host = 'ecs1b';
 my $port;
-my $dbname = 'laura_test';
+my $dbname = 'chr_6_13_updated';
 my $user = 'ensro';
 my $pass = undef;
 
