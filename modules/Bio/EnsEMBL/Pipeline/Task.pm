@@ -231,9 +231,10 @@ sub create_Jobs {
 
 
 sub description{
-  print STDERR "This is an abstract method which should be implemented\n"
-  ."in the child classes of Task describing what the Task does and\n".
-   "what its dependancies are\n";
+  my $self = @_;
+  print STDERR $self->name." hasn't implemented a description method".
+    " this method is useful so others can see what a Task does and what".
+      "its dependancies are\n";
 }
 
 1;

@@ -22,11 +22,11 @@ dbname =
 dbname = 
 
 [LSF]
-tmpdir = /tmp
+ouput_dir = /tmp
 path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 [LOCAL]
-tmpdir = /tmp
+ouput_dir = /tmp
 
 [PIPELINE_MANAGER]
 check_interval = 35

@@ -202,8 +202,8 @@ sub _generate_filename_prefix {
 
   # get temp dir from config
   my $config = $self->get_Config();
-  my $temp_dir = $config->get_parameter('LOCAL', 'tmpdir');
-  $temp_dir || $self->throw('Could not determine temp dir for job ' . $job->taskname() . ' ID ' . $job->dbID() . '\n');
+  my $temp_dir = $config->get_parameter('LOCAL', 'output_dir');
+  $temp_dir || $self->throw('Could not determine output dir for job ' . $job->taskname() . ' ID ' . $job->dbID() . '\n');
 
   # don't need to distribute files through subdirectories like in LSF as there will only be a few
   my $time = localtime(time());

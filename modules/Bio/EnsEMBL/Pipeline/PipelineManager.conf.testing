@@ -1,8 +1,8 @@
 [DEFAULT_DATABASE]
-host=127.0.0.1
+host=ecs1g
 user=ensadmin
 pass=ensembl
-port=5000
+port=3306
 
 #
 # Database where pipeline config is stored
@@ -18,11 +18,11 @@ dbname = mcvicker_test_briggsae
 dbname = mcvicker_test_briggsae
 
 [LSF]
-tmpdir = /tmp
+output_dir = /tmp
 path = /usr/local/lsfv42/4.2/alpha5/bin/
 
 [LOCAL]
-tmpdir = /tmp
+output_dir = /tmp
 
 [PIPELINE_MANAGER]
 check_interval = 35
@@ -50,7 +50,7 @@ max_create = 50
 
 [REPEATMASKER_TASK]
 timeout  = 3600
-where = Local
+where = LSF:acarilong
 retries = 3
 
 [GENSCAN_TASK]

@@ -46,14 +46,7 @@ if( $check ) {
   if ( ! -e $output_dir ) {
     die "output dir $output_dir doesn't exist according to host $host";
   }
-  my $deadhostfile = "$output_dir/deadhosts";
-  open( FILE, $deadhostfile ) or exit 0;
-  while( <FILE> ) {
-    chomp;
-    if( $host eq $_ ) {
-      die "Cant use this host";
-    }
-  }
+
   exit 0;
 
 }

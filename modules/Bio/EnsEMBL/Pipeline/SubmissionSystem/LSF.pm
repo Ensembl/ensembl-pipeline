@@ -110,6 +110,8 @@ sub flush {
                     '-dbuser', $db->username,
                     '-pass',   $db->password);
 
+  my $runner = $config->get_parameter('LSF', 'runner');
+
 	foreach $taskname (@tasknames) {
 
 		#extract the queue name and free form parameters from the 'where'
@@ -135,13 +137,13 @@ sub flush {
 		#submission needs to be uniquely named
 		my $lsf_job_name = join('_', $taskname, time(),$self->{'sub_count'});
 
+		my $dir_prefix = $self->_dir_prefix($taskname);
+
 		#add the preexec to the arguments
-		my @args = ('-E', "\"runner.pl -check\"");
+		my @args = ('-E', "\"$runner -check -output_dir $dir_prefix\"");
 		#add the queue name
 		push @args, ('-q', $queue);
 		
-
-    my $dir_prefix = $self->_dir_prefix($taskname);
 
     my $command;
 
@@ -162,14 +164,14 @@ sub flush {
 			$job->array_index(undef);
 
 			$job_adaptor->update($job);
-			$job->update_status('SUBMITTED');
+			$job->set_current_status('SUBMITTED');
 
 			#add the output dirs to the stdout list
 			push @args, ('-o', $stdout);
 			push @args, ('-e', $stderr);
 			push @args, ('-J', $lsf_job_name);
 
-      $command = "\"runner.pl -jobname $lsf_job_name $dbargs\"";
+      $command = "$runner -jobname $lsf_job_name $dbargs";
 		} else {
 			my $array_index = 0;
 
@@ -203,7 +205,7 @@ sub flush {
 			
 			#add the job name and array index
 			push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
-      $command = "\"runner.pl -jobname $lsf_job_name -index %I $dbargs\"";
+      $command = "$runner -jobname $lsf_job_name -index %I $dbargs";
 		}
 
 		#execute the bsub to submit the job or job_array
@@ -211,8 +213,8 @@ sub flush {
 		#need to get job_id out of stdout :(
 		my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
 
-    #print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
-    #my $sub_id = int(rand(100000));
+    print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
+ #   my $sub_id = int(rand(100000));
 
 		open(SUB, $bsub." 2>&1 |") or
 			$self->throw("could not execute command [$bsub]");
@@ -363,10 +365,10 @@ sub _dir_prefix {
 	# get temp dir from config
 	#
 	my $config = $self->get_Config();
-	my $temp_dir = $config->get_parameter('LSF', 'tmpdir');
+	my $temp_dir = $config->get_parameter('LSF', 'output_dir');
 
 	if(!$temp_dir) {
-    $self->warn("could not determine temp dir for task [$taskname]" .
+    $self->warn("could not determine output dir for task [$taskname]" .
                " : using /dev/null");
     return undef;
   }
@@ -375,7 +377,7 @@ sub _dir_prefix {
 
   if(! -e $task_dir) {
     if(!mkdir($task_dir)) {
-      $self->warn("could not create temp dir [$task_dir] : using /dev/null");
+      $self->warn("could not create output dir [$task_dir] : using /dev/null");
       return undef;
     }
   }
@@ -385,7 +387,7 @@ sub _dir_prefix {
 	#create the dir if it doesn't exist
   if(! -e $temp_dir) {
     if(!mkdir($temp_dir)) {
-      $self->warn("could not create temp dir [$temp_dir] : using /dev/null");
+      $self->warn("could not create output dir [$temp_dir] : using /dev/null");
       return undef;
     }
   }
