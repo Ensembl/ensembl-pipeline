@@ -40,6 +40,8 @@ use vars qw(@ISA);
 use strict;
 use DBI;
 
+use Bio::EnsEMBL::DBSQL::Obj;
+
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Pipeline::DB::ObjI;
@@ -49,45 +51,18 @@ use FreezeThaw qw(freeze thaw);
 
 # Inherits from the base bioperl object
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI  Bio::EnsEMBL::DBSQL::Obj Bio::Root::Object);
 
 sub _initialize {
     my ($self,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
+    my $make = $self->SUPER::_initialize(@args);
 
-    my ($db,$host,$driver,$user,$password,$debug) = 
-	$self->_rearrange([qw(DBNAME
-			      HOST
-			      DRIVER
-			      USER
-			      PASS
-			      DEBUG
-			      )],@args);
-    
-    $db   || $self->throw("Database object must have a database name");
-    $user || $self->throw("Database object must have a user");
-    
-    if( ! $driver ) {
-	$driver = 'mysql';
-    }
-    
-    if( ! $host ) {
-	$host = 'localhost';
-    }
-    
-    my $dsn = "DBI:$driver:database=$db;host=$host";
-    my $dbh = DBI->connect("$dsn","$user",$password);
-
-    $dbh || $self->throw("Could not connect to database $db user $user using [$dsn] as a locator");
-      
-    $self->_db_handle($dbh);
-    
     return $make; # success - we hope!
 
 }
 
-=head2 get_Clone
+=head2 get_TimClone
 
  Title   : get_Clone
  Usage   : $db->get_Clone($disk_id)
@@ -99,7 +74,7 @@ sub _initialize {
 
 =cut
 
-sub get_Clone{
+sub get_TimClone{
    my ($self,$disk_id) = @_;
 
    $disk_id || $self->throw("Trying to delete a clone without a disk id!");
@@ -118,35 +93,6 @@ sub get_Clone{
 							 -dbobj      => $self );
 
    return $clone;
-}
-
-=head2 delete_Clone
-
- Title   : delete_Clone
- Usage   : $db->delete_Clone($disk_id)
- Function: Deletes a clone with a specific disk_id
- Example : $db->delete_Clone($disk_id)
- Returns : nothing
- Args    : disk_id
-
-
-=cut
-
-sub delete_Clone{
-   my ($self,$disk_id) = @_;
-
-   $disk_id || $self->throw("Trying to delete a clone without a disk id!");
-
-   my $sth = $self->prepare("delete from clone where disk_id = \"$disk_id\";");
-   my $res = $sth ->execute();
-   my $rv  = $sth ->rows;
-
-   if( ! $rv ) {
-       # make sure we deallocate sth - keeps DBI happy!
-       $sth = 0;
-       $self->throw("Clone $disk_id does not seem to occur in the database!");
-   }
-   return 1;
 }
 
 =head2 create_Clone
@@ -265,7 +211,7 @@ sub get_JobsByInputId {
 
     $self->throw("No input input_id for get_JobsByInputId") unless defined($id);
     my $query = "select id,input_id,analysis,LSF_id,machine,object,queue " . 
-	",stdout_file,stderr_file,input_object_file,output_file " .
+	",stdout_file,stderr_file,input_object_file,output_file,status_file " .
         "from job " . 
 	"where input_id = \"$id\"";
 
@@ -289,7 +235,7 @@ sub get_JobsByCurrentStatus {
     $self->throw("No input status for get_JobsByCurrentStatus") unless defined($status);
 
     my $query = "select j.id,j.input_id,j.analysis,j.LSF_id,j.machine,j.queue," .
-   	        " j.stdout_file,j.stderr_file,j.input_object_file,j.output_file,cs.status " . 
+   	        " j.stdout_file,j.stderr_file,j.input_object_file,j.output_file,j.status_file,cs.status " . 
 		" from job as j, current_status as cs where cs.id = j.id and cs.status = \"" . 
 		    $status . "\""; 
     
@@ -322,6 +268,7 @@ sub _parseJob {
     my $stderr            = $row->{stderr_file};
     my $input_object_file = $row->{input_object_file};
     my $output_file       = $row->{output_file};
+    my $status_file       = $row->{status_file};
     
     my $analysis          = $self->get_Analysis($analysis_id);
     
@@ -339,6 +286,7 @@ sub _parseJob {
 						     -stderr   => $stderr,
 						     -input_object_file => $input_object_file,
 						     -output_file => $output_file,
+                                                     -status_file => $status_file,        
 						     );
     
     return $job;

@@ -54,7 +54,7 @@ sub _initialize {
     my ($self,@args) = @_;
 
     my $make = $self->SUPER::_initialize;
-    my ($dbobj,$id,$lsfid,$input_id,$analysis,$queue,$create,$stdout,$stderr,$input,$output) 
+    my ($dbobj,$id,$lsfid,$input_id,$analysis,$queue,$create,$stdout,$stderr,$input,$output,$status) 
 	= $self->_rearrange([qw(DBOBJ
 				ID
 				LSF_ID
@@ -66,6 +66,7 @@ sub _initialize {
 				STDERR
 				INPUT_OBJECT_FILE
 				OUTPUT_FILE
+                                STATUS_FILE
 				)],@args);
 
     $id    = -1 unless defined($id);
@@ -89,6 +90,7 @@ sub _initialize {
     $self->stderr_file($stderr);
     $self->input_object_file($input);
     $self->output_file($output);
+    $self->status_file($status);
 
     my $job = new Bio::EnsEMBL::Pipeline::LSFJob(-queue     => $queue,
 						 -exec_host => "__NONE__",
@@ -297,7 +299,7 @@ sub submit {
     $obj->disconnect;
 
     $self->write_object_file($obj);
-
+    $obj->_dbobj($tmpdb);
     my $status = $self->set_status("WRITTEN_OBJECT_FILE");
     
     my $cmd = "bsub -q " . $self->queue;
@@ -344,7 +346,7 @@ sub store {
     my ($jobstr) = FreezeThaw::freeze($obj);
     
     my $query = ("replace into job(id,input_id,analysis,LSF_id,machine,object,queue," .
-		 "input_object_file,stdout_file,stderr_file,output_file) " .
+		 "input_object_file,stdout_file,stderr_file,output_file,status_file) " .
 		 "values( " . $obj->id .   ",\"" .
 		 $obj->input_id        .   "\"," .
 		 $obj->analysis->id    .   "," .
@@ -355,7 +357,8 @@ sub store {
 		 $obj->input_object_file . "\",\"".
 		 $obj->stdout_file     .   "\",\"".
 		 $obj->stderr_file     .   "\",\"" .
-		 $obj->output_file     .   "\")");
+		 $obj->output_file     .   "\",\"" .
+		 $obj->status_file     .   "\")");
     
     my $sth = $tmpdb->prepare($query);
     my $res = $sth->execute();
@@ -543,11 +546,13 @@ sub make_filenames {
     my $stdout_file       = $self->get_file("job","out");
     my $stderr_file       = $self->get_file("job","err");
     my $output_file       = $self->get_file("job","dat");
+    my $status_file       = $self->get_file("job","status");
 
     $self->input_object_file($input_object_file);
     $self->stdout_file      ($stdout_file);
     $self->stderr_file      ($stderr_file);
     $self->output_file      ($output_file);
+    $self->status_file      ($status_file);
 
 }
 
@@ -555,7 +560,7 @@ sub make_filenames {
 sub get_file {
     my ($self,$stub,$ext) = @_;
 
-    my $dir = "/nfs/disk100/humpub/michele/out/";
+    my $dir = "/nfs/disk100/humpub/humpub3/michele/out/";
 
     # Should check disk space here.
 
@@ -614,6 +619,25 @@ sub stderr_file {
 	$self->{_stderr_file} = $arg;
     }
     return $self->{_stderr_file};
+}
+
+=head2 status_file
+
+  Title   : status_file
+  Usage   : my $file = $self->status_file
+  Function: Get/set method for status
+  Returns : string
+  Args    : string
+
+=cut
+
+sub status_file {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+        $self->{_status_file} = $arg;
+    }
+    return $self->{_status_file};
 }
 
 =head2 output_file
@@ -694,6 +718,7 @@ sub print {
     $self->print_var("Stderr"           , $self->stderr_file            ); 
     $self->print_var("Object"           , $self->input_object_file      ); 
     $self->print_var("Output"           , $self->output_file            ); 
+    $self->print_var("Status"           , $self->status_file            ); 
     $self->print_var("Analysis_id"      , $self->analysis->id           );
     $self->print_var("Created"          , $self->analysis->created      );
     $self->print_var("Program"          , $self->analysis->program      );
