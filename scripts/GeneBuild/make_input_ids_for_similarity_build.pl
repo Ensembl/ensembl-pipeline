@@ -152,7 +152,8 @@ my $sl_adp = $db->get_SliceAdaptor;
 
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db,
                                                                        -slice => 1,
-                                                                       -slice_size => $max_slice_size);
+                                                                       -slice_size => $max_slice_size,
+                                                                       -coord_system => 'toplevel');
 my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
 
