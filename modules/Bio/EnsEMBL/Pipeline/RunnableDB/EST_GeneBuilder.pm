@@ -329,7 +329,7 @@ sub fetch_input {
       ($self->input_id);
     my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
     push (@$genes, @$cdna_genes);
-    $self->cdna_db->dbc->disconnect_when_inactive(1); 
+    $self->cdna_db->disconnect_when_inactive(1); 
   }
   
   my @forward_transcripts;
@@ -340,8 +340,8 @@ sub fetch_input {
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	    my $exons = $transcript->get_all_Exons;
 	    # keep only genes in the forward strand
-	    if ($exons->[0]->strand == 1){
-        push (@forward_transcripts, $transcript );
+	    if ($exons->[0] && $exons->[0]->strand == 1){
+              push (@forward_transcripts, $transcript );
 	    }
     }
   }
@@ -386,7 +386,7 @@ sub fetch_input {
       my @exons = @{$transcript->get_all_Exons};
       # these are really - strand, but the Slice is reversed, 
       #so they are relatively + strand
-      if( $exons[0]->strand == 1){
+      if( $exons[0] && $exons[0]->strand == 1){
         push (@reverse_transcripts, $transcript);
       }
     }
@@ -601,10 +601,12 @@ sub _check_Transcripts {
       }
       if ( $RAISE_SINGLETON_COVERAGE ){
 	      my @evidence = @{$exons[0]->get_all_supporting_features};
-	      my $coverage = $evidence[0]->score;
-	      if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
-          next TRANSCRIPT;
-	      }
+              if($evidence[0]){
+	        my $coverage = $evidence[0]->score;
+	        if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
+                  next TRANSCRIPT;
+	        }
+              }
       }
     }
     
@@ -632,7 +634,7 @@ sub _check_Transcripts {
         
         my @previous_sf = sort { $a->hstart <=> $b->hstart } @{$previous_exon->get_all_supporting_features};
         
-        if ( @previous_sf ){
+        if ( @previous_sf && @sf){
           
           # if the hstart increases per exon, the EST runs in the same direction of the gene 
           if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
@@ -748,24 +750,15 @@ sub _check_Transcript_Location{
   # check for possible coordinate nonsense in the exons
   ############################################################    
   my @exons = @{$transcript->get_all_Exons};
+  # note that all the transcript's exons are now sorted in order of exon-start when they are retrieved...
   my $apparent_strand = $exons[0]->strand * $exons[0]->slice->strand;
+  #print STDERR ">>>>>>>>APPARENT STRAND IS $apparent_strand: exonid: ".$exons[0]->dbID." exon strand: ".$exons[0]->strand." -- slice strand: ".$exons[0]->slice->strand." \n";
   
   if ($#exons > 0) {
     for (my $i = 1; $i <= $#exons; $i++) {
-      
-      # check for folded transcripts
-      if ($apparent_strand == 1) {
-        if ($exons[$i]->start < $exons[$i-1]->end) {
-          print STDERR "transcript $id folds back on itself\n";
-          $valid = 0;
-        } 
+      if ($exons[$i]->start < $exons[$i-1]->end) {
+        $valid = 0;
       } 
-      elsif ($apparent_strand == -1) {
-        if ($exons[$i]->end > $exons[$i-1]->start) {
-          print STDERR "transcript $id folds back on itself\n";
-          $valid = 0;
-        } 
-      }
     }
   }
   if ($valid == 0 ){
