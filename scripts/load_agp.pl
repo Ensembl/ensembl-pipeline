@@ -135,7 +135,7 @@ LINE:while(<FH>){
   
   my ($a_id, $c_id);
   if(!$assembled_ids{$a_name}){
-    if($a_name =~ /^chr(\d+)/){
+    if($a_name =~ /^chr(\S+)/){
       $a_name = $1;
     }
     my $a_piece = $sa->fetch_by_region($assembled_cs->name, $a_name,
