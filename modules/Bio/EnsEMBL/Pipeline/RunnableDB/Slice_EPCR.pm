@@ -109,10 +109,11 @@ sub fetch_input {
     $self->db->assembly_type($sgp) if $sgp;
 
     my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end);
-    $self->slice($slice);
 
-    my $genseq = $slice->primary_seq() or $self->throw("Unable to fetch contig");
-    $self->genseq($genseq);
+    $self->throw("Unable to fetch contig") unless $slice;
+
+    $self->slice($slice);
+    $self->genseq($slice);
 }
 
 #get/set for runnable and args

@@ -114,11 +114,10 @@ sub fetch_input {
     my $slice = $self->db->get_SliceAdaptor->
      fetch_by_chr_start_end($chr, $start, $end);
 
-    my $genseq = $slice->primary_seq() or
-     $self->throw("Unable to fetch virtual contig");
+    $self->throw("Unable to fetch virtual contig") unless $slice;
 
-    $self->vcontig($slice);
-    $self->genseq($genseq);
+    $self->slice($slice);
+    $self->genseq($slice);
 }
 
 #get/set for runnable and args
@@ -160,7 +159,7 @@ sub write_output {
     my $db  = $self->db;
     my $sfa = $db->get_SimpleFeatureAdaptor;
 
-    my $slice = $self->vcontig;
+    my $slice = $self->slice;
     my @mapped_features;
 
     foreach my $f ($self->output) {
