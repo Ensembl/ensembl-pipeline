@@ -5,14 +5,14 @@ use vars qw(%Config);
 
 %Config = (
 
-    # binaries, libraries and data files
-    BIN_DIR  => '/usr/local/ensembl/bin',
-    DATA_DIR => '/usr/local/ensembl/data',
-    LIB_DIR  => '/usr/local/ensembl/lib',
+           # binaries, libraries and data files
+           BIN_DIR  => '/usr/local/ensembl/bin',
+           DATA_DIR => '/usr/local/ensembl/data',
+           LIB_DIR  => '/usr/local/ensembl/lib',
 
-    ANALYSIS_WORK_DIR => '/tmp',
-
-);
+           ANALYSIS_WORK_DIR => '/tmp',
+           ANALYSIS_REPEAT_MASKING => ['RepeatMask'],      
+          );
 
 
 
