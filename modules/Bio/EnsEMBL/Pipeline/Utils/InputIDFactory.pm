@@ -98,12 +98,17 @@ sub get_slice_names{
   my ($self, $cs_name, $cs_version, $size, $overlap) = @_;
 
   $overlap = 0 if (!$overlap);
+  $size = 0 if(!$size);
   $cs_version = '' unless($cs_version);
   my $csa = $self->db->get_CoordSystemAdaptor();
   my $sa = $self->db->get_SliceAdaptor();
-
+  
   my $slices = $sa->fetch_all($cs_name, $cs_version);
-  $slices = split_Slices($slices,$size,$overlap);
+  
+  if($size > 0){
+    $slices = split_Slices($slices,$size,$overlap);
+  }
+  
   my @ids;
   foreach my $slice(@$slices){
     push(@ids, $slice->name);
