@@ -1,3 +1,61 @@
+#
+# Local.pm - Implementation of the submission system interface for Local 
+#            submissions
+#
+# 
+# You may distribute this module under the same terms as perl itself
+#
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::SubmissionSystem::Local - Implementation of the 
+submission system interface for Local running of jobs
+
+=head1 SYNOPSIS
+
+  use Bio::EnsEMBL::Pipeline::SubmissionSystem::Local;
+
+  $ss = Bio::EnsEMBL::Pipeline::SubmissionSystem::Local->new(-config => $conf);
+  ...
+
+  #create a job to be locally run
+  $job = $ss->create_Job($taskname, $module, $input_id, $parameter_string);
+  if(!$job) {
+    warn('job could not be created');
+  }
+  ...
+
+  #submit the job (may be stored in internal queue if others are running)
+  $ss->submit($job);
+  ...
+
+  #submit jobs from the queue if not too many are running
+  $ss->flush($taskname);
+  ...
+
+  #kill a job which is running
+  $ss->kill($job);
+
+=head1 DESCRIPTION
+
+This is an implmentation of the common submission system interface which is 
+used by the PipelineManager.  See Bio::EnsEMBL::Pipeline::SubmissionSystem
+for further details.
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
+
 package Bio::EnsEMBL::Pipeline::SubmissionSystem::Local;
 use vars qw(@ISA);
 use strict;
@@ -80,7 +138,6 @@ sub submit {
 
 sub sig_chld {
   $children--;
-  print "Child finished; children now $children\n";
 }
 
 =head2 create_job
@@ -133,16 +190,18 @@ sub kill {
   my $self = shift;
   my $job  = shift;
 
-  my $job_id = $job->dbID;
+  my $pid = $job->submission_id;
 
-  my $rc = system('kill', '-3', $job_id);     # is -3 enough?
+  my $rc = system('kill', '-3', $pid);     # is -3 enough?
 
   if($rc & 0xffff) {
-    $self->warn("kill of job $job_id returned non-zero exit status $!");
+    $self->warn("kill of job pid=[$pid] returned non-zero exit status");
     return;
   }
 
-  $job->update_status('KILLED');
+  warn("killing job pid=[$pid]\n");
+
+  $job->set_current_status('KILLED');
 }
 
 
@@ -231,14 +290,13 @@ sub _start_job {
   if (my $pid = fork) {	 # fork returns PID of child to parent, 0 to child
     # PARENT
     $children++;
-    print "Size of children is now " . $children . "; " . 
-      scalar(@{$self->{'_queue'}}) . " jobs left in queue\n";
-	
   } else {
     #CHILD
 
     #The child needs its own connection to the database. We don't want the
-    #parent's database handle cleaned up when the child exits and vice-versa
+    #parent's database handle cleaned up when the child exits or vice-versa
+    
+    $db->db_handle()->{'InactiveDestroy'} = 1;
 
     $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
       (-dbname   => $dbname,
@@ -269,7 +327,6 @@ sub _start_job {
       || warn "Error redirecting STDOUT to " .  $job->stdout_file();
     open(STDIN,  "+>/dev/null");
 
-    #print "Executing $job with PID $$\n";
     $job->submission_id($$);
     $job->adaptor->update($job);
     $job->set_current_status('SUBMITTED');
