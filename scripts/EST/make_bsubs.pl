@@ -335,12 +335,15 @@ sub make_MapGeneToExpression_bsubs{
   my $scratchdir = $EST_TMPDIR;
   my $queue      = $EST_QUEUE;
   my $scriptdir  = $EST_SCRIPTDIR;
-
+  
+  my $runnable   = $EST_EXPRESSION_RUNNABLE;
+  my $analysis   = $EST_EXPRESSION_ANALYSIS;
+  
   open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
-
+  
   # where out and err files go
   my $filter = $scratchdir . "/" .  $gene2expression_dir . "/";
-
+  
   # genomic size for each job
   my $size   = $EST_EXPRESSION_CHUNKSIZE;
   my $runner = $EST_EXPRESSION_RUNNER;
@@ -364,7 +367,7 @@ sub make_MapGeneToExpression_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
 
       # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression -input_id $input_id -write";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
       print OUT "$command\n";
 
       $count = $count + $size;
