@@ -208,7 +208,7 @@ sub run{
   # align the cDNAs with Exonerate
   $self->throw("Can't run - no funnable objects") unless ($self->runnables);
   foreach my $runnable ($self->runnables){
-      
+    
     # run the funnable
     $runnable->run;  
     
@@ -235,7 +235,6 @@ sub run{
     }
   }
   
- 
   ############################################################
   # test for homology
   my @processed_pseudogenes = $self->test_homology( @genes );
@@ -245,8 +244,17 @@ sub run{
   my @final_genes = $self->check_for_overlap( @processed_pseudogenes );
 
   ############################################################
+  # map candidates into one-block structures
+  my @candidate_genes = $self->_convert_to_block( @final_genes );
+
+  
+  ############################################################
+  # check that the 'block' has in-frame stops
+  my @candidate_genes2 = $self->_check_inframe_stops( @candidate_genes );
+  
+  ############################################################
   # need to convert coordinates
-  my @mapped_genes = $self->convert_coordinates( @final_genes );
+  my @mapped_genes = $self->convert_coordinates( @candidate_genes2 );
   
   ############################################################
   # store the results
@@ -264,6 +272,8 @@ sub run{
 # If there is an alignment for which all the introns are in fact frameshifts
 # (or there is no introns) and there is a equal or better spliced alignment
 # elsewhere in the genome, we consider that a potential processed pseudogene.
+# We also consider a potential processed pseudogene when a real intron
+# contains a repeat over at least 80% of its length.
 
 sub filter_output{
   my ($self,@results) = @_;
@@ -314,7 +324,7 @@ sub filter_output{
   TRANSCRIPT:
     foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
       $count++;
-      unless ($max_score){
+      unless ( $max_score ){
 	$max_score = $self->_coverage($transcript);
       }
       unless ( $perc_id_of_best ){
@@ -355,87 +365,230 @@ sub filter_output{
       }
       
       my $accept;
+      
       ############################################################
-      # if we use the option best in genome:
-      if ( $BEST_IN_GENOME ){
-	if ( ( $score  == $max_score && 
-	       $score >= $MIN_COVERAGE && 
-	       $perc_id >= $MIN_PERCENT_ID
-	     )
-	     ||
-	     ( $score == $max_score &&
-	       $score >= (1 + 5/100)*$MIN_COVERAGE &&
-	       $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
-	     )
+      # we keep anything which is 
+      # within the 2% of the best score
+      # with score >= $MIN_COVERAGE and percent_id >= $MIN_PERCENT_ID
+      if ( ( $score >= (0.98*$max_score) && 
+	     $score >= $MIN_COVERAGE && 
+	     $perc_id >= $MIN_PERCENT_ID )
+	   ||
+	   ( $score >= (0.98*$max_score) &&
+	     $score >= (1 + 5/100)*$MIN_COVERAGE &&
+	     $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
+	   )
+	 ){
+	
+	############################################################
+	# non-best matches are kept only if they are not unspliced with the
+	# best match being spliced - otherwise they could be processed pseudogenes
+	if ( $count > 1 
+	     && $is_spliced 
+	     && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
 	   ){
-	  ############################################################
-	  # if we have an unspliced alignment which which has similarity with a
-	  # spliced alignment we have a potential processed pseudogene:	  
-	  if ( $count > 1 
-	       && $is_spliced 
-	       && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
-	     ){
-	    $accept = 'YES';
-	    push( @potential_processed_pseudogenes, $transcript);
-	  }
-	  else{
-	    $accept = 'NO';
-	  }
+	  $accept = 'YES';
+	  push( @potential_processed_pseudogenes, $transcript);
 	}
 	############################################################
-	# don't accept if below threshold
+	# if it has real introns, but the intron falls in a repeat
+	# it is also a candidate
+	elsif( $self->_has_repeat_in_intron( $transcript ) ){
+	  $accept = 'YES';
+	  push( @potential_processed_pseudogenes, $transcript);
+	}
 	else{
 	  $accept = 'NO';
 	}
-	print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
-	
-	print STDERR "--------------------\n";
-	
       }
-      ############################################################
-      # we might want to keep more than just the best one
       else{
-	
-	############################################################
-	# we keep anything which is 
-	# within the 2% of the best score
-	# with score >= $MIN_COVERAGE and percent_id >= $MIN_PERCENT_ID
-	if ( ( $score >= (0.98*$max_score) && 
-	       $score >= $MIN_COVERAGE && 
-	       $perc_id >= $MIN_PERCENT_ID )
-	     ||
-	     ( $score >= (0.98*$max_score) &&
-	       $score >= (1 + 5/100)*$MIN_COVERAGE &&
-	       $perc_id >= ( 1 - 3/100)*$MIN_PERCENT_ID
-	     )
-	   ){
-	  
-	  ############################################################
-	  # non-best matches are kept only if they are not unspliced with the
-	  # best match being spliced - otherwise they could be processed pseudogenes
-	  if ( $count > 1 
-	       && $is_spliced 
-	       && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
-	     ){
-	    $accept = 'YES';
-	    push( @potential_processed_pseudogenes, $transcript);
-	  }
-	  else{
-	    $accept = 'NO';
-	  }
-	}
-	else{
-	  $accept = 'NO';
-	}
-	print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
-	
-	print STDERR "--------------------\n";
+	$accept = 'NO';
       }
+      print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
+      print STDERR "--------------------\n";
     }
   }
   
   return @potential_processed_pseudogenes;
 }
+
+############################################################
+# method to check whether real introns in a transcript
+# ( if intron <=9 it is considered a frameshift )
+# overlap with a repeat at least over 80% of its length.
+# That's another tell-tale sign of a processed pseudogene
+
+sub _has_repeat_in_intron{
+  my ($self, $tran) = @_;
+  
+  # instantiate a db with repeats
+  my $repeat_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+						     -host             => $REPEAT_DBHOST,
+						     -dbname           => $REPEAT_DBNAME,
+						    );
+  
+  my @exons  = sort { $a->start <=> $b->start} @{$tran->get_all_Exons};
+
+  ############################################################
+  # pseudogene is a transcript
+  my @exons  = sort { $a->start <=> $b->start} @{$pseudogene->get_all_Exons};
+  my $start  = $exons[0]->start;
+  my $end    = $exons[$#exons]->end;
+  my $strand = $exons[0]->strand;
+  my $length = $end - $start + 1;
+
+  ############################################################
+  # need to get a slice where pseudogene sits:
+  my $chr_name  = $exons[0]->contig->chr_name;
+  my $chr_start = $exons[0]->contig->chr_start;
+  my $chr_end   = $exons[0]->contig->chr_end;
+  
+  my $slice_start = $chr_start + $start - 1 - 1000;
+  my $slice_end   = $chr_start + $end   - 1 + 1000;
+
+  ############################################################
+  # get slice from the same db where our pseudogene is
+  my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
+  my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
+  
+ INTRON:
+  for (my $i=0; $i<$#exons; $i++ ){
+    my $intron_start  = $exons[$i]->end + 1;
+    my $intron_end    = $exons[$i+1]->start - 1;
+    my $intron_stran  = $exons[$i]->strand;
+    my $intron_length = $intron_end - $intron_start + 1;
+
+    next INTRON unless ( $intron_length > 9 );
+
+    ############################################################
+    # should we skip really long introns?
+
+  FEAT:
+    foreach my $feature ( @features ){
+      my $repeat_start  = $feature->start + $slice_start - 1;
+      my $repeat_end    = $feature->end   + $slice_start - 1;
+      my $repeat_strand = $feature->strand;
+
+      next FEAT unless ( $repeat_strand == $intron_strand );
+      next FEAT if ( $repeat_start > $intron_end || $repeat_end < $intron_start );
+      
+      my $overlap_end   = $self->_min( $repeat_end  , $intron_end );
+      my $overlap_start = $self->_max( $repeat_start, $intron_start );
+      
+      my $overlap_length = $overlap_end - $overlap_start + 1;
+      
+      
+      my $overlap_proportion = 100.00*$overlap_length/$intron_length;
+
+      if ( $overlap_proportion >= 80 ){
+	return 1;
+      }
+      else{
+	return 0;
+      }
+    }
+  }
+  return 0;
+} 
+
+############################################################
+
+sub _max{
+  my ($self,$max,$other) = @_;
+  if ($other > $max){
+    $max = $other;
+  }
+  return $max;
+}
+
+############################################################
+
+sub _min{
+  my ($self,$min,$other) = @_;
+  if ($other < $min){
+    $min = $other;
+  }
+  return $min;
+}
+############################################################
+# method to convert a transcript with exons into
+# a 1-exon transcript. Processed pseudogenes are described
+# as just 1-block
+
+sub _convert_to_block{
+  my ( $self, @genes ) = @_;
+  
+  my @new_genes;
+  foreach my $gene ( @genes ){
+    my $new_gene = Bio::EnsEMBL::Gene->new();
+    $new_gene->analysis($gene->analysis);
+    $new_gene->type($gene->analysis->logic_name);
+    foreach my $tran ( @{$gene->get_all_Transcripts} ){
+      my $new_transcript  = new Bio::EnsEMBL::Transcript;
+      
+      my $newexon = Bio::EnsEMBL::Exon->new();
+      my @exons = sort{ $a->start <=> $b->start } @{$transcript->get_all_Exons};
+      my $strand = $exons[0]->strand;
+      
+      ############################################################
+      # make all exons into one
+      $newexon->start    ($exons[0]->start);
+      $newexon->end      ($exons[-1]->end);
+      $newexon->phase    (0);
+      $newexon->end_phase(0);
+      $newexon->strand   ($strand);
+      $newexon->contig   ($exons[0]->contig);
+      $newexon->seqname  ($exons->seqname);
+  
+      ############################################################
+      # transfer supporting evidence
+      foreach my $exon ( @exons ){
+	foreach my $sf ( @{$exon->get_all_supporting_features} ){
+	  if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
+	    next;
+	  }
+	  $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
+	  $newexon->add_supporting_features( $sf );
+	}
+      }
+      
+      $new_transcript->add_Exon($new_exon);
+      $new_gene->add_Transcript($new_transcript);
+    }
+    push(@new_genes, $new_gene);
+  }
+  return @new_genes;
+}
+
+############################################################
+# method to check the translation of the transcript-block
+# for inframe stops which fall midway in the transcript-block
+
+sub _check_inframe_stops{
+  my ($self,@genes) = @_;
+
+  my @selected;
+  foreach my $gene ( @genes ){
+    my @trans      = @{$gene->get_all_Transcripts};
+    my $tran       = $trans[0];
+    my $mrna       = $tran->seq->seq;
+    my $display_id = $self->_evidence_id($tran);
+    
+    my $peptide    = Bio::Seq->new( -seq      => $mrna,
+				    -moltype  => "dna",
+				    -alphabet => 'dna',
+				    -id       => $display_id );
+    
+    my $pep0 = $peptide->translate(undef,undef,0);
+    my $pep1 = $peptide->translate(undef,undef,1);
+    my $pep2 = $peptide->translate(undef,undef,2);
+  }
+  
+  
+  return @genes;
+
+}
+
 
 ############################################################
 
