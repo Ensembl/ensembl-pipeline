@@ -54,7 +54,6 @@ use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
-
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -129,8 +128,8 @@ sub genomic_sequence {
     Title   :   seqfetcher
     Usage   :   $self->seqfetcher($seqfetcher)
     Function:   Get/set method for SeqFetcher
-    Returns :   Bio::EnsEMBL::Pipeline::SeqFetcher object
-    Args    :   Bio::EnsEMBL::Pipeline::SeqFetcher object
+    Returns :   Bio::DB:RandomAccessI
+    Args    :   Bio::DB:RandomAccessI
 
 =cut
 
@@ -237,8 +236,25 @@ sub parse_Header {
 sub run {
     my ($self) = @_;
 
+    # filter ESTs using exonerate
+    my @exonerate_res = $self->run_exonerate();
+
+    print STDERR "**got " . scalar(@exonerate_res) . " hits\n";
+    
+    my %exonerate_ests;
+    foreach my $res(@exonerate_res ) {
+      my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
+      $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
+      print "exonerate: " . $seqname . "\n";
+
+      # score cutoff 500 for exonerate ...
+      if($res->score > 500) {
+	$exonerate_ests{$seqname} = 1;
+      }
+    }
+
     # run blast on genomic seq vs dbEST
-    my @blastres = $self->run_blast();
+    my @blastres = $self->run_blast(keys %exonerate_ests);
 
     # get list of hits - 
     my %esthash;
@@ -248,7 +264,7 @@ sub run {
       $result->hseqname($seqname);
       
       # score cutoff? percentID? any EST with any hit > ... gets used
-      if($result->score > 200 || defined ($esthash{$seqname}) ) {
+      if($result->score > 500 || defined ($esthash{$seqname}) ) {
 	push(@{$esthash{$seqname}},$result);
       }
     }
@@ -257,6 +273,7 @@ sub run {
       print STDERR "id: $id "  . scalar(@{$esthash{$id}}) . "hits\n";
 
       # make a set of features per EST
+      # should we do some ordering? deal with strands?
       my @features = @{$esthash{$id}};
  
       # make MiniEst2Genome runnables
@@ -279,12 +296,30 @@ sub run {
     }
 }
 
+sub run_exonerate {
+  my ($self) = @_;
+  my @res;
+
+  my $exr = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate(
+							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
+							    '-genomic'   => $self->genomic_sequence,
+							    '-est'      => $self->blastdb
+							   );
+  
+  $exr->run;
+  my @res = $exr->output;
+
+  return @res;
+  
+}
+
 sub run_blast {
 
-    my ($self) = @_;
+    my ($self, @ests) = @_;
 
     my $genomic = $self->genomic_sequence;
-    my $blastdb = $self->blastdb;
+    my @seq = $self->get_Sequences(@ests);
+    my $blastdb = $self->make_blast_db(@seq);
 
     # tmp files
     my $blastout = $self->get_tmp_file("/tmp/","blast","tblastn_dbest.msptmp");
