@@ -97,7 +97,7 @@ sub new {
   $self->{'_sequence'} = undef; #location of bio::seq object
   $self->{'_window'} = 0; #size of window to be analysed
   
-  print STDERR "args: ", @args, "\n";  
+  #print STDERR "args: ", @args, "\n";  
 
   my($sequence, $window) = $self->_rearrange([qw(QUERY
 						 WINDOW)],
@@ -225,18 +225,24 @@ sub run_gc {
     my @features;
     while($start_point<$length)
     {
-	my $end_point=$start_point+($self->window)-1;
+	my $end_point = $start_point + ($self->window) - 1;
 	if($end_point>$length)
 	{
 	    $end_point=$length;
 	}
-	
+	my $gcfraction;
 	my $chunk = substr($seq, $start_point, $window);
-	my $gccount = $chunk =~ tr/gcGC/gcGC/;
-	my $Ncount = $chunk =~ tr/nN/nN/;
-	my $windowsize = $end_point-$start_point;
-	my $gcfraction = $gccount/($windowsize-$Ncount)*100;
-	#print "gcfraction : ".$gcfraction."\n gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
+	my $GC_count = $chunk =~ tr/gcGC//;
+	my $AT_count = $chunk =~ tr/atAT//;
+	#print "gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
+	my $tot_bases = $GC_count + $AT_count;
+	if($tot_bases == 0){
+	  $gcfraction = 0;
+	}else{
+	  #print "division = ".$division."\n";
+	  $gcfraction = $GC_count/$tot_bases;
+	}
+	#print "gcfraction : ".$gcfraction."\n";# gcount = ".$gccount."\n N count = ".$Ncount."\n window size = ".$windowsize."\n length = ".length($chunk)."\n";
 	my $analysis_obj = Bio::EnsEMBL::Analysis->new
                         (   -db              => undef,
                             -db_version      => undef,
@@ -244,6 +250,10 @@ sub run_gc {
                             -program_version => '1',
                             -gff_source      => 'gc',
                             -gff_feature     => 'gc_content');
+        
+        
+        $start_point++; ## substr takes first character as '0' - necessary to +1 to write correct co-ordinates to DB
+        $end_point ++; ## same as above
         my $gc = Bio::EnsEMBL::SeqFeature->new
 	    (   -seqname => $self->query->id,
 		-start   => $start_point,
@@ -254,8 +264,8 @@ sub run_gc {
 		-primary_tag => 'gc_content',
 		-analysis => $analysis_obj);  
 
-	$start_point = $start_point + $window + 1;
-	#$end_point = $end_point + $window + 1;
+	$start_point = $end_point ; # +1 already added to $end point above - not necesssary here
+	#$end_point = $end_point + $window ;
 
 	push (@features, $gc);
     }

@@ -1,4 +1,3 @@
-
 #
 #
 # Cared for by Laura Clarke  <lec@sanger.ac.uk>
@@ -17,49 +16,27 @@ Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM
 
 =head1 SYNOPSIS
 
-  #create and fill Bio::Seq object
-  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
-  my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
-  $seq = $seqstream->next_seq();
-  #create Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM object
-  my $halfwisehmm = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-QUERY => $seq);
-  $halfwisehmm->workdir($workdir);
-  $halfwisehmm->run();
-  my @genes = $halfwisehmm->output();
-  my @exons = $halfwisehmm->output_exons();
-  my $seqfeature = $halfwisehmm->output_singlefeature();
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new(
+					     -genomic => $seq,
+					     -features => \@features,
+								);
+    $obj->run
+
+    my @newfeatures = $obj->output;
+
 
 =head1 DESCRIPTION
 
-This package is based on the genscan runnable.
-HalfwiseHMM takes a Bio::Seq (or Bio::PrimarySeq) object and runs HalfwiseHMM on it. The
-resulting output is parsed to produce a set of Bio::SeqFeatures. 
-
-=head2 Methods:
-
-=over 4
-
-=item new($seq_obj)
-
-=item    HalfwiseHMM($path_to_HalfwiseHMM)
-
-=item    workdir($directory_name)
-
-=item    run()
-
-=item    output()
-
-=back
+Finds which pfam domains a particular swissprot hit matchs, finds the related hmms and runs genewiseHmm
 
 =head1 CONTACT
 
-ensembl-dev.ebi.ac.uk
+lec@sanger.ac.uk
 
 =head1 APPENDIX
 
 The rest of the documentation details each of the object methods. 
-
+Internal methods are usually preceded with a _
 
 =cut
 
@@ -81,8 +58,9 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use Bio::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-
-
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;
+use DB_File;
+use Fcntl;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -90,14 +68,14 @@ BEGIN {
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
-=head2 new
+=head2  new
 
-    Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-QUERY => $seq);
-    Function:   Initialises HalfwiseHMMobject
-    Returns :   a HalfwiseHMMObject
-    Args    :   A Bio::Seq object 
-                (blastdb, hmmdb location of exes etc  optional)
+    Arg      : Bio:Seq obj, reference to array of swall features, location of hmmfetch program, location of hmmdb, location of dbm index
+    Function : Make a new HalfwiseHMM object defining the above variables
+    Exception: Will throw an exception if no genomic sequence is defined or no features are passed
+    Caller   : 
+    Example  : $halfwise = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new(genomic => $seq
+                                                                              features => \@features);
 
 =cut
 
@@ -106,59 +84,26 @@ sub new {
 
     my $self = $class->SUPER::new(@args);    
 
-    $self->{'_query'} = undef; #location of Bio::Seq object
-    $self->{'_blastprog'} = undef; #location of blast program
-    $self->{'_blastdb'} = undef; #location fo blast database
-    $self->{'_blastobj'} = undef; #location of blast object
-    $self->{'_threshold'} = undef; #threshold value for blast analysis
-    $self->{'_blastfplist'} = [];        # an array of feature pairs (the output)
-    $self->{'_pfamlist'}    = []; #list of pfam hits
-    $self->{'_uniquepfamids'} = [];
-    $self->{'_featurelist'} = []; #array of features
-    $self->{'_genewise'} = undef; #location of genewise prog
-    $self->{'_options'} = undef; #options for genewise program
-    $self->{'_workdir'}   = undef;     # location of temp directory
-    $self->{'_filename'}  = undef;     # file to store Bio::Seq object
+    $self->{'_query'} = undef;
+    $self->{'_input_features'} = [];
+    $self->{'_output_features'} = [];
+    $self->{'_hmmfetch'} = undef;
+    $self->{'_hmmdb'} = undef;
     $self->{'_hmmfilename'} = undef; #file to store protein profile hmms 
-    $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throws 
-    $self->{'_results'}   = undef;     # file to store results of analysis
-    $self->{'_hmmfetch'} = undef; #location of hmmfetch program
-    $self->{'_hmmdb'} = undef; #location of hmmdb
+    $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throw
+    $self->{'_dbm_file'} = undef;
+    #print"args = @args\n";
+    my ($genomic, $features, $hmmfetch, $hmmdb, $dbmfile, $memory) = $self->_rearrange([qw(QUERY
+											   FEATURES
+											   HMMFETCH
+											   HMMDB 
+											   DBMFILE
+											   MEMORY)], @args);
+    $self->throw("No genomic sequence input") unless defined($genomic);
+    $self->query($genomic);
+    $self->throw("No features input") unless defined($features);
+    $self->add_input_features($features);
     
-    print STDERR "args: ", @args, "\n";
-    my ($query, $blastprog, $blastdb, $threshold, $genewise, $options, $hmmfetch, $hmmdb) 
-	= $self->_rearrange([qw (QUERY BLASTPROG BLASTDB THRESHOLD GENEWISE OPTIONS HMMFETCH HMMDB)], @args);
-    
-    $self->query($query) if ($query);
-    if ($blastprog){
-       $self->blast_loc($self->find_executable($blastprog));
-    } else {
-      $self->blast_loc($self->find_executable('wublastx'));
-    }
-    if ($blastdb) {
-	$self->blastdb($blastdb);
-    } else {#note database name must always contain halfwise
-	$self->blastdb("/usr/local/ensembl/halfwise.db");
-	#$self->blastdb("/nfs/disk100/pubseq/halfwise/halfwise.db");
-    }
-    if (defined($genewise )){
-	$self->genewise_loc($self->find_executable($genewise));
-    } else {
-	$self->genewise_loc($self->find_executable('genewisedb'));
-    }
-    if (defined($threshold)) {
-	$self->threshold($threshold);
-    }
-    else
-    {
-	$self->threshold(1e-6);
-    }
-    if ($options) {
-      $self->options($options);
-    } else {
-      $self->options(' -init wing -cace -cut 25 -aln 200 -gff -quiet ');  
-    }
-
     if ($hmmfetch){
 	$self->hmmfetch($hmmfetch);
     } else {
@@ -168,9 +113,15 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/usr/local/ensembl/data/Pfam');
-	#$self->hmmdb('/nfs/disk100/pubseq/Pfam/DB/Pfam');
+	$self->hmmdb('/usr/local/ensembl/data/blastdb/Ensembl/Pfam');
+	
     }
+    if($dbmfile){
+      $self->dbm_file($dbmfile);
+    } else {
+      $self->dbm_file('/usr/local/ensembl/data/swiss2prot_7.0.index');	
+    }
+    $self->memory ($memory)    if (defined($memory));
     return $self; # success - we hope!
 }
 
@@ -183,117 +134,72 @@ sub new {
 
 =head2 query
 
-    Title   :   query
-    Usage   :    $HalfwiseHMM->query($seq);
-    Function:   sets the sequence the halfwisehmm object will run on
-  and checks it is a Bio::Seq
-    Returns :   a seq
-    Args    :   A Bio::Seq object 
-                
+  Arg      : Bio:Seq object
+  Function : get/set method for query
+  Exception: throws an exception if not passed a Bio:PrimarySeq
+  Caller   : 
 
 =cut
 
 sub query {
-    my ($self, $seq) = @_;
-    if ($seq)
-    {
-        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
-        {
-            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
-        }
-        $self->{'_query'} = $seq ;
-        $self->filename($self->query->id.".$$.seq");
-        $self->results($self->filename.".hlf");
-	$self->hmmfilename($self->filename."dbhmm.$$");
-	$self->errorfile($self->filename."err.$$");
+    my( $self, $value ) = @_;    
+    if ($value) {
+        #need to check if passed sequence is Bio::Seq object
+        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+        $self->{'_query'} = $value;
     }
     return $self->{'_query'};
 }
 
-=head2 blast_loc
+=head2 add_input_features
 
- Title    : blast_loc
- Usage    : $self->blast_loc($self->find_executable('wublastx'))
- Function : checks exceutable is found in correct location
- Returns  : executable location
- Args     : executable location
+    Arg      : reference to array of features
+    Function : get/set method for input features
+    Exception: throws an exception if not passed an array ref
+    Caller   : 
 
 =cut
 
-sub blast_loc {
-    my ($self, $location) = @_;
-    if ($location)
-    {
-        $self->throw("Blast not found at $location: $!\n") 
-                                                    unless (-e $location);
-        $self->{'_blastprog'} = $location ;
+sub add_input_features{
+    
+    my ($self, $features) = @_;
+    
+    if (ref($features) eq "ARRAY") {
+      push(@{$self->{'_input_features'}},@$features);
+    } else {
+      $self->throw("[$features] is not an array ref.");
     }
-    #print STDERR "blast location is ".$self->{'_blastprog'}."\n";
-    return $self->{'_blastprog'};
+      
+}
+
+=head2 all_input_features
+
+    Arg      : none
+    Function : returns all input features
+    Exception: none
+    Caller   : 
+
+=cut
+
+
+sub all_input_features{
+
+  my ($self) = @_;
+
+  return @{$self->{'_input_features'}};
+
 }
 
 
-=head2 blastdb
-
- Title    : blastdb
- Usage    : $self->blastdb($db);
- Function : gets and sets balst db location
- Returns  : blastdb location
- Args     : blastdb location
-
-=cut
-
-sub blastdb {
-    my ($self, $db) = @_;
-
-    if (defined($db)) {
-	$self->{'_blastdb'} = $db ;
-    }
-    return $self->{'_blastdb'};
-}
+#methods that probably won't be needed
 
 
-=head2 genewise_loc
+=head2 hmmfetch
 
- Title    : genewise_loc
- Usage    : $self->genewise_loc($self->find_executable('wublastx'))
- Function : checks exceutable is found in correct location
- Returns  : executable location
- Args     : executable location
-
-=cut
-
-
-sub genewise_loc {
-    my ($self, $location) = @_;
-    if ($location)
-    {
-        $self->throw("genewise not found at $location: $!\n") 
-                                                    unless (-e $location);
-        $self->{'_genewise'} = $location ;
-    }
-    return $self->{'_genewise'};
-}
-
-
-=head2 options
-
- Title    : options
- Usage    : $self->options($options);
- Function : gets and sets the options which may be passed to genewise
- Returns  : the options
- Args     : the options
-
-=cut
-
-
-=head2 hmmfetch 
-
- Title    : hmmfetch
- Usage    : $self->hmmfetch($location);
- Function : gets and sets the location of the hmmfetch command
- Returns  : the hmmfetch command
- Args     : the hmmfetch comand
+    Arg      : location of hmmfetch program
+    Function : gets/sets location of hmmfetch program
+    Exception: none
+    Caller   : 
 
 =cut
 
@@ -308,11 +214,10 @@ sub hmmfetch {
 
 =head2 hmmdb
 
- Title    : hmmdb
- Usage    : $self->hmmdb($db);
- Function : gets and sets the location of the hmmdb
- Returns  : the location of the hmmdb
- Args     : the location of the hmmdb
+    Arg      : location of hmmdb 
+    Function : gets/sets location of hmmdb
+    Exception: none
+    Caller   : 
 
 =cut
 
@@ -326,13 +231,12 @@ sub hmmdb {
 }
 
 
-=head2  hmmfilename
+=head2 hmmfilename
 
- Title    : hmmfilename
- Usage    : $self->hmmfilename($filename);
- Function : gets and sets the name of the hmmdb file
- Returns  : the name of the hmmdb file
- Args     : the name of the hmmdb file
+    Arg      : hmm filename
+    Function : gets/sets hmmfilename
+    Exception: none
+    Caller   : 
 
 =cut
 
@@ -345,281 +249,309 @@ sub hmmfilename {
     return $self->{'_hmmfilename'};
 
 }
+=head2 dbm_file
 
-
-=head2  errorfile
-
- Title    : errorfile
- Usage    : $self->errorfile($filename);
- Function : gets and sets the name of the hmmdb file
- Returns  : the name of the hmmdb file
- Args     : the name of the hmmdb file
+    Arg      : dbm filename
+    Function : gets/sets dbm filename
+    Exception: none
+    Caller   : 
 
 =cut
 
-sub errorfile {
+
+sub dbm_file {
     my ($self, $args) = @_;
     if (defined ($args)){
-	$self->{'_errorfile'} = $args;
+	$self->{'_dbm_file'} = $args;
     }
 
-    return $self->{'_errorfile'};
+    return $self->{'_dbm_file'};
 
 }
 
+=head2 memory
 
+    Arg      : value memory to be set to, this is an option of how much memory genewise can use when it is run
+    Function : gets/sets memory
+    Exception: none
+    Caller   : 
+
+=cut
+
+sub memory {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->{'_memory'} = $arg;
+    }
+
+    return $self->{'_memory'} || 400000;
+}
 
 ##########
 #ANALYSIS#
 ##########
 
+=head2 run
 
-=head2  run
- 
- Title    : Run
- Usage    : $self->run
- Function : runs blast and halfwise
- Returns  : nothing
- Args     : workdir
+    Arg      : directory if to be set to anything other than tmp 
+    Function : runs functions which run genewisehmm
+    Exception: none
+    Caller   : 
 
 =cut
 
 sub run {
 
-    my ($self) = @_;
+    my ($self, $dir) = @_;
+    #print "running halfwise\n";
+    my %swissprot_ids = $self->get_swissprot_ids();
+    #print "got swiss prot ids \n";
+    my @keys = keys(%swissprot_ids);
     
+    #foreach my $key (@keys){
+    #  print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
+    #}
 
-    $self->workdir('/tmp') unless $self->workdir();
-    $self->checkdir();
-
-    #print STDERR "write sequence to file\n";
-    #system ('pwd');
-    $self->writefile();
-    #print STDERR "written sequence to file\n";
-    my $filesize = (-s $self->filename);
-
-    if (!defined $filesize || $filesize == 0)
-      {
-	print STDERR "results file ".$self->filename." has not been created or is empty\n";
-      } #else {
-	#print $self->filename." is ".$filesize." big\n";
-      #}
-    #system ('pwd');
-    my $blast = $self->create_blast;
-    $blast->run;
-    #print "run blast\n";
-    $self->writefile();
-    #print "recreated sequence file";
-    $filesize = (-s $self->filename);
+    my %pfam_ids = $self->get_pfam_ids(\%swissprot_ids);
+    #print "got pfam ids \n";
+    $self->create_genewisehmm(\%pfam_ids, $dir);
     
-    if (!defined $filesize || $filesize == 0)
-      {
-	print STDERR "sequence file ".$self->filename." has not been created or is empty\n";
-      }#else {
-	#print $self->filename." is ".$filesize." big\n";
-      #}
-    my $fp;
-    my @featurepairs = $blast->output;
-    #print STDERR "blast output = ".@featurepairs."\n";
-    foreach $fp (@featurepairs)
-    {
-      #print "fp = ".$fp."\n";
-      #print "gff = ".$fp->gffstring."\n";
-      #print "seqname ".$fp->hseqname."\n";
-      my $pfamid = $fp->hseqname;
-      $self->add_pfam_id($pfamid);
-    }
-    $self->find_unique_ids;
-    #print "found unique ids \n";
-    $self->get_hmm();
-    #print "got hmms\n";
-    $self->run_genewise();
-    $self->parse_results();
-    $self->deletefiles();
-    unlink ($self->hmmfilename);
 }
 
+=head2 get_swissprot_ids
 
-=head2 create_blast
-
- Title    : create_blast
- Usage    : $self->create_blast();
- Function : creates the blast object so the blast analysis can be run
- Returns  : nothing
- Args     : nothing
+    Arg      : none
+    Function : gets swissprot ids and strands from input features and returns a hash of these
+    Exception: none
+    Caller   : 
 
 =cut
 
-sub create_blast {
-    
-    my ($self) = @_;
-    eval{
-      $self->query;
-    };
-    if($@){
-      $self->throw("cannot create a blast object without a seq object : ".$@."\n");
-    }
-    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-QUERY => $self->query,
-							      -PROGRAM => $self->blast_loc,
-							      -DATABASE => $self->blastdb,
-							      -THRESHOLD => 1e-6,
-							      );
-    $self->{'_blastobj'} = $blast;
+### 1, -1 and 0 are used to repesent strand, 1 and -1 have the same meaning as in teh ensembl databases 1 is the forward strand and -1 is the reverse 
+### 0 is used if a particular id has hit on both strands
+sub get_swissprot_ids{
 
-    return $self->{'_blastobj'};
-}
-
-
-=head2 blast_output
-
- Title    : blast_output
- Usage    : $self->blast_output;
- Function : gets and sets the blast output
- Returns  : the array of features produced by blast
- Args     : the blast runnable
-
-=cut
-
-sub blast_output{
-
-    my ($self, $blast) = @_;
-
-    if (defined($blast))
-    {
-	@{$self->{'_blastfplist'}} = $blast->output;
-    }
-    return @{$self->{'_blastfplist'}};
-}
-
-
-=head2  add_pfam_id
-
- Title    : add_pfam_id
- Usage    : $self->add_pfam_id($id);
- Function : adds a pfam id to the array of ids
- Returns  : the array of ids
- Args     : a pfam id;
-
-=cut
-
-sub add_pfam_id{
-    my ($self, $id) = @_;
-    if (defined($id))
-    {
-	push(@{$self->{'_pfamlist'}}, $id);
-    }
-    return @{$self->{'_pfamlist'}};
-}
-
-
-=head2 
-
- Title    : each_pfam_id
- Usage    : @pfamids = $self->each_pfam_id;
- Function : returns the array of pfam ids
- Returns  : an array of pfam ids
- Args     : none
-
-=cut
-
-sub each_pfam_id{
-    my ($self) = @_;
-    return @{$self->{'_pfamlist'}};
-}
-
-
-=head2 
-
- Title    :find_unique_ids
- Usage    :$self->find_unique_ids;
- Function :ensures all the pfam ids wich will be passed to hmmfetch will be unique so the same analysis isnt run multiple times
- Returns  : nothing
- Args     : nothing
-
-=cut
-
-sub find_unique_ids{
   my ($self) = @_;
-  my @pfam = $self->each_pfam_id;
-  my %hash;
-  foreach my $id(@pfam){
-    if(!defined($hash{$id})){
-      $hash{$id} = 1;
+
+  my @features = $self->all_input_features();
+  my %swissprot_ids;
+  foreach my $f(@features){
+    #print "swissprot id = ".$f->hseqname."\n";
+    if(!$swissprot_ids{$f->hseqname}){
+     
+      $swissprot_ids{$f->hseqname} = $f->strand;
+    
+    }elsif(defined$swissprot_ids{$f->hseqname}){
+      
+      if($swissprot_ids{$f->hseqname} != $f->strand){
+	$swissprot_ids{$f->hseqname} = 0;
+      }else{
+	$swissprot_ids{$f->hseqname} = $f->strand;
+      }
+
+    }
+    
+  }
+
+  return %swissprot_ids;
+    
+}
+
+=head2 get_pfam_ids
+
+    Arg      : reference to a hash of swissprotids and stands
+    Function : gets all pfam ids for a particular swissprot id and puts them in a hash along with the strand the swissprot id is found on and returns its
+    Exception: warns if swissprot id has no pfam domains
+    Caller   : 
+
+=cut
+
+sub get_pfam_ids{
+
+  my ($self, $swissprot_ids) = @_;
+
+  my %swiss_pfam;
+  my %pfams;
+  my $permission = O_RDONLY;
+  tie(%swiss_pfam, "DB_File", $self->dbm_file, $permission, 0400) or die "couldn't open ".$self->dbm_file." : $!\n";;
+  
+  foreach my $swiss_id(keys(%$swissprot_ids)){
+    #print "searching for pfam ids for ".$swiss_id."\n";  
+    my $strand = $swissprot_ids->{$swiss_id};
+    
+    my $pfam = $swiss_pfam{$swiss_id};
+    #print "found these pfam domains ".$pfam." \n";
+    if(!$pfam){
+      #$self->warn("the swissprot ".$swiss_id ."entry has no pfam domains :!")
+    }
+    my @pfams = split /,/, $pfam;
+    #print "pfams = @pfams\n";
+    foreach my $pfam_id(@pfams){
+      #print "trying to create a hash entry for pfam".$pfam_id."\n";
+      if(!defined $pfams{$pfam_id}){
+	#print "defining pfam hash key\n";
+	$pfams{$pfam_id} = $strand;
+    
+     }elsif(defined$pfams{$pfam_id}){
+	if($pfams{$pfam_id} != $strand){
+	 $pfams{$pfam_id} = 0;
+	}else{
+	 $pfams{$pfam_id} = $strand;
+       }
+      }
     }
   }
-  foreach my $id(keys %hash){
-      $self->add_unique_pfam_id($id);
-    }
-}     
-     
+ # my @ids = keys(%pfams);
+ # foreach my $id(@ids){
+ #   print $id."\n";
+ # }
+  return %pfams;
+}
+ 
+=head2 create_genewisehmm
 
-=head2 add_unique_pfam_id
-
- Title    : add_unique_pfam_id
- Usage    : $self->add_unique_pfam_id($id);
- Function : sets up an array of unique pfam ids 
- Returns  : the array of unique ids
- Args     : a pfam id preferable unique
+    Arg      : reference to pfam_id hash and directory if it is to be set to anything other than temp
+    Function : runs through each pfam id runs, get_hmm and creates and runs the GenewiseHmm runnable
+    Exception: throws an exception if anything other than 1, -1 or 0 is found for strand
+    Caller   : 
 
 =cut
 
-sub add_unique_pfam_id{
-    my ($self, $id) = @_;
-    if (defined($id))
-    {
-     # print "id = ".$id."\n";
-	push(@{$self->{'_uniquepfamids'}}, $id);
-    }
-    return @{$self->{'_uniquepfamids'}};
+sub create_genewisehmm{
+
+ my ($self, $pfam_ids, $dir) = @_;
+ #print "getting hmms\n";
+ $self->workdir('/tmp') unless ($self->workdir($dir)); 
+ $self->checkdir();
+ #print "running HalfwiseHMM\n";
+ #system("pwd");
+ my @ids = keys(%$pfam_ids);
+ my $genewisehmm;
+ my @features;
+ my $memory = $self->memory;
+ my %pfam_run;
+ #print "there are ".scalar(@ids)." pfam ids to run\n";
+ foreach my $id (@ids){
+   
+   my $strand = $pfam_ids->{$id};
+
+   $self->get_hmm($id);
+    if (-z $self->hmmfilename){
+    $self->warn("hmm file not created :$!");
+    next;
+  }
+   #print $id."\n";
+   if($pfam_run{$id}){
+     #print "running twice on ".$id."\n";
+   }else{
+     $pfam_run{$id} = 1;
+   }
+   if($strand == 1){
+     @features = [];
+     #print "running on ".$strand."\n";
+     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+     #$self->display_genes(\@features);
+     #print "adding ".scalar(@features)." to output\n";
+     unlink $self->hmmfilename();
+     $self->add_output_features(\@features);
+   }elsif($strand == -1){
+     @features = [];
+     #print "running on ".$strand."\n";
+     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+     #$self->display_genes(\@features);
+     #print "adding ".scalar(@features)." to output\n";
+     unlink $self->hmmfilename();
+     $self->add_output_features(\@features);
+  }elsif($strand == 0){
+    @features = [];
+    #print "running on ".$strand."\n";
+    $genewisehmm = $self->run_genewisehmm(1, $memory);
+    $genewisehmm->run();
+    @features = $genewisehmm->output();
+    #$self->display_genes(\@features); 
+    #print "adding ".scalar(@features)." to output\n";
+    $self->add_output_features(\@features);
+    $genewisehmm = $self->run_genewisehmm(-1, $memory);
+    $genewisehmm->run();
+    @features = [];
+    @features = $genewisehmm->output();
+    #$self->display_genes(\@features);
+    #print "adding ".scalar(@features)." to output\n";
+    unlink $self->hmmfilename();
+    $self->add_output_features(\@features);
+  }else{
+    $self->throw("strand = ".$strand." something funnies going on : $!\n");
+  }
+
+ }
+
+
 }
 
+=head2 run_genewisehmm
 
-=head2 each_unique_pfam_id
-
- Title    : each_unique_pfam_id
- Usage    : @ids = $self->each_unique_pfam_id
- Function : returns all the unique pfma ids
- Returns  : an array of pfam ids
- Args     : none
+    Arg      : the strand of the hit and the memory to be used by genewisehmm
+    Function : runs the new method of GenewiseHmm and returns the runnable
+    Exception: none
+    Caller   : 
 
 =cut
 
-sub each_unique_pfam_id{
-    my ($self) = @_;
-    return @{$self->{'_uniquepfamids'}};
+sub run_genewisehmm{
+
+  my ($self, $strand, $memory) = @_;
+  my $reverse;
+  if($strand == -1){
+    $reverse = 1;
+  }else{
+    $reverse = undef;
+  }
+  #print "creating genewisehmm\n";
+  my $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm->new('-query' => $self->query(),
+                                                                    '-memory' => $memory,
+                                                                    '-hmmfile' => $self->hmmfilename(),
+                                                                    '-reverse' => $reverse);
+
+  return $genewisehmm
+
 }
 
 
-=head2 
+=head2 get_hmm
 
- Title    : get_hmm
- Usage    : $self->get_hmm;
- Function : gets all the hmms for the pfam matchs found by blast
- Returns  : none
- Args     : none
+    Arg      : id of hmm to be fetched normally a pfam id 
+    Function : runs hmmfetch on given id
+    Exception: thows if no hmmfile is created
+    Caller   : 
 
 =cut
 
 sub get_hmm{
-  my ($self) = @_;
-  #open(TEMPDB, ">".$self->hmmfilename) or die "couldn't open ".$self->hmmfilename." : $!\n";
-  my $count = 0;
-  foreach  my $id  ( $self->each_unique_pfam_id) {
-    $id =~s/^(.*?\;).*/$1/;
-    $count++;
-    #print  "Loading $id\n";
-    #print "command = ".$self->hmmfetch." ".$self->hmmdb." ".$id." 2>> ".$self->errorfile."1>>".$self->hmmfilename." \n ";
-    system($self->hmmfetch." ".$self->hmmdb." ".$id." 2>> ".$self->errorfile."1>>".$self->hmmfilename)
-    #open(GETZ,  $self->hmmfetch." ".$self->hmmdb." ".$id." | ") or die "couldn't open hmmfetch : $! \n";
-    #while(<GETZ>) {
-     # print TEMPDB $_;
-    #}
-   # close(GETZ) or die "couldn't close hmmfetch : $!\n";
+  
+  my ($self, $id) = @_;
+  #print "getting hmms\n";
+  $self->hmmfilename($id.".".$$.".hmm");
+  #print "getting hmm for id ".$id."\n";
+  my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." > ".$self->hmmfilename;
+
+  #print "command = ".$command."\n";
+  #system ('pwd');
+  eval{
+    system($command);
+  };
+  if($@){
+    $self->warn("hmmfetch threw error : $@\n");
   }
-  #close(TEMPDB) or die "couldn't open hmmfile : $!\n";
-  #print "starting error analysis\n";
-  if (-e $self->errorfile){
-    open(ERROR, $self->errorfile) or die "couldn't open error file : $!";
+  
+  if (-z $self->hmmfilename){
+    $self->warn("hmm file not created :$!");
+  }elsif(-e $self->hmmfilename){
+    open(ERROR, $self->hmmfilename) or die "couldn't open error file : $!";
     while(<ERROR>){
       if(/no such hmm/i){
 	print STDERR "error message : ".$_."\n";
@@ -627,174 +559,31 @@ sub get_hmm{
     }
     close(ERROR) or die "couldn't close error file : $!";
   }
+  
 }
 
+=head2 add_output_features
 
-=head2 run_genewise
-
- Title    : run_genewise
- Usage    : $self->run_genewise
- Function : runs genewisedb wotht the pfam hmms and the clone
- Returns  : none
- Args     : none
+    Arg      : array ref to array of output features
+    Function : adds the array of features to the output feature array
+    Exception: throws an exception if not passed an array ref
+    Caller   : 
 
 =cut
 
-sub run_genewise {
-
- my ($self) = @_;
- #print STDERR "trying to run genewise\n";
- #print STDERR "systems command is ".$self->genewise_loc." -pfam ".$self->hmmfilename." -dnas ".$self->filename ." ".$self->options." > ".$self->results."\n";
- my $filesize = (-s $self->hmmfilename); #check that hmmfile has been creeated
-
- if (!defined $filesize || $filesize == 0)
-   {
-     print STDERR "results file ".$self->hmmfilename." has not been created or is empty\n";
-   }
- #system ('pwd'); 
- system ($self->genewise_loc.' -pfam /tmp/'.$self->hmmfilename.' -dnas /tmp/'.$self->filename .' '.$self->options.' > '.$self->results);
+sub add_output_features{
     
- $filesize = (-s $self->results);#check that results file exists
-
- if (!defined $filesize || $filesize == 0)
-   {
-     print STDERR "results file ".$self->results." has not been created or is empty\n";
-   }
-
-}
-
-
-=head2 parse_results
-
- Title    :parse_results
- Usage    :$self->parse_results
- Function :parse the results produced by genewisedb
- Returns  :none
- Args     :none
-
-=cut
-
-sub parse_results{
-  
-  my ($self) = @_;
-
-  my $filehandle;
-  if (ref ($self->results) !~ /GLOB/){
-    open (FH, "<".$self->results) or $self->throw ("couldn't open file".$self->results.":$!\n");
-    $filehandle = \*FH;
-  } else {
-    $filehandle = $self->results;
-  }
-  #print "opened results file\n";
-  while(<$filehandle>){
-
-    my %feature;
-    my $count=0;
-    my $match=0;
-    if(/^>/){
-      
-      while(<$filehandle>){
-	
-	#print "1 line to be parsed = ".$_."\n"; 
-	if(/>Results/i){
-	    $match =0;
-	    $count++;
-	    #print "another pfam domain matched setting count to ".$count." \n";
-	  }elsif(/genewise-prediction/i){ 
-	    #print "2 line to be parsed = ".$_."\n"; 
-	    my @elements = split;
-	    # my $count =0;
-	    # foreach my $element(@elements){
-	    #   print "element ".$count." = ".$element." \n";
-	    #   $count++;
-	    # }
-	    
-	    $self->throw("unable to properly parse genewisedb output there are ".scalar(@elements)." elements : $!\n")
-	      unless(scalar(@elements) == 9);
-	    #print "3 line to be parsed = ".$_."\n";   
-	    
-	    if(/match/i){
-	      
-	      $feature{score} = $elements[5];
-	      
-	    } elsif (/cds/i) {
-	      if($elements[6] eq '+'){
-		$feature{strand} = 1;
-		$feature{start} = $elements[3];
-		$feature{end} = $elements[4];
-	      }elsif($elements[6] eq '-'){
-		$feature{strand} = -1;
-		$feature{start} = $elements[4];
-		$feature{end} = $elements[3];
-	      }
-	      $feature{frame} = $elements[7];
-	      $feature{seqname} = $elements[0];
-	      $elements[8] =~ s/-genewise-prediction-/\./i;
-	      $feature{hseqname} = $elements[8].".".$count.".".$match;
-	      #print "$count = ".$count."\n";
-	      #print "hseqname = $feature{hseqname}\n";
-	      $match++;
-	      $feature{type} = $elements[2];
-	      #     print "checking hash contains data\n";
-	      #     foreach my $key(keys %feature){
-	      #	my $value = $feature{$key};
-	      #	print $key."  = ".$value."\n";
-	      #}
-	      $self->create_feature(\%feature);
-	      #print "created feature\n";
-	    }
-	  }
-      }
+    my ($self, $features) = @_;
+    #print "adding ".scalar(@$features)." to output\n";
+    if (ref($features) eq "ARRAY") {
+      push(@{$self->{'_output_features'}},@$features);
+    } else {
+      $self->throw("[$features] is not an array ref.");
     }
-  }
-}
-
-
-
-=head2 create_feature
-
- Title    :create_feature
- Usage    :$self->create_feature(\%feats);
- Function :creates features from an hash of results
- Returns  : none
- Args     : reference to hash of features
-
-=cut
-
-sub create_feature{
-
-  my ($self, $feat) = @_;
-  #print "creating feature\n";
-
-  
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => 'halfwise',
-                            -program_version => '1.0',
-                            -gff_source      => 'halfwise',
-                            -gff_feature     => 'similarity');
-
-  #create and fill Bio::EnsEMBL::Seqfeature objects
-  #print "seqname = ". $feat->{'seqname'}."\n start = ".$feat->{'start'}."\n end = ".$feat->{'end'}."\n";
-  #print "strand >". $feat->{'strand'}."\n score >". $feat->{'score'}."\n frame = ".$feat->{'frame'}."\n";
-  #print "hseqname > ".$feat->{'hseqname'}."\n source_tag > 'genewisedb'\n  primary_tag => 'similarity'\n, analysis = ". $analysis_obj."\n"; 
-  my $feature = Bio::EnsEMBL::SeqFeature->new
-    (   -seqname => $feat->{'hseqname'},
-	-start   => $feat->{'start'},
-	-end     => $feat->{'end'},
-	-strand  => $feat->{'strand'},
-	-score   => $feat->{'score'},
-	-source_tag  => 'genewisedb',
-	-primary_tag => 'similarity',
-	-analysis => $analysis_obj);  
-  
-  #print "feature = ".$feature."\n";
-  push(@{$self->{'_featurelist'}}, $feature);
+      
+    #print "total feature no = ".scalar(@{$self->{'_output_features'}})."\n";
 
 }
-
 
 
 
@@ -804,68 +593,46 @@ sub create_feature{
 ################
 
 
-=head2 
+=head2 output
 
- Title    : ouptut
- Usage    : $self->output
- Function : turns the features into feature pairs
- Returns  : an array of feature pairs
- Args     : none
+    Arg      : none
+    Function : returns the array of output features
+    Exception: none
+    Caller   : 
 
 =cut
 
-sub output {
 
+sub output{
   my ($self) = @_;
-
-  my @feat;
-
-  my $analysis = Bio::EnsEMBL::Analysis->new(   -db              => undef,
-						-db_version      => undef,
-						-program         => 'halfwise',
-						-program_version => '1.0',
-						-gff_source      => 'halfwise',
-						-gff_feature     => 'similarity',
-						-logic_name      => 'halfwise',
-						);
-
-  
-  
-
-  my @feature = @{$self->{'_featurelist'}};
-  
-  foreach my $feat (@feature) {
-    my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $feat->seqname,
-					 -start   => $feat->start,
-					 -end     => $feat->end,
-					 -strand  => $feat->strand,
-					 -frame => $feat->frame,
-					 -score   => $feat->score,
-					 -source_tag => 'halfwise',
-					 -primary_tag => 'similarity',
-					 -analysis     => $analysis);
-    my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $feat->seqname,
-					  -start   => $feat->start,
-					  -end     => $feat->end,
-					  -strand  => $feat->strand,
-					  -frame => $feat->frame,
-					  -score   => $feat->score,
-					  -source_tag => 'halfwise',
-					  -primary_tag => 'similarity',
-					  -analysis     => $analysis);
-    
-
-    $f->analysis($analysis);
-    $f2->analysis($analysis);
-
-    my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-					   -feature2 => $f2);
-    
-    push(@feat, $fp);
-  }
-  
-  
-  return @feat;
+  #print "outputing data\n";
+  #print "returning ".scalar(@{$self->{'_output_features'}})." to output\n";
+  return @{$self->{'_output_features'}};
 
 }
+
+sub display_genes {
+  my ($self, $result) = @_;
+  #Display output
+  my @results = @$result;
+  foreach my $obj (@results)
+    {
+      print STDERR ("gene:  ".$obj->gffstring. "\n");
+      if ($obj->sub_SeqFeature)
+	{
+	  foreach my $exon ($obj->sub_SeqFeature)
+	    {
+	      print STDERR "Exon:  ".$exon->gffstring."\n";
+	      if ($exon->sub_SeqFeature)
+		{
+		  foreach my $sub ($exon->sub_SeqFeature){
+		    print STDERR "supporting features:  ".$sub->gffstring."\n";
+		  }
+		}
+	    }
+	}
+    }
+}
+
+
 1;
