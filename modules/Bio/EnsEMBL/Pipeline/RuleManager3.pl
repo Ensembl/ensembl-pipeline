@@ -36,6 +36,7 @@ my $wakeup   =  120;   # period to check batch queues; set to 0 to disable
 # $SIG{USR1} = \&sighandler;
 $SIG{ALRM} = \&alarmhandler;
 $SIG{TERM} = \&termhandler;
+$SIG{INT} = \&termhandler;
 
 
 # dynamically load appropriate queue manager (e.g. LSF)
@@ -256,7 +257,7 @@ while (1) {
             $alarm = 0;
 
             # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-            while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
+            while ($get_pend_jobs && !$term_sig && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
                 sleep 300;
             }
             alarm $wakeup;
