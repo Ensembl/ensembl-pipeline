@@ -184,6 +184,13 @@ sub run_alignment {
       }
     }
 
+    # If the nt sequence included a stop codon, tack this
+    # on here (the aa sequence will be missing this).
+
+    if (scalar @nt_seq_array == 1){
+      $aligned_nt_string .= join '', @nt_seq_array;
+    }
+
     my $aligned_nt_bioseq = Bio::Seq->new(-display_id => $aligned_seq->display_id,
 					  -seq        => $aligned_nt_string);
 
