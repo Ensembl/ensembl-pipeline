@@ -73,6 +73,8 @@ use strict;
 
 use FileHandle;
 use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
+use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
@@ -123,11 +125,12 @@ sub new {
     $self->{'_workdir'}   = undef;     # location of temp directory
     $self->{'_filename'}  = undef;     # file to store Bio::Seq object
     $self->{'_results'}   = undef;     # file to store results of analysis
-    $self->{'_prune'}     = 1;         # 
-    $self->{'_coverage'}  = 10;
+    $self->{'_prune'}     = 1;         # Don't allow hits to the same sequence in the same region
+    $self->{'_coverage'}  = 10;        # Only return hits to a depth of 10
+    $self->{'_ungapped'}  = 1;         # Do we create gapped features or not
 
     # Now parse the input options and store them in the object
-    my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$options) = 
+    my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$ungapped,$options) = 
 	    $self->_rearrange([qw(QUERY 
 				  PROGRAM 
 				  DATABASE 
@@ -136,6 +139,7 @@ sub new {
 				  FILTER 
 				  COVERAGE
 				  PRUNE
+				  UNGAPPED
 				  OPTIONS)], 
 			      @args);
 
@@ -186,6 +190,9 @@ sub new {
     }
     if (defined($coverage)) {
       $self->coverage($coverage);
+    }
+    if (defined($ungapped)) {
+      $self->ungapped($ungapped);
     }
     return $self; # success - we hope!
 }
@@ -531,8 +538,7 @@ sub filter_hits {
         $feature1->end  ($qend);
         $feature1->strand($qstrand);
         $feature1->score($score);
-        $feature1->source_tag('tmp');
-        $feature1->primary_tag('similarity');
+        $feature1->analysis($self->analysis);
 
         my $feature2 = new Bio::EnsEMBL::SeqFeature();
         $feature2->start  ($hstart);
@@ -540,8 +546,8 @@ sub filter_hits {
         $feature2->strand ($hstrand);
         $feature2->score  ($score);
         $feature2->seqname($name);
-        $feature2->source_tag('tmp');
-        $feature2->primary_tag('similarity');
+        $feature2->analysis($self->analysis);
+
         my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
                                                -feature2 => $feature2);
       $fp->p_value($hsp->P);
@@ -649,18 +655,9 @@ sub split_HSP {
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have a feature pair
     
-    my $source = $self->program;             
-    $source =~ s/\/.*\/(.*)/$1/;
-
-    my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
-					      -db_version      => 1,
-					      -program         => $source,
-					      -program_version => 1,
-					      -gff_source      => $source,
-					      -gff_feature     => 'similarity',
-					      -logic_name      => 'blast');
-    
     # Here goes...
+
+    my @tmpf;
 
     while ($count <= $#qchars) {
 	# We have hit an ungapped region.  Increase the query and hit counters.
@@ -680,9 +677,10 @@ sub split_HSP {
 
 	    if ($found == 1) {
 
-		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
+		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name);
 		print "Found " . $fp->gffstring . "\n";		
-		$self->growfplist($fp);                             	    
+		push(@tmpf,$fp);
+		#$self->growfplist($fp);                             	    
 	    }
 	
 	    # We're in a gapped region.  We need to increment the sequence that
@@ -710,11 +708,26 @@ sub split_HSP {
 
     # Remember the last feature
     if ($found == 1) {
-	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
+	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name);
 	print "Found " . $fp->gffstring . "\n";
-	$self->growfplist($fp);                             	    
+	push(@tmpf,$fp);
+#	$self->growfplist($fp);                             	    
     }
 
+    if ($self->ungapped) {
+      foreach my $f (@tmpf) {
+	$self->growfplist($f);                             	    
+      } 
+    } else {
+      # Which type of feature do we want?
+      my $fp;
+      if (abs($qinc/$hinc) == 1) {
+	$fp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@tmpf);
+      } else {
+	$fp = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@tmpf);
+      }
+      $self->growfplist($fp);
+    }
 }
 
 =head2 _convert2FeaturePair
@@ -730,8 +743,9 @@ sub split_HSP {
 =cut
 
 sub _convert2FeaturePair {
-    my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis) = @_;
+    my ($self,$qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name) = @_;
 
+    my $analysis = $self->analysis;
     # The actual end of the alignment is the previous character.
     
     my $tmpqend = $qend; $tmpqend -= $qinc;
@@ -790,8 +804,6 @@ sub _makeFeaturePair {
                                                 -start       => $qstart,
                                                 -end         => $qend,
                                                 -strand      => $qstrand * $hstrand,
-                                                -source_tag  => $source,
-                                                -primary_tag => 'similarity',
                                                 -analysis    => $analysis,
                                                 -score       => $score);
         
@@ -802,8 +814,6 @@ sub _makeFeaturePair {
                                                 -start   => $hstart,
                                                 -end     => $hend,
                                                 -strand  => $hstrand * $qstrand,
-                                                -source_tag  => $source,
-                                                -primary_tag => 'similarity',
                                                 -analysis => $analysis,
                                                 -score    => $score);
     
@@ -987,6 +997,27 @@ sub program {
   return $self->{'_program'};
 }
 
+sub analysis {
+   my ($self) = @_;
+
+   if (!defined($self->{_analysis})) {
+    my $source = $self->program;             
+    $source =~ s/\/.*\/(.*)/$1/;
+
+    my $analysis = new Bio::EnsEMBL::Analysis(-db              => $self->database,
+					      -db_version      => 1,
+					      -program         => $source,
+					      -program_version => 1,
+					      -gff_source      => $source,
+					      -gff_feature     => 'similarity',
+					      -logic_name      => $source);
+    $self->{_analysis} = $analysis;
+  }
+
+  return $self->{_analysis};
+}
+    
+
 =head2 database
 
     Title   :   database
@@ -1021,6 +1052,15 @@ sub options {
     $self->{'_options'} = $args ;
   }
   return $self->{'_options'};
+}
+
+sub ungapped {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_ungapped} = $arg;
+  }
+  return $self->{_ungapped};
 }
 
 sub filter {
