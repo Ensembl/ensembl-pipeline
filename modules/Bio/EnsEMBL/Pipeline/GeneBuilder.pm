@@ -98,6 +98,9 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GB_MIN_GENSCAN_EXONS
 					 GB_GENSCAN_MAX_INTRON
+					 GB_TARGETTED_GW_GENETYPE
+					 GB_SIMILARITY_GENETYPE
+					 GB_COMBINED_GENETYPE
 					 );
 use vars qw(@ISA);
 use strict;
@@ -119,10 +122,9 @@ sub new {
     $self->{'_genes'}          = [];
     $self->{'_genewise_types'} = [];
 
-    $self->genewise_types('combined_gw_e2g');
-    $self->genewise_types('TGE_gw');
-#    $self->genewise_types('riken_genewise');
-    $self->genewise_types('similarity_genewise');
+    $self->genewise_types($GB_COMBINED_GENETYPE);
+    $self->genewise_types($GB_TARGETTED_GW_GENETYPE);
+    $self->genewise_types($GB_SIMILARITY_GENETYPE);
 
     $self->input_id($input_id);
 
@@ -258,8 +260,6 @@ sub get_Genewises {
 	push(@genewise, $t);
       } # end TRANSCRIPT
     }
-
-   print STDERR "numbers of gw transcripts after splits: " . scalar(@genewise) . "\n";
 
     $self->genewise(@genewise);
 }
@@ -598,7 +598,7 @@ sub  make_ExonPairs {
 		    if ($ispair == 1) {
 			eval {
 			    my $check = $self->check_link($exon1,$exon2,$f1,$f2);
-			    print STDERR "\nPossible pair - checking link - $check ". 
+#			    print STDERR "\nPossible pair - checking link - $check ". 
 				$exon1->start . "\t" . $exon1->end . "\n";
 			    
 			    next J unless $check;
@@ -1172,11 +1172,9 @@ sub make_Genes {
   foreach  my $tran (@transcripts) {
     eval{
       if ($tran->translate->seq !~ /\*/) {
-#	print STDERR $tran->{'temporary_id'} . " translates!\n";
 	$valid = 1;
       }
       else{
-#	print STDERR $tran->{'temporary_id'} . " does not translate!\n";
 	$valid = 0;
       }
     };
@@ -1221,12 +1219,9 @@ sub make_Genes {
   GENE: foreach my $gene (@genes) {
     EXON: foreach my $gene_exon ($gene->get_all_Exons) {
 	foreach my $exon ($tran->get_all_Exons) {
-	  #next EXON if ($exon->contig_id ne $gene_exon->contig_id);
-	  
 	  if ($exon->overlaps($gene_exon)) {
 	    if ($exon->strand == $gene_exon->strand) {
 	      $found = $gene;
-#	      print STDERR "exon overlap\n";
 	      last GENE;
 	    } 
 	    else {
@@ -1254,8 +1249,6 @@ sub make_Genes {
   # if already rejected non translators could prune gene by gene?
   foreach my $gene(@genes){
     my @newgenes = $self->prune_gene($gene);
-    
-    #    my @newgenes = $self->prune(@genes);
     
     # deal with shared exons
     foreach my $gene (@newgenes) {
@@ -2797,21 +2790,77 @@ sub prune_gene {
 
   # sizehash holds transcript length - based on sum of exon lengths
   my %sizehash;
-  
-  foreach my $tran (@transcripts) {
+  # orfhash holds orf length - based on sum of translateable exon lengths
+  my %orfhash;
 
+  foreach my $tran (@transcripts) {
     # keep track of number of exons in multiexon transcripts
     my @exons = $tran->get_all_Exons;
     if(scalar(@exons) > $max_num_exons){ $max_num_exons = scalar(@exons); }
+
+    # total exon length
     my $length = 0;
     foreach my $e($tran->get_all_Exons){
       $length += $e->end - $e->start + 1;
     }
     $sizehash{$tran->{'temporary_id'}} = $length;
+    
+    # now for ORF length
+    $length = 0;
+    foreach my $e($tran->translateable_exons){
+      $length += $e->end - $e->start + 1;
+    }
+
+    push(@{$orfhash{$length}}, $tran);
   }
 
-  # sort transcripts based on total exon number
-  @transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
+  # VAC 15/02/2002 sort transcripts based on total exon length - this
+  # introduces a problem - we can (and have) masked good transcripts
+  # with long translations in favour of transcripts with shorter
+  # translations and long UTRs that are overall slightly longer. This
+  # is not good.
+
+# better way? hold both total exon length and length of translateable exons. Then sort:
+# long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
+
+  @transcripts = ();
+  # sort first by orfhash{'length'}
+  my @orflengths = sort {$b <=> $a} (keys %orfhash);
+  
+  # strict sort by translation length is just as wrong as strict sort by UTR length
+  # bin translation lengths - 4 bins (based on 25% length diff)? 10 bins (based on 10%)?
+  my %orflength_bin;
+  my $numbins = 4;
+  my $currbin = 1;
+
+  foreach my $orflength(@orflengths){
+    last if $currbin > $numbins;
+    my $percid = ($orflength*100)/$orflengths[0];
+    if ($percid > 100) { $percid = 100; }
+    my $currthreshold = $currbin * (100/$numbins);
+    $currthreshold = 100 - $currthreshold;
+
+    if($percid <$currthreshold) { $currbin++; }
+    my @tmp = @{$orfhash{$orflength}};
+    push(@{$orflength_bin{$currbin}}, @{$orfhash{$orflength}});
+  }
+
+  # now, foreach bin in %orflengthbin, sort by exonlength
+  $currbin = 1;
+  EXONLENGTH_SORT:
+  while( $currbin <= $numbins){
+    if(!defined $orflength_bin{$currbin} ){
+      $currbin++;
+      next EXONLENGTH_SORT;
+    }
+
+    my @sorted_transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @{$orflength_bin{$currbin}};
+    push(@transcripts, @sorted_transcripts);
+    $currbin++;
+  }
+
+# old way - sort strictly on exon length
+#    @transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
 
   # deal with single exon genes
   my @maxexon = $transcripts[0]->get_all_Exons;
@@ -2863,6 +2912,8 @@ sub prune_gene {
 # any valid non-frameshifted single exon transcripts will get rejected - which is definitely not right.
 # We need code to represent frameshifted exons more sensibly so the frameshifted one doesn't 
 # get through the check for single exon genes above.
+
+
 
     for ($i = 0; $i < $#exons; $i++) {
       my $foundpair = 0;
@@ -2972,7 +3023,6 @@ sub prune_gene {
 sub split_transcript{
   my ($self, $transcript) = @_;
   $transcript->sort;
-print STDERR "splitting!\n";
   my @split_transcripts   = ();
 
   if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
@@ -3104,7 +3154,6 @@ sub validate_transcript{
   my @valid_transcripts;
 
 my @e = $transcript->get_all_Exons;
-print STDERR "\nnew transcript with " . scalar(@e) . " exons\n";
 
   my $valid = 1;
   my $split = 0;
@@ -3120,8 +3169,6 @@ print STDERR "\nnew transcript with " . scalar(@e) . " exons\n";
 	$intron = abs($exon->end   - $previous_exon->start + 1);
       }
       
-print STDERR "intron: $intron\n";
-
       if ($intron > $GB_GENSCAN_MAX_INTRON) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
 	$split = 1;
