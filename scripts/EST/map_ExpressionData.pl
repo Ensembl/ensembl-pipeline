@@ -38,11 +38,11 @@ use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Pipeline::ESTConf qw ( EST_E2G_DBNAME
-                                         EST_E2G_DBHOST
-	                                 EST_E2G_DBUSER
-	                                 EST_E2G_DBPASS
-                                       );
+use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::GenesToExpression qw ( EST_DBNAME
+                                                                       EST_DBHOST
+	                                                               EST_DBUSER
+	                                                               EST_DBPASS
+                                                                     );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
