@@ -33,6 +33,7 @@ my $estfile;
 my $seqoutfile;
 my $clip;
 my $softmask;
+my $min_length = 60;
 
 &GetOptions( 
 	    'estfile:s'     => \$estfile,
@@ -50,8 +51,6 @@ if(!defined $estfile    ||
     " -min_length <min_est_length> -clip -softmask\n";
   exit(1);
 }
-
-my $min_length = 60 unless $length;
 
 my $seqin  = new Bio::SeqIO(-file   => "<$estfile",
 			    -format => "Fasta",
@@ -105,7 +104,7 @@ while( my $cdna = $seqin->next_seq ){
   my $polyA_clipper = Bio::EnsEMBL::Utils::PolyA->new();
   my $new_cdna;
   if ($clip){
-    print STDERR "going to pass a $cdna\n";
+#    print STDERR "going to pass a $cdna\n";
     $new_cdna = $polyA_clipper->clip($cdna);
   }
   elsif( $softmask ){
