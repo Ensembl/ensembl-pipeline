@@ -709,63 +709,48 @@ sub logic_name2dbID {
 sub db_sanity_check{
   my ($db) = @_;
 
-  my ($sth, $query, $count);
+  my ($query, $msg);
   #check all rules in the rule_goal table have existing analyses
-  $query = "SELECT count(distinct g.rule_id) "
-          ."from rule_goal g "
-          ."left join analysis a on g.goal = a.analysis_id "
-	  ."where a.analysis_id is null";
-
-  $sth = $db->prepare($query);
-  $sth->execute;
-  $count = $sth->fetchrow;
-  if($count){
-    die "Some of your goals in the rule_goal table don't seem ".
-      "to have entries in the analysis table";
-  }
+  $query = qq{SELECT COUNT(DISTINCT g.rule_id)
+                FROM rule_goal g
+                LEFT JOIN analysis a ON g.goal = a.analysis_id
+	        WHERE a.analysis_id IS NULL};
+  $msg = "Some of your goals in the rule_goal table don't seem".
+         " to have entries in the analysis table";
+  execute_sanity_check($db, $query, $msg);
   #check all rules in the rule_condition table have existing analyses
-  $query = "select count(distinct c.rule_id) ".
-    "from rule_conditions c ".
-      "left join analysis a on c.condition = a.logic_name ".
-	"where a.logic_name is null";
-
-  $sth = $db->prepare($query);
-  $sth->execute;
-  $count = $sth->fetchrow;
-  if($count){
-    die "Some of your conditions in the rule_condition table don't ".
-      "seem to have entries in the analysis table";
-  }
+  $query = qq{SELECT COUNT(DISTINCT c.rule_id)
+                FROM rule_conditions c
+                LEFT JOIN analysis a ON c.condition = a.logic_name
+	        WHERE a.logic_name IS NULL};
+  $msg = "Some of your conditions in the rule_condition table don't" .
+         " seem to have entries in the analysis table";
+  execute_sanity_check($db, $query, $msg);
   #check all the analyses have types
-  $query = "select count(distinct(a.analysis_id)) ".
-    "from analysis a left join input_id_type_analysis t ".
-      "on a.analysis_id = t.analysis_id ".
-	"where t.analysis_id is null";
-  $sth = $db->prepare($query);
-  $sth->execute;
-  $count = $sth->fetchrow;
-  if($count){
-    die "Some of you analyses don't have entries in the ".
-      " input_id_type_analysis table"; 
-  }
+  $query = qq{SELECT COUNT(DISTINCT(a.analysis_id))
+                FROM analysis a
+                LEFT JOIN input_id_type_analysis t ON a.analysis_id = t.analysis_id
+	        WHERE t.analysis_id IS NULL};
+  $msg = "Some of your analyses don't have entries in the".
+         " input_id_type_analysis table"; 
+  execute_sanity_check($db, $query, $msg);
   #check that all types which aren't accumulators have entries in
   #input__id_analysis table
-  $query = "select distinct(t.input_id_type) ".
-    "from input_id_type_analysis t ".
-      "left join input_id_analysis i ".
-	"on t.input_id_type = i.input_id_type ".
-	  "where i.input_id_type is null ".
-	    "and t.input_id_type != 'ACCUMULATOR'";
-  
-  $sth = $db->prepare($query);
-  $sth->execute;
-  $count = $sth->fetchrow;
-  if($count){
-    die "Some of you types  don't have entries in the ".
-      " input_id_type_analysis table"; 
-  }
+  $query = qq{SELECT DISTINCT(t.input_id_type)
+                FROM input_id_type_analysis t
+                LEFT JOIN input_id_analysis i ON t.input_id_type = i.input_id_type
+	        WHERE i.input_id_type IS NULL
+                && t.input_id_type != 'ACCUMULATOR'};
+  $msg = "Some of your types don't have entries in the".
+         " input_id_type_analysis table";
+  execute_sanity_check($db, $query, $msg);
 }
-
+sub execute_sanity_check{
+    my ($db, $query, $msg) = @_;
+    my $sth = $db->prepare($query);
+    $sth->execute();
+    die $msg if $sth->fetchrow();
+}
 
 sub job_time_check{
   my ($batch_q_module, $verbose, $running_jobs, $file, $time) = @_;
