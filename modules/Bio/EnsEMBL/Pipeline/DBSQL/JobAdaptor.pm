@@ -55,11 +55,11 @@ sub list_current_status {
   my $self = shift;
   my $q = "
   SELECT j.job_id, j.input_id,j.taskname,
-         MAXIMUM(
-           CONCAT(LPAD(UNIX_TIMESTAMP(TIME(js.time)), 11,'0'),
+         MAX(
+           CONCAT(LPAD(UNIX_TIMESTAMP(js.time), 11,'0'),
 	          ':', js.status)) AS max_status,
     FROM job_status js, job j
-     AND js.job_id = j.job_id
+   WHERE js.job_id = j.job_id
    GROUP BY js.job_id ";
   my $sth = $self->prepare( $q );
   $sth->execute();
