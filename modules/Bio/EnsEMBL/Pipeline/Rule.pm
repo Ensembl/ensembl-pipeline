@@ -61,16 +61,17 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ( $goalAnalysis, $adaptor, $dbID ) =
+  my ( $goal, $adaptor, $dbID ) =
     $self->_rearrange( [ qw ( GOALANALYSIS
 			      ADAPTOR
 			      DBID
 			     ) ], @args );
   $self->throw( "Wrong parameter" ) unless
-    $goalAnalysis->isa( "Bio::EnsEMBL::Analysis" );
+    $goal->isa( "Bio::EnsEMBL::Analysis" );
   $self->dbID( $dbID );
-  $self->goalAnalysis( $goalAnalysis );
+  $self->goalAnalysis( $goal );
   $self->adaptor( $adaptor );
+  $self->{'_condition_type_cache'} = {};
 				
   return $self;
 }
@@ -109,11 +110,14 @@ sub add_condition {
 sub list_conditions {
   my $self = shift;
 
-  my @conditions = @{$self->{'_conditions'}};
+  my @conditions;
+  if ($self->{'_conditions'}) {
+    @conditions = @{$self->{'_conditions'}};
+  }
   if (! scalar (@conditions) ) {
       $self->throw("No conditions found for this Rule");
   }
-  return @conditions;
+  return \@conditions;
 }
 
 
@@ -126,10 +130,13 @@ sub has_condition_of_input_id_type {
       $self->throw("No conditions found for this Rule");
   }
   
+  return 1 if (exists($self->{'_condition_type_cache'}{$id_type}));
+
   foreach my $cond (@{$self->{'_conditions'}}) {
       my $cond_anal = $ana_adaptor->fetch_by_logic_name($cond);
       if ($cond_anal->input_id_type eq $id_type) {
           #print " Condition of " . $cond_anal->logic_name . " is of type $id_type\n";
+          $self->{'_condition_type_cache'}{$id_type} = 1;
           return 1;
       }
   }
@@ -169,47 +176,49 @@ sub goalAnalysis {
 sub check_for_analysis {
   my $self = shift;
   my ($analist, $input_id_type, $completed_accumulator_href, $verbose) = @_;
-  
-  $verbose = 0;
   my %anaHash;
   my $return = 0;
-  # reimplement with proper identity check!
-  my $goal = $self->goalAnalysis->dbID;
 
-  my $goal_id_type = $self->goalAnalysis->input_id_type;
-  
-  print "have goal type ".$goal_id_type." and input id type ".$input_id_type."\n" if($verbose);
+  # reimplement with proper identity check!
+  my $goal_anal    = $self->goalAnalysis;
+  my $goal         = $goal_anal->dbID;
+  my $goal_id_type = $goal_anal->input_id_type;
+
+  print "\nHave goal type ".$goal_id_type." and input id type ".$input_id_type."\n" if($verbose);
+
 #This id isn't of the right type so doesn't satify goal
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
-    print STDERR " failed input_id_type check as goal input_id type ".
-      "isn't the same as the input_id type for goal analysis " . $self->goalAnalysis->logic_name. "\n" if($verbose);
+    print "In check_for_analysis failed input_id_type check as goal input_id type ".
+      "isn't the same as the input_id type\n" if($verbose);
     $return += 1;
   }
 
 
-  print STDERR "\nMy goal is " . $self->goalAnalysis->logic_name . "\n" if($verbose);
+  print "My goal is " . $goal_anal->logic_name . "\n" if($verbose);
 
   for my $analysis ( @$analist ) {
-    print STDERR " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n" if($verbose);
+
+    print " Analysis " . $analysis->logic_name . " " . $analysis->dbID . "\n" if($verbose);
     $anaHash{$analysis->logic_name} = $analysis;
-    if( $goal == $analysis->dbID ) {
+
+    if ($goal == $analysis->dbID) {
       # already done
-      print STDERR $self->goalAnalysis->logic_name." already done\n" 
-	if($verbose);
+      print $goal_anal->logic_name." already done\n" if($verbose);
       $return += 2;
     }
   }
 
 #the completed_accumulator_href contains input_id_type ACCUMULATOR anals that have completed
-  for my $cond ( $self->list_conditions ) {
-    if ( ! $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
-      print STDERR " failed condition check for $cond\n" if($verbose);
+  for my $cond ( @{$self->{'_conditions'}} ) {
+    if ( ! exists $anaHash{$cond} && ! exists $completed_accumulator_href->{$cond}) {
+      print " failed condition check for $cond\n" if($verbose);
       $return += 4;
     }
   }
+
   return $return if $return;
-  return $self->goalAnalysis;
+  return $goal_anal;
 }
 
 sub dbID {
@@ -227,3 +236,6 @@ sub adaptor {
 }
 
 1;
+
+
+

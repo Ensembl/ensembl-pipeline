@@ -487,7 +487,7 @@ sub rules_cache{
             my $rule_adaptor = $self->dbobj->get_RuleAdaptor();
             my @rules = $rule_adaptor->fetch_all;
             foreach my $rule (@rules)  {
-                $self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name if ($rule->list_conditions())[0];
+                $self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name if ($rule->list_conditions()->[0]);
             }
     }
     return $self->{'_rules_cache'};

@@ -98,11 +98,11 @@ sub accumulator_sanity_check{
   my $aa = $self->db->get_AnalysisAdaptor;
  RULE:foreach my $rule(@$rules){
     if($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR'){
-      print STDERR "dealing with rule ".$rule->goalAnalysis->logic_name."\n";
-      my @conditions = $rule->list_conditions;
+      #print STDERR "dealing with rule ".$rule->goalAnalysis->logic_name."\n";
+      my @conditions = @{$rule->list_conditions};
       my %input_id_type;
       foreach my $c(@conditions){
-        print STDERR "have condition ".$c."\n";
+        #print STDERR "have condition ".$c."\n";
         my $analysis = $aa->fetch_by_logic_name($c);
         if(!$input_id_type{$analysis->input_id_type}){
           $input_id_type{$analysis->input_id_type} = [];
@@ -110,9 +110,9 @@ sub accumulator_sanity_check{
         push(@{$input_id_type{$analysis->input_id_type}}, $c);
       }
       TYPE:foreach my $type(keys(%input_id_type)){
-          print STDERR "have type ".$type."\n";
+          #print STDERR "have type ".$type."\n";
         my @ids = @{$sic->list_input_ids_by_type($type)};
-          print STDERR "have ".@ids." ids\n";
+          #print STDERR "have ".@ids." ids\n";
         if(!@ids){
           my $logic_names = join(",", @{$input_id_type{$type}});
           print STDERR "can't run with accumulators on as ".
@@ -143,7 +143,7 @@ sub rule_type_sanity{
     if($type eq 'ACCUMULATOR'){
       next RULE;
     }
-  CONDITION:foreach my $name($rule->list_conditions){
+  CONDITION:foreach my $name(@{$rule->list_conditions}){
       my $condition = $aa->fetch_by_logic_name($name);
       if(!$condition){
         my $msg = "Can't depend on an analysis which doesn't exist $name";
