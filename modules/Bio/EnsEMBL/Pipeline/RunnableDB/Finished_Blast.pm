@@ -4,8 +4,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_Blast;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
-
-use Data::Dumper;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
