@@ -30,11 +30,11 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep
 
 This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides
 constructed from assembling genscan predicted features to peptide
-sequence. The resulting blast hits are written back as FeaturePairs.
+sequence. The resulting blast hits are stored as DnaPepAlignFeature's.
 
 =head1 CONTACT
 
-Describe contact details here
+B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -48,13 +48,12 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
 					      BIOPERLDB
 					     );
-
-#use Data::Dumper;
 
 use vars qw(@ISA);
 
@@ -147,11 +146,11 @@ sub new {
 
 =head2 run
 
-    Title   :   run
-    Usage   :   $self->run;
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->run
-    Returns :   none
-    Args    :   none
+    Args       : none
+    Description: runs the blast program and creates features
+    Returntype : none
+    Exceptions : none
+    Caller     : general
 
 =cut
 
@@ -167,7 +166,7 @@ sub run {
   print STDERR "Creating BioPrimarySeq for peptide ".$transcript->translate()."\n";
 
   my $peptide = Bio::PrimarySeq->new(-id         => 'Genscan_prediction',
-				     -seq        => $transcript->translate(),
+				     -seq        => $transcript->translate->seq,
 				     -moltype    => 'protein' );
 
   #print STDERR "Peptide length: ", $peptide->length, "\n";
@@ -194,10 +193,8 @@ sub run {
 
   $self->align_hits_to_contig2($runnable->output);
   print "Output " . $runnable->output. "\n"; 
-#  $self->align_hits_to_contig($runnable->output);
-#  $self->check_features($transcript->translate->seq,$self->featurepairs);
-  
 }
+
 
 =head2 output
 
