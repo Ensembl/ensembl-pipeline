@@ -428,11 +428,14 @@ sub runInLSF {
   my $self = shift;
   my $module = $self->analysis->module;
   my $rdb;
-  my $err;
+  my ($err, $res);
   my $autoupdate = $::pipeConf{'autoupdate'};
   
 
-  eval {
+  STATUS:
+  {
+    # "CREATED"
+    eval {
       if( $module =~ /::/ ) {
 	  $module =~ s/::/\//g;
 	  require "${module}.pm";
@@ -448,44 +451,55 @@ sub runInLSF {
 		-input_id => $self->input_id,
 		-dbobj => $self->adaptor->db );
       }
-  };
-  if ($err = $@) {
+    };
+    if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
       $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
-  }
-  eval {   
+    }
+
+    # "READING"
+    eval {   
       $self->set_status( "READING" );
-      $rdb->fetch_input;
-  };
-  if ($err = $@) {
+      $res = $rdb->fetch_input;
+    };
+    if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "READING: Lost the will to live Error\n");
       die "Problems with $module fetching input for " . $self->input_id . " [$err]\n";
-  }
-  if ($rdb->input_is_void) {
+    }
+    if ($res eq "") {
+    }
+    if ($rdb->input_is_void) {
       $self->set_status( "VOID" );
       return;
-  }
-  eval {
+    }
+
+    # "RUNNING"
+    eval {
       $self->set_status( "RUNNING" );
       $rdb->run;
-  };
-  if ($err = $@) {
+    };
+    if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "RUNNING: Lost the will to live Error\n");
       die "Problems running $module for " . $self->input_id . " [$err]\n";
-  }
-  eval {
+    }
+
+    # "WRITING"
+    eval {
       $self->set_status( "WRITING" );
       $rdb->write_output;
       $self->set_status( "SUCCESSFUL" );
-  }; 
-  if ($err = $@) {
+    }; 
+    if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "WRITING: Lost the will to live Error\n");
       die "Problems for $module writing output for " . $self->input_id . " [$err]" ;
-  }
+    }
+  } # STATUS
+
+  # update job in StateInfoContainer
   if ($autoupdate) {
     eval {
       my $sic = $self->adaptor->db->get_StateInfoContainer;
