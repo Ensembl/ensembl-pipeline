@@ -47,6 +47,7 @@ use vars qw(%Config);
     QUEUE_MANAGER      => 'LSF',
     DEFAULT_BATCH_SIZE => 10,
     DEFAULT_RETRIES    => 3,
+    DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
     MAX_PENDING_JOBS   => 500,
     QUEUE_CONFIG       => [
 	{
