@@ -99,7 +99,7 @@ Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::ESTFilter;
+package Bio::EnsEMBL::Pipeline::Tools::ESTFilter;
 
 use vars qw(@ISA);
 use strict;
