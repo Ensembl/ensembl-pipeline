@@ -91,7 +91,9 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 RAISE_SINGLETON_COVERAGE
 									 FILTER_ON_SINGLETON_SIZE
 									 MAX_TRANSCRIPTS_PER_GENE
-									);
+									 CLUSTERMERGE_MIN_EVIDENCE_NUMBER
+									 EST_USE_DENORM_GENES
+);
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -247,7 +249,7 @@ sub fetch_input {
 
     my $genes;
     if ($EST_USE_DENORM_GENES){
-      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->db);
+      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
       $genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
     } else {
       $genes  = $slice->get_all_Genes_by_type($genetype);
@@ -407,18 +409,20 @@ sub _process_Transcripts {
 	    -splice_mismatch  => $EST_GENEBUILDER_SPLICE_MISMATCH,
 	    -intron_mismatch  => $EST_GENEBUILDER_INTRON_MISMATCH,
 	    -exon_match       => $EST_GENEBUILDER_EXON_MATCH,
+	    -minimum_order    => $CLUSTERMERGE_MIN_EVIDENCE_NUMBER,
 	   );
   
   $merge_object->run;
   my @merged_transcripts = $merge_object->output;
   
+
   # reject the single exon transcripts
   my @filtered_transcripts;
   if ( $REJECT_SINGLE_EXON_TRANSCRIPTS ){
-      @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
-      print STDERR scalar(@filtered_transcripts)
-	." transcripts left after rejecting single-exon transcripts\n";
-    }
+    @filtered_transcripts = @{$self->_reject_single_exon_Transcripts(@merged_transcripts)};      
+    print STDERR scalar(@filtered_transcripts)
+      ." transcripts left after rejecting single-exon transcripts\n";
+  }
   else{
     @filtered_transcripts = @merged_transcripts;
     print STDERR scalar(@filtered_transcripts)
@@ -535,7 +539,7 @@ sub _check_Transcripts {
 	      }
 	  }
 	  ############################################################
-	  # reject too-small exons:
+	  # reject transcripts with too-small exons:
 	  ############################################################
 	  my $size = $exon->end - $exon->start + 1;
 	  if ( $size  < $EST_MIN_EXON_SIZE ){
@@ -591,9 +595,9 @@ sub _check_Transcripts {
 	      next TRANSCRIPT;
 	    }
 	  }
-
+	  
 	  ############################################################
-	  # bridge over small introns
+	  # check tiny introns
 	  ############################################################
 	  if ( $EST_MIN_INTRON_SIZE && $exon_count>1 ){
 	    if ( $exon->start - $previous_exon->end - 1 <=  $EST_MIN_INTRON_SIZE ){
@@ -601,6 +605,9 @@ sub _check_Transcripts {
 		$previous_exon->end( $exon->end );
 		next EXON;
 	      }
+	      ############################################################
+	      # if not bridged - reject it
+	      ############################################################
 	      else{
 		print STDERR "Rejecting transcript with small intron size =  ".
 		  ($exon->start - $previous_exon->end - 1)."\n";
@@ -1011,15 +1018,28 @@ sub check_splice_sites{
       my $downstream_exon = $exons[$i+1];
       my $upstream_site;
       my $downstream_site;
-      my $up_site;
-      my $down_site;
+      
+      my $upstream_start   = $upstream_exon->end + 1;
+      my $upstream_end     = $upstream_exon->end + 2;
+      my $downstream_start = $downstream_exon->start - 2;
+      my $downstream_end   = $downstream_exon->start - 1;
+     
       eval{
-	  $upstream_site = 
-	      $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-	  $downstream_site = 
-	      $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-          
+	$upstream_site = 
+	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
+	$downstream_site = 
+	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
       };
+
+      #my $up_start   = $slice->chr_start + $upstream_start - 1;
+      #my $up_end     = $slice->chr_start + $upstream_end - 1;
+      #my $down_start = $slice->chr_start + $downstream_start - 1;
+      #my $down_end   = $slice->chr_start + $downstream_end - 1;
+      #my $upstream_site   = 
+#	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
+#      my $downstream_site = 
+#	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
+            
       unless ( $upstream_site && $downstream_site ){
 	print STDERR "problems retrieving sequence for splice sites\n$@";
 	next INTRON;
@@ -1052,6 +1072,27 @@ sub check_splice_sites{
     return 1;
   }
 }
+############################################################
+
+#sub get_chr_subseq{
+#  my ( $self, $chr_name, $start, $end, $strand ) = @_;
+
+#  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+#  my $command = "chr_subseq $chr_file $start $end |";
+#  #print STDERR "command: $command\n";
+#  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+#  my $seq = uc <SEQ>;
+#  chomp $seq;
+#  close( SEQ );
+
+#  if ( $strand == 1 ){
+#    return $seq;
+#  }
+#  else{
+#    ( my $revcomp_seq = reverse( $seq ) ) =~ tr/ACGTacgt/TGCAtgca/;
+#    return $revcomp_seq;
+#  }
+#}
 
 ############################################################
 
