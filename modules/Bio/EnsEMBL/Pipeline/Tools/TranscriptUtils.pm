@@ -581,15 +581,50 @@ sub split_Transcript{
     }
     
     $prev_exon = $exon;
-    
   }
   
+# Discard initial frameshift exons
+  my @tidied_split_transcripts;
+
+  foreach my $st (@split_transcripts) {
+    if ($st->translation->start_Exon->length < 3) {
+      my @exons = @{$st->get_all_Exons};
+
+      ELOOP:
+      while (scalar(@exons)) {
+        my $exon = shift @exons;
+
+        if ($exon->length > 3) {
+          $st->translation->start_Exon($exon);
+          if ($exon->phase == 0) {
+            $st->translation->start(1);
+          } elsif ($exon->phase == 1) {
+            $st->translation->start(3);
+          } elsif ($exon->phase == 2) {
+            $st->translation->start(2);
+          }
+
+          $st->flush_Exons;
+          $st->add_Exon($exon);
+          foreach my $e (@exons) {
+            $st->add_Exon($e);
+          }
+
+          push @tidied_split_transcripts,$st;
+          last ELOOP;
+        }
+      }
+      #print "Discarded transcript because its all less than 3 bp frameshift exons\n";
+    } else {
+      push @tidied_split_transcripts,$st;
+    }
+  }
+
   # discard any single exon transcripts
   my @final_transcripts = ();
   my $count = 1;
   
-  foreach my $st (@split_transcripts){
-   
+  foreach my $st (@tidied_split_transcripts){
     
     my @ex = @{$st->get_all_Exons};
     
@@ -597,7 +632,6 @@ sub split_Transcript{
       $st->{'temporary_id'} = $transcript->dbID . "." . $count;
       $count++;
       push(@final_transcripts, $st);
-      
     }
   }
   
