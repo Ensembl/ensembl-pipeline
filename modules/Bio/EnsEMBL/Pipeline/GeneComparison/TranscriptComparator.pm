@@ -784,9 +784,9 @@ sub _test_for_Merge_allow_gaps{
   my $merge     = 0; # =1 if they merge
 
   print STDERR "comparing:\n";
- Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
- Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
-
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
+  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
+  
   my $splice_mismatch = 0;
   if ( defined $self->splice_mismatch ){
     $splice_mismatch =  $self->splice_mismatch;
@@ -1337,7 +1337,7 @@ sub _test_for_merge{
 		  $object_map->match( $exons1[$j], $exons2[$k] );
 		  $overlaps++;
 		  $foundlink = 1;
-		  $start++;
+		  $start += $k + 1;
 		  next EXON1;
 	      }
 	  }
@@ -1567,9 +1567,12 @@ sub discrete_compare{
     }
 
     if ($verbose){
-	print STDERR "comparing ".
-	    $tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
+      #print STDERR "comparing ".
+      #$tran1->dbID."-".$tran2->dbID." ( ".$tran2->dbID."-".$tran1->dbID." )\n";
+      print STDERR "comparing\n";
+      print STDERR $tran1->dbID.": ";
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran1);
+      print STDERR $tran2->dbID.": ";
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran2);
     }
     my @exons1 = sort { $a->start <=> $b->start } @{$tran1->get_all_Exons};
@@ -1594,14 +1597,17 @@ sub discrete_compare{
 	if ( $exons1[0]->overlaps($exons2[0] )){
 	    
 	    if ( $exons1[0]->end > $exons2[0]->end ){
-		return 'extension';
+	      print STDERR "EXTENSION\n" if $verbose;
+	      return 'extension';
 	    }
 	    elsif( $exons1[0]->end <= $exons2[0]->end ){
-		return 'inclusion';
+	      print STDERR "INCLUSION\n" if $verbose;
+	      return 'inclusion';
 	    }
 	}
 	else{
-	    return 'no-overlap';
+	  print STDERR "NO_OVERLAP\n" if $verbose;
+	  return 'no-overlap';
 	}
     }
 
@@ -1654,10 +1660,13 @@ sub discrete_compare{
 		$is_last{ $exons2[$k] } = 0;
 	    }
 	    
+	    print STDERR "foundlink = $foundlink\n" if $verbose;
+	    print STDERR "comparing ".$exons1[$j]->start."-".$exons1[$j]->end." and ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+
 	    if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k])) ){
-		print STDERR "go to next exon2\n" if $verbose;
-		$foundlink = 0;
-		next EXON2;
+	      print STDERR "go to next exon2\n" if $verbose;
+	      $foundlink = 0;
+	      next EXON2;
 	    }
 	    elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k])) ){
 		print STDERR "link is broken, not merging\n" if $verbose;
@@ -1690,7 +1699,7 @@ sub discrete_compare{
 		    $object_map->match( $exons1[$j], $exons2[$k] );
 		    $overlaps++;
 		    $foundlink = 1;
-		    $start++;
+		    $start += $k + 1;
 		    next EXON1;
 		}
 	    }
@@ -1705,7 +1714,7 @@ sub discrete_compare{
     }   # end of EXON1      
     
     unless ( $merge ){
-	print STDERR "No merge\n" if $verbose;
+	print STDERR "CLASH\n" if $verbose;
 	return 'clash';
     }
     
@@ -1716,9 +1725,11 @@ sub discrete_compare{
     if ( $self->comparison_level == 5 && $merge ){
 	print STDERR "Loose mode merge\n" if $verbose;
 	if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
-	    return 'extension';
+	  print STDERR "EXTENSION\n" if $verbose;  
+	  return 'extension';
 	}
 	elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
+	    print STDERR "INCLUSION\n" if $verbose;
 	    return 'inclusion';
 	}
     }
@@ -1822,14 +1833,17 @@ sub discrete_compare{
 	
 	if ( $merge == 1 ){
 	    if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
-		return 'extension';
+	      print STDERR "EXTENSION\n" if $verbose;
+	      return 'extension';
 	    }
 	    elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
-		return 'inclusion';
+	      print STDERR "INCLUSION\n" if $verbose;
+	      return 'inclusion';
 	    }
 	}
 	else{
-	    return 'clash';
+	  print STDERR "CLASH\n" if $verbose;
+	  return 'clash';
 	}
     }
     
@@ -1915,17 +1929,19 @@ sub discrete_compare{
 	    next PAIR;
 	}
 	else{
-	    print STDERR "Failed to find a proper match. Not merging\n" if $verbose;
+	    print STDERR "CLASH\n" if $verbose;
 	    return 'clash';
 	}
     } # end of PAIR
     
     print STDERR "--- merge ---\n" if $verbose;
     if ( $exons1[$#exons1]->end > $exons2[$#exons2]->end ){
-	return 'extension';
+      print STDERR "EXTENSION\n" if $verbose;
+      return 'extension';
     }
     elsif( $exons1[$#exons1]->end <= $exons2[$#exons2]->end ){
-	return 'inclusion';
+      print STDERR "INCLUSION\n" if $verbose;
+      return 'inclusion';
     }
 }
 
