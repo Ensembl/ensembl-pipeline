@@ -204,36 +204,6 @@ sub agp_parse{
 
 
 
-sub parse_pseudo_gff{
-  my ($file, $seq, $analysis) = @_;
-
-  #print STDERR "opening ".$file."\n";
-  open(FH, $file) or die"couldn't open ".$file." $!";
-
-  die " seq ".$seq." is not a Bio::Seq " unless($seq->isa("Bio::SeqI") || 
-						$seq->isa("Bio::Seq")  || 
-						$seq->isa("Bio::PrimarySeqI"));
-  my @genes;
-  my ($transcripts) = &process_pseudo_file(\*FH);
-  #print "there are ".keys(%$transcripts)." distinct transcripts\n";
-  my ($processed_transcripts) = &process_pseudo_transcripts($transcripts, $seq, $analysis);
-  #print "there are ".keys(%$processed_transcripts)." transcript\n";
-  #print keys(%$five_start)." transcripts have 5' UTRs and ".keys(%$three_end)." have 3' UTRs\n";
-  my $genes = undef;
-  $genes = &create_pseudo_transcripts($processed_transcripts);
-  #print "PARSE GFF there are ".keys(%$genes)." genes\n";
-  foreach my $gene_id(keys(%$genes)){
-    my $transcripts = $genes->{$gene_id};
-    my $unpruned = &create_gene($transcripts, $gene_id);
-    #print STDERR "gene ".$unpruned."\n";
-    my $gene = &prune_Exons($unpruned);
-    push(@genes, $gene);
-  }
-  close(FH);
-  #print "PARSE_GFF ".@genes." genes\n";
-  return \@genes;
-}
-
 sub parse_gff{
   my ($file, $seq, $analysis) = @_;
 
@@ -250,7 +220,7 @@ sub parse_gff{
   #print "there are ".keys(%$processed_transcripts)." transcript\n";
   #print keys(%$five_start)." transcripts have 5' UTRs and ".keys(%$three_end)." have 3' UTRs\n";
   my $genes = undef;
-  $genes = &create_transcripts($processed_transcripts);
+  $genes = &create_transcripts($processed_transcripts, $five_start, $three_end);
   #print "PARSE GFF there are ".keys(%$genes)." genes\n";
   foreach my $gene_id(keys(%$genes)){
     my $transcripts = $genes->{$gene_id};
@@ -263,6 +233,7 @@ sub parse_gff{
   #print "PARSE_GFF ".@genes." genes\n";
   return \@genes;
 }
+
 
 
 
@@ -340,43 +311,6 @@ sub process_file{
   return \%transcripts, \%five_prime, \%three_prime;
 }
 
-sub process_pseudo_file{
-  my ($fh) = @_;
-  
-  my %transcripts;
-
- LOOP: while(<$fh>){
-    # CHROMOSOME_IV	Pseudogene	exon	15782362	15783253	.	-	.	Sequence "Y105C5A.21"
-    #CHROMOSOME_IV	Pseudogene	exon	16063292	16063511	.	-	.	Sequence "Y105C5B.24"
-    #CHROMOSOME_IV	Pseudogene	exon	16063824	16063899	.	-	.	Sequence "Y105C5B.24"
-    #CHROMOSOME_IV	Pseudogene	exon	16063951	16064098	.	-	.	Sequence "Y105C5B.24"
-
-    chomp;
-    my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split;
-    my $element = $_;
-    if($chr =~ /sequence-region/){
-      #print STDERR $_;
-      next LOOP;
-    }
-    if(!$status && !$type){
-      #print "status and type no defined skipping\n";
-      next LOOP;
-    }
-    my $line = $status." ".$type;
-    if($line ne 'Pseudogene exon'){
-      next LOOP;
-    }
-    $gene =~ s/\"//g;
-    if(!$transcripts{$gene}){
-      $transcripts{$gene} = [];
-      push(@{$transcripts{$gene}}, $element);
-    }else{
-      push(@{$transcripts{$gene}}, $element);
-    }
-    
-  }
-  return \%transcripts;
-}
 
 =head2 process_transcripts
 
@@ -522,63 +456,6 @@ sub process_transcripts{
 
 }
 
-sub process_pseudo_transcripts{
-  my ($transcripts, $slice, $analysis) = @_;
-  
-  my %genes;
-  my %transcripts = %$transcripts;
-  my @names = keys(%transcripts);
- 
-  #print STDERR "PROCESSING TRANSCRIPTS \n";
-  foreach my $name(@names){
-    my @lines = @{$transcripts{$name}};
-    $transcripts{$name} = [];
-    my @exons;
-    foreach my $line(@lines){
-      #print STDERR $line."\n";
-      my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split /\s+/, $line;
-      $chr =~ s/CHROMOSOME_//;
-      if($start == $end){
-	next;
-      }
-     
-      my $exon = new Bio::EnsEMBL::Exon;
-      if($frame eq '.'){
-	$frame = 0;
-      }
-      my $phase = (3 - $frame)%3; # wormbase gff cotains frame which is effectively the opposite of phase 
-                                  # for a good explaination of phase see the Bio::EnsEMBL::Exon documentation
-      #print STDERR "phase calculated to be ".$phase."\n";
-      $exon->start($start);
-      $exon->end($end);
-      $exon->analysis($analysis);
-      $exon->contig($slice);
-      $exon->phase($phase);
-      my $end_phase = ($phase + ($exon->end-$exon->start) + 1)%3;
-      #print STDERR "end phase calculated to be ".$end_phase."\n";
-      $exon->end_phase($end_phase);
-      if($strand eq '+'){
-	$exon->strand(1);
-      }else{
-	$exon->strand(-1);
-      }
-      $exon->score(100);
-      push(@exons, $exon);
-    }
-    if($exons[0]->strand == -1){
-      @exons = sort{$b->start <=> $a->start} @exons;
-    }else{
-      @exons = sort{$a->start <=> $b->start} @exons;
-    }
-    my $phase = 0;
-    foreach my $e(@exons){
-      push(@{$transcripts{$name}}, $e);
-    }
-  }
-    
-  return (\%transcripts);
-
-}
 
 
 =head2 create_transcripts
@@ -671,53 +548,6 @@ sub create_transcripts{
 }
 
 
-sub create_pseudo_transcripts{
-  my ($transcripts) = @_;
- 
- 
-  my %transcripts = %$transcripts;
-  my %genes;
-  my $gene_name;
-  my $transcript_id;
-  foreach my $transcript(keys(%transcripts)){
-    my $time = time;
-    my @exons = @{$transcripts{$transcript}};
-    if($transcript =~ /\w+\.\d+[a-z A-Z]/){
-     ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]/;
-     $transcript_id = $transcript;
-    }else{
-      $gene_name = $transcript;
-      $transcript_id = $transcript;
-    }
-    my $transcript = new Bio::EnsEMBL::Transcript;
-    my @sorted_exons;
-    if($exons[0]->strand == 1){
-      @sorted_exons = sort{$a->start <=> $b->start} @exons
-    }else{
-      @sorted_exons = sort{$b->start <=> $a->start} @exons  
-    }
-    my $exon_count = 1;
-    my $phase = 0;
-    foreach my $exon(@sorted_exons){
-      $exon->created($time);
-      $exon->modified($time);
-      $exon->version(1);
-      $exon->stable_id($transcript_id.".".$exon_count);
-      $exon_count++;
-      $transcript->add_Exon($exon);
-    }
-    $transcript->version(1);
-    $transcript->stable_id($transcript_id);
-    if(!$genes{$gene_name}){
-      $genes{$gene_name} = [];
-      push(@{$genes{$gene_name}}, $transcript);
-    }else{
-      push(@{$genes{$gene_name}}, $transcript);
-    }
-  }
-  return \%genes;
-
-}
 
 =head2 create_gene
 
@@ -826,6 +656,44 @@ sub prune_Exons {
 =cut
 
 
+#sub write_genes{
+#  my ($genes, $db) = @_;
+#  
+#  my %non_translating;
+#  my %non_transforming;
+#  
+# GENE: foreach my $gene(@$genes){
+#    eval{
+#      $gene->transform;
+#    };
+#    if($@){
+#      warn("gene ".$gene->stable_id." wouldn't transform ".$@);
+#      my ($clone_name) = $gene->stable_id =~ /(\S+)\.\S+/;
+#      if(!$non_transforming{$gene->stable_id}){
+#	$non_transforming{$gene->stable_id} = 1;
+#	next GENE;
+#      }else{
+#	push(@{$non_transforming{$clone_name}}, $gene);
+#	next GENE;
+#      }
+#    }
+# 
+#    #print STDERR "BEFORE STORAGE \n";
+#    #&display_exons(@{$gene->get_all_Exons});
+#    my $gene_adaptor = $db->get_GeneAdaptor;
+#    eval{
+#      $gene_adaptor->store($gene);
+#    };
+#    if($@){
+#      die "couldn't store ".$gene->stable_id." problems ".$@;
+#    }
+#    #print STDERR "AFTER STORAGE\n";
+#    #&display_exons(@{$gene->get_all_Exons});
+#  }
+
+#  return \%non_transforming;
+#}
+
 sub write_genes{
   my ($genes, $db, $stable_id_check) = @_;
 
@@ -879,8 +747,6 @@ sub write_genes{
 
   return \%non_transforming;
 }
-
-
 =head2 translation_check
 
   Arg [1]   : Bio::EnsEMBL::Gene
@@ -1050,6 +916,7 @@ sub non_translate{
     my @exons = @{$t->get_all_Exons};
 #    print "transcript sequence :\n".$t->seq."\n";
     foreach my $e(@exons){
+      print "exon ".$e->stable_id." ".$e->start." ".$e->end." ".$e->strand."\n";
       my $seq = $e->seq;
       my $pep0 = $seq->translate('*', 'X', 0);
       my $pep1 = $seq->translate('*', 'X', 1);
@@ -1402,5 +1269,179 @@ sub write_simple_features{
 
 
 
+sub parse_pseudo_gff{
+  my ($file, $seq, $analysis) = @_;
+
+  #print STDERR "opening ".$file."\n";
+  open(FH, $file) or die"couldn't open ".$file." $!";
+
+  die " seq ".$seq." is not a Bio::Seq " unless($seq->isa("Bio::SeqI") || 
+						$seq->isa("Bio::Seq")  || 
+						$seq->isa("Bio::PrimarySeqI"));
+  my @genes;
+  my ($transcripts) = &process_pseudo_file(\*FH);
+  #print "there are ".keys(%$transcripts)." distinct transcripts\n";
+  my ($processed_transcripts) = &process_pseudo_transcripts($transcripts, $seq, $analysis);
+  #print "there are ".keys(%$processed_transcripts)." transcript\n";
+  #print keys(%$five_start)." transcripts have 5' UTRs and ".keys(%$three_end)." have 3' UTRs\n";
+  my $genes = undef;
+  $genes = &create_pseudo_transcripts($processed_transcripts);
+  #print "PARSE GFF there are ".keys(%$genes)." genes\n";
+  foreach my $gene_id(keys(%$genes)){
+    my $transcripts = $genes->{$gene_id};
+    my $unpruned = &create_gene($transcripts, $gene_id);
+    #print STDERR "gene ".$unpruned."\n";
+    my $gene = &prune_Exons($unpruned);
+    push(@genes, $gene);
+  }
+  close(FH);
+  #print "PARSE_GFF ".@genes." genes\n";
+  return \@genes;
+}
+
+sub process_pseudo_file{
+  my ($fh) = @_;
+  
+  my %transcripts;
+
+ LOOP: while(<$fh>){
+    # CHROMOSOME_IV	Pseudogene	exon	15782362	15783253	.	-	.	Sequence "Y105C5A.21"
+    #CHROMOSOME_IV	Pseudogene	exon	16063292	16063511	.	-	.	Sequence "Y105C5B.24"
+    #CHROMOSOME_IV	Pseudogene	exon	16063824	16063899	.	-	.	Sequence "Y105C5B.24"
+    #CHROMOSOME_IV	Pseudogene	exon	16063951	16064098	.	-	.	Sequence "Y105C5B.24"
+
+    chomp;
+    my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split;
+    my $element = $_;
+    if($chr =~ /sequence-region/){
+      #print STDERR $_;
+      next LOOP;
+    }
+    if(!$status && !$type){
+      #print "status and type no defined skipping\n";
+      next LOOP;
+    }
+    my $line = $status." ".$type;
+    if($line ne 'Pseudogene exon'){
+      next LOOP;
+    }
+    $gene =~ s/\"//g;
+    if(!$transcripts{$gene}){
+      $transcripts{$gene} = [];
+      push(@{$transcripts{$gene}}, $element);
+    }else{
+      push(@{$transcripts{$gene}}, $element);
+    }
+    
+  }
+  return \%transcripts;
+}
+
+
+sub process_pseudo_transcripts{
+  my ($transcripts, $slice, $analysis) = @_;
+  
+  my %genes;
+  my %transcripts = %$transcripts;
+  my @names = keys(%transcripts);
+ 
+  #print STDERR "PROCESSING TRANSCRIPTS \n";
+  foreach my $name(@names){
+    my @lines = @{$transcripts{$name}};
+    $transcripts{$name} = [];
+    my @exons;
+    foreach my $line(@lines){
+      #print STDERR $line."\n";
+      my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split /\s+/, $line;
+      $chr =~ s/CHROMOSOME_//;
+      if($start == $end){
+	next;
+      }
+     
+      my $exon = new Bio::EnsEMBL::Exon;
+      if($frame eq '.'){
+	$frame = 0;
+      }
+      my $phase = (3 - $frame)%3; # wormbase gff cotains frame which is effectively the opposite of phase 
+                                  # for a good explaination of phase see the Bio::EnsEMBL::Exon documentation
+      #print STDERR "phase calculated to be ".$phase."\n";
+      $exon->start($start);
+      $exon->end($end);
+      $exon->analysis($analysis);
+      $exon->contig($slice);
+      $exon->phase($phase);
+      my $end_phase = ($phase + ($exon->end-$exon->start) + 1)%3;
+      #print STDERR "end phase calculated to be ".$end_phase."\n";
+      $exon->end_phase($end_phase);
+      if($strand eq '+'){
+	$exon->strand(1);
+      }else{
+	$exon->strand(-1);
+      }
+      $exon->score(100);
+      push(@exons, $exon);
+    }
+    if($exons[0]->strand == -1){
+      @exons = sort{$b->start <=> $a->start} @exons;
+    }else{
+      @exons = sort{$a->start <=> $b->start} @exons;
+    }
+    my $phase = 0;
+    foreach my $e(@exons){
+      push(@{$transcripts{$name}}, $e);
+    }
+  }
+    
+  return (\%transcripts);
+
+}
+
+sub create_pseudo_transcripts{
+  my ($transcripts) = @_;
+ 
+ 
+  my %transcripts = %$transcripts;
+  my %genes;
+  my $gene_name;
+  my $transcript_id;
+  foreach my $transcript(keys(%transcripts)){
+    my $time = time;
+    my @exons = @{$transcripts{$transcript}};
+    if($transcript =~ /\w+\.\d+[a-z A-Z]/){
+     ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]/;
+     $transcript_id = $transcript;
+    }else{
+      $gene_name = $transcript;
+      $transcript_id = $transcript;
+    }
+    my $transcript = new Bio::EnsEMBL::Transcript;
+    my @sorted_exons;
+    if($exons[0]->strand == 1){
+      @sorted_exons = sort{$a->start <=> $b->start} @exons
+    }else{
+      @sorted_exons = sort{$b->start <=> $a->start} @exons  
+    }
+    my $exon_count = 1;
+    my $phase = 0;
+    foreach my $exon(@sorted_exons){
+      $exon->created($time);
+      $exon->modified($time);
+      $exon->version(1);
+      $exon->stable_id($transcript_id.".".$exon_count);
+      $exon_count++;
+      $transcript->add_Exon($exon);
+    }
+    $transcript->version(1);
+    $transcript->stable_id($transcript_id);
+    if(!$genes{$gene_name}){
+      $genes{$gene_name} = [];
+      push(@{$genes{$gene_name}}, $transcript);
+    }else{
+      push(@{$genes{$gene_name}}, $transcript);
+    }
+  }
+  return \%genes;
+
+}
 
 1;
