@@ -603,11 +603,6 @@ sub prune_Transcripts {
     ##############################
   TRANSCRIPT:
     foreach my $tran (@transcripts) {
-      # if it's blessed, we keep it and there's nothing more to do
-      if(exists $blessed_genetypes{$tran->type}){
-	push (@newtran, $tran);
-	next TRANSCRIPT;
-      }
 
       $tran->sort;
       my @exons = @{$tran->get_all_Exons};
@@ -705,7 +700,13 @@ sub prune_Transcripts {
       }				# end of EXONS
 
       # decide whether this is a new transcript or whether it has already been seen
-      if ($found == 0) {
+
+      # if it's blessed, we keep it and there's nothing more to do
+      if(exists $blessed_genetypes{$tran->type}){
+	push (@newtran, $tran);
+      }
+
+      elsif ($found == 0) {
 	#print STDERR "found new transcript:\n";
 	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 	
