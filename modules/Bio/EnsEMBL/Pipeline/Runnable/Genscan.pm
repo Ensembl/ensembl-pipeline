@@ -410,10 +410,13 @@ sub create_exon {
 sub create_genes {
     my ($self) = @_;
     my @exons = $self->output_exons();
+
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } @exons;
+
     for (my $ex_index = 0; $ex_index < scalar(@ordered_exons); $ex_index++)
     {
         my $ex = $ordered_exons[$ex_index];
+	print STDERR "Exon is " . $ex . "\n";
         if ($ex->primary_tag =~ /Single|Initial/) #lone exon or intial exon
         {
             $ex->seqname =~ /\./;     #extract number before '.'
@@ -421,7 +424,7 @@ sub create_genes {
             my @sub_exons;    #an array of exons to be loaded
             #create gene as new SeqFeature
             my $gene = Bio::EnsEMBL::SeqFeature->new
-                        (   -seqname => $gene_number,
+		(   -seqname => $gene_number,
                             -strand  => $ex->strand,
                             -score   => $ex->score,
                             -frame   => $ex->frame,
