@@ -253,6 +253,7 @@ sub prune_features {
   # define the depth of the coverage
   my $depth = $self->coverage;
 
+  # here we store the created clusters
   my @clusters;
   my @cluster_starts;
   my @cluster_ends;
@@ -261,9 +262,6 @@ sub prune_features {
 
   # sort the features by start coordinates, this is crucial
   @input = sort {$a->start <=> $b->start} @input;
-
-  # here we store the created clusters
-  my @clusters;
 
   ## this is handy to compare the two clustering methods quickly
   #my $old_method = 0;
