@@ -59,7 +59,6 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis::PairAlign;
 use Bio::PrimarySeq;

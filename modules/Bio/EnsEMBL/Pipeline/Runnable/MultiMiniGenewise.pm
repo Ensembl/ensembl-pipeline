@@ -265,11 +265,9 @@ sub run {
   #print STDERR "have ".@$ids." ids\n";
   my $failed_count = 0;
   foreach my $id (@$ids) {
-    #print STDERR "$id\n";
-    
     my @features = @{$fhash->{$id}};
-    #print STDERR "have ".@features." features\n";
-   
+
+    printf STDERR "Doing $id (%d feats)\n", scalar(@features);
   
     my $pepseq = $self->get_Sequence($features[0]->hseqname);
       

@@ -74,7 +74,6 @@ use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::PepDnaAlignFeature;
 use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::EnsEMBL::Root;

@@ -37,7 +37,6 @@ use vars   qw(@ISA);
 # Object preamble
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::SeqIO;
@@ -133,7 +132,7 @@ sub align_protein {
 
   my $command = "$genewise $pepfile $genfile -genesf -kbyte $memory -ext $ext -gap $gap -subs $subs $options";
 
-  print STDERR $command."\n";
+  # print STDERR $command."\n";
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }
@@ -195,14 +194,12 @@ sub align_protein {
 
       my $end_phase   = ( $exon_length + $phase ) %3;
 
-      $curr_exon = new Bio::EnsEMBL::SeqFeature;
+      $curr_exon = new Bio::EnsEMBL::Feature;
       $curr_exon->seqname  ($self->genomic->id);
       $curr_exon->id       ($self->protein->id);
       $curr_exon->start    ($start);
       $curr_exon->end      ($end);
       $curr_exon->strand   ($strand);
-      $curr_exon->phase    ($phase);
-      $curr_exon->end_phase($end_phase);
 
       $self->addExon($curr_exon);
 
@@ -243,7 +240,6 @@ sub align_protein {
       $fp->hstart  ($pstart);
       $fp->hend    ($pend);
       $fp->hstrand (1);
-
       $curr_exon->add_sub_SeqFeature($fp,'');
     }
   } 

@@ -43,7 +43,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
@@ -128,13 +127,13 @@ sub make_MiniSeq {
 	
       } else {
 	
-	my $newfeature = new Bio::EnsEMBL::SeqFeature;
+	my $newfeature = new Bio::EnsEMBL::Feature;
 	
         $newfeature->seqname   ($f->hseqname);
         $newfeature->start     ($start);
 	$newfeature->end       ($end);
 	$newfeature->strand    (1);
-	$newfeature->attach_seq($self->genomic_sequence);
+	$newfeature->slice($self->genomic_sequence);
 	
 	push(@genomic_features,$newfeature);
 	
@@ -161,13 +160,10 @@ sub make_MiniSeq {
       $fp->seqname($f->seqname);
       $fp->slice($self->genomic_sequence);
       $fp->strand($f->strand);
-      $fp->score($f->score);
       $fp->hstart($cdna_start);
       $fp->hend($cdna_end);
       $fp->hstrand(1);
       $fp->hseqname($f->seqname."cdna");
-      $fp->p_value($f->p_value);
-      $fp->percent_id($f->percent_id);
       
       $pairaln->addFeaturePair($fp);
       
@@ -256,11 +252,8 @@ sub run {
       $gf = $genomics[0];
     }
     
-    $gf->phase    ($f->phase);
-    $gf->end_phase($f->end_phase);
     $gf->strand   ($strand);
     $gf->seqname  ($self->genomic_sequence->seq_region_name);
-    $gf->score    (100);
     
     # also need to convert each of the sub alignments back to genomic coordinates
     
@@ -278,7 +271,7 @@ sub run {
 	$a->hseqname($self->protein_sequence->id);
 	
 	# Maybe put a check in that this really is a sub feature
-	
+
 	$gf->add_sub_SeqFeature($a,'');
       }
     }
@@ -291,7 +284,7 @@ sub run {
   # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
   # sub_SeqFeatures representing ungapped alignments making up the exon:protein alignment
   
-  my $fset = new Bio::EnsEMBL::SeqFeature();
+  my $fset = new Bio::EnsEMBL::Feature();
   
   foreach my $nf (@newf) {
     $fset->add_sub_SeqFeature($nf,'EXPAND');
