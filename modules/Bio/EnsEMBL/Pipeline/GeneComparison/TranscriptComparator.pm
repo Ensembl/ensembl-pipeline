@@ -339,7 +339,7 @@ sub _test_for_fuzzy_semiexact_Merge{
     $allowed_mismatch =  $self->splice_mismatch;
   }
 
-  my $verbose = 1;
+  my $verbose = 0;
   
   print STDERR "=========== comparing ================\n";
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
@@ -1215,7 +1215,7 @@ sub _compare_Transcripts {
 sub _test_for_merge{
   my ($self,$tran1,$tran2) = @_;
 
-  my $verbose   = 1;
+  my $verbose   = 0;
 
   if ($verbose){
       print STDERR "comparing ".
@@ -1236,12 +1236,15 @@ sub _test_for_merge{
   
   # the simplest case is with two single-exon transcripts:
   if ( scalar(@exons1) == 1 && scalar(@exons2) == 1 ){
-      if ( $exons1[0]->overlaps($exons2[0] )){
-	  print STDERR "--- single-exon transcripts --- merge ---\n" if $verbose;
-	  return (1,1);
-      }
+    if ( $exons1[0]->overlaps($exons2[0] )){
+      print STDERR "--- single-exon transcripts --- merge ---\n" if $verbose;
+      return (1,1);
+    }
+    else{
+      print STDERR "--- single-exon transcripts --- No merge ---\n" if $verbose;
+      return (0,0);
+    }
   }
-  
   my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
 
   my $splice_mismatch = $self->splice_mismatch;
@@ -1520,7 +1523,7 @@ sub _test_for_merge{
       }
       else{
 	  print STDERR "Failed to find a proper match. Not merging\n" if $verbose;
-	  return (0,$overlaps);
+	  return (0,@list1);
       }
   } # end of PAIR
   

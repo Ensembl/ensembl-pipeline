@@ -140,16 +140,31 @@ sub run {
   my @lists = $self->link_Transcripts( \@transcript_clusters );
   print STDERR scalar(@lists)." lists returned from link_Transcripts\n";
 
-  # merge each list into a putative transcript
-  my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
-  print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
+	 # merge each list into a putative transcript
+	 my @merged_transcripts  = $self->_merge_Transcripts(\@lists);
+	 #print STDERR scalar(@merged_transcripts)." transcripts returned from _merge_Transcripts\n";
 	 
-  foreach my $tran ( @merged_transcripts ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
-  }
+	 ############################################################
+	 # repeat the process. The representation we use is still not satisfactory
+	 # and there are still things that can be merge:
+	 ############################################################
 
-  $self->output(@merged_transcripts);
-}
+	 # cluster the transcripts
+	 my @more_transcript_clusters = $self->_cluster_Transcripts(@merged_transcripts);
+	 print STDERR scalar(@transcript_clusters)." clusters returned from second call _cluster_Transcripts\n";
+	 my @more_lists = $self->link_Transcripts( \@more_transcript_clusters );
+	 print STDERR scalar(@more_lists)." lists returned from second call link_Transcripts\n";
+	 
+	 # merge each list into a putative transcript
+	 my @more_merged_transcripts  = $self->_merge_Transcripts(\@more_lists);
+	 print STDERR scalar(@more_merged_transcripts)." transcripts returned from second call _merge_Transcripts\n";
+	 
+	 #foreach my $tran ( @more_merged_transcripts ){
+	 #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($tran);
+	 #}
+	 
+	 $self->output(@more_merged_transcripts);
+	}
 
 
 
@@ -485,21 +500,39 @@ sub link_Transcripts{
 	# get the transcripts in this cluster
 	my @transcripts = @{$cluster->get_Transcripts};
 	
+        ############################################################
 	# sort the transcripts by the left most coordinate in ascending order
 	# for equal value, order by the right most coordinate in descending order
+        ############################################################
 	@transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 			      if ($result){
-				  return $result;
+	             return $result;
 			      }
 			      else{
 				  return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-			      }
+	     	      }
 			  } @transcripts;
 	
-	print STDERR "Cluster: (sorted transcripts)\n";
-	foreach my $t ( @transcripts ){
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-	}
+        # the other way around does not work either:
+        #@transcripts = sort { my $result = (  $self->transcript_high($b) <=> $self->transcript_high($a) );
+	#		      if ($result){
+	#      		       return $result;
+	#		      }
+	#		      else{
+	#			  return ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+	#     	      }
+	#		  } @transcripts;
+	
+        ############################################################
+        # trying to sort them by genomic length does not work
+        #@transcripts = sort { $self->genomic_length($b) <=> $self->genomic_length($a) } @transcripts;
+        #@transcripts = sort { $self->exonic_length($b) <=> $self->exonic_length($a) } @transcripts;
+
+
+	#print STDERR "Cluster: (sorted transcripts)\n";
+	#foreach my $t ( @transcripts ){
+	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+	#}
 	
 	# for each transcript
 	# try to find al the linked lists that start in this transcript
@@ -527,9 +560,9 @@ sub link_Transcripts{
 		foreach my $list ( @current_lists ){
 		    
 		    # test
-                    print STDERR "-- comparing: ".Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$j] );
-                    print STDERR "with list:\n";
-                    $self->_print_List($list);
+                    #print STDERR "-- comparing: ".Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[$j] );
+                    #print STDERR "with list:\n";
+                    #$self->_print_List($list);
 
                     # check whether this trans can be linked to this list or to a proper sublist
 		    my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
@@ -556,8 +589,8 @@ sub link_Transcripts{
 		# if we have complete lists, we add $transcripts[$j] to the end of all of them
 		if ( @complete_lists ){
 		    foreach my $list ( @complete_lists ){
-		       print STDERR "ADDING transcript to complete list:\n";
-                       $self->_print_List($list);
+		       #print STDERR "ADDING transcript to complete list:\n";
+                       #$self->_print_List($list);
                        push ( @$list, $transcripts[$j] );
 		    }
 		    next TRAN2;
@@ -569,8 +602,8 @@ sub link_Transcripts{
 		    # add it to the longest sublist:
 		    my $longest_sublist  = shift( @sorted_sublists );
 		    push ( @$longest_sublist , $transcripts[$j] );
-		    print STDERR "ADDING transcript to complete list:\n";
-                    $self->_print_List($longest_sublist);
+		    #print STDERR "ADDING transcript to complete list:\n";
+                    #$self->_print_List($longest_sublist);
 
 		    # add this new list to the set $lists{$i}
 		    push ( @current_lists, $longest_sublist );
@@ -579,8 +612,8 @@ sub link_Transcripts{
                     my $next_sublist = shift( @sorted_sublists); 
                     while( defined $next_sublist && scalar(@$next_sublist) == $max ){
                       push ( @$next_sublist , $transcripts[$j] );
-		      print STDERR "ADDING transcript to sub list:\n";
-                      $self->_print_List($next_sublist);
+		      #print STDERR "ADDING transcript to sub list:\n";
+                      #$self->_print_List($next_sublist);
 
 		      # add this new list to the set $lists{$i}
 		      push ( @current_lists, $next_sublist );
@@ -652,15 +685,16 @@ sub link_Transcripts{
     
     $self->sub_clusters( @final_lists );
     
-    #print STDERR "final lists:\n";
-    #my $count = 0;
-    #foreach my $list (@final_lists){
-#	$count++;
+#    print STDERR "final lists:\n";
+#    my $count = 0;
+#    foreach my $list (@final_lists){	
+#$count++;
 #	print STDERR "list $count\n";
 #	foreach my $t ( @$list ){
 #	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
 #	}
- #   }
+#    }
+
     return @final_lists;	      
 }
 
@@ -824,6 +858,22 @@ sub _check_embedding{
 
 ############################################################
 
+sub genomic_length{
+  my ($self,$t) = @_;
+  my @exons = sort{ $a->start <=> $b->start } @{$t->get_all_Exons};
+  return $exons[$#exons]->end - $exons[0]->start + 1;
+}
+
+sub exonic_length{
+  my ($self,$t) = @_;
+  my $length = 0;
+  foreach my $exon ( @{$t->get_all_Exons} ){
+  $length += ( $exon->end - $exon->start + 1 );
+  }
+  return $length;
+}
+
+############################################################
 
 =head2 _test_for_Merge
  Function: this function is called from link_Transcripts and actually checks whether two transcripts
@@ -1015,6 +1065,12 @@ sub _merge_Transcripts{
 	my $new_exon = Bio::EnsEMBL::Exon->new();
 	$new_exon->start($exon_cluster->start );
 	$new_exon->end  ($exon_cluster->end   );
+	
+	############################################################
+	# they should not have a translation
+	############################################################
+	$new_exon->phase(0);
+	$new_exon->end_phase(0);
 	
 	# set the strand to be the same as the exon_cluster
 	$new_exon->strand($exon_cluster->strand);
@@ -1311,7 +1367,7 @@ CLUSTER:
     }
     # if we have too little exons to obtain the end, take the original value
     if ( !defined $max_end ){
-      print STDERR "In last position, cluster end wins!\n";
+      #print STDERR "In last position, cluster end wins!\n";
       $new_end = $cluster->end;
     }
     
@@ -1362,16 +1418,16 @@ CLUSTER:
       if ($other_end && $other_start && $other_start < $other_end ){
 	$new_start = $other_start;
 	$new_end   = $other_end;
-	print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
+	#print STDERR "Reset: new_start: $new_start\t new_end: $new_end\n";
       }
       else{
 	## ok, you tried to change, but you got nothing, what can we do about it?
-	print STDERR "Could not reset the start and end coordinates\n";
+	#print STDERR "Could not reset the start and end coordinates\n";
 	if ( $other_end <= $other_start ){
-	  print STDERR "Sorry will have to put the end = end of cluster\n";
+	  #print STDERR "Sorry will have to put the end = end of cluster\n";
 	  $new_end  = $cluster->end;
 	  if ( $new_start >= $new_end ){
-	    print STDERR "Last resort: I'm afraid we'll also have to put start = start of cluster, good luck\n";
+	    #print STDERR "Last resort: I'm afraid we'll also have to put start = start of cluster, good luck\n";
 	  }
 	}
       }
