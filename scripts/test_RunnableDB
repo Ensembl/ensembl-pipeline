@@ -30,7 +30,9 @@ Requires a DB connexion, input ID, name of runnable and analysis ID.
 
     -input_id  The input id for the RunnableDB
 
-    -analysis  The logic name of the analysis we want to run
+    -logic_name  The logic name of the analysis we want to run
+    
+    -write       writes to the database (optionnal)
 
 =cut
 
