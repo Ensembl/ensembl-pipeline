@@ -341,7 +341,9 @@ sub _store_affy_features {
     my $probe_name = $h->{'q_id'};
     $probe_name =~ s/^probe\://;
     my ($probeset_name,$composite_name) = split /\:/, $probe_name;
-    $probeset_name =~ s/-/_//g;  ###this to keep name same as in code corresponds to external_db.db_name
+
+    my $xref_name = $probeset_name;
+    $xref_name =~ s/-/_//g;  ###this to keep name same as in code corresponds to external_db.db_name
 
     my $misc_feature = Bio::EnsEMBL::MiscFeature->new (
 						       -START  => $h->{'t_start'}, ###it's been added 1 already
@@ -403,7 +405,7 @@ sub _store_affy_features {
     #
     
     $misc_feature->add_MiscSet( Bio::EnsEMBL::MiscSet->new (
-							    -CODE  => "AFFY\_$probeset_name",
+							    -CODE  => "AFFY\_$xref_name",
 							    -NAME  => $probeset_name,
 							    -DESCRIPTION => "$probeset_name probe set",
 							    -LONGEST_FEATURE => $self->max_length,
