@@ -1,5 +1,5 @@
 
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise.pm
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
@@ -11,13 +11,13 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise
+Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise
 
 =head1 SYNOPSIS
 
 =head1 DESCRIPTION
 
-Runs all the TargettedGeneWise jobs needed for a chunk of genomic sequence
+Runs all the TargettedGenewise jobs needed for a chunk of genomic sequence
 
 =head1 CONTACT
 
@@ -47,7 +47,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
-                   GB_GW_DBPORT                                          
+							     GB_GW_DBPORT
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
@@ -77,7 +77,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    qw (
 			   -SEQFETCHER  => $sf,
                            -ANALYSIS    => $analysis);
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise object
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Args    :   -db:      A Bio::EnsEMBL::DBSQL::DBAdaptor,
                 -input_id:   Contig input id (required), 
@@ -173,13 +173,9 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-    (-dbname => $self->db->dbname,
-     -user => $self->db->username,
-     -pass => $self->db->password,
-     -host => $self->db->host,
-     -port => $self->db->port,
-    );
+
+  my $pipeline_db = $self->db;
+
   my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
   #print STDERR "have ".$pmfa." adaptor\n";
   my $input_id = $self->input_id;
@@ -197,8 +193,9 @@ sub make_targetted_runnables {
 						       '-host'   => $GB_GW_DBHOST,
 						       '-user'   => $GB_GW_DBUSER,
 						       '-pass'   => $GB_GW_DBPASS,
+						       '-port'	 => $GB_GW_DBPORT,
 						       '-dbname' => $GB_GW_DBNAME,
-                   '-port' => $GB_GW_DBPORT,                               
+						       '-port' => $GB_GW_DBPORT,                               
 						      );
   
   
@@ -288,7 +285,7 @@ sub run {
     };
     
     if($@){
-      $self->warn("problems fetching input for TargettedGeneWise: [$@]\n");
+      $self->warn("problems fetching input for TargettedGenewise: [$@]\n");
       next TGE;
     }
 
@@ -297,10 +294,10 @@ sub run {
     };
 
     if($@){
-      $self->warn("problems running TargettedGeneWise: [$@]\n");
+      $self->warn("problems running TargettedGenewise: [$@]\n");
       next TGE;
     }
-     
+
   }
 
 }
@@ -350,7 +347,7 @@ sub write_output {
       next TGE;
     }
  }
-  # data has already been written out, so no need to do anything here.
+
 }
 
 sub convert_output {
