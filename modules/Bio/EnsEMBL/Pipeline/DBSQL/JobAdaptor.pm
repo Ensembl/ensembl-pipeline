@@ -75,6 +75,7 @@ sub new {
 sub fetch_by_dbID {
   my $self = shift;
   my $id = shift;
+  #print STDERR "Fetching job ".$id."\n";
   my $sth = $self->prepare(q{
     SELECT job_id, input_id, analysis_id, submission_id,
            stdout_file, stderr_file, retry_count
@@ -205,6 +206,49 @@ sub fetch_by_Status {
     return @jobs;
 }
 
+
+
+sub list_dbIDs{
+  my ($self) = @_;
+
+  my $query = q{
+	SELECT   j.job_id
+	FROM     job j
+    };
+
+  my $sth = $self->prepare($query);
+  $sth->execute();
+
+  my @ids;
+
+  while( my ($id) = $sth->fetchrow){
+    push(@ids, $id);
+  }
+
+  return \@ids;
+}
+
+sub fetch_all{
+  my ($self) = @_;
+
+  my $query = q{
+	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
+	         j.stdout_file, j.stderr_file, j.retry_count
+	FROM     job j
+    };
+
+  my $sth = $self->prepare($query);
+  my $res = $sth->execute();
+
+  my @jobs;
+
+  while (my $row = $sth->fetchrow_hashref)
+   {
+     my $job = $self->_objFromHashref($row);
+     push(@jobs,$job);
+    }
+  return @jobs;
+}
 
 =head2 fetch_by_age {
 
@@ -731,6 +775,8 @@ sub deleteObj {
     }
   }
 }
+
+
 
 
 1;

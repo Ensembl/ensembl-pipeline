@@ -343,7 +343,7 @@ sub run_program {
 	 
 
 	my $cmd = $self->program .' '.
-	        '--acc --cut_ga --cpu 1 '.
+	        '--acc --cut_ga '.
 	        $self->options .' '.
 	        $dbfiles[0]      .' '.
 	        $self->filename.' > '.
@@ -359,7 +359,7 @@ sub run_program {
    if ($dbfiles[1] =~ /fs/) { 
        
 	my $cmd = $self->program .' '.
-	        '--acc --cut_ga --cpu 1 '.
+	        '--acc --cut_ga '.
 	        $self->options .' '.
 	        $dbfiles[1]      .' '.
 	        $self->filename.' > '.

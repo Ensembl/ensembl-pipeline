@@ -359,7 +359,12 @@ sub run_genefinder {
     my ($self) = @_;
     #print "Running genefinder on ".$self->filename."\n";
     #print STDERR `pwd`;
-    my $command = $self->genefinder.' -tablenamefile '.$self->tablenamefile.' -intronPenaltyFile '.$self->intronpenalty.' -exonPenaltyFile '.$self->exonpenalty.' /tmp/'.$self->filename.' > '.$self->results; 
+    $self->throw("either tablenamefile ".$self->tablenamefile.
+                 " intronpenalty file ".$self->intronpenalty.
+                 " or exonpenalty file ".$self->exonpenalty.
+                 " config files don't exist and genefinder won't run without".
+                 " them ") unless($self->filecheck);
+    my $command = $self->genefinder.' -tablenamefile '.$self->tablenamefile.' -intronPenaltyFile '.$self->intronpenalty.' -exonPenaltyFile '.$self->exonpenalty.' /tmp/'.$self->filename.' > '.$self->results;
     print STDERR $command."\n";
     system ($command);
     my $size = -s $self->results;
@@ -368,6 +373,21 @@ sub run_genefinder {
 }
 
 
+
+
+sub filecheck{
+    my ($self) = @_;
+
+    if(!-e $self->tablenamefile){
+       return undef;
+    }elsif(!-e $self->intronpenalty){
+       return undef;
+    }elsif(!-e $self->exonpenalty){
+       return undef;
+    }else{
+       return 1;
+    }
+}
 
 =head2 parse_results
 

@@ -774,11 +774,16 @@ sub can_retry{
   if(!$BATCH_QUEUES{$logic_name}){
      $logic_name = 'default';
   }
-
+  #print STDERR "Checking if can retry ".$self->dbID." ".
+  #  $self->logic_name."\n";
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
+  #print STDERR "Retry count is ".$self->retry_count." max retries ".
+  #  $max_retry."\n";
   if($self->retry_count <= $max_retry){
+    #print STDERR "Can retry\n";
      return 1;
   }else{
+    #print STDERR "Can't retry\n";
      return 0;
   }
 }
