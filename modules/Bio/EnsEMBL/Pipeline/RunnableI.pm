@@ -141,6 +141,24 @@ sub protect {
     return @{$self->{_protected}};
 }
 
+=head2 threshold
+
+    Title   :   threshold
+    Usage   :   $obj->threshold($value);
+    Function:   Get/set method for threshold score required for outputting
+                Feature/FeaturePair
+    Args    :   Optional value (depends on type of Analysis)
+
+=cut
+
+sub threshold {
+    my ($self, $value) = @_;
+        
+    $self->{'_threshold'} = $value if ($value);
+    
+    return  $self->{'_threshold'};
+}
+
 =head2 workdir
 
     Title   :   workdir
