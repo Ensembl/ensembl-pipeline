@@ -90,8 +90,8 @@ GetOptions(
            'single'       => \$single,
            'single_name:s'=> \$name,
            'translation_ids' => \$translation_id,
-           'seq_level' => \$seq_level,
-           'top_level' => \$top_level,
+           'seq_level!' => \$seq_level,
+           'top_level!' => \$top_level,
            ) or useage(\@command_args);
 
 
@@ -153,9 +153,9 @@ if($config_sanity){
 my $analysis = $rulemanager->analysis_adaptor->
   fetch_by_logic_name($logic_name);
 
-if(!$analysis || !$analysis->input_id_type){
+if(!$analysis || !$analysis->input_id_type || !$analysis->module){
   throw("Must have an analysis object $logic_name $analysis and analysis ".
-        "must have an input_id_type\n");
+        "must have an input_id_type and a module to run\n");
 }
 if($analysis->input_id_type eq 'ACCUMULATOR'){
   throw("Can't use this script to run accumulators");
@@ -170,11 +170,11 @@ my $input_ids = setup_input_ids($analysis, $rulemanager, $ids_to_run,
                                 $seq_level, $top_level, $verbose, 
                                 $logic_name);
 
-my @input_ids = keys(%{$input_ids->{$analysis->input_id_type}});
+
 
 my $rule = $rulemanager->rule_adaptor->fetch_by_goal($analysis);
 my %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
-if(@input_ids == 0){
+if(@$input_ids == 0){
   throw("Can't do anything I have no input ids");
 }
 if($force){
@@ -184,7 +184,7 @@ if($force){
 }
 print STDERR "Trying to submit jobs for ".$analysis->logic_name."\n" 
   if($verbose);
-INPUT_ID:foreach my $input_id(@input_ids){
+INPUT_ID:foreach my $input_id(@$input_ids){
   print $input_id."\n" if($verbose);
   if ($term_sig) {
     print "Got term signal\n" if($verbose);
@@ -212,7 +212,6 @@ sub setup_input_ids{
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
       $verbose, $logic_name) = @_;
   
-  my $id_hash;
   if($ids_to_run){
     $id_hash = $rulemanager->read_id_file($ids_to_run);
     my @types = keys(%$id_hash);
@@ -225,22 +224,19 @@ sub setup_input_ids{
             $types[0]." compared to ".$analysis->input_id_type." this ".
             "won't work");
     }
-    return $id_hash;
+    my @ids = keys(%{$id_hash->{$analysis->input_id_type}});
+    return \@ids;
   }elsif($make_input_ids){
-    print STDERR "Making input ids\n";
-    $id_hash = make_input_ids($slice, $file, $translation_id, $single, 
+    print STDERR "Making input ids\n" if($verbose);
+    $ids = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
                           $verbose, $logic_name, $input_id_type);
+    return $ids;
   }else{
-    $id_hash->{$analysis->input_id_type} = {};
     my @ids = @{$rulemanager->stateinfocontainer
                   ->list_input_ids_by_type($analysis->input_id_type)};
-    foreach my $id(@ids){
-      $id_hash->{$analysis->input_id_type}->{$id} = 1;
-    }
-    $rulemanager->input_ids($id_hash);
-    return $id_hash;
+    return \@ids;
   }
 }
 
@@ -254,6 +250,7 @@ sub make_input_ids{
   my ($slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
       $verbose, $logic_name, $store_input_ids) = @_;
+
   my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
     (
      -db => $db,
@@ -274,11 +271,44 @@ sub make_input_ids{
      -slice_overlaps => $slice_overlap,
     );
 
-
-
   my $ids = $inputIDFactory->generate_input_ids;
+  return $ids;
+}
 
-  return $inputIDFactory->get_id_hash;
+sub useage{
+  my ($command_args) = @_;
+  print "Your commandline was :\n".
+    "job_submission.pl ".join("\t", @$command_args), "\n\n";
+
+  print "job_submission.pl is a script for submitting a single analysis ".
+    "jobs to the farm using the job system  as standard it derives its ".
+      "input ids based on the input_id type of the analysis  \n\n";
+  print "Everytime you run job_submission.pl you must pass in the ".
+    "database options\n\n";
+  print "-dbhost     The host where the pipeline database is.\n".
+    "-dbport     The port.\n".
+      "-dbuser     The user to connect as.\n".
+        "-dbpass     The password to use.\n".
+          "-dbname   The database name.\n\n";
+  print "This script also requires an analysis object to already exist ".
+    "in the database and its logic_name is passed in with\n".
+      "-logic_name\n\n";
+  print "Other options you may find useful are:\n\n".
+    "-force which forces the script to ignore currently running jobs and ".
+      " the rules and just submits jobs with the input_ids specified\n".
+    "-input_id_file a file in the format input_id input_id_type which ".
+      "specified which input_ids to run the analysis with\n";
+  print "-make_input_ids which tells the script to create a set of ".
+    "input_ids using the Bio::EnsEMBL::Pipeline::Utils::InputIDFactory\n".
+      "this also requires a series of other options which can been seen ".
+        "if you run the script with -perldoc\n\n";
+  print " -perldocs will print out the perl documentation of this module ".
+    "and -help will print out the help again \n";
+  exit(0);
+}
+sub perldoc{
+	exec('perldoc', $0);
+	exit(0);
 }
 
 =pod 
@@ -411,8 +441,43 @@ Misc options
 
 Post general queries to <ensembl-dev@ebi.ac.uk>
 
-=head1 APPENDIX
+=head1 EXAMPLES
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+ ./job_submission.pl -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -logic_name blast
+
+this would run the analysis specified with logic_name blast using
+input_ids fetched using blasts input_id type and checking the rules and running
+jobs to ensure the analysis can be run
+
+./job_submission.pl -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -logic_name blast -force
+
+as above this would still the same input_ids and run the same analysis but this
+time it would ignore running jobs and rules
+
+./job_submission.pl -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -logic_name blast -input_id_file id_list
+
+this time would consider only the input_ids specified in the file
+
+./job_submission.pl -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+-dbname my_pipeline_database -logic_name blast -make_input_ids -slice
+-coord_system contig
+
+this time it would make the input_ids based on the contig input_id system
+note by specifying make_input_ids this automatically switched -force on
+as if you need to manufacture your input_ids it is unlikely that the analysis
+will pass any rule checks 
+
+=head1 SEE ALSO
+
+  Bio::EnsEMBL::Pipeline::Job
+  Bio::EnsEMBL::Pipeline::Config::General
+  Bio::EnsEMBL::Pipeline::Config::BatchQueue
+
+  pipeline_sanity.pl script here in ensembl-pipeline/scripts
+
+and also using_the_ensembl_pipeline.txt in the ensembl-docs cvs module
 
 =cut

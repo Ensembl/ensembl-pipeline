@@ -345,7 +345,7 @@ sub termhandler {
 sub useage{
   my ($command_args) = @_;
   print "Your commandline was :\n".
-    "RuleManager3.pl ".join("\t", @$command_args), "\n\n";
+    "rulemanager.pl ".join("\t", @$command_args), "\n\n";
 
   print "ensembl-pipeline/scripts/rulemanager.pl is the main script used ".
     "to run the pipeline\n\n"; 

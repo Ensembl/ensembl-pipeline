@@ -4,6 +4,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Getopt::Long;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 my $dbhost;
 my $dbuser;
@@ -21,26 +22,32 @@ my $update = 0;
 my $input_type;
 my $module;
 my $analysis;
-
+my $perl_path = 'Bio/EnsEMBL/Pipeline/RunnableDB';
+my $utils_verbosity = 'WARNING'; #how verbose do you want the 
+#Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
+#WARNING as this gives warning and throws but not deprecates or infos
+my @command_args = @ARGV;
 &GetOptions( 
-	    'dbhost=s'      => \$dbhost,
-	    'dbname=s'      => \$dbname,
-	    'dbuser=s'      => \$dbuser,
-	    'dbpass=s'      => \$dbpass,
-	    'dbport=s'      => \$dbport,
-	    'input_id:s'  => \$input_id,
-	    'logic_name:s'  => \$logic_name,
-	    'check'       => \$check,
-	    'write!' => \$write,
-	    'help!' => \$help,
-	    'verbose!' => \$verbose,
-	    'update_input_id_analysis!' => \$update,
-	    'input_type:s'=> \$input_type,
-	    'module:s'    => \$module,
-	     ) or &useage();
+            'dbhost=s'      => \$dbhost,
+            'dbname=s'      => \$dbname,
+            'dbuser=s'      => \$dbuser,
+            'dbpass=s'      => \$dbpass,
+            'dbport=s'      => \$dbport,
+            'input_id:s'  => \$input_id,
+            'logic_name:s'  => \$logic_name,
+            'check'       => \$check,
+            'write!' => \$write,
+            'help!' => \$help,
+            'verbose!' => \$verbose,
+            'update_input_id_analysis!' => \$update,
+            'input_id_type:s'=> \$input_type,
+            'module:s'    => \$module,
+            'runnabledb_path:s' => \$perl_path,
+            'utils_verbosity=s' => \$utils_verbosity,
+           );
 
 $| = 1;
-
+verbose($utils_verbosity);
 if($check ) {
   print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n";
   exit 0;
@@ -50,7 +57,7 @@ if(!$dbhost || !$dbuser || !$dbname || !$input_id || !$logic_name){
   $help = 1;
 }
 
-&useage() if($help);
+&useage(\@command_args) if($help);
 
 if(!$write){
   $update = 0;
@@ -89,10 +96,21 @@ if(!$analysis){
 }
 
 my $runnable;
-if($analysis->module =~ "Bio::") { $runnable = $analysis->module; }
-else { $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module; }
-(my $file = $runnable) =~ s/::/\//g;
-require "$file.pm";
+my $file;
+if($analysis->module =~ "Bio::"){ 
+  $runnable = $analysis->module; 
+  ($file = $runnable) =~ s/::/\//g;
+  
+}else{
+  $file = $perl_path."/".$analysis->module; 
+  ($runnable = $file) =~ s/\//::/g;
+}
+eval{
+  require "$file.pm";
+};
+if($@){
+  throw("Couldn't require $file $@");
+}
 print STDERR "creating runnable ".$file."\n" if($verbose);
 
 $runnable =~ s/\//::/g;
@@ -177,6 +195,9 @@ sub print_gff{
 }
 
 sub useage{
+  my ($command_args) = @_;
+  print "Your commandline was :\n".
+    "test_RunnableDB ".join("\t", @$command_args), "\n\n";
 	exec('perldoc', $0);
 	exit;
 }
