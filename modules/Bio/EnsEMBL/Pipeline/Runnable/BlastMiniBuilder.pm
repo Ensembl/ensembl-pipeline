@@ -405,6 +405,21 @@ sub form_gene_clusters {
   return \@final_gene_clusters;
 }
 
+=head2 make_object
+
+  Args [1]   : minigenomic sequence object
+  Args [2]   : reference to a list of FeaturePairs
+  Example    : $self->make_object($miniseq, $features);
+  Description: This is an interface that must be implemented
+               in inheriting classes.  This method handles
+               the ultimate creation of the runnable object.
+  Returntype : 0
+  Exceptions : Throws an error if the class has not been
+               implemented by the inheriting class.
+  Caller     : self->build_runnables
+
+=cut
+
 sub make_object {
   my ($self) = @_;
 
