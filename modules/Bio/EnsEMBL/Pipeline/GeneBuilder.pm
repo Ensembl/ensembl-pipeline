@@ -175,6 +175,8 @@ sub get_Features {
     my $contig = $self->contig;
     my @tmp    = $self->get_all_Features;
 
+    @tmp = sort {$a->start <=> $b->start} @tmp;
+
     foreach my $f (@tmp) {
 
 	if (defined($f->sub_SeqFeature)) {
@@ -203,7 +205,9 @@ sub get_Features {
 	    }
 
 	} elsif ($f->primary_tag eq "similarity") {
-	    $f->seqname($contig->id);
+	    
+	    $f->seqname  ($contig->id);
+
 	    if ($f->source_tag eq "est2genome") {
 #		push(@extras,$f);
 	    } elsif ($f->source_tag eq "hmmpfam" && $f->score > 25) {
@@ -270,10 +274,11 @@ sub make_genscanExons {
 	my $excount    = 1;
 
       EXON: foreach my $f ($gs->sub_SeqFeature) {
-	    
+	  print STDERR "Looking at " . $f->id . "\t" . $f->start . "\t" . $f->end . "\n";  
 	  # Don't include any genscans that are inside a genewise
 	  foreach my $gw ($self->genewise) {
-	      if (!($gw->end < $f->start && $gw->start > $f->end)) {
+	      if (!(($gw->end < $f->start) || $gw->start > $f->end)) {
+		  print STDERR "Ignoring genscan exon\n";
 		  next EXON;
 	      }
 	  }
@@ -283,6 +288,7 @@ sub make_genscanExons {
 	                $newexon->find_supporting_evidence(\@features);
 	  my @support = $newexon->each_Supporting_Feature;
 	  
+	  print ("Supporting evidence for " . $newexon->id .  " " . @support . "\n");
 	  if ($#support >= 0) {
 	      push(@exons,$newexon);
 	      $excount++;
@@ -303,7 +309,25 @@ sub make_genewiseExons {
 
     my $gwcount = 1;
 
-    foreach my $f ($self->genewise) {
+    my @fset = $self->genewise;
+
+    @fset = sort {$b->sub_SeqFeature <=> $a->sub_SeqFeature} @fset;
+
+    my @newfset;
+
+     # Remove overlapping genewise sets - this confuses the exon pair building process
+     # 
+     #FSET:  foreach my $f (@fset) {
+     # foreach my $f2 (@newfset) {
+#	  if (!($f->start > $f2->end || $f->end < $f2->start)) {
+#	      next FSET;
+#	  } else {
+#	      push(@newfset,$f);
+#	  }
+#      }
+#  }
+
+      foreach my $f (@fset) {
 	my @gwexons;
 
 	my $excount = 1;
@@ -312,35 +336,35 @@ sub make_genewiseExons {
 	  my $found   = 0;
 	  my $foundex;
 
-	    # Make sure non redundant with all the new exons
-	    foreach my $ex (@newexons) {
-		if ($subf->start == $ex->start && $subf->end == $ex->end) {
-		    $found = 1;
-		    $foundex = $ex;
-		}
-	    }
+	  # Make sure non redundant with all the new exons
+	  foreach my $ex (@newexons) {
+	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
+		  $found = 1;
+		  $foundex = $ex;
+	      }
+	  }
 
-	    # Make sure non redundant with current sub seqfeatures
-	    foreach my $ex (@gwexons) {
-		if ($subf->start == $ex->start && $subf->end == $ex->end) {
-		    $found = 1;
-		    $foundex = $ex;
-		}
-	    }
-
-	    if ($found == 1) {
-		print STDERR "\nFound duplicate exon - adding evidence\n";
-		$foundex->add_Supporting_Feature($subf);
-	    } else {
-		print STDERR "Making new exon from " .  $subf->gffstring . "\n";
-
-		my $newexon = $self->_make_Exon($subf,"genewise." . $gwcount . "." . $excount);
-
-		push(@gwexons,$newexon);
-		
-		$excount++;
-	    }
-	}
+	  # Make sure non redundant with current sub seqfeatures
+	  foreach my $ex (@gwexons) {
+	      if ($subf->start == $ex->start && $subf->end == $ex->end) {
+		  $found = 1;
+		  $foundex = $ex;
+	      }
+	  }
+	  
+	  if ($found == 1) {
+	      print STDERR "\nFound duplicate exon - adding evidence\n";
+	      $foundex->add_Supporting_Feature($subf);
+	  } else {
+	      print STDERR "Making new exon from " .  $subf->gffstring . "\n";
+	      
+	      my $newexon = $self->_make_Exon($subf,"genewise." . $gwcount . "." . $excount);
+	      
+	      push(@gwexons,$newexon);
+	      
+	      $excount++;
+	  }
+      }
 
 	$gwcount++;
 
@@ -367,7 +391,7 @@ sub make_genewise_ExonPairs {
     my @exons = $self->genewise_exons;
 
     foreach my $ex (@exons) {
-	
+	eval {
 	if ($count > 0) {
 	    my $makepair = 0;
 
@@ -411,9 +435,14 @@ sub make_genewise_ExonPairs {
 		}
 	    }
 	}
+    };
+	
+	if ($@) {
+	    print STDERR "ERROR making exon pair $@\n";
+	}
 	$count++;
     }
-
+  
 }
 	
 
@@ -437,7 +466,7 @@ sub  make_ExonPairs {
 
     my %pairhash;
 
-    my @exons = $self->genscan;
+    my @exons = $self->genscan_exons;
 
     @exons = sort { $a->start <=> $b->start } @exons;
 
@@ -448,8 +477,8 @@ sub  make_ExonPairs {
     print STDERR "Making exon pairs \n";
 
     for (my $i = 0; $i < scalar(@exons)-1; $i++) {
-	print STDERR "Exono no. $i\n";
 
+	print ("Looking at exon $i\n");
 	my %idhash;
 	my $exon1 = $exons[$i];
 	
@@ -472,10 +501,11 @@ sub  make_ExonPairs {
 	    # If any of the supporting features of the two exons
             # span across an intron a pair is made.
 	  F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
-#	      print ("FEATURE1 " . $f1->gffstring . "\n");
+	      next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
+	#      print ("FEATURE1 " . $f1->gffstring . "\n");
 	      my @f = $exon2->each_Supporting_Feature;
 	    F2: foreach my $f2 (@f) {
-
+		next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
 #		print ("FEATURE2 " . $f1->gffstring . "\n");
 		my @pairs = $self->get_all_ExonPairs;
 		
@@ -1458,12 +1488,16 @@ sub set_phases {
     }
 
     push(@fset,$sf);
-	
+    
+    my @newfset;
+
     foreach my $fset (@fset) {
 	my $phase = $self->find_phase($fset->sub_SeqFeature);
 	
 	if ($phase == -1) {
-	    $self->warn("Couldn't find correct phase for feature set\n");
+	    $self->warn("Couldn't find correct phase for feature set - ignoring feature set\n");
+	} else {
+	    push(@newfset,$fset);
 	}
 
 
@@ -1492,7 +1526,7 @@ sub set_phases {
 	}
     }
 	
-    return @fset;
+    return @newfset;
 }
 
 # This is a somewhat kludgy attempt to deal with gene repeats
@@ -1678,8 +1712,8 @@ sub find_phase {
     my $dna = new Bio::PrimarySeq(-id => "cdna" ,-seq => $seq);
 	 
     my $tran0 =  $dna->translate('*','X',0)->seq;
-    my $tran1 =  $dna->translate('*','X',1)->seq;
-    my $tran2 =  $dna->translate('*','X',2)->seq;
+    my $tran1 =  $dna->translate('*','X',2)->seq;
+    my $tran2 =  $dna->translate('*','X',1)->seq;
 
     my $phase;
 
@@ -1692,8 +1726,17 @@ sub find_phase {
     } else {
 	$phase = -1;
     }
+    
+    if ($phase == -1) {
+	print STDERR "Couldn't find correct phase for transcript. Translations were :\n";
 
-    print(STDERR "\n\tTranslation =  " . $dna->translate('*','X',(3-$phase)%3)->seq . " " . $phase . "\n\n");
+	print STDERR "Phase 0 : $tran0\n";
+	print STDERR "Phase 1 : $tran0\n";
+	print STDERR "Phase 2 : $tran0\n";
+    } else {
+	print(STDERR "\n\tTranslation ($phase) =  " . $dna->translate('*','X',(3-$phase)%3)->seq . " " . $phase . "\n\n");
+    }
+
     return $phase;
 }
 
