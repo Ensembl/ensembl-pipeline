@@ -16,7 +16,7 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..3\n"; 
+BEGIN { $| = 1; print "1..4\n"; 
 	use vars qw($loaded); }
 
 END { print "not ok 1\n" unless $loaded; }
@@ -50,6 +50,12 @@ print "ok 2\n";
 print "ok 3\n";
 
 
+
+if( scalar(@fp) != 3 ) {	
+  print "not ok 4\n";
+} else {
+  print "ok 4\n";
+}
 
 
 

@@ -141,7 +141,28 @@ sub run{
    #process alignments above score
 
    foreach my $fp ( $cm->fp($self->score) ) {
-       my ($start,$end,$strand,$score,$seq1,$hstart,$hend,$hstrand,$score,$seq2) = split(/:/,$fp);
+       my ($seq1,$seq2,$score,$start,$end,$hstart,$hend) = split(/:/,$fp);
+       my ($strand,$hstrand,$swap);
+
+       if( $start > $end ) {
+	   $strand = -1;
+	   $swap = $start;
+	   $start = $end;
+	   $end = $swap;
+       } else {
+	   $strand = 1;
+       }
+
+       if( $hstart > $hend ) {
+	   $hstrand = -1;
+	   $swap = $hstart;
+	   $hstart = $hend;
+	   $hend = $swap;
+       } else {
+	   $hstrand = 1;
+       }
+
+
        $fp = Bio::EnsEMBL::FeatureFactory->new_feature_pair();
 
        $fp->start($start);
