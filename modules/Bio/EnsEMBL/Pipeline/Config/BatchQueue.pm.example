@@ -47,7 +47,7 @@ use vars qw(%Config);
 	   QUEUE_MANAGER      => 'LSF',
 	   DEFAULT_BATCH_SIZE => 10,
 	   DEFAULT_RETRIES    => 3,
-	   DEFAULT_BATCH_QUEUE => 'acarilong', # put in the queue  of your choice, eg. 'acari'
+	   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
 	   DEFAULT_OUTPUT_DIR => '',
 	   DEFAULT_CLEANUP => 'yes',	
 	   MAX_PENDING_JOBS   => 400,
@@ -60,8 +60,8 @@ use vars qw(%Config);
 				   retries    => 3,
 				   sub_args   => '',
 				   runner     => '',
-				   queue => 'acarilong',
-				   output_dir => '/acari/work1/lec/out/',
+				   queue => 'normal',
+				   output_dir => '/some_dir/',
 				   cleanup => 'yes',	
 				  },
 				  {
@@ -71,8 +71,6 @@ use vars qw(%Config);
 				   retries    => 3,
 				   sub_args   => '',
 				   runner     => '',
-				   queue => 'acarilong', 
-				   output_dir => '/acari/work1/lec/out/',
 				   cleanup => 'yes',	
 				  },
 				  {
@@ -82,8 +80,6 @@ use vars qw(%Config);
 				   retries    => 3,
 				   sub_args   => '',
 				   runner     => '',
-				   queue => 'acarilong',
-				   output_dir => '/acari/work1/lec/out/',
 				   cleanup => 'yes',	 
 				  },
 	
