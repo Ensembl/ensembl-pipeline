@@ -20,7 +20,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome->new(
 					     -dbobj     => $db,
-					     -input_id  => $id
+					     -input_id  => $id,
+					     -blastdb   => $blastdb
                                              );
     $obj->fetch_input
     $obj->run
@@ -59,8 +60,9 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
            
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID'], @args);
+    my( $dbobj, $blastdb, $input_id ) = $self->_rearrange(['DBOBJ',
+							   'BLASTDB',
+							   'INPUT_ID'], @args);
        
     $self->throw("No database handle input") unless defined($dbobj);
     $self->dbobj($dbobj);
@@ -68,6 +70,9 @@ sub new {
     $self->throw("No input id input") unless defined($input_id);
     $self->input_id($input_id);
     
+    $self->throw("No blast db specified") unless defined($blastdb);
+    $self->blastdb($blastdb);
+
     return $self; # success - we hope!
 }
 
@@ -203,8 +208,11 @@ sub fetch_input {
   $contig->_chr_name($chrid);
   
   my $genseq    = $contig->get_repeatmasked_seq;
-  
-  my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'  => $genseq);
+  my $blastdb   = $self->blastdb;
+  print STDERR "fpc blastdb: $blastdb\n";
+
+  my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome('-genomic'  => $genseq, 
+									    '-blastdb'  => $blastdb);
     
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
@@ -291,7 +299,7 @@ sub _convert_output {
     push(@genes, @g);
   }
 
-  # map genes back to genomic coordinates
+  # map genes back to RawContig coordinates
   my @remapped = $self->_remap_genes(@genes);	
     
   if (!defined($self->{_output})) {
@@ -319,7 +327,7 @@ sub _make_genes {
   
   print STDERR "About to make genes\n";
 
-  my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
+  my @tmpf = $runnable->output; # an array of SeqFeatures one per gene prediction, with subseqfeatures
   print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
   my @genes;
   
@@ -366,7 +374,7 @@ sub _make_genes {
       $exon->end  ($exon_pred->end);
       $exon->strand($exon_pred->strand);
       
-      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
+
       
       #	$exon->phase($subf->feature1->{_phase});
       
@@ -375,21 +383,21 @@ sub _make_genes {
       # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
       $exon_pred->source_tag('BME2G');
       $exon_pred->primary_tag('BME2G');
-      $exon_pred->score(100); # ooooooohhhhhh
-      
+      print STDERR "***Exon_pred " . $exon_pred->gffstring . "\n";
+
+      print "number of subf: " . scalar($exon_pred->sub_SeqFeature) . "\n";
+
       # sort out supporting evidence for this exon prediction
       foreach my $subf($exon_pred->sub_SeqFeature){
 	$subf->feature1->source_tag($genetype);
 	$subf->feature1->primary_tag('similarity');
-	$subf->feature1->score(100); # eeeeek
 	$subf->feature1->analysis($exon_pred->analysis);
 	
 	$subf->feature2->source_tag($genetype);
 	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->score(100); # eeeeeek
 	$subf->feature2->analysis($exon_pred->analysis);
 	
-#	print STDERR "*subf " . $subf->gffstring . "\n";
+	print STDERR "*subf " . $subf->gffstring . "\n";
 	$exon->add_Supporting_Feature($subf);
       }
       
@@ -577,6 +585,29 @@ sub vc{
     return $obj->{'vc'};
 
 }
+
+=head2 blastdb
+
+ Title   : blastdb
+ Usage   : $obj->blastdb($newval)
+ Function: 
+ Returns : value of blastdb
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub blastdb{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'blastdb'} = $value;
+    }
+    return $obj->{'blastdb'};
+
+}
+
+
 
 1;
 
