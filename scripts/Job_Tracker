@@ -33,6 +33,8 @@ Job_Tracker: Displays jobs by status, analysis id, input id or age.
     -age          age since job status recorded in minutes
 
     -input        input id
+    
+    -$dir         a directory to store Job_Tracker output (gives faster loading)
 
 =cut
 
@@ -50,13 +52,14 @@ use FreezeThaw;
 
 my $anahost     = 'localhost';
 my $anaport     = '410000';
-my $anadbname   = 'pipeline',
+my $anadbname   = 'pipeline', #freeze_24
 my $anadbuser   = 'root';
 my $anapass     =  undef;
 my $status      = 'FAILED';
 my $analysis    = undef;
 my $age         = undef;
 my $input_id    = undef;
+my $dir         = undef;
 
 &GetOptions(
 	    'anahost:s'     => \$anahost,
@@ -68,6 +71,7 @@ my $input_id    = undef;
 	    'analysis:s'    => \$analysis,
 	    'age:s'         => \$age,
         'input:s'       => \$input_id,
+        'dir:s'         => \$dir,
         );
 
 
@@ -124,34 +128,75 @@ foreach my $job (@jobs)
     }
 }
 
+if ($dir)
+{
+    die ("Directory $dir doesn't exist") unless (-e $dir);
+    my $filename = $dir.'jobtracker'
+}
+
 print STDERR "Sorted by status: JOBS: ".@jobs." CREATED ".@created." SUBMITTED ".@submitted
       ." SUCCESSFUL ".@successful." FAILED ".@failed."\n";
 
 print "<BODY TEXT=\"#000000\" BGCOLOR=\"#FFFFFF\">";
     print("<TABLE>\n");
+    
+    
+if ($dir)
+{
+    die ("Directory $dir doesn't exist") unless (-e $dir);
+    my $filename = $dir.'jobtracker.output'; #need to add machine info   
     print(  "<TR>$title</TR>"
             ."<TR BGCOLOR=\"00FF55\">"
-            ."<TD>CREATED (".@created.")</TD>"
+            ."<TD><a href=\"$filename.created.html\"> CREATED  (".@created.")</a></TD>"
+            ."<TD><a href=\"$filename.submitted.html\"> SUBMITTED (".@submitted.")</a></TD>"
+            ."<TD><a href=\"$filename.successful.html\"> SUCCESSFUL (".@successful.")</a></TD>"
+            ."<TD><a href=\"$filename.failed.html\"> FAILED (".@failed.")</a></TD>"
+            ."</TR>"
+            );
+    print("</TABLE>\n");
+    
+    printlist($filename.'.created.html', @created);
+    printlist($filename.'.submitted.html', @submitted);
+    printlist($filename.'.successful.html', @successful);
+    printlist($filename.'.failed.html', @failed);
+}
+else 
+{
+    print(  "<TR>$title</TR>"
+            ."<TR BGCOLOR=\"00FF55\">"
+            ."<TD><a>CREATED (".@created.")</TD>"
             ."<TD>SUBMITTED (".@submitted.")</TD>"
             ."<TD>SUCCESSFUL (".@successful.")</TD>"
             ."<TD>FAILED (".@failed.")</TD>"
             ."</TR>"
             );
     print("</TABLE>\n");
-    
-    printlist(@created);
-    printlist(@submitted);
-    printlist(@successful);
-    printlist(@failed);          
-    
+    printlist(undef, @created);
+    printlist(undef, @submitted);
+    printlist(undef, @successful);
+    printlist(undef, @failed);
+}    
 
 print STDERR "Sorted by status:\n JOBS: ".@jobs." CREATED ".@created." SUBMITTED ".@submitted
       ." SUCCESSFUL ".@successful." FAILED ".@failed."\n";
 
 sub printlist {
-    my (@list) = @_;
+    my ($filename, @list) = @_;
+    my $handle;
     
-    print "<PRE>\n" 
+    if ($filename)
+    {
+        
+        open (OUT, ">".$filename) 
+            or die ("Couldn't open $filename for writing: $!\n");
+        $handle = \*OUT;
+    }
+    else
+    {
+        $handle = \*STDOUT;
+    }
+    
+    print $handle "<PRE>\n" 
           ."+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
           ."|   STATUS   | JOB ID |   ANALYSIS  |    INPUT ID    |  LSF ID |STDOUT       | STDERR (bytes)|  STATUS  |\n" 
           ."+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
@@ -185,11 +230,10 @@ sub printlist {
         $statsize       = " ".$statsize         .(" " x (2  - length ($statsize)));
         $lsf            = "| ".$lsf             .(" " x (8  - length ($lsf)));
         
-        print   ($status.$jobid.$analysis.$input.$lsf.$stdout.$outsize.$stderr.$errsize.$statfile.$statsize."|\n");
-                   
+        print $handle ($status.$jobid.$analysis.$input.$lsf.$stdout.$outsize.$stderr.$errsize.$statfile.$statsize."|\n");                 
     }
     
-    print "+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
+    print $handle "+------------+--------+-------------+----------------+---------+-------------+---------------+----------+\n"
           ."</PRE>\n" 
           if (@list);
 }
