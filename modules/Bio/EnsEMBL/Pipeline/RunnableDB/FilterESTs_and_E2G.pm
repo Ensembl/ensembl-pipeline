@@ -53,9 +53,11 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::Tools::BPlite;
+use FileHandle;
 
 # config file; parameters searched for here if not passed in as @args
 require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
@@ -109,6 +111,7 @@ sub new {
 
     $path = $::db_conf{'golden_path'};
     $path = 'UCSC' unless (defined $path && $path ne '');
+    print STDERR "path: $path\n";
     $self->dbobj->static_golden_path_type($path);
 
     $refdbname = $::db_conf{'refdbname'} unless (defined $refdbname && $refdbname ne '');
@@ -134,13 +137,14 @@ print "refdb: $refdbname $refdbhost $refdbuser $refpass\n";
 						     -pass   => $refpass,
 						    );
 
-
+   $refdb->static_golden_path_type($path);
       my $estdb = new Bio::EnsEMBL::ExternalData::ESTSQL::DBAdaptor(-host   => $estdbhost,		
 								    -user   => $estdbuser,
 								    -dbname => $estdbname,
 								    -pass   => $estpass,
 								   );
-      my $est_ext_feature_factory = $estdb->get_EstAdaptor();
+     
+my $est_ext_feature_factory = $estdb->get_EstAdaptor();
 
       print "exff: $est_ext_feature_factory\n";
       
@@ -420,12 +424,11 @@ sub fetch_input {
   my $chrstart  = $1;
   my $chrend    = $2;
 
-#  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
   my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
   $self->vc($contig);
-  print STDERR "contig: " . $contig . "\n";
+  print STDERR "contig: " . $contig  ."\n";
 
   # find exonerate features amongst all the other features  
   my @allfeatures = $contig->get_all_ExternalFeatures();
@@ -439,34 +442,43 @@ sub fetch_input {
   foreach my $feat(@allfeatures){
     if (defined($feat->analysis)      && defined($feat->score) && 
 	defined($feat->analysis->db)  && $feat->analysis->db eq $est_source) {
-      # percent_id cutoff 90% for exonerate ... take all features for a sequence as long as 
-      # one of them gets over this threshold
-      if(($feat->percent_id > 89 || defined $exonerate_ests{$feat->hseqname})){ 
+      # only take ests that score > 97% for EVERY feature
+      if($feat->percent_id >= 97){
+	if(!defined $exonerate_ests{$feat->hseqname}){
 	  push (@{$exonerate_ests{$feat->hseqname}}, $feat);
-	  push (@exonerate_features, $feat);
+	}
+	push (@exonerate_features, $feat);
       }
     }
   }
+
+  # empty out massive arrays
+  @allfeatures = ();
 
   print STDERR "exonerate features: " . scalar(@exonerate_features) . "\n";
   print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n";
   
   # filter features, current depth of coverage 10, and group successful ones by est id
   my %filtered_ests;
-  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
+
+  # use coverage 5 for now.
+  my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 5,
 								    '-minscore' => 500);
   my @filteredfeats = $filter->run(@exonerate_features);
   
+  # empty out massive arrays
+  @exonerate_features = ();
+
   foreach my $f(@filteredfeats){
     push(@{$filtered_ests{$f->hseqname}}, $f);
   }
   
+  # empty out massive arrays
+  @filteredfeats = ();
+
   print STDERR "num filtered ests " . scalar(keys %filtered_ests) . "\n";
-  
-  # run blast for each of the ests retained so far - previously ran exonerate on raw 
-  # contigs, now need to run on virtual contig ready for making miniseq; need to be 
-  # sure we have even the very small features
-  # group new features by est
+
+# reinstate blast
   my @ids = keys %filtered_ests;
 
   my @blast_features = $self->blast(@ids);
@@ -481,41 +493,76 @@ sub fetch_input {
 
   my %final_ests;
   foreach my $feat(@blast_features) {
-    push(@{$final_ests{$feat->hseqname}}, $feat);
+    my $id = $feat->hseqname;
+    # very annoying white space nonsense
+    $id =~ s/\s//;
+    $feat->hseqname($id);
+    push(@{$final_ests{$id}}, $feat);
+    my @fe = @{$final_ests{$id}};
   }
 
+
   # make one runnable per EST set
+  my $rcount = 0;
+  my $single = 0;
+  my $multi  = 0;
+  
+  my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->dbobj);
+
+  # only fetch this once for the whole set or it's SLOW!
+  my $genomic  = $self->vc->get_repeatmasked_seq;
+
  ID:    
-
   foreach my $id(keys %final_ests) {
-    # I have thought about doing a strand split here - sending plus and minus features separately - but
-    # currently have decided to just use all the features to make a MiniSeq and let Est2Genome find the 
-    # best alignment over the whole region. Otherwise we will end up with squillions of extra genes.
+    # length coverage check for every EST
+    
+    my $hitlength;
+    my $hitstart;
+    my $hitend;
+    foreach my $f(@{$final_ests{$id}}){
+      if(!defined $hitstart || (defined $hitstart && $f->hstart < $hitstart)){
+	$hitstart = $f->hstart;
+      }
 
-    my @features = @{$final_ests{$id}};
-
-    # reject ESTs with only 1 blast hit unless that hit covers ?90% of the length of the EST
-    if (scalar(@features) == 1 ){
-      $id =~ s/\s//;
-      my $est = $self->{'_seq_cache'}{$id};
-      my $hitlength = $features[0]->hend - $features[0]->hstart + 1;
-      my $coverage = ceil(100 * ($hitlength/($est->length)));
-      if($coverage < 90){
-	$self->warn("rejecting $id for insufficient coverage: $coverage %\n");
-	next ID;
+      if(!defined $hitend || (defined $hitend && $f->hend > $hitend)){
+	$hitend = $f->hend;
       }
     }
+    
+    $hitlength = $hitend - $hitstart + 1;
+    my $estlength = $efa->get_est_length($id);
+    if(!defined $estlength || $estlength < 1){
+      print STDERR "problem getting length for $id\n";
+      next ID;
+    }
 
+
+    my $coverage = ceil(100 * ($hitlength/($estlength)));
+    if($coverage < 90){
+      print STDERR "rejecting $id for insufficient coverage: $coverage %\n";
+      if(scalar(@{$final_ests{$id}}) == 1){
+	$single++;
+      }
+      else{
+	$multi++;
+      }
+      next ID;
+    }
+  
     # make MiniEst2Genome runnables
     # to repmask or not to repmask?    
-    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->vc->get_repeatmasked_seq,
-								   '-features' => \@features,
+    my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
+								   '-genomic'  => $genomic,
+								   '-features' => \@{$final_ests{$id}},
 								   '-seqfetcher' => $self->seqfetcher,
 								   '-analysis' => $self->analysis);
     $self->runnable($e2g);
-
+    $rcount++;
   }
-  
+
+  print STDERR "number of e2gs: $rcount\n";  
+  print STDERR "rejected $single single feature ests\n";
+  print STDERR "rejected $multi multi feature ests\n";
 }
 
 =head2 run
@@ -535,7 +582,6 @@ sub run {
   
   foreach my $runnable($self->runnable) {
     $runnable->run;
-
   }
 
   $self->convert_output;
@@ -894,7 +940,9 @@ sub blast{
    unlink $blastdb.".csq";
    unlink $blastdb.".nhd";
    unlink $blastdb.".ntb";
-   
+   # empty seq array
+   @estseq = ();
+
    return @features;
  }
 
@@ -918,10 +966,10 @@ sub get_Sequences {
   foreach my $acc(@$allids) {
     my $seq;
 
-    if (defined($self->{'_seq_cache'}{$acc})){
-      push (@estseq, $seq);
-      next ACC;
-    }
+#    if (defined($self->{'_seq_cache'}{$acc})){
+#      push (@estseq, $seq);
+#      next ACC;
+#    }
 
     eval{
       $seq = $self->seqfetcher->get_Seq_by_acc($acc);
@@ -932,7 +980,7 @@ sub get_Sequences {
       $self->warn($msg);
     }
     else {
-      $self->{'_seq_cache'}{$acc} = $seq;
+#      $self->{'_seq_cache'}{$acc} = $seq;
       push(@estseq, $seq);
     }
   }
