@@ -68,21 +68,27 @@ sub add_match {
   my ($self,
       $query_id,
       $match_id,
-      $nonsyn,
-      $syn) = @_;
+      $dn,
+      $ds,
+      $n,
+      $s,
+      $lnL) = @_;
 
   die "Dont have a match identifier to store with match." 
     unless $match_id;
 
   die "Dont have nonsynonymous and synonymous values to store with match."
-    unless defined $nonsyn & defined $syn;
+    unless defined $dn & defined $ds;
 
   my %match_hash;
 
   $match_hash{query_id} = $query_id;
   $match_hash{match_id} = $match_id;
-  $match_hash{dN}       = $nonsyn;
-  $match_hash{dS}       = $syn;
+  $match_hash{dN}       = $dn;
+  $match_hash{dS}       = $ds;
+  $match_hash{N}        = $n;
+  $match_hash{S}        = $s;
+  $match_hash{lnL}      = $lnL ? $lnL : 0; #Set to zero if no defined.
 
   push @{$self->{_matches}}, \%match_hash;
 
