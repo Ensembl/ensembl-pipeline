@@ -1,5 +1,5 @@
 CREATE TABLE job (
-  job_id            int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+  job_id            int(10) unsigned NOT NULL auto_increment,
   input_id          varchar(100) NOT NULL,
   analysis_id       smallint(5) unsigned NOT NULL,
   submission_id     mediumint(10) unsigned NOT NULL,
@@ -58,7 +58,7 @@ CREATE TABLE job_status (
 # rule_conditions.condition is an analysis logic_name
 
 CREATE TABLE rule_goal (
-  rule_id           smallint(5) unsigned default '0' not null auto_increment,
+  rule_id           smallint(5) unsigned not null auto_increment,
   goal              varchar(40),
 
   PRIMARY KEY (rule_id)
