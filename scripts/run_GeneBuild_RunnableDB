@@ -36,14 +36,16 @@ use strict;
 use Getopt::Long;
 
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_DBHOST
-					 GB_DBNAME
-					 GB_DBUSER
-					 GB_DBPASS
-					 GB_LENGTH_RUNNABLES
-                                         );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+					                     GB_DBHOST
+					                     GB_DBNAME
+					                     GB_DBUSER
+					                     GB_DBPASS
+                                                            );
 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts  qw  (
+					                     GB_LENGTH_RUNNABLES
+                                                            );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
