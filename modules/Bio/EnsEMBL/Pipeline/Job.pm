@@ -219,7 +219,7 @@ sub analysis {
   Function: runLocally doesnt submit to LSF
             runInLSF is like runLocally, but doesnt redirect STDOUT and 
             STDERR. 
-            runRemote starts in LSF via the runner.pl script.
+            runRemote submits to LSF via the runner.pl script.
   Returns : 
   Args    : 
 
@@ -227,8 +227,20 @@ sub analysis {
 
 sub runLocally {
   my $self = shift;
-
-  $self->throw( "Not implemented" );
+  local *STDOUT;
+  local *STDERR;
+  
+  if( ! open ( STDOUT, ">".$self->stdout_file )) {
+    $self->set_status( "FAILED" );
+    return;
+  }
+        
+  if( ! open ( STDERR, ">".$self->stderr_file )) {
+    $self->set_status( "FAILED" );
+    return;
+  }
+        
+  $self->runInLSF();
 }
 
 sub runRemote {
