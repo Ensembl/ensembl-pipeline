@@ -91,6 +91,7 @@ sub comment{
 sub description{
     my $self = shift;
     $self->{'_DE'} =~ s/\n/ /g;
+    $self->{'_DE'} =~ s/\.\s$//;
     return $self->{'_DE'};
 }
 sub date{
@@ -130,7 +131,7 @@ sub accession{
 }
 sub sequence_version{
     my $self = shift;
-    $self->{'_SV'} =~ s/\n//g;
+    $self->{'_SV'} =~ s/\n//g if $self->{'_SV'};
     return $self->{'_SV'};
 }
 sub ox{
