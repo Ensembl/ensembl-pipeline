@@ -1,0 +1,157 @@
+#
+# BioPerl module for Bio::EnsEMBL::Analysis::ESTConf;
+#
+# Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
+#
+# Copyright GRL & EBI
+#
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat - imports global variables used by Blat in the EST and cDNA  analysis
+
+=head1 SYNOPSIS
+
+    use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat
+    use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat qw()
+
+=head1 DESCRIPTION
+
+It is a pure ripoff of humConf written by James Gilbert.
+
+humConf is based upon ideas from the standard perl Env environment
+module.
+
+It imports and sets a number of standard global variables into the
+calling package, which are used in many scripts in the human sequence
+analysis system.  The variables are first declared using "use vars",
+so that it can be used when "use strict" is in use in the calling
+script.  Without arguments all the standard variables are set, and
+with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%ESTConf> hash is asked to be set.
+
+The variables can also be references to arrays or hashes.
+
+Edit C<%Blat> to add or alter variables.
+
+All the variables are in capitals, so that they resemble environment
+variables.
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::;
+
+use strict;
+use vars qw( %Blat );
+
+# Hash containing config info	
+%Blat = (		 
+	 #general options for scripts
+	 
+	 # path to run_ESTRunnableDB
+	 
+	 EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
+	 EST_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_EST_RunnableDB', 	   
+		    
+	 # path to ensembl-pipeline/scripts/EST
+	 EST_SCRIPTDIR     => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/',
+	    
+	 # where the result-directories are going to go	
+	 EST_TMPDIR        => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/',
+	    
+	 # job-queue in the farm
+	 LSF_OPTIONS       => '-q acari -C0',
+	    
+	 # make_blat_bsubs.pl options
+	 EST_BLAT_BSUBS   => '/ecs2/scratch3/ensembl/eae/NCBI_31/ests/blat.jobs',
+	    
+	 # path to file containing ALL ESTs/cDNAs
+	 EST_FILE                    => '/ecs2/work1/eae/NCBI_31/ests/human_ests',
+	    
+	 # path to directory where EST chunks live
+	 EST_CHUNKDIR                => '/ecs2/work1/eae/NCBI_31/ests/chunks/',
+	    	    
+	 # how many chunks?
+	 # for NCBI_28 we have 3690891 ests, at approx. 350 ests per chunk, we estimate
+	 EST_CHUNKNUMBER             => 40000, 	 
+	       
+	 ################
+	 # BLAT OPTIONS #
+	 ################
+	 # binary script
+	 EST_BLAT_BINARY  => '/usr/local/ensembl/bin/blat',    
+	 
+	 # full path fo the dir where we have the masked-dusted chromosomes
+	 EST_BLAT_GENOMIC             => '/data/blastdb/Ensembl/NCBI_31/genome',
+	 
+	 # for cDNAs (long sequences) these options seem fine:
+	 EST_BLAT_OPTIONS => " -mask=lower ",
+	    
+	    
+	 EST_MIN_PERCENT_ID => 97,
+	 EST_MIN_COVERAGE   => 90,
+	 
+	 ############################################################
+	 # each runnable has an analysis
+	 ############################################################
+
+	 EST_BLAT_RUNNABLE          => 'Bio::EnsEMBL::Pipeline::RunnableDB::BlatToGenes',
+	 EST_BLAT_ANALYSIS          => 'human_est',
+
+	 EST_SOURCE                  => 'dbEST',      
+	    
+	 ############################################################
+	 # ref_db - holds the static golden path, contig and dna information
+	 ############################################################
+	 
+	 EST_REFDBNAME               => 'ens_NCBI_31',
+	 EST_REFDBHOST               => 'ecs2b',
+	 EST_REFDBUSER               => 'ensro',
+	 EST_REFDBPASS               => '',
+	 
+	 ############################################################
+	 # est_db = where we write the blat results as genes/transcripts/exons
+	 ############################################################
+	 
+	 EST_DBNAME                  => 'ens_NCBI_31_est',
+	 EST_DBHOST                  => 'ecs2f',
+	 EST_DBUSER                  => 'ensadmin',
+	 EST_DBPASS                  => 'ensembl',
+	 	    
+	);
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+  
+  # Get list of variables supplied, or else
+  # all of ESTConf:
+  my @vars = @_ ? @_ : keys( %Blat );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw"."(". join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $Blat{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Blat{ $_ };
+	} else {
+	    die "Error: Blat: $_ not known\n";
+	}
+    }
+}
+
+1;
