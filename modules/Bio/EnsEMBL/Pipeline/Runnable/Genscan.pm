@@ -495,7 +495,7 @@ sub calculate_and_set_phases_new {
 #         print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
 
           $translation_found = 1;
-          foreach my $exon ($tran->get_all_Exons) {
+          foreach my $exon (@{$tran->get_all_Exons()}) {
            #print "exon ".$exon->seqname." ".$exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
           }
           $tran->temporary_id($self->query->id . "." . $count);
@@ -534,13 +534,22 @@ sub add_Transcript {
   }
 }
 
-sub each_Transcript {
-  my ($self) = @_;
+sub get_all_Transcripts {
+  my ( $self ) = @_;
 
   if (!defined($self->{_transcripts})) {
     $self->{_transcripts} = [];
   }
-  return @{$self->{_transcripts}};
+  return $self->{_transcripts};
+}
+
+
+sub each_Transcript {
+  my ($self) = @_;
+
+  my $transcripts = $self->get_all_Transcripts();
+  $self->warn( "each_Transcript deprecated, use get_all_Transcripts()" );
+  return @{$self->get_all_Transcripts()};
 }
 
 
@@ -669,13 +678,14 @@ sub output {
                                                 );
 
   
-  foreach my $transcript ($self->each_Transcript) {
-    my @exons = $transcript->get_all_Exons;
+  foreach my $transcript (@{$self->get_all_Transcripts}) {
+    my $exons = $transcript->get_all_Exons();
+    my @exons;
 
-    if ($exons[0]->strand == 1) {
-      @exons = sort {$a->start <=> $b->start } @exons;
+    if ($exons->[0]->strand == 1) {
+      @exons = sort {$a->start <=> $b->start } @{$exons};
     } else {
-      @exons = sort {$b->start <=> $a->start } @exons;
+      @exons = sort {$b->start <=> $a->start } @{$exons};
     }
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
     #print "\ntranscript ".$transcript->temporary_id." translates to ".$transcript->translate->seq."\n\n";
