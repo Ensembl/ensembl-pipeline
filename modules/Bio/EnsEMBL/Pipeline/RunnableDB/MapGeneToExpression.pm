@@ -65,7 +65,8 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
-
+use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
+use Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher;
 
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw(
@@ -116,7 +117,7 @@ sub new{
 						     );
   
 
-  # where the ests are (we actually want exonerate_e2g transcripts )
+  # where the ests are
   unless( $self->db){
     my $est_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						    '-host'   => $EST_E2G_DBHOST,
@@ -134,10 +135,10 @@ sub new{
   # database where the expression vocabularies are.
   # this is also where we are going to store the results
   my $expression_adaptor = Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor->new(
-									  '-host'   => $EST_EXPRESSION_DBHOST,
-									  '-user'   => $EST_EXPRESSION_DBUSER,
-									  '-dbname' => $EST_EXPRESSION_DBNAME,
-									  #'-pass'   => $EST_EXPRESSION_DBPASS,
+										 '-host'   => $EST_EXPRESSION_DBHOST,
+										 '-user'   => $EST_EXPRESSION_DBUSER,
+										 '-dbname' => $EST_EXPRESSION_DBNAME,
+										 #'-pass'   => $EST_EXPRESSION_DBPASS,
 									 );
   
   $self->expression_adaptor($expression_adaptor);
@@ -286,30 +287,28 @@ sub fetch_input {
   my $input_id    = $self->input_id;
   unless ($input_id =~ /$EST_INPUTID_REGEX/ ){
     $self->throw("input $input_id not compatible with EST_INPUTID_REGEX $EST_INPUTID_REGEX");
-    }
+  }
   my $chrname  = $1;
   my $chrstart = $2;
   my $chrend   = $3;
   
   print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
-
+  
   my $ensembl_sa = $self->ensembl_db->get_SliceAdaptor();
   my $est_sa     = $self->est_db->get_SliceAdaptor();
-
+  
   my $ensembl_slice  = $ensembl_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
   my $est_slice      = $est_sa->fetch_by_chr_start_end($chrname,$chrstart,$chrend);
-
+  
   $self->ensembl_slice( $ensembl_slice );
   $self->est_slice( $est_slice );
-
-  # get ests (mapped with Filter_ESTs_and_E2G )
+  
+  # get ests 
   print STDERR "getting genes of type $EST_GENEBUILDER_INPUT_GENETYPE\n";
   $self->ests(@{ $self->est_slice->get_all_Genes_by_type( $EST_GENEBUILDER_INPUT_GENETYPE, 'evidence' ) });
   print STDERR "got ".scalar( $self->ests )." ests\n";
 
-
-
-  # get ensembl genes (from GeneBuilder)
+  # get ensembl genes
   $self->ensembl_genes(@{ $self->ensembl_slice->get_all_Genes_by_type( $EST_TARGET_GENETYPE, 'evidence' ) });
 
 }
@@ -343,70 +342,60 @@ sub run{
     print STDERR "No ests in this region, leaving...\n";
     exit(0);
   }
-   
+  
   # cluster the genes:
   my @clusters = $self->cluster_Genes( $self->ensembl_genes, $self->ests );
   
  CLUSTER:
   foreach my $cluster ( @clusters ){
+    
+    # get genes of each type
+    my @genes = $cluster->get_Genes_of_Type( $EST_TARGET_GENETYPE );
+    my @ests  = $cluster->get_Genes_of_Type( $EST_GENEBUILDER_INPUT_GENETYPE );
+    
+    # if we have genes of either type, let's try to match them
+    if ( @genes && @ests ){
+      print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
       
-      # get genes of each type
-      my @genes = $cluster->get_Genes_of_Type( $EST_TARGET_GENETYPE );
-      my @ests  = $cluster->get_Genes_of_Type( $EST_GENEBUILDER_INPUT_GENETYPE );
-      
-      # if we have genes of either type, let's try to match them
-      if ( @genes && @ests ){
-	  print STDERR "Trying to match ".scalar(@genes)." ensembl genes and ".scalar(@ests)." ests\n"; 
-	  
-	  ############################################################
-	  #
-	  #
-	  # See if you can map genes to clone libraries instead of ESTs
-	  #
-	  #
-	  ############################################################
-	  
-	  my @est_transcripts;
-	  foreach my $est ( @ests ){
-	      my @est_trans = @{$est->get_all_Transcripts};
-	      push ( @est_transcripts, $self->in_SANBI( @est_trans ));
-	  }
-	  
-	  my @ensembl_transcripts;
-	  foreach my $gene ( @genes ){
-	      push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
-	  }
-	  
-	  my $matcher = 
-	    Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher->new(
-										  -reference_set => \@ensembl_transcripts,
-										  -match_set => \@est_transcripts,
-										  );
-	  
-	  $matcher->run;
-	  
-	  my $matching_map = $matcher->output;
-	  $self->output( $matching_map );
+      my @est_transcripts;
+      foreach my $est ( @ests ){
+	push ( @est_transcripts,  @{$est->get_all_Transcripts} );
       }
       
+      my @ensembl_transcripts;
+      foreach my $gene ( @genes ){
+	push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
+      }
       
+      my $matcher = 
+	Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher->new(
+									      -reference_set => \@ensembl_transcripts,
+									      -match_set => \@est_transcripts,
+									     );
+	  
+      $matcher->run;
       
-      # else we could have only ensembl genes
-      elsif(  @genes && !@ests ){
-	  # we have nothing to modify them, hence we accept them...
-	  print STDERR "Skipping cluster with no ests\n";
-	  next CLUSTER;
-      }
-      # else we could have only ests
-      elsif( !@genes && @ests ){
-	  print STDERR "Cluster with no genes\n";
-	  next CLUSTER;
-      }
-      # else we could have nothing !!?
-      elsif( !@genes && !@ests ){
-	  print STDERR "empty cluster, you must be kidding!\n";
-	  next CLUSTER;
-      }
+      # the output is a Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap
+      my $matching_map = $matcher->output;
+      $self->output( $matching_map );
+    }
+          
+    # else we could have only ensembl genes
+    elsif(  @genes && !@ests ){
+      # we have nothing to modify them, hence we accept them...
+      print STDERR "Skipping cluster with no ests\n";
+      next CLUSTER;
+    }
+    # else we could have only ests
+    elsif( !@genes && @ests ){
+      print STDERR "Cluster with no genes\n";
+      next CLUSTER;
+    }
+    # else we could have nothing !!?
+    elsif( !@genes && !@ests ){
+      print STDERR "empty cluster, you must be kidding!\n";
+      next CLUSTER;
+    }
   } # end of CLUSTER
   
   # before returning, check that we have written anything
@@ -427,7 +416,42 @@ sub run{
 # covered by the genes. The proper clustering of transcripts
 # to give rise to genes occurs in _cluster_into_Genes()
 
+
+
 sub cluster_Genes{
+  my ($self,@genes) = @_;
+  my @forward_genes;
+  my @reverse_genes;
+ 
+  foreach my $gene (@genes){
+    my @exons = @{ $gene->get_all_Exons };
+    if ( $exons[0]->strand == 1 ){
+      push( @forward_genes, $gene );
+    }
+    else{
+      push( @reverse_genes, $gene );
+    }
+  }
+  my @clusters;
+  if ( @forward_genes ){
+    my @forward_clusters = $self->_cluster_Genes_one_strand( @forward_genes );
+    if ( @forward_clusters){
+      print STDERR scalar( @forward_clusters )." clusters in forward strand\n";
+      push( @clusters, @forward_clusters);
+    }
+  }
+  if ( @reverse_genes ){
+    my @reverse_clusters = $self->_cluster_Genes_one_strand( @reverse_genes );
+    if ( @reverse_clusters ){
+      print STDERR scalar( @reverse_clusters )." clusters in reverse strand\n";
+      push( @clusters, @reverse_clusters);
+    }
+  }
+  return @clusters;
+}
+  
+
+sub _cluster_Genes_one_strand{
   my ($self, @genes) = @_;
 
   # first sort the genes by the left-most position coordinate ####
@@ -780,42 +804,42 @@ sub _find_est_id{
 #########################################################################
 
 sub write_output {
-    my ($self) = @_;
-    my $expression_adaptor = $self->expression_adaptor;
-    
-    my @maps = $self->output;
-    
-    foreach my $map ( @maps ){
-	my @list1 = $map->list1;
-	foreach my $transcript ( @list1 ){
-	    
-	    my $t_id;
-	    if ($transcript->stable_id){
-		$t_id = $transcript->stable_id;
-	    }
-	    elsif($transcript->dbID){
-		$t_id = $transcript->dbID;
-	    }
-	    
-	    my @est_matches = $map->partners($transcript);
-	    my @est_ids;
-	    foreach my $est ( @est_matches ){
-		my $est_id = $self->_find_est_id($est);
-		if ( $est_id){
-		    my $est_id_no_version;
-		    if ( $est_id =~/(\S+)\.(\d+)/){
-			$est_id_no_version = $1;
-		    }
-		    else{
-			$est_id_no_version = $est_id;
-		    }
-		    push (@est_ids, $est_id_no_version);
-		}
-	    }
-	    print STDERR "Storing pairs $t_id, @est_ids\n";
-	    $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
+  my ($self) = @_;
+  my $expression_adaptor = $self->expression_adaptor;
+  
+  my @maps = $self->output;
+  
+  foreach my $map ( @maps ){
+    my @list1 = $map->list1;
+    foreach my $transcript ( @list1 ){
+	
+      my $t_id;
+      if ($transcript->stable_id){
+	$t_id = $transcript->stable_id;
+      }
+      elsif($transcript->dbID){
+	$t_id = $transcript->dbID;
+      }
+      
+      my @est_matches = $map->partners($transcript);
+      my @est_ids;
+      foreach my $est ( @est_matches ){
+	my $est_id = $self->_find_est_id($est);
+	if ( $est_id){
+	  my $est_id_no_version;
+	  if ( $est_id =~/(\S+)\.(\d+)/){
+	    $est_id_no_version = $1;
+	  }
+	  else{
+	    $est_id_no_version = $est_id;
+	  }
+	  push (@est_ids, $est_id_no_version);
 	}
+      }
+      print STDERR "Storing pairs $t_id, @est_ids\n";
+      $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
     }
+  }
 }
 
 ########################################################################
