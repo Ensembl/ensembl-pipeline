@@ -52,6 +52,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
@@ -66,6 +67,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 EST_DBUSER
 									 EST_DBPASS     
 									 EST_GENEBUILDER_INPUT_GENETYPE
+									 EST_USE_DENORM_GENES
 									 EST_MIN_INTRON_SIZE
 									 BRIDGE_OVER_SMALL_INTRONS
 									 EST_MAX_INTRON_SIZE
@@ -242,7 +244,14 @@ sub fetch_input {
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    my $genes  = $slice->get_all_Genes_by_type($genetype);
+
+    my $genes;
+    if ($EST_USE_DENORM_GENES){
+      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->db);
+      $genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
+    } else {
+      $genes  = $slice->get_all_Genes_by_type($genetype);
+    } 
     
     print STDERR "Number of genes of type $genetype   = " . scalar(@$genes) . "\n";
 
@@ -305,7 +314,15 @@ sub fetch_input {
     # this will return a slice which corresponds to the reversed complement of $slice:
     my $rev_slice = $slice->invert;
     $self->revcomp_query($rev_slice);
-    my $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
+
+    my $revgenes;
+    if ($EST_USE_DENORM_GENES){
+      my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->db);
+      $revgenes = $dga->get_genes_by_Slice_and_type($rev_slice, $genetype);
+    } else {
+      $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
+    } 
+
     my @reverse_transcripts;
     
     if ( $USE_cDNA_DB ){
