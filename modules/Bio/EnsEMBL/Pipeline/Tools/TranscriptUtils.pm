@@ -125,7 +125,7 @@ sub _check_Transcript{
 			last EXON;
 		    }
 		}
-		elsif( $strand = -1 ){
+		elsif( $strand == -1 ){
 		    my $intron_length = $exons[i-1]->start - $exons[i]->end -1;
 		    if ( $intron_length > $MAX_INTRON_LENGTH ){
 			print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
