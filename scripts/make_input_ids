@@ -113,11 +113,10 @@ my $dbname;
 my $logic_name;
 my $slice_size;
 my $slice_overlap;
-my $type;
 my $coord_system;
-my $cs_version;
+my $coord_system_version;
 my $slice;
-my $input_type;
+my $input_id_type;
 my $file;
 my $dir;
 my $regex;
@@ -136,12 +135,12 @@ my $insert_analysis = 0;
             'dbpass:s'     => \$pass,
             'dbname:s'     => \$dbname,
             'coord_system:s'       => \$coord_system,
-            'coord_system_version:s' => \$cs_version,
+            'coord_system_version:s' => \$coord_system_version,
             'slice'        => \$slice,
             'slice_size:s' => \$slice_size,
             'slice_overlap:s' => \$slice_overlap,
             'logic_name:s' => \$logic_name,
-            'input_type:s' => \$input_type,
+            'input_id_type:s' => \$input_id_type,
             'file'         => \$file,
             'dir:s'        => \$dir,
             'file_regex:s' => \$regex,
@@ -196,80 +195,30 @@ if(!$logic_name){
   exec('perldoc', $0);
 }
 
-my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
-
-my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
-
-
-
-if( ($slice + $single + $file + $translation_id) > 1){
-  die "must only define one of these options on the commandline ".
-    "-slice $slice  -single $single -file $file  -translation_id ".
-      "$translation_id";
-}
-
-$input_type = $analysis->input_id_type unless($input_type);
-
-my @ids;
-
-if ($slice) {
- 
-  $input_type = "SLICE" unless $input_type;
-  die ("Must define a coord system name when fetching slice names") 
-    unless($coord_system);
-
-  $cs_version = '' unless($cs_version);
-  print STDERR "Fetching slices for ".$coord_system." coord system\n";
-  @ids = $inputIDFactory->generate_slice_input_ids($coord_system, $cs_version, $slice_size, $slice_overlap); 
-}elsif($single){
-  $input_type = 'GENOME' unless $input_type;
-  @ids = ($name);
-}elsif($file){
-  $input_type = 'FILENAME' unless $input_type;
-  if(!$dir){
-    die "if you want to use filenames as a input ids you must provide".
-      " a directory to get them from"; 
-  }
-  @ids = $inputIDFactory->generate_filename_input_ids($dir, $regex);
-}elsif($translation_id){
-  @ids = $inputIDFactory->generate_translation_id_input_ids;
-}else{
-    exec('perldoc', $0);
-}
+my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
+  (
+   -db => $db,
+   -slice => $slice,
+   -single => $single,
+   -file => $file,
+   -translation_id => $translation_id,
+   -seq_level => $seq_level,
+   -top_level => $top_level,
+   -dir => $dir,
+   -regex => $regex,
+   -single_name => $name,
+   -verbose => $verbose,
+   -logic_name => $logic_name,
+   -input_id_type => $input_id_type,
+   -insert_analysis => $insert_analysis,
+   -coord_system => $coord_system,
+   -coord_system_version => $coord_system_version,
+   -slice_size => $slice_size,
+   -slice_overlaps => $slice_overlap,
+  );
 
 
+$inputIDFactory->generate_input_ids;
+$inputIDFactory->store_input_ids;
 
 
-
-if($insert_analysis && !$analysis){
-  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
-    (-logic_name    => $logic_name,
-     -input_id_type => $input_type);
-  
-  print "storing analysis ".$analysis->logic_name."\n" if($verbose);
-  
-  $db->get_AnalysisAdaptor->store($analysis);
-  if(!$analysis->logic_name){
-    die "you  must specify a logic_name for your analysis otherwise".
-      " this won't work properly\n";
-  }
-}elsif(!$analysis){
-  die("Can't run without a defined analysis $logic_name doesn't seem to ".
-      "exist in the database");
-}
-
-
-print STDERR "have analysis ".$analysis->logic_name ." ".$analysis->input_id_type."\n";
-$analysis->input_id_type($input_type) if(!$analysis->input_id_type); 
-
-foreach my $id (@ids) {
-    eval {
-      print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
-
-      $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis, '');  
-    
-    };
-    if ($@) {
-      print "Input id $id already present $@";
-    }
-}

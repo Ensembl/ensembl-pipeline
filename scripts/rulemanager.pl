@@ -383,12 +383,13 @@ sub useage{
                 "input_id_type\n\n";
   print " -perldocs will print out the perl documentation of this module ".
     "and -help will print out the help again \n";
+  exit(0);
 }
 
 
 sub perldoc{
 	exec('perldoc', $0);
-	exit;
+	exit(0);
 }
 
 =pod
