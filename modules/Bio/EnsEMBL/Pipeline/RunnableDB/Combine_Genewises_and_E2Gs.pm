@@ -144,7 +144,11 @@ sub fetch_input{
   print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
   print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
   $self->gw_genes( @similarity_genes, @targetted_genes );
-  
+  foreach my $gw($self->gw_genes){
+    if($gw->dbID == 101){
+      $self->_print_Gene($gw);
+    }
+  }
   # cdnas db
   my $slice_adaptor2 = $self->cdna_db->get_SliceAdaptor();
   my $cdna_vc        = $slice_adaptor2->fetch_by_chr_start_end($chr_name,$start,$end);
@@ -314,7 +318,7 @@ sub _filter_cdnas{
  cDNA_GENE:
   foreach my $e2g (@e2g) {
     
-    print STDERR "e2g is a $e2g\n";
+    #print STDERR "e2g is a $e2g\n";
   cDNA_TRANSCRIPT:
     foreach my $tran (@{$e2g->get_all_Transcripts}) {
       
@@ -335,7 +339,7 @@ sub _filter_cdnas{
 	  next cDNA_TRANSCRIPT;
 	}
       }
-      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+      #print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
       push(@newe2g,$e2g);
     }
   }
@@ -513,7 +517,7 @@ sub match_protein_to_cdna{
 
   my %UTR_hash;
   
-  print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
+  #print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
   my @matching_e2g;
   my @gw_tran = @{$gw->get_all_Transcripts};
   
@@ -774,14 +778,22 @@ sub _merge_gw_genes {
       }
       
       if ( defined($previous_exon) && $merge_it == 1){
-	
+	if ( $exon == $trans[0]->translation->end_Exon ){
+	  #print STDERR "have end exon of translation ".$exon."\n" if($verbose);
+	  $cloned_translation->end_Exon( $previous_exon );
+	  $cloned_translation->end($trans[0]->translation->end);
+	}
+	if ( $exon == $trans[0]->translation->start_Exon ){
+	  $cloned_translation->start_Exon( $previous_exon );
+	  $cloned_translation->start($trans[0]->translation->start);
+	}
 	# combine the two
 	
 	# the first exon (5'->3' orientation always) is the containing exon,
 	# which gets expanded and the other exons are added into it
-	print STDERR "merging $exon into $previous_exon\n";
-	print STDERR $exon->start."-".$exon->end."  into
-	".$previous_exon->start."-".$previous_exon->end."\n";
+	#print STDERR "merging $exon into $previous_exon\n";
+	#print STDERR $exon->start."-".$exon->end."  into
+	#".$previous_exon->start."-".$previous_exon->end."\n";
 	$previous_exon->end($exon->end);
 	$previous_exon->add_sub_SeqFeature($exon,'');
 	
@@ -1742,51 +1754,32 @@ sub compare_translations{
     
   my $seqout = new Bio::SeqIO->new(-fh => \*STDERR);
   
-  my $genewise_translation;
-  my $combined_translation;
+  my $gwseq;
+  my $comseq;
   
   eval {
-      $genewise_translation = $genewise_transcript->translate;
+      $gwseq = $genewise_transcript->translate;
   };
-  if ($@) {
-    print STDERR "Couldn't translate genewise gene\n";
+
+  if($@){
+    print STDERR "Couldn't translate genewise gene:[$@]\n";
   }
-  else{
-    print STDERR "genewise: \n";             
-    $seqout->write_seq($genewise_translation);
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($genewise_transcripts[0]);
-  }
-  # test
-  #my %seen;
-  #foreach my $exon ( @{$genewise_transcript->get_all_Exons} ){
-  #  foreach my $evi ( @{$exon->get_all_supporting_features} ){
-  #    my $hid = $evi->hseqname;
-  #    if ( exists( $seen{$hid} ) && $seen{$hid} != 0 ){
-#	next;
-#      }
-#      system("pfetch $hid");
-#      $seen{$hid} =1;
-#    }
-#  }
-  
 
   $@ = '';
   
   eval{
-    $combined_translation = $combined_transcript->translate;
+    $comseq = $combined_transcript->translate;
   };
   
   if ($@) {
     print STDERR "Couldn't translate combined gene:[$@]\n";
     return 0;
   }
-  else{
-    print STDERR "combined: \n";             
-    $seqout->write_seq($combined_translation);
-  }	 
+ 
+  	 
   
-  my $gwseq  = $genewise_translation->seq;
-  my $comseq = $combined_translation->seq;
+  #my $gwseq  = $genewise_translation->seq;
+  #my $comseq = $combined_translation->seq;
   
   if($gwseq eq $comseq) {
     print STDERR "combined translation is identical to genewise translation\n";
@@ -1818,16 +1811,19 @@ sub remap_genes {
   my $contig = $self->query;
   
   my @genes = $self->combined_genes;
-
+  print STDERR "REMAPPING GENES\n";
 GENE:  
   foreach my $gene (@genes) {
       my @t = @{$gene->get_all_Transcripts};
       my $tran = $t[0];
-      
+      $self->_print_Gene($gene);
       # check that it translates - not the est2genome genes
       if($gene->type eq 'TGE_gw' || $gene->type eq 'combined_gw_e2g'){
 	  
 	  my $translates = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran);
+	  if(!$translates){
+	    print "gene doesn't translate\n";
+	  }
 	  next GENE unless $translates;
       }
       
@@ -1890,7 +1886,8 @@ GENE:
       foreach my $exon (@{$newgene->get_all_Exons}){
 	# make sure we deal with stickies!
 	if($exon->isa("Bio::EnsEMBL::StickyExon")){
-	  foreach my $ce($exon->each_component_Exon){
+	  print STDERR "have ".$exon."\n";
+	  foreach my $ce(@{$exon->get_all_component_Exons}){
 	    # exon start and end must both be within the raw contig!!!
 	    if($ce->start < 1){
 	      $self->throw("can't set exon->start < 1 (" . $ce->start . ") - discarding gene\n");
@@ -1924,7 +1921,7 @@ GENE:
     }
 
   }
-  
+  print STDERR "\n";
   return @newf;
 }
 
