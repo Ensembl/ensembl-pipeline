@@ -165,23 +165,13 @@ sub run{
   }
   close(E);
   
-
-#
-#   open(GW,"genomewise $genome_file $evi_file |");
-#  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
-#  open(GW,"</tmp/test.out");
-  
- 
-# in acari, genomewise is in '/nfs/acari/birney/prog/wise2/src/bin/'
-# or in '/usr/local/ensembl/bin/genomewise'
-
-#### Ewan's version
-#
-#  open(GW,"/nfs/acari/birney/prog/wise2/src/bin/genomewise -silent -nogff -smell 4 -notrans -nogenes -geneutr $genome_file $evi_file |");
-
 #### Steve's version (fixed)
+#  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
 
-  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
+
+### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
+
+  open(GW,"/usr/local/ensembl/bin/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
 
   
   # parse gff output for start, stop, strand, phase
@@ -204,7 +194,7 @@ sub run{
 	my $seen_utr3 = 0;
 	my $prev = undef;
 	while( <GW> ) {
-	  #print STDERR "$_";
+	  print STDERR "$_";
 	  chomp;
 	  #print "Seen $_\n";
 	  if( /End/ ) {
@@ -226,8 +216,10 @@ sub run{
 	    $exon->start($start);
 	    $exon->end  ($end);
 	    $exon->strand($strand);
-	    # there isn't really a phase in teh UTR exon, but we set it to -1 otherwise later stages fail
+	    
+	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
 	    $exon->phase(-1); 
+	    $exon->end_phase(-1);
 	    $t->add_Exon($exon);
 	    $prev = $exon;
 	    next;
@@ -238,21 +230,39 @@ sub run{
 	    my $strand = 1;
 	    my $phase = $3;
 	    
+	    my $this_start  = $1;
+	    my $this_end    = $2;
+	    my $this_length = $this_end - $this_start + 1;
+
 	    my $cds_start = $start;
 	    my $exon;
 	    if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
+	      
 	      # we have an abutting utr5
+	      print STDERR "abutting utr5\n";
 	      $start = $prev->start();
-	      $exon  = $prev;
-	    } else {
+	      $exon  = $prev; 
+	      # end_phase is number of bases at the end of the exon which do not fall in a codon
+	      my $end_phase = $this_length%3;
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);
+	      $exon->phase($prev->phase);
+	      print STDERR "Genomewise: setting end_phase to $end_phase\n";
+	      $exon->end_phase($end_phase);
+	    }
+	    else {
 	      # make a new Exon
 	      $exon  = Bio::EnsEMBL::Exon->new();
 	      $t->add_Exon($exon);
+	      $exon->phase($phase);
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->end_phase( ( $end - $start + 1 + $phase ) %3 );
 	    }
-	    $exon->start($start);
-	    $exon->end  ($end);
-	    $exon->strand($strand);
-	    $exon->phase($phase);
+	    #$exon->start($start);
+	    #$exon->end  ($end);
+	    #$exon->strand($strand);
 	    
 	    if( $seen_cds == 0 ) {
 	      $trans->start_exon($exon);
@@ -281,25 +291,32 @@ sub run{
 	      $orig_end = $prev->end;
 	      $exon     = $prev;
 	      $start    = $prev->start;
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);
+	      $exon->phase($prev->phase);
+	      $exon->end_phase(-1);
+	    } 
+	    else {
 	      
-	    } else {
-	      
-	      #   not abutting; should be fine.
+	      # not abutting
 	      $exon =  Bio::EnsEMBL::Exon->new();
 	      $t->add_Exon($exon);
-	      $exon->phase(-1); 
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);	    
+	      $exon->phase(-1);
+	      $exon->end_phase(-1);
 	    }
-	    
-	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
-	    
-	    $exon->start($start);
-	    $exon->end  ($end);
-	    $exon->strand($strand);
+	    #$exon->start($start);
+	    #$exon->end  ($end);
+	    #$exon->strand($strand);	    
 	    
 	    if( $seen_utr3 == 0 ) {
 	      if( !defined $orig_end ) {
 		$self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
-	      } else {
+	      } 
+	      else {
 		$trans->end_exon($exon);
 		
 		# position of the end of translation in exon-local coordinates
@@ -315,6 +332,16 @@ sub run{
 	  chomp;
 	  $self->throw("Should not able to happen - unparsable line in geneutr $_");
 	}
+	
+	# test:
+	print STDERR "transcript created:\n";
+	foreach my $exon ( $t->get_all_Exons ){
+	  print STDERR "exon: ".$exon." ".$exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
+	}
+	print STDERR "translation:\n";
+	print STDERR "start_exon: ".$trans->start_exon." start: ".$trans->start."\n";
+	print STDERR "start_exon: ".$trans->end_exon." start: ".$trans->end."\n";
+      
       }
       chomp;
       #print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
