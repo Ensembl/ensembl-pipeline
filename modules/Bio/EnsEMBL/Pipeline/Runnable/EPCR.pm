@@ -109,7 +109,7 @@ sub new {
 	CLONE PCR DB OPTIONS
     )], @args);
 
-    $epcr = 'e-PCR' unless defined ($epcr);
+    $epcr = 'e-PCR' unless ($epcr);
 
     $self->clone  ($clone)   if ($clone);       
     $self->options($options) if ($options);       

@@ -110,7 +110,7 @@ sub new {
 							   @args);
 
 
-  $cpg = 'cpg' unless defined($cpg);
+  $cpg = 'cpg' unless ($cpg);
 
   $self->clone($sequence) if ($sequence);       
   $self->cpg($self->find_executable($cpg));
