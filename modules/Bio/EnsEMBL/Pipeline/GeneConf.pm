@@ -57,7 +57,6 @@ my $prefix='COB';
 %GeneConf = (
 	     # database specific variables
 	     GB_DBHOST                  => '',
-#	     GB_DBNAME                  => '',
 	     GB_DBNAME                  => '',
 	     GB_DBUSER                  => '',
 	     GB_DBPASS                  => '',
@@ -92,17 +91,14 @@ my $prefix='COB';
 	     # eg TargettedGeneE2G
 	     GB_TARGETTED_RUNNABLES   => [''],
 	     # eg FPC_TargettedGeneE2G
-	     GB_LENGTH_RUNNABLES      => ['FPC_TargettedGeneE2G', 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
+	     GB_LENGTH_RUNNABLES      => ['FPC_TargettedGeneWise', 'FPC_BlastMiniGenewise','Combine_Genewises_and_E2Gs', 'Gene_Builder'],
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '5000000',
 
-	     # location of sequence indices
-	     GB_PROTEIN_INDEX           => '',
+	     # targetted genewise/geneE2G specific parameters
 	     # species specific protein index
 	     GB_TARGETTED_PROTEIN_INDEX => '',
 	     GB_TARGETTED_CDNA_INDEX    => '',
-
-	     # targetted genewise/geneE2G specific parameters
 	     # minimum required coverage for multiexon predictions
 	     GB_TARGETTED_MULTI_EXON_COVERAGE      => '25',
 	     # minimum required coverage for single predictions
@@ -115,8 +111,22 @@ my $prefix='COB';
 	     GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',
 
 	     # similairity genewise specific parameters
-	     GB_SIMILARITY_TYPE      => 'swall',
-	     GB_SIMILARITY_THRESHOLD => 200,
+	     GB_SIMILARITY_DATABASES => [
+					 # fill in one complete hash for each database from which blast 
+					 # features are to be retrieved
+					 {				  
+					  'type'       => '',
+					  'threshold'  => '',
+					  'index'      => ''
+					 },
+# example:
+#					 {
+#					  'type'       => 'swall',
+#					  'threshold'  => '100',
+#					  'index'      => '/full/path/to/swall'
+#					 },
+					],
+	     
 	     # minimum required parent protein coverage
 	     GB_SIMILARITY_COVERAGE           => 70,
 	     # maximum allowed size of intron 
