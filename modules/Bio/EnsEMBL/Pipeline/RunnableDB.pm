@@ -52,6 +52,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
+use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
 
@@ -199,3 +200,26 @@ sub write_output {
     }
     return 1;
 }
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
+
+=cut
+
+sub seqfetcher {
+    my( $self, $value ) = @_;    
+    if ($value) {
+        #need to check if passed sequence is Bio::DB::RandomAccessI object
+        $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+        $self->{'_seqfetcher'} = $value;
+    }
+    return $self->{'_seqfetcher'};
+}
+
+
+1;
