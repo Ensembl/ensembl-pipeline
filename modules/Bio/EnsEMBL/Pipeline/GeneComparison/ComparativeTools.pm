@@ -98,11 +98,14 @@ sub get_all_syntenic_slices{
   print STDERR scalar(@features)." syntenic features found\n";
   my %chr_features;
   foreach my $feature_pair ( @features ){
-    #print STDERR $feature_pair->hseqname."\t".
-    #$feature_pair->hstart."\t".
-    #$feature_pair->hend."\t".
-    #$feature_pair->hstrand."\n";
-    push( @{ $chr_features{$feature_pair->hseqname} }, $feature_pair );
+      #my $seqname = $feature_pair->hseqname;
+      #$seqname =~ /(\S+)\.(\d+)-(\d+)/;
+      #my $chr = $1;
+      #print STDERR $feature_pair->hseqname."\t".
+      #$feature_pair->hstart."\t".
+      #$feature_pair->hend."\t".
+      #$feature_pair->hstrand."\n";
+      push( @{ $chr_features{$feature_pair->hseqname} }, $feature_pair );
   }
   
   my @slices;
@@ -114,39 +117,43 @@ sub get_all_syntenic_slices{
       
       ############################################################
       # if the distance between features is smaller than the original length, we bridge them over
-      if ( $chr_features[$i]->start - $chr_features[$i-1] - 1 < $focus_length ){
+	#print STDERR "features($i) start = ".$chr_features[$i]->start." chr_features[$i-1] end : ".$chr_features[$i-1]->end ."\n";
+
+	if ( $chr_features[$i]->start - $chr_features[$i-1]->end - 1 < $focus_length ){
 	$end = $chr_features[$i]->hend;
       }
       ############################################################
       # else we create a slice with the current (start,end) feature
       else{
 
-	############################################################
-	# if the slice is not as big as the original, we make it as big it's ok if they overlap
-	my $length = $end - $start + 1;
-	if ( $focus_length > $length ){
-	  $start -= ( $focus_length - $length )/2;
-	  $end   += ( $focus_length - $length )/2;
-	}
-
-        my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
-	push(@slices, $target_slice);
-
-        # update to the latest feature
-	$start = $chr_features[$i]->hstart;
-	$end   = $chr_features[$i]->hend;
+	  ############################################################
+	  # if the slice is not as big as the original, we make it as big it's ok if they overlap
+	  my $length = $end - $start + 1;
+	  if ( $focus_length > $length ){
+	      $start -= ( $focus_length - $length )/2;
+	      $end   += ( $focus_length - $length )/2;
+	      #print STDERR "for start: $start and end $end \n";
+	  }
+	  
+	  print STDERR "creating slice with chr: $chr, start: $start, end: $end\n";
+	  my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+	  push(@slices, $target_slice);
+	  
+	  # update to the latest feature
+	  $start = $chr_features[$i]->hstart;
+	  $end   = $chr_features[$i]->hend;
       }
-
+      
       if ( $i == scalar(@chr_features) - 1 ){
-         my $length = $end - $start + 1;
-        if ( $focus_length > $length ){
-          $start -= int( ( $focus_length - $length )/2 );
-          $end   += int( ( $focus_length - $length )/2 );
-        }
-        my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
+	  my $length = $end - $start + 1;
+	  if ( $focus_length > $length ){
+	      $start -= int( ( $focus_length - $length )/2 );
+	      $end   += int( ( $focus_length - $length )/2 );
+	  }
+	  my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
 	push(@slices, $target_slice);
       }
-    }
+  }
     
     #my $length = $end - $start + 1;
     #if ( $focus_length > $length ){
@@ -155,13 +162,13 @@ sub get_all_syntenic_slices{
     #}
     #my $target_slice = $target_db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
     #push(@slices, $target_slice);
-  }
-
+}
+  
   if (@slices){
-    print STDERR "Produced slices:\n";
-    foreach my $slice (@slices){
-      print STDERR $slice->chr_name.".".$slice->chr_start."-".$slice->chr_end."\n";
-    }
+      print STDERR "Produced slices:\n";
+      foreach my $slice (@slices){
+	  print STDERR $slice->chr_name.".".$slice->chr_start."-".$slice->chr_end."\n";
+      }
   }
   #print STDERR "returning ".scalar(@slices)."\n";
   return \@slices;
@@ -491,7 +498,7 @@ sub test_for_orthology{
 
   ############################################################
   # get a slice for the transcript with extra sequence on both sides
-
+  
   my $focus_slice;
   if ($transcript->dbID){
     $focus_slice = $db->get_SliceAdaptor->fetch_by_transcript_id( $transcript->dbID, 1000 );
@@ -762,7 +769,7 @@ sub test_for_orthology_with_tblastx{
   my $count = 0;
   foreach my $target_slice ( @target_slices ){
       eval{
-	  ( $orthologues[$count], $coverage[$count] ) = $self->align_with_tblastx( $transcript, $target_slice );
+	( $orthologues[$count], $coverage[$count] ) = $self->align_with_tblastx( $transcript, $target_slice );
       };
       if ($@){
 	  print STDERR $@;
@@ -777,45 +784,45 @@ sub test_for_orthology_with_tblastx{
       
       my $max;
       for(my $i=0; $i<$count;$i++){
-	  next unless ( @{$orthologues[$i]} );
-	  my $coverage = sprintf "%2.2f",$coverage[$i];
-	  unless ( $max){
-	      $max = $coverage;
-	  }
-	  if ( $coverage > $max ){
-	      $max = $coverage;
-	  }
-	  print STDERR "max: $max\n";
-	  my $id;
-	  my $extent; 
-	  my $sum_percent_id;
-	  my $strand;
-	  foreach my $f ( @{$orthologues[$i]} ){
-	      $id = $f->hseqname;
-	      $sum_percent_id += $f->percent_id;
-	      $extent = $f->seqname;
-	      $strand = $f->strand;
-	  }
-	  my $perc_id = sprintf "%2.2f", (3*$sum_percent_id/scalar( @{$orthologues[$i]} ));
-	  my $g_id = $gene_id->{$transcript};
-	  print STDERR "$focus_species $g_id $id $target_species coverage:$coverage percent_id:$perc_id target_id:$extent strand:$strand\n";
+	next unless ( @{$orthologues[$i]} );
+	my $coverage = sprintf "%2.2f",$coverage[$i];
+	unless ( $max){
+	  $max = $coverage;
+	}
+	if ( $coverage > $max ){
+	  $max = $coverage;
+	}
+	print STDERR "max: $max\n";
+	my $id;
+	my $extent; 
+	my $sum_percent_id;
+	my $strand;
+	foreach my $f ( @{$orthologues[$i]} ){
+	  $id = $f->hseqname;
+	  $sum_percent_id += $f->percent_id;
+	  $extent = $f->seqname;
+	  $strand = $f->strand;
+	}
+	my $perc_id = sprintf "%2.2f", (3*$sum_percent_id/scalar( @{$orthologues[$i]} ));
+	my $g_id = $gene_id->{$transcript};
+	print STDERR "$focus_species $g_id $id $target_species coverage:$coverage percent_id:$perc_id target_id:$extent strand:$strand\n";
       }
       if ($threshold){
-	  my @selected;
-	  for(my $i=0; $i<$count;$i++){
-	      if ( $coverage[$i] >= $threshold ){
-		  push( @selected, $orthologues[$i] );
-	      }
+	my @selected;
+	for(my $i=0; $i<$count;$i++){
+	  if ( $coverage[$i] >= $threshold ){
+	    push( @selected, $orthologues[$i] );
 	  }
-	  if (@selected){
-	      return $max;
-	  }
-	  else{
-	      return 0;
-	  }
+	}
+	if (@selected){
+	  return $max;
+	}
+	else{
+	  return 0;
+	}
       }
       else{
-	  return $max;
+	return $max;
       }
   }
   else{
@@ -859,13 +866,13 @@ sub align_with_tblastx{
 
 
    ############################################################
-  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'     => $slice,
-							     '-program'   => 'wutblastx',
-							     '-database'  => $database,
-							     -threshold_type => "PVALUE",
-							     '-threshold' => 1e-10,
-							     #'-filter'    => $filter,
-							     '-options'   => 'V=1000000'
+  my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $slice,
+							     '-program'        => 'wublastn',
+							     '-database'       => $database,
+							     '-threshold_type' => "PVALUE",
+							     '-threshold'      => 1e-10,
+							     #'-filter'       => $filter,
+							     '-options'       => 'V=200 B=200 W=5 E=0.01 E2=0.01'
 							    );
 
     
@@ -1066,6 +1073,8 @@ sub align_with_tblastx{
   #}
 
   my @best_features = $alignments{features}{$order[0]};
+  
+  unlink($database);
   
   return (\@featurepairs,$alignments{coverage}{$order[0]});  
 }
