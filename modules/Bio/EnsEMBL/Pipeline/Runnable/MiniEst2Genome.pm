@@ -62,44 +62,47 @@ use Data::Dumper;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI );
 
 sub new {
-  my ($class,@args) = @_;
-  my $self = $class->SUPER::new(@args);
-  
-  $self->{'_fplist'} = []; #create key to an array of feature pairs
-  
-  my( $genomic, $features, $seqfetcher, $analysis ) = $self->_rearrange([qw(GENOMIC
-								 FEATURES
-								 SEQFETCHER
-								 ANALYSIS)], @args);
-  
-  $self->throw("No genomic sequence input")           
-    unless defined($genomic);
-  $self->throw("[$genomic] is not a Bio::PrimarySeqI") 
-    unless $genomic->isa("Bio::PrimarySeqI");
-  $self->genomic_sequence($genomic) if defined($genomic);
+    my ( $class, @args ) = @_;
+    my $self = $class->SUPER::new(@args);
 
-  $self->throw("No seqfetcher provided")           
-    unless defined($seqfetcher);
-  $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
-    unless $seqfetcher->isa("Bio::DB::RandomAccessI");
-  $self->seqfetcher($seqfetcher) if defined($seqfetcher);
-  
-  $self->analysis($analysis) if defined $analysis;
-  
+    $self->{'_fplist'} = [];    #create key to an array of feature pairs
 
-  if (defined($features)) {
-    if (ref($features) eq "ARRAY") {
-      my @f = @$features;
-      
-      foreach my $f (@f) {
-	$self->addFeature($f);
-      }
-    } else {
-      $self->throw("[$features] is not an array ref.");
+    my ( $genomic, $features, $seqfetcher, $analysis ) = $self->_rearrange(
+        [
+            qw(GENOMIC
+            FEATURES
+            SEQFETCHER
+            ANALYSIS)
+        ],
+        @args
+    );
+
+    $self->throw("No genomic sequence input") unless defined($genomic);
+    $self->throw("[$genomic] is not a Bio::PrimarySeqI")
+      unless $genomic->isa("Bio::PrimarySeqI");
+    $self->genomic_sequence($genomic) if defined($genomic);
+
+    $self->throw("No seqfetcher provided") unless defined($seqfetcher);
+    $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI")
+      unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
+
+    $self->analysis($analysis) if defined $analysis;
+
+    if ( defined($features) ) {
+        if ( ref($features) eq "ARRAY" ) {
+            my @f = @$features;
+
+            foreach my $f (@f) {
+                $self->addFeature($f);
+            }
+        }
+        else {
+            $self->throw("[$features] is not an array ref.");
+        }
     }
-  }
-  
-  return $self; # success - we hope!
+
+    return $self;    # success - we hope!
 }
 
 =head2 genomic_sequence
@@ -113,10 +116,12 @@ sub new {
 =cut
 
 sub genomic_sequence {
-    my( $self, $value ) = @_;    
+    my ( $self, $value ) = @_;
     if ($value) {
+
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+        $value->isa("Bio::PrimarySeqI")
+          || $self->throw("Input isn't a Bio::PrimarySeqI");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -133,10 +138,12 @@ sub genomic_sequence {
 =cut
 
 sub seqfetcher {
-    my( $self, $value ) = @_;    
+    my ( $self, $value ) = @_;
     if ($value) {
+
         #need to check if passed sequence is Bio::DB::RandomAccessI object
-        $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+        $value->isa("Bio::DB::RandomAccessI")
+          || $self->throw("Input isn't a Bio::DB::RandomAccessI");
         $self->{'_seqfetcher'} = $value;
     }
     return $self->{'_seqfetcher'};
@@ -153,9 +160,10 @@ sub seqfetcher {
 =cut
 
 sub analysis {
-    my( $self, $value ) = @_;    
+    my ( $self, $value ) = @_;
     if ($value) {
-        $value->isa("Bio::EnsEMBL::Analysis") || $self->throw("[$value] isn't a Bio::EnsEMBL::Analysis");
+        $value->isa("Bio::EnsEMBL::Analysis")
+          || $self->throw("[$value] isn't a Bio::EnsEMBL::Analysis");
         $self->{'analysis'} = $value;
     }
     return $self->{'_analysis'};
@@ -172,18 +180,18 @@ sub analysis {
 =cut
 
 sub addFeature {
-    my( $self, $value ) = @_;
-    
-    if(!defined($self->{'_features'})) {
-	$self->{'_features'} = [];
+    my ( $self, $value ) = @_;
+
+    if ( !defined( $self->{'_features'} ) ) {
+        $self->{'_features'} = [];
     }
 
     if ($value) {
-        $value->isa("Bio::EnsEMBL::FeaturePair") || $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair");
-	push(@{$self->{'_features'}},$value);
+        $value->isa("Bio::EnsEMBL::FeaturePair")
+          || $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair");
+        push ( @{ $self->{'_features'} }, $value );
     }
 }
-
 
 =head2 get_all_FeaturesbyId
 
@@ -197,27 +205,27 @@ sub addFeature {
 =cut
 
 sub get_all_FeaturesById {
-    my( $self) = @_;
-    
-    my  %idhash;
+    my ($self) = @_;
 
-    FEAT: foreach my $f ($self->get_all_Features) {
-    if (!(defined($f->hseqname))) {
-	$self->warn("No hit name for " . $f->seqname . "\n");
-	    next FEAT;
-	} 
-	if (defined($idhash{$f->hseqname})) {
-	    push(@{$idhash{$f->hseqname}},$f);
-	} else {
-	    $idhash{$f->hseqname} = [];
-	    push(@{$idhash{$f->hseqname}},$f);
-	}
+    my %idhash;
+
+    FEAT: foreach my $f ( $self->get_all_Features ) {
+        if ( !( defined( $f->hseqname ) ) ) {
+            $self->warn( "No hit name for " . $f->seqname . "\n" );
+            next FEAT;
+        }
+        if ( defined( $idhash{ $f->hseqname } ) ) {
+            push ( @{ $idhash{ $f->hseqname } }, $f );
+        }
+        else {
+            $idhash{ $f->hseqname } = [];
+            push ( @{ $idhash{ $f->hseqname } }, $f );
+        }
 
     }
 
-    return (\%idhash);
+    return ( \%idhash );
 }
-
 
 =head2 get_all_Features
 
@@ -229,13 +237,11 @@ sub get_all_FeaturesById {
 
 =cut
 
-
 sub get_all_Features {
-    my( $self, $value ) = @_;
-    
-    return (@{$self->{'_features'}});
-}
+    my ( $self, $value ) = @_;
 
+    return ( @{ $self->{'_features'} } );
+}
 
 =head2 get_all_FeatureIds
 
@@ -252,12 +258,14 @@ sub get_all_FeatureIds {
 
     my %idhash;
 
-    foreach my $f ($self->get_all_Features) {
-	if (defined($f->hseqname)) {
-	    $idhash{$f->hseqname} = 1;
-	} else {
-	    $self->warn("No sequence name defined for feature. " . $f->seqname . "\n");
-	}
+    foreach my $f ( $self->get_all_Features ) {
+        if ( defined( $f->hseqname ) ) {
+            $idhash{ $f->hseqname } = 1;
+        }
+        else {
+            $self->warn(
+                "No sequence name defined for feature. " . $f->seqname . "\n" );
+        }
     }
 
     return keys %idhash;
@@ -274,11 +282,11 @@ sub get_all_FeatureIds {
 =cut
 
 sub make_miniseq {
-    my ($self,@features) = @_;
+    my ( $self, @features ) = @_;
 
     my $seqname = $features[0]->seqname;
 
-    @features = sort {$a->start <=> $b->start} @features;
+    @features = sort { $a->start <=> $b->start } @features;
     my $count  = 0;
     my $mingap = $self->minimum_intron;
 
@@ -288,46 +296,50 @@ sub make_miniseq {
 
     my $prevend     = 0;
     my $prevcdnaend = 0;
-    
-  FEAT: foreach my $f (@features) {
 
-      my $start = $f->start;
-      my $end   = $f->end;
-      
-      $start = $f->start - $self->exon_padding;
-      $end   = $f->end   + $self->exon_padding;
+    FEAT: foreach my $f (@features) {
 
-      if ($start < 1) { $start = 1;}
-      if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
+        my $start = $f->start;
+        my $end   = $f->end;
 
-      my $gap     =    ($start - $prevend);
+        $start = $f->start - $self->exon_padding;
+        $end   = $f->end + $self->exon_padding;
 
-      if ($count > 0 && ($gap < $mingap)) {
-	# STRANDS!!!!!
-	  if ($end < $prevend) { $end = $prevend;}
-	  $genomic_features[$#genomic_features]->end($end);
-	  $prevend     = $end;
-	  $prevcdnaend = $f->hend;
+        if ( $start < 1 ) { $start = 1; }
+        if ( $end > $self->genomic_sequence->length ) {
+            $end = $self->genomic_sequence->length;
+        }
 
-      } else {
-	
-	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
+        my $gap = ( $start - $prevend );
 
-        $newfeature->seqname ($f->hseqname);
-        $newfeature->start     ($start);
-	    $newfeature->end       ($end);
-	    $newfeature->strand    (1);
-# ???	    $newfeature->strand    ($strand);
-	    $newfeature->attach_seq($self->genomic_sequence);
+        if ( $count > 0 && ( $gap < $mingap ) ) {
 
-	    push(@genomic_features,$newfeature);
-	    
+            # STRANDS!!!!!
+            if ( $end < $prevend ) { $end = $prevend; }
+            $genomic_features[$#genomic_features]->end($end);
+            $prevend     = $end;
+            $prevcdnaend = $f->hend;
 
-	    $prevend = $end;
-	    $prevcdnaend = $f->hend; 
+        }
+        else {
 
-	}
-	$count++;
+            my $newfeature = new Bio::EnsEMBL::SeqFeature;
+
+            $newfeature->seqname( $f->hseqname );
+            $newfeature->start($start);
+            $newfeature->end($end);
+            $newfeature->strand(1);
+
+            # ???	    $newfeature->strand    ($strand);
+            $newfeature->attach_seq( $self->genomic_sequence );
+
+            push ( @genomic_features, $newfeature );
+
+            $prevend     = $end;
+            $prevcdnaend = $f->hend;
+
+        }
+        $count++;
     }
 
     # Now we make the cDNA features
@@ -337,40 +349,45 @@ sub make_miniseq {
     my $current_coord = 1;
 
     # make a forward strand sequence, est2genome runs -reverse 
-    @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
+    @genomic_features = sort { $a->start <=> $b->start } @genomic_features;
 
     foreach my $f (@genomic_features) {
-	$f->strand(1);
-	my $cdna_start = $current_coord;
-	my $cdna_end   = $current_coord + ($f->end - $f->start);
-	
-	my $tmp = new Bio::EnsEMBL::SeqFeature(
-					       -seqname => $f->seqname.'.cDNA',
-					       -start => $cdna_start,
-					       -end   => $cdna_end,
-					       -strand => 1);
-	
-	my $fp  = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-						-feature2 => $tmp);
-	
-	$pairaln->addFeaturePair($fp);
-	
-#	$self->print_FeaturePair($fp);
+        $f->strand(1);
+        my $cdna_start = $current_coord;
+        my $cdna_end   = $current_coord + ( $f->end - $f->start );
 
-	$current_coord = $cdna_end+1;
+        my $tmp = new Bio::EnsEMBL::SeqFeature(
+            -seqname => $f->seqname . '.cDNA',
+            -start   => $cdna_start,
+            -end     => $cdna_end,
+            -strand  => 1
+        );
+
+        my $fp = new Bio::EnsEMBL::FeaturePair(
+            -feature1 => $f,
+            -feature2 => $tmp
+        );
+
+        $pairaln->addFeaturePair($fp);
+
+        #	$self->print_FeaturePair($fp);
+
+        $current_coord = $cdna_end + 1;
     }
-	
+
     #changed id from 'Genomic' to seqname
-    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => $seqname,
-						      -pairalign => $pairaln);
+    my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(
+        -id        => $seqname,
+        -pairalign => $pairaln
+    );
 
     my $newgenomic = $miniseq->get_cDNA_sequence->seq;
     $newgenomic =~ s/(.{72})/$1\n/g;
-#    print ("New genomic sequence is " . $newgenomic. "\n");
+
+    #    print ("New genomic sequence is " . $newgenomic. "\n");
     return $miniseq;
 
 }
-
 
 =head2 minimum_introm
 
@@ -383,10 +400,10 @@ sub make_miniseq {
 =cut
 
 sub minimum_intron {
-    my ($self,$arg) = @_;
+    my ( $self, $arg ) = @_;
 
-    if (defined($arg)) {
-	$self->{'_minimum_intron'} = $arg;
+    if ( defined($arg) ) {
+        $self->{'_minimum_intron'} = $arg;
     }
 
     return $self->{'_minimum_intron'} || 1000;
@@ -401,15 +418,15 @@ sub minimum_intron {
   Args    : 
 
 =cut
-   
-sub exon_padding {
-    my ($self,$arg) = @_;
 
-    if (defined($arg)) {
-	$self->{'_padding'} = $arg;
+sub exon_padding {
+    my ( $self, $arg ) = @_;
+
+    if ( defined($arg) ) {
+        $self->{'_padding'} = $arg;
     }
 
-#    return $self->{'_padding'} || 100;
+    #    return $self->{'_padding'} || 100;
     return $self->{'_padding'} || 1000;
 
 }
@@ -425,18 +442,13 @@ sub exon_padding {
 =cut
 
 sub print_FeaturePair {
-    my ($self,$nf) = @_;
-    #changed $nf->id to $nf->seqname
-    print(STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
-	  $nf->start . "\t" . 
-	  $nf->end   . "\t(" . 
-	  $nf->strand . ")\t" .
-	  $nf->hseqname  . "\t" . 
-	  $nf->hstart   . "\t" . 
-	  $nf->hend     . "\t(" .
-	  $nf->hstrand  . ")\n");
-}
+    my ( $self, $nf ) = @_;
 
+    #changed $nf->id to $nf->seqname
+    print( STDERR "FeaturePair is " . $nf->seqname . "\t" . $nf->start . "\t"
+        . $nf->end . "\t(" . $nf->strand . ")\t" . $nf->hseqname . "\t"
+        . $nf->hstart . "\t" . $nf->hend . "\t(" . $nf->hstrand . ")\n" );
+}
 
 =head2 get_Sequence
 
@@ -449,29 +461,25 @@ sub print_FeaturePair {
 =cut
 
 sub get_Sequence {
-    my ($self,$id) = @_;
+    my ( $self, $id ) = @_;
     my $seqfetcher = $self->seqfetcher;
 
-    if (defined($self->{'_seq_cache'}{$id})) {
-      return $self->{'_seq_cache'}{$id};
-    } 
-    
+    if ( defined( $self->{'_seq_cache'}{$id} ) ) {
+        return $self->{'_seq_cache'}{$id};
+    }
+
     my $seq;
-    eval {
-      $seq = $seqfetcher->get_Seq_by_acc($id);
-    };
+    eval { $seq = $seqfetcher->get_Seq_by_acc($id); };
 
     # if we didn't get it by accession, try by id
-    if(!defined $seq){
-      eval{
-	$seq = $seqfetcher->get_Seq_by_id($id) unless defined $seq;
-      };
+    if ( !defined $seq ) {
+        eval { $seq = $seqfetcher->get_Seq_by_id($id) unless defined $seq; };
     }
 
-    if ((!defined($seq)) && $@) {
-      $self->warn("Couldn't find sequence for [$id]:\n $@");
+    if ( ( !defined($seq) ) && $@ ) {
+        $self->warn("Couldn't find sequence for [$id]:\n $@");
     }
-    
+
     return $seq;
 
 }
@@ -487,14 +495,14 @@ sub get_Sequence {
 =cut
 
 sub get_all_Sequences {
-  my ($self,@id) = @_;
-  
- SEQ: foreach my $id (@id) {
-    my $seq = $self->get_Sequence($id);
-    if(defined $seq) {
-      $self->{'_seq_cache'}{$id} = $seq;
+    my ( $self, @id ) = @_;
+
+    SEQ: foreach my $id (@id) {
+        my $seq = $self->get_Sequence($id);
+        if ( defined $seq ) {
+            $self->{'_seq_cache'}{$id} = $seq;
+        }
     }
-  }
 }
 
 =head2 run
@@ -508,35 +516,34 @@ sub get_all_Sequences {
 =cut
 
 sub run {
-  my ($self) = @_;
-  
-  my ($esthash) = $self->get_all_FeaturesById;
-  
-  my @ests    = keys %$esthash;
-  
-  $self->get_all_Sequences(@ests);
+    my ($self) = @_;
 
- ID: foreach my $est (@ests) {
-    
-    my $features = $esthash->{$est};
-    my @exons;
-    
-    # How would you never have an array?
-    next ID unless (ref($features) eq "ARRAY");
-    
-    # why > not >= 1?
-    next ID unless (scalar(@$features) >= 1);
-    
-    eval {
-      $self->run_blaste2g($est, $features);
-    };
+    my ($esthash) = $self->get_all_FeaturesById;
 
-    if ($@) {
-      print STDERR "Error running blaste2g on" . $features->[0]->hseqname . " [$@]\n";
+    my @ests = keys %$esthash;
+
+    $self->get_all_Sequences(@ests);
+
+    ID: foreach my $est (@ests) {
+
+        my $features = $esthash->{$est};
+        my @exons;
+
+        # How would you never have an array?
+        next ID unless ( ref($features) eq "ARRAY" );
+
+        # why > not >= 1?
+        next ID unless ( scalar(@$features) >= 1 );
+
+        eval { $self->run_blaste2g( $est, $features ); };
+
+        if ($@) {
+            print STDERR "Error running blaste2g on" . $features->[0]->hseqname
+              . " [$@]\n";
+        }
+
     }
 
-  }
-  
 }
 
 =head2 run_blaste2g
@@ -550,170 +557,183 @@ sub run {
 =cut
 
 sub run_blaste2g {
-  my ($self,$est,$features) = @_;
+    my ( $self, $est, $features ) = @_;
 
-  
-  #?? never did fully understand this.
-  my @extras  = $self->find_extras (@$features);
+    #?? never did fully understand this.
+    my @extras = $self->find_extras(@$features);
 
-  return unless (scalar(@extras) >= 1);
-  
-  my $miniseq = $self->make_miniseq(@$features);
+    return unless ( scalar(@extras) >= 1 );
 
-  my $hseq    = $self->get_Sequence($est);
-  
-  if (!defined($hseq)) {
-    $self->throw("Can't fetch sequence for id [$est]\n");
-  }
-  
-  my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome(  -genomic => $miniseq->get_cDNA_sequence,
-							      -est     => $hseq);
-  
-  $eg->run;
-  
-  # output is a list of Features, one per predicted gene. Exons are added as 
-  # subseqfeatures of gene features, and supporting evidence featurepairs as 
-  # subseqfeatures of exons.
-  my @genes = $eg->output;
+    my $miniseq = $self->make_miniseq(@$features);
 
-  return unless scalar(@genes);
-  
-  my @newf;
-  
-  if ( scalar(@genes) >1 ) {
-    $self->throw("more than one gene predicted - I'm outta here!\n");
-  }
-  
-  my @genomic_exons;
-  my $ec = 0;
-  my $strand;
+    my $hseq = $self->get_Sequence($est);
 
-  foreach my $gene(@genes) {
-    my @exons = $gene->feature1->sub_SeqFeature;
-    print "*numexons: " . scalar(@exons) . "\n";
-
-    $strand = $exons[0]->strand;
-  FEAT:    foreach my $ex(@exons){
-      $ec++;
-      $self->throw("mismatched exon strands\n") unless $ex->strand == $strand;
-      
-      # exonerate has no concept of phase, but remapping will fail if this is unset
-      $ex->phase(0);
-      $ex->analysis($self->analysis);
-
-      # convert back to genomic coords, but leave the EST coordinates alone
-      my @converted = $miniseq->convert_FeaturePair($ex);
-      if ($#converted > 0) {
-	# all hell will break loose as the sub alignments will probably not map cheerfully 
-	# for now, ignore this feature.
-	print STDERR "Warning : feature converts into > 1 features " . scalar(@converted) . " ignoring exon $ec\n";
-	next FEAT;
-      }
-      
-      foreach my $nf(@converted) {
-	# make sure we don't lose the score ...
-	$nf->score($ex->score);
-	push(@genomic_exons, $nf->feature1); 
-      }
-      
-      # now sort out sub seqfeatures - details of sub segments making up an exon.
-
-      foreach my $aln($ex->feature1->sub_SeqFeature){
-	# strands 
-	if($aln->strand != $aln->hstrand){
-	  $aln->strand(-1);
-	  $aln->hstrand(1);
-	  $ex->strand(-1);
-	}
-	
-	# convert to genomic coords
-	my @alns = $miniseq->convert_FeaturePair($aln);
-	if ($#alns > 0) {
-	  # we're in for fun
-	  print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
-	}
-	
-	foreach my $a(@alns) {
-	  my $added = 0;
-	  $a->strand($aln->strand); # genomic
-	  $a->hstrand(1);      # protein
-	  
-	  $a->seqname($aln->seqname);
-	  $a->hseqname($aln->hseqname);
-	  $a->analysis($self->analysis);
-
-	  # shouldn't need to expand ... as long as we choose the right parent feature to add to!
-	  foreach my $g(@genomic_exons){
-	    if($a->start >= $g->start && $a->end <=$g->end && !$added){
-	      $g->add_sub_SeqFeature($a,'');
-	      $added = 1;
-	    }
-	  }
-	  $self->warn("Sub align feature could not be added ...\n") unless $added;
-	}
-      }
+    if ( !defined($hseq) ) {
+        $self->throw("Can't fetch sequence for id [$est]\n");
     }
-    
-    
-    foreach my $gex (@genomic_exons) {
-      $gex->{_phase} = 0; # e2g doesn;t give us phase
-      $gex->strand($strand);
-      #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
-      $gex->seqname($gene->seqname); # urrmmmm?
-      $gex->analysis($self->analysis);
-      #end BUGFIX
-    }
-  }   
-  
-  
-  # $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
-  # sub_SeqFeatures representing ungapped alignments making up the exon:EST alignment
 
-  if(scalar(@genomic_exons)){
-    my $fset = new Bio::EnsEMBL::SeqFeature();
-    $fset->analysis($self->analysis);
-    
-    foreach my $nf (@genomic_exons) {
-      $nf->analysis($self->analysis);
-      $fset->add_sub_SeqFeature($nf,'EXPAND');
-      $fset->seqname($nf->seqname);
+    my $eg = new Bio::EnsEMBL::Pipeline::Runnable::Est2Genome(
+        -genomic => $miniseq->get_cDNA_sequence,
+        -est     => $hseq
+    );
+
+    $eg->run;
+
+    # output is a list of Features, one per predicted gene. Exons are added as 
+    # subseqfeatures of gene features, and supporting evidence featurepairs as 
+    # subseqfeatures of exons.
+    my @genes = $eg->output;
+
+    return unless scalar(@genes);
+
+    my @newf;
+
+    if ( scalar(@genes) > 1 ) {
+        $self->throw("more than one gene predicted - I'm outta here!\n");
     }
-    
-    $self->add_output($fset);
-  }
+
+    my @genomic_exons;
+    my $ec = 0;
+    my $strand;
+
+    foreach my $gene (@genes) {
+        my @exons = $gene->feature1->sub_SeqFeature;
+        print "*numexons: " . scalar(@exons) . "\n";
+
+        $strand = $exons[0]->strand;
+        FEAT: foreach my $ex (@exons) {
+            $ec++;
+            $self->throw("mismatched exon strands\n")
+              unless $ex->strand == $strand;
+
+            # exonerate has no concept of phase, but remapping will fail if this is unset
+            $ex->phase(0);
+            $ex->analysis( $self->analysis );
+
+            # convert back to genomic coords, but leave the EST coordinates alone
+            my @converted = $miniseq->convert_FeaturePair($ex);
+            if ( $#converted > 0 ) {
+
+                # all hell will break loose as the sub alignments will probably not map cheerfully 
+                # for now, ignore this feature.
+                print STDERR "Warning : feature converts into > 1 features "
+                  . scalar(@converted) . " ignoring exon $ec\n";
+                next FEAT;
+            }
+
+            foreach my $nf (@converted) {
+
+                # make sure we don't lose the score ...
+                $nf->score( $ex->score );
+                push ( @genomic_exons, $nf->feature1 );
+            }
+
+        # now sort out sub seqfeatures - details of sub segments making up an exon.
+
+            foreach my $aln ( $ex->feature1->sub_SeqFeature ) {
+
+                # strands 
+                if ( $aln->strand != $aln->hstrand ) {
+                    $aln->strand(-1);
+                    $aln->hstrand(1);
+                    $ex->strand(-1);
+                }
+
+                # convert to genomic coords
+                my @alns = $miniseq->convert_FeaturePair($aln);
+                if ( $#alns > 0 ) {
+
+                    # we're in for fun
+                    print STDERR
+                      "Warning : sub_align feature converts into > 1 features "
+                      . scalar(@alns) . "\n";
+                }
+
+                foreach my $a (@alns) {
+                    my $added = 0;
+                    $a->strand( $aln->strand );    # genomic
+                    $a->hstrand(1);                # protein
+
+                    $a->seqname( $aln->seqname );
+                    $a->hseqname( $aln->hseqname );
+                    $a->analysis( $self->analysis );
+
+                    # shouldn't need to expand ... as long as we choose the right parent feature to add to!
+                    foreach my $g (@genomic_exons) {
+                        if ( $a->start >= $g->start && $a->end <= $g->end
+                            && !$added )
+                        {
+                            $g->add_sub_SeqFeature( $a, '' );
+                            $added = 1;
+                        }
+                    }
+                    $self->warn("Sub align feature could not be added ...\n")
+                      unless $added;
+                }
+            }
+        }
+
+        foreach my $gex (@genomic_exons) {
+            $gex->{_phase} = 0;    # e2g doesn;t give us phase
+            $gex->strand($strand);
+
+            #BUGFIX: This should probably be fixed in Bio::EnsEMBL::Analysis
+            $gex->seqname( $gene->seqname );    # urrmmmm?
+            $gex->analysis( $self->analysis );
+
+            #end BUGFIX
+        }
+    }
+
+# $fset holds a list of (genomic) SeqFeatures (one fset per gene) plus their constituent exons and
+# sub_SeqFeatures representing ungapped alignments making up the exon:EST alignment
+
+    if ( scalar(@genomic_exons) ) {
+        my $fset = new Bio::EnsEMBL::SeqFeature();
+        $fset->analysis( $self->analysis );
+
+        foreach my $nf (@genomic_exons) {
+            $nf->analysis( $self->analysis );
+            $fset->add_sub_SeqFeature( $nf, 'EXPAND' );
+            $fset->seqname( $nf->seqname );
+        }
+
+        $self->add_output($fset);
+    }
 
 }
 
 sub find_extras {
-  my ($self,@features) = @_;
-  
-  my @output = $self->output;
-  my @new;
-  
- FEAT: foreach my $f (@features) {
-    my $found = 0;
-    
-    # Skip features shorter than 50bp
-    if (($f->end - $f->start) < 50) {
-      next FEAT;
+    my ( $self, @features ) = @_;
+
+    my @output = $self->output;
+    my @new;
+
+    FEAT: foreach my $f (@features) {
+        my $found = 0;
+
+        # Skip features shorter than 50bp
+        if ( ( $f->end - $f->start ) < 50 ) {
+            next FEAT;
+        }
+
+        #	print ("New feature\n");
+
+        #$self->print_FeaturePair($f);
+        foreach my $out (@output) {
+            foreach my $sf ( $out->sub_SeqFeature ) {
+
+                if ( !( $f->end < $out->start || $f->start > $out->end ) ) {
+                    $found = 1;
+                }
+            }
+        }
+
+        if ( $found == 0 ) {
+            push ( @new, $f );
+        }
     }
-    #	print ("New feature\n");
-    
-    #$self->print_FeaturePair($f);
-    foreach my $out (@output) {
-      foreach my $sf ($out->sub_SeqFeature) {
-	
-	if (!($f->end < $out->start || $f->start >$out->end)) {
-	  $found = 1;
-	}
-      }
-    }
-    
-    if ($found == 0) {
-      push(@new,$f);
-    }
-  }
-  return @new;
+    return @new;
 }
 
 =head2 output
@@ -728,17 +748,16 @@ sub find_extras {
 
 sub output {
     my ($self) = @_;
-    if (!defined($self->{'_output'})) {
-	$self->{'_output'} = [];
+    if ( !defined( $self->{'_output'} ) ) {
+        $self->{'_output'} = [];
     }
-    return @{$self->{'_output'}};
+    return @{ $self->{'_output'} };
 }
 
 sub add_output {
-    my( $self, @feat_pairs ) = @_;
-    
-    push(@{$self->{'_output'}}, @feat_pairs);
-}
+    my ( $self, @feat_pairs ) = @_;
 
+    push ( @{ $self->{'_output'} }, @feat_pairs );
+}
 
 1;
