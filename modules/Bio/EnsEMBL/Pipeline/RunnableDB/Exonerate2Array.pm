@@ -80,7 +80,10 @@ sub fetch_input {
   my $options;
   my $query_file = $PIPELINE_INPUT_DIR.$input_id;
   my $target_dir =$PIPELINE_TARGET_DIR;
-  
+  my $verbose = 0;
+
+  #$target_dir .= "22.fa"; ##only for testing
+
   ###Runnable::ExonerateArray take a array of query_seq_obj, so it's need to be generated here###
 
   my @query_seqs;
@@ -101,9 +104,9 @@ sub fetch_input {
   $self->throw("Can't run Exonerate without both query and target sequences") 
     unless (defined($query_file) && defined($target_dir));
   
-  print "exonerate is '$exonerate', target_dir is $target_dir, query_file is $ query_file\n";
   my $executable =  $BIN_DIR."/".$exonerate."-".$version;
-  
+  print "executable is '$executable', target_dir is $target_dir, query_file is $ query_file\n";
+
   $self->throw("No exonerate executable") unless defined($executable);
 
   #my $target_file = $target_dir . "*";###exonerate-0.8.2 can use both file and dir
@@ -115,7 +118,7 @@ sub fetch_input {
 								      '-target_type'  => 'dna',
 								      '-exonerate'    => $executable,
 								      '-options'      => $options,
-								      '-analysis'     => $analysis,
+								      '-verbose'     => $verbose,
 								     );
   $self->runnables($runnable);
 }
@@ -139,9 +142,7 @@ sub run {
   foreach my $runnable ($self->runnables){
     $runnable->run();
     my @out = $runnable->output();
-    my $match = $runnable->output_match_count;
     $self->output(\@out);
-    $self->output_match_count($match);
   }
 }
 
@@ -188,33 +189,9 @@ sub write_output {
   my($self) = @_;
   
   my @misc_features = $self->output(); 
-  #my $match = $self->output_match_count;
   
   my $mfa = $self->db->get_MiscFeatureAdaptor();
   $mfa->store( @misc_features );
-  
-  #my ($tot_pass_ids,$only_25,$only_24,$both,$total_query_seq,%done);
-
-  #foreach my $q_id (keys %{$match}) {
-  #  $tot_pass_ids++;
-  #  if ($match->{$q_id}->{'full_match_count'} and !$match->{$q_id}->{'mis_match_count'}) {
-  #    $only_25 += $match->{$q_id}->{'full_match_count'};
-  #  }
-  #  elsif ($match->{$q_id}->{'full_match_count'} and $match->{$q_id}->{'mis_match_count'}) {
-  #    $both +=$match->{$q_id}->{'full_match_count'};
-  #    $both +=$match->{$q_id}->{'mis_match_count'};
-  #  }
-  #  elsif ($match->{$q_id}->{'mis_match_count'} and !$match->{$q_id}->{'fullmatch_count'}) {
-  #    $only_24 += $match->{$q_id}->{'mis_match_count'};
-  #  }
-  #}
-  
-  
-  #my $ratio_25 = $only_25/$tot_pass_ids;
-  #my $ratio_24 = $only_24/$tot_pass_ids;
-  #my $ratio_both = $both/$tot_pass_ids;
-  #$total_query_seq += $self->total_query_seq;
-  #printf "total_query_seq is $total_query_seq, total pass ids is $tot_pass_ids, with 25 bases exact match is $only_25 (%.2f), with 24 bases exact match is $only_24 (%.2f) and both is $both (%.2f)\n", $ratio_25,$ratio_24,$ratio_both;
   
   return 1;
 }

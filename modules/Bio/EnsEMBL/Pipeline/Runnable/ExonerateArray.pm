@@ -72,7 +72,7 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($db,$database, $query_seqs, $query_type, $target_type, $exonerate, $options, $analysis) = 
+  my ($db,$database, $query_seqs, $query_type, $target_type, $exonerate, $options, $verbose) = 
     $self->_rearrange([qw(
 			  DB
 			  DATABASE
@@ -81,16 +81,16 @@ sub new {
 			  TARGET_TYPE
 			  EXONERATE
 			  OPTIONS
-			  ANALYSIS
+			  VERBOSE
 			 )
 		      ], @args);
   
   
   $self->{_output} = [];
-  $self->analysis($analysis) if $analysis;
+  $self->verbose($verbose) if $verbose;
 
   ###$db is needed to create $slice which is needed to create DnaDnaAlignFeatures
-  $self->db($db) if $db;
+  $self->db($db);
   # must have a target and a query sequences
   unless( $query_seqs ){
     $self->throw("Exonerate needs a query_seqs: $query_seqs");
@@ -155,7 +155,7 @@ Function:   Runs exonerate script and generate features which then stored in $se
 sub run {
   my ($self) = @_;
   
-  my $verbose = 0;
+  my $verbose = $self->verbose;
   
   my $dir         = $self->workdir();
   my $exonerate   = $self->exonerate;
@@ -215,9 +215,8 @@ sub run {
   
   $command .= " | ";
   
-  #print STDERR "running exonerate: $command\n" if $verbose;
-  print STDERR "running exonerate: $command\n";
-  
+  print STDERR "running exonerate: $command\n" if $verbose;
+    
   open( EXO, $command ) || $self->throw("Error running exonerate $!");
   
   # system calls return 0 (true in Unix) if they succeed
@@ -287,17 +286,14 @@ sub run {
       
       if ($h->{'matching_length'} == $h->{'probe_length'}-1) {
 	$h->{'match_status'} = "Mismatch";
-	#$match{$h->{'q_id'}}{'mis_match_count'}++;
 	push @pro_features, $h;
       } 
       elsif ($h->{'matching_length'} == $h->{'probe_length'}) {
 	if ($h->{'score'} == 125) {
 	  $h->{'match_status'} = "Fullmatch";
-	  #$match{$h->{'q_id'}}{'full_match_count'}++;
 	}
 	else {
 	  $h->{'match_status'} = "Mismatch";
-	  #$match{$h->{'q_id'}}{'mis_match_count'}++;
 	}
 	push @pro_features, $h;
       }
@@ -309,14 +305,16 @@ sub run {
   
   $self->_make_affy_features(@pro_features);
 
-  #$self->output_match_count(\%match);
+  
   ############################################################
   
-# remove interim files (but do not remove the database if you are using one)
+  # remove interim files (but do not remove the database if you are using one)
   unlink $query;
   if ( $self->genomic){
     unlink $target;
   }
+
+  return 1;
 }
 
 sub _make_affy_features {
@@ -329,8 +327,10 @@ sub _make_affy_features {
   foreach my $h (@h) {
     my ($coord_system_name,$seq_region_name,$slice) ;
     
-    if ($h->{'q_id'} =~/Zebrafish/i) {
+    if ($h->{'q_id'} =~/Zebrafish/i or $h->{'t_id'} =~ /AL157394.15/) {
       $coord_system_name = undef;
+      $seq_region_name = $h->{'t_id'} if $h->{'t_id'} =~ /AL157394.15/;
+      #print "coord_system_name is $coord_system_name and seq_region_name is $seq_region_name\n";
     }
     else {
       $coord_system_name = "chromosome";
@@ -439,13 +439,13 @@ sub _make_affy_features {
 #
 ############################################################
 
-sub analysis{
+sub verbose{
   
-  my ($self,$analysis) = @_;
-  if( defined $analysis) {
-    $self->{'_analysis'} = $analysis;
+  my ($self,$verbose) = @_;
+  if( defined $verbose) {
+    $self->{'_verbose'} = $verbose;
   }
-  return $self->{'_analysis'};
+  return $self->{'_verbose'};
   
 }
 
