@@ -14,13 +14,14 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise
+Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new(-genomic  => $genseq,
-								  -features => $features,
-								  -trim     => 0)
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new(-genomic    => $genseq,
+								       -features   => $features,
+								       -seqfetcher => $seqfetcher,
+								       -trim       => 0)
 
     $obj->run
 
@@ -51,49 +52,55 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 
 #compile time check for executable
-use Bio::EnsEMBL::Analysis::Programs qw(pfetch efetch); 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::DB::RandomAccessI;
 
 use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
-           
-    $self->{'_idlist'} = []; #create key to an array of feature pairs
-    
-    my( $genomic, $ids,$trim,$endbias) = $self->_rearrange(['GENOMIC',
-						   'IDS',
-						   'TRIM',
-						   'ENDBIAS',
-						  ], @args);
-       
-    $self->throw("No genomic sequence input")           unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
-
-    $self->genomic_sequence($genomic) if defined($genomic);
-    $self->endbias($endbias) if defined($endbias);
-
-    if (defined($ids)) {
-	if (ref($ids) eq "ARRAY") {
-	    push(@{$self->{_idlist}},@$ids);
-	} else {
-	    $self->throw("[$ids] is not an array ref.");
+sub new {
+  my ($class,@args) = @_;
+  my $self = bless {}, $class;
+  
+  $self->{'_idlist'} = []; #create key to an array of feature pairs
+  
+  my( $genomic, $ids, $seqfetcher, $trim, $endbias) = $self->_rearrange(['GENOMIC',
+									 'IDS',
+									 'SEQFETCHER',
+									 'TRIM',
+									 'ENDBIAS',
+									], @args);
+  
+  $self->throw("No genomic sequence input")           unless defined($genomic);
+  $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
+  $self->genomic_sequence($genomic) if defined($genomic);
+  
+  $self->endbias($endbias) if defined($endbias);
+  
+  $self->throw("No seqfetcher provided")           
+    unless defined($seqfetcher);
+  $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
+    unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+  $self->seqfetcher($seqfetcher) if defined($seqfetcher);
+  
+  if (defined($ids)) {
+    if (ref($ids) eq "ARRAY") {
+      push(@{$self->{_idlist}},@$ids);
+    } else {
+      $self->throw("[$ids] is not an array ref.");
 	}
-    }
-    
-    if (defined($trim)) {
-      $self->trim($trim);
-    }
-
-    return $self; # success - we hope!
+  }
+  
+  if (defined($trim)) {
+    $self->trim($trim);
+  }
+  
+  return $self; # success - we hope!
 }
 
 =head2 genomic_sequence
@@ -138,6 +145,26 @@ sub endbias {
     }    
 
     return $self->{_endbias};
+}
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::EnsEMBL::Pipeline::SeqFetcher object
+    Args    :   Bio::EnsEMBL::Pipeline::SeqFetcher object
+
+=cut
+
+sub seqfetcher {
+  my( $self, $value ) = @_;    
+  if ($value) {
+    #need to check if passed sequence is Bio::DB::RandomAccessI object
+    $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+    $self->{'_seqfetcher'} = $value;
+  }
+  return $self->{'_seqfetcher'};
 }
 
 
@@ -226,10 +253,11 @@ sub run {
 
     my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
 
-    my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(-genomic  => $self->genomic_sequence,
-								     -features => \@features,
-								     -forder   => \@forder,
-								     "-endbias"  => $self->endbias);
+    my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $self->genomic_sequence,
+								     '-features'   => \@features,
+								     '-seqfetcher' => $self->seqfetcher,
+								     '-forder'     => \@forder,
+								     '-endbias'    => $self->endbias);
 
     $mg->minirun;
     
@@ -446,7 +474,7 @@ sub validate_sequence {
     
 sub get_Sequence {
     my ($self,$id) = @_;
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+    my $seqfetcher = $self->seqfetcher;
     my $seq;
 
     if (!defined($id)) {
@@ -455,12 +483,11 @@ sub get_Sequence {
     
     print(STDERR "Sequence id :  is [$id]\n");
 
-    # VAC FIXME
-    # temporarily get rid of pfetch for Riken, or we'll end up with DNA not protein sequences
-    $seq = $seqfetcher->run_bp_search($id,'/data/blastdb/riken_prot.inx','Fasta');
-
-    if(!defined($seq)){
-      $seq = $seqfetcher->run_pfetch($id);
+    eval {
+      $seq = $seqfetcher->get_Seq_by_acc($id);
+    };
+    if($@) {
+      $self->throw("Problem fetching sequence for id [$id]\n");
     }
 
     if(!defined($seq)){

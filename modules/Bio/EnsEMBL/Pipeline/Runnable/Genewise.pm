@@ -46,11 +46,9 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 
 # _initialize is where the heavy stuff will happen when new is called
 
-sub _initialize {
-  my($self,@args) = @_;
-
-  my $make = {};
-  bless $make, ref($self);
+sub new {
+  my ($class,@args) = @_;
+  my $self = bless {}, $class;
 
   my ($genomic, $protein, $memory,$reverse,$endbias) = 
       $self->_rearrange(['GENOMIC','PROTEIN','MEMORY','REVERSE','ENDBIAS'], @args);
@@ -64,7 +62,7 @@ sub _initialize {
   $self->endbias($endbias)   if (defined($endbias));             
   $self->memory ($memory)    if (defined($memory));
 
-  return $make; # success - we hope!
+  return $self; # success - we hope!
 }
 
 # RunnableI methods

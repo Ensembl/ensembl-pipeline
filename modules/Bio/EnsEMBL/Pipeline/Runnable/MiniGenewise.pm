@@ -52,7 +52,7 @@ use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::Pipeline::SeqFetcher;
+use Bio::DB::RandomAccessI;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(pfetch efetch); 
@@ -63,22 +63,28 @@ use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+sub new {
+  my ($class,@args) = @_;
+  my $self = bless {}, $class;
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $features,$endbias,$forder) = $self->_rearrange(['GENOMIC',
-						                   'FEATURES',
-						                   'ENDBIAS',
-						                   'FORDER'], @args);
+    my( $genomic, $features, $seqfetcher, $endbias, $forder) = $self->_rearrange(['GENOMIC',
+						                    'FEATURES',
+								    'SEQFETCHER',
+						                    'ENDBIAS',
+						                    'FORDER'], @args);
        
     $self->throw("No genomic sequence input")           unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
-
     $self->genomic_sequence($genomic) if defined($genomic);
+
+    $self->throw("No seqfetcher provided") unless defined($seqfetcher);
+    $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
+
     $self->{_forder} = $forder        if defined($forder);
+
     $self->endbias($endbias)          if defined($endbias);
 
     if (defined($features)) {
@@ -137,6 +143,27 @@ sub endbias {
   }
   return $self->{_endbias};
   }
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
+
+=cut
+
+sub seqfetcher {
+  my( $self, $value ) = @_;    
+  if (defined($value)) {
+    #need to check if we are being passed a Bio::DB::RandomAccessI object
+    $self->throw("[$value] is not a Bio::DB::RandomAccessI") unless $value->isa("Bio::DB::RandomAccessI");
+    $self->{'_seqfetcher'} = $value;
+  }
+  return $self->{'_seqfetcher'};
+}
+
 
 
 =head2 addFeature 
@@ -399,37 +426,31 @@ sub print_FeaturePair {
 =cut
 
 sub get_Sequence {
-    my ($self,$id) = @_;
-    my $seq;
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
-
-    if (defined($self->{_seq_cache}{$id})) {
-      return $self->{_seq_cache}{$id};
-    } 
-    
-    # for riken proteins; pfetch will get the nucleotide sequence from embl doh!
-    $seq = $seqfetcher->run_bp_search($id,'/data/blastdb/riken_prot.inx','Fasta');
-    
-    if (!defined($seq)) {
-      # try pfetch
-      $seq = $seqfetcher->run_pfetch($id);
-    }
-    
-    if (!defined($seq)) {
-      # try efetch
-      $seq = $seqfetcher->run_efetch($id);
-    }
-    
-    if (!defined($seq)) {
-      $self->throw("Couldn't find sequence for [$id]");
-    }
-    
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
-    
-
-    
-    return $seq;
-
+  my ($self,$id) = @_;
+  
+  if (defined($self->{_seq_cache}{$id})) {
+    return $self->{_seq_cache}{$id};
+  } 
+  
+  my $seqfetcher = $self->seqfetcher;    
+  my $seq;
+  eval {
+    $seq = $seqfetcher->get_Seq_by_acc($id);
+  };
+  
+  if ($@) {
+    $self->throw("Problem fetching sequence for [$id]: [$@]\n");
+  }
+  
+  if (!defined $seq) {
+    $self->throw("Couldn't find sequence for [$id]");
+  }
+  
+  print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+  
+  
+  return $seq;
+  
 }
 
 =head2 get_all_Sequences
