@@ -34,6 +34,7 @@ my $nodes     = $::pipeConf{'usenodes'};
 my $workdir   = $::pipeConf{'nfstmp.dir'};
 my $flushsize = $::pipeConf{'batchsize'};
 my $jobname   = $::pipeConf{'jobname'};
+my $retry     = $::pipeConf{'retry'} || 3;
 
 $| = 1;
 
@@ -45,6 +46,8 @@ my $analysis;               # Only run this analysis ids
 my $submitted;
 my $jobname;                # Meaningful name displayed by bjobs
 			    # aka "bsub -J <name>"
+			    # maybe this should be compulsory, as
+			    # the default jobname really isn't any use
 my $idlist;
 my ($done, $once);
 
@@ -60,6 +63,7 @@ GetOptions(
     'jobname=s'   => \$jobname,
     'usenodes=s'  => \$nodes,
     'once!'       => \$once,
+    'retry=i'     => \$retry,
     'analysis=s'  => \$analysis
 )
 or die ("Couldn't get options");
@@ -77,11 +81,18 @@ my $sic         = $db->get_StateInfoContainer;
 
 
 # scp
-# $LSF_params - send certain (LSF) parameters to Job. They have not
-# been incorporated as methods as they are more class variables than
-# instance variables. This hash is passed to batch_runRemote which
-# passes them on to flush_runs. I'm not saying this is the best way of
-# doing it...
+# $LSF_params - send certain (LSF) parameters to Job. This hash contains
+# things LSF wants to know, i.e. queue name, nodelist, jobname (things that
+# go on the bsub command line), plus the queue flushsize. This hash is
+# passed to batch_runRemote which passes them on to flush_runs.
+#
+# The idea is that you could have more than one of these hashes to suit
+# different types of jobs, with different LSF options. You would then define
+# a queue 'resolver' function. This would take the Job object and return the
+# queue type, based on variables in the Job/underlying Analysis object.
+#
+# For example, you could put slow (e.g., blastx) jobs in a different queue,
+# or on certain nodes, or simply label them with a different jobname.
 
 my $LSF_params = {};
 $LSF_params->{'queue'}     = $queue if defined $queue;
@@ -207,9 +218,14 @@ while (1) {
 			   $cj->current_status->status . " " .
 			   $anal->dbID . "\n";
 
-		    # if ($cj->analysis->dbID == $anal->dbID && $cj->current_status->status ne "FAILED") { #}
 		    if ($cj->analysis->dbID == $anal->dbID) {
-			print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n";
+			if ($cj->current_status->status eq 'FAILED' && $cj->retry_count < $retry) {
+			    $cj->batch_runRemote($LSF_params);
+			    print "Retrying job\n";
+			}
+			else {
+			    print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n";
+			}
 			next ANAL;
 		    }
 		}
