@@ -158,12 +158,11 @@ sub run {
 sub write_output {
     my($self) = @_;
 
-    my $db=$self->dbobj();
     my @features = $self->output();
 
-    print STDERR "ARRAY: @features\n";
+    #print STDERR "ARRAY: @features\n";
 
-     my $feat_Obj=Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor->new($db);
+     my $feat_Obj=$self->dbobj->get_Protein_Feature_Adaptor;
 
     foreach my $feat(@features) {
 	
