@@ -145,6 +145,8 @@ sub _parse_files {
   my $self = shift;
   my @files = shift;
 
+  my %headers;     # will store names of headers and number of keys for each
+
   # read each file
 
   foreach my $file (@files) {
@@ -163,8 +165,9 @@ sub _parse_files {
       # [HEADER]
       if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
 	$header = lc($1);
-	print "Reading stanza $header\n";
-	# TODO insert dummy key or something so all headers get put into the hash
+	$headers{$header} = 0;
+	#print "Reading stanza $header\n";
+
       }
 
       # key=value
@@ -185,14 +188,27 @@ sub _parse_files {
 	} else {
 	  # store them
 	  $self->{'config'}->{$header}->{$key} = $value;
-	  print "$header:$key=$value\n";
+	  #print "$header:$key=$value\n";
+	  $headers{$header}++;
+
 	}
 
       }
 
-    }
+    } # while <FILE>
+
     close FILE;
   }
+
+
+  # add a blank key/value for any headers that have no keys
+  foreach my $h (keys (%headers)) {
+    if ($headers{$h} == 0) {
+      print "$h has no keys; adding blank key/value\n";
+      $self->{'config'}->{$h}->{""} = "";
+    }
+  }
+
 }
 
 # modify the config hash so that default values are stored where no value is specified
