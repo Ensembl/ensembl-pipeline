@@ -10,34 +10,34 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm
+ Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm
 
 =head1 SYNOPSIS
 
-my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
-                                  -fmt => 'Fasta',
-                                );
-$seq = $seqstream->next_seq;
+ my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
+                                   -fmt => 'Fasta',
+                                 );
+ $seq = $seqstream->next_seq;
 
-my $tmhmm = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new ( -CLONE => $seq);
-$tmhmm->workdir ($workdir);
-$tmhmm->run;
-my @results = $tmhmm->output;
+ my $tmhmm = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new ( -CLONE => $seq);
+ $tmhmm->workdir ($workdir);
+ $tmhmm->run;
+ my @results = $tmhmm->output;
 
 =head1 DESCRIPTION
 
-Tmhmm takes a Bio::Seq (or Bio::PrimarySeq) object
-and runs tmhmm on it (detecting transmembrane segments). 
-The resulting output file is parsed to produce a set of features.
+ Tmhmm takes a Bio::Seq (or Bio::PrimarySeq) object
+ and runs tmhmm on it (detecting transmembrane segments). 
+ The resulting output file is parsed to produce a set of features.
 
 =head1 CONTACT
 
-Marc Sohrmann: ms2@sanger.ac.uk
+ Marc Sohrmann: ms2@sanger.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
-Internal methods are usually preceded with a _.
+ The rest of the documentation details each of the object methods. 
+ Internal methods are usually preceded with a _.
 
 =cut
 
@@ -49,7 +49,6 @@ use strict;
 use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
@@ -65,7 +64,7 @@ use Bio::EnsEMBL::Analysis;
                          );
  Function : initialises Tmhmm object
  Returns  : a Tmhmm object
- Args     : a Bio::Seq object, the path to the tmhmm binaries and an analysisId (all optional)
+ Args     : a Bio::Seq object, the path to the program binaries and an analysisId
  Throws   :
 
 =cut
@@ -75,35 +74,22 @@ sub new {
  
     my $self = $class->SUPER::new (@_);    
   
-    $self->{'_flist'} = [];               # an array of Bio::SeqFeatures
+    $self->{'_flist'}     = [];           # an array of Bio::SeqFeatures
     $self->{'_sequence'}  = undef;        # location of Bio::Seq object
-    $self->{'_tmhmm'} = undef;            # location of tmhmm executable
+    $self->{'_program'}   = undef;        # location of executable
     $self->{'_workdir'}   = undef;        # location of tmp directory
     $self->{'_filename'}  = undef;        # file to store Bio::Seq object
-    $self->{'_results'}   = undef;        # file to store results of tmhmm run
+    $self->{'_results'}   = undef;        # file to store results of program run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $tmhmm, $analysisid) = $self->_rearrange([qw(CLONE 
-					                     PROGRAM
-                                                             ANALYSISID)], 
-					                 @args);
+    my ($clone, $program, $analysisid) = $self->_rearrange([qw(CLONE 
+					                       PROGRAM
+                                                               ANALYSISID)], 
+					                    @args);
   
     $self->clone ($clone) if ($clone);       
     $self->analysisid ($analysisid) if ($analysisid);
-  
-    my $bindir = $::pipeConf{'bindir'} || undef;
-
-    if (-x $tmhmm) { 
-        # passed from RunnableDB (full path assumed)  
-        $self->tmhmm ($tmhmm); 
-    }
-    elsif (defined $bindir && -x ($tmhmm = "$bindir/tmhmm")) {
-        $self->tmhmm ($tmhmm);
-    }
-    else {  
-        # search shell $PATH 
-        $self->tmhmm ($self->locate_executable('tmhmm'));
-    }
+    $self->program ($self->find_executable ($program));
   
     return $self;
 }
@@ -159,11 +145,11 @@ sub analysisid {
 } 
 
 
-=head2 tmhmm
+=head2 program
 
- Title    : tmhmm
- Usage    : $self->tmhmm ('/usr/local/pubseq/bin/tmhmm');
- Function : get/set method for the path to the tmhmm binaries
+ Title    : program
+ Usage    : $self->program ('/usr/local/pubseq/bin/tmhmm');
+ Function : get/set method for the path to the program binaries
  Example  :
  Returns  : File path
  Args     : File path (optional)
@@ -171,15 +157,12 @@ sub analysisid {
 
 =cut
 
-sub tmhmm {
-    my ($self, $location) = @_;
-    if ($location) {
-        unless (-x $location) {
-            $self->throw ("tmhmm not found at $location");
-	}
-        $self->{'_tmhmm'} = $location ;
+sub program {
+    my $self = shift;
+    if (@_) {
+        $self->{'_program'} = shift;
     }
-    return $self->{'_tmhmm'};
+    return $self->{'_program'};
 }
 
 ###################
@@ -190,21 +173,19 @@ sub tmhmm {
 
  Title    : run
  Usage    : $self->run ($workdir, $args)
- Function : runs tmhmm and populates @{$self->{'_flist'}} (array of features)
+ Function : runs program and populates @{$self->{'_flist'}} (array of features)
  Example  :
  Returns  :   
- Args     : workdir, args (optional)
+ Args     : workdir (optional)
  Throws   :
 
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
-
-    # nothing to be done with $args
+    my ($self, $dir) = @_;
 
     # check clone
-    my $seq = $self->clone || $self->throw("Clone required for Tmhmm\n");
+    my $seq = $self->clone || $self->throw("Clone required for Program\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -220,8 +201,8 @@ sub run {
     # write sequence to file
     $self->writefile;        
 
-    # run tmhmm
-    $self->run_tmhmm;
+    # run program
+    $self->run_program;
 
     # parse output
     $self->parse_results;
@@ -229,11 +210,11 @@ sub run {
 }
 
 
-=head2 run_tmhmm
+=head2 run_program
 
- Title    : run_tmhmm
- Usage    : $self->tmhmm
- Function : makes the system call to tmhmm
+ Title    : run_program
+ Usage    : $self->program
+ Function : makes the system call to program
  Example  :
  Returns  : 
  Args     :
@@ -241,12 +222,12 @@ sub run {
 
 =cut
 
-sub run_tmhmm {
+sub run_program {
     my ($self) = @_;
-    # run tmhmm
-    print STDERR "running tmhmm\n";
-    $self->throw ("Error running tmhmm on ".$self->filename) 
-        unless ((system ($self->tmhmm." ".$self->filename." > ".$self->results)) == 0); 
+    # run program
+    print STDERR "running ".$self->program."\n";
+    $self->throw ("Error running ".$self->program." on ".$self->filename) 
+        unless ((system ($self->program." ".$self->filename." > ".$self->results)) == 0); 
 }
 
 
@@ -254,7 +235,7 @@ sub run_tmhmm {
 
  Title    :  parse_results
  Usage    :  $self->parse_results ($filename)
- Function :  parses tmhmm output to give a set of features
+ Function :  parses program output to give a set of features
  Example  :
  Returns  : 
  Args     : filename (optional, can be filename, filehandle or pipe, not implemented)
@@ -270,12 +251,12 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print STDERR "tmhmm didn't find anything\n";
+	    print STDERR $self->program." didn't find anything\n";
 	    return;
         }       
         else {
-            open (TMHMMOUT, "<$resfile") or $self->throw ("Error opening $resfile");
-            $filehandle = \*TMHMMOUT;
+            open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
+            $filehandle = \*OUT;
       }
     }
     else {
@@ -302,13 +283,13 @@ sub parse_results {
                 $orien = uc ($orien);
                 if ($orien eq "M") {
                     my (%feature);
-	            $feature {name} = $id;
-	            $feature {start} = $start;
-	            $feature {end} = $end;
-	            $feature {source}= 'tmhmm';
-	            $feature {primary}= 'transmembrane';
-	            $feature {program} = 'tmhmm';
-  	            $self->create_feature (\%feature);
+	            $feature{name} = $id;
+	            $feature{start} = $start;
+	            $feature{end} = $end;
+	            ($feature{source}) = $self->program =~ /([^\/]+)$/;
+	            $feature{primary}= 'transmembrane';
+	            ($feature{program}) = $self->program =~ /([^\/]+)$/;
+                    $feature{logic_name} = 'transmembrane';
 		}
 	    }
 	}
@@ -321,7 +302,7 @@ sub parse_results {
 
  Title    : create_feature
  Usage    : $self->create_feature ($feature)
- Function : creates a Bio::EnsEMBL::FeaturePair object from %feature,
+ Function : creates a Bio::EnsEMBL::seqFeature object from %feature,
             and pushes it onto @{$self->{'_flist'}}
  Example  :
  Returns  :
@@ -334,38 +315,25 @@ sub create_feature {
     my ($self, $feat) = @_;
 
     # create analysis object (will end up in the analysis table)
-    my $analysis = Bio::EnsEMBL::Analysis->new ( -db              => $feat->{db},               # optional
-                                                 -db_version      => $feat->{db_version},       # optional
-                                                 -program         => $feat->{program},
-                                                 -program_version => $feat->{program_version},
+    my $analysis = Bio::EnsEMBL::Analysis->new ( -program         => $feat->{program},
                                                  -gff_source      => $feat->{source},
                                                  -gff_feature     => $feat->{primary},
+                                                 -logic_name      => $feat->{logic_name},
                                                );
 
-    # create featurepair object
-    my $feature1 = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
-                                                   -start       => $feat->{start},
-                                                   -end         => $feat->{end},
-                                                   -score       => $feat->{score},
-                                                   -p_value     => $feat->{p_value},            # optional
-                                                   -percent_id  => $feat->{percent_id},
-                                                   -source_tag  => $feat->{source},
-                                                   -primary_tag => $feat->{primary},
-                                                   -analysis    => $analysis,
-                                                 ); 
-    $feature1->add_tag_value ('analysisid', $self->analysisid);
+    # create feature object
+    my $feature = Bio::EnsEMBL::SeqFeature->new ( -seqname     => $feat->{name},
+                                                  -start       => $feat->{start},
+                                                  -end         => $feat->{end},
+                                                  -source_tag  => $feat->{source},
+                                                  -primary_tag => $feat->{primary},
+                                                  -analysis    => $analysis,
+                                                ); 
 
-    my $feature2 = Bio::EnsEMBL::SeqFeature->new;
-
-
-    my $featurepair = Bio::EnsEMBL::FeaturePair->new ( -feature1 => $feature1,
-                                                       -feature2 => $feature2,
-						     );
-
-    if ($featurepair) {
-	$featurepair->feature1->validate_prot_feature;
+    if ($feature) {
+	$feature->validate_prot_feature;
 	# add to _flist
-	push (@{$self->{'_flist'}}, $featurepair);
+	push (@{$self->{'_flist'}}, $feature);
     }
 }
 
@@ -374,9 +342,9 @@ sub create_feature {
 
  Title    : output
  Usage    : $self->output
- Function : returns an array of featurepair objects
+ Function : returns an array of feature objects
  Example  :
- Returns  : an array of Bio::EnsEMBL::FeaturePair objects
+ Returns  : an array of Bio::EnsEMBL::SeqFeature objects
  Args     :
  Throws   :
 
