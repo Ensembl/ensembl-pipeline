@@ -129,8 +129,8 @@ sub show_current_status_summary {
 
   my $res = $sth->execute;
 
-  my $maxcount;
-  my $maxstatus;
+  my $maxcount = 0;
+  my $maxstatus = 0;
 
   my @counts;
   my @status;
@@ -181,9 +181,9 @@ sub show_finished_summary {
   
   my $res = $sth->execute;
 
-  my $maxcount;
-  my $maxname;
-  my $maxid;
+  my $maxcount = 0;
+  my $maxname = 0;
+  my $maxid = 0;
 
   my @counts;
   my @names;
@@ -193,15 +193,19 @@ sub show_finished_summary {
     my $count  = $ref->{'count(*)'};
     my $name = $ref->{'logic_name'};
     my $id = $ref->{'analysis_id'};
+
     if ($name =~ /Submit/){
       next if($no_submit);
     }
+
     if (length($count) > $maxcount) {
       $maxcount = length($count);
     }
+
     if (length($name) > $maxname) {
       $maxname = length($name);
     }
+
     if (length($id) > $maxid) {
       $maxid = length($id);
     }
@@ -209,7 +213,6 @@ sub show_finished_summary {
     push(@counts,$count);
     push(@names,$name);
     push(@ids,$id);
-
   }
 
   $maxcount++;
