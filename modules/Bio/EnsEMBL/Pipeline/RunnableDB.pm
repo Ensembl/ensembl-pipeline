@@ -192,7 +192,7 @@ sub parameter_hash{
 	
 	my ($key, $value) = split (/=>/, $pair);
 
-	if ($key && $value) {
+	if (defined($key) && defined($value)) {
 	  $key   =~ s/^\s+//g;
 	  $key   =~ s/\s+$//g;
 	  $value =~ s/^\s+//g;
