@@ -39,7 +39,7 @@ my $softmask;
 my $clip_ends = 0;
 
 ############################################################
-# we don't want any EST which is shorter than 60bp
+# we don't want any EST which is shorter than 100bp
 my $min_length = 100;
 
 
@@ -63,7 +63,7 @@ if(!defined $estfile    ||
   print STDERR "                         -clip (clips polyA/T) -clip_ends n (clips n bases from both ends)\n";
   print STDERR "                                                             default = 0, 20 seems to be ok\n";
   print STDERR "                         -softmask ( softmask the polyA/T )\n";
-  print STDERR "                         -min_length ( min_est_length, default = 60 )\n";
+  print STDERR "                         -min_length ( min_est_length, default = 100 )\n";
   exit(0);
 }
 
