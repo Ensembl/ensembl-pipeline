@@ -17,6 +17,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -user => $WB_DBUSER,
 					    -dbname => $WB_DBNAME,
 					    -pass  => $WB_DBPASS,
+					    -port => $WB_DBPORT,
 					   );
 
 
@@ -31,12 +32,12 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
 
   print "handling ".$chromosome_info->{'chr_name'}." with files ".$chromosome_info->{'agp_file'}." and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
   
-
- my $chr = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{'chr_name'}, 1, ($chromosome_info->{'length'}+1));
+  my $chr = $db->get_SliceAdaptor->fetch_by_region('Chromosome', $chromosome_info->{'chr_name'}, 1, ($chromosome_info->{'length'}, 1, $WB_AGP_TYPE));
+  
  
   
   my @operons = @{&parse_operons($chromosome_info->{'gff_file'}, $chr, $operon_analysis)};
-  my $non_transforming = &write_simple_features(\@operons, $db);
+  &write_simple_features(\@operons, $db);
 
 
   
