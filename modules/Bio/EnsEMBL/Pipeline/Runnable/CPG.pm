@@ -96,8 +96,6 @@ sub new {
                                  # required for a predicted cpg island to
                                  # be reported
   
-  print STDERR "args: ", @args, "\n";
-
   my( $sequence, $len, $gc, $oe, $cpg) = $self->_rearrange([qw(QUERY 
 							       LENGTH 
 							       GC 
