@@ -46,7 +46,7 @@ sub new {
     $self->{'_database'}      = undef;  # name of database
     $self->{'_threshold'}     = undef;  # Threshold for hit filterting
     $self->{'_options'}       = undef;  # arguments for blast
-    $self->{'_filter'}        = 1;      # Do we filter features?
+    $self->{'_filter'}        = 0;      # Do we filter features?
     $self->{'_fplist'}        = [];     # an array of feature pairs (the output)
     $self->{'_no_blast'}      = 0;
     $self->{'_features'}      = [];
@@ -54,7 +54,7 @@ sub new {
     $self->{'_filename'}      = undef;  # file to store Bio::Seq object
     $self->{'_results'}       = undef;  # file to store results of analysis
     $self->{'_seqfetcher'}    = undef;
-    $self->{'_prune'}         = 1;      #
+    $self->{'_prune'}         = 0;      #
     $self->{'_coverage'}      = 10;
     $self->{'_merged_features'} = [];
     $self->{'_percent_id'}      = undef;
@@ -162,7 +162,7 @@ sub new {
         $self->percent_id($percent_id);
     }
     else {
-        $self->percent_id(95);
+        $self->percent_id(0);
     }
     if ($percent_id) {
 
@@ -177,7 +177,7 @@ sub new {
         $self->threshold($threshold);
     }
     else {
-        $self->threshold(95);
+        $self->threshold(0);
     }
 
     if ( defined($threshold_type) ) {
@@ -748,7 +748,7 @@ sub run_est2genome {
             $f->start( $f->start + $start - 1 );
             $f->end( $f->end + $start - 1 );
 
-            if ( ( $f->hstart  <= 5 || $f->hend <= ( $est_length - 5 ) ) && $coverage>=0.9) {    
+            if ( ( $f->hstart  <= 5 || $f->hend >= ( $est_length - 4 ) ) && $coverage>=0.9 && $f->percent_id >=95) {    
                 push ( @output, $f );
             }
     }
