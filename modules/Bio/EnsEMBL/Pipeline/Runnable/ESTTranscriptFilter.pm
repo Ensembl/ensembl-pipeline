@@ -71,15 +71,20 @@ sub new {
 # represented in the (transcript) alignment
 
 sub _coverage{
-  my ($self,$tran) = @_;
-  my @exons = @{$tran->get_all_Exons};
-  my $score;
-  foreach my $exon ( @exons ){
-    my @evi = @{$exons[0]->get_all_supporting_features};
-    $score = $evi[0]->score;
-    last if defined($score);
-  }
-  return $score;
+    my ($self,$tran) = @_;
+    my @exons = @{$tran->get_all_Exons};
+    my $score;
+    my $hseqname;
+  EXON:
+    foreach my $exon ( @exons ){
+	my @evi = @{$exons[0]->get_all_supporting_features};
+	foreach my $evi ( @evi ){
+	    $score = $evi->score;
+	    $hseqname = $evi->hseqname;
+	    last EXON if defined($score);
+	}
+    }
+    return $score;
 }
 
 ############################################################
@@ -112,9 +117,17 @@ sub _exon_perc_id{
 
 sub _perc_id{
   my ($self,$tran) = @_;
+  my $perc_id;
   my @exons = @{$tran->get_all_Exons};
-  my @evi = @{$exons[0]->get_all_supporting_features};
-  return $evi[0]->percent_id;
+  EXON:
+  foreach my $exon ( @exons ){
+      my @evi = @{$exon->get_all_supporting_features};
+      foreach my $evi ( @evi ){
+	  $perc_id = $evi->percent_id;
+	  last EXON if defined $perc_id;
+      }
+  }
+  return $perc_id;
 }
 
 ############################################################
@@ -122,8 +135,16 @@ sub _perc_id{
 sub _id{
   my ($self,$tran) = @_;
   my @exons = @{$tran->get_all_Exons};
-  my @evi = @{$exons[0]->get_all_supporting_features};
-  return $evi[0]->hseqname;
+  my $id;
+  EXON:
+  foreach my $exon ( @exons ){
+      my @evi = @{$exon->get_all_supporting_features};
+      foreach my $evi ( @evi ){
+	  $id = $evi->percent_id;
+	  last EXON if defined $id;
+      }
+  }
+  return $id;
 } 
 
 ############################################################
@@ -147,7 +168,12 @@ sub _end{
 sub filter {
   my ($self,$transcripts) = @_;  
   
-  my $verbose = 0;
+  my $verbose = 1;
+
+  print STDERR "filter input: ".scalar( @$transcripts )."\n";
+  my @filtered_by_length = $self->filter_by_length( $transcripts );
+  print STDERR "after filter by length: ".scalar( @$transcripts )."\n";
+
 
   my $min_coverage = $self->coverage_threshold;
   my $min_perc_id  = $self->perc_id_threshold;
@@ -155,25 +181,21 @@ sub filter {
   
   my %exon2est;
  
-  # valid hits are stored in a hash of arrays
-  # we sort by score to know that the first score for a hseqname is its best  
-  @$transcripts = sort { $self->_coverage($b) <=> $self->_coverage($a) } @$transcripts;
-
-  #print STDERR "before filtering ".scalar(@$transcripts)."\n";
-  #foreach my $est ( @$transcripts ){
+  #print STDERR "before filtering ".scalar(@sorted)."\n";
+  #foreach my $est ( @sorted ){
   #  print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
   #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
   #}
   
   my @accepted_exons;
   my @tmp_ests;
-  foreach my $t ( @$transcripts ) {
+  foreach my $t ( @filtered_by_length ) {
     
-    my $c  = $self->_coverage($t);
-    my $p  = $self->_perc_id($t);
+      my $c  = $self->_coverage($t);
+      my $p  = $self->_perc_id($t);
     
-    next unless ( $c > $min_coverage );
-    next unless ( $p > $min_perc_id );
+      next unless ( $c > $min_coverage );
+      next unless ( $p > $min_perc_id );
     
     if ( $self->depth_threshold ){
       foreach my $exon ( @{$t->get_all_Exons} ){
@@ -198,6 +220,47 @@ sub filter {
   else{
     return @tmp_ests;
   }
+}
+
+############################################################
+# this method consider the distribution of lengths of ests P(L)
+# which is close to normal, and selects those
+# with lengths L>=Lm where Lm is the maximum for P(L)
+
+sub filter_by_length{
+    my ( $self, $ests ) = @_;
+    
+    my %lengths;
+    my $length_for_max = 0;
+    my $max_count = 0;
+    foreach my $est ( @$ests ){
+	#print STDERR "est is a $est\n";
+	#print STDERR "exons: ".scalar( @{$est->get_all_Exons} )."\n";
+	my $length = $est->length;
+	#print STDERR "length: $length\n";
+	push ( @{ $lengths{ $length } }, $est );
+	
+	if ( scalar( @{ $lengths{ $length } } ) > $max_count ){
+	    $max_count      = scalar( @{ $lengths{ $length } } );
+	    $length_for_max = $length;
+	}
+    }
+  
+    # test
+    my %bins;
+    foreach my $key ( keys %lengths ){
+	$bins{ 10*int( $key/10 ) } += scalar ( @{ $lengths{$key} } );
+    }
+    foreach my $key ( sort { $a <=> $b } keys %bins ){
+	print STDERR "$key\t$bins{$key}\n";
+    }
+  
+    my @selected;
+    foreach my $key ( keys %lengths ){
+	next unless $key >= $length_for_max;
+	push( @selected, @{ $lengths{$key} });
+    }
+    return @selected;
 }
 
 ############################################################
@@ -380,5 +443,7 @@ sub depth_threshold{
 }
 
 ############################################################
+
+
 
 1;
