@@ -31,7 +31,7 @@ $options   = a string with options ,
  $runnable->run; #create and fill Bio::Seq object
  my @results = $runnable->output;
  
- where @results is an array of SeqFeatures, each one representing an aligment (e.g. a transcript), 
+ where @results is an array of SeqFeatures, each one representing an alignment (e.g. a transcript), 
  and each feature contains a list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
  in fact feature pairs.
  
@@ -94,25 +94,29 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($database, $query_seqs, $query_type, $target_type, $exonerate, $options) = 
-      $self->_rearrange([qw(
-			    DATABASE
-			    QUERY_SEQS
-			    QUERY_TYPE
-			    TARGET_TYPE
-			    EXONERATE
-			    OPTIONS
-			   )
-			 ], @args);
-  
-  
+  my ($database,
+      $query_seqs,
+      $query_type,
+      $target_type,
+      $exonerate,
+      $options) = $self->_rearrange([qw(
+					DATABASE
+					QUERY_SEQS
+					QUERY_TYPE
+					TARGET_TYPE
+					EXONERATE
+					OPTIONS
+				       )
+				    ], @args);
+
+
   $self->{_output} = [];
   # must have a target and a query sequences
   unless( $query_seqs ){
     $self->throw("Exonerate needs a query_seqs: $query_seqs");
   }
   $self->query_seqs(@{$query_seqs});
-  
+
   # you can pass a sequence object for the target or a database (multiple fasta file);
   if( $database ){
     $self->database( $database );
@@ -142,21 +146,17 @@ sub new {
   }
 
   ############################################################
-  # we are using the latest version: exonerate-0.6.7
-  #$self->exonerate('/usr/local/ensembl/bin/exonerate-0.7.0-buggy');
-  # $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
+  # We default exonerate-0.6.7
   if ($exonerate) {
       $self->exonerate($exonerate);
-  }
-  else {
+  } else {
       $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
   }
-  
+
   ############################################################
   # options
-  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %p %g %V\\n\" "; 
-  #my $basic_options = "  --ryo \"RESULT: %S %p %V\\n\" "; 
-  
+  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %ps %ql %g %V\\n\" "; 
+
   # can add extra options as a string
   if ($options){
     $basic_options .= " ".$options;
@@ -165,6 +165,14 @@ sub new {
 
   return $self;
 }
+
+sub DESTROY {
+  my $self = shift;
+
+  unlink $self->_query_file;
+}
+
+
 
 ############################################################
 #
@@ -178,105 +186,58 @@ Usage   :   $obj->run($workdir, $args)
 Function:   Runs exonerate script and puts the results into the file $self->results
             It calls $self->parse_results, and results are stored in $self->output
 =cut
-  
+
 sub run {
   my ($self) = @_;
 
- my $verbose = 0;
-  
-  my $dir         = $self->workdir();
-  my $exonerate   = $self->exonerate;
-  my @query_seqs  = $self->query_seqs;
-  my $query_type  = $self->query_type;
-  my $target_type = $self->target_type;
+  # Set name of results file
+  $self->results($self->workdir . "/results.$$");
 
-  # set the working directory (usually /tmp)
-  $self->workdir('/tmp') unless ($self->workdir());
-  
-  # results go here:
-  $self->results($self->workdir()."/results.$$");
-  
-  # target sequence
-  my $target;
-  if ( $self->database ){
-    $target = $self->database;
-  }
-  #elsif( $self->target_seq ){
-  #  
-  #  # write the target sequence into a temporary file then
-  #  $target = "$dir/target_seq.$$";
-  #  open( TARGET_SEQ,">$target") || $self->throw("Could not open $target $!");
-  #  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
-  #		 '-fh'     => \*TARGET_SEQ);
-  #  $seqout->write_seq($self->target_seq);
-  #  close( TARGET_SEQ );
-  #}
-  
-  ############################################################
-  # write the query sequence into a temporary file then
-  my $query = "$dir/query_seqs.$$";
-  open( QUERY_SEQ,">$query") || $self->throw("Could not open $query $!");
-  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
-			       '-fh'     => \*QUERY_SEQ);
-  
-  # we write each Bio::Seq sequence in the fasta file $query
-  my %length;
-  my $max_length;
-  foreach my $query_seq ( @query_seqs ){
-    ## calculate the length
-    #print STDERR "length( ".$query_seq->display_id.") = ".$query_seq->length."\n";
-    my $length = $query_seq->length;
-    unless ( $max_length ){
-      $max_length = $length;
-    }
-    if ( $length > $max_length ){
-      $max_length = $length;
-    }
-    if ( $query_seq->display_id ){
-      $length{ $query_seq->display_id } = $query_seq->length;
-    }
-    else{
-      $query_seq->display_id("no id");
-      $length{ $query_seq->display_id } = $query_seq->length;
-    }
-    $seqout->write_seq($query_seq);
-  }
-  close( QUERY_SEQ );
-  
-  my $command =$self->exonerate." ".
-    $self->options.
-      " --querytype $query_type --targettype $target_type --query $query --target $target ";
-  
-  # long cDNA, should use special parameters?
-  #if ( $max_length > 60000 ){
-  #  $command .= " --spanrangeint 12 --spanrangeext 12 --joinrangeext 12 --joinrangeint 12";
-  #}
-  
-  $command .= " | ";
+  # Write query sequences to file
 
-  #print STDERR "running exonerate: $command\n" if $verbose;
-  print STDERR "running exonerate: $command\n";
-  
-  open( EXO, $command ) || $self->throw("Error running exonerate $!");
-  
-  # system calls return 0 (true in Unix) if they succeed
-  #$self->throw("Error running exonerate\n") if (system ($command));
-  
-    
-  ############################################################
-  # store each alignment as a transcript with supporting features
+  $self->_write_sequences;
+
+  # Build exonerate command
+
+  my $command =$self->exonerate . " " .$self->options .
+      " --querytype " . $self->query_type .
+	" --targettype " . $self->target_type .
+	  " --query " . $self->_query_file .
+	    " --target " . $self->database;
+
+
+  # Execute command and parse results
+
+  print STDERR "Exonerate command : $command\n" 
+    if $self->_verbose;
+
+  open( EXO, "$command |" ) || $self->throw("Error running exonerate $!");
+
+  $self->parse_results(\*EXO);
+
+  close(EXO);
+
+  return 1
+}
+
+sub parse_results {
+  my ($self, $fh) = @_;
+
+  # Each alignment will be stored as a transcript with 
+  # supporting features
+
   my @transcripts;
 
-  ############################################################
-  # parse results - avoid writing to disk the output
-  while (<EXO>){
-    
-    print STDERR $_ if $verbose;
-      
+  # Begin parsing exonerate output
+
+  while (<$fh>){
+
+    print STDERR $_ if $self->_verbose;
+
       ############################################################
       # the output is of the format:
       #
-      # --ryo "RESULT: %S %p %V\n"
+      # --ryo "RESULT: %S %ps %ql %g %V\n"
       # 
       # It shows the alignments in "sugar" + percent_id + gene orientation + "vulgar blocks" format. 
       #
@@ -310,25 +271,30 @@ sub run {
       # G 1 0      |
       # M 7 7     /
       # 
+
+    next unless /^RESULT:/;
+
     chomp;
-    my ( $tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end, $t_strand, $score, $perc_id, $gene_orientation, @blocks) = split;
-    
+
+    my ($tag, $q_id, $q_start, $q_end,
+	$q_strand, $t_id, $t_start, $t_end, 
+	$t_strand, $score, $perc_id, $q_length,
+	$gene_orientation, @blocks) = split;
+
     # the SUGAR 'start' coordinates are 1 less than the actual position on the sequence
     $q_start++;
     $t_start++;
-    
-    next unless ( $tag && $tag eq 'RESULT:' );
 
     ############################################################
     # initialize the feature
     my (%query, %target);
-    my (%rev_query, %rev_target);    
+    my (%rev_query, %rev_target);
 
     ( $query{score}  , $target{score} )  = ($score,$score);
     ( $query{percent}, $target{percent}) = ( $perc_id, $perc_id );
     ( $query{source} , $target{source} ) = ('exonerate','exonerate');
     ( $query{name}   , $target{name})    = ( $q_id, $t_id);
- 
+
     if ( $q_strand eq '+' ){ $q_strand = 1; }
     else{ $q_strand = -1; }
     if ( $t_strand eq '+' ){ $t_strand = 1; }
@@ -340,27 +306,28 @@ sub run {
     # coordinates are corrected later according to strand
     $query{start}  = $q_start;
     $target{start} = $t_start;
-        
+
     ############################################################
     # orientation is not used at the moment
-    print STDERR "gene_orientation: $gene_orientation\n" if $verbose;
+
+    print STDERR "gene_orientation: $gene_orientation\n" if $self->_verbose;
 
     if ( $gene_orientation eq '+' ){   $gene_orientation = 1 }
     elsif( $gene_orientation eq '-' ){ $gene_orientation = -1 }
     else{ $gene_orientation = 0 }
-    
-    my $transcript = Bio::EnsEMBL::Transcript->new();      
+
+    my $transcript = Bio::EnsEMBL::Transcript->new();
     my $exon = Bio::EnsEMBL::Exon->new();
     my @features;
     my $in_exon = 0;
     my $target_gap_length = 0;
-    
+
     ############################################################
     # exons are delimited by M - I
     # supporting features are delimited by M - G  and  M - I
   TRIAD:
     for( my $i=0; $i<=$#blocks; $i+=3){
-      
+
       # do not look at splice sites now
       if ( $blocks[$i] eq '5' || $blocks[$i] eq 'F' 
 	   || 
@@ -370,13 +337,13 @@ sub run {
 	# the re-set of the coordinates is done in the intron triad
 	next TRIAD;
       }
-      
+
       ############################################################
       # match
       if ( $blocks[$i] eq 'M' ){
 	if ( $in_exon == 0 ){
 	  $in_exon = 1;
-	  
+	
 	  # start a new exon
 	  $exon = Bio::EnsEMBL::Exon->new();
 	  $exon->seqname( $t_id );
@@ -399,9 +366,9 @@ sub run {
 	$query{end}  = $query{start}  + $blocks[$i+1] - 1;
 	$target{end} = $target{start} + $blocks[$i+2] - 1;
 	
-	if ($verbose){
+	if ($self->_verbose){
 	  print STDERR "FEATURE:\n";
-	  #print STDERR "query length: ".$length{$q_id}."\n";
+	  print STDERR "query length: ".$q_length."\n";
 	  print STDERR "query : $query{start} -  $query{end}\n";
 	  print STDERR "target: $target{start} -  $target{end}\n";
 	}
@@ -412,12 +379,17 @@ sub run {
 	
 	%rev_query  = %query;
 	%rev_target = %target;
+
 	if ( $q_strand == -1 ){
-	  $rev_query{end}   = $length{$q_id} - $query{start} + 1;
-	  $rev_query{start} = $length{$q_id} - $query{end} + 1;
-	  
-	  #print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
-	  #print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
+
+	  $rev_query{end}   = $q_length - $query{start} + 1;
+	  $rev_query{start} = $q_length - $query{end} + 1;
+
+	  print STDERR "rev_query{end}   = ".($q_length)." - ".$query{start}." + 1\n" 
+	    if $self->_verbose;
+	  print STDERR "rev_query{start} = ".($q_length)." - ".$query{start}." + 1\n" 
+	    if $self->_verbose;
+
 	  my $feature_pair = $self->create_FeaturePair($rev_target{start}, 
                                                  $rev_target{end}, 
                                                  $rev_target{strand},
@@ -429,10 +401,12 @@ sub run {
                                                  $rev_query{percent},
                                                  0,
                                                  $rev_target{name});
-	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+
+	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
+
 	  push( @features, $feature_pair);
 	}
-	else{	      	    
+	else{
 	  my $feature_pair = $self->create_FeaturePair($target{start}, 
                                                  $target{end}, 
                                                  $target{strand},
@@ -444,7 +418,9 @@ sub run {
                                                  $query{percent},
                                                  0,
                                                  $target{name});
-	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
+
+	  print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $self->_verbose;
+
 	  push( @features, $feature_pair);
 	}
 		
@@ -452,25 +428,20 @@ sub run {
 	# re-set the start:
 	$query{start}  = $query{end}  + 1;
 	$target{start} = $target{end} + 1;
-	#if ($verbose){
-	#  print STDERR "Re-SET POINTERS:\n";
-	#  print STDERR "query : $query{start} -  $query{end}\n";
-	#  print STDERR "target: $target{start} -  $target{end}\n";
-	#}
-	
+
       }
       ############################################################
-      # gap 
+      # gap
       if ( $blocks[$i] eq 'G' ){
-	print STDERR "in_exon: $in_exon GAP: $blocks[$i+1] $blocks[$i+2]\n" if $verbose;
+	print STDERR "in_exon: $in_exon GAP: $blocks[$i+1] $blocks[$i+2]\n" if $self->_verbose;
 	if ( $in_exon ){
 	  # keep the same exon
-	  
+	
 	  # if the gap is in the query, we move the target
 	  if ( $blocks[$i+2] ){
 	    $target{start} += $blocks[$i+2];
 	    # also move the exon:
-	    print STDERR "moving exon end from ". $exon->end. " to ". ( $exon->end + $blocks[$i+2] )."\n" if $verbose;
+	    print STDERR "moving exon end from ". $exon->end. " to ". ( $exon->end + $blocks[$i+2] )."\n" if $self->_verbose;
 	    $exon->end( $exon->end + $blocks[$i+2]); 
 	  }
 	  # if the gap is in the target, we move the query
@@ -478,11 +449,6 @@ sub run {
 	    $query{start} += $blocks[$i+1];
 	    $target_gap_length += $blocks[$i+1]
 	  }
-	  #if ($verbose){
-	  #  print STDERR "GAP:\n";
-	  #  print STDERR "query : $query{start} -  $query{end}\n";
-	  #	print STDERR "target: $target{start} -  $target{end}\n";
-	  #  }
 	}
       }
       ############################################################
@@ -490,24 +456,24 @@ sub run {
       if( $blocks[$i] eq 'I' ){
 	if ( $in_exon ){
 	  # emit the current exon
-	  if ($verbose){
+	  if ($self->_verbose){
 	    print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
 	  }
-	  
+	
 	  $transcript->add_Exon($exon);
-	  
+	
 	  # add the supporting features
 	  my $supp_feature;
 	  eval{
 	    $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@features);
 	  };
-	  print STDERR "intron: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
+	  print STDERR "intron: adding evidence : ".$supp_feature->gffstring."\n" if $self->_verbose;
 	  $exon->add_supporting_features( $supp_feature );
-	  
+	
 	  $in_exon = 0;
-	  
+	
 	  @features = ();
-	  
+	
 	  # reset the start in the target only
 	  my $intron_length = $blocks[$i+2];
 	  if ( $i>=3 && 
@@ -524,13 +490,13 @@ sub run {
 	    $intron_length += 2;
 	  }
 
-	  #print STDERR "intron length = $intron_length\n" if $verbose;
+	  #print STDERR "intron length = $intron_length\n" if $self->_verbose;
 	  $target{start} += $intron_length;
-	  print STDERR "new target starts at $target{start}\n" if $verbose;
+	  print STDERR "new target starts at $target{start}\n" if $self->_verbose;
 	}
       }
     } # end of TRIAD
-    
+
     ############################################################
     # emit the last exon and the last set of supporting features
     # and add the supporting features
@@ -538,8 +504,8 @@ sub run {
     #foreach my $f (@features){
     #print STDERR $f->gffstring."\n";
     #}
-    
-    if ($verbose){
+
+    if ($self->_verbose){
       print STDERR "EXON: ".$exon->start."-".$exon->end."\n";
     }
     if ( scalar(@features) ){
@@ -550,50 +516,41 @@ sub run {
       if ($@){
 	print STDERR $@."\n";
       }
-      #print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $verbose;
+      #print STDERR "outside: adding evidence : ".$supp_feature->gffstring."\n" if $self->_verbose;
       $exon->add_supporting_features( $supp_feature );
     }
-    else{
-      #print STDERR "No more features to add" if $verbose;
-    }
+
     $transcript->add_Exon($exon);
 
-    
+
     ############################################################
     # compute coverage
     # q_start reported by the sugar/cigar lines is one less 
     # as exonerate counts between lines
     my $aligned_length = $q_end - ($q_start + 1) + 1;
 
-    my $coverage = sprintf "%.2f", 100 * ( $aligned_length - $target_gap_length ) / $length{$q_id};
-    
-    print STDERR "coverage = ( $aligned_length - $target_gap_length ) / ".$length{$q_id}." =  $coverage\n" if $verbose;
-    
+    my $coverage = sprintf "%.2f", 
+      100 * ( $aligned_length - $target_gap_length ) / $q_length;
+
+    print STDERR "coverage = ( $aligned_length - $target_gap_length ) / " . 
+      $q_length ." =  $coverage\n" 
+	if $self->_verbose;
+
     foreach my $exon ( @{$transcript->get_all_Exons} ){
       foreach my $evidence ( @{$exon->get_all_supporting_features} ){
 	$evidence->score($coverage);
       }
     }
-    
+
     push( @transcripts, $transcript );
-    
+
   } # end of while loop
-  
-  # test #
-#  foreach my $t ( @transcripts ){
- #   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t);
-  #}
 
   $self->output( @transcripts );
-  close(EXO) or $self->throw("couldn't close pipe ");  
-    
-  ############################################################
-  # remove interim files (but do not remove the database if you are using one)
-  unlink $query;
-  if ( $self->genomic){
-    unlink $target;
-  }
+
+  return 1
 }
+
 
 ############################################################
 #
@@ -649,12 +606,13 @@ sub options {
 ############################################################
 
 sub output {
-    my ($self, @output) = @_;
+  my ($self, @output) = @_;
+
   if (@output) {
-      unless( $self->{_output} ){
-	  $self->{_output} = [];
-      }
-      push( @{$self->{_output}}, @output );
+    unless( $self->{_output} ){
+      $self->{_output} = [];
+    }
+    push( @{$self->{_output}}, @output );
   }
   return @{$self->{_output}};
 }
@@ -663,9 +621,17 @@ sub output {
 
 sub database {
   my ($self, $database) = @_;
+
   if ($database) {
     $self->{_database} = $database;
+    $self->throw("Genomic sequence database file [" . 
+		 $self->{_database} . "] does not exist.")
+      unless -e $self->{_database};
   }
+
+  $self->throw("No genomic sequence database provided for Exonerate.")
+    unless $self->{_database};
+
   return $self->{_database};
 }
 ############################################################
@@ -689,7 +655,7 @@ sub target_type {
   if (defined($mytype) ){
     my $type = lc($mytype);
     unless( $type eq 'dna'|| $type eq 'protein' ){
-      $self->throw("not the right target type: $type");
+      $self->throw("Not the right target type: $type");
     }
     $self->{_target_type} = $type ;
   }
@@ -697,6 +663,43 @@ sub target_type {
 }
 
 ############################################################
+
+
+sub _write_sequences {
+  my $self = shift;
+
+  my $seqout = Bio::SeqIO->new('-file'   => ">" . $self->_query_file,
+			       '-format' => 'Fasta',
+			      );
+
+  foreach my $query_seq ( $self->query_seqs ){
+    $seqout->write_seq($query_seq);
+  }
+}
+
+sub _query_file {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_query_file} = shift;
+  }
+
+  unless ($self->{_query_file}){
+    $self->{_query_file} = $self->workdir . "/query_seqs.$$"
+  }
+
+  return $self->{_query_file};
+}
+
+sub _verbose {
+  my $self = shift;
+
+  if (@_){
+    $self->{_verbose} = shift;
+  }
+
+  return $self->{_verbose}
+}
 
 
 1;
