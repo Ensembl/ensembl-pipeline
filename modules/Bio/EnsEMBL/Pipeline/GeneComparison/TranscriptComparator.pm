@@ -386,20 +386,43 @@ sub _test_for_fuzzy_semiexact_Merge{
 	
 	# if one of them is a single-exon transcript
 	# we allow any mismatch
-	if( ( $k == 0 && $k == $#exons2 ) || 
-	    ( $j == 0 && $j == $#exons1 )    ){
-	  $foundlink = 1;
-	  $overlaps++;
-	  $merge = 1;
-	  print STDERR "merged single exon transcript\n" if $verbose;
-	  last EXON1;
+	if( ( $k == 0 && $k == $#exons2 ) || ( $j == 0 && $j == $#exons1 )    ){
+	  if ( $k == 0 && $k == $#exons2 
+	       && (
+		   ( $j>0  && $exons2[$k]->overlaps($exons1[$j-1]) )
+		   ||
+		   ( $j<$#exons1 && $exons2[$k]->overlaps($exons1[$j+1]) )
+		  )
+	     ){
+	    print STDERR "single exon transcript overlapping internally more than one exon. Not merging\n" if $verbose;
+	    $merge = 0;
+	    last EXON1;
+	  }
+	  elsif ( $j == 0 && $j == $#exons1 
+		  && (
+		      ( $k>0  && $exons1[$j]->overlaps($exons2[$k-1]) )
+		      ||
+		      ( $k<$#exons2 && $exons1[$j]->overlaps($exons2[$k+1]) )
+		     )
+		){
+	    print STDERR "single exon transcript overlapping internally more than one exon. Not merging\n" if $verbose;
+	    $merge = 0;
+	    last EXON1;
+	  }
+	  else{
+	    $foundlink = 1;
+	    $overlaps++;
+	    $merge = 1;
+	    print STDERR "merged single exon transcript\n" if $verbose;
+	    last EXON1;
+	  }
 	}
 	# if the first overlaps with the last, we allow any overlap
 	elsif ( ( $k==0 && $j == $#exons1 ) || ( $j==0 && $k == $#exons2 ) ){
 	  $foundlink = 1;
 	  $overlaps++;
 	  $merge = 1;
-	  print STDERR "found link --> merged\n";
+	  print STDERR "found link --> merged\n" if $verbose;
 	  last EXON1;
 	}
 	elsif ( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
@@ -418,7 +441,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	      ( $foundlink == 1 )                  &&
 	      ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
 	    ){
-	print STDERR "link completed, merged transcripts\n";
+	print STDERR "link completed, merged transcripts\n" if $verbose;
 	$merge = 1;
 	$overlaps++;
 	last EXON1;
