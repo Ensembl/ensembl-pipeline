@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
@@ -61,7 +61,7 @@ use Bio::SeqIO;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 sub new {
   my ($class,@args) = @_;

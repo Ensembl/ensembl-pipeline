@@ -46,7 +46,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 
 #compile time check for executable
@@ -60,7 +60,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 sub new {
     my ($class,@args) = @_;

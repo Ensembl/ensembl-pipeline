@@ -34,15 +34,15 @@ The rest of the documentation details each of the object methods. Internal metho
 use strict;  
 use vars   qw(@ISA);
 
-# Object preamble - inherits from Bio::Root::Object
+# Object preamble - inherits from Bio::Root::RootI
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Analysis::Programs qw(genewise); 
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 # _initialize is where the heavy stuff will happen when new is called
 

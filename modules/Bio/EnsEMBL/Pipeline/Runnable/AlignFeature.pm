@@ -56,13 +56,13 @@ package Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 use Bio::EnsEMBL::Pipeline::MiniSeq;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
 #compile time check for executable
 use Bio::EnsEMBL::Analysis::Programs qw(est_genome pfetch); 
@@ -71,7 +71,7 @@ use Bio::SeqIO;
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 sub _initialize {
     my ($self,@args) = @_;

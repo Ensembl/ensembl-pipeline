@@ -67,7 +67,7 @@ use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 =head2 new
 

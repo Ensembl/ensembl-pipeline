@@ -58,7 +58,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Runnable::Inverted;
 use vars qw(@ISA);
 use strict;
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Repeat;
@@ -67,11 +67,11 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Analysis::Programs;
 use Bio::Seq;
 use Bio::SeqIO;
-use Bio::Root::Object;
+use Bio::Root::RootI;
 
 #use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
 
 =head2 new
 

@@ -46,11 +46,11 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Analysis::Programs 'phrap.longreads';
 use Bio::EnsEMBL::ContigOverlap;
 use Bio::SeqIO;
-use Bio::Root::Object;
+use Bio::Root::RootI;
 use File::Path 'rmtree';
 use vars '@ISA';
 
-@ISA = ('Bio::EnsEMBL::Pipeline::RunnableI','Bio::Root::Object');
+@ISA = ('Bio::EnsEMBL::Pipeline::RunnableI','Bio::Root::RootI');
 
 =head2 new
 
