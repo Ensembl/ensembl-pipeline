@@ -82,6 +82,9 @@ use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw(
 						FINAL_DBUSER
 						FINAL_DBPASS
 						FINAL_TYPE
+					       
+						GENECOMBINER_INPUTID_REGEX
+					       
 					       );
 
 
@@ -120,7 +123,7 @@ sub new{
   
   # dbobj is read by the parent class RunnableDB and it holds the FINAL_DB database
   
-  unless( $self->dbobj ){
+  unless( $self->db ){
 
 
       my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $FINAL_DBHOST,
@@ -129,10 +132,10 @@ sub new{
 							'-pass'   => $FINAL_DBPASS,
 							'-dnadb'  => $refdb,
 						   ); 
-    $self->dbobj($final_db);
-  }
+      $self->db($final_db);
+    }
   
-  $self->final_db( $self->dbobj ); 
+  $self->final_db( $self->db ); 
   $self->final_db->dnadb($refdb);
 
 
@@ -259,19 +262,25 @@ sub fetch_input {
   # get genomic region 
   my $chrid    = $self->input_id;
   print STDERR "input_id: $chrid\n";
-  if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
+   
+  my $chrname;
+  my $chrstart;
+  my $chrend;
+  if ( $chrid =~/$GENECOMBINER_INPUTID_REGEX/ ){
+    $chrname  = $1;
+    $chrstart = $2;
+    $chrend   = $3;
+  }
+  else{
     $self->throw("Not a valid input_id... $chrid");
   }
-  $chrid       =~ s/\.(.*)-(.*)//;
-  my $chrstart = $1;
-  my $chrend   = $2;
-  print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
+  print STDERR "Chromosome id = $chrname , range $chrstart $chrend\n";
 
-  my $ensembl_gpa = $self->ensembl_db->get_StaticGoldenPathAdaptor();
-  my $estgene_gpa = $self->estgene_db->get_StaticGoldenPathAdaptor();
+  my $ensembl_gpa = $self->ensembl_db->get_SliceAdaptor();
+  my $estgene_gpa = $self->estgene_db->get_SliceAdaptor();
 
-  my $ensembl_vc  = $ensembl_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $estgene_vc  = $estgene_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $ensembl_vc  = $ensembl_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $estgene_vc  = $estgene_gpa->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
 
   $self->ensembl_vc( $ensembl_vc );
   $self->estgene_vc( $estgene_vc );
@@ -777,7 +786,7 @@ sub _pair_Transcripts{
     # test:
     print STDERR "Candidates:\n";
     foreach my $pair ( @sorted_lists ){
-	$self->_print_Transcript( $pair->[3] );
+      $self->_print_Transcript( $pair->[3] );
     }
     
     # try to merge it, if succeeded, mark the chosen one and leave the rest
@@ -785,18 +794,17 @@ sub _pair_Transcripts{
     for (my $i = 0; $i< scalar(@sorted_lists); $i++){
       print STDERR "trying to modify ".$ens_tran->dbID."\n";
       my $est_tran = $sorted_lists[$i][3];
-	unless( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1){
-	    my $modified;
-	    ( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
-	    if ($modified == 1 ){
-		$used_est_transcript{$est_tran} = 1;
-		print STDERR "Merged\n";
-		# we only allow one cdna to modify each transcript
-		last MODIFY;
-	     }
-	 }
-     }
-
+      unless( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1){
+	my $modified;
+	( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
+	if ($modified == 1 ){
+	  $used_est_transcript{$est_tran} = 1;
+	  print STDERR "Merged\n";
+	  # we only allow one cdna to modify each transcript
+	  last MODIFY;
+	}
+      }
+    }
   }  # end of ENS_TRANSCRIPT
  
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
