@@ -12,10 +12,12 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new
-    ('-genomic'    => $genseq,
-     '-features'   => $features,
-     '-protein'    => $protein
-     '-seqfetcher' => $seqfetcher);
+    ('-genomic'        => $genseq,
+     '-features'       => $features,
+     '-protein'        => $protein,
+     '-seqfetcher'     => $seqfetcher,
+     '-check_repeated' => 1);
+
     
     $obj->run
 
@@ -66,11 +68,12 @@ sub new {
 
   my $self = $class->SUPER::new(@args);
   
-  my( $genomic, $ids, $seqfetcher, $endbias) = $self->_rearrange([qw(GENOMIC
-								     IDS
-								     SEQFETCHER
-								     ENDBIAS)],
-								 @args);
+  my( $genomic, $ids, $seqfetcher, $endbias, $check_repeated) = $self->_rearrange([qw(GENOMIC
+										      IDS
+										      SEQFETCHER
+										      ENDBIAS
+										      CHECK_REPEATED)],
+										  @args);
   
   $self->throw("No genomic sequence input")            unless defined($genomic);
   $self->throw("No seqfetcher provided")               unless defined($seqfetcher);
@@ -83,6 +86,12 @@ sub new {
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
+
+  if (defined $check_repeated){
+    $self->check_repeated($check_repeated);
+  }else {
+    $self->check_repeated(0);
+  }
 
   return $self;
 }
@@ -166,6 +175,27 @@ sub seqfetcher {
 }
 
 
+=head2 check_repeated
+
+    Title   :   check_repeated
+    Usage   :   $self->check_repeated(1)
+    Function:   Get/Set method for check_repeated
+    Returns :   0 (False) or 1 (True)
+    Args    :   0 (False) or 1 (True)
+
+=cut
+
+sub check_repeated {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->{'_check_repeated'} = $value;
+  }
+
+  return $self->{'_check_repeated'};
+}
+
+
 =head2 run
 
   Title   : run
@@ -186,15 +216,21 @@ sub run {
     print STDERR "Contig has no associated features.  Finishing run.\n";
     return;
   }
-  
-  my $mg_runnables = $self->build_runnables(@features);
-  
+
+  my $mg_runnables;
+
+  if ($self->check_repeated){ 
+    $mg_runnables = $self->build_runnables(@features);
+  } else {
+    $mg_runnables = $self->make_mmgw($self->genomic_sequence, \@features);
+  }
+
   #print STDERR "Running the MultiMiniGenewise runnables.\n";
   foreach my $mg (@$mg_runnables){
     $mg->run;
     my @f = $mg->output;
     #print STDERR "There were " . scalar @f . " $f[0]  " 
-      . " features after the MiniGenewise run.\n";
+    #  . " features after the MiniGenewise run.\n";
 
     push(@{$self->{'_output'}},@f);
   }
