@@ -83,16 +83,16 @@ while (<RNA>){
     my $length = length($seq);
    
     # is it a polyA or polyT?
-    my $check_polyT = substr( $seq, 0, 10 );
+    my $check_polyT = substr( $seq, 0, 6 );
 
-    my $check_polyA = substr( $seq, -10 );
+    my $check_polyA = substr( $seq, -6 );
         
     my $t_count = $check_polyT =~ tr/Tt//;
     my $a_count = $check_polyA =~ tr/Aa//;
     
 
     #### polyA ####
-    if ( $a_count >= 7 && $a_count > $t_count ){
+    if ( $a_count >= 5 && $a_count > $t_count ){
            
       # we calculate the number of bases we want to chop
       my $length_to_chop = 0;
@@ -112,18 +112,26 @@ while (<RNA>){
 	}
       }
       
-      # do not chop the last base if it is not an A:
-      my $last_base = substr( $seq, ($length - $length_to_chop), 1);
-      unless ( $last_base eq 'A' || $last_base eq 'a' ){
-	$length_to_chop--;
+      if ( $length_to_chop > 0 ){
+	# do not chop the last base if it is not an A:
+	#print STDERR "clipping sequence $seq\n";
+	my $last_base        = substr( $seq, ( $length - $length_to_chop    ), 1);
+	my $previous_to_last = substr( $seq, ( $length - $length_to_chop - 1), 1);
+	if ( !( $last_base eq 'A' || $last_base eq 'a') ){
+	  $length_to_chop--;
+	}
+	elsif( $previous_to_last eq 'A' || $previous_to_last eq 'a' ){
+	  $length_to_chop++;
+	}
+	$clipped_seq = substr( $seq, 0, $length - $length_to_chop );
+	#print STDERR "result: $clipped_seq\n";
       }
-      print STDERR "clipping sequence $seq\n";
-      $clipped_seq = substr( $seq, 0, $length - $length_to_chop );
-      print STDERR "result: $clipped_seq\n";
-      
+       else{
+	$clipped_seq = $seq;
+      }	
     }
     #### polyT ####
-    elsif( $t_count >=7 && $t_count > $a_count ){
+    elsif( $t_count >=5 && $t_count > $a_count ){
       
       # calculate the number of bases to chop
       my $length_to_chop = -3;
@@ -147,14 +155,17 @@ while (<RNA>){
       }
       if ( $length_to_chop > 0 ){
 	# do not chop the last base if it is not a A:
-	print STDERR "clipping sequence $seq\n";
-	my $last_base = substr( $seq, ( $length_to_chop + 3 - 1 ), 1 );
-	print STDERR "last base: $last_base\n";
-	unless ( $last_base eq 'T' || $last_base eq 't' ){
+	#print STDERR "clipping sequence $seq\n";
+	my $last_base        = substr( $seq, ( $length_to_chop + 3 - 1 ), 1 );
+	my $previous_to_last = substr( $seq, ( $length_to_chop + 3     ), 1 );
+	if ( !( $last_base eq 'T' || $last_base eq 't' ) ){
 	  $length_to_chop--;
 	}
+	elsif( $previous_to_last eq 'T' || $previous_to_last eq 't' ){
+	  $length_to_chop++;
+	}
 	$clipped_seq = substr( $seq, $length_to_chop + 3);
-	print STDERR "result: $clipped_seq\n";
+	#print STDERR "result: $clipped_seq\n";
       }
       else{
 	$clipped_seq = $seq;
