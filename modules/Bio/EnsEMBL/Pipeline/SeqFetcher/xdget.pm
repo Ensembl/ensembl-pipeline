@@ -30,6 +30,10 @@ files. Returns sequence as Bio::Seq.
 Additional options for xdget can be specifed though no checking
 is performed for compatibility.
 
+Note that, at the time of writing, xdget is case-insensitive:
+retrieved sequence is in upper case, irrespective of what was
+in the original unformatted fasta file.
+
 =head1 CONTACT
 
 B<ensembl-dev@ebi.ac.uk>
