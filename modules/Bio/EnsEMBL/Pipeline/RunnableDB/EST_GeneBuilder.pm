@@ -1482,10 +1482,15 @@ sub _check_Translations {
 
       ############################################################
       # put possible stop at the end:
-      $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon( $transcript );
-      
-      push(@good_transcripts, $transcript);
-      
+      eval{
+	$transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon( $transcript );
+      };
+      if($@){
+	print STDERR "there was a problem with the trancript: [$@]\n"
+      }
+      else{
+	push(@good_transcripts, $transcript);
+      }
     }
   } # end of TRANSCRIPT
   
