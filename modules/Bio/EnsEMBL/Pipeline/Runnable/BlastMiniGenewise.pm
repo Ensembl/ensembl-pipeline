@@ -333,7 +333,7 @@ sub run_blast {
 	my $genomic = new Bio::EnsEMBL::SeqFeature(
 						   -start   => $hsp->subject->start,
 						   -end     => $hsp->subject->end,
-						   -strand  => 1,
+						   -strand  => $strand,
 						   -seqname => $hsp->subject->seqname,
 						   -score   => $hsp->score,
 						  );
@@ -343,7 +343,7 @@ sub run_blast {
 	my $protein = new Bio::EnsEMBL::SeqFeature(
 						   -start   => $hsp->query->start,
 						   -end     => $hsp->query->end,
-						   -strand  => $strand,
+						   -strand  => 1,
 						   -seqname => $protname,
 						   -score   => $hsp->score,
 						   );
