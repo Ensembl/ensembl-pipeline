@@ -11,15 +11,22 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm - DESCRIPTION of Object
+Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm - Targetted genewise Runnable DB
 
 =head1 SYNOPSIS
 
-Give standard usage here
+my $tgw = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise
+    (  -dbobj => $dbobj,
+       -input_id => $input_id);
+
+  $tgw->fetch_input;
+  $tgw->run();
+  $tgw->output();
+  $tgw->write_output(); # write to db
 
 =head1 DESCRIPTION
 
-Describe the object here
+This object manages the data fetching, running, output parsing, and data storing of Targetted Genewise in the Ensembl pipeline.
 
 =head1 CONTACT
 
@@ -52,37 +59,37 @@ use Bio::EnsEMBL::Gene;
 
 BEGIN { print STDERR "\n\n***I'm here!***\n"; };
 
-@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+			   -SEQFETCHER  => $sf);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
+=cut
 
 sub new {
-  my ($class,@args) = @_;
-  my $self = bless {}, $class;
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);
 
-    $self->{'_fplist'} = []; #create key to an array of feature pairs
-    
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")           unless defined($dbobj);
-    $self->dbobj($dbobj);
-    $dbobj->static_golden_path_type('UCSC');
-  
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
+    $self->{'_fplist'} = [];	#create key to an array of feature pairs
 
-  if (!defined $seqfetcher) {
-    # will look for pfetch in $PATH - change this once PipeConf up to date
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)
 
-  }
-  $self->throw("no seqfetcher\n") unless defined $seqfetcher;
-  print STDERR "seqfetcher: $seqfetcher\n";
-  $self->seqfetcher($seqfetcher); 
-  
-  return $self; # success - we hope!
+    # force to static golden path
+    $self->dbobj->static_golden_path_type('UCSC');
+
+    return $self;
 }
-
 
 
 =head2 fetch_input
@@ -93,7 +100,6 @@ sub new {
  Example :
  Returns : 
  Args    :
-
 
 =cut
 
@@ -197,26 +203,43 @@ sub run{
 
 }
 
+=head2 Bio::EnsEMBL::Pipeline::RunnableDB methods 
+
+=head2 dbobj
+
+    Title   :   dbobj
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+
+=head2 input_id
+
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
 =head2 output
 
- Title   : output
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   
+    Returns :   Array of Bio::EnsEMBL::FeaturePair
+    Args    :   None
 
+=head2 vc
 
-=cut
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
 
-sub output{
-   my ($self,@args) = @_;
-
-   return @{$self->{'_output'}};
-}
-
-
-
+=head2 TargettedGeneWise implemented methods
+ 
 =head2 write_output
 
     Title   :   write_output
@@ -564,27 +587,6 @@ sub remap_genes {
 }
 
 
-=head2 input_id
-
- Title   : input_id
- Usage   : $obj->input_id($newval)
- Function: 
- Returns : value of input_id
- Args    : newvalue (optional)
-
-
-=cut
-
-sub input_id{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'input_id'} = $value;
-    }
-    return $obj->{'input_id'};
-
-}
-
 =head2 runnable
 
  Title   : runnable
@@ -600,31 +602,9 @@ sub runnable{
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'runnable'} = $value;
+      $obj->{'_runnable'} = $value;
     }
-    return $obj->{'runnable'};
-
-}
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
+    return $obj->{'_runnable'};
 }
 
 1;

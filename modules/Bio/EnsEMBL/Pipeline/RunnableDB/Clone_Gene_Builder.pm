@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -14,11 +12,11 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::AlignFeature
+Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome->new(
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder->new(
 					     -dbobj     => $db,
 					     -input_id  => $id
                                              );
@@ -50,7 +48,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
 
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
@@ -62,24 +60,33 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 use Data::Dumper;
+use Bio::Root::RootI;
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+=head2 new
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db,
+                           -INPUT_ID    => $id,
+			   -SEQFETCHER  => $sf,
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Sequence Fetcher Object,
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+=cut
+
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj,$input_id,$vcontig,$extend ) = $self->_rearrange([qw(DBOBJ INPUT_ID VCONTIG EXTEND)], @args);
+    my( $vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
        
-    $self->throw("No database handle input")           unless defined($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-
     $vcontig = 1 unless defined($vcontig);
     
     $self->vcontig($vcontig);
@@ -88,15 +95,13 @@ sub _initialize {
     return $self; # success - we hope!
 }
 
-sub input_id {
-    my ($self,$arg) = @_;
-    
-    if (defined($arg)) {
-	$self->{_input_id} = $arg;
-    }
-    
-    return $self->{_input_id};
-}
+=head2 input_id
+
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
 
 =head2 dbobj
 
@@ -105,18 +110,6 @@ sub input_id {
     Function:   Get/set method for database handle
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
-
-=cut
-
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
-
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
 
 =head2 fetch_output
 
@@ -504,20 +497,23 @@ sub run {
     push(@{$self->{_output}},@vcgenes);
 }
 
-sub output {
-    my ($self) = @_;
+=head2 output
 
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
-    }
-    return @{$self->{_output}};
-}
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   
+    Returns :   Array of Bio::EnsEMBL::FeaturePair
+    Args    :   None
 
+=head2 vc
+
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
+
+
+=cut
 
 1;
-
-
-
-
-
-

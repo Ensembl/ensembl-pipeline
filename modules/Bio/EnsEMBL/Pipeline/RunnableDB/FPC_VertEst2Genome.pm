@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -54,32 +52,31 @@ use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Gene;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
-@ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db,
+                           -INPUT_ID    => $id,
+                           -SEQFETCHER  => $sf,
+			   -ANALYSIS    => $analysis);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_VertEst2Genome object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::FPC_VertEst2Genome object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required),
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+                -input_id:   Contig input id (required), 
+=cut
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
            
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input") unless defined($dbobj);
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-
-    
-    if(!defined $seqfetcher) {
-      # will look for pfetch in $PATH - change this once PipeConf up to date
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-    }
-    $self->seqfetcher($seqfetcher);
-    
-    return $self; # success - we hope!
+    return $self; 
 }
 
 =head2 write_output
@@ -93,7 +90,7 @@ sub new {
 =cut
 
 sub write_output {
-
+# alter this so it writes features, not genes!
   my($self) = @_;
   
   my @features = $self->output();
@@ -279,7 +276,7 @@ sub run {
     Title   :   _convert_output
     Usage   :   $self->_convert_output()
     Function:   Converts est2genome output into an array of genes remapped into genomic coordinates
-    Returns :   Nothing, but $self->{_output} contains remapped genes
+    Returns :   Nothing, but $self->{'_output'} contains remapped genes
     Args    :   None
 =cut
 
@@ -313,11 +310,11 @@ sub _convert_output {
     # map genes back to genomic coordinates
     my @remapped = $self->_remap_genes($contig,@genes);	
     
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
     }
     
-    push(@{$self->{_output}},@remapped);
+    push(@{$self->{'_output'}},@remapped);
 
     # somewhere in here, convert exons back to genomic coordinates so can write out as features
 
@@ -970,10 +967,10 @@ sub _print_FeaturePair {
 sub output {
     my ($self) = @_;
    
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
     } 
-    return @{$self->{_output}};
+    return @{$self->{'_output'}};
 }
 
 =head2 _new_exon

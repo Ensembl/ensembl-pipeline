@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -46,50 +44,67 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+			   -SEQFETCHER  => $sf);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
+=cut
 
 sub new {
-    my ($class,@args) = @_;
-    my $self = bless {}, $class;
+    my ($new,@args) = @_;
+    my $self = $self->SUPER::new(@args);    
+           
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")           unless defined($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::Pipeline::DB::ObjI");
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
-    if(!defined $seqfetcher) {
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-    }
-
-    $self->seqfetcher($seqfetcher);
-
-    return $self; # success - we hope!
+    return $self;
 }
+
 
 =head2 dbobj
 
-Inherited from C<Bio::EnsEMBL::Pipeline::RunnableDBI>.
+    Title   :   dbobj
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
-=cut 
+=head2 input_id
 
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
 
 =head2 fetch_output
 
@@ -214,5 +229,3 @@ sub output {
 }
 
 1;
-
-

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -58,7 +56,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;
-
+use Bio::Root::RootI;
 use Data::Dumper;
 
 #@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
@@ -66,30 +64,9 @@ use Data::Dumper;
 
 sub new {
   my ($class, @args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);  
   
-
-  
-  my( $dbobj, $input_id, $analysis ) = $self->_rearrange(['DBOBJ',
-							  'INPUT_ID',
-							  'ANALYSIS'], @args);
-
-  $self->{'_fplist'} = []; #create key to an array of feature pairs
-  
-  $self->throw("No database handle input")           
-    unless defined($dbobj);
-  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") 
-    unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
-  $self->dbobj($dbobj);
-
-  $self->throw("Analysis object required") unless ($analysis);
-  $self->analysis($analysis);
-  
-  $self->throw("No input id input") 
-    unless defined($input_id);
-  $self->input_id($input_id);
-  
-  return $self; # success - we hope!
+  return $self; 
 }
 
 =head2 fetch_input
@@ -130,29 +107,6 @@ sub fetch_input {
   
 }
 
-
-
-=head2 runnable
-
-    Title   :   runnable
-    Usage   :   $self->runnable($arg)
-    Function:   Sets a runnable for this RunnableDB
-    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
-    Args    :   Bio::EnsEMBL::Pipeline::RunnableI
-
-=cut
-
-sub runnable {
-  my ($self,$runnable) = @_;
-  
-  if ($runnable) {
-    $self->throw("[$runnable] is not a Bio::EnsEMBL::Pipeline::RunnableI") 
-      unless $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI");
-    $self->{_runnable} = $runnable;
-  }
-  
-  return $self->{_runnable};
-}
 
 =head2 run
 
@@ -236,15 +190,6 @@ sub _convert_output {
     Args    :   None
 
 =cut
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
-}
 
 =head2 write_output
 

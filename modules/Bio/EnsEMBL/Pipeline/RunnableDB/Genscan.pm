@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -75,7 +73,7 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_genseq'}      = undef;
@@ -83,22 +81,11 @@ sub new {
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless ($dbobj->isa ('Bio::EnsEMBL::DB::ObjI'));
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
+    # dbobj input_id mandatory and read in by BlastableDB
+
+    # anlaysis not mandatory for BlastableDB, so we check here 
+    $self->throw("Analysis object required") unless ($self->analysis);
+
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Genscan');
     
     return $self;
@@ -179,3 +166,5 @@ sub result_quality_tag {
         return 'INVALID';
     }
 }
+
+1;

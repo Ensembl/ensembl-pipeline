@@ -1,5 +1,5 @@
 
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA.pm
 #
 # Cared for by Ewan Birney <birney@ebi.ac.uk>
 #
@@ -15,11 +15,19 @@ Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA
 
 =head1 SYNOPSIS
 
-Give standard usage here
+my $tgdna = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA
+ ( -dbobj => $dbobj,
+   -input_id => $input_id );
+
+$tgdna->fetch_input();
+$tgdna->run();
+$tgdna->output();
+$tgdna->write_output(); # write to db
+   
 
 =head1 DESCRIPTION
 
-Describe the object here
+This object manages the data fetching, running, output parsing, and data storing of Targetted Genes building in the Ensembl pipeline.
 
 =head1 CONTACT
 
@@ -55,25 +63,14 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
-@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class,@args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
 
-           
-  my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
-					       'INPUT_ID'], @args);
-  
-  $self->throw("No database handle input")           unless defined($dbobj);
-  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::Obj");
-  $self->dbobj($dbobj);
-  $dbobj->static_golden_path_type('UCSC');
-  
-  $self->throw("No input id input") unless defined($input_id);
-  $self->input_id($input_id);
-  
-  return $self; # success - we hope!
+  # input_id and dbobj are handled in RunnableDB new
+  return $self; 
 }
 
 
@@ -130,9 +127,7 @@ sub fetch_input{
   }
   
   $start = $fpcstart unless (defined $start && $start < $fpcstart);
-  $end = $fpcend unless (defined $end && $end > $fpcend);
-
-    
+  $end = $fpcend unless (defined $end && $end > $fpcend);    
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
 
@@ -188,25 +183,6 @@ sub run {
    $self->convert_gw_output;
    $self->convert_exonerate_output;
 }
-
-=head2 output
-
- Title   : output
- Usage   :
- Function:
- Example :
- Returns : 
- Args    :
-
-
-=cut
-
-sub output{
-   my ($self,@args) = @_;
-   return @{$self->{'_output'}};
-}
-
-
 
 =head2 exonerate_runnable
 
@@ -588,8 +564,6 @@ sub remap_genes {
 	  }
 	}
       }
-
-
       print STDERR "Couldn't reverse map gene " . $gene->id . " [$@]\n";
     }
     
@@ -597,71 +571,6 @@ sub remap_genes {
   }
 
   return @newf;
-
-}
-
-
-=head2 input_id
-
- Title   : input_id
- Usage   : $obj->input_id($newval)
- Function: 
- Returns : value of input_id
- Args    : newvalue (optional)
-
-
-=cut
-
-sub input_id{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'input_id'} = $value;
-    }
-    return $obj->{'input_id'};
-
-}
-
-=head2 runnable
-
- Title   : runnable
- Usage   : $obj->runnable($newval)
- Function: 
- Returns : value of runnable
- Args    : newvalue (optional)
-
-
-=cut
-
-sub runnable{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'runnable'} = $value;
-    }
-    return $obj->{'runnable'};
-
-}
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
 }
 
 1;

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -73,27 +71,14 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_runnable'}    = [];
-    $self->{'_input_id'}    = undef;
     
-    my ( $dbobj, $input_id, $analysis, $threshold) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
+    my ( $threshold) = $self->_rearrange ([qw(THRESHOLD)], @args);    
+
+    $self->throw("Analysis object required") unless ($self->analysis);
     
 #    if ($threshold)
 #    {
@@ -115,8 +100,6 @@ sub new {
                 (which extends Bio::EnsEMBL::DB::ObjI)
     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
-=cut
-
 =head2 threshold
 
     Title   :   threshold
@@ -124,8 +107,6 @@ sub new {
     Function:   Get/set method for threshold score required for writing
                 Feature/FeaturePair to database.
     Args    :   Optional value (depends on type of Analysis)
-
-=cut
 
 =head2 fetch_input
 
@@ -273,3 +254,5 @@ sub write_output {
         return 1;
     } 
 }
+
+1;

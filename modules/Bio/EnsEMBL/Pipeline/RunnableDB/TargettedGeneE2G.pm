@@ -1,5 +1,5 @@
 #
-# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise.pm
+# Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::TargettedE2G.pm
 #
 # Cared for by Val Curwen <vac@sanger.ac.uk>
 #
@@ -11,15 +11,22 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneDNA
+Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
 
 =head1 SYNOPSIS
 
-Give standard usage here
+my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
+(-db_obj => $dbobj,
+ -input_id => $input_id);
+
+$t_e2g->fetch_input();
+$t_e2g->run();
+$t_e2g->output();
+$t_e2g->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
-Describe the object here
+Run Targetted Est2Genome for building Gene objects
 
 =head1 CONTACT
 
@@ -55,27 +62,13 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
 
-@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class,@args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
 
-           
-  my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
-					       'INPUT_ID'], @args);
-  
-  $self->throw("No database handle input")           unless defined($dbobj);
-  
-#  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::Obj");
-  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::DBAdaptor") unless $dbobj->isa("Bio::EnsEMBL::DBSQL::DBAdaptor");
-  $self->dbobj($dbobj);
-  $dbobj->static_golden_path_type('UCSC');
-  
-  $self->throw("No input id input") unless defined($input_id);
-  $self->input_id($input_id);
-
-  return $self; # success - we hope!
+  return $self;
 }
 
 
@@ -132,8 +125,6 @@ sub fetch_input{
   
   $start = $fpcstart unless (defined $start && $start < $fpcstart);
   $end = $fpcend unless (defined $end && $end > $fpcend);
-
-    
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
 
@@ -154,11 +145,9 @@ sub fetch_input{
 
   my $e2g = Bio::EnsEMBL::Pipeline::Runnable::Est2Genome->new( -genomic => $vc->primary_seq,
 							       -est => $cdna
-							     );
-    
+							       );
   $self->runnable($r);
   $self->e2g_runnable($e2g);
-
 }
 
 
@@ -176,7 +165,7 @@ sub fetch_input{
 
 sub run {
    my ($self,@args) = @_;
-
+   
    $self->runnable->run();
    $self->e2g_runnable->run();
 
@@ -253,12 +242,31 @@ sub e2g_runnable{
    my $obj = shift;
    if( @_ ) {
       my $value = shift;
-      $obj->{'e2g_runnable'} = $value;
+      $obj->{'_e2g_runnable'} = $value;
     }
-    return $obj->{'e2g_runnable'};
+    return $obj->{'_e2g_runnable'};
 
 }
 
+=head2 runnable
+
+ Title   : runnable
+ Usage   : $obj->runnable($newval)
+ Function: 
+ Returns : value of runnable
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub runnable{
+   my $obj = shift;
+   if( @_ ) {
+      my $value = shift;
+      $obj->{'_runnable'} = $value;
+    }
+    return $obj->{'_runnable'};
+}
 
 =head2 write_output
 
@@ -443,13 +451,13 @@ sub convert_e2g_output {
   my $genetype = "TGE_e2g";
   my @genes = $self->make_genes($count, $genetype, \@results);
   
-  if (!defined($self->{_e2g_genes})) {
-    $self->{_e2g_genes} = [];
+  if (!defined($self->{'_e2g_genes'})) {
+    $self->{'_e2g_genes'} = [];
   }
 
   print STDERR "e2g genes: " . scalar(@genes) . "\n";
 
-  push(@{$self->{_e2g_genes}},@genes);  
+  push(@{$self->{'_e2g_genes'}},@genes);  
 }
 
 =head2 convert_gw_output
@@ -471,13 +479,13 @@ sub convert_gw_output {
   my @results  = $self->runnable->output;
   my @genes    = $self->make_genes($count, $genetype, \@results);
 
-  if (!defined($self->{_gw_genes})) {
-    $self->{_gw_genes} = [];
+  if (!defined($self->{'_gw_genes'})) {
+    $self->{'_gw_genes'} = [];
   }
 
   print STDERR "gw genes: " . scalar(@genes) . "\n";
 
-  push(@{$self->{_gw_genes}},@genes);
+  push(@{$self->{'_gw_genes'}},@genes);
   
 }
 
@@ -518,10 +526,10 @@ sub combine_genes{
     $count++;
   }
 
-  if (!defined($self->{_combined_genes})) {
-    $self->{_combined_genes} = [];
+  if (!defined($self->{'_combined_genes'})) {
+    $self->{'_combined_genes'} = [];
   }
-  push(@{$self->{_combined_genes}},@genes);
+  push(@{$self->{'_combined_genes'}},@genes);
   
 }
 
@@ -543,7 +551,7 @@ sub _merge_gw_genes {
   my @merged;
   my $count = 1;
   my $contig = $self->vc;
-  foreach my $gwg(@{$self->{_gw_genes}}){
+  foreach my $gwg(@{$self->{'_gw_genes'}}){
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->type('combined');
     #  $gene->id($self->input_id . ".combined.$count");
@@ -620,8 +628,8 @@ sub _merge_gw_genes {
 
 sub _make_newtranscripts {
   my ($self, @merged_gw_genes) = @_;
-  my @gw_genes  = @{$self->{_gw_genes}};
-  my @e2g_genes = @{$self->{_e2g_genes}};
+  my @gw_genes  = @{$self->{'_gw_genes'}};
+  my @e2g_genes = @{$self->{'_e2g_genes'}};
   my @newtrans  = ();
 
  GENE:
@@ -682,7 +690,7 @@ sub _make_newtranscripts {
 	    }
 	    
 	    # add all the exons from the est2genome transcript, subsequent to this one
-	    my $c = $#eg_ex;
+	    $c = $#eg_ex;
 	    while($c > $eecount){
 	      print STDERR "adding 3' exon\n";
 	      $newtranscript->add_Exon($eg_ex[$c]);
@@ -974,9 +982,9 @@ sub remap_genes {
   my @newf;  
   my $contig = $self->vc;
 
-  my @genes = @{$self->{_gw_genes}};
-  push(@genes, @{$self->{_e2g_genes}});
-  push(@genes, @{$self->{_combined_genes}});
+  my @genes = @{$self->{'_gw_genes'}};
+  push(@genes, @{$self->{'_e2g_genes'}});
+  push(@genes, @{$self->{'_combined_genes'}});
 
   foreach my $gene (@genes) {
     print STDERR "about to remap\n";
@@ -1169,7 +1177,7 @@ sub _make_transcript{
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
     
-    $exon->phase($exon_pred->{_phase});
+    $exon->phase($exon_pred->{'_phase'});
     $exon->attach_seq($contig);
     
     # sort out supporting evidence for this exon prediction
@@ -1224,69 +1232,6 @@ sub _make_transcript{
   }
   
   return $transcript;
-}
-
-=head2 input_id
-
- Title   : input_id
- Usage   : $obj->input_id($newval)
- Function: 
- Returns : value of input_id
- Args    : newvalue (optional)
-
-
-=cut
-
-sub input_id{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'input_id'} = $value;
-    }
-    return $obj->{'input_id'};
-
-}
-
-=head2 runnable
-
- Title   : runnable
- Usage   : $obj->runnable($newval)
- Function: 
- Returns : value of runnable
- Args    : newvalue (optional)
-
-
-=cut
-
-sub runnable{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'runnable'} = $value;
-    }
-    return $obj->{'runnable'};
-
-}
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
 }
 
 1;

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -78,32 +76,15 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
- 
+    my $self = $class->SUPER::new(@args);
 
     $self->{'_fplist'}      = []; # ???   
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
-    $self->{'_input_id'}    = undef;
-    $self->{'_analysis'}    = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
+    $self->throw("Analysis object required") unless ($self->analysis);
     
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::CPG');
+    &Bio::EnsEMBL::Pipeline::RunnableDB::CPG::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::CPG');
     return $self;
 }
 
@@ -131,7 +112,6 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;
-    
     if ($runnable)
     {
         #extract parameters into a hash
@@ -150,13 +130,13 @@ sub runnable {
         }
         $parameters{'-cpg'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::CPG object
-        $self->{'_runnable'} = $runnable->new( 
-					      -clone => $parameters{'-clone'},
-					      -length => $parameters{'-length'},
-					      -gc => $parameters{'-gc'},
-					      -oe => $parameters{'-oe'},
-					      -cpg => $parameters{'-cpg'},
-					     );
+        $self->{'_runnable'} = $runnable->new
+	    ( '-clone' => $parameters{'-clone'},
+	      '-length' => $parameters{'-length'},
+	      '-gc' => $parameters{'-gc'},
+	      '-oe' => $parameters{'-oe'},
+	      '-cpg' => $parameters{'-cpg'},
+	      );
     }
     return $self->{'_runnable'};
 }

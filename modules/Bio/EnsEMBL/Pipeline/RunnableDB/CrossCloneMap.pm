@@ -42,27 +42,25 @@ use strict;
 
 # Object preamble - inheriets from Bio::Root::RootI
 
-use Bio::Root::RootI;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::CrossMatch;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my($class,@args) = @_;
 
-  my $self = {};
+  my $self = $class->SUPER::new(@args);
 
   $self->{'_final'} = [];
   $self->{'_crossmatch'} = [];
-  bless $self,$class;
 
   my ($cross_db,$score) = $self->_rearrange([qw(CROSSDB SCORE)],@args);
 
-  if ((!$cross_db) || (!$cross_db->isa('Bio::EnsEMBL::DBSQL::CrossMatchDBAdaptor'))) {
+  if ((!$cross_db) || 
+      (!$cross_db->isa('Bio::EnsEMBL::DBSQL::CrossMatchDBAdaptor'))) {
       $self->throw("You need to provide a CrossMatch database adaptor to run CrossCloneMap!");
   }
-  $self->dbobj($cross_db);
   $self->_score($score);
 
   return $self;
@@ -282,18 +280,6 @@ sub write_output{
  Returns : value of dbobj
  Args    : newvalue (optional)
 
-
-=cut
-
-sub dbobj{
-   my ($self,$value) = @_;
-   if( defined $value) {
-      $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-
-}
-
 =head2 score
 
  Title   : score
@@ -336,3 +322,5 @@ sub _acc{
     return $self->{'_acc'};
 
 }
+
+1;

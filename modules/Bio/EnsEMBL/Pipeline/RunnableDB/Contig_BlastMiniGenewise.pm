@@ -20,7 +20,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise->new(
 					     -dbobj      => $db,
 					     -input_id   => $id,
 					     -seqfetcher => $seqfetcher
@@ -51,9 +51,14 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
@@ -62,40 +67,43 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+			   -SEQFETCHER  => $sf);
+                           
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Contig_MiniGenewise object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
+=cut
 
 sub new {
     my ($class,@args) = @_;
-    my $self = bless {}, $class;
-  
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")                 unless defined($dbobj);
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
-    if(!defined $seqfetcher) {
-      # will look for pfetch in $PATH - change this once PipeConf up to date
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-    }
-    $self->seqfetcher($seqfetcher); 
-
-    return $self; # success - we hope!
+    my $self = $class->SUPER::new(@args);    
+           
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)               
+    return $self; 
 }
 
-sub input_id {
-	my ($self,$arg) = @_;
+=head1 RunnableDB implemented methods
 
-   if (defined($arg)) {
-      $self->{_input_id} = $arg;
-   }
+=head2 input_id
 
-   return $self->{_input_id};
-}
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
+=cut
 
 =head2 dbobj
 
@@ -105,17 +113,23 @@ sub input_id {
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
 
-=cut
+=head2 output
 
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   
+    Returns :   Array of Bio::EnsEMBL::FeaturePair
+    Args    :   None
 
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
+=head2 vc
+
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
+
+=head1 Contig_BlastMiniGenewise implemented methods
 
 =head2 fetch_output
 
@@ -542,38 +556,6 @@ sub check_splice {
 	                        $splice2      . "] " . 
 	       ($f2->start - $f1->end)        . "\n");
     }
-}
-
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
-}
-
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
 }
 
 1;

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Val Curwen (vac@sanger.ac.uk)
@@ -62,25 +60,13 @@ use Bio::SeqIO;
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
            
-    my( $dbobj,$input_id,$analysis ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID',
-						'ANALYSIS'], @args);
-
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-   
-    $self->throw("No database handle input") unless defined($dbobj);
-    $self->dbobj($dbobj);
 
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
+    $self->throw("Analysis object required") unless ($self->analysis);
 
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->analysis($analysis);
-
-
-    return $self; # success - we hope!
+    return $self;
 }
 
 =head2 fetch_input
@@ -94,72 +80,63 @@ sub new {
 =cut
 
 sub fetch_input {
-  my ($self) = @_;
-  
- print STDERR "Fetching input \n";
-  $self->throw("No input id") unless defined($self->input_id);
-  
-  # eg ctg25118
-  my $contigid  = $self->input_id;
-  
-  $self->dbobj->static_golden_path_type('UCSC');
-  
-  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
-  
-  # returns all the contigs making up the fpc contig munged together as a list of virtual contigs.
-  my @contig    = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
-  
- foreach my $contig (@contig){
-   print STDERR "Analysing contig " . $contig->id . "\n";
-   foreach my $rc ($contig->_vmap->each_MapContig) {
-     my $strand = "+";
-     if ($rc->orientation == -1) {
-       $strand = "-";
-     }
-     print STDERR "orientation: $strand\n";
-     
-   }
+    my ($self) = @_;
 
-   my @ests = $self->_get_ests($contig);
-   my @genomic = ( $contig->get_repeatmasked_seq() );
+    print STDERR "Fetching input \n";
+    $self->throw("No input id") unless defined($self->input_id);
 
-   if(scalar(@ests) && scalar(@genomic))
-     {
-       my $executable =  $self->analysis->program_file();
-       my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate('-genomic'  => \@genomic,
-								       '-est'      => \@ests,
-								       '-exonerate' => $executable);
-       $self->add_Runnable($exonerate);
-       $self->{$exonerate} = $contig;
-     }
-   else { print STDERR "No ests to be analysed for " . $contig->id()  . "\n"; }
- }
+    # eg ctg25118
+    my $contigid  = $self->input_id;
+
+    $self->dbobj->static_golden_path_type('UCSC');
+
+    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+
+    # returns all the contigs making up the fpc contig munged together as a list of virtual contigs.
+    my @contig    = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
+
+    foreach my $contig (@contig){
+	print STDERR "Analysing contig " . $contig->id . "\n";
+	foreach my $rc ($contig->_vmap->each_MapContig) {
+	    my $strand = "+";
+	    if ($rc->orientation == -1) {
+		$strand = "-";
+	    }
+	    print STDERR "orientation: $strand\n";
+
+	}
+
+	my @ests = $self->_get_ests($contig);
+	my @genomic = ( $contig->get_repeatmasked_seq() );
+
+	if(scalar(@ests) && scalar(@genomic))
+	{
+	    my $executable =  $self->analysis->program_file();
+	    my $exonerate = new Bio::EnsEMBL::Pipeline::Runnable::Exonerate('-genomic'  => \@genomic,
+									    '-est'      => \@ests,
+									    '-exonerate' => $executable);
+	    $self->runnable($exonerate);
+	    $self->{$exonerate} = $contig;
+	}
+	else { print STDERR "No ests to be analysed for " . $contig->id()  . "\n"; }
+    }
 }
 
 =head2 output
 
     Title   :   output
     Usage   :   $self->output()
-    Function:   Returns the contents of $self->{_output}, which holds predicted genes.
+    Function:   Returns the contents of $self->{_output}, 
+                which holds predicted genes.
     Returns :   Array of Bio::EnsEMBL::Gene
     Args    :   None
-
-=cut
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
-}
 
 =head2 run
 
     Title   :   run
     Usage   :   $self->run()
-    Function:   Runs the exonerate analysis, producing Bio::EnsEMBL::Gene predictions
+    Function:   Runs the exonerate analysis, producing 
+                Bio::EnsEMBL::Gene predictions
     Returns :   Nothing, but $self{_output} contains the predicted genes.
     Args    :   None
 
@@ -170,7 +147,7 @@ sub run {
 
   $self->throw("Can't run - no runnable objects") unless defined($self->{_runnables});
   
-  foreach my $runnable ($self->get_Runnables) {
+  foreach my $runnable ($self->runnable) {
         $runnable->run;
   }
 
@@ -266,52 +243,13 @@ sub write_output {
   return 1;
 }
 
-=head2 add_Runnable
+=head2 runnable
 
-    Title   :   add_Runnable
-    Usage   :   $self->add_Runnable($runnable)
-    Function:   Adds $runnable to $self->{_runnables}
-    Returns :   nothing
+    Title   :   runnable
+    Usage   :   $self->runnable($arg)
+    Function:   Sets a runnable for this RunnableDB
+    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
     Args    :   Bio::EnsEMBL::Pipeline::RunnableI
-
-=cut
-
-sub add_Runnable {
-  my ($self,$arg) = @_;
-  
-  if (!defined($self->{_runnables})) {
-    $self->{_runnables} = [];
-  }
-  
-  if (defined($arg)) {
-    if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      push(@{$self->{_runnables}},$arg);
-    } else {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-    }
-  }
-}
-
-=head2 get_Runnables
-
-    Title   :   get_Runnables
-    Usage   :   $self->get_Runnables
-    Function:   Gets list of Runnables
-    Returns :   array of Bio::EnsEMBL::Pipeline::Runnable
-    Args    :   none
-
-=cut
-
-sub get_Runnables {
-  my ($self) = @_;
-  
-  if (!defined($self->{_runnables})) {
-    $self->{_runnables} = [];
-  }
-  
-  return @{$self->{_runnables}};
-}
-
 
 =head2 _convert_output
 
@@ -331,7 +269,7 @@ sub _convert_output {
   my $count=1;
 
   # make an array of genes for each runnable
-  foreach my $runnable ($self->get_Runnables) {
+  foreach my $runnable ($self->runnable) {
     my $contig = $self->{$runnable};
     my @features   = $runnable->output;
     my %homols = ();
@@ -770,12 +708,12 @@ sub _check_disk_space {
 sub _print_FeaturePair {
   my ($self,$pair) = @_;
   
-  print STDERR $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . 
-               $pair->score . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-	       $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
+  print STDERR $pair->seqname . "\t" . $pair->start . "\t" .
+               $pair->end . "\t" . $pair->score . "\t" . 
+               $pair->strand . "\t" . $pair->hseqname . "\t" . 
+	       $pair->hstart . "\t" . $pair->hend . "\t" . 
+	       $pair->hstrand . "\n";
 }
-
-
 
 1;
 

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -73,30 +71,16 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
- 
+    my $self = $class->SUPER::new(@args);
 
-    $self->{'_fplist'}      = []; # ???   
+    $self->{'_fplist'}      = [];  
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     $self->{'_input_id'}    = undef;
     $self->{'_analysis'}    = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
+
+    $self->throw("Analysis object required") unless ($self->analysis);
     
     # set up cpg specific parameters
     my $params = $self->parameters();
@@ -129,6 +113,15 @@ sub fetch_input {
     $self->genseq($genseq);
 }
 
+=head2 runnable
+
+    Title   :   runnable
+    Usage   :   $self->runnable($arg)
+    Function:   Sets a runnable for this RunnableDB
+    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
+    Args    :   Bio::EnsEMBL::Pipeline::RunnableI
+
+=cut
 #get/set for runnable and args
 sub runnable {
     my ($self, $runnable) = @_;

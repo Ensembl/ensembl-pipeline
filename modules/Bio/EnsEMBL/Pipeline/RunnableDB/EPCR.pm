@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -67,38 +65,24 @@ use vars qw(@ISA);
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::EPCR object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::EPCR object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                input_id:   Contig input id , 
+                -input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
 
 =cut
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
-    $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
-        
-    my ( $dbobj, $input_id, $analysis, $threshold) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
     
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless ($dbobj->isa ('Bio::EnsEMBL::DB::ObjI'));
-    $self->dbobj($dbobj);
+    $self->throw("Analysis object required") unless ($self->analysis);
     
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::EPCR');
+    # inheritance is tripping us up here
+    &Bio::EnsEMBL::Pipeline::RunnableDB::EPCR::runnable($self,'Bio::EnsEMBL::Pipeline::Runnable::EPCR');
     return $self;
 }
 

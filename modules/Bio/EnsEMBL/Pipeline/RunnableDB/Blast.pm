@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -67,36 +65,18 @@ use vars qw(@ISA);
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                input_id:   Contig input id , 
+                -input_id:   Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
 
 =cut
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    $self->{'_input_id'}    = undef;
-        
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless ($dbobj->isa ('Bio::EnsEMBL::DB::ObjI'));
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
+    $self->{'_runnable'}    = undef;            
     return $self;
 }
 
@@ -133,7 +113,7 @@ sub fetch_input {
 sub runnable {
     my ($self) = @_;
     
-    if (!defined($self->{_runnable})) {
+    if (!defined($self->{'_runnable'})) {
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
@@ -161,6 +141,26 @@ sub run {
     $self->throw("Input not fetched")       unless ($self->genseq());
 
     $self->runnable->run($dir);
+}
+
+
+=head2 output
+
+    Title   :   output
+    Usage   :   $self->output();
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable->output()
+    Returns :   An array of Bio::EnsEMBL::Repeat objects (FeaturePairs)
+    Args    :   none
+
+=cut
+
+sub output {
+    my ($self) = @_;
+
+    my $runnable = $self->runnable;
+    $runnable || $self->throw("Can't return output - no runnable object");
+
+    return $runnable->output;
 }
 
 1;

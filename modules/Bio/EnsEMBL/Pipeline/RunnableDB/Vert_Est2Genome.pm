@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -62,35 +60,86 @@ use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db,
+			   -INPUT_ID    => $id,
+                           -SEQFETCHER  => $sf,
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a 
+                Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome 
+                object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome 
+                object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Sequence Fetcher Object (required),
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+=cut
+
 sub new {
   my ($class, @args) = @_;
-  my $self = bless {}, $class;
+  my $self = $class->SUPER::new(@args);
+
+  # dbobj, input_id, seqfetcher, and analysis objects are all set in
+  # in superclass constructor (RunnableDB.pm)
   
   $self->{'_fplist'} = []; #create key to an array of feature pairs
-  
-  my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							    'INPUT_ID',
-							    'SEQFETCHER'], @args);
-  
-  $self->throw("No database handle input")           
-    unless defined($dbobj);
-  $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") 
-    unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
-  
-  $self->dbobj($dbobj);
-    
-  $self->throw("No input id input") 
-    unless defined($input_id);
-  $self->input_id($input_id);
-  
-  if(!defined $seqfetcher) {
-    # will look for pfetch in $PATH - change this once PipeConf up to date
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-  }
-  $self->seqfetcher($seqfetcher);
-  
-  return $self; # success - we hope!
+  return $self; 
 }
+
+=head2 From Bio::EnsEMBL::Pipeline::RunnableDB
+
+=head2 dbobj
+
+    Title   :   dbobj
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+
+=cut
+
+=head2 input_id
+
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
+=cut
+
+=head2 genseq
+
+    Title   :   genseq
+    Usage   :   $self->genseq($genseq);
+    Function:   Get/set genseq
+    Returns :   
+    Args    :   
+
+=cut
+
+=head2 output
+
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   
+    Returns :   Array of Bio::EnsEMBL::FeaturePair
+    Args    :   None
+
+=head2 runnable
+
+    Title   :   runnable
+    Usage   :   $self->runnable($arg)
+    Function:   Sets a runnable for this RunnableDB
+    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
+    Args    :   Bio::EnsEMBL::Pipeline::RunnableI
+
+=head2 Vert_Est2Genome implemented methods
 
 =head2 features
 
@@ -106,9 +155,9 @@ sub features {
     my ($self, @features) = @_;
     if (@features)
     {
-        push (@{$self->{_features}}, @features);
+        push (@{$self->{'_features'}}, @features);
     }
-    return @{$self->{_features}};
+    return @{$self->{'_features'}};
 }
 
 =head2 fetch_input
@@ -131,8 +180,8 @@ sub features {
    my $contig    = $self->dbobj->get_Contig($contigid);
    my $genseq = $contig->get_repeatmasked_seq();
    my @features = $contig->get_all_SimilarityFeatures;
-   $self->{_genseq} = $genseq;
-   $self->{_features} = [];
+   $self->genseq($genseq);
+   $self->{'_features'} = [];
    $self->features(@features);
   
    # process the features for blast
@@ -156,7 +205,7 @@ sub features {
 
 sub _process_features {
   my ($self,@features) = @_;
-  my $genseq = $self->{_genseq};
+  my $genseq = $self->genseq;
   my @mrnafeatures = ();
   my @new_features = ();
   my %idhash = ();
@@ -207,14 +256,14 @@ sub _process_features {
     Usage   :   $self->_prepare_runnables(@new_features)
     Function:   Makes a Bio::EnsEMBL::Runnable::ALignFeature for plus strand blast 
                 FeaturePairs, and one for minus strand hits as appropriate.
-    Returns :   Nothing, but $self->{_runnables} contains the two runnables
+    Returns :   Nothing, but $self->{'_runnables'} contains the two runnables
     Args    :   array of Bio::EnsEMBL::FeaturePair
 
 =cut
 
 sub _prepare_runnables {
   my ($self, @new_features) = @_;
-  my $genseq = $self->{_genseq};
+  my $genseq = $self->genseq;
   my @plusfeat;
   my @minusfeat;
    foreach my $f(@new_features) {
@@ -239,25 +288,6 @@ sub _prepare_runnables {
     $self->runnable($mrunnable);
   }
   else { print STDERR "no features on minus strand\n"; }
-}
-
-=head2 output
-
-    Title   :   output
-    Usage   :   $self->output()
-    Function:   
-    Returns :   Array of Bio::EnsEMBL::FeaturePair
-    Args    :   None
-
-=cut
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
 }
 
 =head2 write_output
@@ -350,41 +380,12 @@ sub write_output {
   return 1;
 }
 
-=head2 runnable
-
-    Title   :   runnable
-    Usage   :   $self->runnable($arg)
-    Function:   Sets a runnable for this RunnableDB
-    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
-    Args    :   Bio::EnsEMBL::Pipeline::RunnableI
-
-=cut
-
-sub runnable {
-  my ($self,$arg) = @_;
-  
-  if (!defined($self->{_runnables})) {
-    $self->{_runnables} = [];
-  }
-  
-  if (defined($arg)) {
-    if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      push(@{$self->{_runnables}},$arg);
-    } else {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-    }
-  }
-  
-  return @{$self->{_runnables}};
-  
-}
-
 =head2 run
 
     Title   :   run
     Usage   :   $self->run()
  Function:   Runs the est2genome analysis, producing Bio::EnsEMBL::Gene predictions
-    Returns :   Nothing, but $self{_output} contains the predicted genes.
+    Returns :   Nothing, but $self{'_output'} contains the predicted genes.
     Args    :   None
 
 =cut
@@ -392,7 +393,7 @@ sub runnable {
 sub run {
   my ($self) = @_;
   
-  $self->throw("Can't run - no runnable objects") unless defined($self->{_runnables});
+  $self->throw("Can't run - no runnable objects") unless defined($self->{'_runnables'});
   
   foreach my $runnable ($self->runnable) {
     $runnable->minirun;
@@ -407,7 +408,7 @@ sub run {
     Title   :   _convert_output
     Usage   :   $self->_convert_output()
     Function:   Converts est2genome output into an array of genes remapped into genomic coordinates
-    Returns :   Nothing, but $self->{_output} contains remapped genes
+    Returns :   Nothing, but $self->{'_output'} contains remapped genes
     Args    :   None
 =cut
 
@@ -438,11 +439,11 @@ sub _convert_output {
       }
     }
     
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
     }
     
-    push(@{$self->{_output}},@genes);
+    push(@{$self->{'_output'}},@genes);
   }
 }
 
@@ -723,8 +724,8 @@ sub get_Sequences {
 sub get_Sequence {
   my ($self,$id) = @_;
 
-  if (defined($self->{_seq_cache}{$id})) {
-    return $self->{_seq_cache}{$id};
+  if (defined($self->{'_seq_cache'}{$id})) {
+    return $self->{'_seq_cache'}{$id};
   } 
   
   my $seq;
@@ -740,8 +741,8 @@ sub get_Sequence {
     $self->throw("Couldn't find sequence for [$id]");
   }
 
-  print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
-  $self->{_seq_cache}{$id} = $seq;
+  print (STDERR "Found sequence for $newid [" . $seq->length() . "]\n");
+  $self->{'_seq_cache'}{$id} = $seq;
   
   return $seq;
   

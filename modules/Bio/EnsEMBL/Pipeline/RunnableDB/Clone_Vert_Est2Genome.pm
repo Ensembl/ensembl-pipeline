@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -18,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome->new(
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome->new(
 					     -dbobj     => $db,
 					     -input_id  => $id
                                              );
@@ -56,46 +54,44 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::SeqIO;
 use Bio::Tools::Blast;
-
+use Bio::Root::RootI;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Vert_Est2Genome object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Sequence Fetcher Object (required)
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+=cut
 
 sub new {
-my ($class,@args) = @_;
-    my $self = bless {}, $class;
+    my ($new,@args) = @_;
+    my $self = $self->SUPER::new(@args);    
            
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)
+
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")           unless defined($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
-    if(!defined $seqfetcher) {
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-    }
-
-    $self->seqfetcher($seqfetcher);
-
-    return $self; # success - we hope!
+    return $self;
 }
 
-sub input_id {
-    my ($self,$arg) = @_;
-    
-    if (defined($arg)) {
-	$self->{_input_id} = $arg;
-    }
-    
-    return $self->{_input_id};
-}
+=head2 input_id
+
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
 
 =head2 dbobj
 
@@ -105,17 +101,13 @@ sub input_id {
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
 
-=cut
+=head2 seqfetcher
 
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
-
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
 
 =head2 fetch_output
 
@@ -233,9 +225,10 @@ sub fetch_input {
     my @contigs  = $clone->get_all_Contigs;
 
     foreach my $contig (@contigs) {
-	my $runnable = new Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome('-dbobj'      => $self->dbobj,
-									       '-input_id'   => $contig->id,
-									       '-seqfetcher' => $self->seqfetcher);
+	my $runnable = new Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome
+	    ('-dbobj'      => $self->dbobj,
+	     '-input_id'   => $contig->id,
+	     '-seqfetcher' => $self->seqfetcher);
 	$runnable->fetch_input;
 	$self->add_ContigRunnable($runnable);
     }
@@ -288,11 +281,4 @@ sub output {
     return @output;
 }
 
-
 1;
-
-
-
-
-
-

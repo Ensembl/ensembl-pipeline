@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -58,31 +56,38 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::RunnableDB );
 
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a 
+                Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome 
+                object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome 
+                object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Sequence Fetcher Object (required),
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+=cut
+
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
            
-    my( $dbobj, $blastdb, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-									'BLASTDB',
-									'INPUT_ID',
-									'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input") unless defined($dbobj);
-    $self->dbobj($dbobj);
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)
 
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
+    my( $blastdb ) = $self->_rearrange([qw(BLASTDB)], @args);
+       
     $self->throw("No blast db specified") unless defined($blastdb);
     $self->blastdb($blastdb);
 
-    if(!defined $seqfetcher) {
-      # will look for pfetch in $PATH - change this once PipeConf up to date
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-    }
-    $self->seqfetcher($seqfetcher);
-
-    return $self; # success - we hope!
+    return $self;
 }
 
 =head2 write_output
@@ -227,37 +232,6 @@ sub fetch_input {
   $self->runnable($runnable);
   # at present, we'll only ever have one ...
   $self->vc($contig);
-}
-
-
-
-=head2 runnable
-
-    Title   :   runnable
-    Usage   :   $self->runnable($arg)
-    Function:   Get/set runnables for this RunnableDB
-    Returns :   Bio::EnsEMBL::Pipeline::RunnableI
-    Args    :   Array of Bio::EnsEMBL::Pipeline::RunnableI
-
-=cut
-
-sub runnable {
-  my ($self,$arg) = @_;
-  
-  if (!defined($self->{_runnables})) {
-    $self->{_runnables} = [];
-  }
-  
-  if (defined($arg)) {
-    if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-      push(@{$self->{_runnables}},$arg);
-    } else {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-    }
-  }
-  
-  return @{$self->{_runnables}};
-  
 }
 
 =head2 run
@@ -564,17 +538,6 @@ sub _print_FeaturePair {
     Returns :   Array of Bio::EnsEMBL::Gene
     Args    :   None
 
-=cut
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
-}
-
 =head2 vc
 
  Title   : vc
@@ -582,19 +545,6 @@ sub output {
  Function: 
  Returns : value of vc
  Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
-}
 
 =head2 blastdb
 
@@ -616,8 +566,6 @@ sub blastdb{
     return $obj->{'blastdb'};
 
 }
-
-
 
 1;
 

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <ensembl-dev@ebi.ac.uk>
@@ -48,7 +46,6 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
@@ -56,62 +53,61 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Translation;
+
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
-           
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
+
 sub new {
-
-  my ($class, @args) = @_;
-  my $self = bless {}, $class;
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")                 unless defined($dbobj);
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
-    if(!defined $seqfetcher) {
-      # will look for pfetch in $PATH - change this once PipeConf up to date
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
-    }
-    $self->seqfetcher($seqfetcher); 
-
-    return $self; # success - we hope!
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
+               
+    return $self; 
 }
-sub input_id {
-	my ($self,$arg) = @_;
 
-   if (defined($arg)) {
-      $self->{_input_id} = $arg;
-   }
-
-   return $self->{_input_id};
-}
+=head1 RunnableDB implemented methods
 
 =head2 dbobj
 
     Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
 =cut
 
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
+=head2 input_id
 
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
+=head2 output
+
+    Title   :   output
+    Usage   :   $self->output()
+    Function:   
+    Returns :   Array of Bio::EnsEMBL::FeaturePair
+    Args    :   None
+
+=head2 vc
+
+ Title   : vc
+ Usage   : $obj->vc($newval)
+ Function: 
+ Returns : value of vc
+ Args    : newvalue (optional)
+
+=head1 FPC_BlastMiniGenewise implemented methods
 
 =head2 fetch_output
 
@@ -156,9 +152,6 @@ sub write_output {
 
     my @newgenes = $self->output;
     return unless ($#newgenes >= 0);
-
-
-
 
     # get new ids
     eval {
@@ -345,42 +338,16 @@ sub fetch_input {
 									   '-trim'     => 1);
     
     
-    $self->add_Runnable($runnable);
+    $self->runnable($runnable);
     # at present, we'll only ever have one ...
     $self->vc($contig);
-}
-     
-sub add_Runnable {
-    my ($self,$arg) = @_;
-
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
-
-    if (defined($arg)) {
-	if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-	    push(@{$self->{_runnables}},$arg);
-	} else {
-	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-	}
-    }
-}
-
-sub get_Runnables {
-    my ($self) = @_;
-
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
-    
-    return @{$self->{_runnables}};
-}
+}     
 
 sub run {
     my ($self) = @_;
 
     # is there ever going to be more than one?
-    foreach my $runnable ($self->get_Runnables) {
+    foreach my $runnable ($self->runnable) {
 	$runnable->run;
     }
     
@@ -400,7 +367,7 @@ sub convert_output {
   my $analysis = $self->dbobj->get_OldAnalysis(7);
   my $trancount = 1;
   my $genetype;
-  foreach my $runnable ($self->get_Runnables) {
+  foreach my $runnable ($self->runnable) {
     if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
       $genetype = "genewise";
     }
@@ -579,51 +546,18 @@ sub remap_genes {
 
 }
 
-
 sub check_splice {
     my ($self,$f1,$f2) = @_;
     
-    my $splice1 = substr($self->{_genseq}->seq,$f1->end,2);
-    my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
+    my $splice1 = substr($self->genseq->seq,$f1->end,2);
+    my $splice2 = substr($self->genseq->seq,$f2->start-3,2);
     
     if (abs($f2->start - $f1->end) > 50) {
-	print ("Splices are " . $f1->hseqname . " [" . 
-	                        $splice1      . "][" . 
-	                        $splice2      . "] " . 
-	       ($f2->start - $f1->end)        . "\n");
+	print "Splices are " . $f1->hseqname . " [" . 
+	    $splice1      . "][" . 
+	    $splice2      . "] " . 
+	    ($f2->start - $f1->end)        . "\n";
     }
-}
-
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
-}
-
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
 }
 
 1;

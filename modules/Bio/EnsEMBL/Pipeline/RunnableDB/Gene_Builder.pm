@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -14,11 +12,11 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::AlignFeature
+Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome->new(
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder->new(
 					     -dbobj     => $db,
 					     -input_id  => $id
                                              );
@@ -50,7 +48,7 @@ use strict;
 
 # Object preamble - inherits from Bio::Root::RootI;
 
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
 use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
@@ -63,29 +61,38 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 );
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-sub _initialize {
-    my ($self,@args) = @_;
-    my $make = $self->SUPER::_initialize(@_);    
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db,
+                           -INPUT_ID    => $id,
+			   -SEQFETCHER  => $sf,
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Sequence Fetcher Object,
+                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+=cut
+
+sub new {
+    my ($class,@args) = @_;
+    my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $dbobj,$input_id,$vcontig,$extend ) = $self->_rearrange([qw(DBOBJ INPUT_ID VCONTIG EXTEND)], @args);
+    my( $vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
        
-    $self->throw("No database handle input")           unless defined($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI") unless $dbobj->isa("Bio::EnsEMBL::DB::ObjI");
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-
     $vcontig = 1 unless defined($vcontig);
     
     $self->vcontig($vcontig);
     $self->extend($extend);
 
-    return $self; # success - we hope!
+    return $self;
 }
 
 sub input_id {
@@ -96,26 +103,6 @@ sub input_id {
     }
     
     return $self->{_input_id};
-}
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
-
-=cut
-
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
-
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
 }
 
 =head2 fetch_output
@@ -395,7 +382,7 @@ sub run {
     my $genebuilders = $self->get_genebuilders;
     #my @gene;
 
-    $self->{_output} = [];
+    $self->{'_output'} = [];
     
     my @vcgenes;
     foreach my $contig (keys %$genebuilders) {
@@ -415,18 +402,8 @@ sub run {
     }
     
 	    
-    push(@{$self->{_output}},@vcgenes);
+    push(@{$self->{'_output'}},@vcgenes);
 }
-
-sub output {
-    my ($self) = @_;
-
-    if (!defined($self->{_output})) {
-	$self->{_output} = [];
-    }
-    return @{$self->{_output}};
-}
-
 
 1;
 

@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -61,54 +59,43 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
     my ($class,@args) = @_;
-    my $self = bless {}, $class;
-           
-    my( $dbobj,$input_id ) = $self->_rearrange(['DBOBJ',
-						'INPUT_ID'], @args);
-       
-    $self->throw("No database handle input") unless defined($dbobj);
-    $self->dbobj($dbobj);
+    my $self = $class->SUPER::new(@args);
 
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-    
-    return $self; # success - we hope!
+    # dbobj input_id mandatory and read in by BlastableDB
+
+    return $self; 
 }
 
-sub input_id {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{_input_id} = $arg;
-  }
-  
-  return $self->{_input_id};
-}
+=head2 RunnableDB methods
+
+=head2 analysis
+
+    Title   :   analysis
+    Usage   :   $self->analysis($analysis);
+    Function:   Gets or sets the stored Analusis object
+    Returns :   Bio::EnsEMBL::Pipeline::Analysis object
+    Args    :   Bio::EnsEMBL::Pipeline::Analysis object
 
 =head2 dbobj
 
     Title   :   dbobj
-    Usage   :   $self->dbobj($db)
-    Function:   Get/set method for database handle
-    Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
-    Args    :   
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
 
-=cut
+=head2 input_id
 
-sub dbobj {
-  my( $self, $value ) = @_;    
-  if ($value) {
- 
-# sort this for DBAdaptor   
-#    $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-    $self->{'_dbobj'} = $value;
-  }
-  return $self->{'_dbobj'};
-}
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
 
 =head2 write_output
 
@@ -546,28 +533,6 @@ sub convert_e2g_output {
 #    } 
 #    return @{$self->{_output}};
 #}
-
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-
-=cut
-
-sub vc{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'vc'} = $value;
-    }
-    return $obj->{'vc'};
-
-}
 
 1;
 

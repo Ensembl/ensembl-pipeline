@@ -1,6 +1,3 @@
-
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -75,28 +72,12 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
     $self->{'_fplist'}      = [];
     $self->{'_runnable'}    = [];
-    $self->{'_input_id'}    = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
+    $self->throw("Analysis object required") unless ($self->analysis);    
     return $self;
 }
 
@@ -120,10 +101,10 @@ sub fetch_input {
     
     my $cloneid     = $self->input_id;
     my $clone       = $self->dbobj->get_Clone($cloneid);
+    
     foreach my $contig  ($clone->get_all_Contigs())
     {       
-        my $genseq
-            = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+        my $genseq = $contig->primary_seq() or $self->throw("Unable to fetch contig");
         $self->runnable($genseq);
     }
 }
@@ -135,7 +116,7 @@ sub runnable {
     if ($genseq)
     {
 	my $repeatmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (
-   						 -clone    => $genseq,
+									      -clone    => $genseq,
 									      );
 	
 	push (@{$self->{'_runnable'}}, $repeatmask);
@@ -253,3 +234,5 @@ sub write_output {
         return 1;
     } 
 }
+
+1;

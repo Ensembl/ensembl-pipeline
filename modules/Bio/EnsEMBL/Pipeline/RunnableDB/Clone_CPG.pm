@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl -w
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -83,28 +81,12 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
+    my $self = $class->SUPER::new(@args);
     
 #    $self->{'_flist'}      = []; # list of features
     $self->{'_runnable'}    = []; # list of runnables, one per contig associated with input clone
-    $self->{'_input_id'}    = undef;
     
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
-    
-    $self->throw('Need database handle') unless ($dbobj);
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
-                unless $dbobj->isa ('Bio::EnsEMBL::DB::ObjI');
-    $self->dbobj($dbobj);
-    
-    $self->throw("No input id provided") unless ($input_id);
-    $self->input_id($input_id);
-    
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->analysis($analysis);
-    
+    $self->throw("Analysis object required") unless ($self->analysis);
     return $self;
 }
 
@@ -137,6 +119,7 @@ sub fetch_input {
 
 sub runnable {
     my ($self, $runnable, $genseq) = @_;
+    print "runnable is ", $self->{'_runnable'}, "\n";
     if ($runnable && $genseq)
     {
         #extract parameters into a hash
@@ -218,7 +201,7 @@ sub output {
 
 sub write_output {
     my($self) = @_;
-    
+
     $self->throw("fetch_input must be called before write_output\n") 
         unless ($self->runnable());
 
@@ -229,16 +212,18 @@ sub write_output {
         my @islands = $runnable->output();
         eval 
         {
-	        $contig = $db->get_Contig($runnable->clone->display_id());
+	    $contig = $db->get_Contig($runnable->clone->display_id());
         };
         if ($@) 
         {
-	        print STDERR "Contig not found, skipping writing output to db\n";
+	    print STDERR "Contig not found, skipping writing output to db\n";
         }
         elsif (@islands) 
-	  {
+	{
 	    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
 	    $feat_Obj->write($contig, @islands);
-	  }
-      } 
-  }
+	}
+    } 
+}
+
+1;

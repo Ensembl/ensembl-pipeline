@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -18,11 +16,12 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise->new(
-									       -dbobj     => $db,
-									       -input_id  => $id,
-									       -seqfetcher=> $seqfetcher
-									      );
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise->new
+    (
+     '-dbobj'     => $db,
+     '-input_id'  => $id,
+     '-seqfetcher'=> $seqfetcher
+     );
     $obj->fetch_input
     $obj->run
 
@@ -60,43 +59,53 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
+use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::Translation;
+use Bio::EnsEMBL::Transcript;
+
 use Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+			   -SEQFETCHER  => $sf);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Riken_BlastMiniGenewise 
+                object
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
+=cut
 
 sub new {
     my ($class,@args) = @_;
-    my $self = bless {}, $class;          
-    my( $dbobj, $input_id, $seqfetcher ) = $self->_rearrange(['DBOBJ',
-							      'INPUT_ID',
-							      'SEQFETCHER'], @args);
-       
-    $self->throw("No database handle input")                 unless defined($dbobj);
-    $self->dbobj($dbobj);
-
-    $self->throw("No input id input") unless defined($input_id);
-    $self->input_id($input_id);
-
-    if(!defined $seqfetcher) {
-      $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex(
-								    '-index'  =>'/data/blastdb/riken_prot.inx', 
-								    '-format' =>'Fasta',
-								   );
-    }
-    $self->seqfetcher($seqfetcher);
+    my $self = $class->SUPER::new(@args);    
     
-    return $self; # success - we hope!
-}
+    # dbobj, input_id, seqfetcher objects are all set in
+    # in superclass constructor (RunnableDB.pm)
 
-sub input_id {
-	my ($self,$arg) = @_;
+    # override default seqfetcher
+    my ($seqfetcher) = $self->_rearrange([qw(SEQFETCHER)], @args);
+    
+    if(!defined $seqfetcher) {
+	print STDERR "creating new SEQFETCHER\n";
+	$seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex
+	    (
+	     '-index'  =>'/data/blastdb/riken_prot.inx', 
+	     '-format' =>'Fasta',
+	     );
+	$self->seqfetcher($seqfetcher);
+    } 
+    # it was already set in superclass constructor
 
-   if (defined($arg)) {
-      $self->{_input_id} = $arg;
-   }
-
-   return $self->{_input_id};
+    return $self;
 }
 
 =head2 dbobj
@@ -107,17 +116,21 @@ sub input_id {
     Returns :   Bio::EnsEMBL::Pipeline::DB::ObjI
     Args    :   
 
-=cut
+=head2 input_id
 
-sub dbobj {
-    my( $self, $value ) = @_;    
-    if ($value) {
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
 
-        $value->isa("Bio::EnsEMBL::DB::ObjI") || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
 
 =head2 fetch_output
 
@@ -319,51 +332,25 @@ sub fetch_input {
 
     print STDERR "Feature ids are @ids\n";
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
-									   '-ids'        => \@ids,
-									   '-seqfetcher' => $self->seqfetcher,
-									   '-trim'       => 1);
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
+	('-genomic'    => $genseq,
+	 '-ids'        => \@ids,
+	 '-seqfetcher' => $self->seqfetcher,
+	 '-trim'       => 1);    
     
-    
-    $self->add_Runnable($runnable);
+    $self->runnable($runnable);
     $self->{$runnable} = $contig;
 
-}
-     
-sub add_Runnable {
-    my ($self,$arg) = @_;
-
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
-
-    if (defined($arg)) {
-	if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
-	    push(@{$self->{_runnables}},$arg);
-	} else {
-	    $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI");
-	}
-    }
-}
-sub get_Runnables {
-    my ($self) = @_;
-
-    if (!defined($self->{_runnables})) {
-	$self->{_runnables} = [];
-    }
-    
-    return @{$self->{_runnables}};
-}
+}     
 
 sub run {
     my ($self) = @_;
 
-    foreach my $runnable ($self->get_Runnables) {
+    foreach my $runnable ($self->runnable) {
 	$runnable->run;
     }
     
     $self->convert_output;
-
 }
 
 sub convert_output {
@@ -376,17 +363,17 @@ sub convert_output {
   
   my $trancount = 1;
   
-  foreach my $runnable ($self->get_Runnables) {
+  foreach my $runnable ($self->runnable) {
     my @genes = $self->make_genes($count,$time,$runnable);
 
     my @remapped = $self->remap_genes($runnable,@genes);
 
     # store the genes
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
+    if (!defined($self->{'_output'})) {
+      $self->{'_output'} = [];
     }
     
-    push(@{$self->{_output}},@remapped);
+    push(@{$self->{'_output'}},@remapped);
     
   }
 }
@@ -394,8 +381,8 @@ sub convert_output {
 sub check_splice {
     my ($self,$f1,$f2) = @_;
     
-    my $splice1 = substr($self->{_genseq}->seq,$f1->end,2);
-    my $splice2 = substr($self->{_genseq}->seq,$f2->start-3,2);
+    my $splice1 = substr($self->{'_genseq'}->seq,$f1->end,2);
+    my $splice2 = substr($self->{'_genseq'}->seq,$f2->start-3,2);
     
     if (abs($f2->start - $f1->end) > 50) {
 	print ("Splices are " . $f1->hseqname . " [" . 
@@ -403,16 +390,6 @@ sub check_splice {
 	                        $splice2      . "] " . 
 	       ($f2->start - $f1->end)        . "\n");
     }
-}
-
-
-sub output {
-    my ($self) = @_;
-   
-    if (!defined($self->{_output})) {
-      $self->{_output} = [];
-    } 
-    return @{$self->{_output}};
 }
 
 sub make_genes {
@@ -629,5 +606,3 @@ sub generate_outfeat {
 }
 
 1;
-
-

@@ -1,4 +1,3 @@
-#!/usr/local/bin/perl -w
 #
 #
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
@@ -56,6 +55,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA;
 use Bio::PrimarySeq;
+use Bio::Root::RootI;
 
 use vars qw(@ISA);
 
@@ -78,41 +78,16 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {}, $class;
-
-    $self->{'_input_id'}    = undef;
+    my $self = $class->SUPER::new(@args);
     $self->{'_runnable'}    = [];
-    
 
     $self->{'_genseq'}      = undef;
     $self->{'_transcripts'} = [];
     $self->{'_parameters'}  = undef;
 
     $self->{'_featurepairs'}= [];
-    
-    my ( $dbobj, $input_id, $analysis) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
 
-    # Check the input parameters are valid
-
-    $self->throw('Need database handle')     unless (defined($dbobj));
-    $self->throw("No input id provided")     unless (defined($input_id));
-    $self->throw("Analysis object required") unless (defined($analysis));
-
-    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DBSQL::Obj")  
-                unless ($dbobj->isa ('Bio::EnsEMBL::DBSQL::Obj'));
-
-    # $self->throw("[$dbobj] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj")  
-    #             unless ($dbobj->isa ('Bio::EnsEMBL::Pipeline::DBSQL::Obj'));
-
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-
-    # Finally set parameters in the object
-    $self->dbobj   ($dbobj);
-    $self->input_id($input_id);
-    $self->analysis($analysis);    
-
+    $self->throw("Analysis object required") unless (defined($self->analysis));
     
     return $self;
 }
@@ -263,31 +238,4 @@ sub write_output {
     return 1;
 }
 
-
-sub input_id  {
-  my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_input_id} = $arg;
-  }
-  return $self->{_input_id};
-}
-
-sub analysis {
-  my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-    $self->{_analysis} = $arg;
-  }
-  return $self->{_analysis};
-}
-
-sub genseq {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{_genseq} = $arg;
-  }
-  return $self->{_genseq};
-}
 1;
