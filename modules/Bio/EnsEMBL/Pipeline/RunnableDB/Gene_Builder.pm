@@ -190,6 +190,17 @@ sub write_output {
 	    $gene->id($GENE_ID_SUBSCRIPT . $gcount);
 
 	    print (STDERR "Writing gene " . $gene->id . "\n");
+
+            # Convert all exon ids and save in a hash
+            my %namehash;
+
+            foreach my $ex ($gene->each_unique_Exon) {
+                  print STDERR "Exon id " . $ex . " " . $ex->id . " " . $EXON_ID_SUBSCRIPT . "\n";
+                  $namehash{$ex->id} = $EXON_ID_SUBSCRIPT.$ecount;
+                  $ex->id($EXON_ID_SUBSCRIPT.$ecount);
+	   	  $ecount++;
+            }
+
 	    print (STDERR "Transcripts are\n");
 	    foreach my $tran ($gene->each_Transcript) {
 		$tran->id             ($TRANSCRIPT_ID_SUBSCRIPT . $tcount);
@@ -202,24 +213,18 @@ sub write_output {
 
 		print (STDERR "Transcript  " . $tran->id . "\n");
 		print (STDERR "Translation " . $tran->translation->id . "\n");
+
 		foreach my $ex ($tran->each_Exon) {
                     my @sf = $ex->each_Supporting_Feature;
                     print STDERR "Supporting features are " . scalar(@sf) . "\n";
 
-		    if ($ex->id !~ /$EXON_ID_SUBSCRIPT/) {
-			my $tmpid = $ex->id;
-			$ex->id($EXON_ID_SUBSCRIPT.$ecount);
-
-			if ($translation->start_exon_id eq $tmpid) {
-			    $translation->start_exon_id($EXON_ID_SUBSCRIPT.$ecount);
-			}
-
-			if ($translation->end_exon_id eq $tmpid) {
-			    $translation->end_exon_id($EXON_ID_SUBSCRIPT.$ecount);
-			}
-			$ecount++;
-			print(STDERR "Exon         " . $ex->id . "\n");
-		    }
+                    if ($namehash{$translation->start_exon_id} ne "") {
+		      $translation->start_exon_id($namehash{$translation->start_exon_id});
+                    }
+                    if ($namehash{$translation->end_exon_id} ne "") {
+		      $translation->end_exon_id  ($namehash{$translation->end_exon_id});
+                    }
+		    print(STDERR "Exon         " . $ex->id . "\n");
 		}
 		
 	    }
@@ -314,7 +319,7 @@ sub extend {
 	$self->{_extend} = $arg;
     }
 
-    return $self->{_extend} || 200000;
+    return $self->{_extend} || 400000;
 }
 
 sub addgenebuilder {

@@ -1053,10 +1053,43 @@ sub make_Genes {
 	    push(@genes,$gene);
 	}
     }
-
+    foreach my $gene (@genes) {
+        $self->prune_Exons($gene);
+    }
     return @genes;
 }
 
+sub prune_Exons {
+    my ($self,$gene) = @_;
+
+    my @unique_Exons; 
+
+    foreach my $tran ($gene->each_Transcript) {
+       my @newexons;
+
+       foreach my $exon ($tran->each_Exon) {
+           my $found;
+           foreach my $uni (@unique_Exons) {
+              if ($uni->start  == $exon->start &&
+                  $uni->end    == $exon->end   &&
+                  $uni->strand == $exon->strand ) {
+                  $found = $uni;
+                  last $uni;
+              }
+           }
+           if (defined($found)) {
+              push(@newexons,$found);
+           } else {
+              push(@newexons,$exon);
+           }
+                 
+         }          
+      $tran->flush_Exon;
+      foreach my $exon (@newexons) {
+         $tran->add_Exon($exon);
+      }
+   }
+}
 sub make_id_hash {
     my ($self,@features) = @_;
 

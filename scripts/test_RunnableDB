@@ -32,10 +32,11 @@ test_RunnableDB
 use strict;
 use Getopt::Long;
 
-use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder;
 
 use vars qw(@ISA);
 
@@ -49,6 +50,7 @@ my $dbuser = 'root';
 my $pass   = undef;
 my $runnable;
 my $input_id;
+my $write  = 0;
 
 &GetOptions( 
 	     'host:s'    => \$host,
@@ -58,13 +60,15 @@ my $input_id;
 	     'pass:s'    => \$pass,
 	     'input_id:s'  => \$input_id,
 	     'runnable:s' => \$runnable,
+             'write'      => \$write,
 	     );
 
 $| = 1;
 
-my $module  = "Bio::EnsEMBL::DBSQL::Obj";
+my $module  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+my $perl    = 1;
 
-my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass);
+my $locator = make_locator_string($dbtype,$module,$host,$port,$dbname,$dbuser,$pass,$perl);
 
 my $db      = new Bio::EnsEMBL::DBLoader($locator);
 
@@ -78,6 +82,10 @@ $runobj->fetch_input;
 $runobj->run;
 
 my @out = $runobj->output;
+
+if ($write) {
+   $runobj->write_output(@out);
+}
 
 foreach my $out (@out) {
     if ($out->isa ("Bio::EnsEMBL::FeaturePair")) {
