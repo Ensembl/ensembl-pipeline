@@ -159,12 +159,6 @@ sub blastdb {
 
       # check for presence of relevant files .csq, .nhd, .ntb
       $self->throw("Can't find blastfile [$blastdb]\n") unless -e $blastdb;
-      my $csq = $blastdb . ".csq";
-      $self->throw("Can't find .csq file [$csq]\n") unless -e $csq;
-      my $nhd = $blastdb . ".nhd";
-      $self->throw("Can't find .nhd file [$nhd]\n") unless -e $nhd;
-      my $ntb = $blastdb . ".ntb";
-      $self->throw("Can't find .ntb file [$ntb]\n") unless -e $ntb;
 
       $self->{'_blastdb'} = $blastdb;
     }
