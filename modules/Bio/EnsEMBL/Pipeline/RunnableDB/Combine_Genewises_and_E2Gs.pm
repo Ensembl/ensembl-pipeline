@@ -471,7 +471,7 @@ sub make_gene{
   
   print STDERR "Produced genes:\n";
   foreach my $gene (@genes){
-    Bio::EnsEMBL::Pipeline::Tools:GeneUtils->_print_Gene($gene);
+    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($gene);
   }
   
   $self->combined_genes(@genes);
