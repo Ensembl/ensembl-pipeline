@@ -174,7 +174,7 @@ sub run {
             }
         }
     }
-
+    print $arguments."\n";
     $parameters{'-query'} = $self->genseq;
     $parameters{'-database'} = $self->analysis->db;
     $parameters{'-program'} = $self->analysis->program;

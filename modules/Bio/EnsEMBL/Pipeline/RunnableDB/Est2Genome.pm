@@ -79,7 +79,7 @@ sub new {
 
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     my $seqfetcher = $self->make_seqfetcher();
-    print $seqfetcher."\n"; 
+    #print $seqfetcher."\n"; 
     $self->seqfetcher($seqfetcher);
 	
     return $self;
@@ -136,7 +136,7 @@ sub new {
 
 sub fetch_input {
   my( $self) = @_;
-  print "running fetch input\n";  
+  #print "running fetch input\n";  
   my @fps;
   my %ests;
   my @estseqs;
@@ -144,11 +144,11 @@ sub fetch_input {
   
   my $contigid  = $self->input_id;
   my $contig    = $self->dbobj->get_Contig($contigid);
-  print "got contig\n";
+  #print "got contig\n";
   my $genseq   = $contig->primary_seq;
-  print "got dnaseq\n";
+  #print "got dnaseq\n";
   my @features = $contig->get_all_SimilarityFeatures;
-  print "got data\n";
+  #print "got data\n";
   
   foreach my $f (@features) {
     if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
@@ -156,7 +156,7 @@ sub fetch_input {
       push(@fps, $f);
     }
   }
-  print "got feature pairs\n";
+  #print "got feature pairs\n";
   
   foreach my $fp(@fps){
     if($fp->analysis->logic_name eq 'Full_dbEST'){
@@ -167,7 +167,7 @@ sub fetch_input {
       }
   }
   
-  print "got all unique dbest feature pairs";  
+  #print "got all unique dbest feature pairs";  
     
   foreach my $id(keys %ests){
     
@@ -175,13 +175,13 @@ sub fetch_input {
     push(@estseqs, $est);
       
   }
-  print "got all ests\n";
+  #print "got all ests\n";
   my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'     => $genseq, 
 									    '-queryseq' => \@estseqs,
 									    '-seqfetcher'  => $self->seqfetcher);
-  print "created BlastMiniEst2Genome Runnable\n";  
+  #print "created BlastMiniEst2Genome Runnable\n";  
   $self->runnable($runnable);
-  print "finshed fetching input\n";
+  #print "finshed fetching input\n";
 }    
       
   
@@ -234,12 +234,13 @@ sub write_output {
  
     
     
-  
+  print "writting output there should be ".scalar(@genes)." written to the database\n"; 
  GENE: foreach my $gene (@genes) {	
     # do a per gene eval...
     eval {
-      print "gene = ".$gene."\n";
-      $gene_adaptor->store($gene);
+      #print "gene = ".$gene."\n";
+      my $dbid = $gene_adaptor->store($gene);
+      print "gene has been store as ".$dbid."\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -260,6 +261,7 @@ sub _convert_output {
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
   my $analysis;
+  #print "converting output\n";
   if(scalar(@analyses) > 1){
     $self->throw("panic! > 1 analysis for $genetype\n");
   }
@@ -280,6 +282,7 @@ sub _convert_output {
       );
   } 
   # make an array of genes for each runnable
+  #print $analysis."\n";
   foreach my $runnable ($self->runnable) {
     my @g = $self->_make_genes($count, $time, $runnable, $analysis);
     push(@genes, @g);
@@ -301,14 +304,14 @@ sub _make_genes {
   my $genetype = 'eg';
   my $internal_id = $contig->internal_id;
   my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
-  print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
+  #print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
   my @genes;
-  
+  #print "making genes\n";
   foreach my $tmpf(@tmpf) {
     my $gene   = new Bio::EnsEMBL::Gene;
     my $tran   = new Bio::EnsEMBL::Transcript;
     my $transl = new Bio::EnsEMBL::Translation;
-    
+    #print "gene analysis = ".$analysis."\n";
     $gene->type($genetype);
     $gene->analysis($analysis);
     
@@ -343,19 +346,24 @@ sub _make_genes {
       $exon_pred->primary_tag('E2G');
 
       $exon_pred->score(100); # ooooooohhhhhh
-      
-      print "num subfeatures: " . scalar($exon_pred->sub_SeqFeature) . "\n";
+      $exon->analysis($gene->analysis);
+      #print "num subfeatures: " . scalar($exon_pred->sub_SeqFeature) . "\n";
 
       # sort out supporting evidence for this exon prediction
       foreach my $subf($exon_pred->sub_SeqFeature){
+	$subf->feature1->contig_id($internal_id);
+	$subf->feature2->contig_id($internal_id);
+	$subf->contig_id($internal_id);
 	$subf->feature1->source_tag($genetype);
 	$subf->feature1->primary_tag('similarity');
 	$subf->feature1->analysis($exon_pred->analysis);
 	
 	$subf->feature2->source_tag($genetype);
 	$subf->feature2->primary_tag('similarity');
-	$subf->feature2->analysis($exon_pred->analysis);
-	
+	#print " supporting feature analysis ".$exon->analysis."\n";
+	$subf->feature2->analysis($exon->analysis);
+	$subf->analysis($exon->analysis);
+	#print $subf->analysis."\n";
 	$exon->add_Supporting_Feature($subf);
       }
       
@@ -367,7 +375,7 @@ sub _make_genes {
     if ($#exons < 0) {
       print STDERR "Odd.  No exons found\n";
     } else {
-      print "gene = ".$gene."\n";
+      #print "gene = ".$gene."\n";
       push(@genes,$gene);
       
       if ($exons[0]->strand == -1) {
@@ -404,7 +412,7 @@ sub _make_genes {
 
     }
   }
-  print "_make genes made genes @genes\n";
+  #print "_make genes made genes @genes\n";
   return @genes
 
 
@@ -413,7 +421,7 @@ sub _make_genes {
 sub make_seqfetcher {
   my ( $self ) = @_;
   my $index   = $ENV{BLASTDB}."/".$self->analysis->db;
-  print "index = ".$index."\n";
+  #print "index = ".$index."\n";
   my $seqfetcher;
 
   if(defined $index && $index ne ''){

@@ -93,7 +93,7 @@ sub new {
 
 sub fetch_input {
   my( $self) = @_;
-  print "running fetch input\n";  
+  #print "running fetch input\n";  
   my @fps;
   my %ests;
   my @estseqs;
@@ -133,7 +133,7 @@ sub fetch_input {
     Function : Gets/sets the runnable 
     Exception: throws if argument passed isn't a runnable
     Caller   : 
-    Example  :
+    Example  :'
 
 =cut    
     
@@ -175,6 +175,7 @@ sub run {
     
 }
  
+
 =head2  output
 
     Arg      : none
@@ -185,13 +186,16 @@ sub run {
 
 =cut
 
+
 #sub output {
 #    my ($self) = @_;
 #    my @out = $self->runnable->output();
 #    return @out;
 #}
  
+
 =head2  write_output
+
 
     Arg      : none
     Function : writes the converted output to the database as genes
@@ -215,7 +219,7 @@ sub write_output {
   GENE: foreach my $gene (@genes) {	
     # do a per gene eval...
     eval {
-      print "gene = ".$gene->type()."\n";
+      #print "gene = ".$gene->type()."\n";
       $gene_adaptor->store($gene);
     }; 
     if( $@ ) {
@@ -223,9 +227,9 @@ sub write_output {
     }
     
   }
-  
-  return 1;
+   return 1;
 }
+
 
 =head2  _convert_output
 
@@ -240,7 +244,7 @@ sub write_output {
 
 sub _convert_output {
   my ($self) = @_;
-  print "converting genes to features\n";
+  #print "converting genes to features\n";
   my @genes;
   my $genetype = 'Halfwise';
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
@@ -251,8 +255,7 @@ sub _convert_output {
   }
   elsif(scalar(@analyses) == 1){
     $analysis = $analyses[0];
-  }
-  else{
+  }else{
     # make a new analysis object
     $analysis = new Bio::EnsEMBL::Analysis
       (
@@ -263,8 +266,8 @@ sub _convert_output {
        -logic_name      => 'Halfwise',
        -module          => 'HalfwiseHMM',
       );
-  } 
-  # make an array of genes for each runnable
+  }
+   # make an array of genes for each runnable
     my $runnable = $self->runnable();
     my @out = $runnable->output;
     #print "HalfwiseDB\n";
@@ -272,7 +275,7 @@ sub _convert_output {
     my @g = $self->_make_genes($genetype, $analysis, \@out);
     push(@genes, @g);
   
-  #print STDOUT "genes = @genes\n";
+ #print STDOUT "genes = @genes\n";
 
     
   if (!defined($self->{_output})) {
@@ -311,7 +314,7 @@ sub _make_genes {
   my $contig = $self->dbobj->get_Contig($self->input_id);
   my @tmpf   = @$results;
   my @genes;
-  print "genetype = ".$genetype."\n";
+#  print "genetype = ".$genetype."\n";
   foreach my $tmpf (@tmpf) {
     my $gene       = new Bio::EnsEMBL::Gene;
     my $transcript = $self->_make_transcript($tmpf, $contig, $genetype, $analysis_obj);
@@ -320,7 +323,7 @@ sub _make_genes {
     $gene->analysis($analysis_obj);
     $gene->add_Transcript($transcript);
 
-    push (@genes, $gene);
+    push (@genes, $gene)
   }
 
   return @genes;
@@ -392,7 +395,7 @@ sub _make_transcript{
   }
   
   if ($#exons < 0) {
-    print STDERR "Odd.  No exons found\n";
+   # printSTDERR "Odd.  No exons found\n";
   } 
   else {
     
