@@ -59,7 +59,7 @@ my $prefix='COB';
 		     # EST GENES PROPERTIES
 		     ############################################################
 		     
-		     # db from where we get the est-genes
+		     # db from where we get the cdna-genes
 		     ESTGENE_DBHOST              => '',
 		     ESTGENE_DBUSER              => '', 
 		     ESTGENE_DBNAME              => '',

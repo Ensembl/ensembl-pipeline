@@ -61,7 +61,7 @@ use vars qw( %GeneBuilder );
 		GB_GENSCAN_MAX_INTRON       => 15000,
 
                 # If you want to confirm prediction transcripts with pfam. This option is currently only used for anopheles. Use with caution as the result will be drastically different than what you get with the default option.
-	        GB_CONFIRM_PFAM             => '0',
+	  GB_CONFIRM_PFAM             => '0',
 
 		# lower bound in the 'base align features' retireved in the genebuilder
 		GB_MIN_FEATURE_SCORE        => 50,
