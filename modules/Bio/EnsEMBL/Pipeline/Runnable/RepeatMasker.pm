@@ -286,6 +286,14 @@ sub parse_results {
             my @columns = split;
 	    my $have_cls;   # flag for the presence of the family/class column
 
+	    # There are normally 15 columns in the output file, plus one for an
+	    # optional '*' at the end of the line, minus 1 if the class/family
+	    # is not known
+	    # first remove the '*' if present, then the number of columns should
+	    # indicate whether the class/family is present as well.
+
+	    pop @columns if $columns[-1] eq '*';
+
 	    if (@columns == 15) {
 		$have_cls = 1;
 	    }
@@ -316,6 +324,10 @@ sub parse_results {
 	    else {
 		$repeat_class = 'UNK';
 	    }
+
+	    # first 9 columns fixed; col 10 is the optional class/family
+	    # for remaining columns (hit coords), need to add one if the
+	    # class/family column is present
 
 	    if ($strand eq '+') {
 	        ($hit_start, $hit_end) = @columns[10 + $have_cls, 11 + $have_cls];
