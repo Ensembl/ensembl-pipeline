@@ -107,6 +107,8 @@ sub table_groups{
                         'prediction_transcript'];
   $tables{'firstef'} = ['core', 'pipeline', 'repeat_feature',
                          'repeat_consensus'];
+  $tables{'bestpmatch'} = ['core', 'pipeline', 'protein',
+                           'pmatch_feature'];
   if($tables{$logic_name}){
     return $tables{$logic_name};
   }else{
