@@ -108,8 +108,7 @@ sub fetch_input {
 	        -peptide        => $t,
 	        -database       => $db,
                 -program        => $self->analysis->program_file,
-                # -options      => $arguments if $arguments,
-                -args           => $self->arguments,
+                -options        => $self->arguments || undef,
 		-threshold      => $thr,
 		-threshold_type => $thr_type
             ));
