@@ -70,10 +70,12 @@ unless (defined($pred_transcript) && scalar (@{$pred_transcript->get_all_Exons})
 else
 { print "ok 3\n"; }
 
-my $database = `pwd`;
-chomp($database);
+my $db_home = `pwd`;
+chomp($db_home);
+$db_home .= '/t/data';
 
-$database .= '/t/data/mini_mrna.fa';
+$ENV{'BLASTDB'} = "$db_home";
+$database = 'mini_mrna.fa';
 # Make a BlastGenscanDNA object.
 my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new ( 
                                                     -genomic    => $genomic_seq,
