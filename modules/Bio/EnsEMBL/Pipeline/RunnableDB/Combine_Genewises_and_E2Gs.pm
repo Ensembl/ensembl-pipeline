@@ -201,14 +201,14 @@ sub run {
   my @newe2g;
 
   foreach my $e2g (@e2g) {
-    my $found = 0;
     foreach my $tran ($e2g->each_Transcript) {
+      my $found = 0;
       my @exons = $tran->get_all_Exons;
       @exons = sort {$a->start <=> $b->start} @exons;
       my $i;
 
       for ($i = 1; $i <= $#exons; $i++) {
-	my $intron = $exons[$i]->start - $exons[$i-1]->end + 1;
+	my $intron = $exons[$i]->start - $exons[$i-1]->end - 1;
 
 
 	# this is a very low threshold ... we were losing a lot of good matches this way
@@ -218,10 +218,13 @@ sub run {
 	  
 	}
       }
-    }
-    if ($found == 0) {
-      print STDERR "keeping " . $e2g->dbID . "\n";
-      push(@newe2g,$e2g);
+      if ($found == 0) {
+	print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+	push(@newe2g,$e2g);
+      }
+      else{
+	print STDERR "rejecting trans_dbID: ".$tran->dbID." for long intron\n";
+      }
     }
   }
 
@@ -262,8 +265,14 @@ sub run {
 	$longest = $length;
       }
     }
-    print STDERR "combining : " . $gw->dbID . " with " . $chosen_e2g->dbID . "\n";
-    
+    # there is one transcript per gene
+    my @e2g_tran = $chosen_e2g->each_Transcript; 
+    if ( @gw_tran == 1 &&  @e2g_tran == 1){
+      print STDERR "combining : " . $gw_tran[0]->dbID . " with " . $e2g_tran[0]->dbID . "\n";
+    }
+    else{
+      $self->warn("genes with more thatn one transcript -> gw: ".scalar(@gw_tran)." e2g: ".scalar(@e2g_tran));
+    }
     # build combined genes
     $self->combine_genes($gw, $chosen_e2g);
   }
@@ -312,7 +321,7 @@ sub output{
 
 =cut
 
-
+  
 sub write_output {
   my($self) = @_;
   
@@ -480,11 +489,12 @@ sub combine_genes{
   foreach my $gene (@genes){
     foreach my $tran ( $gene->each_Transcript ){
       foreach my $exon ( $tran->get_all_Exons ){
-	print STDERR "exon: ".$exon->start."-".$exon->end."\n";
-	foreach my $sf ($exon->each_Supporting_Feature){
-	  print STDERR "evidence: ".$sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
-	}
+	print STDERR "exon: ".$exon->start."-".$exon->end." ";
+	#foreach my $sf ($exon->each_Supporting_Feature){
+	#  print STDERR "evidence: ".$sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
+	#}
       }
+      print STDERR "\n";
     }
   }
 
@@ -509,12 +519,12 @@ sub match_gw_to_e2g{
 
   my @matching_e2g;
   my @gw_tran = $gw->each_Transcript;
-  print STDERR "\nSearching mRNA for gw: ".$gw->dbID."\n";
   foreach my $tran ( @gw_tran ){
-    foreach my $exon ($tran->get_all_Exons){
-      print STDERR $exon->start."-".$exon->end."  ";
-    }
-    print STDERR "\n";
+    print STDERR "\nSearching mRNA for gw trans_dbID: ".$tran->dbID."\n";
+    #foreach my $exon ($tran->get_all_Exons){
+    #  print STDERR $exon->start."-".$exon->end."  ";
+    #}
+    #print STDERR "\n";
   }
   
   my @gw_exons = $gw_tran[0]->get_all_Exons;
@@ -631,12 +641,12 @@ sub match_gw_to_e2g{
 	  push(@matching_e2g, $e2g);
 	  
 	  # test
-	  print STDERR "Found mRNA match:".$e2g->dbID."\n";
 	  foreach my $egtran ( $e2g->each_Transcript ){
-	    foreach my $exon ($egtran->get_all_Exons){
-	      print STDERR $exon->start."-".$exon->end."  ";
-	    }
-	    print STDERR "\n";
+	    print STDERR "Found mRNA match trans_dbID:".$egtran->dbID."\n";
+	    #foreach my $exon ($egtran->get_all_Exons){
+	    #  print STDERR $exon->start."-".$exon->end."  ";
+	    #}
+	    #print STDERR "\n";
 	  }
 	}
     }
@@ -732,6 +742,7 @@ sub _merge_gw_genes {
 
     # transcript
     my $merged_transcript   = new Bio::EnsEMBL::Transcript;
+    $merged_transcript->dbID($trans[0]->dbID);
     foreach my $pe(@pred_exons){
       $merged_transcript->add_Exon($pe);
     }
