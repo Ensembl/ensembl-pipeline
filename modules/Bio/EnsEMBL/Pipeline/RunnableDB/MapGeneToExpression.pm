@@ -372,6 +372,7 @@ sub run{
 	      push ( @est_transcripts, $self->in_SANBI( @est_trans ));
 	  }
 	  
+	  my @ensembl_transcripts;
 	  foreach my $gene ( @genes ){
 	      push ( @ensembl_transcripts,  @{$gene->get_all_Transcripts} );
 	  }
@@ -811,8 +812,8 @@ sub write_output {
 		    push (@est_ids, $est_id_no_version);
 		}
 	    }
-	    print STDERR "Storing pairs $transcript_id, @est_ids\n";
-	    $expression_adaptor->store_ensembl_link($transcript_id,\@est_ids);
+	    print STDERR "Storing pairs $t_id, @est_ids\n";
+	    $expression_adaptor->store_ensembl_link($t_id,\@est_ids);
 	}
     }
 }
