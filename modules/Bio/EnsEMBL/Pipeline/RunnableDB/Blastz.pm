@@ -1,4 +1,4 @@
-# Cared for by Ensembl
+og # Cared for by Ensembl
 #
 # Copyright GRL & EBI
 #
@@ -89,11 +89,8 @@ sub fetch_input {
   if ( -d $database) {
     @db = glob("$database/*");
     
-    # if the files have standard names, try to sort them for consistency
-
-    @db = sort { my ($o) = ($a =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 my ($t) = ($b =~ /\/([^\.\/]+)[^\/]*\.fa$/); 
-                 $o cmp $t } @db;
+    # do largest files first, so that memory problems, if they occur, occur early
+    @db = sort { -s $b <=> -s $a } @db;
     
   } else {
     push(@db,$database);
