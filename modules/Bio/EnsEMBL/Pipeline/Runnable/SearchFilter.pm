@@ -108,9 +108,9 @@ sub new {
 =cut
 
 sub run{
-   my ($self) = @_;
+   my ($self,$dir) = @_;
 
-   $self->runnable->run();
+   $self->runnable->run($dir);
    
    my ($minscore,$maxevalue,$coverage);
    my (@accepted);
