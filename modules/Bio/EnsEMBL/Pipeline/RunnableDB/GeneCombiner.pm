@@ -555,13 +555,19 @@ sub cluster_Genes {
       next GENE;
     }
   }
-
-  my @forward_clusters = $self->_cluster_Genes_by_genomic_range( @forward_genes );
-  my @reverse_clusters = $self->_cluster_Genes_by_genomic_range( @reverse_genes );
   my @clusters;
-  push( @clusters, @forward_clusters);
-  push( @clusters, @reverse_clusters);
-  
+  if ( @forward_genes ){
+    my @forward_clusters = $self->_cluster_Genes_by_genomic_range( @forward_genes );
+    if ( @forward_clusters){
+      push( @clusters, @forward_clusters);
+    }
+  }
+  if ( @reverse_genes ){
+    my @reverse_clusters = $self->_cluster_Genes_by_genomic_range( @reverse_genes );
+    if ( @reverse_clusters){
+      push( @clusters, @reverse_clusters);
+    }
+  }
   return @clusters;
 }
 ############################################################
