@@ -288,7 +288,7 @@ sub parse_results {
             }
             $feat2 {name} = $feat1{name}."_inv_repeat";
             $feat1 {score} = $1; #score as an inverted repeat
-            $feat2 {score} = $4; #percentage identity to feature 1
+            $feat2 {score} = $1; #percentage identity to feature 1 is $4
         }
         elsif (/(\d+)\D+(\d+)/ && ($feat1{start}))
         { 
@@ -304,9 +304,9 @@ sub parse_results {
                 $feat2 {end} = $1;
                 $feat2 {strand} = -1;
             }
-            $feat1 {primary} = 'similarity';
+            $feat1 {primary} = 'repeat';
             $feat1 {source} = 'einverted';
-            $feat2 {primary} = 'similarity';
+            $feat2 {primary} = 'repeat';
             $feat2 {source} = 'einverted';
             $feat2 {db} = undef;
             $feat2 {db_version} = undef;

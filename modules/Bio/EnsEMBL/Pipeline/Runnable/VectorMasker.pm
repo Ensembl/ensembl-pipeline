@@ -361,7 +361,7 @@ sub parse_results {
         $feat1 {primary} = 'similarity';
         $feat1 {source} = 'VectorMasker';
         $feat2 {primary} = 'similarity';
-        $feat2 {source} = 'vector';
+        $feat2 {source} = 'VectorMasker';
         
         $feat2 {db} = 'vector_etc';
         $feat2 {db_version} = 'unknown';

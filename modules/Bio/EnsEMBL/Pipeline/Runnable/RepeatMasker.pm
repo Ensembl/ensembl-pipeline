@@ -319,9 +319,9 @@ sub parse_results {
         $feat2 {program} = 'RepeatMaskerHum';
         $feat2 {p_version}='unknown';
         $feat2 {source}= 'ReapeatMaskerHum';
-        $feat2 {primary}= 'similarity';
+        $feat2 {primary}= 'repeat';
         $feat1 {source}= 'RepearMaskerHum';
-        $feat1 {primary}= 'similarity';
+        $feat1 {primary}= 'repeat';
         
         $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
     }
