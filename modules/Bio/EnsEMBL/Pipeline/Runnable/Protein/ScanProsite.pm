@@ -76,11 +76,9 @@ sub multiprotein{
 sub run_analysis {
     my ($self) = @_;
 
-    my $run = "/usr/local/bin/perl ".$self->program . ' -pattern ' .
+    my $run = $self->program . ' -pattern ' .
       $self->database.' '.$self->parameters.' '.$self->filename . ' > ' 
         .$self->results;
-
-    print STDERR "RUNNING: $run\n";
     
     $self->throw("Failed during ScanProsite run $!\n") unless 
       (system ($run) == 0) ;
@@ -99,42 +97,40 @@ sub run_analysis {
 
 =cut
 sub parse_results {
-    my ($self) = @_;
+  my ($self) = @_;
+  
+  my $filehandle;
+  my $resfile = $self->results();
+  
+  if (-e $resfile) {
     
-    my $filehandle;
-    my $resfile = $self->results();
-    
-    if (-e $resfile) {
-        
-      if (-z $self->results) {  
-        print STDERR "pfscan didn't find any hits\n";
-        return; }       
-      else {
-        open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
-      }
-    }
-    my %printsac;
-    my $line;
-    
-    while (<CPGOUT>) {
-      $line = $_;
-      chomp $line;
-      #print STDERR "$line\n";
-      my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
-      if($id){
-        if ($confirmed eq "?") {
-          $confirmed = 0;
-        }else {
-          $confirmed = 1;
+    if (-z $self->results) {  
+      return; 
+    }       
+    else {
+      open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
         }
-        my $fp = $self->create_protein_feature($from, $to, $confirmed, $id,
-                                               0, 0, $hid, $self->analysis,
-                                               0, 0);
-        $self->add_to_output($fp);
+  }
+  my %printsac;
+  my $line;
+  
+  while (<CPGOUT>) {
+    $line = $_;
+    chomp $line;
+    #print STDERR "$line\n";
+    my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
+    if($id){
+      if ($confirmed eq "?") {
+        $confirmed = 0;
+      }else {
+        $confirmed = 1;
       }
+      my $fp = $self->create_protein_feature($from, $to, $confirmed, $id,
+                                             0, 0, $hid, $self->analysis,
+                                             0, 0);
+      $self->add_to_output($fp);
     }
-    
-     
+  }  
 }
 
 

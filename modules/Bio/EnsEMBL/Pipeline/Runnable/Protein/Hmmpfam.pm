@@ -65,53 +65,47 @@ sub multiprotein{
 }
 
 
-=head2 run_program
-
- Title    : run_program
- Usage    : $self->program
- Function : makes the system call to program
- Example  :
- Returns  : 
- Args     :
- Throws   :
-
-=cut
 
 sub run_analysis {
     my ($self) = @_;
-
-    # run program
-    print STDERR "running ".$self->program." against ".$self->database."\n";
 
     # some of these options require HMMER 2.2g (August 2001)
     
     my @dbfiles = split(/;/,$self->database);
 
-    print STDERR "FILENAME: ".$self->filename."\n";
+    # print STDERR "FILENAME: ".$self->filename."\n";
 
     if ($dbfiles[0] =~ /ls/) {
-      my $cmd = $self->program .' --acc --cut_ga  '.
-        $self->parameters .' '.$dbfiles[0].' '.$self->filename.' > '.
-          $self->lsresults;
-      print STDERR "$cmd\n";   
+      my $cmd = $self->program .' --acc --cut_ga  ';
+      if (defined($self->parameters)) {
+        $cmd .= $self->parameters . ' ';
+      }
+      $cmd .= $dbfiles[0] . ' ' . $self->filename.' > '. $self->lsresults;
+      # not-standard results file; register the output file for deletion
+      $self->file($self->lsresults);
+
       $self->throw ("Error running ".$self->program." on ".
                     $self->filename." against ".$dbfiles[0])unless 
                       ((system ($cmd)) == 0);
-    }else {
-      die || "ls pfam file has not been provided";
+    } else {
+      $self->throw( "Cannot run " . $self->program . " as 'ls' pfam file has not been provided" );
     }
 
     if ($dbfiles[1] =~ /fs/) { 
        
-      my $cmd = $self->program .' --acc --cut_ga '.
-	        $self->parameters.' '.$dbfiles[1]      .' '.$self->filename.
-            ' > '.$self->fsresults;
-      print STDERR "$cmd\n";   
+      my $cmd = $self->program .' --acc --cut_ga ';
+      if (defined($self->parameters)) {
+        $cmd .= $self->parameters . ' ';
+      }
+      $cmd .=  $dbfiles[1] . ' ' . $self->filename . ' > ' . $self->fsresults;
+      # not-standard results file; register the output file for deletion
+      $self->file($self->fsresults);
+
       $self->throw ("Error running ".$self->program." on ".
                     $self->filename." against ".$dbfiles[1]) unless 
                       ((system ($cmd)) == 0);
     }else {
-      die || "fs pfam file has not been provided";
+      $self->throw( "Cannot run " . $self->program . " as 'fs' pfam file has not been provided" );
     }
   }
 
@@ -136,30 +130,25 @@ sub parse_results {
   my $id;
   my $resfile = $self->lsresults;
   my $fsfile  = $self->fsresults;
-  
-		
-
+  	       
   if (-e $resfile) {
     # it's a filename
     if ((-z $self->lsresults) && (-z $self->fsresults)) {  
-      print STDERR $self->program." didn't find anything\n";
+      # didn't find anything;
       return;
     }       
     else {
-	    open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
+      open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
       $filehandle = \*OUT;
-      
-      
-	    open (OUT1, "<$fsfile")  or $self->throw ("Error opening $fsfile");
-	    $fshandle = \*OUT1;
+            
+      open (OUT1, "<$fsfile")  or $self->throw ("Error opening $fsfile");
+      $fshandle = \*OUT1;
     }
-  }else {
+  } else {
     # it'a a filehandle
     $filehandle = $resfile;
     $fshandle = $fsfile;
   }
-  
-  
   
   #First parse what comes from the ls mode matches. 
   #Every match in that case is taken
@@ -171,7 +160,13 @@ sub parse_results {
       $id = $1;
     }
     
-    if (my ($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+    if (my ($hid, 
+            $start, 
+            $end, 
+            $hstart, 
+            $hend, 
+            $score, 
+            $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
       
       my $pvalue = sprintf ("%.3e", $evalue);
    
@@ -197,7 +192,13 @@ sub parse_results {
     if (/^Query sequence:\s+(\S+)/) {
       $id = $1;
     }
-    if (($hid, $start, $end, $hstart, $hend, $score, $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
+    if (($hid, 
+         $start, 
+         $end, 
+         $hstart, 
+         $hend, 
+         $score, 
+         $evalue) = /^(\S+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\d+)\s+(\d+)\s+\S+\s+(\S+)\s+(\S+)/) {
       
       
       foreach my $featpair(@{$self->{'_flist'}}) {
@@ -215,7 +216,7 @@ sub parse_results {
                                                $self->analysis, $pvalue,
                                                0);
         $self->add_to_output($fp);
-	    }
+      }
     }
   }
   close (FS);

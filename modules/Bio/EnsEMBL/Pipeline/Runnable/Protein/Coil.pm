@@ -59,27 +59,17 @@ sub multiprotein{
   return 1;
 }
 
-=head2 run_program
 
- Title    : run_program
- Usage    : $self->program
- Function : makes the system call to program
- Example  :
- Returns  : 
- Args     :
- Throws   :
-
-=cut
 
 sub run_analysis {
     my ($self) = @_;
 
     my $coilsdir='/usr/local/ensembl/data/coils';
     $ENV{'COILSDIR'}=$coilsdir;
+
     my $command = $self->program." -f < ".$self->filename." > ".$self->results;
-    print STDERR "command ".$command."\n";
+
     # run program
-    print STDERR "running ".$self->program."\n";
     $self->throw ("Error running ".$self->program." on ".$self->filename) 
         unless (system($command) == 0);
 }
@@ -105,8 +95,8 @@ sub parse_results {
   if (-e $resfile) {
     # it's a filename
     if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
-	    return;
+      #print STDERR $self->program." didn't find anything\n";
+      return;
     }       
     else {
       open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
@@ -123,7 +113,7 @@ sub parse_results {
   close $filehandle;   
   
   foreach my $id (keys %result_hash) {
-		
+    
     my $pep = reverse ($result_hash{$id});
     my $count = my $switch = 0;
     my ($start, $end);
@@ -139,7 +129,7 @@ sub parse_results {
                                                0, 0);
         $self->add_to_output($fp);
         $switch = 0;
-	    }
+      }
     }
   }
 }
@@ -151,28 +141,28 @@ sub parse_results {
 # subroutines
 #############################
 sub _read_fasta {
-    local (*FILE) = @_;
-    my ($id , $seq , %name2seq);
-    while (<FILE>) {
-        chomp;
-        if (/^>(\S+)/) {
-            my $new_id = $1;
-            if ($id) {
-                $name2seq{$id} = $seq;
-            }
-            $id = $new_id ; $seq = "" ;
-        } 
-        elsif (eof) {
-            if ($id) {
-                $seq .= $_ ;
-                $name2seq{$id} = $seq;
-            }
-        }
-        else {
-            $seq .= $_ ;
-        }
+  local (*FILE) = @_;
+  my ($id , $seq , %name2seq);
+  while (<FILE>) {
+    chomp;
+    if (/^>(\S+)/) {
+      my $new_id = $1;
+      if ($id) {
+        $name2seq{$id} = $seq;
+      }
+      $id = $new_id ; $seq = "" ;
+    } 
+    elsif (eof) {
+      if ($id) {
+        $seq .= $_ ;
+        $name2seq{$id} = $seq;
+      }
     }
-    return %name2seq;
+    else {
+      $seq .= $_ ;
+    }
+  }
+  return %name2seq;
 }
 
 

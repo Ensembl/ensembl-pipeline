@@ -84,17 +84,17 @@ sub write_protein_file{
 =cut
 
 sub run_analysis {
-    my ($self) = @_;
-    
-    print STDERR "RUNNING: ".$self->program." -t euk ".$self->filename.
-      " > ".$self->results."\n";
-    
-    # run program
-    
-    $self->throw ("Error running ".$self->program." on ".$self->filename) 
+  my ($self) = @_;
+  
+  #print STDERR "RUNNING: ".$self->program." -t euk ".$self->filename.
+  #    " > ".$self->results."\n";
+  
+  # run program
+  
+  $self->throw ("Error running ".$self->program." on ".$self->filename) 
       unless ((system ($self->program." -t euk ".$self->filename. 
                        " > ".$self->results)) == 0); 
-  }
+}
 
 
 =head2 parse_results
@@ -117,8 +117,8 @@ sub parse_results {
   if (-e $resfile) {
     # it's a filename
     if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
-	    return;
+      # no hits
+      return;
     }else {
       open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
       $filehandle = \*OUT;
@@ -152,7 +152,7 @@ sub parse_results {
                                                'Sigp', $self->analysis,
                                                0, 0);
         $self->add_to_output($fp);
-	    }
+      }
     }
   }
 }

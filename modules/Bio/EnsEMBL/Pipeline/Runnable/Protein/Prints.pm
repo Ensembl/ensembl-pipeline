@@ -76,18 +76,17 @@ sub multiprotein{
 =cut
 
 sub run_analysis {
-    my ($self) = @_;
+  my ($self) = @_;
+      
+  my $command =  $self->program ." " . 
+      $self->database . " " . 
+      $self->filename . " " .
+      "-fjR  > " . 
+      $self->results;
 
-    
-    # This routine expands the database name into $db-1 etc for
-    # split databases
-
-     my $command =  $self->program." ".$self->database." ".$self->filename.
-       " "."-fjR  > ".$self->results, "\n";
-
-    $self->throw("Failed during prints run $!\n") unless 
-      (system ($command) == 0) ;
-  }
+  $self->throw("Failed during prints run $!\n") unless 
+      system($command) == 0 ;
+}
 
 
 
@@ -107,13 +106,13 @@ sub parse_results {
   my $filehandle;
   my $resfile = $self->results();
   
-  if (-e $resfile) {
-    
+  if (-e $resfile) {    
     if (-z $self->results) {  
-	    print STDERR "Printscan didn't find any hits\n";
-	    return; }       
+      # No hits found
+      return; 
+    }       
     else {
-	    open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
+      open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");
     }
   }
   my %printsac;
@@ -125,13 +124,11 @@ sub parse_results {
     chomp $line;
     # Pattern match the Sn; field which should contain the SequenceId and Accession
     
-    if ($line =~ s/^Sn;//) { # We have identified a Sn; line so there should be the following:
-	    
-	    #ENSP00000003603 Gene:ENSG00000000003 Query:AL035608 Contig:AL035608.00001 Chr:chrX basepair:97227305
-	    ($sequenceId) = $line =~ /^\s*(\w+)/;
+    if ($line =~ s/^Sn;//) { # We have identified a Sn; line so there should be the following:	    
+      #ENSP00000003603 Gene:ENSG00000000003 Query:AL035608 Contig:AL035608.00001 Chr:chrX basepair:97227305
+      ($sequenceId) = $line =~ /^\s*(\w+)/;
     }
-    
-    
+        
     if ($line =~ s/^1TBH//) {
       my  ($id) = $line =~ /^\s*(\w+)/;
       my ($ac) = $line =~ /(PR\w+);?\s*$/;
@@ -142,7 +139,7 @@ sub parse_results {
       if ($line =~ s/^[HN]//) {
         my ($num,$temp1,$tot1) = "";
         # Grab these lines
-        #       1433ZETA        1  of  6  88.19   1328    1.00e-16  ELTVEERNLLSVAYKNVIGARRASWRIITS                          30   35   36   48
+        #       1433ZETA        1  of  6  88.19   1328    1.00e-16  ELTVEERNLLSVAYKNVIGARRASWRIITS   30   35   36   48
         # split line on space, hence strip off all leading spaces first.
         $line =~ s/^\s+//;
         
@@ -150,13 +147,25 @@ sub parse_results {
         my @elements = split /\s+/, $line; 
         
         # Name each of the elements in the array
-        my ($fingerprintName,$motifNumber,$temp,$tot,$percentageIdentity,$profileScore,$pvalue,$subsequence,$motifLength,$lowestMotifPosition,$matchPosition,$highestMotifPosition) = @elements;
+        my ($fingerprintName,
+            $motifNumber,
+            $temp,
+            $tot,
+            $percentageIdentity,
+            $profileScore,
+            $pvalue,
+            $subsequence,
+            $motifLength,
+            $lowestMotifPosition,
+            $matchPosition,
+            $highestMotifPosition) = @elements;
         
         my $start = $matchPosition;
         #
-        # If the match to the pattern lies at the end of the protein we might get padding of the subsequence with #'s, and the 
-        # end position will be bigger than the actual end of the protein. So we'll strip the #'s off the end, adjust the 
-        # motif length accordingly, and only then derive the match end.
+        # If the match to the pattern lies at the end of the protein we might get 
+        # padding of the subsequence with #'s, and the end position will be bigger 
+        # than the actual end of the protein. So we'll strip the #'s off the end, 
+        # adjust the motif length accordingly, and only then derive the match end.
         my $hash_substring;
         my $end;
         

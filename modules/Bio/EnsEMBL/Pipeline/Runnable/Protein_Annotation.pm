@@ -81,6 +81,9 @@ sub query{
       my $filename = $self->get_tmp_file('/tmp/', 'annotation.'.$$, 
                                          'results');
       $self->results($filename);
+      # register the file for deletion; it may or may not actually get written,
+      # but it will only get deleted if it did actually get written
+      $self->file($self->results);
     }
     return $self->{'_sequence'};
   }
@@ -221,7 +224,7 @@ sub create_protein_feature{
      $analysis, $p_value, $percent_id) = @_;
 
 
-  print STDERR "Create:have id ".$seqname."\n";
+  # print STDERR "Create:have id ".$seqname."\n";
   my $fp = Bio::EnsEMBL::ProteinFeature->new(
                                              -start    => $start,
                                              -end      => $end,

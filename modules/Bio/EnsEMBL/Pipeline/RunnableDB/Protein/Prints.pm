@@ -68,19 +68,18 @@ sub runnable {
   if($program !~ /\//){
     my $name = $program;
     my $full_path = $PA_IPRSCAN_DIR."/".$^O."/".$name;
-    print STDERR "have full path ".$full_path."\n";
     $self->analysis->program($full_path);
   } 
-    if (!($self->{'_runnable'})) {
-	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->query,
-									  -analysis  => $self->analysis	);
-	
-	
-	$self->{'_runnable'} = $run;
-    }
+  if (!($self->{'_runnable'})) {
     
-    return $self->{'_runnable'};
+    my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->query,
+                                                                     -analysis  => $self->analysis	);
+    
+    
+    $self->{'_runnable'} = $run;
+  }
+  
+  return $self->{'_runnable'};
 }
 
 

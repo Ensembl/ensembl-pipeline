@@ -78,14 +78,14 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Protein_Annotation;
 sub runnable {
   my ($self) = @_;
     
-    if (!defined($self->{'_runnable'})) {
-	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-query     => $self->query,
-									-analysis  => $self->analysis	);
-	
-	
-	$self->{'_runnable'} = $run;
-    }
+  if (!defined($self->{'_runnable'})) {
+    
+    my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-query     => $self->query,
+                                                                    -analysis  => $self->analysis	);
+    
+    
+    $self->{'_runnable'} = $run;
+  }
   
   return $self->{'_runnable'};
 }

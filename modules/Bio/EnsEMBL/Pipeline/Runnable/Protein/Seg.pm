@@ -98,9 +98,8 @@ sub parse_results {
   
   if (-e $resfile) {
     # it's a filename
-    if (-z $self->results) {  
-	    #print STDERR $self->program." didn't find anything\n";
-	    return;
+    if (-z $self->results) {        
+      return;
     }else {
       open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
       $filehandle = \*OUT;
@@ -109,23 +108,23 @@ sub parse_results {
     # it'a a filehandle
     $filehandle = $resfile;
   }
-    
+  
   # parse
   while (<$filehandle>) {
     chomp;
     next if /^$/;
     if (/^\>/) {
-       /^\>(\S+)?\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
-       my $tid = $1;
-       my $start = $2;
-       my $end = $3;
-       my $score = $4;
-       
-       my $fp = $self->create_protein_feature($start, $end, $score, $tid, 
-                                              0, 0, 'Seg', 
-                                              $self->analysis, 0, 0);
-       $self->add_to_output($fp);
-     }
+      /^\>(\S+)?\((\d+)\-(\d+)\)\s*complexity=(\S+)/;
+      my $tid = $1;
+      my $start = $2;
+      my $end = $3;
+      my $score = $4;
+      
+      my $fp = $self->create_protein_feature($start, $end, $score, $tid, 
+                                             0, 0, 'Seg', 
+                                             $self->analysis, 0, 0);
+      $self->add_to_output($fp);
+    }
   }
   close $filehandle;   
 }
@@ -144,9 +143,9 @@ sub parse_results {
 =cut
 
 sub output {
-    my ($self) = @_;
-    my @list = @{$self->{'_flist'}};
-    return @{$self->{'_flist'}};
+  my ($self) = @_;
+  my @list = @{$self->{'_flist'}};
+  return @{$self->{'_flist'}};
 }
 
 

@@ -69,7 +69,6 @@ sub runnable {
     if($program !~ /\//){
       my $name = $program;
       my $full_path = $PA_IPRSCAN_DIR."/".$^O."/".$name;
-      print STDERR "have full path ".$full_path."\n";
       $self->analysis->program($full_path);
     } 
     if (!($self->{'_runnable'})) {

@@ -68,12 +68,12 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein_Annotation;
 =cut
 
 sub run_analysis {
-    my ($self) = @_;
-    # run program
-    print STDERR "running ".$self->program." ".$self->filename."\n";
-    $self->throw ("Error running ".$self->program." on ".$self->filename) 
-        unless ((system ("perl ".$self->program." ".$self->filename.
-                         " > ".$self->results)) == 0); 
+  my ($self) = @_;
+  # run program
+  my $cmd = $self->program . " " . $self->filename . " " . " > " . $self->results;
+  
+  $self->throw ("Error running ".$self->program." on ".$self->filename) 
+      unless system($cmd) == 0;
 }
 
 
@@ -97,8 +97,7 @@ sub parse_results {
   if (-e $resfile) {
     # it's a filename
     if (-z $self->results) {  
-	    print STDERR $self->program." didn't find anything\n";
-	    return;
+      return;
     }else {
       open (OUT, "<$resfile") or $self->throw ("Error opening $resfile");
       $filehandle = \*OUT;
@@ -111,12 +110,10 @@ sub parse_results {
   # parse
   my $id;
   while (<$filehandle>) {
-    #print STDERR;
     chomp;
     next if /^$/;
     if (/^\>(\S+)/) {
       $id = $1;
-      print STDERR "have id ".$id."\n";
     }
     elsif (/^%pred/) {
       my ($junk, $values) = split /:/;

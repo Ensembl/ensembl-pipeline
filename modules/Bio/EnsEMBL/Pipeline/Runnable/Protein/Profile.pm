@@ -70,8 +70,6 @@ sub multiprotein{
 sub run_analysis {
   my ($self) = @_;
   
-  print STDERR "RUNNING: ".$self->program . ' -fz ' .$self->filename. ' ' .$self->database . ' > ' .$self->results."\n";
-  
   $self->throw("Failed during Profile run $!\n") unless 
     (system ($self->program . ' -fz ' . $self->filename. ' ' .
              $self->database . ' > ' .$self->results) == 0) ;
@@ -99,11 +97,11 @@ sub parse_results {
     if (-e $resfile) {
 	
       if (-z $self->results) {  
-        print STDERR "pfscan didn't find any hits\n";
-        return; }       
+        return; 
+      }       
       else {
-        open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
-	    }
+        open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");
+      }
     }
     my %printsac;
     my $line;

@@ -63,10 +63,9 @@ sub runnable {
     my ($self) = @_;
     
     if (!($self->{'_runnable'})) {
-	print STDERR "QUERY: ".$self->query."\n";
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-query     => $self->query,
+      my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new(-query     => $self->query,
 									-analysis  => $self->analysis	);
- 
+      
            
       $self->{'_runnable'} = $run;
     }
