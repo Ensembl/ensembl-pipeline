@@ -1,0 +1,146 @@
+# EnsEMBL module for Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+#
+# You may distribute this module under the same terms as perl itself
+
+
+=head1 NAME
+
+=head1 CONTACT
+
+B<ensembl-dev@ebi.ac.uk>
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::ECR;
+
+use strict;
+use vars qw(%ECR_Config);
+
+%ECR_Config = (
+
+               SUBSETAXT_MATRIX => '/ecs2/work1/klh/data/blastmat/blastz_coding.mat',
+               SUBSETAXT_CUTOFF => 3400,
+
+               AXT_FILTERS => {
+                 'MouseBest' => {
+                   source => 'MouseBlastz',
+                   best   => 1,
+                   subset => 0,
+                   targetnib => '/ecs2/work1/klh/data/genomes/mouse33/nib_files',
+                 },
+                 
+                 'MouseTight' => {
+                   source => 'MouseBest',
+                   best   => 0,
+                   subset => 1,
+                   targetnib => '/ecs2/work1/klh/data/genomes/mouse33/nib_files',
+                 },
+                 
+                 'RatBest' => {
+                   source => 'RatBlastz',
+                   best   => 1,
+                   subset => 0,
+                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
+                 },
+                 
+                 'RatTight' => {
+                   source => 'RatBest',
+                   best   => 0,
+                   subset => 1,
+                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
+                 },
+                 
+                 'ChickenBest' => {
+                   source => 'ChickenBlastz',
+                   best   => 1,
+                   subset => 0,
+                   targetnib => '/ecs2/work1/klh/data/genomes/chicken/chr1/nib_files',
+                 },
+                 
+                 'ChickenTight' => {
+                   source => 'ChickenBest',
+                   best   => 0,
+                   subset => 1,
+                   targetnib => '/ecs2/work1/klh/data/genomes/rat3/nib_files',
+                 },
+                                  
+               },
+
+               ECR_FILTERS      => {
+                 'MouseRatFuguTetZfish' => {
+                   sources => ['MouseTight',
+                               'RatTight',
+                               'FuguEcore',
+                               'ZfishEcore',
+                               'TetEcore'],
+                   union => 0,
+                   merge => 0, 
+                 },
+                 
+                 'Mouse_Rat_Fugu_Tet_Zfish' => {
+                   sources => ['MouseTight',
+                               'RatTight',
+                               'FuguEcore',
+                               'ZfishEcore',
+                               'TetEcore'],
+                   union => 1,
+                   merge => 0,
+                 },
+                 'MouseRat' => {
+                   sources => ['MouseTight',
+                               'RatTight'],
+                   union => 0,
+                   merge => 0,
+                 },
+                 'Mouse_Rat' => {
+                   sources => ['MouseTight',
+                               'RatTight'],
+                   union => 1,
+                   merge => 0,
+                 },
+                 'FuguTetZfish' =>  {
+                   sources => ['FuguEcore',
+                               'ZfishEcore',
+                               'TetEcore'],
+                   union => 0,
+                   merge => 0,
+                 },
+                 'Fugu_Tet_Zfish' => {
+                   sources => ['FuguEcore',
+                               'ZfishEcore',
+                               'TetEcore'],
+                   union => 1,
+                   merge => 0,
+                 },
+               },
+               );
+               
+sub import {
+    my ($callpack) = caller(0); # Name of the calling package
+    my $pack = shift; # Need to move package off @_
+
+    # Get list of variables supplied, or else all
+    my @vars = @_ ? @_ : keys(%ECR_Config);
+    return unless @vars;
+
+    # Predeclare global variables in calling package
+    eval "package $callpack; use vars qw("
+         . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if (defined $ECR_Config{ $_ }) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$ECR_Config{ $_ };
+	} else {
+	    die "Error: Config: $_ not known\n";
+	}
+    }
+}
+
+1;
