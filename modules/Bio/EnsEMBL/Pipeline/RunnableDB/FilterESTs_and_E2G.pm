@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G->new(
-									  -dbobj       => $db,
+									  -db          => $db,
 									  -input_id    => $id,
 									  -seq_index   => $index,
 									 );
@@ -80,7 +80,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 =head2 new
 
     Title   :   new
-    Usage   :   $self->new(-DBOBJ       => $db
+    Usage   :   $self->new(-DB          => $db
                            -INPUT_ID    => $id
                            -ANALYSIS      => $analysis
 			   -REFDBNAME     => $refdbname
@@ -94,7 +94,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
                 object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateESTs
                 object
-    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+    Args    :   -db:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object (required),
                 -analysis:   A Bio::EnsEMBL::Analysis (optional) 
@@ -104,7 +104,7 @@ sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
            
-    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # db, input_id, seqfetcher, and analysis objects are all set in
     # in superclass constructor (RunnableDB.pm)
 
 	 #my( $refdbname, $refdbhost, $refdbuser, $refpass, $path ) = $self->_rearrange([qw(REFDBNAME
@@ -210,7 +210,7 @@ sub write_output {
     
     #    $self->throw("exiting before write");
     
-    my $estdb = $self->dbobj;
+    my $estdb = $self->db;
 
     if( !defined $estdb ) {
       $self->throw("unable to make write db");
@@ -232,7 +232,7 @@ sub write_output {
 
 sub write_genes {
   my ($self) = @_;
-  my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
 
  GENE: foreach my $gene ($self->output) {	
     eval {
@@ -262,8 +262,8 @@ sub write_exons_as_features {
   my ($self) = @_;
   
   # for writing features
-  my $feat_adaptor = $self->dbobj->get_FeatureAdaptor;
-  my $contig_adaptor = $self->dbobj->get_RawContigAdaptor;
+  my $feat_adaptor = $self->db->get_FeatureAdaptor;
+  my $contig_adaptor = $self->db->get_RawContigAdaptor;
   my %contig_cache; # keep track of which contig internal_ids we have looked up so far
   my %contig_features;
 
@@ -280,7 +280,7 @@ sub write_exons_as_features {
   # convert exons to features
  GENE:
   foreach my $gene(@genes){
-    foreach my $transcript($gene->each_Transcript){
+    foreach my $transcript($gene->get_all_Transcripts){
     EXON:
       foreach my $exon($transcript->get_all_Exons){
 	my $hstart;
@@ -348,7 +348,7 @@ sub write_exons_as_features {
 CONTIG:  foreach my $contig_id( keys %contig_features){
     my $contig;
     eval{
-      $contig =   $self->dbobj->get_Contig($contig_id);
+      $contig =   $self->db->get_Contig($contig_id);
     };
     if($@){
       print STDERR "No contig for $contig_id part 1\n$@\n";
@@ -380,7 +380,7 @@ sub get_exon_analysis{
   my ($self) = @_;
 
   my $logicname  = 'est';
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses   = $anaAdaptor->fetch_by_logic_name($logicname);
   my $analysis;
   my $est_source = $EST_SOURCE;
@@ -434,7 +434,7 @@ sub fetch_input {
   my $stadaptor = $self->estdb->get_StaticGoldenPathAdaptor();
   my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
   $contig->_chr_name($chrid);
-  $self->vc($contig);
+  $self->vcontig($contig);
 
   # find exonerate features amongst all the other features  
   my @allfeatures = $contig->get_all_Features();
@@ -526,10 +526,10 @@ sub fetch_input {
   my $single = 0;
   my $multi  = 0;
   
-  my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->dbobj);
+  my $efa = new Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor($self->db);
   
   # only fetch this once for the whole set or it's SLOW!
-  my $genomic  = $self->vc->get_repeatmasked_seq;
+  my $genomic  = $self->vcontig->get_repeatmasked_seq;
   
   # keep track of those ESTs who make it into a MiniEst2genome
   my %accepted_ests;
@@ -698,7 +698,7 @@ sub convert_output {
 
 sub make_genes {
   my ($self, $count, $results) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my $genetype = 'exonerate_e2g';
   my @genes;
   
@@ -708,7 +708,7 @@ sub make_genes {
     $gene->type($genetype);
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
-    my $transcript = $self->make_transcript($tmpf, $self->vc, $genetype, $count);
+    my $transcript = $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
     $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
     $count++;
@@ -833,13 +833,13 @@ sub make_transcript{
 
 sub remap_genes {
   my ($self, @genes) = @_;
-  my $contig = $self->vc;
+  my $contig = $self->vcontig;
   my @remapped;
   
  GENEMAP:
   foreach my $gene(@genes) {
     #     print STDERR "about to remap " . $gene->temporary_id . "\n";
-    my @t = $gene->each_Transcript;
+    my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
     eval {
       my $newgene = $contig->convert_Gene_to_raw_contig($gene);
@@ -849,10 +849,10 @@ sub remap_genes {
       
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
       
-      my @oldtrans = $gene->each_Transcript;
+      my @oldtrans = $gene->get_all_Transcripts;
       my @oldexons  = $oldtrans[0]->get_all_Exons;
       
-      my @newtrans = $newgene->each_Transcript;
+      my @newtrans = $newgene->get_all_Transcripts;
       my @newexons  = $newtrans[0]->get_all_Exons;
       
       if($#oldexons == $#newexons){
@@ -920,12 +920,12 @@ sub output {
    return @{$self->{'_output'}};
 }
 
-=head2 vc
+=head2 vcontig
 
- Title   : vc
- Usage   : $obj->vc($newval)
+ Title   : vcontig
+ Usage   : $obj->vcontig($newval)
  Function: 
- Returns : value of vc
+ Returns : value of vcontig
  Args    : newvalue (optional)
 
 =head2 estfile
@@ -1106,7 +1106,7 @@ sub run_blast {
   my $blastout = "/tmp/FEE_blastout." . $$ . ".fa";;
   my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			      -file   => ">$seqfile");
-  $seqio->write_seq($self->vc);
+  $seqio->write_seq($self->vcontig);
   close($seqio->_filehandle);
 
   # set B here to make sure we can show an alignment for every EST
@@ -1221,7 +1221,7 @@ sub make_analysis {
   my ($self) = @_;
   
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($self->genetype);
   
   my $analysis_obj;
