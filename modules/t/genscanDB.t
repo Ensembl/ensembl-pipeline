@@ -44,19 +44,19 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
+my $ana = $ana_adaptor->fetch_by_logic_name('genscan');
 
-
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'HumanIso',
-					  -db_version     => '__NONE__',
-					  -db_file        => '/usr/local/ensembl/data/HumanIso.smat',
-					  -program        => 'Genscan',
-					  -program_file   => '/usr/local/ensembl/bin/genscan',
-					  -module         => $runnable,
-					  -module_version => 1,
-					  -gff_source     => 'genscan',
-					  -gff_feature    => 'exon', 
-					  -logic_name     => 'genscan',
-				      );
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'HumanIso',
+#					  -db_version     => '__NONE__',
+#					  -db_file        => '/usr/local/ensembl/data/HumanIso.smat',
+#					  -program        => 'Genscan',
+#					  -program_file   => '/usr/local/ensembl/bin/genscan',
+#					  -module         => $runnable,
+#					  -module_version => 1,
+#					  -gff_source     => 'genscan',
+#					  -gff_feature    => 'exon', 
+#					  -logic_name     => 'genscan',
+#				      );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -64,7 +64,7 @@ else
 { print "ok 3\n"; }
 my $id ='AB015752.00001';
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(-dbobj      => $db,
+my $runobj = "$runnable"->new(-db      => $db,
 			      -input_id   => $id,
 			      -analysis   => $ana );
 unless ($runobj)
@@ -72,7 +72,7 @@ unless ($runobj)
 else
 { print "ok 4\n"; }
 
-$runobj->fetch_input;;
+$runobj->fetch_input;
 $runobj->run;
 
 my @out = $runobj->output;
@@ -84,33 +84,27 @@ display(@out);
 
 $runobj->write_output();
 
-print STDERR "Written output\n";
-my $contig = $db->get_Contig($id);
-my @features = $contig->get_all_PredictionFeatures();
+#print STDERR "Written output\n";
+my $contig = $db->get_RawContigAdaptor()->fetch_by_name($id);
+my @prediction_transcripts = $contig->get_all_PredictionFeatures();
 
-print STDERR "Got features\n";
-display(@features);
-
-foreach my $f (@features) {
-  my $transcript = Bio::EnsEMBL::TranscriptFactory::fset2transcript($f,$contig);
-  print "Transcrip " . $transcript->translate->seq . "\n";
+#print STDERR "Have features\n";
+foreach my $pred_trans (@prediction_transcripts) {
+  print "Transcript  " . $pred_trans->translate . "\n";
 }    
 
-
-
-
-unless (@features)
+unless (@prediction_transcripts)
 { print "not ok 6\n"; }
 else
 { print "ok 6\n"; }
+
+
 
 sub display {
   my @results = @_;
 
   foreach my $obj (@results) {
-
     print STDERR ($obj->gffstring."\n");
-
     if ($obj->sub_SeqFeature) {
       foreach my $exon ($obj->sub_SeqFeature) {
 	print STDERR "Sub: ".$exon->gffstring."\n";
@@ -118,3 +112,5 @@ sub display {
     }
   }
 }
+
+
