@@ -1,0 +1,171 @@
+
+use strict;
+
+use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;;
+use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
+use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+
+use Getopt::Long;
+
+my $mailReceiver = "michele\@sanger.ac.uk";
+my $maxMails = 10000;
+my $currentMail = 0;
+$| = 1;
+my %stats = ( );
+
+
+my $dbhost = $::pipeConf{'dbhost'};
+my $dbname = $::pipeConf{'dbname'};
+my $dbuser = $::pipeConf{'dbuser'};
+my $queue  = $::pipeConf{'queue'};
+my $test   = 0;
+my $resubmit = 0;
+
+GetOptions(     'host=s'     => \$dbhost,
+                'dbname=s'   => \$dbname,
+                'dbuser=s'   => \$dbuser,
+		'test'       => \$test,
+		'resubmit'   => \$resubmit,
+                ) or die ("Couldn't get options");
+
+my $class = 'contig';
+
+# how many second before job becomes old?
+my $oldJob = 1200;
+
+my $chunksize    = 500;
+my $currentStart = 0;
+my $completeRead = 0;
+
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
+    ( -host   => $dbhost,
+      -dbname => $dbname,
+      -user   => $dbuser,
+  );
+
+my $ruleAdaptor = $db->get_RuleAdaptor;
+my $jobAdaptor  = $db->get_JobAdaptor;
+my $sic         = $db->get_StateInfoContainer;
+
+check_jobs_against_failed();
+check_jobs_against_success();
+
+sub check_jobs_against_success {
+
+  my @success = $jobAdaptor->list_jobId_by_status( "SUCCESSFUL" );
+  my %successHash = map { ( $_,1) } @success;
+  my @newHot;
+  print ( "Processing  ",scalar( @success )," successful jobs\n" );
+  
+
+  foreach my $jobId (keys %successHash) {
+      my $job;
+      eval {
+
+	  $job = $jobAdaptor->fetch_by_dbID($jobId );
+
+	  print ("Job " . $jobId . "\t" . $job->input_id . "\t" . $job->analysis->dbID . "\n");	  
+
+	  # yep, successful job	      
+
+	  if (!$test) {
+	      $sic->store_inputId_class_analysis( $job->input_id, 
+						  $class, 
+						  $job->analysis );
+	  }
+      };
+      if ($@) {
+	  print ("ERROR: updating successful job $jobId [$@]\n");
+      }
+	  
+      if (defined($job) && !$test) {
+	  $job->remove;
+      }
+
+  }
+}
+
+
+sub check_jobs_against_failed {
+    my @failed = $jobAdaptor->list_jobId_by_status( 'FAILED' );
+    my %failedHash = map { ( $_, 1 ) } @failed;
+  
+  print "Failed jobs: ", scalar( @failed ), ".\n";
+  
+  JOBID:     foreach my $jobId (keys %failedHash) {
+      my $job;
+      
+      eval {
+	  my @current_jobs = $jobAdaptor->fetch_by_dbID($jobId);
+	  
+	  # yep, failed job, get an updated version of it ...
+	  $job = $jobAdaptor->fetch_by_dbID( $jobId );
+
+	  print ("Job " . $jobId . "\t" . $job->input_id . "\t" . $job->analysis->dbID . "\n");	  
+	  
+	  foreach my $cj (@current_jobs) {
+	      
+	      print ("Comparing to current_job " . $cj->input_id . " " . 
+		     $cj->analysis->dbID . " " . 
+		     $cj->current_status->status . " " . 
+		     $job->analysis->dbID . "\n");
+	      
+	      if ($cj->analysis->dbID == $job->analysis->dbID &&
+		  $cj->current_status->status ne "FAILED") {
+		  print ("\nJob already in pipeline with status : " . $cj->current_status->status . "\n");
+		  next JOBID;
+	      }
+	  }
+
+	  if (!$test && $resubmit) {
+	      if( $job->retry_count < 5 ) {
+		  print( "Job restart ",$job->dbID,"\n" );
+		  $job->runRemote($queue);
+	      } else {
+		  # dont retry, send mail ....
+		  mail_job_problem( $job );
+	      }
+	  }
+      };
+      if ($@) {
+	  print STDERR "Error processing failed job $jobId [$@]\n";
+      }
+  }
+}
+
+
+sub mail_job_problem {
+  my $job = shift;
+
+  print ( "Problem with job mailed\n" );
+  open( PIPE, "| Mail -s \"Pipeline problem\" $mailReceiver" ) or 
+    die( "Cant contact babysitter..." );
+  print PIPE ( "Tried ",$job->analysis->module," 3 times and failed\n" );
+  print PIPE ( "on input id ", $job->input_id,"\n" );
+  
+  if( open( FILE, $job->stdout_file )) {
+    print PIPE "----begin stdout----\n";
+    while( <FILE> ) {
+      print PIPE $_;
+    }
+    close( FILE );
+    print PIPE "----end stdout----\n";
+  }
+  
+  if( open( FILE, $job->stderr_file )) {
+    print PIPE "----begin stderr----\n";
+    while( <FILE> ) {
+      print PIPE $_;
+    }
+    close( FILE );
+    print PIPE "----end stderr----\n";
+	  }
+  close PIPE;
+  print ( "Mailed a problem.\n" );
+}
+
+
+
+
