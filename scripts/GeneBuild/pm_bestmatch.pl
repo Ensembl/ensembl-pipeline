@@ -58,7 +58,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
                                          GB_DBNAME
 					 GB_DBHOST
 					 GB_DBUSER
-                                         GB_GOLDEN_PATH
 					);
 
 # global vars
@@ -178,7 +177,6 @@ sub get_static_golden_path_adaptor {
     -dbname           => $GB_DBNAME,
 );
 
-  $db->static_golden_path_type($GB_GOLDEN_PATH);
   my $sgpa = $db->get_StaticGoldenPathAdaptor();
   return $sgpa;
 }

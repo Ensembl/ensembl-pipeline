@@ -32,7 +32,6 @@ use  Bio::EnsEMBL::Pipeline::GeneConf qw (
 					  GB_DBHOST
 					  GB_DBPASS
 					  GB_PM_OUTPUT
-					  GB_GOLDEN_PATH
 					 );
 
 my $dbname = $GB_DBNAME;
@@ -41,11 +40,9 @@ my $host   = $GB_DBHOST;
 my $pass   = $GB_DBPASS;
 my $pmfile = $GB_PM_OUTPUT;
 if(defined $pmfile && $pmfile ne ''){
-  $pmfile .= "/pm_best.out";
+#  $pmfile .= "/pm_best.out";
+  $pmfile .= "/14.pm_best.out";
 }
-
-my $path     = $GB_GOLDEN_PATH;
-$path        = 'UCSC' unless (defined $path && $path ne '');
 
 # usage
 if(!defined $dbname  ||
@@ -59,7 +56,6 @@ if(!defined $dbname  ||
     "\tGB_DBUSER      = $GB_DBUSER\n" .
     "\tGB_DBHOST      = $GB_DBHOST\n" .
     "\tGB_DBPASS      = $GB_DBPASS\n" . 
-    "\tGB_GOLDEN_PATH = $GB_GOLDEN_PATH\n" . 
     "\tGB_PM_OUTPUT   = $GB_PM_OUTPUT\n";
 
   exit(1);
@@ -73,7 +69,6 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -pass             => $pass,
 );
 
-$db->static_golden_path_type($path);
 my $sgpa = $db->get_StaticGoldenPathAdaptor;
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 

@@ -6,7 +6,6 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (GB_RUNNER
 					 GB_DBHOST
 					 GB_DBUSER
 					 GB_DBPASS
-					 GB_GOLDEN_PATH
 					 GB_QUEUE
 					 GB_TMPDIR
 					 GB_LENGTH_RUNNABLES
@@ -32,8 +31,7 @@ foreach my $arg($GB_RUNNER, $GB_DBNAME, $GB_DBHOST, $GB_DBUSER, $GB_QUEUE, $GB_T
 	"dbuser      => $GB_DBUSER\n" .
 	"dbpass      => $GB_DBPASS\n" .
 	"queue       => $GB_QUEUE\n" .
-	"tmpdir      => $GB_TMPDIR\n" .
-	"golden_path => $GB_GOLDEN_PATH ( empty string will use UCSC )\n" ;
+	"tmpdir      => $GB_TMPDIR\n" ;
 
       exit(1);
     }
@@ -82,12 +80,10 @@ sub make_tbsubs {
   my $dbuser      = $GB_DBUSER;
   my $dbpass      = $GB_DBPASS;
   my $queue       = $GB_QUEUE;
-  my $golden_path = $GB_GOLDEN_PATH;
   my $dir         = $GB_TMPDIR . "/$runnable";
   my $pm_out      = $GB_PM_OUTPUT;
 
   $pm_out     .= "pm_best.out";
-  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
   # check them!
   foreach my $arg($pm_out){
     if ($arg eq '' ){
@@ -160,12 +156,10 @@ sub make_lbsubs {
   my $dbhost      = $GB_DBHOST;
   my $dbuser      = $GB_DBUSER;
   my $dbpass      = $GB_DBPASS;
-  my $golden_path = $GB_GOLDEN_PATH;
   my $queue       = $GB_QUEUE;
   my $size        = $GB_SIZE;
   my $dir         = $GB_TMPDIR . "/$runnable";
   
-  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
 
   # check them!
   foreach my $arg($size, $GB_TMPDIR){
