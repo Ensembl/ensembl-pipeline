@@ -100,7 +100,7 @@ GetOptions(
 or die ("Couldn't get options");
 
 unless ($dbhost && $dbname && $dbuser) {
-    print STDERR "Must specify database with -dbhost, -dbname and -dbuser\n";
+    print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     exit 1;
 }
 
