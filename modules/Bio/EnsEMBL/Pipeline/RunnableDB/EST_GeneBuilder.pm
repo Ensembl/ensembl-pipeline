@@ -284,7 +284,8 @@ sub fetch_input {
     my( $self) = @_;
     my $strand;
 
-    # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/ESTConf.pm
+    # the type of the genes being read is specified in
+    # Bio/EnsEMBL/Pipeline/Config/cDNAs_ESTs/EST_GeneBuilder_Conf
     my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
 
     # make sure you have an analysis
