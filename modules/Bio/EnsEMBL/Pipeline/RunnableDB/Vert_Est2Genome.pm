@@ -223,6 +223,7 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
+    #$contig->use_db_seq(0);
     my $genseq   = $contig->primary_seq;
     my @features = $contig->get_all_SimilarityFeatures;
     $self->{_genseq} = $genseq;
@@ -284,16 +285,13 @@ sub run {
     foreach my $f (@features) {
 
 	if (defined($f->analysis)      && defined($f->score) && 
-	    defined($f->analysis->db)  && $f->analysis->db eq "vert"  &&
-	    $f->score > 100) {
+	    defined($f->analysis->db)  && $f->analysis->db eq "vert" 
+	    ) {
 
-	    my $organism = $self->get_organism($f->hseqname);
 
 	    if (!defined($idhash{$f->hseqname})) { 
-		if ($organism eq "Homo sapiens (human)" && !defined($idhash{$f->hseqname})) { 
 		    push(@mrnafeatures,$f);
 		    $idhash{$f->hseqname} =1;
-		}
 	    } else {
 		print STDERR ("Ignoring feature " . $f->hseqname . "\n");
 	    }
@@ -383,8 +381,13 @@ sub get_Sequences {
     foreach my $pair (@pairs) {
 	my $id = $pair->hseqname;
 	if ($pair->analysis->db eq "vert") {
+            eval {
 	    my $seq = $self->get_Sequence($id);
 	    push(@seq,$seq);
+            };
+            if ($@) {
+               $self->warn("Couldn't fetch sequence for $id [$@]");
+            } 
 	}
     }
     return @seq;
@@ -593,7 +596,7 @@ sub get_Sequence {
     my $newid = $self->parse_Header($id);
 
     next ID unless defined($newid);
-    print(STDERR "New id :  is $newid [$id]\n");
+    print(STDERR "New pog id :  is $newid [$id]\n");
 
     open(IN,"pfetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
 
@@ -605,6 +608,7 @@ sub get_Sequence {
     }
 	
     if (!defined($seq) || $seq eq "no match") {
+        print STDERR "Using efetch to fetch sequence\n";
 	open(IN,"efetch -q $newid |") || $self->throw("Error fetching sequence for id [$newid]");
            
 	$seq = "";
@@ -620,8 +624,9 @@ sub get_Sequence {
     }
     
     $seq = new Bio::Seq(-id  => $newid,
-			   -seq => $seq);
+   		   -seq => $seq);
 	
+    print (STDERR "Found sequence for $newid [" . $seq->length() . "]\n");
     $self->{_seq_cache}{$id} = $seq;
 
     return $seq;
