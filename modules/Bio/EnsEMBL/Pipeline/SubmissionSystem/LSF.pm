@@ -3,7 +3,9 @@ use warnings;
 
 package Bio::EnsEMBL::Pipeline::SubmissionSystem::LSF;
 
-use constant LSF_MAX_BATCH_SIZE => 65536;
+#LSF_MAX_BATCH_SIZE could go as high as 65536, but we need a way to seperate
+#job_array output files into seperate dirs to ease filesystem burden
+use constant LSF_MAX_BATCH_SIZE => 1000;
 use constant MAX_INT => 2147483647; # (2^31)-1 max 32 bit signed int
 
 =head2 kill
@@ -46,7 +48,6 @@ sub kill {
 		$self->warn("bkill returned non-zero exit status $!");
 		return;
 	}
- 
 
 	$job->update_status('KILLED');
 }
@@ -109,71 +110,90 @@ sub flush {
 		my $lsf_job_name = join('_', $taskname, time(),$self->{'sub_count'});
 
 		#add the preexec to the arguments
-		my @args = ('-E', '"runLSF.pl -pre_exec"');
+		my @args = ('-E', '"runner.pl -pre_exec"');
 		#add the queue name
 		push @args, ('-q', $queue);
 		
+
+    my $dir_prefix = $self->_dir_prefix($taskname);
+    my $command = "perl runner.pl -jobname $lsf_job_name";
+
 		#
 		# If there is only a single job submit it normally
 		# otherwise submit it as a job array
-		#				
+		#
 		if(@jobs == 1) {
 			my ($job) = @jobs;
-			my $file_prefix = $self->_generate_file_prefix($job);
 
 			$job->job_name($lsf_job_name);
-			$job->stdout_file("${file_prefix}.out");
-			$job->stderr_file("${file_prefix}.err");
+      my $stdout = ($dir_prefix) ?
+        "$dir_prefix/$lsf_job_name.out" : '/dev/null';
+      my $stderr = ($dir_prefix) ?
+        "$dir_prefix/$lsf_job_name.err" : '/dev/null';
+			$job->stdout_file($stdout);
+			$job->stderr_file($stderr);
 			$job->array_index(undef);
 
 			$job_adaptor->update($job);
 			$job->update_status('SUBMITTED');
 
 			#add the output dirs to the stdout list
-			push @args, ('-o', $job->stdout_file);
-			push @args, ('-e', $job->stderr_file);
+			push @args, ('-o', $stdout);
+			push @args, ('-e', $stderr);
 			push @args, ('-J', $lsf_job_name);
 		} else {
-			my $array_index = 1;
+			my $array_index = 0;
 
 			foreach my $job (@jobs) {
-				my $file_prefix = $self->_generate_file_prefix($job);
+        $array_index++;
 
-				#$job->stdout_file("${file_prefix}.out");
-				#$job->stderr_file("${file_prefix}.err");
+        my $job_stdout = ($dir_prefix) ? 
+          "$dir_prefix/${lsf_job_name}_${array_index}.out" : '/dev/null';
+        my $job_stderr = ($dir_prefix) ?
+          "$dir_prefix/${lsf_job_name}_${array_index}.err" : '/dev/null';
+
+        $job->stdout_file($job_stdout);
+        $job->stderr_file($job_stderr);
 				$job->job_name($lsf_job_name);
-				$job->array_index($array_index++);
+				$job->array_index($array_index);
 
 				# write entry into job table
 				$job_adaptor->update($job);
 
 				# set each job status to submitted
-				$job->update_status('SUBMITTED');
+				$job->set_current_status('SUBMITTED');
 			}	
 			#add the output dirs to the stdout list
-			#push @args, ('-o', $job->stdout_file);
-			#push @args, ('-e', $job->stderr_file);
+      my $stdout = ($dir_prefix) ? 
+        "$dir_prefix/$lsf_job_name".'_%I.out' : '/dev/null';
+      my $stderr = ($dir_prefix) ?
+        "$dir_prefix/$lsf_job_name".'_%I.err' : '/dev/null';
+
+			push @args, ('-o', $stdout);
+			push @args, ('-e', $stderr);
 			
 			#add the job name and array index
 			push @args, ('-J', '"'.$lsf_job_name.'[1-'.scalar(@jobs).']"');
+      $command .= ' -index %I';
 		}
 
 		#execute the bsub to submit the job or job_array
-		#would rather use system since it doesn't require a fork, but
+		#would rather use system() since it doesn't require a fork, but
 		#need to get job_id out of stdout :(
-		my $bsub = 'bsub ' . join(' ', @args, $other_parms) .;
-		open(SUB, $bsub." 2>&1 |") or 
-			$self->throw("could not execute command $bsub");
+		my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
+
+		open(SUB, $bsub." 2>&1 |") or
+			$self->throw("could not execute command [$bsub]");
 		my $sub_id;
-		while(<SUB>){
+		while(<SUB>) {
 			if (/Job <(\d+)>/) {
 				$sub_id = $1;
 			}
 		}
 		close(SUB);
-		
+
+    #update the job table so that the submission id is also stored
 		foreach my $job(@jobs) {
-			#update the job table so that the submission id is also stored
 			$job->submission_id($sub_id);
 			$job_adaptor->update($job);
 		}
@@ -273,9 +293,16 @@ sub _task_queue {
 }
 
 
+
+#
+# creates temp directories like:
+# /tmp/repeat_masker_task/1/
+# /tmp/genscan_task/4/
+# etc..
+#
 sub _dir_prefix {
 	my $self = shift;
-	my $job  = shift;
+	my $taskname  = shift;
 
   #distribute temp files evenly into 10 different dirs so that we don't
   #get too many files in the same dir
@@ -286,26 +313,34 @@ sub _dir_prefix {
 	# get temp dir from config
 	#
 	my $config = $self->get_Config();
-	my $task_dir = $config->get_parameter('LSF', 'tmpdir');
+	my $temp_dir = $config->get_parameter('LSF', 'tempdir');
 
-	$task_dir || $self->throw('Could not determine temp dir for task ['.
-														$job->taskname() . ']');
+	if(!$temp_dir) {
+    $self->warn("could not determine temp dir for task [$taskname]" .
+               " : using /dev/null");
+    return undef;
+  }
 	
-	$task_dir .= $job->taskname();
+	my $task_dir .= $taskname;
 
-	mkdir($task_dir) if(! -e $task_dir);
-
+  if(! -e $task_dir) {
+    if(!mkdir($task_dir)) {
+      $self->warn("could not create temp dir [$task_dir] : using /dev/null");
+      return undef;
+    }
+  }
 	
-
-	$temp_dir .= $job->taskname().'/'.$self->{'dir_num'};
+	$temp_dir .= "$task_dir/".$self->{'dir_num'};
 
 	#create the dir if it doesn't exist
-	mkdir($temp_dir) if(! -e $temp_dir);
+  if(! -e $temp_dir) {
+    if(!mkdir($temp_dir)) {
+      self->warn("could not create temp dir [$temp_dir] : using /dev/null");
+      return undef;
+    }
+  }
 
-	my $time = localtime(time());
-	$time =~ tr/ :/_./;
-
-	return "$temp_dir/" . $job->taskname . "_job" . $job->dbID() . "$time";
+  return "$temp_dir/";
 }
 
 
