@@ -132,6 +132,7 @@ my $compara_db = Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
 
 my $focus_db  = $db1;
 my $target_db = $db2;
+my $target_gene_adaptor = $target_db->get_GeneAdaptor;
 
 my $slices2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
   ->get_all_syntenic_slices($slice1, $focus_db, 'Homo sapiens', $compara_db, $target_db, 'Mus musculus' );
@@ -146,8 +147,7 @@ if (@$slices2){
   
  SLICE:
   foreach my $slice2 ( @$slices2 ){
-
-
+    
     my @genes2 = @{$slice2->get_all_Genes};
     
   GENE2:
@@ -159,7 +159,13 @@ if (@$slices2){
       print STDERR "comparing $gene_id1 and $gene_id2\n";
       ############################################################
       # call the comparison method
-      
+      if ( $gene2->stable_id ){
+	$gene2 = $target_gene_adaptor->fetch_by_stable_id($gene_id2,1);
+      }
+      else{
+	$gene2 = $target_gene_adaptor->fetch_by_dbID($gene_id2,1);
+      }
+
       my $gene_pair = Bio::EnsEMBL::Pipeline::GeneComparison::GenePair->new();
       
       print STDERR "comparing isoforms and aligning exons\n";
