@@ -55,40 +55,12 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
-use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
-use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
+use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-use Bio::EnsEMBL::Pipeline::DBSQL::ExpressionAdaptor;
 
 
-
-use Bio::EnsEMBL::Pipeline::ESTConf qw(
-				       EST_INPUTID_REGEX
-				       EST_REFDBHOST
-				       EST_REFDBUSER
-				       EST_REFDBNAME
-				       EST_REFDBPASS
-				       EST_E2G_DBHOST
-				       EST_E2G_DBUSER
-				       EST_E2G_DBNAME
-				       EST_E2G_DBPASS
-				       EST_TARGET_DBNAME
-				       EST_TARGET_DBHOST
-				       EST_TARGET_DBUSER
-				       EST_TARGET_DBPASS      
-				       EST_TARGET_GENETYPE
-				       EST_GENEBUILDER_INPUT_GENETYPE
-				       EST_EXPRESSION_DBHOST
-				       EST_EXPRESSION_DBNAME
-				       EST_EXPRESSION_DBUSER
-				       EST_EXPRESSION_DBPASS
-				      );
-
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 ######################################################################
 
@@ -223,24 +195,23 @@ sub run{
 
 #transcript      ######------######--------######
 
-# (1),(2) and (3) would be linked. I'm not sure yet about cases like (4) and
-# (5).
+# (1),(2) and (3) would be linked. 
+# cases like (4) and (5) would not be linked, unless one uses a different
+# method in the transcript comparator 
 
-# Also, case (2) could be a hint for alternative polyA site if we have
+# case (2) could be a hint for alternative polyA site if we have
 # already annotated an UTR for that transcript. We could check for this case
 # and only add (2) if there is no 3'UTR, to be sure.
 
 # Case (3) could be also related to an alternative start of transcription,
 # we could add it only for cases that a 5'UTR is not annotated.
 
-# Part of the alternative polyA sites and start of transcription is
+# Part of the alternative polyA sites and start of transcription seems to be 
 # correlated with alternative splicing so maybe this 'ambiguity' cases will
 # not cause too many problems.
 
-# We can keep the conditions tight for a start. As ests have been filtered,
-# we could accept the splicing of (4) and (5) with some confidence, and
-# we can include the check of UTRs for (2) and (3). ESTs that are not linked
-# would be rejected in principle, I cannot predict yet how much data wil
+# there are some methods to include a check of UTRs for (2) and (3). ESTs that are not linked
+# would be rejected in principle, I cannot predict yet how much data will
 # remain unused by doing this.
 
 sub _map_Transcripts{
@@ -262,14 +233,6 @@ sub _map_Transcripts{
       # allows mismatches at outer end of the 5' and 3' exons)
       # check 5' and 3' ends in case ESTs give an alternative transcription 
       
-      # start or alternative polyA site, respectively
-      if ($merge){
-	  my $alt_start = $self->_check_5prime($transcript,$est);
-	  my $alt_polyA = $self->_check_3prime($transcript,$est);
-	  
-      }
-      
-      
       # if match, put est in $expression_map{ $transcript }
       if ($merge){
 	  $self->matching_map->match($transcript,$est);
@@ -277,7 +240,13 @@ sub _map_Transcripts{
   }
 }
 
+
+
 #########################################################################
+#
+# METHODS TO CHECK THE UTRs (Not in use yet)
+#
+############################################################
 
 sub _check_5prime{
   my ($self,$transcript,$est) = @_;
@@ -390,37 +359,5 @@ sub _check_3prime{
 }
 
 #########################################################################
-
-# method to calculate the exonic length of a transcript which is inside a gene
-
-sub _transcript_exonic_length{
-  my ($self,$tran) = @_;
-  my $exonic_length = 0;
-  foreach my $exon (@{$tran->get_all_Exons}){
-    $exonic_length += ($exon->end - $exon->start + 1);
-  }
-  return $exonic_length;
-}
-
-#########################################################################
-
-# method to calculate the length of a transcript in genomic extent, 
-
-sub _transcript_length{
-    my ($self,$tran) = @_;
-    my @exons= @{$tran->get_all_Exons};
-    my $genomic_extent = 0;
-    if ( $exons[0]->strand == -1 ){
-      @exons = sort{ $b->start <=> $a->start } @exons;
-      $genomic_extent = $exons[0]->end - $exons[$#exons]->start + 1;
-    }
-    elsif( $exons[0]->strand == 1 ){
-      @exons = sort{ $a->start <=> $b->start } @exons;
-      $genomic_extent = $exons[$#exons]->end - $exons[0]->start + 1;
-    }
-    return $genomic_extent;
-}
-
-############################################################
  
 1;
