@@ -45,7 +45,7 @@ my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::EPCR';
 my $sts_db   = '/nfs/disk100/humpub/data/sanger_sts.epcr';
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => $sts_db,
+my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file             => $sts_db,
                                                     -db_version     => '1',
                                                     -program        => 'e-PCR',
                                                     -program_version=> 1,
