@@ -75,7 +75,7 @@ sub new {
     my $self = bless {}, $class;
     
     $self->{'_fplist'}      = [];
-    $self->{'_genseq'};
+    $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
     $self->{'_input_id'}    = undef;
     $self->{'_analysis'}    = undef;
