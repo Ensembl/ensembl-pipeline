@@ -156,7 +156,7 @@ sub new {
   $self->debug($debug);
   $self->verbose($verbose);
 
-  $self->printvars;
+  $self->printvars if ($self->verbose);
   return $self;
 }
 
@@ -213,7 +213,7 @@ sub run {
 
   $self->file($fasta1."_".$fasta2.".cns");
 
-  print "cns-alignment-file : ".$fasta1."_".$fasta2.".cns\n";
+#  print "cns-alignment-file : ".$fasta1."_".$fasta2.".cns\n";
 
   return 1
 }
@@ -254,7 +254,7 @@ sub _getgcdir{
   my $gcdir;
 
   if(exists($gcdirs->{$pairName})) {
-    print "We have paramter bins defined for this organism pair.\n";
+    print "We have paramter bins defined for this organism pair.\n" if $self->verbose;
 
     my($seqStream,$seqObj);
 
