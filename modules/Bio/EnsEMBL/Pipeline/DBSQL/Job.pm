@@ -203,12 +203,11 @@ sub input_id {
 
 =cut
 
-
 sub analysis {
     my ($self,$arg) = @_;
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) unless
-	    $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) 
+            unless $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
 	$self->{_analysis} = $arg;
     }
@@ -508,21 +507,20 @@ sub get_all_status {
 
     $self->throw("Can't get status if id not defined") unless defined($self->id);
 
-    my $sth = $self->_dbobj->prepare("select id,status,time from  jobstatus " . 
+    my $sth = $self->_dbobj->prepare("select id,status, UNIX_TIMESTAMP(time) from  jobstatus " . 
 				     "where id = \"" . $self->id . "\" order by time desc");
 
     my $res = $sth->execute();
 
     my @status;
-
-    while (my  $rowhash = $sth->fetchrow_hashref() ) {
-	my $time      = $rowhash->{'time'};
+    while (my $rowhash = $sth->fetchrow_hashref() ) {
+	my $time      = $rowhash->{'UNIX_TIMESTAMP(time)'};#$rowhash->{'time'};
 	my $status    = $rowhash->{'status'};
-	
-	my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+    my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
 							   -status  => $status,
 							   -created => $time,
 							   );
+                               
 	
 	
 	push(@status,$statusobj);
