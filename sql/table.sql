@@ -70,7 +70,7 @@ CREATE TABLE jobstatus (
   status varchar(40) DEFAULT 'CREATED' NOT NULL,
   time datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
 
-  PRIMARY KEY (jobId),
+  KEY (jobId),
   KEY status_index (status)
 );
 
@@ -106,7 +106,7 @@ CREATE TABLE RuleConditions (
 );
 
 CREATE TABLE InputIdAnalysis (
-  inputId varchar(20) not null,
+  inputId varchar(40) not null,
   class enum( "clone","contig","vc","gene" ) not null,
   analysisId int not null,
   created datetime not null,
