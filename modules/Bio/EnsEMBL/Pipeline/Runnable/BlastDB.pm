@@ -348,16 +348,20 @@ sub index_type {
     $value = 'new wu' 
       unless $value;
 
+    my $seqfetch_cmd_ok;
+
     if ($value =~ /wu/i) {
 
       if (($value =~ /new/i)&&($self->molecule_type eq 'DNA')) {
-	$self->{_format_command}   = 'xdformat -n -I';
-	$self->{_seqfetch_command} = ['xdget -n' , 'blastdb' , 'seqid'];
+	$self->format_command('xdformat -n -I');
+	$self->seqfetch_command(['xdget -n' , 'blastdb' , 'seqid']);
+	$seqfetch_cmd_ok = 1;
 	$self->{_index_type} = 'new_wu';
 	
       } elsif (($value =~ /new/i)&&($self->molecule_type eq 'PROTEIN')) {
-	$self->{_format_command}   = 'xdformat -p -I';
-	$self->{_seqfetch_command} = ['xdget -p' , 'blastdb' , 'seqid'];
+	$self->format_command('xdformat -p -I');
+	$self->seqfetch_command(['xdget -p' , 'blastdb' , 'seqid']);
+	$seqfetch_cmd_ok = 1;
 	$self->{_index_type} = 'new_wu';
 	
       } elsif ($value =~ /old/i) {
@@ -365,26 +369,35 @@ sub index_type {
 	$self->{_index_type} = 'old_wu';
 	
 	if ($self->molecule_type eq 'DNA') {
-	  $self->{_format_command}   = 'pressdb';
+	  $self->format_command('pressdb');
 ### Can this be fixed?
-	  $self->{_seqfetch_command} = 'throw';
+	  $self->seqfetch_command('throw');
+	  $seqfetch_cmd_ok = 1;
 
 	} elsif ($self->molecule_type eq 'PROTEIN') {
-	  $self->{_format_command}   = 'setdb';
+	  $self->format_command('setdb');
 ### Can this be fixed?
-	  $self->{_seqfetch_command} = 'throw';
+	  $self->seqfetch_command('throw');
+	  $seqfetch_cmd_ok = 1;
 	}
       }
     } elsif ($value =~ /ncbi/i) {
-      $self->{_format_command}   = 'formatdb -o T -i ';
-      $self->{_format_command}  .= '-p F ' if $self->molecule_type eq 'DNA';
-      $self->{_seqfetch_command} = ['fastacmd -d' , 'blastdb' , '-s', 'seqid'];
+      my $format_command = 'formatdb -o T ';;
+      $format_command .= '-p F ' 
+	if $self->molecule_type eq 'DNA';
+      $format_command .= '-i ';
+
+      $self->format_command($format_command);
+
+      $self->seqfetch_command(['fastacmd -d' , 'blastdb' , '-s', 'seqid']);
+      $seqfetch_cmd_ok = 1;
+
       $self->{_index_type} = 'ncbi';
     }
 
     $self->throw("Database indexing method [$value] not recognised.")
-      unless ($self->{_format_command} 
-	      && $self->{_seqfetch_command});
+      unless ($self->format_command
+	      && $seqfetch_cmd_ok);
   }
 
   return $self->{_index_type}
@@ -393,11 +406,26 @@ sub index_type {
 sub format_command {
   my $self = shift;
 
+  if (@_){
+    $self->{_format_command} = shift
+  }
+
+  $self->throw("Unable to return unset format command")
+    unless $self->{_format_command};
+
   return $self->{_format_command}
 }
 
 sub seqfetch_command {
   my $self = shift;
+
+  if(@_){
+    $self->{_seqfetch_command} = shift;
+    return
+  }
+
+  $self->throw("Seqfetch command not yet set.")
+    unless $self->{_seqfetch_command};
 
   $self->throw("Blast database is not configured for sequence fetching (yet).") 
     if $self->{_seqfetch_command} eq 'throw';
