@@ -252,6 +252,28 @@ sub get_JobsByCurrentStatus {
     return @jobs;
 }
 
+sub get_JobsByAnalysis {
+    my ($self,$analysis) = @_;
+
+    
+    $self->throw("No input analysis for get_JobsByCurrentAnalysis") unless defined($analysis);
+    
+    my $query = "select id,input_id,analysis,LSF_id,machine,queue," .
+	"stdout_file,stderr_file,input_object_file,output_file,status_file " . 
+	    " from job where analysis = $analysis"; 
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+    
+    my @jobs;
+    
+    while (my $row = $sth->fetchrow_hashref) {
+	my $job = $self->_parseJob($row);
+	push(@jobs,$job);
+    }
+
+    return @jobs;
+}
+
 sub _parseJob {
     my ($self,$row) = @_;
 

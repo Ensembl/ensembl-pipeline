@@ -463,16 +463,34 @@ sub set_status {
 
 sub current_status {
     my ($self,$arg) = @_;
-
+    
     if (defined($arg)) {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object") unless
 	    $arg->isa("Bio::EnsEMBL::Pipeline::Status");
-
 	$self->{_status} = $arg;
-    } 
-
-    ## Should go to the database here if we don't have a status object
-    
+    }
+    else {
+	$self->throw("Can't get status if id not defined") unless defined($self->id);
+	my $id =$self->id;
+	my $sth = $self->_dbobj->prepare("select status from current_status where id=$id");
+	my $res = $sth->execute();
+	my $status;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $status    = $rowhash->{'status'};
+	}
+	my $sth = $self->_dbobj->prepare("select now()");
+	my $res = $sth->execute();
+	my $time;
+	while (my  $rowhash = $sth->fetchrow_hashref() ) {
+	    $time    = $rowhash->{'now()'};
+	}
+	my $statusobj = new Bio::EnsEMBL::Pipeline::Status(-jobid   => $self->id,
+							   -status  => $status,
+							   -created => $time,
+							   );
+	
+	$self->{_status} = $statusobj;
+    }
     return $self->{_status};
 }
 
