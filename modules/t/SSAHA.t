@@ -1,109 +1,43 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 7;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::SSAHA;
 use Bio::Seq;
 use Bio::SeqIO;
-use strict;
 
-$loaded = 1;
-print "ok 1\n";;    # 1st test passed.
+ok(1);
 
-# Make two Bio::Seq objects - one for the and one for the subject.
+ok(my ($subject, $query) =  get_seqs());
 
-my ($subject, $query) =  get_seqs();
-
-my $subj_seq = Bio::Seq->new(	-seq         => $subject,
-				-id          => 'HSAC74',  
-				-accession   => 'ACOOOO74',
-				-moltype     => 'dna');
+ok(my $subj_seq = Bio::Seq->new(	-seq         => $subject,
+					-id          => 'HSAC74',  
+					-accession   => 'ACOOOO74',
+					-moltype     => 'dna'));
 
 
-my $query_seq = Bio::Seq->new(	-seq         => $query,
-				-id          => 'HSAC74_frag',  
-				-accession   => 'ACOOOO74',  #The query seq is only a fragment of this accession.
-				-moltype     => 'dna');
+ok(my $query_seq = Bio::Seq->new(	-seq         => $query,
+					-id          => 'HSAC74_frag',  
+					-accession   => 'ACOOOO74',  
+					-moltype     => 'dna'));
 
-if ($subj_seq && $query_seq) {
-  print "ok 2\n";  # 2nd test passed.
-}else {
-  print "not ok 2\n";
-}
+ok(my $seqio_out = Bio::SeqIO->new(-file => '>/tmp/dbfile.fa', -fmt => 'Fasta'));
 
-# Write the db sequence to a working directory.
+ok($seqio_out->write_seq($subj_seq));
 
-my $seqio_out = Bio::SeqIO->new(-file => '>/tmp/dbfile.fa', -fmt => 'Fasta');
+ok(my $ssaha = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(	-CLONE => $query_seq,
+								-DB    => '/tmp/dbfile.fa'));
 
-if ($seqio_out->write_seq($subj_seq)) {
-print "ok 3\n";
-} else {
-print "not ok 3\n";
-}
+ok($ssaha->workdir('/tmp'));
 
+ok($ssaha->run);
 
-# Get a Bio::EnsEMBL::Pipeline::Runnable::SSAHA object.
+ok(my @output = $ssaha->output);
 
-my $ssaha = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(	-CLONE => $query_seq,
-								-DB    => '/tmp/dbfile.fa');
-
-if ($ssaha) {
-  print "ok 4\n";  # 3rd test passed.
-}else {
-  print "not ok 4\n";
-}
-
-# Attempt to set a workdir.
-
-if ($ssaha->workdir('/tmp')) {
-  print "ok 5\n";
-} else {
-  print "not ok 5\n";
-}
-
-# Try to run.
-
-$ssaha->run();
-
-print "ok 6\n";  # 4th test passed.
-
-# Retrieve output.
-
-my @output = $ssaha->output;
-
-if (@output) {
-  print "ok 7\n"; # 5th test passed.
-}else {
-  print "not ok 7\n";
-}
-
-# Print some details of the output.
-
-my @methods = qw(seqname start end score percent_id);
 foreach my $feat_pair (@output) {
-    foreach my $method_name (@methods) {
-        my $value = $feat_pair->$method_name();
-        printf ("%10s = $value\n", $method_name);
-    }
+  print $feat_pair->gffstring . "\n";
 }
 
 
