@@ -445,7 +445,7 @@ sub _process_Transcripts {
     print STDERR "applying filtering\n";
     
     my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-      ->new( -coverage => 95,
+      ->new( -coverage => 97,
 	     -perc_id  => 99,
 	     -depth    => 20,
 	   );
