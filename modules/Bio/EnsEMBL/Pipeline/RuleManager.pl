@@ -28,7 +28,7 @@ my $currentMail = 0;
 my %stats = ( );
 
 # how many second before job becomes old?
-my $oldJob = 90;
+my $oldJob = 600;
 
 # $statusDir = '/tmp/ruleManager';
 

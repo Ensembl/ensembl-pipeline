@@ -37,7 +37,7 @@ package Bio::EnsEMBL::Pipeline::Job;
 # use Data::Dumper;
 
 BEGIN {
-  require "Bio/EnsEMBL/Pipeline?pipeConf.pl";
+  require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
 }
 
 use vars qw(@ISA);
@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 #my $nfs_tmpdir = "/nfs/disk100/humpub1/michele/est2genome/";
 my $nfs_tmpdir = "/nfs/disk21/stabenau/tmp";
+# my $nfs_tmpdir = "/nfs/ensembl/ensembl/tmp";
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
