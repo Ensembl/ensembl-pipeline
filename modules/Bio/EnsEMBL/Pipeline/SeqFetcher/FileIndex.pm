@@ -56,8 +56,8 @@ sub new {
   if (defined($seqfile)) {
     $self->seqfile($seqfile);
   } else {
-		$self->throw("Need a sequence file");
-	}
+    $self->throw("Need a sequence file");
+  }
   
   return $self; # success - we hope!
 }
@@ -89,27 +89,28 @@ sub  get_Seq_by_acc {
 sub seqfile {
   my ($self,$file) = @_;
 
+
   if (defined($file)) {
-     open (INDEX,"<$file");
-
-		 my $seqio = new Bio::SeqIO(-fh => \*INDEX, -format => 'fasta');
-
-		 while (my $seq = $seqio->next_seq) {
-			 $self->{_seqhash}{$seq->id} = $seq;
-		 }
-
-		 close(INDEX);
-	 } else {
-		 $self->throw("Must supply a seqfile to Bio:EnsEMBL::Pipeline::SeqFetcher::FileIndex");
-	 }
+    open (INDEX,"<$file") || $self->throw("Can't open $file");
+    
+    my $seqio = new Bio::SeqIO(-fh => \*INDEX, -format => 'fasta');
+    
+    while (my $seq = $seqio->next_seq) {
+      $self->{_seqhash}{$seq->id} = $seq;
+    }
+    
+    close(INDEX);
+  } else {
+    $self->throw("Must supply a seqfile to Bio:EnsEMBL::Pipeline::SeqFetcher::FileIndex");
+  }
 }
   
 sub list_all_ids {
   my ($self) = @_;
 
-	my @ids = keys %{$self->{_seqhash}};
+  my @ids = keys %{$self->{_seqhash}};
 
-	return \@ids;
+  return \@ids;
 }
 
 1;

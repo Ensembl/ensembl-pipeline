@@ -4,6 +4,7 @@ use Test;
 
 BEGIN { $| = 1; plan test => 10;}
 
+use Bio::EnsEMBL::Pipeline::SeqFetcher::FileIndex;
 use Bio::EnsEMBL::Pipeline::GeneUtils;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -12,6 +13,10 @@ use Bio::EnsEMBL::RawContig;
 use Bio::SeqIO;
 
 ok(1);
+
+my $pepfile = '/nfs/acari/michele/cvs/ensembl-trunk/ensembl-pipeline/modules/t/data/testpep.fa';
+
+ok( -e $pepfile);
 
 ok(my $dnafile = 't/data/AC099340.fa.masked');
 
@@ -89,7 +94,36 @@ foreach my $exon (@{$transcript->get_all_Exons}) {
 
 print $transcript->translation->start . "\n";
 print $transcript->translation->end   . "\n";
-print $transcript->translate->seq . "\n";
+print $transcript->translate->seq     . "\n";
+
+my $valid = Bio::EnsEMBL::Pipeline::GeneUtils::check_strand($transcript);
+
+print "Valid strand $valid\n";
+
+my @tran  = Bio::EnsEMBL::Pipeline::GeneUtils::check_introns($transcript,7000);
+
+ok(scalar(@tran) == 1);
+
+foreach my $tran (@tran) {
+  print "Tran " . $tran->translate->seq . "\n";
+}
+
+my $compl = Bio::EnsEMBL::Pipeline::GeneUtils::check_low_complexity($transcript,80);
+
+print "Complexity " . $compl . "\n";
+
+my $seqfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::FileIndex->new(
+	   -seqfile => $pepfile);
+
+my @ids = @{$seqfetch->list_all_ids};
+
+print "Ids @ids\n";
+
+my $cov = Bio::EnsEMBL::Pipeline::GeneUtils::check_coverage(
+     $transcript,50,[$seqfetch]);
+
+print "Coverage $cov\n";
+
 
 sub make_feature {
   my ($start,$end,$strand,$hid,$hstart,$hend,$hstrand) = @_;
