@@ -50,6 +50,11 @@ my $runnable    = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA';
 my $ana_adaptor = $db->get_AnalysisAdaptor();
 my $ana = $ana_adaptor->fetch_by_logic_name('blastgenscanDNA');
 
+my $database = `pwd`;
+chomp($database);
+
+$database .= "/t/data/mini_mrna.fa";
+$ana->db_file($database);
 $ana->parameters('-B=10');
 
 unless ($ana) {
@@ -104,7 +109,7 @@ $runobj->write_output();
 #########################################
 
 my $contig   = $db->get_RawContigAdaptor()->fetch_by_name($id);
-my @features = $contig->get_all_SimilarityFeatures();
+my @features = @{$contig->get_all_SimilarityFeatures()};
 
 display(@features);
 
@@ -121,15 +126,15 @@ sub display {
     #Display output
     foreach my $obj (@results)
     {
-       print STDERR ($obj->gffstring."\n");
-       print STDERR ("PHASE: ".$obj->phase."\n") if (defined($obj->phase));
+       print ($obj->gffstring."\n");
+       print ("PHASE: ".$obj->phase."\n") if (defined($obj->phase));
        
        if ($obj->sub_SeqFeature)
        {
             foreach my $exon ($obj->sub_SeqFeature)
             {
-                print STDERR "Sub: ".$exon->gffstring."\n";
-                print STDERR ("PHASE: ".$exon->phase."\n");
+                print "Sub: ".$exon->gffstring."\n";
+                print ("PHASE: ".$exon->phase."\n");
             }
        }
     }

@@ -115,7 +115,7 @@ if ($@) {
 }
 
 foreach my $out ($blastx->output) {
-    print STDERR $out->gffstring . "\n";
+    print $out->gffstring . "\n";
 }
 
 print "ok 9\n";
@@ -147,7 +147,7 @@ if ($@) {
 }
 
 foreach my $out ($tblastn->output) {
-    print STDERR $out->gffstring . "\n";
+    print $out->gffstring . "\n";
 }
 
 print "ok 12\n";

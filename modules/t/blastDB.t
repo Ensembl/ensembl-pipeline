@@ -52,19 +52,6 @@ print STDERR "have ".$ana."\n";
 $ana->db('AI053588.fa');
 $ana->db_file("$pwd/t/data/AI053588.fa");
 
-#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
-#                                                    -db_file        => 'embl_vertrna',
-#                                                    -db_version     => '1',                  
-#                                                    -program        => 'wublastn',
-#                                                    -program_file   => 'wublastn',
-#                                                    -program_version=> 1,
-#                                                    -module         => $runnable,
-#                                                    -module_version => 1,
-#                                                    -gff_source     => 'wublastn',
-#                                                    -gff_feature    => 'similarity', 
-#                                                    -parameters     => $parameters,
-#						    -logic_name     => 'wublastn',
-#                                                     );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -89,7 +76,7 @@ unless (@out)
 else
 { print "ok 5\n"; }
 #display(@out);
-print STDERR "Feature Hits: ".scalar(@out)."\n";
+print "Feature Hits: ".scalar(@out)."\n";
 
 $runobj->write_output();
 my @features = $db->get_RawContigAdaptor()->fetch_by_name($id)->get_all_SimilarityFeatures();
@@ -105,12 +92,12 @@ sub display {
     #Display output
     foreach my $obj (@results)
     {
-       print STDERR ($obj->gffstring."\n");
+       print ($obj->gffstring."\n");
        if ($obj->sub_SeqFeature)
        {
             foreach my $exon ($obj->sub_SeqFeature)
             {
-                print STDERR "Sub: ".$exon->gffstring."\n";
+                print "Sub: ".$exon->gffstring."\n";
             }
        }
     }

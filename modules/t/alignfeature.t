@@ -63,7 +63,7 @@ $inx->make_index($fasta_filename);
 
 #create SeqFetcher::Pfetch object    
 my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-                     -executable  => '/usr/local/pubseq/bin/pfetch',
+                     -executable  => 'pfetch',
 		     -bp_index    => $index_filename);
 
 ok($seqfetcher);

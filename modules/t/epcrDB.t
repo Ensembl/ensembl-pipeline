@@ -105,12 +105,12 @@ sub display {
     #Display output
     foreach my $obj (@results)
     {
-       print STDERR ($obj->gffstring."\n");
+       print ($obj->gffstring."\n");
        if ($obj->sub_SeqFeature)
        {
             foreach my $exon ($obj->sub_SeqFeature)
             {
-                print STDERR "Sub: ".$exon->gffstring."\n";
+                print "Sub: ".$exon->gffstring."\n";
             }
        }
     }

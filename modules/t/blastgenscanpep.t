@@ -1,26 +1,8 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..6\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan test => 10; }
 
 use Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep;
 use Bio::EnsEMBL::PredictionTranscript;
@@ -28,20 +10,19 @@ use Bio::EnsEMBL::Exon;
 use Bio::PrimarySeq;
 
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
+ok(1);
 
-# make PrimarySeq objects for genomic and protein sequences.
-my $gseq =  set_seq();
+ok(my $gseq =  set_seq());
 
 my $genomic_seq	   =  Bio::PrimarySeq->new(	-seq         => $gseq,
 						-id          => 'Z84721.1.1.43058',
 						-accession   => 'Z84721',
 						-moltype     => 'dna');
 
+ok($genomic_seq);
 
-my $pred_transcript = Bio::EnsEMBL::PredictionTranscript->new();
-my $exon = Bio::EnsEMBL::Exon->new;
+ok(my $pred_transcript = Bio::EnsEMBL::PredictionTranscript->new());
+ok(my $exon = Bio::EnsEMBL::Exon->new);
 
 $exon->start(33739);
 $exon->end  (33870);
@@ -61,11 +42,7 @@ $exon->end_phase(1);
 
 $pred_transcript->add_Exon($exon);
 
-unless (defined($pred_transcript) && 
-	scalar (@{$pred_transcript->get_all_Exons}) > 0)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+ok($pred_transcript);
 
 my $pwd = `pwd`; chomp($pwd);
 
@@ -79,26 +56,17 @@ my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new (
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
-
-unless (defined($blastgenscan))
-{ print "not ok 4\n"; }
-else
-{ print "ok 4\n"; }
-
+ok($blastgenscan);
 
 # Run BlastGenscanPep runnable.
 $blastgenscan->run();
+ok(1);
 
-print "ok 5\n"; # 5th test passed
+ok(my @results = $blastgenscan->output());
 
-# Retrieve output.
-my @results = $blastgenscan->output();
 display(@results);
 
-unless (@results) 
-{ print "not ok 6\n"; }
-else
-{ print "ok 6\n"; }
+ok(1);
 
 sub display {
   my @results = @_;
@@ -108,7 +76,7 @@ sub display {
     {
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
-        printf STDERR ("%10s = $value\n", $method_name);
+        printf ("%10s = $value\n", $method_name);
       }
       print "\n";
     }

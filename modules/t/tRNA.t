@@ -29,10 +29,10 @@ use Bio::SeqIO;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+my $seqstr =  set_seq();
 
 
-my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seq,
+my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seqstr,
 					-id          => 'HS97D16',
 					-accession   => 'AL009179',
 					-moltype     => 'dna');
@@ -71,10 +71,10 @@ sub display {
 
   foreach my $obj (@results)
     {
-      printf STDERR "\n";
+      print "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
-        printf STDERR ("%10s = $value\n", $method_name);
+        printf ("%10s = $value\n", $method_name);
       }
     }
 }

@@ -31,9 +31,9 @@ use strict;
 $loaded = 1;
 print "ok 1\n";;    # 1st test passed.
 
-my ($seq) =  set_seq();
+my $seqstr =  set_seq();
 
-my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seq,
+my $seq	   =  Bio::PrimarySeq->new(	-seq         => $seqstr,
 					-id          => 'HSAC74',
 					-accession   => 'ACOOOO74',
 					-moltype     => 'dna');

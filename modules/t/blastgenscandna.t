@@ -70,14 +70,17 @@ unless (defined($pred_transcript) && scalar (@{$pred_transcript->get_all_Exons})
 else
 { print "ok 3\n"; }
 
+my $database = `pwd`;
+chomp($database);
 
+$database .= '/t/data/mini_mrna.fa';
 # Make a BlastGenscanDNA object.
 my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new ( 
                                                     -genomic    => $genomic_seq,
                                                     -peptide    => $pred_transcript,
 						    -program    => 'wutblastn',
                                             # Hardcoded path alert
-                                                    -database   => '/data/blastdb/Ensembl/embl_vertrna-1',
+                                                    -database   => $database,
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
@@ -108,10 +111,10 @@ sub display {
 
   foreach my $obj (@results)
     {
-      printf STDERR "\n";
+      printf "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
-        printf STDERR ("%10s = $value\n", $method_name);
+        printf ("%10s = $value\n", $method_name);
       }
     }
 }

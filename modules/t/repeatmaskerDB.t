@@ -41,7 +41,6 @@ ok(my @out = $runobj->output);
 display(@out);
 
 ok(1);
-$ens_test->pause;
 $runobj->write_output();
 
 ok(1);

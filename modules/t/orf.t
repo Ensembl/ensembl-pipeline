@@ -22,14 +22,16 @@ my $orf = Bio::EnsEMBL::Pipeline::Runnable::ORF->new (-seq => $seq ,
 						      -length => 50);
 
 ok($orf);
-ok($orf->run);
+$orf->run;
 
-foreach my $out ( $orf->output ) {
+ok(my @output = $orf->output);
+
+foreach my $out (@output ) {
     print $out->start," ",$out->end," ",$out->strand," ",$out->{'_peptide'},"\n";
 }
 
 
-ok($orf);
+ok(1);
 
 
 

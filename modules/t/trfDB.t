@@ -87,6 +87,6 @@ sub display {
     #Display output
     foreach my $obj (@results)
     {
-       print STDERR ($obj->gffstring."\n");
+       print ($obj->gffstring."\n");
     }
 }

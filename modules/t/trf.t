@@ -71,10 +71,10 @@ sub display {
 
   foreach my $obj (@results)
     {
-      printf STDERR "\n";
+      printf "\n";
       foreach my $method_name (@methods) {
         my $value = $obj->$method_name();
-        printf STDERR ("%10s = $value\n", $method_name);
+        printf ("%10s = $value\n", $method_name);
       }
     }
 }

@@ -67,17 +67,17 @@ my $ssaha = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(	-CLONE => $query_seq,
 								-DB    => '/tmp/dbfile.fa');
 
 if ($ssaha) {
-  print "ok 3\n";  # 3rd test passed.
+  print "ok 4\n";  # 3rd test passed.
 }else {
-  print "not ok 3\n";
+  print "not ok 4\n";
 }
 
 # Attempt to set a workdir.
 
 if ($ssaha->workdir('/tmp')) {
-  print "ok 4\n";
+  print "ok 5\n";
 } else {
-  print "not of 4\n";
+  print "not ok 5\n";
 }
 
 # Try to run.
