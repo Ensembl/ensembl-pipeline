@@ -175,4 +175,36 @@ sub get_pending_jobs {
   return scalar @lines;
 }
 
+
+# the next two methods are used together in the RuleMAnager_Genebuild script
+# if you implement one you must implement the other
+
+sub get_job_time{
+  my ($self, $job_id) = @_;
+
+  my $command = "bjobs -l ".$job_id;
+  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs: $!");
+
+  while(<BJOB>){
+    chomp;
+    if($_ =~ /The CPU time used/){
+      my ($time) = $_ =~ /The CPU time used is (\d+)/;
+      return $time;
+    }else{
+      next;
+    }
+  }
+  print STDERR "CPU time isn't yet reported for job ".$job_id."\n";
+  return undef;
+}
+
+
+
+sub kill_job{
+  my ($self, $job_id) = @_;
+
+  my $command = "bkill ".$job_id;
+  system($command);
+}
+
 1;
