@@ -384,7 +384,7 @@ sub parse_results {
         $feat->{'source'} = 'e-PCR';
         $feat->{'primary'} = 'sts';
 
-	print "$name : $start : $end : $dbID\n";
+	#print "$name : $start : $end : $dbID\n";
 
 	$self->create_MarkerFeature($feat);
     }
@@ -394,7 +394,7 @@ sub parse_results {
 
 =head2 output
 
-Returns an array of FeaturePair's (must be called after parse_results()).
+Returns an array of FeaturePair's (must be called after parse_results()).'
 
 =cut
 
@@ -493,12 +493,11 @@ sub create_MarkerFeature {
 
     my $mf = Bio::EnsEMBL::Map::MarkerFeature->new;
     $mf->analysis($analysis);
-    $mf->score   ($feat->{'score'});
     $mf->seqname ($feat->{'name'});
     $mf->start   ($feat->{'start'});
     $mf->end     ($feat->{'end'});
     $mf->strand  ($feat->{'strand'});
-    $mf->dbID    ($feat->{'dbID'});
+    #$mf->dbID    ($feat->{'dbID'});
     $mf->marker  ($m);
 
     # display_label must be a null string, and not undef

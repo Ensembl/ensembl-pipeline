@@ -80,25 +80,7 @@ sub new {
 sub fetch_input {
     my( $self) = @_;
 
-    # Check analysis exists
-    $self->throw("Analysis object not passed to RunnableDB/FirstEF") 
-      unless $self->analysis->isa("Bio::EnsEMBL::Analysis");
-
-    # Check input id
-    $self->throw("No input id passed to RunnableDB/FirstEF (eg. 1.500000-1000000)") 
-      unless $self->input_id;
-
-    # Fetch slice specified by input id
-    unless ($self->input_id =~ /$SLICE_INPUT_ID_REGEX/ ){
-      $self->throw("Input id [".$self->input_id."] not compatible with ".
-		   "slice input id regex [". $SLICE_INPUT_ID_REGEX ."]");
-    }
-    my $chr   = $1;
-    my $start = $2;
-    my $end   = $3;
-
-    my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
-    $self->query($slice);
+    $self->fetch_sequence;
 
     my %parameters = $self->parameter_hash;
 
@@ -132,23 +114,10 @@ sub write_output {
 
     foreach my $f ($self->output) {
 
-	$f->analysis($self->analysis);
-	$f->contig($slice);
-	my @mapped = $f->transform;
-
-        if (@mapped == 0) {
-	    $self->warn("Couldn't map $f - skipping");
-	    next;
-        }
-        if (@mapped == 1 && $mapped[0]->isa("Bio::EnsEMBL::Mapper::Gap")) {
-	    $self->warn("$f seems to be on a gap - something bad has happened ...");
-	    next;
-        }
-
-	push @mapped_features, $mapped[0];
-
+      $f->analysis($self->analysis);
+      $f->slice($slice);
     }
-    $sfa->store(@mapped_features) if @mapped_features;
+    $sfa->store($self->output);
 
     return 1;
 }
