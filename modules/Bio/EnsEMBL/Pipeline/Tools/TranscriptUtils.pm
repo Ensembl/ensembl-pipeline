@@ -49,9 +49,8 @@ use Bio::EnsEMBL::DnaPepAlignFeature;
 ###########################################################
 
 sub _check_Transcript{
-    my ($self,$transcript) = @_;
-    my $slice = $self->query;
-    
+    my ($self,$transcript, $slice) = @_;
+      
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     
@@ -112,6 +111,7 @@ Description : it returns TRUE if a transcript has a translation, and this has
               we may have some transcripts whih are valid but
               for which we haven not assigned a translation yet.
 ReturnType  : a BOOLEAN.
+=cut
 
 sub _check_Translation{
   my ($self,$transcript) = @_;
@@ -120,8 +120,19 @@ sub _check_Translation{
   
   my $valid = 1;
   
-  # check that they have a translation
   my $translation = $transcript->translation;
+
+  # double check sane translation start & end
+  if( $translation->start < 1){
+      print STDERR "dodgy translation start: ".$translation->start."\n";
+      $valid = 0;
+  }
+  
+  if( $translation->end < 1 || $translation->end > $translation->end_Exon->length ){
+     print STDERR "dodgy translation end " . $translation->end . "\n";
+     $valid = 0;
+  }
+    
   my $sequence;
   eval{
     $sequence = $transcript->translate;
@@ -132,7 +143,9 @@ sub _check_Translation{
   }
   if ( $sequence ){
     my $peptide = $sequence->seq;
-    if ( $peptide =~ /\*/ ){
+    print STDERR "peptide: $peptide\n";
+    # check only terminal stops
+    if ( $peptide =~ /\*./ ){
       print STDERR "translation of transcript $id has STOP codons\n";
       $valid = 0;
     }
@@ -168,6 +181,134 @@ sub transcript_id {
 }
 
 ############################################################
+
+=head2 split_transcript
+
+  Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
+    transcripts that result. 
+    Returns : Ref to @Bio::EnsEMBL::Transcript
+    Args    : Bio::EnsEMBL::Transcript
+
+=cut
+    
+sub split_Transcript{
+  my ($transcript,$max_intron) = @_;
+      
+  $transcript->sort;
+      
+      my @split_transcripts   = ();
+      
+      if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+	#$self->throw("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+      }
+      
+      my $prev_exon;
+      my $exon_added = 0;
+      
+      my $curr_transcript = new Bio::EnsEMBL::Transcript;
+      my $translation     = new Bio::EnsEMBL::Translation;
+      
+      $curr_transcript->translation($translation);
+      
+    EXON: foreach my $exon (@{$transcript->get_all_Exons}){
+	
+	$exon_added = 0;
+	
+	# Start a new transcript if we are just starting out
+	
+	if($exon == $transcript->start_Exon){
+	  
+	  $prev_exon = $exon;
+	  
+	  $curr_transcript->add_Exon($exon);
+	  $exon_added = 1;
+	  $curr_transcript->translation->start_Exon($exon);
+	  $curr_transcript->translation->start($transcript->translation->start);
+	  
+	  push(@split_transcripts, $curr_transcript);
+	  next EXON;
+	}
+	
+	# We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+	my $intron = 0;
+	
+	if ($exon->strand == 1) {
+	  $intron = abs($exon->start - $prev_exon->end - 1);
+	} else {
+	  $intron = abs($prev_exon->start - $exon->end - 1);
+	}
+	
+	if ($intron > $max_intron) {
+	  $curr_transcript->translation->end_Exon($prev_exon);
+	  $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
+	  
+	  my $t  = new Bio::EnsEMBL::Transcript;
+	  my $tr = new Bio::EnsEMBL::Translation;
+	  
+	  $t->translation($tr);
+	  
+	  # add exon unless already added, and set translation start and start_Exon
+	  # But the exon will nev er have been added ?
+	  
+	  $t->add_Exon($exon) unless $exon_added;
+	  $exon_added = 1;
+	  
+	  $t->translation->start_Exon($exon);
+	  
+	  if ($exon->phase == 0) {
+	    $t->translation->start(1);
+	  } elsif ($exon->phase == 1) {
+	    $t->translation->start(3);
+	  } elsif ($exon->phase == 2) {
+	    $t->translation->start(2);
+	  }
+	  
+	  $exon->phase(0);
+	  
+	  $curr_transcript = $t;
+	  
+	  push(@split_transcripts, $curr_transcript);
+	}
+	
+	if ($exon == $transcript->end_Exon){
+	  $curr_transcript->add_Exon($exon) unless $exon_added;
+	  $exon_added = 1;
+	  
+	  $curr_transcript->translation->end_Exon($exon);
+	  $curr_transcript->translation->end($transcript->translation->end);
+	} else {
+	  $curr_transcript->add_Exon($exon) unless $exon_added;
+	}
+	
+	foreach my $sf(@{$exon->get_all_supporting_features}){
+	  $sf->seqname($exon->contig_id);
+	}
+	
+	$prev_exon = $exon;
+	
+      }
+      
+      # discard any single exon transcripts
+      my @final_transcripts = ();
+      my $count = 1;
+      
+      foreach my $st (@split_transcripts){
+	$st->sort;
+	
+	my @ex = @{$st->get_all_Exons};
+
+	if(scalar(@ex) > 1){
+	  $st->{'temporary_id'} = $transcript->dbID . "." . $count;
+	  $count++;
+	  push(@final_transcripts, $st);
+
+	}
+  }
+
+ return \@final_transcripts;
+      
+}
+############################################################
 #
 # METHODS DOING THE PRINTING
 #
@@ -191,8 +332,7 @@ sub _print_Transcript{
   }
   print STDERR "transcript: ".$id."\n";
   foreach my $exon ( @exons){
-    $exon->gffstring;
-    #$self->print_Exon($exon);
+    print STDERR $exon->gffstring."\n";
   }
   if ($transcript->translation){
     $self->_print_Translation($transcript->translation);
@@ -213,7 +353,34 @@ sub _print_Translation{
     $translation->end_Exon->start."-".$translation->end_Exon->end.
 	" end: ".$translation->end."\t phase: ".$translation->end_Exon->phase.
 	  " end_phase: ".$translation->end_Exon->end_phase."\n";
+
+
 }
 
 ############################################################
 
+
+sub _print_Peptide{
+  my ($self, $transcript) = @_;
+  
+  my $seqout = new Bio::SeqIO->new(-fh => \*STDERR);
+  my $translation;
+  
+  eval {
+    $translation = $transcript->translate;
+  };  
+  if ($@) {
+    print STDERR "Couldn't translate transcript\n";
+  }
+  else{
+    unless ( $translation->display_id ){
+      $translation->display_id($self->transcript_id($transcript));
+    }
+    $seqout->write_seq($translation);
+  }
+}
+
+
+############################################################
+
+1;
