@@ -217,7 +217,7 @@ sub run{
      my @new;
 
      foreach my $hseqname (keys %hit) {
-       print STDERR "Pruning $hseqname\n";
+#       print STDERR "Pruning $hseqname\n";
        my @tmp = $self->prune_features(@{$hit{$hseqname}});
        push(@new,@tmp);
        push(@{$self->{'_output'}},@tmp);
@@ -249,7 +249,7 @@ sub prune_features {
   my @cluster_starts;
   my @cluster_ends;
 
-  print STDERR "Before " . scalar(@input) . "\n";
+#  print STDERR "Before " . scalar(@input) . "\n";
 
   @input = sort {$a->start <=> $b->start} @input;
 
@@ -311,11 +311,11 @@ sub prune_features {
       $count++;
     }
     if ($#tmp >= 0) {
-      print STDERR "Removing " . scalar(@tmp) . " features\n";
+#      print STDERR "Removing " . scalar(@tmp) . " features\n";
     }
   }
 
-  print STDERR "After " . scalar(@new) . "\n";
+#  print STDERR "After " . scalar(@new) . "\n";
   
   return @new;
 }
