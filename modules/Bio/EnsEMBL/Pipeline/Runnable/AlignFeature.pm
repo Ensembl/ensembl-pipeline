@@ -451,7 +451,7 @@ ID:    foreach my $id (@id) {
 	    $self->throw("Couldn't find sequence for $newid [$id]");
 	}
     
-	my $seq = new Bio::PrimarySeq(-id  => $newid,
+	$seq = new Bio::PrimarySeq(-id  => $newid,
 				      -seq => $seq);
 	
 	$self->{_seq_cache}{$id} = $seq;
@@ -513,7 +513,7 @@ sub get_all_Sequences {
 	    $self->warn("Couldn't find sequence for $newid [$id]");
 	}
 	
-	my $seq = new Bio::PrimarySeq(-id  => $newid,
+	$seq = new Bio::PrimarySeq(-id  => $newid,
 				      -seq => $seq);
 
 	print("Found seq for $id  $seq\n");
