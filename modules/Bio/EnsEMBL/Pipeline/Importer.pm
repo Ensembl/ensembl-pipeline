@@ -68,10 +68,11 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
     Title   :   new
     Usage   :   my $importer   = new Importer(-dbobj      => $dbobj,
-                                              -mirror_dir => $mirror_dir);
+                                              -mirror_dir => $mirror_dir,
+                                              -species    => $species);
     Function:   Initializes module
     Returns :   
-    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,directory name
+    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,directory name,species
 
 =cut
 
@@ -84,8 +85,8 @@ sub _initialize {
   $self->{_mirror_dir}   = undef;
   $self->{_clones}       = [];
 
-  my( $dbobj,$mirror_dir, ) = 
-    $self->_rearrange(['DBOBJ','MIRROR_DIR'], @args);
+  my( $dbobj,$mirror_dir,$species) = 
+    $self->_rearrange(['DBOBJ','MIRROR_DIR','SPECIES'], @args);
 
   if ($dbobj) {
     $self->dbobj($dbobj);
@@ -96,6 +97,11 @@ sub _initialize {
     $self->mirror_dir($mirror_dir);
   } else {
     $self->throw("No mirror directory input");
+  }
+  if ($species) {
+    $self->species($species);
+  } else {
+    $self->throw("No species input");
   }
 
     return $self; # success - we hope!
@@ -242,7 +248,7 @@ sub checkClones {
 	      $std->removeInputId($contig->id,'contig',$analysis[0]);
 	    }
 	    
-	    $self->dbobj->delete_Clone($clone->id);
+	    $oldclone->delete;
 	    push(@newclones,$clone);
 	  }
 
@@ -299,9 +305,13 @@ sub writeClones {
 
 sub getNewFiles {
   my ($self) = @_;
+  my $fileext;
   
   my $dir     = $self->mirror_dir;
   my $logfile = $self->logfile;
+
+  $self->throw("Need to specify species: mm or hs")
+   unless ($self->species eq 'mm' or $self->species eq 'hs');
 
   open(IN,"<$logfile") || $self->throw("Can't read $logfile file");
 
@@ -319,12 +329,13 @@ sub getNewFiles {
   closedir(DIR);
 
   my @newfiles;
+  my $spec = $self->species;
 
   foreach my $file (@allfiles) {
 #    print STDERR "Looking at file $file\n";
     if ($file !~ /^\./  && 
 	! -d $file      &&
-	$file =~ /\.mm/ &&
+	$file =~ /\.$spec/ &&
 	$oldfiles{$file} != 1) {
 
       push(@newfiles,$file);
@@ -355,18 +366,28 @@ sub readFile {
 
   my $dir = $self->mirror_dir;
   my $count = 1;
+  my $finished = 0;
+  my $ccfile;
+
+  $self->throw("Need to specify species: mm or hs")
+   unless ($self->species eq 'mm' or $self->species eq 'mm');
       
   print STDERR "\nReading fasta file " . $file . "\n\n";
-  
-  my $ccfile = $file;
-  $ccfile =~ s/mm_u/mm_u_cc/;
-  
-  if (! -e "$dir/embl_files/$ccfile") {
-    $self->throw("No contig coordinate file [$dir/embl_files/$ccfile]");
+
+  if ($file =~ /_f/) {
+    $finished = 1;
+  }
+  else {
+    $ccfile = $file;
+    my $spec = $self->species;
+    $ccfile =~ s/$spec\_u/$spec\_u_cc/;
+    if (! -e "$dir/embl_files/$ccfile") {
+      $self->throw("No contig coordinate file [$dir/embl_files/$ccfile]");
+    }
+    open(CC,"gunzip -c $dir/embl_files/$ccfile |") || $self->throw("Can't unzip file [$ccfile]\n");
   }
   
   open(IN,"gunzip -c $dir/embl_files/$file   |") || $self>throw("Can't unzip file [$file]\n");
-  open(CC,"gunzip -c $dir/embl_files/$ccfile |") || $self->throw("Can't unzip file [$ccfile]\n");
   
   my $seqio = new Bio::SeqIO(-fh     => \*IN,
 			     -format => 'fasta');
@@ -395,6 +416,7 @@ sub readFile {
   
   my $accession;
   
+  if (! $finished) {
   while (<CC>) {
     chomp;
     if ($_ =~ /^SV\s+(.*)\.(.*)/) {
@@ -413,6 +435,7 @@ sub readFile {
     }
   }
   close(CC);
+  }
 
   return ($clonehash);
   
@@ -498,10 +521,7 @@ sub makeClones {
 	  
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  # my $padlen    = 5 - length($count);
-	  # my $pad       =  "0" x $padlen;
-	  # my $contigid  = $acc . ".$pad$count";
-	  my $contigid  = $acc . ".$ver.$offset." . $contig->{end};
+	  my $contigid  = "$acc.$ver.$offset." . $contig->{end};
 	  
 	  $newcontig->id          ($contigid);
 	  $newcontig->seq         (new Bio::Seq(-id => $id, -seq =>$seqstr));    
@@ -519,8 +539,7 @@ sub makeClones {
       } else {
 	  my $newcontig    = new Bio::EnsEMBL::PerlDB::Contig;
 	  
-	  # my $contigid  = $acc . ".00001";
-	  my $contigid  = $acc . ".1.1." . length $seq;
+	  my $contigid  = "$acc.1.1." . $seq->length;
 
 
 	  $newcontig->id          ($contigid);
@@ -565,6 +584,29 @@ sub dbobj {
   return $self->{_dbobj};
 }
 
+
+=head2 species
+
+    Title   :   species
+    Usage   :   $species = $obj->species
+    Function:   Get/set method for species (mm/hs)
+    Returns :   string
+    Args    :   string
+
+=cut
+
+sub species {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    if ($arg ne 'hs' && $arg ne 'mm') {
+      $self->throw("Only mm [mouse] and hs [human] options supported");
+    }
+    $self->{_species} = $arg;
+  }
+
+  return $self->{_species};
+}
 
 =head2 mirror_dir
 
