@@ -335,6 +335,9 @@ sub run_analysis {
               # (.+) will be something like "1050704 bytes were last requested."
               die qq{"OUT_OF_MEMORY"\n}; # resent to big mem machine by rulemanager
             }
+            elsif($match =~ /Could not find or open a substitution matrix/){
+              die qq{"BLASTMAT_ERROR"\n};
+            }
             else{
               $self->warn("Something FATAL happened to BLAST we've not ".
                           "seen before, please add it to Package: " 
