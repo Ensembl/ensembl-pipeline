@@ -28,7 +28,7 @@ Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
   $repmask->workdir($workdir);
   $repmask->run();
   my @results = $repmask->output();
-    
+
 =head1 DESCRIPTION
 
 RepeatMasker takes a Bio::Seq (or Bio::PrimarySeq) object and runs RepeatMaskerHum on it. The
@@ -71,7 +71,7 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::Repeat;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
@@ -104,8 +104,9 @@ sub _initialize {
     $self->{_protected} =[];         #a list of files protected from deletion
     $self->{_arguments} =undef;      #arguments for RepeatMaskerHum
     
-    my( $clonefile, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
-    $self->clone($clonefile) if ($clonefile);       
+    my( $clone, $arguments, $repmask) = $self->_rearrange(['CLONE', 'ARGS', 'REPM'], @args);
+    
+    $self->clone($clone) if ($clone);       
     if ($repmask)
     {   $self->repeatmasker($repmask);  }
     else
@@ -130,9 +131,9 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
         {
-            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+            $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
         $self->{_clone} = $seq ;
         
@@ -323,10 +324,49 @@ sub parse_results {
         $feat1 {source}= 'RepearMaskerHum';
         $feat1 {primary}= 'repeat';
         
-        $self->createfeaturepair(\%feat1, \%feat2); #may need to use references
+        $self->create_repeat(\%feat1, \%feat2); #may need to use references
     }
     close $filehandle;   
 }
+
+sub create_repeat {
+    my ($self, $feat1, $feat2) = @_;
+    
+    #create analysis object
+    my $analysis_obj = Bio::EnsEMBL::Analysis->new
+                        (   -db              => $feat2->{db},
+                            -db_version      => $feat2->{db_version},
+                            -program         => $feat2->{program},
+                            -program_version => $feat2->{p_version},
+                            -gff_source      => $feat2->{source},
+                            -gff_feature     => $feat2->{primary});
+    
+    #create and fill Bio::EnsEMBL::Seqfeature objects
+    my $seqfeature1 = Bio::EnsEMBL::SeqFeature->new
+                        (   -seqname => $feat1->{name},
+                            -start   => $feat1->{start},
+                            -end     => $feat1->{end},
+                            -strand  => $feat1->{strand},
+                            -score   => $feat1->{score},
+                            -source_tag  => $feat1->{source},
+                            -primary_tag => $feat1->{primary},
+                            -analysis => $analysis_obj);
+    
+    my $seqfeature2 = Bio::EnsEMBL::SeqFeature->new
+                        (   -seqname => $feat2->{name},
+                            -start   => $feat2->{start},
+                            -end     => $feat2->{end},
+                            -strand  => $feat2->{strand},
+                            -score   => $feat2->{score},
+                            -source_tag  => $feat2->{source},
+                            -primary_tag => $feat2->{primary},
+                            -analysis => $analysis_obj);
+    #create repeat
+    my $fp = Bio::EnsEMBL::Repeat->new   (-feature1 => $seqfeature1,
+                                          -feature2 => $seqfeature2) ;
+    $self->growfplist($fp);
+}
+
 
 ##############
 # input/output methods
