@@ -46,56 +46,86 @@ use vars qw( %PseudoGenes );
 # Hash containing config info
 %PseudoGenes = (
 	      
-	      TMPDIR     => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/',
-	      BSUBS_FILE => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/pseudogenes_jobs',
-	      SCRIPT     => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl',
-	      PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl -check',
-	      LSF_OPTIONS=> ' -C0 -q acari ',
-		
-	      INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	      	      
-	      ############################################################
-	      # database with the syntenic regions. orthologs, etc
-	      #COMPARA_DBUSER => 'ensro',
-	      COMPARA_DBNAME => 'ensembl_compara_12_1',
-	      COMPARA_DBHOST => 'ecs2d',
-	      COMPARA_CONFIG => '/nfs/acari/eae/ensembl/ensembl-compara/modules/Bio/EnsEMBL/Compara/Compara.conf',
-		
-		############################################################
-		# Species we compare to:
-		COMPARATIVE_DBS    => [
+	############################################################
+	# parameters common to both types of
+	# pseudogene analysis
+
+        TMPDIR      => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/',
+        BSUBS_FILE  => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/pseudogenes_jobs',
+        LSF_OPTIONS => ' -C0 -q acari ',
+	      
+        # database with the syntenic regions. orthologs, etc
+	COMPARA_DBNAME  => 'ensembl_compara_16_1',
+	COMPARA_DBHOST  => 'ecs2d',
+				
+	
+	# Species we compare to:
+	# these databases should contain the dna and assembly
+	# compatible with the compara database use above.
+	# We do it like this and not using a compara_config file to
+	# avoid having multiple config files
+	FOCUS_SPECIES => 'Mus musculus',
+	COMPARATIVE_DBS    => [
 				       {
-					SPECIES => 'Mus musculus',
-					DBHOST  => 'ecs2d',
-					DBNAME  => 'mus_musculus_core_10_3',
-					PATH    => 'MGSC3',
+					SPECIES => 'Homo sapiens',
+					DBHOST  => 'ecs2f',
+					DBNAME  => 'homo_sapiens_core_16_33',
+					PATH    => 'NCBI33',
 				       },
 				       {
 					SPECIES => 'Rattus norvegicus',
-					DBHOST  => 'ecs2a',
-					DBNAME  => 'rat_Nov02',
+					DBHOST  => 'ecs2f',
+					DBNAME  => 'Rattus_noervegicus',
 					PATH    => 'RGSC2',
 				       },
 				      ],
 
-		############################################################
-		# refdb, where the sequence is, sometimes this can be different from genewise_db
-		REF_DBNAME   => 'ens_NCBI_31',
-		REF_DBHOST   => 'ecs2b',
+	# refdb, where the sequence is, sometimes this can be different from genewise_db
+	REF_DBNAME   => 'mus_musculus_core_16_30',
+	REF_DBHOST   => 'ecs2f',	
 
-		############################################################
-		# database where we will write the pseudogenes
-		PSEUDO_DBUSER   => 'ensadmin',
-		PSEUDO_DBNAME   => '',
-		PSEUDO_DBHOST   => '',
-		PSEUDO_DBPASS   => '',
+	############################################################
+	#
+	# PSEUDOGENE LABELLING
+	#
+	############################################################
+	# parameters for pseudogene labelling
+	# This is analysis is run on a set of
+	# predicted genes and those with properties indicating
+	# that are possible processed-pseudogenes
+	# will be labelled as 'pseudogenes'
 
-	      
-	      #####################
-	      # EXONERATE OPTIONS #
-	      #####################
-	      
-	      # full path fo the dir where we have the masked-dusted chromosomes
+        LABEL_PRE_EXEC;
+        LABEL_SCRIPT => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/label_pseudogenes.pl';
+	LABEL_PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/label_pseudogenes.pl -check',
+	
+	# database where the genes to be labelled are
+	LABEL_DBNAME => 'mus_musculus_core_16_30',
+        LABEL_DBHOST => 'ecs2f',
+
+
+	############################################################
+	#
+	# PSEUDOGENE ANNOTATION
+	#
+	############################################################
+	# parameters for the automatic annotation of pseudogenes
+	
+	PSEUDO_SCRIPT     => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl',
+	PSEUDO_PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/pseudogene_finder.pl -check',
+				
+	INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
+	      	      
+	
+	# database where we will write the pseudogenes
+	PSEUDO_DBUSER   => 'ensadmin',
+	PSEUDO_DBNAME   => '',
+	PSEUDO_DBHOST   => '',
+	PSEUDO_DBPASS   => '',
+
+        # EXONERATE OPTIONS #
+		      
+	# full path fo the dir where we have the masked-dusted chromosomes
 	      GENOMIC                 => '/data/blastdb/Ensembl/NCBI33/genome/',
       	      # path to file with repeatmasked dusted genomic sequences
 	      # NB this file is huge - distribute it across the farm or 
@@ -105,43 +135,8 @@ use vars qw( %PseudoGenes );
 	      # which version of exonerate      
 	      EXONERATE              => '/usr/local/ensembl/bin/exonerate-0.6.7',
 	      
-	      ### new exonerate options ####
-	      #
-	      # score: min scores to report. 
-	      # Score is here the raw score for the alignment: +5 for every match and -4 for every mismatch 
-	      #
-	      # fsmmemory: memory given for the target sequence ( max memory required for holding the chromosomes )
-	      # In human this could be around 256
-	      #
-	      # here are a few examples of what it can do at this stage:
-	      #
-	      # 1. Aligning cdnas to genomic sequence:
-	      #    exonerate --exhaustive no --model est2genome cdna.fasta genomic.masked.fasta
-	      #    ( this is the default )
-	      #
-	      # 2. Behaving like est2genome:
-	      #    exonerate --exhaustive yes --model est2genome cdna.fasta genomic.masked.fasta
-	      #
-	      # 3. Behaving like blastn:
-	      #    exonerate --model affine:local dna.fasta genomic.masked.fasta
-	      #
-	      # 4. Smith-Waterman:
-	      #    exonerate --exhaustive --model affine:local query.fasta target.fasta
-	      #
-	      # 5. Needleman-Wunsch:
-	      #    exonerate --exhaustive --model affine:global query.fasta target.fasta
-	      #
-	      # 6. Generate ungapped Protein <---> DNA alignments:
-	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
-	      
-	      #optimal options are:
-             	      #EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14',
-	 
       	      # options for pseudogenes:
               EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
-
-	      # options for structural rnas:
-	      EST_EXONERATE_OPTIONS       => ' --softmasktarget  --score 500 --fsmmemory 800  --saturatethreshold 100 --hspthreshold 60 --dnawordlen 14 --forcegtag FALSE',
 
       	      BEST_IN_GENOME => 1,
 	      MIN_COVERAGE            => 90,
@@ -151,9 +146,9 @@ use vars qw( %PseudoGenes );
 	      # each runnable has an analysis
 	      ############################################################
 	      
-	      EXONERATE_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder',
-	      EXONERATE_ANALYSIS     => 'pseudogene',	      
-	      SOURCE                  => 'RefSeq-EMBL',      
+	    PSEUDO_RUNNABLE     => 'Bio::EnsEMBL::Pipeline::RunnableDB::PseudoGeneFinder',
+	    PSEUDO_ANALYSIS     => 'pseudogene',	      
+	    PSEUDO_SOURCE       => 'RefSeq-EMBL',      
 	      	    
 
 		    
