@@ -284,15 +284,15 @@ sub flush_runs {
   my $pass     = $db->password;
   my $lsfid;
 
-  # runner.pl: first look in same directory as Job.pm
-  # if it's not here use file defined in pipeConf.pl
-  # otherwise fail
+  # runner.pl: first look in pipeConf.pl,
+  # then in same directory as Job.pm,
+  # and fail if not found
 
-  my $runner = __FILE__;
-  $runner =~ s:/[^/]*$:/runner.pl:; 	
+  my $runner = $::pipeConf{'runner'} || undef;
 
   unless (-x $runner) {
-    $runner = $::pipeConf{'runner'} || undef;
+    $runner = __FILE__;
+    $runner =~ s:/[^/]*$:/runner.pl:;
     self->throw("runner undefined - needs to be set in pipeConf.pl\n") unless defined $runner;
   }
 
@@ -322,7 +322,16 @@ sub flush_runs {
     $cmd .= " -J $jobname " if defined $jobname;
     $cmd .= " -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+    # check if the password has been defined, and write the
+    # "connect" command line accordingly (otherwise -pass gets the
+    # first job id as password, instead of remaining undef)
+
+    if (defined $pass) {
+      $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -pass $pass ".join( " ",@{$batched_jobs{$queue}} );
+    }
+    else {
+      $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+    }
     
     print STDERR "$cmd\n";
     open (SUB,"$cmd 2>&1 |");
