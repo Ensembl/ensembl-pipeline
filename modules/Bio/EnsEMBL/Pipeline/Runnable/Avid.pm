@@ -8,7 +8,8 @@
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
-
+##todo
+## declaring a lot of methods private !!!
 =pod
 
 =head1 NAME
@@ -181,7 +182,7 @@ sub run {
   close(AVID);
 
   # write output for slam 
-  $self->write_slam_output if ($self->slam_output_opt);
+  $self->parse_binary if ($self->slam_output_opt);
 
   # pass written minfo mout.. files for deletion to $self->file
   $self->files_to_delete($fa_first,$fa_secnd);
@@ -327,7 +328,7 @@ sub write_sequences {
 
 ############################################################
 
-sub write_slam_output {
+sub parse_binary {
   my ($self) =  @_;
 
   $self->checkdir;
@@ -343,7 +344,7 @@ sub write_slam_output {
   my $binfile = $self->workdir."/".$ff."_".$sf.".mout";
   my $outfile = $self->workdir."/".$ff."_".$sf."_slam_input.txt";
 
-  $self->slam_txt_filename($outfile);
+  $self->parsed_binary_output_filename($outfile);
 
   ####### START PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
 
@@ -387,7 +388,7 @@ sub write_slam_output {
     close(OUT);
 
   ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
-# $self->file($outfile);   #uncomment to delete txt outfiles for slam !!!
+ $self->file($outfile);   #uncomment to delete the aat-outputfile for slam txt outfiles for slam !!!
   return $outfile;
 }
 
@@ -409,10 +410,10 @@ sub file_prefix{
   return $self->{_file_prefix};
 }
 
-sub slam_txt_filename{
+sub parsed_binary_output_filename{
   my ($self,$fn) = @_;
-  $self->{_slam_txt_filename}=$fn if (defined $fn && !defined $self->{_slam_txt_filename});
-  return $self->{_slam_txt_filename};
+  $self->{_parsed_binary_output_filename}=$fn if (defined $fn && !defined $self->{_parsed_binary_output_filename});
+  return $self->{_parsed_binary_output_filename};
 }
 
 sub file_basename {
@@ -423,15 +424,13 @@ sub file_basename {
   return $self->{_file_basename}; # /tmp/seq1.88796.
 }
 
+
 sub fasta_filenames {
   my ($self,$name) = @_;
 
-#  $self->{_fasta_filenames} = [$name] if (defined $name && !defined $self->{_fasta_filenames});
-
-  # add to array of existing name if exists $self->
-  push @{$self->{_fasta_filenames}},$name if ( defined $name);
-
-  return $self->{fasta_filenames};
+  # if a filename is supplied, add it to the array
+  push @{$self->{_fasta_filenames}},$name."fasta" if ( defined $name);
+  return $self->{_fasta_filenames};
 }
 
 sub printvars {
