@@ -137,7 +137,7 @@ sub score_Transcripts{
       # $site is a SeqFeature with exons as sub_SeqFeatures 
       my @these_sites;
       foreach my $site ( @sites ){
-	my ($start,$end,$strand) = $self->get_transcript_start_end_strand($tran);
+	my ($start,$end,$strand) = $self->get_start_end_strand_of_transcript($tran);
 	if ( !( $site->start > $end) && !( $site->end < $start ) ){
 	  push( @these_sites, $site );
 	}
@@ -368,7 +368,7 @@ sub _cluster_Exons{
 # start: lowest coordinate
 # end  : highest coordinate
 
-sub get_transcript_start_end_strand_of_transcript {
+sub get_start_end_strand_of_transcript {
   my ($self,$t) = @_;
   my @exons = sort { $a->start <=> $b->start } @{$t->get_all_Exons}; 
   my $start = $exons[0]->start;
@@ -426,7 +426,7 @@ sub cluster_Transcripts_by_strand {
     foreach my $tran (@transcripts) {
 	my @matching_clusters;
 	my ($trans_start, $trans_end, $trans_strand) = 
-	    $self->get_transcript_start_end_strand($tran);
+	    $self->get_start_end_strand_of_transcript($tran);
 	
 	print STDERR "transcript limits: $trans_start $trans_end \n" if $verbose;
 	
