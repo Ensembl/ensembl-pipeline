@@ -17,10 +17,13 @@ public class SaveGraphLayoutConfigurationAction extends AAction{
   protected void doAction(AView view, AModel aModel){
     PathStepsModel model = (PathStepsModel)aModel;
     ModelElement panelModel = model.getRootElement().getChildElement(model.PATH_STEPS_PANEL);
-    Properties graphLayout = 
-      (Properties)panelModel
-        .getChildElement(model.PATH_STEPS_PANEL)
-        .getProperty(model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION);
+    Properties graphLayout = null;
+    if(panelModel != null){
+      graphLayout = 
+        (Properties)panelModel
+          .getChildElement(model.PATH_STEPS_PANEL)
+          .getProperty(model.PATH_STEPS_PANEL_GRAPH_LAYOUT_CONFIGURATION);
+    }
 
     if(graphLayout != null){
       view.getApplication().writeGraphLayoutConfiguration(graphLayout);

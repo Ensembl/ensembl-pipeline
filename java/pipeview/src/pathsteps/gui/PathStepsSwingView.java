@@ -20,6 +20,7 @@ public class PathStepsSwingView implements AView
   private JMenu fileMenu;
   private JMenuItem readNewPipelineDBMenuItem;
   private JMenuItem setNewLayoutConfigurationMenuItem;
+  private JMenuItem saveGraphLayoutConfigurationMenuItem;
   
   private JMenu editMenu;
   private JMenuItem createMenuItem;
@@ -60,6 +61,7 @@ public class PathStepsSwingView implements AView
     setMenuBar(new JMenuBar());
     setReadNewPipelineDBMenuItem(new JMenuItem("Read New Pipeline DB"));
     setSetNewLayoutConfigurationMenuItem(new JMenuItem("Set New Layout Configuration"));
+    setSaveGraphLayoutConfigurationMenuItem(new JMenuItem("Save Graph Layout Configuration"));
 
     setEditMenu(new JMenu("Edit"));
     setCreateMenuItem(new JMenuItem("Create Node"));
@@ -76,6 +78,7 @@ public class PathStepsSwingView implements AView
     getMenuBar().add(getFileMenu());
     getFileMenu().add(getReadNewPipelineDBMenuItem());
     getFileMenu().add(getSetNewLayoutConfigurationMenuItem());
+    getFileMenu().add(getSaveGraphLayoutConfigurationMenuItem());
     
     connectToActionEventRouter(
       getReadNewPipelineDBMenuItem(),
@@ -85,6 +88,11 @@ public class PathStepsSwingView implements AView
     connectToActionEventRouter(
       getSetNewLayoutConfigurationMenuItem(),
       AView.SET_NEW_LAYOUT_PREFERENCES_KEY
+    );
+    
+    connectToActionEventRouter(
+      getSaveGraphLayoutConfigurationMenuItem(),
+      AView.SAVE_GRAPH_LAYOUT_CONFIGURATION_KEY
     );
     
     /* SWITCH ON EDITING SHORTLY...
@@ -464,6 +472,14 @@ public class PathStepsSwingView implements AView
   
   private void setConnectMenuItem(JMenuItem newValue){
     connectMenuItem = newValue;
+  }
+  
+  private JMenuItem getSaveGraphLayoutConfigurationMenuItem(){
+    return saveGraphLayoutConfigurationMenuItem;
+  }
+  
+  private void setSaveGraphLayoutConfigurationMenuItem(JMenuItem item){
+    saveGraphLayoutConfigurationMenuItem = item;
   }
   
   private ReadPipelineDBDialog getReadPipelineDBDialog(){
