@@ -18,14 +18,15 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
 
 =head1 SYNOPSIS
 
-my $db          = Bio::EnsEMBL::DBLoader->new($locator);
-my $genscan     = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new ( -dbobj      => $db,
-									   -input_id   => $input_id
-									   -analysis   => $analysis );
-$genscan->fetch_input();
-$genscan->run();
-$genscan->output();
-$genscan->write_output(); #writes to DB
+  my $db       = Bio::EnsEMBL::DBLoader->new($locator);
+  my $genscan  = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanDNA->new(
+                -dbobj      => $db,
+                -input_id   => $input_id
+                -analysis   => $analysis);
+  $genscan->fetch_input();
+  $genscan->run();
+  $genscan->output();
+  $genscan->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 

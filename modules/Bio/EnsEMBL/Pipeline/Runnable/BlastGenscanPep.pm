@@ -18,15 +18,15 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
 
 =head1 SYNOPSIS
 
-my $blastgenscan     = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new ( 
+  my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new ( 
                                                     -genomic    => $genomic,
                                                     -peptide    => $pep,
                                                     -database   => 'swir',
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
-$blastgenscan->run();
-$blastgenscan->output();
+  $blastgenscan->run();
+  $blastgenscan->output();
 
 =head1 DESCRIPTION
 
