@@ -9,60 +9,29 @@ BEGIN {
 
 =head1 NAME
 
-  pm_filter.pl
+  pmatch_proteome
 
 =head1 SYNOPSIS
  
-  pm_filter.pl
+  pmatch_proteome
 
 =head1 DESCRIPTION
 
-  pm_filter.pl runs and filters the output from pmatch when running human 
-  proteome vs genomic sequence - pmatch produces reams of info that can be usefully 
-  combined and input to eg TargettedGenewise
-
-  pmatch compares a DNA fasta file with a protein fasta file; this script 
-  needs to be given the location of the fasta file contain the human proteome, 
-  the directory at the head of the tree containing all the fpc contig fasta 
-  files and the chromosome on which to run. The first two options are common 
-  with other scripts and should be set in GeneConf.pm
-
-  pm_filter.pl should be run once for each chromosome. The results are written out to 
-  chrname.pm.dat in the GB_PM_OUTPUT directory specified in GeneConf.pm
-
-  The script analyses the whole chromosome by running pmatch for the protein data 
-  against each fpc contig file in turn, and then combining the results to find 
-  the "best" hit for each protein ie the one with the greatest percentage 
-  coverage of the protein sequence, as long as the coverage exceeds the lower threshold 
-  of 25%. It also returns any hits that have coverage within 2% of this best hit, again 
-  as long as coverage >= 25%. We cannot just take the longest hit for each 
-  protein as we expect (at least) one hit per exon, not one hit per protein. 
-  Percentage coverage is based on protein sequence length.
-
-  Typical usage:
-
-  ./pm_filter.pl -chr chr1
-  
-
 =head1 OPTIONS
   
-  Options are to be set in GeneConf.pm
+  Options are to be set in GeneBuild config files
   The important ones for this script are:
-     GB_PFASTA      clean file of proteins in fasta format
-     GB_PMATCH      location of the pmatch executable
-     GB_PM_OUTPUT   directory to write filtered output files
-     GB_FPCDIR      top of the hierarchy where the fpcctg fasta files are
-     GB_TMPDIR      scratch area
+     GeneBuild::Scripts::GB_PFASTA      clean file of proteins in fasta format
+     GeneBuild::Scripts::GB_PMATCH      location of the pmatch executable
+     GeneBuild::Scripts::GB_PM_OUTPUT   directory to write filtered output files
+     GeneBuild::Scripts::GB_FPCDIR      top of the hierarchy where the fpcctg fasta files are
+     GeneBuild::Scripts::GB_OUTPUT_DIR  scratch area
 
-     eg.
-	    GB_PFASTA      => /work2/vac/GeneBuild/human_proteome.fa,
-	    GB_PMATCH      => /work2/vac/rd-utils/pmatch,
-	    GB_PM_OUTPUT   => /work2/vac/GeneBuild/,
-	    GB_FPCDIR      => /work2/vac/data/humangenome,
-	    GB_TMPDIR      => /work5/scratch/vac,
-  
-  If pm_output directory is not provided, output file is written to current directory
-    
+     GeneBuild::Databases::GB_DBNAME
+     GeneBuild::Databases::GB_DBHOST
+     GeneBuild::Databases::GB_DBUSER
+     GeneBuild::Databases::GB_DBPASS
+
 =cut
 
 use strict;
@@ -74,16 +43,19 @@ use FileHandle;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_PFASTA
-					 GB_PMATCH
-					 GB_PM_OUTPUT
-					 GB_TMPDIR  
-                                         GB_DBHOST
-                                         GB_DBUSER
-                                         GB_DBNAME
-                                         GB_DBPASS
-                                        );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
+					                   GB_PFASTA
+					                   GB_PMATCH
+					                   GB_PM_OUTPUT
+					                   GB_OUTPUT_DIR  
+                                                          );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+                                                             GB_DBHOST
+                                                             GB_DBUSER
+                                                             GB_DBNAME
+                                                             GB_DBPASS
+                                                            );
 $| = 1;
 
 # global vars
@@ -93,7 +65,7 @@ my @hits;     # stores the hits from pmatch runs
 my $protfile = $GB_PFASTA;
 my $outdir   = $GB_PM_OUTPUT;
 my $pmatch   = $GB_PMATCH;
-my $tmpdir   = $GB_TMPDIR;
+my $tmpdir   = $GB_OUTPUT_DIR;
 my $check    = 0;
 my $outfile;
 my $chrname;
@@ -128,7 +100,7 @@ if ($check) {
 # final check to make sure all parameters are set before we go ahead
 if(!defined($protfile) || !defined($pmatch) || 
    $protfile eq '' || $pmatch eq ''){
-  print "You must set GB_PFASTA and GB_PMATCH in the config file, GeneConf.pm: $protfile : $pmatch\n";
+  print "You must set GB_PFASTA and GB_PMATCH in the config file, GeneBuild config files: $protfile : $pmatch\n";
   exit (0);
 } 
 

@@ -17,26 +17,29 @@ build.
 
 =head1 OPTIONS
 
-Options are to be set in GeneConf.pm
+Options are to be set in GeneBuild config modules
 The important ones for this script are:
-    GB_DBHOST
-    GB_DBNAME
-    GB_DBUSER
-    GB_DBPASS
-    GB_KILL_LIST
+    GeneBuild::Databases::GB_DBHOST
+    GeneBuild::Databases::GB_DBNAME
+    GeneBuild::Databases::GB_DBUSER
+    GeneBuild::Databases::GB_DBPASS
+    GeneBuild::Scripts::GB_KILL_LIST
 
 =cut
 
 use strict;
 use DBI;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-                                          GB_DBHOST
-                                          GB_DBNAME
-                                          GB_DBUSER
-                                          GB_DBPASS
-					  GB_KILL_LIST
-                                        );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_DBHOST
+							     GB_DBNAME
+							     GB_DBUSER
+							     GB_DBPASS
+							     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
+							   GB_KILL_LIST
+							  );
 my $host = $GB_DBHOST;
 my $name = $GB_DBNAME;
 my $user = $GB_DBUSER;

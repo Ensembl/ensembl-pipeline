@@ -1,16 +1,42 @@
 #!/usr/local/bin/perl
+=head1 NAME
+
+  makepmatchbsubs
+
+=head1 SYNOPSIS
+ 
+  makepmatchbsubs
+
+=head1 DESCRIPTION
+
+=head1 OPTIONS
+  
+  Options are to be set in GeneBuild config files
+
+  The important ones for this script are:
+     GeneBuild::Databases::GB_DBNAME
+     GeneBuild::Databases::GB_DBHOST
+     GeneBuild::Databases::GB_DBUSER
+     GeneBuild::Databases::GB_DBPASS
+     GeneBuild::Scripts::GB_PFASTA
+     GeneBuild::Scripts::GB_OUTPUT_DIR
+
+=cut
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use strict;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-                                         GB_DBHOST
-                                         GB_DBUSER
-                                         GB_DBNAME
-                                         GB_DBPASS
-                                         GB_PFASTA
-                                         GB_TMPDIR
-                                        );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_DBHOST
+							     GB_DBUSER
+							     GB_DBNAME
+							     GB_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw(
+							  GB_PFASTA
+							  GB_OUTPUT_DIR
+							 );
 $| = 1;
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $GB_DBHOST,
@@ -35,9 +61,9 @@ foreach my $chr (@{$db->get_ChromosomeAdaptor->fetch_all}) {
          $end = $length;
       }
 
-      my $cmd = "bsub -q yesterday -R\'ncpus>1' -o $GB_TMPDIR/$chrname.$start-$end.out -e $GB_TMPDIR/$chrname.$start-$end.err pmatch_proteome -chr $chrname -chrstart $start -chrend $end ";
+      my $cmd = "bsub -q yesterday -R\'ncpus>1' -o $GB_OUTPUT_DIR/$chrname.$start-$end.out -e $GB_OUTPUT_DIR/$chrname.$start-$end.err pmatch_proteome -chr $chrname -chrstart $start -chrend $end ";
 
-      if (! -e "$GB_TMPDIR/$chrname.$start-$end.out") {
+      if (! -e "$GB_OUTPUT_DIR/$chrname.$start-$end.out") {
         print $cmd . "\n";
       } 
       $start += $chunk;
