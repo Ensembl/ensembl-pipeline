@@ -128,9 +128,18 @@ sub  get_Seq_by_acc {
   my $options = $self->options;
   if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
 
-  open(IN,"$pfetch -q $options $acc |") or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
+  my $command = "$pfetch -q ";
+  if (defined $options){
+    $command .= "$options ";
+  }
+
+  $command .= $acc;
+
+  print STDERR "$command\n";
+
+  open(IN,"$command |") or $self->throw("Error opening pipe to pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
-  close IN;
+  close IN or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
   
   chomp($seqstr);
   eval{
