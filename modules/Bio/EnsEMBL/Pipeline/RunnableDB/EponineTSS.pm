@@ -131,8 +131,7 @@ sub runnable {
         $parameters{'-java'} = $self->analysis->program_file;
         #creates empty Bio::EnsEMBL::Runnable::EponineTSS object
         $self->{'_runnable'} = $runnable->new
-	    ( '-clone' => $parameters{'-clone'},
-	      '-threshold' => $parameters{'-threshold'},
+	    ( '-threshold' => $parameters{'-threshold'},
 	      '-epojar' => $parameters{'-epojar'},
 	      '-java' => $parameters{'-java'},
 	      );
