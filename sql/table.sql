@@ -18,9 +18,9 @@ CREATE TABLE job (
   class             enum ("clone","contig","vc","gene") not null,
   analysisId        int(10) unsigned DEFAULT '0' NOT NULL,
   LSF_id            int(10) unsigned DEFAULT '0',
-  stdout_file       varchar(100) DEFAULT '' NOT NULL,
-  stderr_file       varchar(100) DEFAULT '' NOT NULL,
-  object_file       varchar(100) DEFAULT '' NOT NULL,
+  stdout_file       varchar(150) DEFAULT '' NOT NULL,
+  stderr_file       varchar(150) DEFAULT '' NOT NULL,
+  object_file       varchar(150) DEFAULT '' NOT NULL,
   retry_count       int default 0,
 
   PRIMARY KEY (jobId),
