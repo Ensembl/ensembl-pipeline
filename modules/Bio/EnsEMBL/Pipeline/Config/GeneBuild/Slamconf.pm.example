@@ -55,25 +55,34 @@ use vars qw( %Slamconf );
 
               # Slam-options
               
-              SLAM_BIN => '/nfs/acari/jhv/bin/slam',
-              SLAM_PARS_DIR => '/nfs/acari/jhv/lib/slam_pars_dir',
-              SLAM_MAX_MEMORY_SIZE => '1572864',                   # default is 1572864 (1.5 gig)
+              SLAM_BIN => '/acari/work6a/jhv/project_slam/slam_prog/slam',
+              SLAM_PARS_DIR => '/acari/work6a/jhv/project_slam/slam_prog/Pars',
+              SLAM_MAX_MEMORY_SIZE => '2572864',                   # default is 1572864 (1.5 gig)
               SLAM_MINLENGTH => '250',
-              SLAM_MAXLENGTH => '200000',                          # Slam.pm- default is 100500 bp. max length of regions to compare
+              SLAM_MAXLENGTH => '300000',                          # Slam.pm- default is 100500 bp. max length of regions to compare
 
-              # DB-configurations for second species
+              # DNA-database for first species
+              SLAM_ORG1_DNA_DB_USER => 'ensro' ,
+              SLAM_ORG1_DNA_DB_PASS => '' ,
+              SLAM_ORG1_DNA_DB_NAME => 'homo_sapiens_core_30_35c',
+              SLAM_ORG1_DNA_DB_HOST => 'ecs2' ,
+              SLAM_ORG1_DNA_DB_PORT => '3364' ,
 
-              SLAM_COMP_DB_USER => 'anonymous' ,
-              SLAM_COMP_DB_PASS => '' ,
-              SLAM_COMP_DB_NAME => 'mus_musculus_core_22_32b' ,
-              SLAM_COMP_DB_HOST => 'kaka.sanger.ac.uk' ,
-              SLAM_COMP_DB_PORT => '' ,
 
-              SLAM_ORG2_RESULT_DB_USER  => 'ensadmin' ,
-              SLAM_ORG2_RESULT_DB_PASS  => 'ensembl' ,
-              SLAM_ORG2_RESULT_DB_NAME  => 'zz_test_jhv_slam_results_org2' ,
-              SLAM_ORG2_RESULT_DB_HOST  => 'ecs1.internal.sanger.ac.uk' ,
-              SLAM_ORG2_RESULT_DB_PORT  => '3306'
+              # DNA-database for second species 
+
+              SLAM_ORG2_DNA_DB_USER => 'ensro' ,
+              SLAM_ORG2_DNA_DB_PASS => '' ,
+              SLAM_ORG2_DNA_DB_NAME => 'mus_musculus_core_30_33f' ,
+              SLAM_ORG2_DNA_DB_HOST => 'ecs2' ,
+              SLAM_ORG2_DNA_DB_PORT => '3364' ,
+
+              # database where the slam-predictions for the second species are written to
+              SLAM_ORG2_RESULT_DB_USER  => '' ,
+              SLAM_ORG2_RESULT_DB_PASS  => '' ,
+              SLAM_ORG2_RESULT_DB_NAME  => '' ,
+              SLAM_ORG2_RESULT_DB_HOST  => '',
+              SLAM_ORG2_RESULT_DB_PORT  => ''
            );
 
 
