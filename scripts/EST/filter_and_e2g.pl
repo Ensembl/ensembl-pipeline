@@ -31,10 +31,13 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_DBNAME
 					EST_DBUSER
 					EST_DBHOST
+					EST_FILTER_RUNNABLE
+					EST_FILTER_ANALYSIS
 				       );
 
 my $runner;
 my $runnable;
+my $analysis;
 my $refdbname;
 my $refdbuser;
 my $refdbhost;
@@ -45,7 +48,7 @@ my $input_id;
 
 &get_variables();
 
-my $command = "$runner -runnable $runnable -analysis exonerate_e2g -input_id $input_id -write";
+my $command = "$runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
 
 print STDERR "command is $command\n";
 
@@ -72,14 +75,22 @@ sub get_variables {
 	      'input_id:s'      => \$input_id,
 	     );
 
-  $runner     = $EST_RUNNER;
+  # get analyses and runnables
+  my @entries = @$EST_RUNNABLES;
+  my %runnable_hash;
+  foreach my $entry ( @entries ){
+    $runnable_hash{$entry->{analysis}} = $entry->{runnable};
+  }
   $runnable   = $EST_FILTER_RUNNABLE;
+  $analysis   = $EST_FILTER_ANALYSIS;
+  $runner     = $EST_RUNNER;
   $refdbname  = $EST_REFDBNAME;
   $refdbuser  = $EST_REFDBUSER;
   $refdbhost  = $EST_REFDBHOST;
   $estdbname  = $EST_DBNAME;
   $estdbuser  = $EST_DBUSER;
   $estdbhost  = $EST_DBHOST;
+
 
   if(!(defined $refdbhost && defined $refdbname & defined $refdbuser &&
        defined $estdbhost && defined $estdbname && defined $estdbuser &&
