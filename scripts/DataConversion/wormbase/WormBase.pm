@@ -15,6 +15,8 @@ the methods are all used by wormbase_to_ensembl.pl script which should be in the
 
 =head1 DESCRIPTION
 
+parse gff and agp files from the wormbase database for caenorhabditis elegans to create ensembl database.
+
 =head1 CONTACT
 
 ensembl-dev@ebi.ac.uk about code issues
@@ -54,8 +56,6 @@ use Bio::EnsEMBL::Slice;
   Example   : &get_seq_ids($fh);
 
 =cut
-
-
 
 sub get_seq_ids{
   my ($fh) = @_;
@@ -98,8 +98,6 @@ sub get_seq_ids{
 
 =cut
 
-
-
 sub get_sequences_pfetch{
   my ($seq_ids, $seqfetcher) = @_;
   unless($seqfetcher->isa("Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch")){
@@ -138,8 +136,6 @@ sub get_sequences_pfetch{
   Example   : 
 
 =cut
-
-
 
 sub agp_parse{
   my ($fh, $chr_id, $agp_type) = @_;
@@ -206,8 +202,6 @@ sub agp_parse{
 
 =cut
 
-
-
 sub parse_gff{
   my ($file, $seq, $analysis) = @_;
 
@@ -257,7 +251,6 @@ sub parse_gff{
   Example   : 
 
 =cut
-
 
 sub process_file{
   my ($fh) = @_;
@@ -384,9 +377,8 @@ sub generate_transcripts{
     my $transcriptcount = 0;
     %temp_transcripts = ();
 
-#############################
 
-    #collect all "curated_coding_exons" for this gene
+    ## collect all "curated_coding_exons" for this gene ##
     my @lines = @{$$genes{$gene_name}};
     my @global_exons = ();
     my %three_prime_exons;
@@ -435,9 +427,8 @@ sub generate_transcripts{
       next GENE;
     }
 
-###############################
 
-    #check different transcripts using UTR information
+    ## check different transcripts using UTR information ##
     #collect 5' UTRs
     foreach my $transcript_name ( keys(%{$$five_prime{$gene_name}}) ){
       #print "\nchecking 5' transcript $transcript_name. ";
@@ -481,9 +472,8 @@ sub generate_transcripts{
       $five_prime_exons{$transcript_name} = \@five_prime_exons;
     }
 
-###############################
 
-    #collect 3' UTRs
+    ## collect 3' UTRs ##
     foreach my $transcript_name ( keys(%{$$three_prime{$gene_name}}) ){
       #print "\nchecking 3' transcript $transcript_name. ";
       my @three_prime_exons = ();
@@ -526,7 +516,7 @@ sub generate_transcripts{
       $three_prime_exons{$transcript_name} = \@three_prime_exons;
     }
 
-    #combine exons, 5' and 3' for every transcript
+    ## combine exons, 5' and 3' for every transcript ##
     foreach my $transcript_name (keys %temp_transcripts){
       $transcriptcount++;
       my @exons = ();
@@ -599,7 +589,6 @@ sub generate_transcripts{
 	    elsif($start > ($exons[$trans_start_exon{$transcript_name}]->end)+1){
 	      #additional non-coding exon
 	      #add to exon array, keep translation start on last coding exon
-	      #$trans_start_exon{$transcript_name} = (scalar @exons)-1;
 	      $trans_start_exon{$transcript_name}++;
 	      $trans_end_exon{$transcript_name}++;
 	      unshift(@exons, $five_prime_exon);
@@ -702,151 +691,6 @@ sub generate_transcripts{
 }
 
 
-##### last version
-
-=head2 process_transcripts
-
-  Arg [1]   : hash ref (the hash is the one returned by process_file)
-  Arg [2]   : Bio::EnsEMBL::Slice
-  Arg [3]   : Bio::EnsEMBL::Analysis
-  Function  : takes line representing a transcript and creates an exon for each one
-  Returntype: hash ref hash keyed on transcript id containing an array of exons
-  Exceptions: 
-  Caller    : 
-  Example   : 
-
-=cut
-
-
-sub process_transcripts{
-  my ($transcripts, $slice, $analysis, $five_prime, $three_prime) = @_;
-  
-  my %genes;
-  my %transcripts = %$transcripts;
-  my @names = keys(%transcripts);
-  my %five_trans_start;
-  my %three_trans_end;
-  #print STDERR "PROCESSING TRANSCRIPTS \n";
-  foreach my $name(@names){
-    my @lines = @{$transcripts{$name}};
-    $transcripts{$name} = [];
-    my @exons;
-    foreach my $line(@lines){
-      #print STDERR $line."\n";
-      my($chr, $status, $type, $start, $end, $score, $strand, $frame, $sequence, $gene) = split /\s+/, $line;
-      $chr =~ s/CHROMOSOME_//;
-      if($start == $end){
-	next;
-      }
-     
-      my $exon = new Bio::EnsEMBL::Exon;
-      my $phase = (3 - $frame)%3; # wormbase gff cotains frame which is effectively the opposite of phase 
-                                  # for a good explaination of phase see the Bio::EnsEMBL::Exon documentation
-      #print STDERR "phase calculated to be ".$phase."\n";
-      $exon->start($start);
-      $exon->end($end);
-      $exon->analysis($analysis);
-      $exon->slice($slice);
-      $exon->phase($phase);
-      my $end_phase = ($phase + ($exon->end-$exon->start) + 1)%3;
-      #print STDERR "end phase calculated to be ".$end_phase."\n";
-      $exon->end_phase($end_phase);
-      if($strand eq '+'){
-	$exon->strand(1);
-      }else{
-	$exon->strand(-1);
-      }
-      #$exon->score(100);
-      push(@exons, $exon);
-    }
-    if($exons[0]->strand == -1){
-      @exons = sort{$b->start <=> $a->start} @exons;
-    }else{
-      @exons = sort{$a->start <=> $b->start} @exons;
-    }
-
-   # print STDERR "AFTER CREATION \n";
-   # &display_exons(@exons);
-    my $exon_number = @exons;
-    my $count = 1;
-    my $phase = 0;
-    EXON: foreach my $e(@exons){
-	if(($count == 1) && ($five_prime->{$name})){
-	  #CHROMOSOME_I    UTR     UTR     111036  111054  .       +       .       UTR "5_UTR:F53G12.10"
-	  my $utr_info = $five_prime->{$name};
-	  my($start, $end, $strand) = (split /\s+/, $utr_info)[3, 4, 6];
-	  if($strand eq '+'){
-	    $strand = 1;
-	  }elsif($strand eq '-'){
-	    $strand = -1;
-	  }else{
-	    die "not sure what to do with strand ".$strand." from transcript ".$name."\n";
-	  }
-	  if($e->strand ne $strand){
-	    warn ("five prime utr of ".$name." lies on a different strand to the first exon");
-	    push(@{$transcripts{$name}}, $e);
-	    $count++;
-	    next EXON;
-	  }
-
-	  my $translation_start;
-	  if($e->strand == 1){
-	    $translation_start = $e->start - $start + 1;
-	    #print $translation_start." = ".$e->start." - ".$start." + 1\n";
-	    $five_trans_start{$name} = $translation_start;
-	    $e->start($start);
-	  }else{
-	    $translation_start = $end - $e->end + 1;
-	    #print STDERR $translation_start." = ".$end." - ".$e->end." + 1\n";
-	    $five_trans_start{$name} = $translation_start;
-	    $e->end($end);
-	  }
-	  #print STDERR "recording ".$name." 5' translation start ".$translation_start." and setting exon start as ".$start." rather then ".$e->start."\n";
-	  if($translation_start <= 0){
-	    print STDERR $name." will have an odd translation_start ".$translation_start."\n";
-	  }
-	 
-	}elsif(($count == $exon_number) && ($three_prime->{$name})){
-	  my $utr_info = $three_prime->{$name};
-	  my($start, $end, $strand) = (split /\s+/, $utr_info)[3, 4, 6];
-	  if($strand eq '+'){
-	    $strand = 1;
-	  }elsif($strand eq '-'){
-	    $strand = -1;
-	  }else{
-	    die "not sure what to do with strand ".$strand." from transcript ".$name."\n";
-	  }
-	  if($e->strand ne $strand){
-	    warn ("three prime utr of ".$name." lies on a different strand to the first exon");
-	    push(@{$transcripts{$name}}, $e);
-	    $count++;
-	    next EXON;
-	  }
-	  my $translation_end; 
-	  #print STDERR "exon coords ".$e->start." - ".$e->end."\n";
-	  #print STDERR "utr coords ".$start." - ".$end."\n";
-	  
-	  
-	  if($e->strand == 1){
-	    $translation_end = ($e->end - $e->start +1);
-	    $e->end($end);
-	  }else{
-	    $translation_end =  ($e->end - $e->start +1);
-	    $e->start($start);
-	  }
-	  $three_trans_end{$name} = $translation_end;
-	  #print STDERR $translation_end." = ".$e->end." - ".$e->start." + 1\n";
-	}	
-	
-	push(@{$transcripts{$name}}, $e);
-	$count++;
-      }
-  }
-  
-  return (\%transcripts, \%five_trans_start, \%three_trans_end);
-
-}
-
 
 =head2 create_transcripts
 
@@ -877,8 +721,9 @@ sub create_transcripts{
     my $time = time;
     my @exons = @{$transcripts{$transcript}};
     #print STDERR "\nWorking on $transcript.(".$exons[0]->strand.") ";
-    if($transcript =~ /\w+\.\d+[a-z A-Z]/){
-     ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]/;
+    #get the gene-name
+    if($transcript =~ /\w+\.\d+[a-z A-Z]*/){
+     ($gene_name) = $transcript =~ /(\w+\.\d+)[a-z A-Z]*/;
      $transcript_id = $transcript;
     }else{
       $gene_name = $transcript;
@@ -930,7 +775,7 @@ sub create_transcripts{
       $translation->start(2);
     }
     else{
-      die "WHAT IS THIS? ".$sorted_exons[0]->phase;
+      die "Strange phase in $transcript_id ".$sorted_exons[0]->phase;
     }
 
     if((!defined($translation->start)) or ($translation->start <= 0) ){
@@ -1018,7 +863,6 @@ sub create_gene{
 
 =cut
 
-
 sub prune_Exons {
   my ($gene) = @_;
   
@@ -1079,7 +923,6 @@ sub prune_Exons {
 
 =cut
 
-
 sub write_genes{
   my ($genes, $db, $stable_id_check) = @_;
   my $e=0;
@@ -1130,11 +973,11 @@ sub write_genes{
     if($@){
       die "couldn't store ".$gene->stable_id." problems ".$@;
     }
-   
   }
-print "\nStored: ".$e;
- 
+  print "\nStored: ".$e;
 }
+
+
 =head2 translation_check
 
   Arg [1]   : Bio::EnsEMBL::Gene
@@ -1156,7 +999,8 @@ sub translation_check{
       if($t->stable_id eq "C06G3.7" and $db){
 	#add Selenocysteine to translation. There seems to be only on Selenoc. in our worm...
 	my $pos = pos($pep);
-	print STDERR "transcript ".$t->stable_id." doesn't translate. Adding Selenocystein at position $pos.\n";
+	print STDERR "transcript ".$t->stable_id." doesn't translate. Adding Selenocystein at position $pos.\n".
+	  "Please beware of problems during further analysis steps because of this.";
 	selenocysteine($t, $pos, $db);
       }
       else{
@@ -1174,6 +1018,19 @@ sub translation_check{
   }
   return $gene;
 }
+
+=head2 selenocysteine
+
+  Arg [1]   : transcript object to be modified
+  Arg [2]   : position (integer) in transcripts sequence to be modified
+  Arg [3]   : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Function  : modifiy transcript/translation by adding a seleocysteine residue
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 sub selenocysteine{
   my ($transcript, $pos, $db) = @_;
@@ -1197,7 +1054,7 @@ sub selenocysteine{
 =head2 insert_agp_line
 
   Arg [1]   : the first 12 args are info for the assembly table
-  Arg [2]   : Bio::EnsEMBL::DBSQL::DBAdaptor pointing to db where you want toe assembly loaded
+  Arg [2]   : Bio::EnsEMBL::DBSQL::DBAdaptor pointing to db where you want the assembly loaded
   Function  : load the provided info into the assembly table
   Returntype: 
   Exceptions: 
@@ -1205,7 +1062,6 @@ sub selenocysteine{
   Example   : 
 
 =cut
-
 
 sub insert_agp_line{
   my ($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori, $db) = @_;
@@ -1233,7 +1089,6 @@ sub insert_agp_line{
 
 =cut
 
-
 sub display_exons{
   my (@exons) = @_;
 
@@ -1259,7 +1114,6 @@ sub display_exons{
 
 =cut
 
-
 sub non_translate{
   my (@transcripts) = @_;
 
@@ -1283,6 +1137,19 @@ sub non_translate{
   }
 }
 
+
+=head2 parse_operons
+
+  Arg [1]   : gff file path
+  Arg [2]   : Bio:Seq object
+  Arg [3]   : analysis object
+  Function  : parse operon information
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 sub parse_operons{
   my ($file, $seq, $analysis) = @_;
@@ -1373,6 +1240,19 @@ sub parse_rnai{
 }
 
 
+=head2 parse_operons
+
+  Arg [1]   : gff file path
+  Arg [2]   : Bio:Seq object
+  Arg [3]   : analysis object
+  Function  : parse expression information
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
 sub parse_expr{
   my ($file, $seq, $analysis) = @_;
 
@@ -1425,8 +1305,6 @@ sub parse_SL1{
   die " seq ".$seq." is not a Bio::Seq " unless($seq->isa("Bio::SeqI") || 
 						$seq->isa("Bio::Seq")  || 
 						$seq->isa("Bio::PrimarySeqI"));
- 
- 
 
   my @operons;
   LINE: while(<FH>){
@@ -1586,12 +1464,25 @@ sub write_simple_features{
 }
 
 
-#fsk 3.8.04
+#not used at this time...
 sub parse_tRNA_genes{
   my $type = "tRNA";
   my ($file, $seq, $analysis) = @_;
   &parse_pseudo_files($file, $seq, $analysis, $type);
 }
+
+=head2 parse_pseudo_gff
+
+  Arg [1]   : gff file path
+  Arg [2]   : Bio:Seq object
+  Arg [3]   : analysis object
+  Function  : parse pseudogene information
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
 
 sub parse_pseudo_gff{
   my $type = "Pseudogene";
@@ -1600,12 +1491,23 @@ sub parse_pseudo_gff{
 }
 
 
-#generic version
+=head2 parse_pseudo_files
+
+  Arg [1]   : gff file path
+  Arg [2]   : Bio:Seq object
+  Arg [3]   : analysis object
+  Arg [4]   : type of feature to be parsed
+  Function  : parse specific feature information from gff file
+  Returntype: 
+  Exceptions: 
+  Caller    : 
+  Example   : 
+
+=cut
+
 sub parse_pseudo_files{
   my ($file, $seq, $analysis, $types) = @_;
 
-  #print "checking $types\n";
-  #print "opening ".$file."\n";
   open(FH, $file) or die"couldn't open ".$file." $!";
 
   die " seq ".$seq." is not a Bio::Seq " unless($seq->isa("Bio::SeqI") || 
