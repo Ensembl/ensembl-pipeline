@@ -203,8 +203,7 @@ sub _clone_Exon{
   $newexon->contig     ($exon->contig);
   $newexon->sticky_rank($exon->sticky_rank);
   $newexon->seqname    ($exon->seqname);
-  $newexon->attach_seq ($self->ensembl_vc);
-
+  
   foreach my $evidence ( @{$exon->get_all_supporting_features} ){
     $newexon->add_supporting_features( $evidence );
   }
