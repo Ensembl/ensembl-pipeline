@@ -71,6 +71,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Map::MarkerFeature;
+use Bio::EnsEMBL::Map::Marker;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -107,7 +108,7 @@ sub new {
     
     my( $query, $epcr, $sts, $margin, $word_size, $min_mismatch,
     $max_mismatch) = $self->_rearrange([qw(
-	QUERY PCR STS M W NMIN NMAX
+	QUERY EPCR STS M W NMIN NMAX
     )], @args);
 
     $epcr = 'e-PCR' unless ($epcr);
@@ -294,7 +295,7 @@ sub run {
     }
 
     # clean up
-    # $self->deletefiles();
+    $self->deletefiles();
 
     return 1;
 }
@@ -448,6 +449,9 @@ sub create_MarkerFeature {
         -gff_feature     => $feat->{'primary'}
     );
 
+    my $m = Bio::EnsEMBL::Map::Marker->new;
+    $m->dbID($feat->{'dbID'});
+
     my $mf = Bio::EnsEMBL::Map::MarkerFeature->new;
     $mf->analysis($analysis);
     $mf->score   ($feat->{'score'});
@@ -456,6 +460,7 @@ sub create_MarkerFeature {
     $mf->end     ($feat->{'end'});
     $mf->strand  ($feat->{'strand'});
     $mf->dbID    ($feat->{'dbID'});
+    $mf->marker  ($m);
 
     # display_label must be a null string, and not undef
     # can't be set above as it is not known to SeqFeature
