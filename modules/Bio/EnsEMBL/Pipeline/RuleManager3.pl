@@ -71,6 +71,8 @@ my $dbhost    = $::pipeConf{'dbhost'} || $ENV{'ENS_DBHOST'};
 my $dbname    = $::pipeConf{'dbname'} || $ENV{'ENS_DBNAME'};
 my $dbuser    = $::pipeConf{'dbuser'} || $ENV{'ENS_DBUSER'};
 my $dbpass    = $::pipeConf{'dbpass'} || $ENV{'ENS_DBPASS'};
+my $port      = $::pipeConf{'port'} || 3306;
+
 my $queue     = $::pipeConf{'queue'}  || $ENV{'ENS_QUEUE'};
 my $nodes     = $::pipeConf{'usenodes'};
 my $workdir   = $::pipeConf{'nfstmp.dir'};
@@ -78,7 +80,10 @@ my $flushsize = $::pipeConf{'batchsize'};
 my $retry     = $::pipeConf{'retry'} || 3;
 my $max_jobs  = $::pipeConf{'maxjobs'} || 10000; # max number of (pend) jobs
 my $jobname   = $::pipeConf{'jobname'};
-zz
+                            # Meaningful name displayed by bjobs
+                            # aka "bsub -J <name>"
+                            # maybe this should be compulsory, as
+                            # the default jobname really isn't any use
 
 $| = 1;
 
@@ -105,6 +110,7 @@ GetOptions(
     'usenodes=s'  => \$nodes,
     'once!'       => \$once,
     'retry=i'     => \$retry,
+    'port=i'      => \$port,
     'analysis=s@' => \@analysis
 )
 or die ("Couldn't get options");
@@ -116,6 +122,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
     -user   => $dbuser,
     -pass   => $dbpass,
+    -port   => $port,
 );
 
 
