@@ -351,7 +351,8 @@ sub _objFromHashref {
   return $analysis;
 }
 
-sub removeInputId {
+# fixme: needs renaming to removeInputId_class_analysis?
+sub removeInputId_analysis {
   my ($self,$inputid,$class,$analysis) = @_;
 
   if (!defined($inputid)) {
@@ -362,6 +363,20 @@ sub removeInputId {
   }
 
   my $query = "delete from InputIdAnalysis where inputId = '$inputid' and analysisId = " . $analysis->dbID . " and class = '" . $class . "'";
+
+  my $sth = $self->prepare($query);
+  my $rv  = $sth->execute();
+}
+
+# fixme: needs renaming to removeInputId_class?
+sub removeInputId {
+  my ($self,$inputid,$class) = @_;
+
+  if (!defined($inputid)) {
+    $self->throw("No input id defined");
+  }
+
+  my $query = "delete from InputIdAnalysis where inputId = '$inputid' and class = '" . $class . "'";
 
   my $sth = $self->prepare($query);
   my $rv  = $sth->execute();
