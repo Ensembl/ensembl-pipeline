@@ -150,8 +150,6 @@ sub run{
     #  perl test_slam_cutting.pl /tmp/fasta1.fasta /tmp/fasta2.fasta /tmp/aatfile.aat /tmp/rempeatmsk.out 
     print "perl  test_slam_cutting.pl  $bug_f1 $bug_f2 $bug_aat $bug_rmf\n";
 
-    exit(0);
-
     # we got the cutting positions in @cuts, we build & store the subslices in @subslices
     # @cuts is an array of arrays [ [start1,end1,start2,end2],[start1,end1,start2,end2] ]
     for my $subseqs (@cuts) {
@@ -176,11 +174,11 @@ sub run{
   for my $slices (@subslices) {
 
     my $avid_obj = $self->runavid( $slices );
-#    print "SlamDB.pm:\t  length 1st subslice " . ${$slices}[0]->length;    print "\n\t\t\tlength 2st subslice " . ${$slices}[1]->length;    print "\n";
+    print "SlamDB.pm:\t  length 1st subslice " . ${$slices}[0]->length;    print "\n\t\t\tlength 2st subslice " . ${$slices}[1]->length;    print "\n";
 
     # run ApproxAlign on subslice
     my $approx = $self->approx_align($avid_obj->parsed_binary_filename,$avid_obj->fasta_filename1,$avid_obj->fasta_filename2);
-#    print "SlamDB.pm: approx_align gelaufen!.. now trying to run slam\n";
+    print "SlamDB.pm: approx_align gelaufen!.. now trying to run slam\n";
 
     # make new slam-run with subslice
     my $slamobj = new Bio::EnsEMBL::Pipeline::Runnable::Slam (
@@ -215,17 +213,17 @@ sub run{
     my @array2 = @{$aref1};
 
     if (scalar (@array1) >0) {
-#      print "I'll put a refernce to the array in the hash\n";
+      print "I'll put a refernce to the array in the hash\n";
       push (@{$alltranscripts{$SLAM_ORG1_NAME}}, $aref1 ); # [HPT]
     }else { 
-#      print "WARNING ! \n I received an undefined reference. I dont store it\n";
+      print "WARNING ! \n I received an undefined reference. I dont store it\n";
     }
 
     if (scalar (@array2) >0) {
-#      print "I'll put a refernce to the array in the hash\n";
+      print "I'll put a refernce to the array in the hash\n";
       push (@{$alltranscripts{$SLAM_ORG2_NAME}}, $aref2 ); # [MUS]
     }else{
-#      print "I received an undefined reference. I dont store it\n";
+      print "I received an undefined reference. I dont store it\n";
     }
   }
   print "SlamDB: finished all subslices\n";
@@ -671,6 +669,6 @@ sub get_repeat_features {
     }
   close(RP);
 
-  exit(0);
+
   return \@all_rpt;
 }
