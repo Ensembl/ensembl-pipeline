@@ -30,8 +30,9 @@ $genscan->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
-This object wraps Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep to add
-functionality for reading and writing to databases.
+This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed from 
+assembling genscan predicted features to peptide sequence. The resulting blast hits are
+written back as FeaturePairs.
 The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
@@ -53,11 +54,9 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
-use Bio::EnsEMBL::Analysis::GenscanPeptide;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-
-use Data::Dumper;
+#use Data::Dumper;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
@@ -71,7 +70,7 @@ use vars qw(@ISA);
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                input_id:   Contig input id , 
+                -input_id:  Contig input id , 
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
 
 =cut
@@ -83,7 +82,6 @@ sub new {
     $self->{'_featurepairs'}= [];
     $self->{'_genseq'}      = undef;
     $self->{'_transcripts'} = [];
-    $self->{'_genes'}       = [];
     $self->{'_runnable'}    = [];
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
@@ -115,22 +113,6 @@ sub new {
     return $self;
 }
 
-=head2 threshold
-
-    Title   :   threshold
-    Usage   :   $obj->threshold($value);
-    Function:   Get/set method for threshold p value required for writing
-                Feature/FeaturePair to database.
-    Args    :   Optional value (p value from Blast)
-
-=cut
-
-sub threshold {
-    my ($self, $value) = @_;
-    $self->{'_threshold'} = $value if (defined $value);
-    return $self->{'_threshold'};
-}
-
 =head2 fetch_input
 
     Title   :   fetch_input
@@ -154,7 +136,6 @@ sub fetch_input {
         or $self->throw("Unable to fetch contig sequence");
     $self->genseq($genseq);
     #need to get features predicted by genscan
-    $self->predicted_genes($contig->get_all_PredictionFeatures);
     $self->transcripts($contig->get_genscan_peptides);
 }
 
@@ -171,20 +152,6 @@ sub transcripts {
         push (@{$self->{'_transcripts'}}, @transcripts);
     }
     return @{$self->{'_transcripts'}};
-}
-
-sub predicted_genes {
-    my ($self, @genes) = @_;
-    if (@genes)
-    {
-        foreach my $gene (@genes)
-        {
-            $self->throw("Input not a Bio::SeqFeatureI\n")
-                unless $gene->isa("Bio::EnsEMBL::SeqFeatureI");
-        }
-        push (@{$self->{'_genes'}}, @genes);
-    }
-    return @{$self->{'_genes'}};
 }
 
 #converts parameters from string to hash
@@ -261,7 +228,7 @@ sub run {
             if ($run->clone->id eq $transcript->id)
             {
                 print STDERR "MATCHED: ".$run->clone->id." with ".$transcript->id."\n";
-                $self->align_to_contig($run, $transcript);
+                $self->align_hit_to_contig($run, $transcript);
                 last;
             }
         }
@@ -329,7 +296,7 @@ sub write_output {
 # and a position within the genscan predicted peptide. The hash is then matched
 # against blast peptide hits to return a set of featurepairs of exons and blast
 # peptides
-sub align_to_contig {
+sub align_hit_to_contig {
     my ($self, $run, $trans) = @_;
     my (%dna_align, @exon_aligns, @featurepairs); #structure for tracking alignment variables
     
@@ -364,10 +331,10 @@ sub align_to_contig {
         push (@exon_aligns, \%ex_align);
         
         $dna_align {'exon_dna_limit'} += $exon->length;   
-        #print "Exon: ".$ex_align {'name'}
-        #        ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
-        #        ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
-        #        ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
+        print "Exon: ".$ex_align {'name'}
+                ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
+                ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
+                ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
     }
     
     $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
@@ -375,7 +342,11 @@ sub align_to_contig {
     #map each feature to 1 or more exons
     foreach my $fp ($run->output)
     {   
-        
+        unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'})
+        {
+            $self->throw("Feature length (".$fp->start."-".$fp->end. 
+               ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
+        }
         #find each matching exon
         my (@aligned_exons);
         foreach my $ex_align (@exon_aligns)
@@ -387,15 +358,14 @@ sub align_to_contig {
             }
         }
         #create sets of featurepairs mapping peptide features to exons
-        push (@featurepairs, $self->create_aligned_featurepairs($fp, @aligned_exons));
-    }
-    return @featurepairs; 
+        $self->create_peptide_featurepairs($fp, @aligned_exons);
+    } 
 }
 
 # This function takes a blast peptide feature hit and a set of matching exons and
 # creates a set of featurepairs aligned to genomic coordinates. It will split
 # features if they cross exon boundaries
-sub create_aligned_featurepairs {
+sub create_peptide_featurepairs {
     my ($self, $fp, @aligned_exons) = @_;
     #create featurepairs
     
@@ -460,7 +430,7 @@ sub create_aligned_featurepairs {
                                 -seqname    =>  $fp->hseqname,
                                 -start      =>  $pep_start,
                                 -end        =>  $pep_end,
-                                -strand     =>  1,
+                                -strand     =>  $fp->hstrand,
                                 -start_frac =>  $start_frac,
                                 -end_frac   =>  $end_frac,
                                 -score      =>  $fp->score,
@@ -479,11 +449,13 @@ sub create_aligned_featurepairs {
 }
 
 sub featurepairs {
-    my ($self, @fp) = @_;
-    
-    if (@fp)
+    my ($self, $fp) = @_;
+    if ($fp)
     {
-        push (@{$self->{'_featurepairs'}}, @fp);
+        $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair") 
+                unless $fp->isa("Bio::EnsEMBL::FeaturePairI");
+        push (@{$self->{'_featurepairs'}}, $fp);
     }
+    #print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
     return @{$self->{'_featurepairs'}};
 }
