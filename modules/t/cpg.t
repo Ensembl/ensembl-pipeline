@@ -44,7 +44,7 @@ else
 { print "ok 2\n"; }
 
 #create CPG object    
-my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-CLONE => $clone, -GC => 75, -LENGTH => 50);
+my $cpg = Bio::EnsEMBL::Pipeline::Runnable::CPG->new (-QUERY => $clone, -GC => 75, -LENGTH => 50);
  
 unless ($cpg)
 { print "not ok 3\n"; }
