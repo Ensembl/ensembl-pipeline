@@ -1,12 +1,13 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl
 
 BEGIN {
   # oooh this is not nice
   my $script_dir = $0;
   $script_dir =~ s/(\S+\/)\S+/$1/;
   unshift (@INC, $script_dir);
-  require "GB_conf.pl";
 }
+
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 =head1 NAME
 
@@ -52,8 +53,10 @@ use pmatch_modules;
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-my %conf =  %::GB_conf; # configuration options
+my %conf =  %::scripts_conf; # configuration options
+my %db_conf =  %::db_conf; # configuration options
 
 # global vars
 my %plengths; # stores lengths of all proteins in $protfile 
@@ -75,6 +78,8 @@ if (defined ($outdir) && $outdir ne '') {
 }
 
 open (OUT, ">$outfile") or die "Can't open $outfile:$!\n";
+my $sgpa = &get_static_golden_path_adaptor;
+
 
 # read pmatch results from STDIN
 while(<>){
@@ -115,7 +120,10 @@ while(<>){
   $mh->add_CoordPair($cp);
 
   push (@hits, $mh);
+
 }
+
+print STDERR "finished reading\n";
 
  # find the best hit(s) in the genome for each protein in $protfile
  my $pmf2 = new Second_PMF( 
@@ -124,20 +132,33 @@ while(<>){
 
  $pmf2->run;
 
+# need to get rid of duplicate lines - eg system sort -u on the output file?
+ 
  # output the results
+
  foreach my $hit($pmf2->output) {
-   print OUT $hit->query  . ":" . 
-         $hit->qstart . "," . 
-         $hit->qend   . ":" . 
+   my ($chrname, $chrstart, $chrend) = $sgpa->convert_fpc_to_chromosome($hit->query, $hit->qstart,$hit->qend);
+   print OUT $chrname  . ":" . 
+         $chrstart . "," . 
+         $chrend   . ":" . 
          $hit->target . ":" .
-         $hit->tstart . "," .
-         $hit->tend   . "\n";
+         $hit->coverage . "\n";
+
  }
 
 close (OUT) or die "Can't close $outfile:$!\n";
 
  ### END MAIN
 
+sub get_static_golden_path_adaptor {
+  my $dbuser = "ensro";
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+    -host             => $db_conf{'dbhost'},
+    -user             => $dbuser,
+    -dbname           => $db_conf{'dbname'},
+);
 
-
-
+  $db->static_golden_path_type($::db_conf{'golden_path'});
+  my $sgpa = $db->get_StaticGoldenPathAdaptor();
+  return $sgpa;
+}
