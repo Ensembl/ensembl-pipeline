@@ -2,63 +2,55 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN { $| = 1; plan test => 9;
-	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-      }
+BEGIN { $| = 1; plan test => 5;}
 
-use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
-use Bio::PrimarySeq;
-use Bio::Seq;
+use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
 use Bio::SeqIO;
 
 ok(1);
 
-open(IN,"<t/data/AC099340.fa.masked");
-
-ok(my $genseqio = new Bio::SeqIO(-fh     => \*IN, -format => 'fasta'));
-
-ok(my $genseq = $genseqio->next_seq);
-
-close(IN);
+ok(my $estseqio = new Bio::SeqIO(-file   => 't/data/testest.fa', 
+                                 -format => 'fasta'));
 
 my @estseqs;
-
-open(IN,"<t/data/testest.fa") || die "Can't open testfile";
-
-ok(my $estseqio = new Bio::SeqIO(-fh => \*IN, -format => 'fasta'));
 
 while (my $seq = $estseqio->next_seq) {
   push(@estseqs,$seq);
 }
 
-close(IN);
+ok(my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
+   -query_seqs  => \@estseqs,
+   -query_type  => 'DNA',
+   -database    => 't/data/AC099340.fa.masked', #$genseq,
+   -target_type => 'DNA',
+   -exonerate   => '/usr/local/ensembl/bin/exonerate-0.6.7',
+#   -exonerate   => '/usr/local/ensembl/bin/exonerate-0.8.2',
+#   -options     => ' --dnahspthreshold 30 --forcegtag TRUE --maxintron 500000'
+   ));
 
-my $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 ";
+$exonerate->_verbose(0);
 
-ok(my $exe = $::pipeConf{'bindir'} . '/exonerate');
+ok($exonerate->run);
 
-ok(my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (
-   -EST       => \@estseqs,
-   -GENOMIC   => $genseq,
-   -EXONERATE => $exe,
-   -ARGS      => $exargs,
-   -PRINT     => 1));
+ok(my @transcripts = $exonerate->output());
 
-my $ungapped = 1;
-
-ok($exonerate->run($ungapped));
-
-ok(my @results = $exonerate->output());
-
-ok(display(@results));
+ok(display(@transcripts));
 
 sub display {
-  my @results = @_;
+  my @transcripts = @_;
 
-  foreach my $pair (@results) {
-    print $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . $pair->score . "\t" . 
-      $pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\n";
+  foreach my $transcript (@transcripts) {
+    my $exons = $transcript->get_all_Exons;
+    my $dafs = $exons->[0]->get_all_supporting_features;
+
+    print "Match : (hseqname) " . 
+    $dafs->[0]->hseqname . "\t" .
+    "(length) " . $transcript->length . "\t" . 
+    "(exons) " . scalar @$exons . "\t" . 
+    "(strand) " . $transcript->strand . "\t" . 
+     "\n";
   }
-  return 1;
+
+  return 1
 }
 
