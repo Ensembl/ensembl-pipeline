@@ -117,9 +117,15 @@ sub run {
     
     my $runnable = $self->runnable;
     $runnable || $self->throw("Can't run - no runnable object");
-    
-    $runnable->run;
-    
+    eval{
+        $runnable->run;
+    };
+    if(my $err = $@){
+        chomp $err;
+        $self->failing_job_status($1) 
+            if $err =~ /^\"([A-Z_]{1,40})\"$/i; # only match '"ABC_DEFGH"' and not all possible throws
+        $self->throw("$@");
+    }
     push (@{$self->{'_output'}}, $runnable->output);
     foreach my $f(@{$self->{'_output'}}){
       #$f->source_tag($self->analysis->db);
