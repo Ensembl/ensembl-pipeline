@@ -44,27 +44,28 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE';
 my $ana_adaptor = $db->get_AnalysisAdaptor();
+my $ana = $ana_adaptor->fetch_by_logic_name('tRNAscan');
 
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
-					  -db_version     => '__NONE__',
-					  -program        => 'tRNAscan_SE',
-					  -program_file   => '/usr/local/pubseq/bin/tRNAscan-SE',
-					  -module         => $runnable,
-					  -module_version => 1,
-					  -gff_source     => 'tRNAscan_SE',
-					  -gff_feature    => 'tRNA', 
-					  -parameters     => '',
-					  -logic_name     => 'tRNA',
-				      );
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
+#					  -db_version     => '__NONE__',
+#					  -program        => 'tRNAscan_SE',
+#					  -program_file   => '/usr/local/pubseq/bin/tRNAscan-SE',
+#					  -module         => $runnable,
+#					  -module_version => 1,
+#					  -gff_source     => 'tRNAscan_SE',
+#					  -gff_feature    => 'tRNA', 
+#					  -parameters     => '',
+#					  -logic_name     => 'tRNA',
+#				      );
 
 unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id ='AL009179.00001';  
+my $id =  'AL009179.00001';  
 
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(  -dbobj      => $db,
+my $runobj = "$runnable"->new(  -db      => $db,
 			        -input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
@@ -83,7 +84,9 @@ else
 #display(@out);
 
 $runobj->write_output();
-my @features = $db->get_Contig($id)->get_all_SimilarityFeatures();
+my $contig =  $db->get_RawContigAdaptor->fetch_by_name($id);
+my @features = $contig->adaptor->fetch_all_simple_features($contig, 'tRNAscan');
+
 display(@features);
 
 unless (@features)
