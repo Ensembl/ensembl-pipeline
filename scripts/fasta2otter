@@ -1,0 +1,147 @@
+#!/usr/local/bin/perl
+
+use strict;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Clone;
+use Bio::EnsEMBL::RawContig;
+use Getopt::Long;
+use Bio::SeqIO;
+
+my $fastafile;
+my $chunk = 100000;
+my $type;
+my $host;
+my $port = 3306;
+my $user = 'ensadmin';
+my $pass = 'ensembl';
+my $chr;
+
+my $dbname;
+
+&GetOptions(
+            'host:s'      => \$host,
+            'port:n'      => \$port,
+            'user:s'      => \$user,
+            'pass:s'      => \$pass,
+            'dbname:s'    => \$dbname,
+            'type:s'      => \$type,
+            'fastafile:s' => \$fastafile,
+            'chunk:s'     => \$chunk,
+            'chr:s'       => \$chr,
+           );
+
+if (!defined($fastafile) || ! -e $fastafile) {  
+   die "Fasta file not input or doesn't exist [$fastafile]\n";
+}
+
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $host,
+                                            -user   => $user,
+                                            -pass   => $pass,
+                                            -dbname => $dbname);
+
+open(IN,"<$fastafile") || die "can't open fasta file [$fastafile]\n";;
+
+my $seqio = new Bio::SeqIO(-fh => \*IN, -format => 'fasta');
+
+my $chrobj = $db->get_ChromosomeAdaptor->fetch_by_chr_name($chr);
+
+my $chrid;
+
+if (!defined($chrobj)) {
+    print "Storing chromosome $chr\n";
+
+    my $chrsql = "insert into chromosome(chromosome_id,name) values(null,'$chr')";
+    my $sth    = $db->prepare($chrsql);
+    my $res    = $sth->execute;
+
+    $sth = $db->prepare("SELECT last_insert_id()");
+    $sth->execute;
+
+    ($chrid) = $sth->fetchrow_array;
+    $sth->finish;
+  } else {
+    print "Using existing chromosome " . $chrobj->dbID . "\n";
+    $chrid = $chrobj->dbID;
+}
+
+my $time  = time;
+my $start = 1;
+
+while (my $seq = $seqio->next_seq) {
+
+  my @seqs;
+
+  if ($seq->length > $chunk) {
+     @seqs = split_fasta($seq,$chunk);
+  } else {
+     @seqs = ($seq);
+  }
+
+  foreach my $tmpseq (@seqs) {
+    
+    # Create clone
+
+    my $clone = new Bio::EnsEMBL::Clone();
+    $clone->id($tmpseq->id);
+    $clone->embl_id($tmpseq->id);
+    $clone->version(1);
+    $clone->embl_version(1);
+    $clone->htg_phase(-1);
+    $clone->created($time);
+    $clone->modified($time);
+
+    # Create contig
+
+    my $contig = new Bio::EnsEMBL::RawContig;
+
+    $contig->name($tmpseq->id);
+    $contig->clone($clone);
+    $contig->embl_offset(1);
+    $contig->length($tmpseq->length);
+    $contig->seq($tmpseq->seq);
+
+    $clone->add_Contig($contig);
+
+    $db->get_CloneAdaptor->store($clone);
+
+    # Make an entry in the assembly table
+
+    my $offset = 1;
+    my $raw_end = $tmpseq->length;
+    my $end = $start + $tmpseq->length - 1;
+    my $id  = $contig->id;
+    my $length = $tmpseq->length;
+    my $rawid  = $contig->dbID; 
+    my $sqlstr = "insert into assembly(chromosome_id,chr_start,chr_end,superctg_name,superctg_start,superctg_end,superctg_ori,contig_id,contig_start,contig_end,contig_ori,type) values($chrid,$start,$end,\'$id\',1,$length,1,$rawid,$offset,$raw_end,1,\'$type\')\n";
+
+    print "SQL $sqlstr\n";
+
+    my $sth = $db->prepare($sqlstr);
+    my $res = $sth->execute;
+ 
+    $start += $tmpseq->length;
+  }
+} 
+
+sub split_fasta {
+  my ($seq,$chunk) = @_;
+
+  my $start = 1;
+  my @newseqs;
+
+  while ($start < $seq->length) {
+
+     my $end = $start + $chunk -1;
+     if ($end > $seq->length) {
+        $end = $seq->length;
+     }
+
+     my $substr = substr($seq->seq,$start-1,($end-$start+1));
+     my $newseq = new Bio::Seq(-seq => $substr,
+                               -id  => $seq->id . ".$start-$end");
+
+     push(@newseqs,$newseq);
+     $start += $chunk;
+  }
+  return @newseqs;
+}

@@ -58,10 +58,14 @@ if (!defined($logic_name)) {
    die "Analysis must have a logic_name defined";
 }
 
+if (!defined($module)) {
+   die "Analysis must have a module defined";
+}
+
 if ($logic_name)       {$analysis->logic_name        ($logic_name);}
-if ($database  )       {$analysis->database          ($database);}
-if ($database_file)    {$analysis->database_file     ($database_file);}
-if ($database_version) {$analysis->database_version  ($database_version);}
+if ($database  )       {$analysis->db                ($database);}
+if ($database_file)    {$analysis->db_file           ($database_file);}
+if ($database_version) {$analysis->db_version        ($database_version);}
 if ($program)          {$analysis->program           ($program);}
 if ($program_file)     {$analysis->program_file      ($program_file);}
 if ($module)           {$analysis->module            ($module);}
