@@ -117,7 +117,7 @@ sub new {
   #}
 
   # can choose which blat to use
-  $self->blat('blat') unless $blat;
+  $blat ||= 'blat';
   $self->blat($self->find_executable($blat));
   
   # can add extra options as a string
