@@ -89,23 +89,25 @@ sub new {
   if (defined($exact_merge)){
     $self->exact_merge($exact_merge);
   }
-
-  if ( $EST_GENEBUILDER_MERGE eq 'fuzzy_semiexact_merge' ){ 
-    $self->_merge_type('fuzzy_semiexact_merge');
-    $self->_mismatch_allowed(7);
-  }
-  elsif( $EST_GENEBUILDER_MERGE eq 'semiexact_merge' ){
-    $self->_merge_type('semiexact_merge');
-    $self->_mismatch_allowed(2);
-  }
-  elsif( $EST_GENEBUILDER_MERGE eq 'merge_allow_gaps' ){
-    $self->_merge_type('merge_allow_gaps');
-    $self->_mismatch_allowed(7);
+  
+  if ( $EST_GENEBUILDER_COMPARISON_LEVEL ){
+    $self->_merge_level($EST_GENEBUILDER_COMPARISON_LEVEL);
   }
   else{
-    $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_MERGE for your ests/cdnas to be compared!")
+    $self->throw("this won't work, you must define ESTConf::EST_GENEBUILDER_COMPARISON_LEVEL for your ests/cdnas to be compared!")
   }
+  
 
+  if ( $EST_GENEBUILDER_SPLICE_MISMATCH ){
+    $self->_splice_mismatch( $EST_GENEBUILDER_SPLICE_MISMATCH);
+  }
+  if ( $EST_GENEBUILDER_INTRON_MISMATCH ){
+    $self->_intron_mismatch( $EST_GENEBUILDER_INTRON_MISMATCH );
+  }
+  if ( $EST_GENEBUILDER_EXON_MATCH ){
+    $self->_exon_match( $EST_GENEBUILDER_EXON_MATCH );
+  }
+  
   return $self;
 }
 
@@ -582,7 +584,7 @@ sub _test_for_link{
   
   my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new( -comparison_level         => 3,
 										      -exon_match               => 0,
-										      -splice_mismatch          => 0,
+										      -splice_mismatch          => 1,
 										      -intron_mismatch          => 0,
 										    );
   my $sublist;
@@ -599,7 +601,7 @@ sub _test_for_link{
       print STDERR "using cached matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
     else{
-      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript, $self->_merge_type, $self->_mismatch_allowed);
+      ($merge,$overlaps) = $comparator->compare($trans_link, $transcript);
       $overlap_matrix{$transcript}{$trans_link} = [$merge,$overlaps];
       print STDERR "calculating matrix[ $transcript ][ $trans_link ] = ( $merge,$overlaps )\n";
     }
@@ -1338,12 +1340,31 @@ sub _transfer_Supporting_Evidence{
 #
 ############################################################
 
-sub _merge_type{
-  my ($self, $type ) = @_;
-  if ($type){
-    $self->{_merge_type} = $type;
+sub _comparison_level{
+  my ($self, $level ) = @_;
+  if ($level){
+    $self->{_comparison_level} = $level;
   }
-  return $self->{_merge_type};
+  return $self->{_comparison_level};
+}
+############################################################
+
+sub _splice_mismatch{
+  my ($self, $mismatch ) = @_;
+  if ($mismatch){
+    $self->{_splice_mismatch} = $mismatch;
+  }
+  return $self->{_splice_mismatch};
+}
+
+############################################################
+
+sub _intron_mismatch{
+  my ($self, $mismatch ) = @_;
+  if ($mismatch){
+    $self->{_intron_mismatch} = $mismatch;
+  }
+  return $self->{_intron_mismatch};
 }
 
 ############################################################
