@@ -427,6 +427,12 @@ sub run{
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN2;
 	  }
+	  
+	  # reject unspliced transcripts
+	  unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript ) ){
+ 	    next TRAN2;
+ 	  }
+
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->estgene_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -488,6 +494,13 @@ sub run{
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN4;
 	  }
+
+	  # reject unspliced transcripts
+ 	  unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript ) ){
+ 	    next TRAN4;
+ 	  }
+
+
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->estgene_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
