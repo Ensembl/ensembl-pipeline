@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl -w 
+#!/usr/local/ensembl/bin/perl 
 
 # default pipeline runner script
 # this script is passed as part of the batch submission request
