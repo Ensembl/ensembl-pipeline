@@ -560,7 +560,7 @@ sub make_seqfetcher {
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
+    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
   }
   else{
     # default to Pfetch
