@@ -46,7 +46,7 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
-use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
+#use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
 use Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools;
 
 use vars qw(@ISA);
@@ -153,19 +153,19 @@ sub pseudogene_test{
   ############################################################
   # has it got homology in mouse?
   my $orthologues = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
+      ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
   if ( $orthologues && @{$orthologues} ){
-    $mouse_homology = 1;
+      $mouse_homology = 1;
   }
   else{
-    print STDERR "Could not find any ortholog\n";
-    $mouse_homology = 0;
+      print STDERR "Could not find any ortholog\n";
+      $mouse_homology = 0;
   }
   
   ############################################################
   # has it got homology in rat?
   my $orthologues2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
+    ->test_for_orthology_with_tblastx($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
   if ( $orthologues2 && @{$orthologues2} ){
     $rat_homology = 1;
   }
@@ -174,31 +174,31 @@ sub pseudogene_test{
     $rat_homology = 0;
   }
   
-  ############################################################
-  # Does it break synteny in mouse?
-  my $synteny_breaking = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold);
-  if ( $synteny_breaking ){
-    print STDERR "synteny in mouse is broken\n";
-    $break_synteny_mouse = 1;
-  }
-  else{
-    print STDERR "synteny in mouse is preserved\n";
-    $break_synteny_mouse = 0;
-  }
+#  ############################################################
+#  # Does it break synteny in mouse?
+#  my $synteny_breaking = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+#    ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold);
+#  if ( $synteny_breaking ){
+#    print STDERR "synteny in mouse is broken\n";
+#    $break_synteny_mouse = 1;
+#  }
+#  else{
+#    print STDERR "synteny in mouse is preserved\n";
+#    $break_synteny_mouse = 0;
+#  }
   
-  ############################################################
-    # Does it break synteny in rat?
-    my $synteny_breaking2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-      ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2 , $threshold);
-  if ( $synteny_breaking2 ){
-    print STDERR "synteny in rat is broken\n";
-    $break_synteny_rat= 1;
-  }
-  else{
-    print STDERR "synteny in rat is preserved\n";
-    $break_synteny_rat = 0;
-  }
+#  ############################################################
+#    # Does it break synteny in rat?
+#    my $synteny_breaking2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
+#      ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2 , $threshold);
+#  if ( $synteny_breaking2 ){
+#    print STDERR "synteny in rat is broken\n";
+#    $break_synteny_rat= 1;
+#  }
+#  else{
+#    print STDERR "synteny in rat is preserved\n";
+#    $break_synteny_rat = 0;
+#  }
   
   ############################################################
   # Does it overlap with repeats?
