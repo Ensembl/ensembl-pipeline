@@ -44,8 +44,10 @@ package Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-# config file; parameters searched for here if not passed in as @args 
-require "Bio/EnsEMBL/Pipeline/GB_conf.pl";  
+use Bio::EnsEMBL::Pipeline::BioperlDBConf qw (
+					      BIOPERLDB
+					     );
+
 
 # Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genewise;
@@ -554,7 +556,7 @@ sub minirun {
     my @reverse;
     
 	
-	if ($::genebuild_conf{'bioperldb'}) {
+	if ($BIOPERLDB) {
 
     	foreach my $feat(@$features) {
 		
