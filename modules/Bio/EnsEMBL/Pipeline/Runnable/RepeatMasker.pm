@@ -31,7 +31,7 @@ Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
     
 =head1 DESCRIPTION
 
-RepeatMasker takes a Bio::Seq object and runs RepeatMaskerHum on it. The
+RepeatMasker takes a Bio::Seq (or Bio::PrimarySeq) object and runs RepeatMaskerHum on it. The
 resulting .out file is parsed to produce a set of feature pairs.
 Arguments can be passed to RepeatMaskerHum through the arguments() method. 
 
@@ -130,7 +130,10 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".RepMask.out");
@@ -214,7 +217,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for RepeatMasker\n");
     #set directory if provided
-    $self->workdir('tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile();        

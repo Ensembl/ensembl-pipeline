@@ -34,7 +34,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Genscan
 =head1 DESCRIPTION
 
 This package is based on Genscan2ace.
-Genscan takes a Bio::Seq object and runs Genscan on it. The
+Genscan takes a Bio::Seq (or Bio::PrimarySeq) object and runs Genscan on it. The
 resulting output is parsed to produce a set of Bio::SeqFeatures. 
 
 =head2 Methods:
@@ -136,7 +136,10 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".genscan");
@@ -271,7 +274,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Genscan\n");
     #set directory if provided
-    $self->workdir('tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

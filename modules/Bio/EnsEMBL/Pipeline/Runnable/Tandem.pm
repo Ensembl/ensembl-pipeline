@@ -31,7 +31,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Tandem
 
 =head1 DESCRIPTION
 
-Tandem takes a Bio::Seq object and runs equicktandem and etandem. The run strategy is taken from
+Tandem takes a Bio::Seq (or Bio::PrimarySeq) object and runs equicktandem and etandem. The run strategy is taken from
 tan_Search in hp.pl. equicktandem is run to get a range of sizes from 2-3. Theses sizes are used as the
 only repeat length searched by etandem. The output is added to the output of etandem run with a repeat
 length of 2 and the uniform switch set to 'yes'. The results are parsed to produce a set
@@ -135,7 +135,10 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".tandem.out");
@@ -238,7 +241,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Tandem\n");
     #set directory if provided
-    $self->workdir('tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

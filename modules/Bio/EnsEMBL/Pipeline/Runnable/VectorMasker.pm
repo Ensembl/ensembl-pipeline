@@ -18,20 +18,20 @@ Bio::EnsEMBL::Pipeline::Runnable::VectorMasker
 
 =head1 SYNOPSIS
 
-#create and fill Bio::Seq object
-my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
-my $seq = Bio::Seq->new();
-my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
-$seq = $seqstream->next_seq();
-#create Bio::EnsEMBL::Pipeline::Runnable::VectorMasker object
-my $vectmask = Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-CLONE => $seq);
-$vectmask->workdir($workdir);
-$vectmask->run();
-@featurepairs = $vectmask->output();
+  #create and fill Bio::Seq object
+  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+  my $seq = Bio::Seq->new();
+  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  $seq = $seqstream->next_seq();
+  #create Bio::EnsEMBL::Pipeline::Runnable::VectorMasker object
+  my $vectmask = Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-CLONE => $seq);
+  $vectmask->workdir($workdir);
+  $vectmask->run();
+  @featurepairs = $vectmask->output();
 
 =head1 DESCRIPTION
 
-VectorMasker takes a Bio::Seq object and runs blastn with vectors_etc, the
+VectorMasker takes a Bio::Seq (or Bio::PrimarySeq) object and runs blastn with vectors_etc, the
 output is parsed by MSPcrunch and stored as Bio::EnsEMBL::FeaturePairs. 
 Arguments can be passed to MSPcrunch through the arguments() method. 
 
@@ -140,7 +140,10 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.".VectMask.out");
@@ -264,7 +267,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Vectormasker\n");
     #set directory if provided
-    $self->workdir('tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

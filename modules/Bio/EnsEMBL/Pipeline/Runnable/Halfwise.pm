@@ -32,7 +32,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Halfwise
 
 =head1 DESCRIPTION
 
-Takes a Bio::Seq object and runs halfwise on it. The results are returned as an
+Takes a Bio::Seq (or Bio::PrimarySeq) object and runs halfwise on it. The results are returned as an
 array of Bio::EnsEMBL::FeaturePairs. The location of halfwise can be set using
 the halfwise() method
 
@@ -117,7 +117,10 @@ sub clone {
     my ($self, $seq) = @_;
     if ($seq)
     {
-        $seq->isa("Bio::Seq") || $self->throw("Input isn't a Bio::Seq");
+        unless ($seq->isa("Bio::PrimarySeq") || $seq->isa("Bio::Seq")) 
+        {
+            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+        }
         $self->{_clone} = $seq ;
         $self->filename($self->clone->id.".$$.seq");
         $self->results($self->filename.'.halfwise');
@@ -200,7 +203,7 @@ sub run {
     #check clone
     my $seq = $self->clone() || $self->throw("Clone required for Halfwise\n");
     #set directory if provided
-    $self->workdir('tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 
