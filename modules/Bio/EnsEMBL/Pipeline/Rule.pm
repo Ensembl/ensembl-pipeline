@@ -183,7 +183,7 @@ sub check_for_analysis {
   if ($goal_id_type ne 'ACCUMULATOR' &&
       $goal_id_type ne $input_id_type) {
     print STDERR " failed input_id_type check as goal input_id type ".
-      "isn't the same as the input_id type\n" if($verbose);
+      "isn't the same as the input_id type for goal analysis " . $self->goalAnalysis->logic_name. "\n" if($verbose);
     $return += 1;
   }
 
