@@ -44,7 +44,12 @@ $pred_transcript->add_Exon($exon);
 
 ok($pred_transcript);
 
-my $pwd = `pwd`; chomp($pwd);
+my $db_home = `pwd`;
+chomp($db_home);
+$db_home .= '/t/data';
+
+$ENV{'BLASTDB'} = $db_home;
+my $database = 'mini_protein.fa';
 
 # Make a BlastGenscanPep object.
 my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new ( 
@@ -52,7 +57,7 @@ my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new (
                                                     -peptide    => $pred_transcript,
 						    -program    => 'wublastp',
                                             # Hardcoded path alert
-                                                    -database   => "$pwd/t/data/mini_protein.fa",
+                                                    -database   => $database,
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
