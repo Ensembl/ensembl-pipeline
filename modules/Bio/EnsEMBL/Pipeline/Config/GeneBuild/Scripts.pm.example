@@ -108,7 +108,11 @@ use vars qw( %Scripts );
 	    GB_FPCDIR      => '',
 	    
 	    # directory to write pmatch results
-	    GB_PM_OUTPUT   => '',
+	    GB_PM_OUTPUT   => '',	
+
+	    GB_SUBMIT_LOGICNAME => 'SubmitGeneBuild', #logic_name of dummy analysis for input_id_analysis table
+
+	    GB_RULEMANAGER_SLEEP => 15,	#how long rulemamnger sleeps for before checking next analysis
 	   );
 
 sub import {
