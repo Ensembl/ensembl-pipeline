@@ -91,15 +91,18 @@ sub new {
 =cut
 
 sub make_seqfetcher {
-  my ( $self, $index ) = @_;
+  my ( $self, $index, $seqfetcher_class ) = @_;
 
   my $seqfetcher;
+  
+  (my $class = $seqfetcher_class) =~ s/::/\//g;
+  require "$class.pm";
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
-								  '-db' => \@db,
-								 );
+    
+    # make sure that your class is compatible with the index type
+    $seqfetcher = "$class"->new('-db' => \@db, );
   }
   else{
     $self->throw("can't make seqfetcher\n");
@@ -142,7 +145,7 @@ sub make_targetted_runnables {
   my ($self) = @_;
 
   # set up seqfetchers
-  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
+  my $protein_fetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX, $GB_TARGETTED_PROTEIN_SEQFETCHER);
 
   # we need to find all the proteins that pmatch into this region
   # take a note of those that fall across the ends of the vc? and do what, precisely?
