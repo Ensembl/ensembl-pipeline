@@ -21,24 +21,21 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
-my $mailReceiver = "ensembl\@ebi.ac.uk";
-my $maxMails = 20;
+my $mailReceiver = "stabenau\@ebi.ac.uk";
+my $maxMails = 1;
 my $currentMail = 0;
 $| = 1;
 my %stats = ( );
 
 # how many second before job becomes old?
-#At the moment, 4 days!
-my $oldJob = 345600;
+my $oldJob = 1200;
 
-# $statusDir = '/tmp/ruleManager';
-
-my $chunksize = 10000;
+my $chunksize = 500;
 my $currentStart = 0;
 my $completeRead = 0;
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
-  ( -host => 'ensrv3.sanger.ac.uk',
-    -dbname => 'arne_anaTest',
+  ( -host => 'ensrv4.sanger.ac.uk',
+    -dbname => 'matloob_freeze17',
     -user => 'ensadmin',
   );
 
@@ -73,6 +70,7 @@ while( 1 ) {
   }
 
 
+  my $jobsStarted = $stats{'jobsStarted'};
   while ( @hotIds ) {
     my $hotId = shift( @hotIds );
     $stats{'sizeHotIds'}--; 
@@ -103,12 +101,16 @@ while( 1 ) {
 	( $anal, $hotId->[0] ); 
       $workOn{ $hotId->[0]."-".$anal->dbID } = 1;
       $jobAdaptor->store( $job );
-      $job->runRemote( resolve_queue( $anal ));
+      $job->batch_runRemote( resolve_queue( $anal ));
+#      $job->runLocally;
       $stats{'jobsStarted'}++;
       push( @hotJobs, [ $job, time ]  );
     }
   }
-
+  if( $jobsStarted == $stats{'jobsStarted' } ) {
+    Bio::EnsEMBL::Pipeline::Job->flush_runs( $jobAdaptor );
+  }
+  
   if( scalar(@hotJobs) ==0 &&
       scalar(@hotIds) == 0 &&
       $completeRead ) {
@@ -121,7 +123,7 @@ while( 1 ) {
   }
   # now try to find about the jobs in
   # the hotlist
-  sleep( 3 );
+  # sleep( 3 );
   &check_jobs_against_success;
   &check_jobs_against_failed;
   &check_jobs_for_old;
@@ -166,6 +168,8 @@ sub check_jobs_against_failed {
   
   my @newHot;
   print "Failed jobs: ", scalar( @failed ), ".\n";
+  $stats{'jobFailed'} += scalar( @failed );
+  
   while( @hotJobs ) {
     my ( $job, $time ) = @{shift( @hotJobs )};
     if( defined $failedHash{$job->dbID} ) {

@@ -33,12 +33,13 @@ my $test_env; #not used at present but could be used to test LSF machine
 my $object_file;
 my $job_id;
 
+print STDERR join( " ", @ARGV ),"\n";
+
 GetOptions(     'host=s'     => \$host,
                 'port=n'     => \$port,
                 'dbname=s'   => \$dbname,
                 'dbuser=s'   => \$dbuser,
                 'pass=s'     => \$pass,
-                'job=n'      => \$job_id,
 		'check!'    => \$check,
                 'objfile=s'  => \$object_file,
                 'module=s'   => \$module ) or die ("Couldn't get options");
@@ -60,7 +61,6 @@ if( defined $check ) {
 }
 
 
-if( defined $job_id) {
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new 
     (  -host   => $host,
        -user   => $dbuser,
@@ -70,17 +70,14 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new
        -perlonlyfeatures  => 1,
        -perlonlysequences => 1 )
     or die ("Failed to create Bio::EnsEMBL::Pipeline::Obj to db $dbname \n");
+my $job_adaptor = $db->get_JobAdaptor();
 
-
-    
-  my $job_adaptor = $db->get_JobAdaptor();
+while( $job_id = shift ) {
   my $job         = $job_adaptor->fetch_by_dbID($job_id);
 
   if( !defined $job) {
-    die( "Couldnt recreate job $job_id" );
+    print STDERR ( "Couldnt recreate job $job_id\n" );
   }
 
-  $job->runInLSF;
-} else {
-  die( "Called runner without job_id" );
+  $job->runLocally;
 }

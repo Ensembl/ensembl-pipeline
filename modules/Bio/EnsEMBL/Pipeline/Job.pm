@@ -51,12 +51,16 @@ use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-#my $nfs_tmpdir = "/nfs/disk100/humpub1/michele/est2genome/";
-my $nfs_tmpdir = "/nfs/disk21/stabenau/tmp";
-# my $nfs_tmpdir = "/nfs/ensembl/ensembl/tmp";
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
+
+# following vars are static and not meaningful on remote side
+# recreation of Job object. Not stored in db of course.
+# hash with queue keys
+
+my %batched_jobs;
+my %batched_jobs_runtime;
 
 sub new {
     my ($class, @args) = @_;
@@ -210,6 +214,135 @@ sub analysis {
 
 }
 
+
+=head2 flush_runs
+
+  Title   : flush_runs
+  Usage   : $job->flush_runs( jobadaptor, [queue] );
+  Function: Issue all jobs in the queue and empty the queue.
+    Set LSF id in all jobs. Uses the given adaptor for connecting to
+    db. Uses first job in queue for stdout/stderr. 
+  Returns : 
+  Args    : 
+
+=cut
+
+sub flush_runs {
+  my $self = shift;
+
+  my $adaptor = shift;
+  my $queue = shift;
+  my @queues;
+  
+  if( !defined $adaptor ) {
+    $self->throw( "Cannot run remote without db connection" );
+  }
+
+  local *SUB;
+  local *FILE;
+
+  if( ! defined $queue ) {
+    @queues = keys %batched_jobs;
+  } else {
+    @queues = ( $queue );
+  }
+  
+  my $db = $adaptor->db;
+  my $host = $db->host;
+  my $username = $db->username;
+  my $dbname = $db->dbname;
+  my ( $lsfid, $job, $stdout, $stderr );
+
+  my $runner = __FILE__;
+  $runner =~ s:/[^/]*$:/runner.pl:; 	
+
+  for my $queue ( @queues ) {
+
+    if( ! scalar( @{$batched_jobs{$queue}} )) {
+      next;
+    }
+
+    my $firstjob = $adaptor->fetch_by_dbID( $batched_jobs{$queue}->[0] );
+
+    if( ! defined $firstjob ) {
+      $self->throw( "First batch job not in db" );
+    }
+  
+
+
+    my $cmd;
+  
+    $cmd = "bsub -q ".$queue." -o ".$firstjob->stdout_file.
+    " -e ".$firstjob->stderr_file." -E \"$runner -check\" ";
+
+
+    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".join( " ",@{$batched_jobs{$queue}} );
+    
+    print STDERR "$cmd\n";
+    open (SUB,"$cmd |");
+  
+    while (<SUB>) {
+      if (/Job <(\d+)>/) {
+        $lsfid = $1;
+      }
+    }
+    close(SUB);
+
+    if( ! defined $lsfid ) {
+      print STDERR ( "Couldnt submit ".join( " ",@{$batched_jobs{$queue}} )." to LSF" );
+      foreach my $jobid ( @{$batched_jobs{$queue}} ) {
+        my $job = $adaptor->fetch_by_dbID( $jobid );
+        $job->set_status( "FAILED" );
+      }
+    } else {
+    
+      foreach my $jobid ( @{$batched_jobs{$queue}} ) {
+        my $job = $adaptor->fetch_by_dbID( $jobid );
+        if( $job->retry_count > 0 ) {
+          for ( $job->stdout_file, $job->stderr_file ) {
+            open( FILE, ">".$_ ); close( FILE );
+          }
+        }
+	$job->LSF_id( $lsfid );
+        $job->retry_count( $job->retry_count + 1 );
+        $job->set_status( "SUBMITTED" );
+        $adaptor->update( $job );
+      }
+    }
+    $batched_jobs{$queue} = [];
+    $batched_jobs_runtime{$queue} = 0;
+  }
+}
+
+
+=head2 batch_runRemote
+
+  Title   : batch_runRemote
+  Usage   : $job->batch_runRemote
+  Function: Issue more than one small job in one LSF job because 
+    job submission is very slow
+  Returns : 
+  Args    : Is static, private function, dont call with arrow notation.
+
+=cut
+
+sub batch_runRemote {
+  my $self = shift;
+  my $queue = shift;
+  
+  # should check job->analysis->runtime
+  # and add it to batched_jobs_runtime
+  # but for now just
+  push( @{$batched_jobs{$queue}}, $self->dbID );
+  if( scalar( @{$batched_jobs{$queue}} ) >= 50 ) {
+    $self->flush_runs( $self->adaptor, $queue );
+  }
+}
+
+
+
+
+
 =head2 runLocally
 =head2 runRemote( boolean withDB, queue )
 =head2 runInLSF
@@ -280,7 +413,7 @@ sub runRemote {
   if( $useDB ) {
     # find out db details from adaptor
     # generate the lsf call
-    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname -job ".$self->dbID;
+    $cmd .= $runner." -host $host -dbuser $username -dbname $dbname ".$self->dbID;
     
   } else {
     # make the object
@@ -452,14 +585,23 @@ sub get_all_status {
 sub make_filenames {
   my ($self) = @_;
   
-  my @files = $self->get_files( $self->input_id,"obj","out","err" );
-  for (@files) {
-    open( FILE, ">".$_ ); close( FILE );
+  my $num = int(rand(10));
+  my $dir = $::pipeConf{'nfstmp.dir'} . "/$num/";
+  if( ! -e $dir ) {
+    system( "mkdir $dir" );
   }
+  my $stub = $self->input_id.".";
+  $stub .= $self->analysis->logic_name.".";
+  $stub .= time().".".int(rand(1000));
+
+#  my @files = $self->get_files( $self->input_id,"obj","out","err" );
+#  for (@files) {
+#    open( FILE, ">".$_ ); close( FILE );
+#  }
  
-  $self->input_object_file($files[0]);
-  $self->stdout_file($files[1]);
-  $self->stderr_file($files[2]);
+  $self->input_object_file($dir.$stub.".obj");
+  $self->stdout_file($dir.$stub.".out");
+  $self->stderr_file($dir.$stub.".err");
 }
 
 

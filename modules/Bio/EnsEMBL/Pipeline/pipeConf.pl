@@ -13,7 +13,7 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '/nfs/ensembl/ensembl/tmp',
+    'nfstmp.dir' => '/nfs/disk21/stabenau/tmp',
     'DBI.driver' => 'mysql',
 );
 }
