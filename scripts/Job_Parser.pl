@@ -79,7 +79,7 @@ my $anadb  = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host   => $anahost,
 						    -pass   => $anapass);
 
 
-my @jobs = $anadb->get_JobsByCurrentStatus('FAILED');
+my @jobs = $anadb->get_JobsByCurrentStatus('SUBMITTED');
 
 JOB:foreach my $job (@jobs) {
     
@@ -88,17 +88,21 @@ JOB:foreach my $job (@jobs) {
     print(STDERR "Id is " . $job->id . "\t$module\t" . $job->input_id . "\n");
 
     my $status=$job->status_file();
-    open(OUT,"<$status") || do {print STDERR "Could not open $stdout\n"; next;};
+    open(OUT,"<$status") || do {print STDERR "Could not open $status\n"; next;};
     
+    my $notprocessed=1;
     while(<OUT>){
+	print $_;
 	if(/PROCESSED/){
+	    print STDERR "Found processed!\n";
 	    $job->set_status('PROCESSED');
-	}
-	else {
-	    next JOB;
+	    $notprocessed=0;
 	}
     }
     close OUT;
+    if ($notprocessed) {
+	next JOB;
+    }
 
     my $stdout=$job->stdout_file();
     print STDERR "STDOUT file is $stdout\n";
@@ -149,8 +153,8 @@ JOB:foreach my $job (@jobs) {
 				      -dbobj    => $anadb);
 	my @features=$runnable->fetch_output($output);
 	print STDERR "Got features from frozen output (when it's fixed)\n";
-	$runnable->write_output(@features);
-	$job->set_status('DONE');    
+	#$runnable->write_output(@features);
+	#$job->set_status('DONE');    
     }
     
 }
