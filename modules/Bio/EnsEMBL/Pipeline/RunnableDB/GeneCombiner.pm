@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::Combine_GeneBuilder_ESTGenes.pm
+Bio::EnsEMBL::Pipeline::RunnableDB::GeneCombiner
 
 =head1 SYNOPSIS
 
@@ -54,10 +54,10 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
-use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
+use Bio::EnsEMBL::Pipeline::Runnable::GeneGraphGenerator;
 
 # config file; parameters searched for here if not passed in as @args
 
@@ -500,7 +500,8 @@ sub run{
       # we have to check the est genes to see whether they are ok
       # they must have some common properties in order
       # to form a proper set of alternative forms
-      my @accepted_trans = $self->_check_est_Cluster( @est_transcripts );
+      my $graph_generator = Bio::EnsEMBL::Pipeline::Runnable::GeneGraphGenerator->new();
+      my @accepted_trans = $graph_generator->_check_est_Cluster( @est_transcripts );
       if ( @accepted_trans ){
 	push ( @transcripts, @accepted_trans );
       }
@@ -938,11 +939,11 @@ sub _pair_Transcripts{
 	  next CANDIDATE;
 	}
 	if ( $fuzzy_merge == 1){
-	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges 'fuzzily' with an ensembl transcript, skipping it\n";
-	      next CANDIDATE;
-	    }
-	  }
-	  
+	  print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges 'fuzzily' with an ensembl transcript, skipping it\n";
+	  next CANDIDATE;
+	}
+      }
+      
       foreach my $ens_tran ( @ens_transcripts ){
 	$one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
 	$similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
@@ -1111,105 +1112,105 @@ sub _lock_Phases{
 }
     
   
-############################################################
-# this function takes est_transcripts that have been clustered together
-# but not with any ensembl transcript and tries to figure out whether they
-# make an acceptable set of alt-forms
+#############################################################
+## this function takes est_transcripts that have been clustered together
+## but not with any ensembl transcript and tries to figure out whether they
+## make an acceptable set of alt-forms
 
-sub _check_est_Cluster{
-  my ($self,@est_transcripts) = @_;
-  my %color;
+#sub _check_est_Cluster{
+#  my ($self,@est_transcripts) = @_;
+#  my %color;
 
-  #if ( scalar(@est_transcripts) == 1 ){
-  print STDERR "cluster with ".scalar(@est_transcripts)." transcripts\n";
-  #}
+#  #if ( scalar(@est_transcripts) == 1 ){
+#  print STDERR "cluster with ".scalar(@est_transcripts)." transcripts\n";
+#  #}
 
-  # adjacency lists:
-  my %adj;
-  my %seen;
-  my @linked;
+#  # adjacency lists:
+#  my %adj;
+#  my %seen;
+#  my @linked;
 
-  for(my $i=0;$i<scalar(@est_transcripts);$i++){
-    for(my $j=0;$j<scalar(@est_transcripts);$j++){
+#  for(my $i=0;$i<scalar(@est_transcripts);$i++){
+#    for(my $j=0;$j<scalar(@est_transcripts);$j++){
       
-      next if $j==$i;
-      print STDERR "Comparing transcripts:\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$i]);
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$j]);
+#      next if $j==$i;
+#      print STDERR "Comparing transcripts:\n";
+#      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$i]);
+#      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_transcripts[$j]);
       
-      # we only check on coincident exon:
-      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) 
-	   #&&	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])
-	 ){
-	print STDERR "they are linked\n";
-	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
-	unless ( defined $seen{ $est_transcripts[$i] } &&  $seen{ $est_transcripts[$i] } ){
-	  push ( @linked, $est_transcripts[$i] );
-	  $seen{ $est_transcripts[$i] } =1 ;
-	}
-	unless ( defined $seen{ $est_transcripts[$j] } &&  $seen{ $est_transcripts[$j] } ){
-	  push ( @linked, $est_transcripts[$j] );
-	  $seen{ $est_transcripts[$j] } = 1;
-	}
-      }
-    }
-  }
+#      # we only check on coincident exon:
+#      if ( $self->_check_exact_exon_Match( $est_transcripts[$i], $est_transcripts[$j]) 
+#	   #&&	   $self->_check_protein_Match(    $est_transcripts[$i], $est_transcripts[$j])
+#	 ){
+#	print STDERR "they are linked\n";
+#	push ( @{ $adj{$est_transcripts[$i]} } , $est_transcripts[$j] );
+#	unless ( defined $seen{ $est_transcripts[$i] } &&  $seen{ $est_transcripts[$i] } ){
+#	  push ( @linked, $est_transcripts[$i] );
+#	  $seen{ $est_transcripts[$i] } =1 ;
+#	}
+#	unless ( defined $seen{ $est_transcripts[$j] } &&  $seen{ $est_transcripts[$j] } ){
+#	  push ( @linked, $est_transcripts[$j] );
+#	  $seen{ $est_transcripts[$j] } = 1;
+#	}
+#      }
+#    }
+#  }
   
-  print STDERR scalar(@linked). " linked transcripts\n";
+#  print STDERR scalar(@linked). " linked transcripts\n";
   
-  print STDERR "adjacency lists:\n";
-  foreach my $tran (@linked){
-    print STDERR $tran->dbID." -> ";
-    foreach my $link ( @{ $adj{ $tran } } ){
-      print STDERR $link->dbID.",";
-    }
-    print STDERR "\n";
-  }
+#  print STDERR "adjacency lists:\n";
+#  foreach my $tran (@linked){
+#    print STDERR $tran->dbID." -> ";
+#    foreach my $link ( @{ $adj{ $tran } } ){
+#      print STDERR $link->dbID.",";
+#    }
+#    print STDERR "\n";
+#  }
   
-  foreach my $tran ( @linked ){
-    $color{$tran} = "white";
-  }
+#  foreach my $tran ( @linked ){
+#    $color{$tran} = "white";
+#  }
   
-  my @potential_genes;
+#  my @potential_genes;
   
-  # find the connected components doing a depth-first search
-  foreach my $tran ( @linked ){
-    if ( $color{$tran} eq 'white' ){
-      my @potential_gene;
-      $self->_visit( $tran, \%color, \%adj, \@potential_gene);
-      push ( @potential_genes, \@potential_gene );
-    }
-  }
-  print STDERR scalar(@potential_genes)." potential genes created\n";
-  my @accepted_transcripts;
-  foreach my $gene (@potential_genes){
-    push ( @accepted_transcripts, @$gene );
-  }
-  print STDERR "returning ".scalar( @accepted_transcripts)." transcripts\n";
-  return @accepted_transcripts;
-}
+#  # find the connected components doing a depth-first search
+#  foreach my $tran ( @linked ){
+#    if ( $color{$tran} eq 'white' ){
+#      my @potential_gene;
+#      $self->_visit( $tran, \%color, \%adj, \@potential_gene);
+#      push ( @potential_genes, \@potential_gene );
+#    }
+#  }
+#  print STDERR scalar(@potential_genes)." potential genes created\n";
+#  my @accepted_transcripts;
+#  foreach my $gene (@potential_genes){
+#    push ( @accepted_transcripts, @$gene );
+#  }
+#  print STDERR "returning ".scalar( @accepted_transcripts)." transcripts\n";
+#  return @accepted_transcripts;
+#}
 
-#########################################################################
+##########################################################################
 
-sub _visit{
-  my ($self, $node, $color, $adj, $potential_gene) = @_;
+#sub _visit{
+#  my ($self, $node, $color, $adj, $potential_gene) = @_;
   
-  # node is a transcript object;
-  $color->{ $node } = 'gray';
+#  # node is a transcript object;
+#  $color->{ $node } = 'gray';
 
-  foreach my $trans ( @{ $adj->{$node} } ){
-    if ( $color->{ $trans } eq 'white' ){
-      $self->_visit( $trans, $color, $adj, $potential_gene );
-    }
-  }
-  unless ( $color->{$node} eq 'black'){
-    push( @{ $potential_gene }, $node);
-  }
-  $color->{ $node } = 'black';    
-  return;
-}
+#  foreach my $trans ( @{ $adj->{$node} } ){
+#    if ( $color->{ $trans } eq 'white' ){
+#      $self->_visit( $trans, $color, $adj, $potential_gene );
+#    }
+#  }
+#  unless ( $color->{$node} eq 'black'){
+#    push( @{ $potential_gene }, $node);
+#  }
+#  $color->{ $node } = 'black';    
+#  return;
+#}
 
-#########################################################################
+##########################################################################
 
 sub _check_Completeness{
   my ($self, $array_ref ) = @_;
