@@ -167,8 +167,8 @@ sub _store_Feature {
 sub _store_FeaturePair{
     my ($self, $featurepair, $analysisid) = @_;
         
-    $featurepair->feature1->validate_prot_feature (1);
-    $featurepair->feature2->validate_prot_feature (1);
+    $featurepair->feature1->validate_prot_feature;
+    $featurepair->feature2->validate_prot_feature;
 
     ################
     # a little temporary hack to modify gadfly id's (Fly database)
@@ -205,19 +205,22 @@ sub _store_FeaturePair{
     $sth->execute;
     my $protein_featureId = ($sth->fetchrow_array)[0];
 
-    my @align_coor_tags = $featurepair->feature1->each_tag_value ('align_coor');
-    my @align_coor_array = @{$align_coor_tags[0]};
 
-    $sth = $self->prepare ( q{ INSERT INTO gapped_align
-                                           (id, featureId, coor, hcoor, length)
-                                    VALUES ('NULL', ?, ?, ?, ?)
-				} );
+    if ($featurepair->feature1->has_tag ('align_coor')) {
+        my @align_coor_tags = $featurepair->feature1->each_tag_value ('align_coor');
+        my @align_coor_array = @{$align_coor_tags[0]};
 
-    foreach my $ref (@align_coor_array) {
-        $sth->execute ($protein_featureId, $ref->[0], $ref->[1], $ref->[2]);
+        $sth = $self->prepare ( q{ INSERT INTO gapped_align
+                                               (id, featureId, coor, hcoor, length)
+                                        VALUES ('NULL', ?, ?, ?, ?)
+		 		 } );
+
+        foreach my $ref (@align_coor_array) {
+            $sth->execute ($protein_featureId, $ref->[0], $ref->[1], $ref->[2]);
+        }
+
+        $sth->finish;
     }
-
-    $sth->finish;
 }
 
 1;
