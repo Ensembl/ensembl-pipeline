@@ -40,9 +40,6 @@ my $alignment_tool = Bio::EnsEMBL::Pipeline::Tools::AlignmentTool->new(
 			   '-fasta_line_length' => 60);
 
 
-# A fairly general summary of overall alignment quality:
-my $overall_best_identity = $alignment_tool->identity('overall_identity');
-
 # Scrutinize each exon for the identity of best evidence:
 my $exon_best_identities = $alignment_tool->identity('identity_by_exon');
 
@@ -117,13 +114,18 @@ sub new {
 
   my $self = bless {},$class;
   
-  my ($db, $transcript, $seqfetcher, $padding, $fasta_line_length)
-    = $self->_rearrange([qw(DBADAPTOR
-			    TRANSCRIPT
-			    SEQFETCHER
-			    PADDING
-			    FASTA_LINE_LENGTH
-			   )],@args);
+  my ($db, 
+      $transcript, 
+      $seqfetcher, 
+      $padding, 
+      $fasta_line_length, 
+      $evidence_identity_cutoff) = $self->_rearrange([qw(DBADAPTOR
+							 TRANSCRIPT
+							 SEQFETCHER
+							 PADDING
+							 FASTA_LINE_LENGTH
+							 IDENTITY_CUTOFF
+							)],@args);
   
 
   # Throw an error if any of the below are undefined or
@@ -174,6 +176,15 @@ sub new {
     $self->{'_fasta_line_length'} = 60;
   }
 
+
+  # Optional evidence identity cut-off
+
+  if ($evidence_identity_cutoff) {
+    $self->{'_evidence_identity_cutoff'} = $evidence_identity_cutoff;
+  } else {
+    $self->{'_evidence_identity_cutoff'} = 0;
+  }
+
   return $self;
 }
 
@@ -218,20 +229,13 @@ sub retrieve_alignment {
 
 sub identity {
 
-  my ($self, $flav) = @_;
-
-  unless (($flav eq 'overall_identity')||($flav eq 'identity_by_exon')){
-    print "Requested identity type unknown.  Options are " . 
-      "\'overall_identity\' and \'identity_by_exon\'. " .
-	"Defaulting to \'overall_identity\'.\n";
-    $flav = 'overall_identity';
-  }
+  my ($self) = @_;
 
   unless ($self->_is_computed){
     $self->_align('all');
   }
 
-  return $self->_compute_identity($flav);
+  return $self->_compute_identity;
 }
 
 
@@ -273,7 +277,7 @@ sub rogue_exons {
   }
 
   unless ($self->_type eq 'all') {
-    $self->warn("This alignment used to count rogue exons has\n".
+    $self->warn("The alignment used to count rogue exons has\n".
 		"not been created with both nucleotide and protein\n".
 		"evidence.  Hence, it is quite likely that you\n".
 		"will see rogue exons.");
@@ -328,17 +332,18 @@ sub _align {
   # cigar string and stored in the hashes returned by 
   # $self->_semialigned_sequences) to insert gaps into the genomic 
   # and exonic sequences, therefore aligning the evidence with
-  # the parent sequence (with a bit of messy fiddling to place
+  # the parent sequence (with a bit of fiddling to place
   # gaps into the evidence sequences that need them).
 
   for (my $i = 0; $i < $self->_slice->length; $i++) {
     my $is_deletion = 0;
     
+  DELETION_HUNT:
     foreach my $unaligned_sequence (@$evidence_sequences){
       if ((defined $unaligned_sequence->{'deletions'}->[$i])
 	  &&($unaligned_sequence->{'deletions'}->[$i] eq 'D')){
 	$is_deletion = 1;
-	last;
+	last DELETION_HUNT;
       }
     }
     
@@ -352,8 +357,9 @@ sub _align {
       splice (@$exon_protein_sequence, $i, 0, '-');  
      
 
+
       for (my $j = 0; $j < scalar @$evidence_sequences; $j++) {
-	unless ((defined $evidence_sequences->{'deletions'}->[$i])
+	unless ((defined $evidence_sequences->[$j]->{'deletions'}->[$i])
 		&&($evidence_sequences->[$j]->{'deletions'}->[$i] eq 'D')) {
 	  splice(@{$evidence_sequences->[$j]->{'seq'}}, $i, 0, '-');
 	}
@@ -423,7 +429,7 @@ sub _align {
 
   my $genomic_alignment = '>' . $self->_transcript->stable_id. " genomic_sequence\n$genomic_string";
   $self->_alignment('add', $genomic_alignment);
-  my $exon_alignment = '>' . $self->_transcript->stable_id. " cDNA_sequence\n$exon_nucleotide_string";
+  my $exon_alignment = '>' . $self->_transcript->stable_id. " exon_sequence\n$exon_nucleotide_string";
   $self->_alignment('add', $exon_alignment);
 
   if (($type eq 'protein')||($type eq 'all')){
@@ -459,7 +465,7 @@ sub _align {
 
 sub _compute_identity {
 
-  my ($self, $flav) = @_;
+  my ($self) = @_;
 
   my $genomic_sequence = $self->_working_alignment('genomic_sequence');
   my $exon_protein_sequence = $self->_working_alignment('exon_protein');
@@ -483,12 +489,14 @@ sub _compute_identity {
 
     my $exon_length = $exon->end - $exon->start;
     my $highest_identity = 0;
+    my $associated_coverage = 0;
 
   EVIDENCE_ITEM:
     foreach my $evidence_item (@{$by_exon{$exon_placemarker}}){
       my $match_sequence = $evidence_item->{'seq'};
 
       my $mismatches = 0;
+      my $noncovered = 0;
 
       if ($evidence_item->{'type'} eq 'protein') {
 
@@ -507,6 +515,10 @@ sub _compute_identity {
 		    ||($match_sequence->[$i] eq '-')))) {
 	    $mismatches += 3;
 	  }
+	  if (($exon_protein_sequence->[$i] ne '-')
+		    &&($match_sequence->[$i] eq '-')) {
+	    $noncovered += 3;
+	  }
 	}
 
       }
@@ -524,30 +536,30 @@ sub _compute_identity {
 		   ||($match_sequence->[$i] eq '-')))) {
 	    $mismatches += 1;
 	  }
+	  if (($genomic_sequence->[$i] ne '-')
+		    &&($match_sequence->[$i] eq '-')) {
+	    $noncovered += 1;
+	  }
 	}
       }
 
       my $this_match_identity = (1 - ($mismatches/$exon_length))*100;
+      my $this_match_coverage = (1 - ($noncovered/$exon_length))*100;
 
       if ($this_match_identity > $highest_identity) {
 	$highest_identity = $this_match_identity;
+	$associated_coverage = $this_match_coverage;
 	$tally_mismatches += $mismatches;
       }
     }
 
     $tally_length += $exon_length;
 
-    push (@exon_identities, $highest_identity);
+    push (@exon_identities, [$highest_identity, $associated_coverage]);
 
     $exon_placemarker++;
   }
 
-  $self->{'_overall_identity'} = (1 - ($tally_mismatches/$tally_length))*100;
-
-  if ($flav eq 'overall_identity') {
-    return $self->{'_overall_identity'};
-  } 
-  
   return \@exon_identities;
 
 }
@@ -871,10 +883,15 @@ sub _corroborating_sequences {
 	     &&($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")))){
 	next FEATURE;
       }
-      
+
+      next FEATURE 
+	if $base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'};
+
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
 
 	my $half_aligned = $self->_fiddly_bits($base_align_feature);
+	next FEATURE unless $half_aligned;
+
 	$half_aligned->{'exon'} = $exon_placemarker;
 	$half_aligned->{'type'} = 'nucleotide';
 
@@ -885,6 +902,8 @@ sub _corroborating_sequences {
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 
 	my $half_aligned = $self->_fiddly_bits($base_align_feature);
+	next FEATURE unless $half_aligned;
+
 	$half_aligned->{'exon'} = $exon_placemarker;
 	$half_aligned->{'type'} = 'protein';
 
@@ -920,9 +939,30 @@ sub _fiddly_bits {
   
   my $hstart = $base_align_feature->hstart;
   my $hend = $base_align_feature->hend;
-  
-  my $fetched_seq = $self->_seq_fetcher->get_Seq_by_acc($base_align_feature->hseqname);
-  
+
+  my $fetched_seq;
+
+  if ($self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname}) {
+
+print STDERR "Using cached sequence.\n";
+    $fetched_seq = $self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname};
+
+  } else {
+    
+    eval {  
+      $fetched_seq = $self->_seq_fetcher->get_Seq_by_acc($base_align_feature->hseqname);
+    };
+    
+    if ($@) {
+      $self->warn("Error fetching sequence " 
+		  . $base_align_feature->hseqname . ".  Ignoring.");
+      return 0;
+    }
+
+    $self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname} = $fetched_seq;
+
+  }
+
   my @fetched_seq;
 
   # If this is a protein align feature, pad amino acids with gaps
@@ -971,9 +1011,9 @@ sub _fiddly_bits {
   my $added_gaps = 0;
   my $hit_sequence_position = $base_align_feature->start;
   my @deletion_sequence;
-  
+
   foreach my $instruction (@cigar_instructions) {
-    
+
     if ($instruction->{'type'} eq 'I') {
       my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
@@ -987,7 +1027,7 @@ sub _fiddly_bits {
       $hit_sequence_position += $instruction->{'length'};
       
     } elsif ($instruction->{'type'} eq 'D') {
-      
+
       for (my $i = $hit_sequence_position; $i < ($hit_sequence_position + $instruction->{'length'});$i++){
 	$deletion_sequence[$i] = 'D';
       }
@@ -1044,7 +1084,7 @@ sub _genomic_sequence {
 
   if (!defined $self->{'_genomic_sequence'}) {
 
-    my @genomic_sequence = split //, $self->{'_slice'}->seq;
+    my @genomic_sequence = split //, $self->_slice->seq;
 
     # Fill in the blanks
 
@@ -1221,22 +1261,23 @@ sub _cigar_reader {
 
   my @cigar_elements;   # An array of hash references.
 
-  my %current_hash;
+  my $current_digits;
 
   while (my $next_char = shift @cigar_array) {
-    
+
     if ($next_char =~ /[MDI]/) {
 
-      if (defined $current_hash{'type'}){
-	push (@cigar_elements, \%current_hash);
-	%current_hash = ();
-      }
+      my %enduring_hash;
+      $enduring_hash{'type'} = $next_char;
+      $enduring_hash{'length'} = $current_digits;
 
-      $current_hash{'type'} = $next_char;
+      push (@cigar_elements, \%enduring_hash);
+
+      $current_digits = '';
 
     } elsif ($next_char =~ /\d/) {
 
-      $current_hash{'length'} .= $next_char;
+      $current_digits .= $next_char;
 
     } else {
 
@@ -1246,7 +1287,7 @@ sub _cigar_reader {
     }
 
   }
-  
+ 
   return @cigar_elements;
 
 }
