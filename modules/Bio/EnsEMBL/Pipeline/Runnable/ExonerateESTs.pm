@@ -89,11 +89,10 @@ sub new {
 								       EXONERATE
 								       EXONERATE_ARGS)],
 					      @args);
-							   
+						   
     $self->throw("No genomic sequence input")           
       unless defined($genomic);
     $self->genomic_sequence($genomic) if defined($genomic);
-
     $self->throw("No ests specified") 
       unless defined($ests);
     $self->ests($ests) if defined($ests);
@@ -158,7 +157,7 @@ sub ests {
   }
   
   #NB ref to an array of Bio::Seq
-  return $self->{'_est_sequences'};
+  return $self->{'_ests_sequences'};
 
   }
 
@@ -265,12 +264,12 @@ sub run_exonerate {
       if (-e $estfile) { $self->throw("alreayd using $estfile\n"); }
       my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
 	or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
-      
+
       foreach my $eseq(@$estseq) {
 	$estOutput->write_seq($eseq);
       }
     };
-    
+
     if($@){
       $self->warn("couldn't run exonerate - problem writing estfile\n");
       return;
