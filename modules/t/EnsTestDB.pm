@@ -59,6 +59,7 @@ my $counter=0;
         pass
         schema_sql
         module
+	readonly_user
         );
 
     ### now takes an optional argument; when given, it can be a filename
