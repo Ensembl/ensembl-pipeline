@@ -252,7 +252,7 @@ sub run {
     }
 
     my (@output);
-    my @runnable = $self->runnable() ;
+    my @runnable = $self->runnable();
     #align the output to the contig
     foreach my $run (@runnable)
     {
@@ -375,12 +375,7 @@ sub align_to_contig {
     #map each feature to 1 or more exons
     foreach my $fp ($run->output)
     {   
-        unless ($fp->start <= $dna_align{'pep_limit'} 
-                    && $fp->end <= $dna_align{'pep_limit'})
-        {
-            $self->throw("Feature coordinates (".$fp->start."-".$fp->end. 
-               ") do not fit translated peptide (".$dna_align{'pep_limit'}.")\n");
-        }
+        
         #find each matching exon
         my (@aligned_exons);
         foreach my $ex_align (@exon_aligns)
