@@ -55,38 +55,61 @@ my $prefix='COB';
 
 # Hash containing config info
 %GeneConf = (
-	     # database specific variables
-	     GB_DBHOST                  => '',
-	     GB_DBNAME                  => '',
-	     GB_DBUSER                  => '',
-	     GB_DBPASS                  => '',
+	     # DATABASE SPECIFIC VARIABLES:
 
+	     # database containing the blast and pmatch features
+	     GB_DBHOST                  => 'ecs1e',
+	     GB_DBNAME                  => 'ens_NCBI_30',
+	     GB_DBUSER                  => 'ensadmin',
+	     GB_DBPASS                  => 'ensembl',
+
+	     # database containing the genewise genes (TGE_gw,similarity_genewise)
+	     GB_GW_DBHOST                  => 'ecs1b',
+	     GB_GW_DBNAME                  => 'ens_NCBI_30_genewises',
+	     GB_GW_DBUSER                  => 'ensadmin',
+	     GB_GW_DBPASS                  => 'ensembl',
+
+	     # database where the combined_gw_e2g genes will be stored
+	     # IMPORTANT: we should have copied the genewise genes to this db before hand:
+	     GB_COMB_DBHOST                  => 'ecs1f',
+	     GB_COMB_DBNAME                  => 'ens_NCBI_30_combined_genes',
+	     GB_COMB_DBUSER                  => 'ensadmin',
+	     GB_COMB_DBPASS                  => 'ensembl',
+	     
+	     # database containing the cdnas mapped, to be combined with the genewises
+	     # by putting this info here, we free up ESTConf.pm so that two analysis can
+	     # be run at the same time
+	     GB_cDNA_DBHOST                  => 'ecs1a',
+	     GB_cDNA_DBNAME                  => 'ens_NCBI_30_cdna',
+	     GB_cDNA_DBUSER                  => 'ensro',
+	     GB_cDNA_DBPASS                  => '',
+	     
 	     #db for writing final genewise genes to - to get round table locks
 	     # this db needs to have clone & contig & static_golden_path tables populated
-	     GB_FINALDBHOST             => '',
-	     GB_FINALDBNAME             => '',
-
+	     GB_FINALDBHOST             => 'ecs1a',
+	     GB_FINALDBNAME             => 'ens_NCBI_30_final_build',
+	     
 	     # general variables
 	     # path to run_GeneBuild_RunnableDB
-	     GB_RUNNER      => '',
-	     GB_TMPDIR      => '',
+	     GB_RUNNER      => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/run_GeneBuild_RunnableDB',
+	     GB_TMPDIR      => '/ecs2/scratch1/ensembl/eae/NCBI_30/',
 	     # LSF queue plus any options you want to use
-	     GB_QUEUE       => '',
+	     GB_QUEUE       => 'acari',
 	     GB_TBLASTN     => '',
 	     
 	     # pmatch related variables - for Targetted build
 	     # path to refseq fasta file
-	     GB_REFSEQ      => '',
+	     GB_REFSEQ      => '/acari/work6a/eae.tmp/Human/NCBI_29/proteome/refseq.fa',
 	     # path to swissprot fasta file
-	     GB_SPTR        => '',
+	     GB_SPTR        => '/acari/work6a/eae.tmp/Human/NCBI_29/proteome/sptr.fa',
 	     # path to file where we'll write cleaned up  proteome data
-	     GB_PFASTA      => '',
+	     GB_PFASTA      => '/acari/work6a/eae.tmp/Human/NCBI_29/proteome/proteome.fa',
 	     # path pmatch executable
-	     GB_PMATCH      => '',
-	     # path to directory where fpc/chromosoaml sequences are 
-	     GB_FPCDIR      => '',
+	     GB_PMATCH      => '/nfs/acari/eae/rd-utils/pmatch',
+	     # path to directory where fpc/chromosomal sequences are 
+	     GB_FPCDIR      => '/acari/scratch5/ensembl/eae/NCBI_29/genome/',
 	     # directory to write pmatch results
-	     GB_PM_OUTPUT   => '',
+	     GB_PM_OUTPUT   => '/acari/scratch5/ensembl/eae/NCBI_29/pmatch/',
 
 	     # eg TargettedGeneE2G
 	     GB_TARGETTED_RUNNABLES   => [''],
@@ -95,10 +118,14 @@ my $prefix='COB';
 	     # size of chunk to use in length based build
 	     GB_SIZE                  => '5000000',
 
-	     # targetted genewise/geneE2G specific parameters
+	     # location of sequence indices
+	     GB_PROTEIN_INDEX           => '',
 	     # species specific protein index
-	     GB_TARGETTED_PROTEIN_INDEX => '',
+	     GB_TARGETTED_PROTEIN_INDEX => '/data/blastdb/Ensembl/NCBI_30_proteome.fa.jidx',
+	     #GB_TARGETTED_PROTEIN_INDEX => '/acari/work6a/eae.tmp/Human/NCBI_29/proteome/NCBI_29_proteome.fa',
 	     GB_TARGETTED_CDNA_INDEX    => '',
+
+	     # targetted genewise/geneE2G specific parameters
 	     # minimum required coverage for multiexon predictions
 	     GB_TARGETTED_MULTI_EXON_COVERAGE      => '25',
 	     # minimum required coverage for single predictions
@@ -115,16 +142,10 @@ my $prefix='COB';
 					 # fill in one complete hash for each database from which blast 
 					 # features are to be retrieved
 					 {				  
-					  'type'       => '',
-					  'threshold'  => '',
-					  'index'      => ''
+					  'type'       => 'swall',
+					  'threshold'  => '200',
+					  'index'      => '/data/blastdb/Ensembl/swall_indicate_index/',
 					 },
-# example:
-#					 {
-#					  'type'       => 'swall',
-#					  'threshold'  => '100',
-#					  'index'      => '/full/path/to/swall'
-#					 },
 					],
 	     
 	     # minimum required parent protein coverage
@@ -133,17 +154,18 @@ my $prefix='COB';
 	     GB_SIMILARITY_MAX_INTRON         => 150000,
 	     # minimum coverage required to prevent splitting on long introns - keep it high!
 	     GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
-	     # low complexity threshold - transcripts whose translations have low
-	     # complexity % higher than GB_MAX_LOW_COMPLEXITY will be discarded
-	     GB_SIMILARITY_MAX_LOW_COMPLEXITY => 60,
 	     # gene type for FPC_BlastMiniGenewise
 	     GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
 
+	     # low complexity threshold - transcripts whose translations have low
+	     # complexity % higher than GB_MAX_LOW_COMPLEXITY will be discarded
+	     GB_SIMILARITY_MAX_LOW_COMPLEXITY => 100,
+	     
 	     # Combine Genewises_and_E2Gs specific parameters
 	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
 	     GB_COMBINED_MAX_INTRON         => 100000,
-	     
+
 	     # GeneBuilder parameters
 	     GB_VCONTIG              => 1,
 	     GB_SKIP_BMG             => 0,
