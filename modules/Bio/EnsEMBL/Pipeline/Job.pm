@@ -48,7 +48,7 @@ use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 #my $nfs_tmpdir = "/nfs/disk100/humpub1/michele/est2genome/";
-my $nfs_tmpdir = "/tmp";
+my $nfs_tmpdir = "/nfs/disk21/stabenau/tmp";
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
@@ -242,7 +242,8 @@ sub runRemote {
   my $dbname = $db->dbname;
   my $cmd;
 
-  my $runner = ( $0 =~ s:/[^/]*$:runner.pl: );
+  my $runner = __FILE__;
+  $runner =~ s:/[^/]*$:/runner.pl:; 	
   $cmd = "bsub -q ".$queue." -o ".$self->stdout_file.
     " -e ".$self->stderr_file." ";
 
@@ -261,7 +262,7 @@ sub runRemote {
     # freeze it
     $self->throw( "useDB=0 not implemented yet." );
   }
-  
+  print STDERR "$cmd\n";
   open (SUB,"$cmd |");
   
   while (<SUB>) {
@@ -289,19 +290,19 @@ sub runInLSF {
   my $rdb;
   
 
-  eval {
+#  eval {
     if( $module =~ /::/ ) {
       $module =~ s/::/\//g;
       require "${module}.pm";
       $rdb = "${module}"->new
 	( -analysis => $self->analysis,
-	  -input_id => $self->inputId,
+	  -input_id => $self->input_id,
 	  -dbobj => $self->adaptor->db );
     } else {
       require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
       $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	( -analysis => $self->analysis,
-	  -input_id => $self->inputId,
+	  -input_id => $self->input_id,
 	  -dbobj => $self->adaptor->db );
     }
     $self->set_status( "READING" );
@@ -311,11 +312,12 @@ sub runInLSF {
     $self->set_status( "WRITING" );
     $rdb->write_output;
     $self->set_status( "SUCCESSFUL" );
-  }; 
+#  }; 
   if( $@ ) {
+    print $@;
 # print STDERR ("Problems with $module\n");
     $self->set_status( "FAILED" );
-    die "Problems with $module." ;
+    die "Problems with $module.\nError: $@" ;
   }
 }
 

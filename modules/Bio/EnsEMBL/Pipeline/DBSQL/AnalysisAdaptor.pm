@@ -42,6 +42,9 @@ The rest of the documentation details each of the object methods. Internal metho
 
 
 package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+
+use Bio::EnsEMBL::Pipeline::Analysis;
+
 use vars qw(@ISA);
 use strict;
 
