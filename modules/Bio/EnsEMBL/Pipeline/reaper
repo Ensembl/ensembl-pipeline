@@ -9,7 +9,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 
 use Getopt::Long;
 
-my $mailReceiver = "michele\@sanger.ac.uk";
+my $mailReceiver = "scp\@sanger.ac.uk";
 my $maxMails = 10000;
 my $currentMail = 0;
 $| = 1;
@@ -23,12 +23,14 @@ my $queue  = $::pipeConf{'queue'};
 
 my $test   = 0;
 my $resubmit = 0;
+my $once = 0;
 
 GetOptions(     'host=s'     => \$dbhost,
                 'dbname=s'   => \$dbname,
                 'dbuser=s'   => \$dbuser,
 		'test'       => \$test,
 		'resubmit'   => \$resubmit,
+		'once'       => \$once,
                 ) or die ("Couldn't get options");
 
 my $class = 'contig';
@@ -51,10 +53,12 @@ my $ruleAdaptor = $db->get_RuleAdaptor;
 my $jobAdaptor  = $db->get_JobAdaptor;
 my $sic         = $db->get_StateInfoContainer;
 
-#while (1) {
+while (1) {
 #  check_jobs_against_failed();
   check_jobs_against_success();
-#}
+  exit 0 if $once;
+  sleep 600;
+}
 
 sub check_jobs_against_success {
 
