@@ -1,3 +1,61 @@
+#
+# PipelineManager.pm - A module for running and controlling a pipeline
+#
+# 
+# You may distribute this module under the same terms as perl itself
+#
+
+=pod 
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::PipelineManager - Singleton class responsible for 
+controlling and running a pipeline system
+
+=head1 SYNOPSIS
+
+  use Bio::EnsEMBL::Pipeline::PipelineManager;
+  use Bio::EnsEMBL::Pipeline::Pipeline::Config;
+
+  my $config = Bio::EnsEMBL::Pipeline::Config->new(-files => \@_);
+  my $pm = Bio::EnsEMBL::Pipeline::PipelineManager->new($config);
+
+  $pm->run();
+
+=head1 DESCRIPTION
+
+This module manages a pipeline.  It is responsible for ensuring that the 
+correct task modules run at the correct times and for maintaining 
+submission systems.  The configuration module passed into the Pipeline 
+constructor specifies which tasks form the pipeline system, and which 
+submission systems will be used.
+
+The pipeline manager may be stopped and restarted without problem.  Jobs
+which are already running will continue to run in the background/farm if the
+manager is stopped. When the manager is restarted jobs which were not submitted
+will be recreated and the system will essentially pick up where it left off.
+
+The recommended way of starting the pipeline manager is through the use
+of the the startPipeline.pl script:
+
+  #start the pipeline
+  perl startPipeline.pl -file conf.file
+  
+  #restart the pipeline using a config already loaded in the db
+  perl startPipeline.pl -dbname hs_pipe -host ecs1g -user ensadmin -pass passw
+
+
+=head1 CONTACT
+
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
 use strict;
 use warnings;
 
@@ -207,7 +265,6 @@ sub _create_submission_systems {
 }
 
 
-
 =head2 run
 
   Arg [1]    : none
@@ -233,17 +290,16 @@ sub run {
 
   my $config = $self->get_Config();
 
-  my $CHECK_INTERVAL = $config->get_parameter('Pipeline_Manager',
-                                              'check_interval');
-  my $last_check = 0;
+  my $CHECK_INTERVAL = 
+    $config->get_parameter('Pipeline_Manager', 'check_interval') || 120;
 
+  my $last_check = 0;
   my $just_started = 1;
 
   #
   # MAIN LOOP
   #
  MAIN: while(!$self->stop()) {
-
     
     if(!keys(%pending_tasks) && !keys(%running_tasks)) {
       print STDERR "\n\nNothing left to do, shutting down\n";
@@ -256,7 +312,17 @@ sub run {
       # update task status by contacting job adaptor
       #
       $self->_update_task_status($just_started);
-      $just_started = 0;
+
+      if($just_started) {
+	$just_started = 0;
+      } else {
+	# periodically flush created jobs in case a task forgot to return
+	# a TASK_DONE response
+	foreach my $taskname (keys %running_tasks) {
+	  $self->_submission_systems->{$taskname}->flush($taskname);
+	}	
+      }
+
       $last_check = time();
     }
 
@@ -314,7 +380,7 @@ sub run {
     foreach my $job (@$timeout_list) {			
       my $ss = $self->_submission_systems()->{$job->taskname()};
       $ss->kill($job);
-		}
+    }
 
     #
     # retry failed jobs
@@ -328,6 +394,7 @@ sub run {
       if($job->retry_count() < $retry_count) {
         my $ss = $self->_submission_systems()->{$taskname};
         $job->retry_count($job->retry_count + 1);
+	$job->set_current_status('RETRIED');
         $ss->submit($job);
       } else {
         $job->set_current_status('FATAL');
@@ -338,11 +405,6 @@ sub run {
 
   } #end of MAIN LOOP
 
-  # submit any remaining jobs (created but not submitted)
-
-  foreach my $taskname (keys %running_tasks) {
-    $self->_submission_systems->{$taskname}->flush;
-  }
 }
 
 
@@ -446,14 +508,16 @@ sub _update_task_status {
     }
 
     #check if this is still running but has timed out
-    if($status ne 'SUCCESSFUL' && $status ne 'FAILED' && $status ne 'FATAL'
-       && $current_time - $timestamp > $timeout_values{$taskname})
+    if($status ne 'SUCCESSFUL' && $status ne 'FAILED'  &&
+       $status ne 'FATAL'      && $status ne 'CREATED' &&
+       $status ne 'KILLED'     && $status ne 'RETRIED' &&
+       $current_time - $timestamp > $timeout_values{$taskname})
       {
         #timed out jobs need to go on list to be killed
         push @{$self->_timeout_list()}, $job_id;
       } else {
 
-        if($status eq 'FAILED') {
+        if($status eq 'FAILED' || $status eq 'KILLED') {
           #failed jobs need to go on list to be retried
           push @{$self->_failed_list()}, $job_id;
         }
@@ -491,6 +555,9 @@ sub _update_task_status {
     }
     if($task_status{$taskname}->{'FATAL'}) {
       $ts->add_fatal($task_status{$taskname}->{'FATAL'});
+    }
+    if($task_status{$taskname}->{'RETRIED'}) {
+      $ts->add_retried($task_status{$taskname}->{'RETRIED'});
     }
     if($task_status{$taskname}->{'EXISTING'}) {
       $ts->add_existing($task_status{$taskname}->{'EXISTING'});
@@ -593,6 +660,7 @@ sub create_Jobs {
   #
   foreach my $id (@{$id_set->ID_list}) {
     my $job = $self->create_Job($taskname, $modulename, $id, $parms);
+    #if there are too many pending jobs this one won't be 
     last if(!$job);
   }
 }
