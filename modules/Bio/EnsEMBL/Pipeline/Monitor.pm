@@ -66,7 +66,7 @@ sub show_current_status {
 
   my $res = $sth->execute;
 
-  my $maxcount;
+  my $maxcount = undef;
   my $maxstatus;
   my $maxname;
 
@@ -79,13 +79,13 @@ sub show_current_status {
     my $status = $ref->{'status'};
     my $name   = $ref->{'logic_name'};
 
-    if (length($count) > $maxcount) {
+    if (!defined($maxcount) || length($count) > $maxcount) {
       $maxcount = length($count);
     }
-    if (length($status) > $maxstatus) {
+    if (!defined($maxstatus) || length($status) > $maxstatus) {
       $maxstatus = length($status);
     }
-    if (length($name) > $maxname) {
+    if (!defined($maxname) || length($name) > $maxname) {
       $maxname = length($name);
     }
 
