@@ -1,0 +1,95 @@
+#!/usr/local/bin/perl
+
+=head1 NAME
+
+test_RunnableDB
+
+=head1 SYNOPSIS
+ 
+  test_RunnableDB
+
+=head1 DESCRIPTION
+
+
+=head1 OPTIONS
+
+    -host      host name for database (gets put as host= in locator)
+
+    -port      For RDBs, what port to connect to (port= in locator)
+
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -input_id  The input id for the RunnableDB
+
+    -runnable  The name of the runnable module we want to run
+
+=cut
+
+use strict;
+use Getopt::Long;
+
+use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::DBLoader;
+use Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::Root::Object);
+
+my $dbtype = 'rdb';
+my $host   = 'localhost';
+my $port   = '410000';
+my $dbname = 'ensembl07';
+my $dbuser = 'root';
+my $pass   = undef;
+my $runnable;
+my $input_id;
+
+&GetOptions( 
+	     'host:s'    => \$host,
+	     'port:n'    => \$port,
+	     'dbname:s'  => \$dbname,
+	     'dbuser:s'  => \$dbuser,
+	     'pass:s'    => \$pass,
+	     'input_id:s'  => \$input_id,
+	     'runnable:s' => \$runnable,
+	     );
+
+$| = 1;
+
+my $module1  = "Bio::EnsEMBL::Pipeline::DBSQL::Obj";
+my $module2  = "Bio::EnsEMBL::DBSQL::Obj";
+
+my $locator1 = make_locator_string($dbtype,$module1,$host,$port,$dbname,$dbuser,$pass);
+my $locator2 = make_locator_string($dbtype,$module2,'obi-wan',$port,'ensembl','ensro',$pass);
+
+my $db1      = new Bio::EnsEMBL::DBLoader($locator1);
+my $db2      = new Bio::EnsEMBL::DBLoader($locator2);
+
+die "No runnable entered" unless defined ($runnable);
+die "No input id entered" unless defined ($input_id);
+
+my $runobj = "$runnable"->new(-dbobj => $db1,
+			      -db2   => $db2,
+			      -input_id => $input_id,
+			     );
+$runobj->fetch_input;
+$runobj->run;
+
+my @out = $runobj->output;
+
+foreach my $out (@out) {
+    print ($out . "\n");
+}
+
+sub make_locator_string {
+    my ($type,$module,$host,$port,$dbname,$dbuser,$dbpass) = @_;
+
+    return "$module/host=$host;port=$port;dbname=$dbname;user=$dbuser;pass=$dbpass";
+
+}
+
