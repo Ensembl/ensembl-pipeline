@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 
 # config file; parameters searched for here if not passed in as @args
 
@@ -303,17 +304,17 @@ sub run{
 
   # get estgenes ( from EST_GeneBuilder )
   print STDERR "getting genes of type $ESTGENE_TYPE\n";
-  $self->estgenes(@{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE, 'evidence' ) } );
-
+  my @est_genes = @{ $self->estgene_vc->get_all_Genes_by_type( $ESTGENE_TYPE, 'evidence' ) };
+  
   # get ensembl genes (from GeneBuilder)
   print STDERR "getting genes of type $ENSEMBL_TYPE\n";
   my @ensembl_genes = @{ $self->ensembl_vc->get_all_Genes_by_type( $ENSEMBL_TYPE, 'evidence' ) };
 
   # if there are no genes, we finish earlier
-  unless ( $self->estgenes ){
+  unless ( @estgenes ){
     unless (@ensembl_genes){
-      print STDERR "no genes found, leaving...\n";
-      exit(0);
+	print STDERR "no genes found, leaving...\n";
+	  exit(0);
     }
     print STDERR "No estgenes found, writing ensembl genes as they are\n";
     my @transcripts;
@@ -321,20 +322,30 @@ sub run{
       push(@transcripts, @{$gene->get_all_Transcripts});
     }
     my @newgenes = $self->_make_Genes(\@transcripts);
+      
     my @remapped = $self->_remap_Genes(\@newgenes);
+    
     $self->output(@remapped);
     return;
   }
   
-  # need to clone all ensembl genes, as their transcripts may share exon objects
+  # need to CLONE all genes, as their transcripts may share exon objects
   # which makes it dangerous when modifying exon coordinates
+
   my @cloned_ensembl_genes;
   foreach my $gene (@ensembl_genes){
-    my $newgene = $self->_clone_Gene($gene);
-    push( @cloned_ensembl_genes, $newgene);
+      my $newgene = $self->_clone_Gene($gene);
+      push( @cloned_ensembl_genes, $newgene);
   }
   $self->ensembl_genes( @cloned_ensembl_genes );
   
+  my @cloned_est_genes;
+  foreach my $gene ( @est_genes){
+      my $newgene = $self->_clone_Gene($gene);
+      push( @cloned_est_genes, $newgene );
+  }
+  $self->estgenes( @cloned_est_genes );
+
   # store the original transcripts, just for the numbers
   my @original_ens_transcripts;
   foreach my $gene ( $self->ensembl_genes ){
@@ -393,10 +404,12 @@ sub run{
       my @ens_transcripts;
       my @est_transcripts;
       
-      foreach my $gene ( @ens_genes ){
+      print STDERR "=== ensembl genes ===\n";
+      foreach my $gene ( @ens_genes ){	
       TRAN1:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -406,10 +419,12 @@ sub run{
 	}
       }
       
+      print STDERR "=== est genes ===\n";
       foreach my $gene ( @est_genes ){
       TRAN2:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN2;
@@ -440,10 +455,12 @@ sub run{
       my @ens_transcripts;
       
       # but before we check, just in case, you know
+      print STDERR "=== ensembl genes only ===\n";
       foreach my $gene ( @ens_genes ){
       TRAN3:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->ensembl_vc)
 		  && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($transcript) ){
 	    print STDERR "skipping this transcript\n";
@@ -452,7 +469,7 @@ sub run{
 	  push ( @ens_transcripts, $transcript );
 	}
       }
-      print STDERR "Accepting ".scalar(@ens_transcripts)." ensembl transcripts\n";
+      print STDERR "Accepting ".scalar(@ens_transcripts)." ens-transcripts\n";
       push ( @transcripts, @ens_transcripts );
     }
     
@@ -463,10 +480,12 @@ sub run{
       print STDERR "Checking ".scalar(@est_genes)." est genes\n";
       my @est_transcripts;
       
+      print STDERR "=== est genes only ===\n";
       foreach my $gene ( @est_genes ){
       TRAN4:
 	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
 	  $transcript->type($gene->type);
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
 	  # reject those with too long introns
 	  if ( $self->_too_long_intron_size( $transcript ) ){
 	    next TRAN4;
@@ -495,22 +514,34 @@ sub run{
   
   # make the genes 
   my @newgenes = $self->_make_Genes(\@transcripts);
-  
+
+  print STDERR "================ GENES MADE =====================\n";
   print STDERR scalar($self->ensembl_genes)." ensembl genes (".scalar(@original_ens_transcripts)." transcripts) and ".
-    scalar($self->estgenes)." estgenes (".scalar(@original_est_transcripts)." transcripts)\n";    
+      scalar($self->estgenes)." estgenes (".scalar(@original_est_transcripts)." transcripts)\n";    
   print STDERR "have produced ".scalar(@transcripts)." transcripts, which are clustered into ".scalar(@newgenes)." genes:\n";
   my $count = 0;
   foreach my $gene (@newgenes){
-    $count++;
-    print STDERR "gene $count: ".$gene->type."\n";
-    foreach my $transcript (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
-    }
+      $count++;
+      print STDERR "gene $count: ".$gene->type."\n";
+      foreach my $transcript (@{$gene->get_all_Transcripts}){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+      }
   }
 
   print STDERR scalar(@newgenes)." genes 2b remapped\n";
   # remap them to raw contig coordinates
   my @remapped = $self->_remap_Genes(\@newgenes);
+  print STDERR "==================== REMAPPED GENES =====================\n";
+  foreach my $gene ( @remapped ){
+      #print STDERR "type    : ".$gene->type."\n";
+      #print STDERR "analysis: ".$gene->analysis->dbID." ".$gene->analysis->logic_name."\n";
+      
+      # test:
+      foreach my $t ( @{$gene->get_all_Transcripts} ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+      }
+  }
+  
   print STDERR scalar(@remapped)." genes remapped\n";
   
   # store the genes
@@ -788,8 +819,8 @@ sub _pair_Transcripts{
       if ($merge == 1 && $overlaps > 0 ){
 	
 	print STDERR "Can merge:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($ens_tran);
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($est_tran);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($ens_tran);
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($est_tran);
 	
 	# we prefer those with both UTR ends matched
 	my ($match_5prime, $match_3prime) = $self->_check_UTRMatches( $ens_tran,$est_tran);
@@ -843,23 +874,26 @@ sub _pair_Transcripts{
     # try to merge it, if succeeded, mark the chosen one and leave the rest
   MODIFY:
     for (my $i = 0; $i< scalar(@sorted_lists); $i++){
-      print STDERR "trying to modify ".$ens_tran->dbID."\n";
-      my $est_tran = $sorted_lists[$i][3];
-      unless( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1){
-	my $modified;
-	( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
-	if ($modified == 1 ){
-	  $used_est_transcript{$est_tran} = 1;
-	  print STDERR "Merged\n";
-	  # we only allow one cdna to modify each transcript
-	  last MODIFY;
+	print STDERR "trying to modify ".$ens_tran->dbID."\n";
+	my $est_tran = $sorted_lists[$i][3];
+	unless( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1){
+	    my $modified;
+	    ( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
+	    if ($modified == 1 ){
+		$used_est_transcript{$est_tran} = 1;
+		print STDERR "Merged\n";
+		print STDERR "transfering supporting evidence\n";
+		$self->_transfer_transcript_supporting_evidence($est_tran,$ens_tran);
+
+                # we only allow one cdna to modify each transcript
+		last MODIFY;
+	    }
 	}
-      }
     }
   }  # end of ENS_TRANSCRIPT
- 
+  
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
-  # those `which haven't been used for extending UTRs are candidate isoforms
+  # those which have not been used for extending UTRs are candidate isoforms
   #
   # This analysis relies on the fact that the set of cdna-genes being used
   # is non redundant, i.e. it forms a putative set of isoforms
@@ -1198,8 +1232,15 @@ sub _clone_Gene{
   my ($self,$gene) = @_;
   
   my $newgene = new Bio::EnsEMBL::Gene;
-  $newgene->type( $gene->type);
-  $newgene->dbID($gene->dbID);
+  if ($gene->type){
+      $newgene->type( $gene->type);
+  }
+  if ( defined $gene->dbID ){
+      $newgene->dbID($gene->dbID);
+  }
+  if ( defined $gene->analysis ){
+      $newgene->analysis($gene->analysis);
+  }
   foreach my $transcript (@{$gene->get_all_Transcripts}){
     my $newtranscript = $self->_clone_Transcript($transcript);
     $newgene->add_Transcript($newtranscript);
@@ -2303,7 +2344,7 @@ sub _make_Genes{
   my @transcripts = @{ $transcripts };
 
   my $genetype = $FINAL_TYPE;
-  my $analysis = $self->analysis;
+  my $analysis = $self->_analysis;
 
   my @selected_transcripts;
   my $count  = 0;
@@ -2356,6 +2397,11 @@ sub _remap_Genes {
     # convert to raw contig coords
     eval {
       # transforming gene to raw contig coordinates.
+      print STDERR "****************about to transform***********************\n";
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+      }
+
       $new_gene = $gene->transform;
     };
     if ($@) {
@@ -2367,6 +2413,10 @@ sub _remap_Genes {
     }
     $new_gene->type($gene->type);
     $new_gene->analysis($gene->analysis);  
+    print STDERR "****************transformed gene***********************\n";
+    foreach my $transcript ( @{$new_gene->get_all_Transcripts} ){
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    }
     push( @new_genes, $new_gene);
     
   }
@@ -2628,21 +2678,42 @@ sub write_output {
     @genes = $self->output;
   }
   #print STDERR "about to write ".scalar(@genes)." into the db\n";
-
+  
   # dbobj holds a reference to FINAL_DB
   my $gene_adaptor = $self->db->get_GeneAdaptor;
   
  GENE: 
   foreach my $gene (@genes) {	
     
+    unless ( $gene->analysis ){
+      $gene->analysis( $self->_analysis );
+    }
+    unless ( $gene->type ){
+      $gene->type( $FINAL_TYPE );
+    }
+    
+    print STDERR "about to write a gene\n";
+    print STDERR "type    : ".$gene->type."\n";
+    print STDERR "analysis: ".$gene->analysis->dbID." ".$gene->analysis->logic_name."\n";
+    #foreach my $t ( @{$gene->get_all_Transcripts} ){
+    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
+    #}
+    
     eval {
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+	$gene_adaptor->store($gene);
+	print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+	foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+      }
+      
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-    }
-  }
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+      }
+     } 
+}
 }
 
 
@@ -2685,6 +2756,109 @@ sub _too_long_intron_size{
 
 
 ############################################################
+
+sub _transfer_transcript_supporting_evidence{
+    my ($self,$trans_source,$trans_target) = @_;
+    
+    my @exons_source  = @{$trans_source->get_all_Exons};
+    my @exons_target  = @{$trans_target->get_all_Exons};
+    
+    # most of the time the numbers of exons doesn't vary
+    if ( scalar( @exons_source ) == scalar ( @exons_target ) ){
+	#print STDERR "passing evi info between 2 transcripts with same number of exons\n";
+	while ( scalar ( @exons_source ) > 0 ){
+	    my $exon_in  = shift( @exons_source  );
+	    my $exon_out = shift( @exons_target );  
+	    
+	    # check just in case
+	    if ( $exon_in->overlaps( $exon_out ) ){
+	      Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence( $exon_in,$exon_out);
+	    }
+	    else{
+		$self->warn("Trying to pass evidence between exons that do not overlap, this won't work!");
+	    }
+	}
+    }
+    else{
+	# if not the same number of exons, we cannot know how the split happened
+	print STDERR "passing evi info between 2 transcripts with different number of exons\n";
+	foreach my $exon_in ( @exons_source ){
+	    foreach my $exon_out( @exons_target ){
+		if ( $exon_out->overlaps($exon_in) ){
+		  Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence( $exon_in,$exon_out);
+		}
+	    }
+	}
+    }
+}
+
+
+
+############################################################
+
+=head2 _transfer_supporting_evidence
+
+ Title   : _transfer_supporting_evidence
+ Usage   : $self->transfer_supporting_evidence($source_exon, $target_exon)
+ Function: Transfers supporting evidence from source_exon to target_exon, 
+           after checking the coordinates are sane and that the evidence is not already in place.
+ Returns : nothing, but $target_exon has additional supporting evidence
+
+=cut
+
+sub _transfer_supporting_evidence{
+  my ($self, $source_exon, $target_exon) = @_;
+  
+  my @target_sf = @{$target_exon->get_all_supporting_features};
+  #  print "target exon sf: \n";
+  #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
+  
+  #  print "source exon: \n";
+ 
+  # keep track of features already transferred, so that we do not duplicate
+  my %unique_evidence;
+  my %hold_evidence;
+
+ SOURCE_FEAT:
+  foreach my $feat ( @{$source_exon->get_all_supporting_features}){
+    next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
+    
+    # skip duplicated evidence objects
+    next SOURCE_FEAT if ( $unique_evidence{ $feat } );
+    
+    # skip duplicated evidence 
+    if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
+      #print STDERR "Skipping duplicated evidence\n";
+      next SOURCE_FEAT;
+    }
+
+    #$self->print_FeaturePair($feat);
+    
+  TARGET_FEAT:
+    foreach my $tsf (@target_sf){
+      next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
+      
+      if($feat->start    == $tsf->start &&
+	 $feat->end      == $tsf->end &&
+	 $feat->strand   == $tsf->strand &&
+	 $feat->hseqname eq $tsf->hseqname &&
+	 $feat->hstart   == $tsf->hstart &&
+	 $feat->hend     == $tsf->hend){
+	
+	#print STDERR "feature already in target exon\n";
+	next SOURCE_FEAT;
+      }
+    }
+    #print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
+    #$self->print_FeaturePair($feat);
+    $target_exon->add_supporting_features($feat);
+    $unique_evidence{ $feat } = 1;
+    $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
+  }
+}
+
+############################################################
+
 
 
 1;
