@@ -245,10 +245,30 @@ sub fetch_by_dbID {
   $sth->execute( $dbID );
 
   while( $queryResult = $sth->fetchrow_hashref ) {
-    $rule->add_condition( $queryResult->{conditionLiteral} );
+    $rule->add_condition( $queryResult->{condition} );
   }
   return $rule;
 }
+
+sub fetch_by_goal{
+  my ($self, $goal_analysis) = @_;
+  
+  if(!$goal_analysis || 
+     !$goal_analysis->isa("Bio::EnsEMBL::Pipeline::Analysis")){
+    throw("analysis ".$goal_analysis." must be a ".
+          "Bio:EnsEMBL::Pipeline::Analysis object");
+  }
+  my $sql = q{ SELECT rule_id 
+               FROM rule_goal
+               WHERE goal = ?
+             };
+  my $sth = $self->prepare($sql);
+  $sth->execute($goal_analysis->dbID);
+  my ($dbID) = $sth->fetchrow;
+  my $rule = $self->fetch_by_dbID($dbID);
+  return $rule;
+}
+
 
 =head2 db
 

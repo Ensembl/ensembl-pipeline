@@ -36,6 +36,7 @@ use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
+use Bio::EnsEMBL::Pipeline::Job;
 use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Root);
@@ -150,7 +151,6 @@ sub new{
 
 =cut
 
-
 sub db{
   my ($self, $db) = @_;
 
@@ -164,7 +164,6 @@ sub db{
 
   return $self->{'dbadaptor'};
 }
-
 
 
 =head2 adaptors

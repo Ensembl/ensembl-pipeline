@@ -16,6 +16,10 @@ use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
 =head2 new
 
   Arg [1]   : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Arg [2]   : int, toggle for slice based input_ids
+  Arg [3]   : int toggle for single input_ids
+  Arg [4]   : int toggle for filename based input_ids
+  Arg [5]   : int 
   Function  : creates an InputIDFactory object
   Returntype: Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
   Exceptions: none
@@ -33,19 +37,42 @@ sub new{
 
   $self->{'db'} = undef;
 
-  my ($db, $slice, $single, $file,
-      $translation_id, $slice_size, 
-      $slice_overlaps, $seq_level,
-      $top_level,$dir, $regex, $single_name,
-      $verbose, $logic_name, $input_id_type,
-      $insert_analysis, $coord_system,
-      $coord_system_version)=rearrange([qw(DB SLICE SINGLE FILE
-                                           TRANSLATION_ID SLICE_SIZE 
-                                           SLICE_OVERLAPS SEQ_LEVEL
-                                           TOP_LEVEL DIR REGEX SINGLE_NAME
-                                           VERBOSE LOGIC_NAME INPUT_ID_TYPE
-                                           INSERT_ANALYSIS COORD_SYSTEM
-                                           COORD_SYSTEM_VERSION)], @_);
+  my ($db, 
+      $slice, 
+      $single, 
+      $file,
+      $translation_id, 
+      $slice_size, 
+      $slice_overlaps, 
+      $seq_level,
+      $top_level,
+      $dir, 
+      $regex, 
+      $single_name,
+      $verbose, 
+      $logic_name, 
+      $input_id_type,
+      $insert_analysis, 
+      $coord_system,
+      $coord_system_version)=rearrange([qw(DB 
+                                           SLICE 
+                                           SINGLE 
+                                           FILE
+                                           TRANSLATION_ID 
+                                           SLICE_SIZE 
+                                           SLICE_OVERLAPS 
+                                           SEQ_LEVEL
+                                           TOP_LEVEL 
+                                           DIR 
+                                           REGEX 
+                                           SINGLE_NAME
+                                           VERBOSE 
+                                           LOGIC_NAME 
+                                           INPUT_ID_TYPE
+                                           INSERT_ANALYSIS 
+                                           COORD_SYSTEM
+                                           COORD_SYSTEM_VERSION
+                                          )], @_);
   $slice = 0 unless ($slice);
   $single = 0 unless ($single);
   $file = 0 unless ($file);
@@ -279,9 +306,9 @@ sub generate_input_ids{
   }elsif($self->file){
     $ids = $self->get_filenames;
   }elsif($self->single){
-    $ids = $self->get_single_name;
-  }elsif($self->translation_ids){
-    $ids = $self->get_translation_ids;
+    $ids = $self->get_single;
+  }elsif($self->translation_id){
+    $ids = $self->get_translation_id;
   }else{
     throw("Reaching this point means you haven't created InputIDFactory ".
           "without selecting what type of input_id to create this won't ".
@@ -311,7 +338,7 @@ sub generate_input_ids{
 
 sub get_slice_names{
   my ($self) = @_;
-
+  print STDERR "Getting slice names\n";
   $self->slice_size(0) if(!$self->slice_size);
   $self->slice_overlaps(0) if(!$self->slice_overlaps);
   $self->coord_system_version('') if(!$self->coord_system_version);
@@ -329,7 +356,7 @@ sub get_slice_names{
   if($self->slice_size > 0){
     $slices = split_Slices($slices,$self->slice_size,$self->slice_overlaps);
   }
-  
+  print STDERR "Have ".@$slices." slices\n";
   my @ids;
   foreach my $slice(@$slices){
     push(@ids, $slice->name);
@@ -374,7 +401,7 @@ sub get_filenames{
 }
 
 
-sub get_translation_ids{
+sub get_translation_id{
   my ($self) = @_;
 
   my $ids = $self->db->get_TranslationAdaptor->list_dbIDs;
@@ -383,7 +410,7 @@ sub get_translation_ids{
 }
 
 
-sub get_single_id{
+sub get_single{
   my ($self) = @_;
   my @ids = ($self->single_name);
   return \@ids;
@@ -405,5 +432,18 @@ sub store_input_ids{
   }
   return 1;
 }
+
+
+sub get_id_hash{
+  my ($self) = @_;
+  my $ids = $self->input_ids;
+  my $id_hash = {};
+  $id_hash->{$self->input_id_type} = {};
+  foreach my $id(@$ids){
+    $id_hash->{$self->input_id_type}->{$id} = 1;
+  }
+  return $id_hash;
+}
+
 
 1;
