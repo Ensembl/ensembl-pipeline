@@ -2,6 +2,7 @@
 
 use strict;
 use Getopt::Long;
+use Env; 
 
 ###############
 #### Usage ####
@@ -18,7 +19,7 @@ use Getopt::Long;
 my $jobs     = 400;
 
 # how many seconds we sleep between every <$jobs> jobs
-my $sleep    = 600;
+my $sleep    = 300;
 
 # how many jobs we allow to be in the queue before we panic and go to sleep again
 my $slowdown = 2000; 
@@ -73,7 +74,7 @@ while( <FILE> ) {
     system("sleep $sleep");
     
     # wake up and check howmany jobs are left to run
-    system("bjobs -u eae -q acari | wc -l > number_file");
+    system("bjobs -u $ENV{'USER'} -q acari | wc -l > number_file");
     open(IN,"<number_file");
     my $result;
     while(<IN>){
