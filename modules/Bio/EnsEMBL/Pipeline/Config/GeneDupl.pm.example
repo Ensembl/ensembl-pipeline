@@ -44,6 +44,9 @@ use vars qw( %GeneDupl );
    # Listref of regexes that will match ids from outgroup species.
    GD_OUTGROUP_REGEXES     => ['ENSMUSG', 'ENSRNOG'],
 
+   # Ingroup stable translation id regex
+   GD_TRANSL_REGEX         => 'ENSP',
+
    # Minimum permitted coverage of match sequences.  Defaults to 0.80.
    GD_HIT_COVERAGE         => '90',
 
