@@ -119,7 +119,7 @@ sub _initialize {
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments('-low') ;     }
+    { $self->arguments('-low -m') ;      }
     return $self; # success - we hope!
 }
 

@@ -168,7 +168,6 @@ sub run {
 							       -threshold => $self->threshold,
 							       -options   => $self->options,
                                                                -filter    => 1);
-
   $runnable->run();
   
   $self->align_hits_to_contig($runnable->output);
