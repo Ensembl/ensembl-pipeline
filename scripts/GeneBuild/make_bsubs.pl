@@ -209,7 +209,7 @@ sub make_lbsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
       $command .= " -input_id $input_id ";
