@@ -46,6 +46,7 @@ use Bio::EnsEMBL::Pipeline::PmatchFeature;
 #use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
+					 GB_TARGETTED_PROTEIN_SEQFETCHER
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
