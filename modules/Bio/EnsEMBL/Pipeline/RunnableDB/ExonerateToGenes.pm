@@ -68,6 +68,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate;
@@ -189,13 +190,14 @@ sub run{
   
   foreach my $runnable ($self->runnables){
       
-      # run the funnable
-      $runnable->run;  
-      
-      # store the results
-      push ( @results, $runnable->output );
-      print STDERR scalar(@results)." matches found in ".$runnable->database."\n";
-      
+    # run the funnable
+    $runnable->run;  
+    
+    # store the results
+    my @results_here = $runnable->output;
+    push ( @results, @results_here );
+    print STDERR scalar(@results_here)." matches found in ".$runnable->database."\n";
+    
   }
   
   ############################################################
