@@ -351,23 +351,23 @@ sub parse_results {
             $feat1 {p}           = $hsp->P;
             $feat2 {p}           = $hsp->P;
             
-            unless ($hsp->queryBegin > $hsp->queryEnd)
+            unless ($hsp->queryBegin < $hsp->queryEnd)
             {
                 $feat1 {start}   = $hsp->queryBegin;
                 $feat1 {end}     = $hsp->queryEnd;
-                $feat1 {strand}  = 1;
+                $feat1 {strand}  = -1;
             }
             else
             {
-                $feat1 {end}     = $hsp->queryBegin;
                 $feat1 {start}   = $hsp->queryEnd;
-                $feat1 {strand}  = -1;
+                $feat1 {end}     = $hsp->queryBegin;
+                $feat1 {strand}  = 1;
             }
             
             $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
             $feat2 {name}    = $1;
             
-            unless ($hsp->sbjctBegin > $hsp->sbjctEnd)
+            unless ($hsp->sbjctBegin < $hsp->sbjctEnd)
             {
                 $feat2 {start}   = $hsp->sbjctBegin;
                 $feat2 {end}     = $hsp->sbjctEnd;
@@ -375,8 +375,8 @@ sub parse_results {
             }
             else
             {
-                $feat2 {end}     = $hsp->sbjctBegin;
                 $feat2 {start}   = $hsp->sbjctEnd;
+                $feat2 {end}     = $hsp->sbjctBegin;
                 $feat2 {strand}  = -1;
             }
             
@@ -416,7 +416,7 @@ sub parse_results {
             $feat1 {alignment} = $hsp->queryAlignment;
             $feat2 {alignment} = $hsp->sbjctAlignment;
             
-            if ( defined $threshold && ($feat1{p} >= $threshold))
+            if ($feat1{p} < $threshold)
             { 
                 if ($feat1 {alignment} =~ /-/ or $feat2 {alignment} =~ /-/)
                 {
@@ -447,6 +447,7 @@ sub split_gapped_feature {
     #replace bases and gaps with positions and mask number
     @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'alignment'});
     @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'alignment'});
+    
     $self->throw("Can't split feature where alignment lengths don't match: F1 ("
                  .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
                 if (scalar(@masked_f1) != scalar(@masked_f2)); 
@@ -459,19 +460,12 @@ sub split_gapped_feature {
         
         if ($masked_f1[$index] == -1 || $masked_f2[$index] == -1 || $index == $mask_len -1)
         {
-            #Either alignment contains an insertion.
-            #Either start a new feature or end current one.
+            #One of the alignments contains an insertion.
             if ($building_feature)
-            {
-                #print STDERR "Feat: ".$feat2->{'name'}
-                #             ." F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
-                #             ." S1 ".$f1_start." - ".$masked_f1[$index-1]
-                #             ." F2 ".$feat2->{'start'}." - ".$feat2->{'end'}
-                #             ." S2 ".$f2_start." - ".$masked_f2[$index-1]."\n";             
-                
+            {            
                 $feat1->{'start'}   = $f1_start; 
                 $feat2->{'start'}   = $f2_start;
-                #feature ended at previous position unless end of alignment reached
+                #feature ended at previous position
                 $feat1->{'end'}     = ($index == $mask_len -1) 
                                         ? $masked_f1[$index] : $masked_f1[$index-1];
                 $feat2->{'end'}     = ($index == $mask_len -1) 
