@@ -155,10 +155,16 @@ sub get_Config {
 sub get_TaskStatus {
   my $self = shift;
   my $taskname = shift;
-  
+
+  $taskname = lc($taskname);
+
   my $task = $self->_tasks()->{$taskname};
-  $self->throw("Don't know anything about task $taskname") if(!$task);
-  
+  if(!$task) {
+    my $tlist = join("\n  ", keys %{$self->_tasks()});
+
+    $self->throw("Don't know anything about task [$taskname]\n" .
+                 "Known Tasks:\n  $tlist");
+  }
   return $task->get_TaskStatus();
 }
 
@@ -234,7 +240,7 @@ sub _create_submission_systems {
     } else {
       $system = substr($where, 0, $idx);
     }
-    
+
     $submission_systems{$system} = 1;
     $tasks{$taskname} = $system;
   }
@@ -249,7 +255,7 @@ sub _create_submission_systems {
       $self->throw("$module cannot be found for submission system $ss.\n" .
 		   "Exception $@\n");
     }
-    
+
     my $subsys = $module->new($config);
 
     $submission_systems{$ss} = $subsys;
@@ -300,7 +306,6 @@ sub run {
   # MAIN LOOP
   #
  MAIN: while(!$self->stop()) {
-    
     if(!keys(%pending_tasks) && !keys(%running_tasks)) {
       print STDERR "\n\nNothing left to do, shutting down\n";
       last MAIN;
@@ -313,13 +318,13 @@ sub run {
       $self->_update_task_status($just_started);
 
       if($just_started) {
-	$just_started = 0;
+        $just_started = 0;
       } else {
-	# periodically flush created jobs in case a task forgot to return
-	# a TASK_DONE response
-	foreach my $taskname (keys %running_tasks) {
-	  $self->_submission_systems->{$taskname}->flush($taskname);
-	}	
+        # periodically flush created jobs in case a task forgot to return
+        # a TASK_DONE response
+        foreach my $taskname (keys %running_tasks) {
+          $self->_submission_systems->{$taskname}->flush($taskname);
+        }	
       }
 
       $last_check = time();
@@ -331,7 +336,7 @@ sub run {
     foreach my $taskname (keys %pending_tasks) {
       my $task = $pending_tasks{$taskname};
       if($task->can_start()) {
-	#print STDERR $taskname." can start\n";
+        #print STDERR $taskname." can start\n";
         delete $pending_tasks{$taskname};
         $running_tasks{$taskname} = $task;
       }
@@ -347,10 +352,10 @@ sub run {
     foreach my $taskname (keys %running_tasks) {
       my $task = $running_tasks{$taskname};
       if($task->is_finished()) {
-	delete $running_tasks{$taskname};
-	$finished_tasks{$taskname} = $task;
-	$task->get_TaskStatus->is_finished(1);
-	$any_finished = 1;
+        delete $running_tasks{$taskname};
+        $finished_tasks{$taskname} = $task;
+        $task->get_TaskStatus->is_finished(1);
+        $any_finished = 1;
       }
 
       last MAIN if($self->stop);
@@ -369,15 +374,14 @@ sub run {
     foreach my $taskname (keys %running_tasks) {
       my $task = $running_tasks{$taskname};
       my $subsystem = $self->_submission_systems->{$taskname};
-      
       my $retcode = $task->run();
 	
       if($retcode eq 'TASK_FAILED') {
-	$self->warn("Task [$taskname] failure");
-      } elsif ($retcode eq 'TASK_DONE') {	  
-	$subsystem->flush($taskname);
+        $self->warn("Task [$taskname] failure");
+      } elsif ($retcode eq 'TASK_DONE') {
+        $subsystem->flush($taskname);
       } elsif ($retcode ne 'TASK_OK') {
-	$self->warn("Task [$taskname] returned unknown status $retcode");
+        $self->warn("Task [$taskname] returned unknown status $retcode");
       }
 
       last MAIN if($self->stop());
@@ -407,7 +411,7 @@ sub run {
       if($job->retry_count() < $retry_count) {
         my $ss = $self->_submission_systems()->{$taskname};
         $job->retry_count($job->retry_count + 1);
-	$job->set_current_status('RETRIED');
+        $job->set_current_status('RETRIED');
         $ss->submit($job);
       } else {
         $job->set_current_status('FATAL');
@@ -418,6 +422,8 @@ sub run {
 
   } #end of MAIN LOOP
 
+
+  $config->get_DBAdaptor->db_handle()->{'InactiveDestroy'} = 0;
 }
 
 
@@ -476,6 +482,8 @@ sub _update_task_status {
   my $self = shift;
   my $flush_created = shift;
 
+  print STDERR "update task status begin\n";
+
   my $config = $self->get_Config;
 
   my $job_adaptor = $config->get_DBAdaptor()->get_JobAdaptor;
@@ -496,7 +504,6 @@ sub _update_task_status {
       $config->get_parameter($task->name(), 'timeout');
     $cleanup{$task->name()} = 
       $config->get_parameter($task->name(), 'cleanup');
-    
   }
 
   #
@@ -506,7 +513,10 @@ sub _update_task_status {
     my ($job_id, $taskname, $input_id, $status, $timestamp) = @$current_status;
 
     $task_status{$taskname}->{'EXISTING'} ||= [];
-    if($flush_created && $status eq 'CREATED') {
+
+    # when pipeline is restarted CREATED and RETRIED jobs need to be 
+    # created again
+    if($flush_created && ($status eq 'CREATED' || $status eq 'RETRIED')) {
       #delete the job from the database, don't and add it to the status
       $job_adaptor->remove($job_adaptor->fetch_by_dbID($job_id));
       next;
@@ -515,7 +525,6 @@ sub _update_task_status {
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
 
     if($status eq 'SUCCESSFUL' && $cleanup{$taskname}){
-      
       my $job = $job_adaptor->fetch_by_dbID($job_id);
       $job->cleanup;
     }
@@ -572,10 +581,17 @@ sub _update_task_status {
     if($task_status{$taskname}->{'RETRIED'}) {
       $ts->add_retried($task_status{$taskname}->{'RETRIED'});
     }
+    if($task_status{$taskname}->{'KILLED'}) {
+      $ts->add_killed($task_status{$taskname}->{'KILLED'});
+    }
     if($task_status{$taskname}->{'EXISTING'}) {
       $ts->add_existing($task_status{$taskname}->{'EXISTING'});
     }
+
+    print STDERR "[$taskname]:\n",$ts->status_report,"\n";
   }
+
+  print STDERR "update task status complete\n";
 }
 
 
@@ -601,7 +617,7 @@ sub _update_task_status {
                jobs to be run using this method or create_Jobs.  Note that
                this method will allow jobs with the same input_id to be
                created.
-  Returntype : Bio::EnsEMBL::Pipeline::Job
+  Returntype : boolean - true on success, false on failure
   Exceptions : none
   Caller     : Tasks
 
@@ -614,7 +630,7 @@ sub create_Job {
 
   if(!$job){
     #too many pending jobs already
-    return undef;
+    return 0;
   }
 
   #add the id to the taskstatus as existing and created...
@@ -625,7 +641,7 @@ sub create_Job {
   $ts->add_created($idset);
 
   $ssystem->submit($job);
-  return $job;
+  return 1;
 }
 
 	
@@ -643,16 +659,15 @@ sub create_Job {
                A set of input ids for the jobs to be submitted
   Arg [4]    : string $parms
                A parameter string specific to the jobs being submitted
-  Example    :
-    $pl_manager->create_Jobs('Genscan',
-                           'Bio::EnsEMBL::Pipeline::RunnnableDB::RepeatMasker',
-                           $id_set,
-                           'vertrna -subopt 90');
+  Example    : $pl_manager->create_Jobs('Genscan',
+                         'Bio::EnsEMBL::Pipeline::RunnnableDB::RepeatMasker',
+                         $id_set,
+                         'vertrna -subopt 90');
   Description: Creates and submits a group of pipeline jobs.  Tasks generally
                create jobs to be run using this method or create_Job.
                Note that this method will filter out all jobs which have
                input_ids matching jobs that have already been created.
-  Returntype : Bio::EnsEMBL::Pipeline::Job
+  Returntype : boolean - true on success, false on failure/partial failure
   Exceptions : none
   Caller     : Tasks
 
@@ -673,9 +688,11 @@ sub create_Jobs {
   #
   foreach my $id (@{$id_set->ID_list}) {
     my $job = $self->create_Job($taskname, $modulename, $id, $parms);
-    #if there are too many pending jobs this one won't be 
-    last if(!$job);
+    #if there are too many pending jobs this one won't be
+    return 0 if(!$job);
   }
+
+  return 1;
 }
 
 
