@@ -321,11 +321,6 @@ sub parse_results {
             $feat2 {primary}= 'repeat';
             $feat1 {source}= 'RepeatMasker';
             $feat1 {primary}= 'repeat';
-            print STDERR "F1: ".$element[5]." ".$feat1 {start}." - "
-                         .$feat1{end}." Strand ".$feat1{strand}
-                         ." Score ".$feat1{score}." F2 ".$element[10]
-                         ." ".$feat2{start}." - ".$feat2{end}
-                         ." Strand ".$feat2{strand}."\n";
             $self->create_repeat(\%feat1, \%feat2);
         }
     }
