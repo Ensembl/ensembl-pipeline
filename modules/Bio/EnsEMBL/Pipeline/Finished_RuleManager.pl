@@ -33,7 +33,10 @@ my $SELF                  = catfile $FindBin::Bin, $SCRIPT;
 my $DEFAULT_HOME          = '';
 my $HOME                  = $DEFAULT_HOME;
 my $HOSTNAME              = Sys::Hostname::hostname();
-my $PID_FILE              = $DEFAULT_HOME . "$SELF.$HOSTNAME.pid";
+
+### Now includes dbname - see later
+#my $PID_FILE              = $DEFAULT_HOME . "$SELF.$HOSTNAME.pid";
+
 my $DEBUG                 = 1;
 my $NAMED                 = 'FINISHED_PIPELINE';
 my $OUT                   = $ENV{$NAMED."_OUTFILE"};
@@ -174,6 +177,9 @@ unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     exit 1;
 }
+
+my $PID_FILE = $DEFAULT_HOME . "$SELF.$HOSTNAME.$dbname.pid";
+
 # -------------------------------------
 # Handle daemon control all sub routines called must exit!
 # check uniqueness of control parameters

@@ -1,4 +1,4 @@
-# $Id: BPlite.pm,v 1.2 2003-06-20 15:40:19 jgrg Exp $
+# $Id: BPlite.pm,v 1.2.18.1 2005-02-18 17:28:07 jgrg Exp $
 ##############################################################################
 # Bioperl module Bio::Tools::BPlite
 ##############################################################################
@@ -188,7 +188,7 @@ use Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct; # we want to use Sbjct
 use Bio::SeqAnalysisParserI;
 use Symbol;
 
-@ISA = qw(Bio::EnsEMBL::Root Bio::SeqAnalysisParserI Bio::Root::IO);
+@ISA = qw(Bio::EnsEMBL::Root Bio::Root::IO Bio::SeqAnalysisParserI);
 
 # new comes from a RootI now
 

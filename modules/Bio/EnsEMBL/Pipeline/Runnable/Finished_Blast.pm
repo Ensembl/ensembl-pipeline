@@ -86,7 +86,7 @@ sub parse_results {
     my @parsers;
 
     if ( defined($fh) ) {
-        @parsers = ( Bio::Tools::BPlite->new( -fh => $fh ) );
+        @parsers = ( Bio::EnsEMBL::Pipeline::Tools::BPlite->new( -fh => $fh ) );
     }
     else {
         @parsers = $self->get_parsers;
@@ -102,7 +102,6 @@ sub parse_results {
     my $query_length = $self->query->length or $self->throw("Couldn't get query length");
     print "Query Length: <" . $query_length . ">\n";
     my $best_hits = {};
-
     
     my $re = $self->get_regex($db);
     if(!$re){
@@ -120,7 +119,7 @@ sub parse_results {
 	    unless ($name) {
 		$self->throw("ERROR - Check BLAST config and/or blast headers. Couldn't get valid accession from '" . $fasta_header . "'");
 	    }
-#            warn "subject name = '$name'\n";
+            #warn "subject name = '$name'\n";
             my $hsps = [];
             while ( my $h = $sbjct->nextHSP ) {
                 push ( @$hsps, $h );
@@ -232,6 +231,7 @@ sub _apply_coverage_filter {
 
 		unless ($max_coverage == 0){
 		print STDERR "    Looking at $name ";
+
 		    foreach my $hsp (@hsps) {
 			my $q = $hsp->query;
 			foreach my $i ( $q->start .. $q->end ) {

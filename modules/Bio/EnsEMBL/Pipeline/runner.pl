@@ -145,7 +145,7 @@ JOB:foreach my $job(@jobs) {
   print STDERR "Input id is " . $job->input_id . "\n";
   print STDERR "Analysis is ".$job->analysis->logic_name."\n";
   print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
-
+	
   eval {
     $job->run_module;
   };

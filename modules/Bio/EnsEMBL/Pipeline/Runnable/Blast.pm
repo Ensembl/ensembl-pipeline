@@ -68,7 +68,7 @@ use vars qw(@ISA);
 use strict;
 # Object preamble
 
-use FileHandle;
+use Symbol;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::DnaPepAlignFeature;
@@ -436,10 +436,11 @@ sub get_parsers {
   foreach my $db ($self->databases) {
     $db =~ s/.*\///;
 
-    my $fh      = new FileHandle;
+    my $fh = Symbol::gensym();
     my $file    = $self->results.".$db";
-    my $filestr = ($output_is_compressed ? "gunzip -c $file |" : "< $file");
-    $fh->open($filestr);
+
+    my $filestr = ($output_is_compressed ? "gunzip -c $file |" : $file);
+    open($fh, $filestr) or die "Can't open '$filestr' : $!";
     my ($filesize) = (stat($fh))[7];
     $self->filesizes($file, $filesize);
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite ('-fh' => $fh);
