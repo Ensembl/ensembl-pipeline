@@ -46,6 +46,10 @@ my %human_cdna2protein;
 my %mouse_cdna2protein;
 my %human_cdnas;
 my %mouse_cdnas;
+my %seen_mouse;
+my %seen_human;
+my %seen_pair;
+
 while(<MAP>){
   chomp;
   my @entries = split;
@@ -56,16 +60,35 @@ while(<MAP>){
   my $mouseNM = $entries[4];
   my $mouseNP = $entries[5];
 
-  push( @{$human_pair{$humanLL}}, $mouseLL );
-  push( @{$human_cdnas{$humanLL}}, $humanNM );
-  push( @{$mouse_cdnas{$mouseLL}}, $mouseNM );
-  $human_cdna2protein{$humanNM}=$humanNP;
-  $mouse_cdna2protein{$mouseNM}=$mouseNP;
-}
+  unless( $seen_pair{$humanLL}{$mouseLL} ){
+    push( @{$human_pair{$humanLL}}, $mouseLL );
+    $seen_pair{$humanLL}{$mouseLL} = 1;
+  }
+  unless( $seen_human{$mouseLL}{$humanNM} ){
+    push( @{$human_cdnas{$humanLL}}, $humanNM );
+    $human_cdna2protein{$humanNM}=$humanNP;
+    $seen_human{$mouseLL}{$humanNM} = 1;
+  }
+  unless( $seen_mouse{$humanLL}{$mouseNM} ){
+    push( @{$mouse_cdnas{$mouseLL}}, $mouseNM );
+    $mouse_cdna2protein{$mouseNM}=$mouseNP;
+    $seen_mouse{$humanLL}{$mouseNM} = 1;
+  }
+  
+  }
 close(MAP);
 
 my $this_humanLL = $gene_id1;
 my $this_mouseLL = $gene_id2;
+
+print STDERR "check:\n";
+foreach my $cdna ( @{$human_cdnas{$this_humanLL}} ){
+  print STDERR "$this_humanLL\t$cdna\t".$human_cdna2protein{$cdna}."\n";
+}
+foreach my $cdna ( @{$mouse_cdnas{$this_mouseLL}} ){
+  print STDERR "$this_mouseLL\t$cdna\t".$mouse_cdna2protein{$cdna}."\n";
+}
+
 
 my %already_seen;
 my @human_cdnas = @{$human_cdnas{$this_humanLL}};
@@ -83,26 +106,53 @@ my %target_coverage;
 my %query_coverage;
 my %perc_id;
 
+my @human_cdna_seqs;
+my %human_protein_seqs;
+my @mouse_cdna_seqs;
+my %mouse_protein_seqs;
+
 HUMAN:
 foreach my $humanNM ( @human_cdnas ){
+  my $humanNM_seq = $seqfetcher->get_Seq_by_acc($humanNM);
+  unless ( $humanNM_seq ){
+    print STDERR "Failed to find sequence $humanNM\n";
+    next HUMAN;
+  }
+  push ( @human_cdna_seqs, $humanNM_seq );
+  my $humanNP = $human_cdna2protein{$humanNM};
+  my $humanNP_seq = $seqfetcher->get_Seq_by_acc($humanNP);
+  unless ( $humanNP_seq ){
+    print STDERR "Failed to find sequence $humanNP\n";
+    next HUMAN;
+  }
+  $human_protein_seqs{$humanNP} = $humanNP_seq;
+}
+MOUSE:
+foreach my $mouseNM ( @mouse_cdnas ){
+  my $mouseNM_seq = $seqfetcher->get_Seq_by_acc($mouseNM);
+  unless ( $mouseNM_seq ){
+    print STDERR "Failed to find sequence $mouseNM\n";
+    next MOUSE;
+  }
+  push ( @mouse_cdna_seqs, $mouseNM_seq );
+  my $mouseNP = $mouse_cdna2protein{$mouseNM};
+  my $mouseNP_seq = $seqfetcher->get_Seq_by_acc($mouseNP);
+  unless ( $mouseNP_seq ){
+    print STDERR "Failed to find sequence $mouseNP\n";
+    next MOUSE;
+  }
+  $mouse_protein_seqs{$mouseNP} = $mouseNP_seq;
+}
+
+HUMAN:
+foreach my $humanNM_seq ( @human_cdna_seqs ){
  MOUSE:
-  foreach my $mouseNM ( @mouse_cdnas ){ 
+  foreach my $mouseNM_seq ( @mouse_cdna_seqs ){ 
     
-    next if $already_seen{$humanNM}{$mouseNM};
+    next if $already_seen{$humanNM_seq}{$mouseNM_seq};
 
     ############################################################
     # compare transcripts
-    my $humanNM_seq = $seqfetcher->get_Seq_by_acc($humanNM);
-    my $mouseNM_seq = $seqfetcher->get_Seq_by_acc($mouseNM);
-    unless ( $humanNM_seq ){
-      print STDERR "Failed to find sequence $humanNM\n";
-      next HUMAN;
-    }
-    unless ( $mouseNM_seq ){
-      print STDERR "Failed to find sequence $mouseNM\n";
-      next MOUSE;
-    }
-
     my ($score,$best_features, $target_coverage, $query_coverage, $perc_id) = 
       Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptPair
 	->blast_unmapped_transcripts( $humanNM_seq, $mouseNM_seq);
@@ -115,14 +165,16 @@ foreach my $humanNM ( @human_cdnas ){
     unless ($score){
       $score = 0;
     }
+    my $humanNM = $humanNM_seq->display_id;
+    my $mouseNM = $mouseNM_seq->display_id;
     my $humanNP = $human_cdna2protein{$humanNM};
     my $mouseNP = $mouse_cdna2protein{$mouseNM};
     print STDERR "Pair [ $humanNM($humanNP)  , $mouseNM($mouseNP) ] score = $score\n";
     
     ############################################################
     # compare peptides
-    my $humanNP_seq = $seqfetcher->get_Seq_by_acc($humanNP);
-    my $mouseNP_seq = $seqfetcher->get_Seq_by_acc($mouseNP);
+    my $humanNP_seq = $human_protein_seqs{$humanNP};
+    my $mouseNP_seq = $mouse_protein_seqs{$mouseNP};
     unless ( $humanNP_seq ){
       print STDERR "Failed to find sequence $humanNP\n";
       next HUMAN;
@@ -153,6 +205,7 @@ foreach my $humanNM ( @human_cdnas ){
 my $best_transcript_pairs_object = $transcript_map->stable_marriage;
 my $transcript_pair_count = scalar($best_transcript_pairs_object->list1);
 print STDERR "Transcript pairs created: ".$transcript_pair_count."\n";
+
 my $best_protein_pairs_object = $protein_map->stable_marriage;
 my $protein_pair_count = scalar($best_protein_pairs_object->list1);
 print STDERR "Protein pairs created: ".$protein_pair_count."\n";
