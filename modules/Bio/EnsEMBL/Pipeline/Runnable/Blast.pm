@@ -284,33 +284,34 @@ sub fetch_databases {
     my ($self) = @_;
     
     my @databases;
-    
-    my $fulldbname;
 
-    # If we have passed a full path name don't append the $BLASTDB
-    # environment variable.
+    foreach my $dbname (split ',', $self->database) {
 
-    if ($self->database =~ /\//) {
-	$fulldbname = $self->database;
-    } else {
-	$fulldbname = $ENV{BLASTDB} . "/" .$self->database;
-    }
+	$dbname =~ s/\s//g;
 
-    # If the expanded database name exists put this in
-    # the database array.
-    #
-    # If it doesn't exist then see if $database-1,$database-2 exist
-    # and put them in the database array
+	# prepend the environment variable $BLASTDB if
+	# database name is not an absoloute path
 
-    if (-f $fulldbname) {
-	push(@databases,$self->database);
-    } else {
-	my $count = 1;
+        unless ($dbname =~ m!^/!) {
+	    $dbname = $ENV{BLASTDB} . "/" . $dbname;
+        }
 
-	while (-f $fulldbname . "-$count") {
-	    push(@databases,$fulldbname . "-$count");
-	    $count++;
-	}
+        # If the expanded database name exists put this in
+        # the database array.
+        #
+        # If it doesn't exist then see if $database-1,$database-2 exist
+        # and put them in the database array
+
+        if (-f $dbname) {
+	    push(@databases,$dbname);
+        } else {
+	    my $count = 1;
+
+	    while (-f $dbname . "-$count") {
+	        push(@databases,$dbname . "-$count");
+	        $count++;
+	    }
+        }
     }
 
     if (scalar(@databases) == 0) {
