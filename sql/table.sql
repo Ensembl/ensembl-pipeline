@@ -62,6 +62,7 @@ CREATE TABLE job_status (
 CREATE TABLE rule_goal (
   rule_id           smallint(5) unsigned default '0' not null auto_increment,
   goal              varchar(40),
+
   PRIMARY KEY (rule_id)
 );
 
@@ -83,6 +84,7 @@ CREATE TABLE input_id_analysis (
   class             enum("clone" ,"contig", "vc", "gene") not null,
   analysis_id       smallint(10) unsigned NOT NULL,
   created           datetime NOT NULL,
+  result            smallint(10) unsigned NOT NULL,
 
   PRIMARY KEY       (analysis_id, input_id, class),
   KEY input_created (input_id, created),
