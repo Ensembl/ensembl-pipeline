@@ -1,4 +1,4 @@
-og # Cared for by Ensembl
+# Cared for by Ensembl
 #
 # Copyright GRL & EBI
 #
