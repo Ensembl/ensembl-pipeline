@@ -104,51 +104,56 @@ if($file){
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => $fh ) ;
 
 GENE: foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
-  
+  #print STDERR "have gene id ".$gene_id."\n";
   eval {
     my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
+    #print STDERR "have gene ".$gene."\n";
     if($genetype){
-      #print STDERR "Skipping ".$gene_id." wrong type\n" 
-	if($gene->type ne $genetype);
-      next GENE if($gene->type ne $genetype);
+      #print STDERR "checking genetype\n";
+      if($gene->type ne $genetype){
+	print STDERR "Skipping ".$gene_id." wrong type\n";
+	next GENE if($gene->type ne $genetype);
+      }
     }
     my $gene_id = $gene->dbID();
-    
+    #print STDERR "fetching transcripts\n";
     foreach my $trans ( @{$gene->get_all_Transcripts}) {
-      
+      #print STDERR "Fetched transcript ".$trans->dbID."\n";
       if ($trans->translation) {
-        # get out first exon. Tag it to clone and gene on this basis
-        my @exon = @{$trans->get_all_Exons};
-        my $fe = $exon[0];
+	# get out first exon. Tag it to clone and gene on this basis
+	my @exon = @{$trans->get_all_Exons};
+	my $fe = $exon[0];
         
-
-
-        my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
-        my $identifier;
-        if($db_id){
-          $identifier = $trans->translation->dbID;
-        }
-        if($stable_id){
-          if(!$db_id){
-            $identifier = $trans->stable_id;
-          }else{
-            $identifier .= ".".$trans->stable_id;
-          }
-        }
-        my $tseq = $trans->translate();
-        if ( $tseq->seq =~ /\*.+/ ) {
-          print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
-          next;
-        }
+	
+	
+	my ($chr,$gene_start,$cdna_start) = find_trans_start($trans);
+	my $identifier;
+	if($db_id){
+	  $identifier = $trans->translation->dbID;
+	}
+	if($stable_id){
+	  if(!$db_id){
+	    $identifier = $trans->stable_id;
+	  }else{
+	    $identifier .= ".".$trans->stable_id;
+	  }
+	}
+	my $tseq = $trans->translate();
+	if ( $tseq->seq =~ /\*.+/ ) {
+	  print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
+	  next;
+	}
 	my $seq = $tseq->seq;
-        $seq =~ s/\*$//;
+	$seq =~ s/\*$//;
 	$tseq->seq($seq);
-        $tseq->display_id($identifier);
-        $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
-        $seqio->write_seq($tseq);
+	$tseq->display_id($identifier);
+	$tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
+	#print STDERR "writing gene ".$gene_id."\n";
+	$seqio->write_seq($tseq);
       }
     }
   };
+
   
   if( $@ ) {
     print STDERR "unable to process $gene_id, due to \n$@\n";
