@@ -79,7 +79,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    ############################################################
 	    
 	    EST_GENEBUILDER_RUNNABLE   => 'Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder',
-	    EST_GENEBUILDER_ANALYSIS   => 'genomewise',
+	    EST_GENEBUILDER_ANALYSIS   => 'estgene',
 
 	    EST_EXPRESSION_RUNNABLE    => 'Bio::EnsEMBL::Pipeline::RunnableDB::MapGeneToExpression',
 	    EST_EXPRESSION_ANALYSIS    => 'expression',
@@ -91,8 +91,13 @@ use vars qw( %EST_GeneBuilder_Conf );
 	    EST_GENEBUILDER_CHUNKSIZE        => 1000000,      #  we use 1000000 (ie 1MB) chunks
 		  
 	    EST_GENEBUILDER_INPUT_GENETYPE => 'human_est',
-	    EST_GENOMEWISE_GENETYPE        => 'genomewise',
-	    			 
+	    ESTGENE_TYPE        => 'estgene',
+	    
+	    # ORFs can be calculated with genomewise (which has a bug (14/08/2003))
+	    # or with a simpler method which takes the longest ORF starting with M,
+	    # and if there is none, it takes the longest ORF.
+	    USE_GENOMEWISE    => 0,			 
+	    
 			 # if this is set to TRUE it will reject ests that do not
 			 # have all splice sites correct
 			 CHECK_SPLICE_SITES => 1,
