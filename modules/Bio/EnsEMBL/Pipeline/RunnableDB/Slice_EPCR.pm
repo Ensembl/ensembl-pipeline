@@ -14,12 +14,12 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR
+Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR
 
 =head1 SYNOPSIS
 
 my $db   = Bio::EnsEMBL::DBLoader->new($locator);
-my $epcr = Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR->new( 
+my $epcr = Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR->new( 
     -dbobj      => $db,
     -input_id   => $input_id,
     -analysis   => $analysis
@@ -48,7 +48,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR;
+package Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
@@ -64,8 +64,8 @@ use vars qw(@ISA);
                            -INPUT_ID    => $id
                            -ANALYSIS    => $analysis);
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR object
-    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EPCR object
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EPCR object
     Args    :   -dbobj:     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  A virtual contig (e.g. chr_name.start.end)
                 -analysis:  A Bio::EnsEMBL::Analysis 
@@ -102,8 +102,9 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $vc_str = $self->input_id;
-    my ($chr, $start, $end, $sgp) = $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
+    my $slice_str = $self->input_id;
+    my ($chr, $start, $end, $sgp) =
+     $slice_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
     $self->db->assembly_type($sgp) if $sgp;
 
@@ -165,12 +166,12 @@ sub write_output {
     
     my @mapped_features;
   
-    my $vc = $self->slice;
+    my $slice = $self->slice;
 
     foreach my $f ($self->output) {
 
 	$f->analysis($self->analysis);
-	$f->contig($vc);
+	$f->contig($slice);
 	my @mapped = $f->transform;
 
         if (@mapped == 0) {

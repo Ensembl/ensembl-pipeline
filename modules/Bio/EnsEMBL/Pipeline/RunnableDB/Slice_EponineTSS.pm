@@ -3,7 +3,7 @@
 # Author Thomas Down <td2@sanger.ac.uk>
 #
 # Based on CPG.pm by Val Curwen
-# Modified by SCP to run on VC's
+# Modified by SCP to run on Slice's
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -13,13 +13,13 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS
+Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS
 
 =head1 SYNOPSIS
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
 
-my $eponine = Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS->new ( 
+my $eponine = Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS->new ( 
                                    -db          => $db,
 			           -input_id   => $input_id
                                    -analysis   => $analysis 
@@ -52,7 +52,7 @@ Internal methods are usually preceded with a _
 
 =cut
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS;
+package Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
@@ -68,8 +68,8 @@ use vars qw(@ISA);
                       -ANALYSIS    => $analysis
 	   );
                            
- Function: creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
- Returns : Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS
+ Function: creates a Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS object
+ Returns : Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS
  Args    :      -db      :     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
                 -input_id:  A virtual contig ('chr_name.start.end')
                 -analysis:  A Bio::EnsEMBL::Analysis
@@ -105,9 +105,9 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $vc_str = $self->input_id;
+    my $slice_str = $self->input_id;
     my ($chr, $start, $end, $sgp) =
-     $vc_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
+     $slice_str =~ m!(\S+)\.(\d+)\.(\d+):?([^:]*)!;
 
     $self->db->assembly_type($sgp) if $sgp;
 
@@ -160,13 +160,13 @@ sub write_output {
     my $db  = $self->db;
     my $sfa = $db->get_SimpleFeatureAdaptor;
 
-    my $vc = $self->vcontig;
+    my $slice = $self->vcontig;
     my @mapped_features;
 
     foreach my $f ($self->output) {
 
 	$f->analysis($self->analysis);
-	$f->contig($vc);
+	$f->contig($slice);
 
 	my (@mapped) = $f->transform;
 
