@@ -83,44 +83,15 @@ sub new {
     $self->{'_threshold'} = undef; # Value of the threshod
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
     
-  
-    print STDERR "args: ", @args, "\n";
+
+
+
+    my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
+						   ANALYSIS)], 
+					       @args);
     
-    my( $query, $program, $database, $threshold, $workdir, $analysis) = $self->_rearrange([qw(QUERY
-										              PROGRAM
-										              DATABASE
-											      THRESHOLD
-											      WORKDIR
-											      ANALYSIS
-											      )],
-											  @args);
-    
-    #$self->clone($sequence) if ($sequence);       
-  
-    if ($query) {
-	$self->clone($query);
-    } else {
-	$self->throw("No query sequence given");
-    }
- 
-    if ($analysis) {
-	$self->analysis($analysis);
-    }
-   
-    if (!defined $self->analysis->program) {   
-	$self->program($self->locate_executable('FingerPRINTScan')); 
-    }
-    
-    if ($threshold) {
-	$self->threshold($threshold);
-    }
-    
-    if (!defined $self->analysis->db) {
-	$self->throw("No database given");
-    }
-    if ($workdir) {
-	$self->workdir($workdir);
-    }
+    $self->clone ($clone) if ($clone);       
+    $self->analysis ($analysis) if ($analysis);
 	
     return $self; # success - we hope!
 }
@@ -142,62 +113,30 @@ sub new {
 =cut
 
 sub clone{
-    my ($self,$seq) = @_;
-    
-    if ($seq)
-    {
-	unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
-	{
-	    $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
+      my ($self, $seq) = @_;
+    if ($seq) {
+	eval {
+	    $seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+
+	if (!$@) {
+	    $self->{'_sequence'} = $seq ;
+	    $self->clonename ($self->clone->id);
+	    $self->filename ($self->clone->id.".$$.seq");
+	    $self->results ($self->filename.".out");
 	}
-	$self->{'_sequence'} = $seq ;
-	
-	$self->filename($self->clone->id.".$$.seq");
-	$self->results($self->filename.".out");
+	else {
+	    print STDERR "WARNING: The input_id is not a Seq object but if its a peptide fasta file, it should go fine\n";
+	    $self->{'_sequence'} = $seq ;
+	    $self->filename ("$$.tmp.seq");
+	    
+	    $self->results ("prints.$$.out");
+	    
+	}
     }
     return $self->{'_sequence'};
 }
 
-=head2 program
-
- Title   : program
- Usage   : $obj->program($newval)
- Function: 
- Returns : value of program
- Args    : newvalue (optional)
-
-
-=cut
-
-sub program{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_program'} = $value;
-    }
-    return $obj->{'_program'};
-}
-
-=head2 database
-
- Title   : database
- Usage   : $obj->database($newval)
- Function: 
- Returns : value of database
- Args    : newvalue (optional)
-
-
-=cut
-
-sub database{
-   my $obj = shift;
-   if( @_ ) {
-      my $value = shift;
-      $obj->{'_database'} = $value;
-    }
-    return $obj->{'_database'};
-
-}
 
 =head2 analysis
 
@@ -236,20 +175,54 @@ sub analysis{
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+ my ($self, $dir) = @_;
 
-    my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
+    # check clone
+    my $seq = $self->clone || $self->throw("Clone required for Program");
 
-    $self->workdir('/tmp') unless ($self->workdir($dir));
-    $self->checkdir();
+    # set directory if provided
+    $self->workdir ('/tmp') unless ($self->workdir($dir));
+    $self->checkdir;
 
-    #write sequence to file
-    $self->writefile(); 
-    $self->run_analysis();
+    # reset filename and results as necessary (adding the directory path)
+    my $tmp = $self->workdir;
+    my $input = $tmp."/".$self->filename;
+    $self->filename ($input);
+    $tmp .= "/".$self->results;
+    $self->results ($tmp);
 
-    #parse output and create features
-    $self->parse_results();
-    $self->deletefiles();
+
+ eval {
+	$seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI")
+	};
+	
+
+    if (!$@) {
+	#The inputId is a sequence file...got the normal way...
+
+	# write sequence to file
+	$self->writefile;        
+
+	# run program
+	$self->run_analysis;
+
+	# parse output
+	$self->parse_results;
+	$self->deletefiles;
+    }
+    else {
+	#The clone object is not a seq object but a file.
+	#Perhaps should check here or before if this file is fasta format...if not die
+	#Here the file does not need to be created or deleted. Its already written and may be used by other runnables.
+
+	$self->filename($self->clone);
+
+	# run program
+	$self->run_analysis;
+
+	# parse output
+	$self->parse_results;
+    }
   }
 
 =head2 run_analysis
@@ -269,11 +242,9 @@ sub run_analysis {
     # This routine expands the database name into $db-1 etc for
     # split databases
 
-    print STDERR $self->analysis->program." ".$self->analysis->db." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
+    print STDERR "RUNNING: ".$self->analysis->program." ".$self->analysis->db." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
 	$self->throw("Failed during prints run $!\n")
 	    
-	    #print STDERR $self->program." ".$self->database." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
-
 	    unless (system ($self->analysis->program . ' ' . 
 			    $self->analysis->db . ' ' .
 			    $self->filename. ' ' .
@@ -323,7 +294,6 @@ sub parse_results {
 	    
 	    #ENSP00000003603 Gene:ENSG00000000003 Clone:AL035608 Contig:AL035608.00001 Chr:chrX basepair:97227305
 	    ($sequenceId) = $line =~ /^\s*(\w+)/;
-	    print STDERR "$sequenceId\n";
 	}
 
 
@@ -347,9 +317,8 @@ sub parse_results {
 		# Name each of the elements in the array
 		my ($fingerprintName,$motifNumber,$temp,$tot,$percentageIdentity,$profileScore,$pvalue,$subsequence,$motifLength,$lowestMotifPosition,$matchPosition,$highestMotifPosition) = @elements;
 	
-		#print STDERR "$fingerprintName\n";
 		my $start = $matchPosition;
-		my $end = $matchPosition + $motifLength;
+		my $end = $matchPosition + $motifLength - 1;
 		my $print =  $printsac{$fingerprintName};
 						
 		my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
@@ -360,7 +329,6 @@ sub parse_results {
 		
 		foreach my $feats (@features) {
 		    $self->create_feature($feats,$sequenceId);
-		    print STDERR "$feats\n";
 		}
 		@features = ();
 	    }
@@ -400,16 +368,6 @@ sub output {
 sub create_feature {
     my ($self, $feat, $sequenceId) = @_;
 
-    #create analysis object
-#    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-#                        (   -db              => "PRINTS",
-#                            -db_version      => 1,
-#                            -program         => "FingerPRINTScan",
-#                            -program_version => 1,
-#                            -gff_source      => "prints",
-#                            -gff_feature     => "domain");
-
-#my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
     my @f = split (/,/,$feat);
     
     
@@ -417,7 +375,7 @@ sub create_feature {
 					       -end => $f[2],        
 					       -score => $f[4],
 					       -analysis => $self->analysis,
-					       -seqname => $self->clone->id,
+					       -seqname => $sequenceId,
 					       -percent_id => $f[3],
 					       -p_value => $f[5]);
     
