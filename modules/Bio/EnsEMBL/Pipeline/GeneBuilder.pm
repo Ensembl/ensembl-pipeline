@@ -1,7 +1,7 @@
 #
 # Object for submitting jobs to and querying the LSF queue
 #
-# Cared for by Michele Clampin  <michele@sanger.ac.uk>
+# Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
 # Copyright Michele Clamp
 #
@@ -2506,10 +2506,13 @@ sub split_transcript{
 
   my @exons = $transcript->get_all_Exons;
 
-  foreach my $exon($transcript->get_all_Exons){
+EXON:   foreach my $exon($transcript->get_all_Exons){
+
+
     $exon_added = 0;
       # is this the very first exon?
     if($exon == $transcript->start_exon){
+
 
       $prev_exon = $exon;
       
@@ -2519,6 +2522,7 @@ sub split_transcript{
       $curr_transcript->translation->start_exon($exon);
       $curr_transcript->translation->start($transcript->translation->start);
       push(@split_transcripts, $curr_transcript);
+      next EXON;
     }
     
     if ($exon->strand != $prev_exon->strand){
@@ -2545,6 +2549,7 @@ sub split_transcript{
 
       # add exon unless already added, and set translation start and start_exon
       $t->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
 
       $t->translation->start_exon($exon);
 
@@ -2563,6 +2568,10 @@ sub split_transcript{
     }
 
     if($exon == $transcript->end_exon){
+      # add it unless already added
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+
       # set $curr_transcript end_exon and end
       $curr_transcript->translation->end_exon($exon);
       $curr_transcript->translation->end($transcript->translation->end);
@@ -2581,6 +2590,7 @@ sub split_transcript{
   # discard any single exon transcripts
   my @t = ();
   foreach my $st(@split_transcripts){
+    $st->sort;
     my @ex = $st->get_all_Exons;
     if(scalar(@ex) > 1){
       push(@t, $st);
@@ -2590,6 +2600,5 @@ sub split_transcript{
   return @t;
 
 }
-
 
 1;
