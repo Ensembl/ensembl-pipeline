@@ -193,7 +193,7 @@ sub _label{
 
 sub _use_score{
   my ($self,$boolean) = @_;
-  if ( defined $label ){
+  if ( defined $boolean ){ 	#substituted $boolean for $label for  09/12/03
     $self->{_use_score} = $boolean;
   }
   return $self->{_use_score};
@@ -225,6 +225,10 @@ sub write_output {
     foreach my $tran (@trans){
       ############################################################
       # put fake stable_ids to keep track of the scoring
+      $self->_label(1);  #PJG and VAC HACK! 
+      	                 #This line added as done with older version of EST_GeneBuilder.pm 
+			 #However, do note that there are changes within the code betw these
+			 #2 versions and therefore this line may be redundant/damaging!
       if ( $self->_label ){
 	
 	last TRAN unless ( $tran->stable_id );
