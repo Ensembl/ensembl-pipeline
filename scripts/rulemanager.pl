@@ -479,7 +479,7 @@ Sanity Checking
    -db_sanity this checks various tables in the databases for missing 
    values or bad foreign key relationships
    -accumulator_sanity this checks you accumulators are set up correctly
-   -rules_setup this checks you rules are setup correctly
+   -rules_sanity this checks you rules are setup correctly
 
    this are all on by default but can be switched off using -nooption_name
 

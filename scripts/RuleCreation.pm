@@ -164,7 +164,7 @@ sub parse_files {
 sub create_rules{
   my ($db, $config) = @_;
 
-  if(!$db || !$db->isa(Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor)){
+  if(!$db || !$db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
     throw("Must define a db and ".$db." must be a ".
           "Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
   }

@@ -52,7 +52,7 @@ for the script to work the db files are required as are -logic_name
 
     -gff_feature the type of feature ie Repeat
 
-    -input_type the type of input_id this analysis will take, this should
+    -input_id_type the type of input_id this analysis will take, this should
      be all in uppercase ie CONTIG or SLICE
 
     
@@ -66,8 +66,8 @@ use strict;
 use Getopt::Long;
 
 my $host;
-my $user = 'ensadmin';
-my $pass = 'ensembl';
+my $user = '';
+my $pass = '';
 my $port = 3306;
 my $dbname;
 
@@ -83,7 +83,7 @@ my $module;
 my $module_version;
 my $gff_source;
 my $gff_feature;
-my $input_type;
+my $input_id_type;
 my $help;
 
 &GetOptions(
@@ -104,8 +104,8 @@ my $help;
             'module_version:s'   => \$module_version,
             'gff_sources:s'      => \$gff_source,
             'gff_feature:s'      => \$gff_feature,
-	    'input_type:s'       => \$input_type,
-	    'h|help'            => \$help,
+            'input_id_type:s'       => \$input_id_type,
+            'h|help'            => \$help,
            );
 
 
@@ -121,7 +121,7 @@ if(!$help){
     $help = 1;
   }
   
-  if (!defined($input_type)) {
+  if (!defined($input_id_type)) {
     print STDERR "Analysis must have an input type \n";
     $help = 1;
   }
@@ -154,7 +154,7 @@ if ($parameters)       {$analysis->parameters        ($parameters);}
 if ($program_version)  {$analysis->program_version   ($program_version);}
 if ($gff_source)       {$analysis->gff_source        ($gff_source);}
 if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
-if ($input_type)       {$analysis->input_id_type     ($input_type);}
+if ($input_id_type)       {$analysis->input_id_type     ($input_id_type);}
 
 $db->get_AnalysisAdaptor->store($analysis);
 

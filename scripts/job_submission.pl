@@ -213,7 +213,7 @@ sub setup_input_ids{
       $verbose, $logic_name) = @_;
   
   if($ids_to_run){
-    $id_hash = $rulemanager->read_id_file($ids_to_run);
+    my $id_hash = $rulemanager->read_id_file($ids_to_run);
     my @types = keys(%$id_hash);
     if(scalar(@types) != 1){
       throw("You have passed in a file with ".@types." input ".
@@ -228,7 +228,7 @@ sub setup_input_ids{
     return \@ids;
   }elsif($make_input_ids){
     print STDERR "Making input ids\n" if($verbose);
-    $ids = make_input_ids($slice, $file, $translation_id, $single, 
+    my $ids = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
                           $verbose, $logic_name, $input_id_type);
