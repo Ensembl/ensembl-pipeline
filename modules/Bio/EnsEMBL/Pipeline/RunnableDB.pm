@@ -253,6 +253,7 @@ sub run {
       $runnable->query($self->genseq());
       $runnable->run();
     }
+    return 1;
 }
 
 =head2 runnable
