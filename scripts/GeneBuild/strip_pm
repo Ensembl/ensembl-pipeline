@@ -1,0 +1,25 @@
+#!/usr/local/bin/perl
+
+my $idfile = $ARGV[0];
+my $pmfile = $ARGV[1];
+
+my @ids;
+open(IN,"<$idfile") || die "Couldn't open $ARGV[0]";
+
+while (<IN>) {
+  chomp;
+  push(@ids,$_);
+}
+
+close(IN);
+
+open(IN,"<$pmfile") || die "Couldn't open pmatch file $ARGV[1]";
+
+LINE: while (<IN>) {
+  foreach my $id (@ids) {
+     if ($_ =~ $id) {
+        next LINE
+     }
+  }
+  print $_;
+}

@@ -1,0 +1,7 @@
+#!/bin/ksh
+
+
+for i in `cat $1` ; do
+   #print $i `pfetch -F $i |grep "^DE"  | perl -pe 's/^DE\s+//'`
+   pfetch -F $i
+done

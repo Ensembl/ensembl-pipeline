@@ -1,0 +1,12 @@
+#!/bin/ksh
+
+perl -pe 's/.*:(.*?):.*/$1/' $1 | sort -u > /tmp/hits
+
+grep ">" $2 |perl -pe 's/^>(\S+).*/$1/' |sort> /tmp/all
+
+comm -23 /tmp/all /tmp/hits
+
+rm /tmp/hits
+rm /tmp/all
+
+
