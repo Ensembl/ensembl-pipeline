@@ -168,62 +168,67 @@ sub run {
         #fill inputs
         $genOutput->write_seq($self->{'_genomic_sequence'}); 
         $estOutput->write_seq($self->{'_est_sequence'});
+
     }
         
     #run est_genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
     my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-    open (ESTGENOME, $est_genome_command) 
-                or $self->throw("Can't open pipe from '$est_genome_command' : $!");
-
-    #Use the first line to get EST orientation
-    my $firstline = <ESTGENOME>;
-    if ($firstline =~ /reverse/i) {$estOrientation = -1;}
-    else {$estOrientation = 1}
+    eval {
+      print (STDERR "Running command $est_genome_command\n");
+      open (ESTGENOME, $est_genome_command) 
+	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
-    #read output
-    while (<ESTGENOME>)
+      #Use the first line to get EST orientation
+      my $firstline = <ESTGENOME>;
+      if ($firstline =~ /reverse/i) {$estOrientation = -1;}
+      else {$estOrientation = 1}
+      
+      #read output
+      while (<ESTGENOME>) {
 
-    {
 
-        if ($_ =~ /^Exon/)
-        {
-	    print STDERR "$_";
-              #split on whitespace
-              my @elements = split;
-              #extract values from output line
-              my $f1score  = $elements[2];
-              my $f1start  = $elements[3];
-              my $f1end    = $elements[4];
-              my $f1id     = $elements[5];
-              my ($f2start, $f2end);
-              my $f2id     = $elements[8];
-              my $f1source = $source_tag;
-              my $f2source = $source_tag;
-              my $f1strand = 1;
-              my $f2strand = $estOrientation;
-              my $f1primary = $primary_tag;
-              my $f2primary = $primary_tag;
-              #ensure start is always less than end
-               if ($elements[6] < $elements[7])
-              {
-                $f2start =  $elements[6]; 
-                $f2end = $elements[7];
-              }
-              else
-              {
-                $f2start =  $elements[7]; 
-                $f2end = $elements[6];
-              }              
-              #create array of featurepairs              
-              $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
-                                      $f2start, $f2end, $f2id, $f1source, 
-                                      $f2source, $f1strand, $f2strand, 
-                                      $f1primary, $f2primary);
+	if ($_ =~ /^Segment/) {
+
+	  print STDERR "$_";
+	  #split on whitespace
+	  my @elements = split;
+	  #extract values from output line
+	  my $f1score  = $elements[2];
+	  my $f1start  = $elements[3];
+	  my $f1end    = $elements[4];
+	  my $f1id     = $elements[5];
+	  my ($f2start, $f2end);
+	  my $f2id     = $elements[8];
+	  my $f1source = $source_tag;
+	  my $f2source = $source_tag;
+	  my $f1strand = 1;
+	  my $f2strand = $estOrientation;
+	  my $f1primary = $primary_tag;
+	  my $f2primary = $primary_tag;
+	  #ensure start is always less than end
+	  if ($elements[6] < $elements[7])
+	    {
+	      $f2start =  $elements[6]; 
+	      $f2end = $elements[7];
+	    }
+	  else
+	    {
+	      $f2start =  $elements[7]; 
+	      $f2end = $elements[6];
+	    }              
+	  #create array of featurepairs              
+	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
+				  $f2start, $f2end, $f2id, $f1source, 
+				  $f2source, $f1strand, $f2strand, 
+				  $f1primary, $f2primary);
         }    
+      }
+      close(ESTGENOME);
+    };
+    if ($@) {
+      print ("Error running est_genome [$@]\n");
     }
-    close(ESTGENOME) or $self->throw("Error running '$est_genome_command' ($?)");
-    
     #clean up temp files
     $self->_deletefiles($genfile, $estfile, $dirname);
 }
@@ -256,7 +261,6 @@ sub _createfeatures {
                                  -gff_source      => $f1source,
                                  -gff_feature     => $f1primary,);
     
-    print STDERR $analysis_obj . "\n";
 
     #create features
     my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start =>  $f1start,
@@ -272,7 +276,7 @@ sub _createfeatures {
                                                 -end =>    $f2end,
                                                 -seqname =>$f2id,
                                                 -strand => $f2strand,
-                                                -score =>  undef,
+                                                -score =>  $f1score,
                                                 -source => $f2source,
                                                 -primary =>$f2primary,
                                                 -analysis => $analysis_obj );

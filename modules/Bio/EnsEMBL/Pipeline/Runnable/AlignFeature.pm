@@ -165,9 +165,9 @@ sub get_all_FeaturesById {
     my  %idhash;
 
     FEAT: foreach my $f ($self->get_all_Features) {
-	print("Feature is $f " . $f->seqname . "\t" . $f->hseqname . "\n");
+#	print("Feature is $f " . $f->seqname . "\t" . $f->hseqname . "\n");
 	if (!(defined($f->hseqname))) {
-	    $self->warn("No hit name for " . $f->seqname . "\n");
+#	    $self->warn("No hit name for " . $f->seqname . "\n");
 	    next FEAT;
 	} 
 	if (defined($idhash{$f->hseqname})) {
@@ -276,8 +276,8 @@ sub make_miniseq {
     my $prevcdnaend = 0;
     
     foreach my $f (@features) {
-	print STDERR "Found feature - " . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n";
-
+#      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n";
+      
 	if ($f->strand != $strand) {
 	    $self->throw("Mixed strands in features set");
 	}
@@ -288,17 +288,17 @@ sub make_miniseq {
 	$start = $f->start - $self->exon_padding;
 	$end   = $f->end   + $self->exon_padding;
 
-	my $gap     = ($start - $prevend);
+	my $gap     =    ($start - $prevend);
 	my $cdnagap = abs($f->hstart - $prevcdnaend);
 
-	print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
-	print STDERR "Padding feature - new start end are $start $end ($cdnagap)\n";
+#	print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
+#	print STDERR "Padding feature - new start end are $start $end ($cdnagap)\n";
 
-	print STDERR "Count is $count : $mingap " . $gap  . "\n";
+#	print STDERR "Count is $count : $mingap " . $gap  . "\n";
 
 #	if ($count > 0 && (($gap <  $mingap) || ($cdnagap > 20))) {
 	if ($count > 0 && ($gap < $mingap)) {
-	    print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
+#	    print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
 	    $genomic_features[$#genomic_features]->end($end);
 	    $prevend     = $end;
@@ -314,13 +314,13 @@ sub make_miniseq {
 
 	    push(@genomic_features,$newfeature);
 	    
-	    print(STDERR "Added feature $count: " . $newfeature->start  . "\t"  . 
-		                                    $newfeature->end    . "\t " . 
-		                                    $newfeature->strand . "\n");
+	    #print(STDERR "Added feature $count: " . $newfeature->start  . "\t"  . 
+	#	                                    $newfeature->end    . "\t " . 
+	#	                                    $newfeature->strand . "\n");
 
 	    $prevend = $end;
 	    $prevcdnaend = $f->hend; 
-	    print STDERR "New end is " . $f->hend . "\n";
+	#    print STDERR "New end is " . $f->hend . "\n";
 
 	}
 	$count++;
@@ -333,7 +333,7 @@ sub make_miniseq {
     if ($strand == 1) {
 	@genomic_features = sort {$a->start <=> $b->start } @genomic_features;
     } elsif ($strand == -1) {
-	print STDERR "Reverse strand - reversing coordinates\n";
+#	print STDERR "Reverse strand - reversing coordinates\n";
 
 	@genomic_features = sort {$b->start <=> $a->start } @genomic_features;
     } else {
@@ -363,7 +363,7 @@ sub make_miniseq {
 						      -pairalign => $pairaln);
 
     my $newgenomic = $miniseq->get_cDNA_sequence;
-    print ("New genomic sequence is " . $newgenomic->seq . "\n");
+ #   print ("New genomic sequence is " . $newgenomic->seq . "\n");
     return $miniseq;
 
 }
@@ -554,9 +554,12 @@ sub run {
 	$eg->run;
 
 	my @f = $eg->output;
+
 	foreach my $f (@f) {
 	    print("Aligned output is " . $id . "\t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
+
 	}
+
 	push(@{$self->{_output}},@f);
 
     }
@@ -598,34 +601,44 @@ sub minirun {
 	    my @newf;
 	    
 	    foreach my $f (@f) {
-		print(STDERR "Aligned output is " . $f->id    . "\t" . 
-		      $f->start      . "\t" . 
-		      $f->end        . "\t(" . 
-		      $f->strand     . ")\t" .
-		      $f->hseqname   . "\t" . 
-		      $f->hstart     . "\t" . 
-		      $f->hend       . "\t(" .
-		      $f->hstrand    . ")\n");
+#		print(STDERR "Aligned output is " . $f->id    . "\t" . 
+#		      $f->start      . "\t" . 
+#		      $f->end        . "\t(" . 
+#		      $f->strand     . ")\t" .
+#		      $f->hseqname   . "\t" . 
+#		      $f->hstart     . "\t" . 
+#		      $f->hend       . "\t(" .
+#		      $f->hstrand    . ")\n");
 		
 		my @newfeatures = $miniseq->convert_FeaturePair($f);
 		
 		push(@newf,@newfeatures);
 		
 		foreach my $nf (@newf) {
-		    
-		    print(STDERR "Realigned output is " . $nf->id    . "\t" . 
-			  $nf->start     . "\t" . 
-			  $nf->end       . "\t(" . 
-			  $nf->strand    . ")\t" .
-			  $nf->hseqname  . "\t" . 
-			  $nf->hstart    . "\t" . 
-			  $nf->hend      . "\t(" .
-			  $nf->hstrand   . ")\n");
+		  $nf->hseqname($id);
+#		    print(STDERR "Realigned output is " . $nf->id    . "\t" . 
+#			  $nf->start     . "\t" . 
+#			  $nf->end       . "\t(" . 
+#			  $nf->strand    . ")\t" .
+#			  $nf->hseqname  . "\t" . 
+#			  $nf->hstart    . "\t" . 
+#			  $nf->hend      . "\t(" .
+#			  $nf->hstrand   . ")\n");
 		    
 		}
 	    }
 	    
 	    push(@{$self->{_output}},@newf);
+	    foreach my $nf (@newf) {
+	      print(STDERR "Realigned output is " . $nf->id    . "\t" . 
+		    $nf->start     . "\t" . 
+		    $nf->end       . "\t(" . 
+		    $nf->strand    . ")\t" .
+		    $nf->hseqname  . "\t" . 
+		    $nf->hstart    . "\t" . 
+		    $nf->hend      . "\t(" .
+		    $nf->hstrand   . ")\n");
+	    }
 	};
 	if ($@) {
 	    print STDERR "Error running est2genome for " . $features->[0]->hseqname . " [$@]\n";
