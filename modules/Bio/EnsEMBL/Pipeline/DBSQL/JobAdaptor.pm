@@ -43,21 +43,17 @@ use Bio::EnsEMBL::Pipeline::Job;
 @ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
 
 
-
-
 =head2 fetch_by_dbID
 
   Arg [1]   : database id
-  Function  : to fetch an particular entry from the database based 
+  Function  : to fetch an particular entry from the database based
   on dbID
   Returntype: Bio::EnsEMBL::Pipeline::Job
   Exceptions: none
-  Caller    : 
+  Caller    :
   Example   : my $job = $jobadaptor->fetch_by_dbID(1);
 
 =cut
-
-
 
 sub fetch_by_dbID{
   my ($self, $dbID) = @_;
@@ -80,6 +76,16 @@ sub fetch_by_dbID{
 }
 
 
+=head2 fetch_by_dbID_list
+
+  Arg [1]   : listref of ints $dbIDs
+  Function  : Retrieves a list of jobs from the database
+  Returntype: listref of Bio::EnsEMBL::Pipeline::Jobs
+  Exceptions: none
+  Caller    : general
+  Example   : my $job = $jobadaptor->fetch_by_dbID(1);
+
+=cut
 
 sub fetch_all_by_dbID_list {
   my ($self, $dbIDs) = @_;
@@ -102,6 +108,47 @@ sub fetch_all_by_dbID_list {
 	
 	return $self->_jobs_from_sth($sth);
 }
+
+
+
+=head2 fetch_all_by_job_name
+
+  Arg [1]    : string $job_name
+  Arg [2]    : (optional) int $array_index
+  Example    : Retrieves a list of jobs with a specified job_name and 
+               optionally an array index.  If an array_index is specified
+               then the expected return value is a listref with a single job
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub fetch_all_by_job_name {
+  my ($self, $job_name, $index) = @_;
+
+  $self->throw('job_name argument expected') if(!$job_name);
+
+  my $columns = $self->_cols();
+
+  my $q = "SELECT $columns
+           FROM job
+           WHERE job_name = ?";
+  my @bindvals = ($job_name);
+
+  if($index) {
+    $q .= " AND array_index = ?";
+    push @bindvals, $index;
+  }
+
+  my $sth = $self->prepare($q);
+  $sth->execute(@bindvals);
+
+  return $self->_jobs_from_sth($sth);
+}
+
+
 
 sub fetch_all_by_status{
   my ($self, $status) = @_;
@@ -129,18 +176,15 @@ sub fetch_all_by_status{
   my $sth = $self->prepare( $q );
   $sth->execute($status);
 
-  
   my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
-      $array_index, $parameters, $module, $stderr_file, $stdout_file,      
+      $array_index, $parameters, $module, $stderr_file, $stdout_file,
       $retry_count, $max_status);
-  
-  $sth->bind_columns(\$job_id, \$taskname, \$input_id, 
+
+  $sth->bind_columns(\$job_id, \$taskname, \$input_id,
 		     \$submission_id, \$job_name, \$array_index,
-		     \$parameters, \$module, \$stderr_file, \$stdout_file, 
+		     \$parameters, \$module, \$stderr_file, \$stdout_file,
 		     \$retry_count, \$max_status);
-  
-  
-  
+
   while($sth->fetch) {
     push @jobs, Bio::EnsEMBL::Pipeline::Job->new
       (-input_id => $input_id,
@@ -160,6 +204,7 @@ sub fetch_all_by_status{
 
   return \@jobs;
 }
+
 #
 # private method, just returns the columns in the job table
 # the implementation of _jobs_from_sth depends on this method
