@@ -12,7 +12,6 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
-use Bio::EnsEMBL::Utils::GFF2Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Exon;
@@ -35,7 +34,7 @@ my $help;
 ############################################################
 
 &GetOptions( 
-	     'gff_format:s'        => \$gff_format,
+	    #'gff_format:s'        => \$gff_format,
 	     'input:s'             => \$input,
 	     'output:s'            => \$output,
 	     'comp_level:n'        => \$comp_level,
@@ -56,7 +55,7 @@ if ( $help || !$input || !$output){
 
 open ( IN, "<$input") || die("could not open input file $input");
 
-my $gff2exon = Bio::EnsEMBL::Utils::GFF2Exon->new( -gff_version => $gff_format );
+#my $gff2exon = Bio::EnsEMBL::Utils::GFF2Exon->new( -gff_version => $gff_format );
 
 my @transcripts;
 my $trans_tag;
@@ -72,7 +71,7 @@ while(<IN>){
   
   chomp;
   my %trans_tag;
-  my $exon = $gff2exon->exon_from_gff( $_ , \%trans_tag );
+  my $exon = &exon_from_gff( $_ , \%trans_tag );
   #print STDERR "trans_tag[ exon ] = $trans_tag{$exon}\n";
   if ( $exon && $exon->start && $exon->end ){
     push( @{$trans{$trans_tag{$exon}}}, $exon );
@@ -136,7 +135,7 @@ if ( $sets ){
     print OUT "set $count:\n";
     foreach my $transcript ( @$set ){
       foreach my $exon ( @{$transcript->get_all_Exons} ){
-	print OUT $gff2exon->gff_string($exon,$transcript);
+	print OUT &gff_string($exon,$transcript);
       }
     }
   } 
@@ -148,14 +147,115 @@ else{
   my @merged_transcripts = $cluster_merge->output;
   foreach my $transcript ( @merged_transcripts ){
     foreach my $exon ( @{$transcript->get_all_Exons} ){
-      print OUT $gff2exon->gff_string($exon,$transcript)."\n";
+      print OUT &gff_string($exon,$transcript)."\n";
     }
   }
 }
 
 close (OUT);
 
+############################################################
 
+sub exon_from_gff {
+  my ($gffstring, $trans_hash) = @_;
+    
+  #print STDERR "gff_string: $gffstring\n";
+
+  #39896	human_cdna	exon	1030942	1031591	100	+	0	6604
+  #39897	human_cdna	exon	1034227	1034285	100	+	0	6604
+  #39898	human_cdna	exon	1035280	1035339	100	+	0	6604
+  #39899	human_cdna	exon	1035741	1035820	100	+	0	6604
+  #39900	human_cdna	exon	1036477	1036629	100	+	0	6604
+  #243299	human_cdna	exon	1037161	1037229	100	+	0	40150
+  #243301	human_cdna	exon	1043180	1043315	100	+	0	40150
+  #243303	human_cdna	exon	1048194	1048340	100	+	0	40150
+  #243305	human_cdna	exon	1053724	1053855	100	+	0	40150
+  #243307	human_cdna	exon	1054346	1054451	100	+	0	40150
+  #243309	human_cdna	exon	1055667	1055833	100	+	0	40150
+  #243310	human_cdna	exon	1057048	1057221	100	+	0	40150
+  #243311	human_cdna	exon	1058529	1058630	100	+	0	40150
+  #243313	human_cdna	exon	1061487	1062080	100	+	0	40150
+  my ($seqname, 
+      $source, 
+      $primary, 
+      $start, 
+      $end, 
+      $score, 
+      $strand, 
+      $frame, 
+      @group) 
+    = split(/\s+/, $gffstring);
+  
+  $frame = 0 unless( $frame =~ /^\d+$/);
+    
+  my $exon = Bio::EnsEMBL::Exon->new();
+  $exon->seqname($seqname);
+  #$exon->source_tag($source);
+  $exon->start($start);
+  $exon->end($end);
+  my $phase = ( 3 - $frame )%3;
+  $exon->phase($phase);
+  $exon->end_phase( ( $exon->phase + $exon->length)%3 );
+  if ( $score ){
+    $exon->score( $score );
+  }
+  if ( $strand eq '-' ) { $exon->strand(-1); }
+  if ( $strand eq '+' ) { $exon->strand(1); }
+  if ( $strand eq '.' ) { $exon->strand(0); }
+
+  ############################################################
+  # warning: it parses only the first element of the group
+  
+  $trans_hash->{ $exon } = $group[0];
+  return $exon;
+}
+
+############################################################
+
+sub gff_string{
+  my ($exon, $transcript) = @_;
+  my ($str,$source,$primary_tag,$score,$frame,$name,$strand);
+  
+  if( $exon->can('score') ) {
+    $score = $exon->score();
+  }
+  $score = '.' unless defined $score;
+  
+  if( $exon->can('frame') ) {
+    $frame = $exon->frame();
+  }
+  $frame = '.' unless defined $frame;
+  
+  $strand = $exon->strand();
+  if(! $strand) {
+    $strand = ".";
+  } elsif( $strand == 1 ) {
+    $strand = '+';
+  } elsif ( $exon->strand == -1 ) {
+    $strand = '-';
+  }
+  
+  $name        = $exon->seqname();
+  $source      = "merged";
+  $primary_tag = "exon";
+  
+  $str = join("\t",
+	      $name,
+	      $source,
+	      $primary_tag,
+	      $exon->start(),
+	      $exon->end(),
+	      $score,
+	      $strand,
+	      $frame);
+  
+  my $tag_str = $transcript->type;
+  $str .= "\t$tag_str";
+  return $str;
+}
+
+
+############################################################
 
 sub usage {
     print STDERR <<EOF
@@ -166,8 +266,6 @@ sub usage {
     -input           : name of the input file in gff format
 
     -output          : name of the output file
-
-    -gff_format      : 1 and 2 supported. (default = 1)
 
     -comp_level      : comparison level (default = 5 )
                        1 --> strict: exact exon matching. 
@@ -226,3 +324,4 @@ sub usage {
      -help           : outputs this help
 EOF
 }
+
