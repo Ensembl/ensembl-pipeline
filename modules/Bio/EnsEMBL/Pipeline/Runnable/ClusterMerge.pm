@@ -105,7 +105,7 @@ sub new {
   if ( $EST_GENEBUILDER_INTRON_MISMATCH ){
     $self->_intron_mismatch( $EST_GENEBUILDER_INTRON_MISMATCH );
   }
-  if ( $EST_GENEBUILDER_EXON_MATCH ){
+  if ( defined $EST_GENEBUILDER_EXON_MATCH ){
     $self->_exon_match( $EST_GENEBUILDER_EXON_MATCH );
   }
   
@@ -646,10 +646,10 @@ description: this method computes the largest proper sublist in $list
 sub _test_for_link{
   my ($self, $list, $transcript) = @_;
   
-  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new( -comparison_level         => 3,
-										      -exon_match               => 0,
-										      -splice_mismatch          => 1,
-										      -intron_mismatch          => 0,
+  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new( -comparison_level         => $self->_comparison_level, 
+										      -exon_match               => $self->_exon_match,
+										      -splice_mismatch          => $self->_splice_mismatch,
+										      -intron_mismatch          => $self->_intron_mismatch,
 										    );
   my $sublist;
   my $can_merge = 0;
@@ -1421,6 +1421,14 @@ sub _splice_mismatch{
   }
   return $self->{_splice_mismatch};
 }
+
+sub _exon_match{
+  my ($self,$exon_match) =@_;
+       if ( defined $exon_match){
+       $self->{_exon_match} = $exon_match;
+       }
+     return $self->{_exon_match};
+     }
 
 ############################################################
 
