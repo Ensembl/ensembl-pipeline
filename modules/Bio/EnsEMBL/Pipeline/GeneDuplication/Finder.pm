@@ -18,7 +18,7 @@ my $DEFAULT_DISTANCE_METHOD  = 'NeiGojobori';
 my $DEFAULT_BLAST_PROGRAM    = 'wublastn';
 my $DEFAULT_DISTANCE_CUTOFF  = 1.000;
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw(Bio::EnsEMBL::Root Bio::EnsEMBL::Pipeline::RunnableI);
 
 ### Constructor ###
 
@@ -108,7 +108,7 @@ sub new {
 
   $self->_query_seq($query)                               if $query;
   $self->_codeml($codeml)                                 if $codeml;
-  $self->_genetic_code($genetic_code)                     if $genetic_code;
+  $self->_genetic_code($genetic_code);
   $self->_regex_query_species($regex_query_species)       if $regex_query_species;
   $self->_regex_outgroup_species($regex_outgroup_species) if $regex_outgroup_species;
   $self->_identity_cutoff($identity_cutoff)               if $identity_cutoff;
@@ -1236,8 +1236,9 @@ sub _genetic_code {
     return
   }
 
-  throw ('Genetic code unset.')
-    unless $self->{_genetic_code};
+  unless (defined $self->{_genetic_code}) {
+    throw ('Genetic code unset.')
+  }
 
   return $self->{_genetic_code};
 }
