@@ -63,6 +63,9 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_PROTEIN_INDEX
 					 GB_SIMILARITY_TYPE
 					 GB_SIMILARITY_THRESHOLD
+					 GB_SIMILARITY_COVERAGE
+					 GB_SIMILARITY_MAX_INTRON
+					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -71,9 +74,6 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
       
- print STDERR "checking: " . $::db_conf{'dbname'} ." : " . $::db_conf{'dbuser'} . " : " . $::db_conf{'dbpass'} . " : " . $::db_conf{'dbhost'} . "\n";
-
- 
     if(!defined $self->seqfetcher) {
       my $seqfetcher =  $self->make_seqfetcher();
       $self->seqfetcher($seqfetcher);
@@ -358,23 +358,18 @@ sub make_genes {
 
     # validate transcript
     my $valid_transcripts = $self->validate_transcript($unchecked_transcript);
-
     
     # make genes from valid transcripts
     foreach my $checked_transcript(@$valid_transcripts){
-      # check coverage of parent protein
-      my $covered = $self->check_coverage($checked_transcript);
-      if($covered){
-	my $gene = new Bio::EnsEMBL::Gene;
-	$gene->type($genetype);
-	$gene->analysis($analysis_obj);
-	$gene->add_Transcript($checked_transcript);
-	
-	push (@genes, $gene);
-      }
+      my $gene = new Bio::EnsEMBL::Gene;
+      $gene->type($genetype);
+      $gene->analysis($analysis_obj);
+      $gene->add_Transcript($checked_transcript);
+      
+      push (@genes, $gene);
     }
   }
-
+  
   return \@genes;
 
 }
@@ -481,7 +476,9 @@ sub _make_transcript{
 
  Title   : validate_transcript 
  Usage   : my @valid = $self->validate_transcript($transcript)
- Function: Validates a transcript - rejects if mixed strands, splits if long introns
+ Function: Validates a transcript - rejects if mixed strands, 
+                                    rejects if low coverage, 
+                                    splits if long introns and insufficient coverage of parental protein
  Returns : Ref to @Bio::EnsEMBL::Transcript
  Args    : Bio::EnsEMBL::Transcript
 
@@ -492,6 +489,16 @@ sub validate_transcript {
   
   my $valid = 1;
   my $split = 0;
+
+  # check coverage of parent protein
+  my $coverage  = $self->check_coverage($transcript);
+  if ($coverage < $GB_SIMILARITY_COVERAGE){
+    $self->warn (" rejecting transcript for low coverage: $coverage\n");
+    $valid = 0;
+    return undef;
+  }
+  
+#  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
 
   my $previous_exon;
   foreach my $exon($transcript->get_all_Exons){
@@ -504,8 +511,10 @@ sub validate_transcript {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-      if ($intron > 100000) {
-	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
+      print STDERR "intron: $intron\n";
+
+      if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
+	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
 	$split = 1;
 	$valid = 0;
       }
@@ -513,7 +522,7 @@ sub validate_transcript {
       if ($exon->strand != $previous_exon->strand) {
 	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
 	$valid = 0;
-	return;
+	return undef;
       }
     }
     $previous_exon = $exon;
@@ -607,10 +616,10 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       $intron = abs($prev_exon->start - $exon->end - 1);
     }
     
-    if ($intron > 100000) {
-      # set translation end and end_exon of $curr_transcript->translation based on phase of $prev_exon
+    if ($intron > $GB_SIMILARITY_MAX_INTRON) {
       $curr_transcript->translation->end_exon($prev_exon);
-      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1);
+      # need to account for end_phase of $prev_exon when setting translation->end
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
       
       # start a new transcript 
       my $t  = new Bio::EnsEMBL::Transcript;
@@ -630,6 +639,9 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       } elsif ($exon->phase == 2) {
 	$t->translation->start(2);
       }
+
+      # start exon always has phase 0
+      $exon->phase(0);
 
       # this new transcript becomes the current transcript
       $curr_transcript = $t;
@@ -683,9 +695,9 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
 
  Title   : check_coverage
  Usage   :
- Function: checks how much of the parent protein is covered by the genewise prediction
+ Function: returns how much of the parent protein is covered by the genewise prediction
  Example :
- Returns : 1 if > 70% coverage, otherwise 0
+ Returns : percentage
  Args    :
 
 
@@ -693,7 +705,6 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
 
 sub check_coverage{
   my ($self, $transcript) = @_;
-  my $threshold = 70;
   my $pstart = 0;
   my $pend = 0;
   my $protname;
@@ -745,15 +756,12 @@ sub check_coverage{
     return 0;
   }
 
+  print STDERR "looking at coverage of $protname\n";
+
   my $coverage = $matches/$plength;
   $coverage *= 100;
-  if ($coverage < $threshold){
-    $self->warn ("Coverage of $protname is only $coverage - will be rejected\n");
-    return 0;
-  }
-  
-  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
-  return 1;
+  return $coverage;
+
 }
 
 
