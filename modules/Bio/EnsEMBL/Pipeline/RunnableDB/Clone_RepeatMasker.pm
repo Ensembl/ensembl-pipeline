@@ -14,12 +14,12 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker
+Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker
 
 =head1 SYNOPSIS
 
 my $db      = Bio::EnsEMBL::DBLoader->new($locator);
-my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker->new ( 
+my $repmask = Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker->new ( 
                                                     -dbobj      => $db,
 			                                        -input_id   => $input_id
                                                     -analysis   => $analysis );
@@ -31,7 +31,9 @@ $repmask->write_output(); #writes to DB
 =head1 DESCRIPTION
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker to add
-functionality to read and write to databases.
+functionality to read and write to databases. 
+This object takes clone ids, Bio::EnsEMBL::Pipeline::RunnabdleDB::RepeatMasker 
+acts on contigs. 
 The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
@@ -50,9 +52,8 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker;
 
 use strict;
-use Bio::EnsEMBL::Pipeline::RunnableDBI;
-use Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
 use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
+
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker);
 
@@ -93,7 +94,7 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->set_parameters($analysis);
+    $self->analysis($analysis);
     
     return $self;
 }
@@ -155,13 +156,16 @@ sub runnable {
     {
         #extract parameters into a hash
         my ($parameter_string) = $self->parameters() ;
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
         my %parameters;
-        foreach my $pair (@pairs)
+        if ($parameter_string)
         {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
+            $parameter_string =~ s/\s+//g;
+            my @pairs = split (/,/, $parameter_string);
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $parameters{$key} = $value;
+            }
         }
         $parameters {'-clone'} = $genseq;
         #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object

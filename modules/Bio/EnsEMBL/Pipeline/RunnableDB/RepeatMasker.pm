@@ -75,9 +75,10 @@ sub new {
     my $self = bless {}, $class;
     
     $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
+    $self->{'_genseq'};
     $self->{'_runnable'}    = undef;
     $self->{'_input_id'}    = undef;
+    $self->{'_analysis'}    = undef;
     
     my ( $dbobj, $input_id, $analysis) = 
             $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
@@ -93,21 +94,23 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->set_parameters($analysis);
+    $self->analysis($analysis);
     
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker');
     return $self;
 }
 
-sub set_parameters {
+sub analysis {
     my ($self, $analysis) = @_;
     
     if ($analysis)
     {
         $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-        $self->parameters($analysis->parameters());
+        $self->{'_analysis'} = $analysis;
+        $self->parameters($analysis->parameters);
     }
+    return $self->{'_analysis'}
 }
 
 =head2 parameters
@@ -122,8 +125,8 @@ sub set_parameters {
 
 sub parameters {
     my ($self, $parameters) = @_;
-    $self->{'_parameters'} = $parameters if ($parameters);
-    return $self->{'_parameters'};
+    $self->analysis->parameters($parameters) if ($parameters);
+    return $self->analysis->parameters();
 }
 
 =head2 dbobj
@@ -163,6 +166,9 @@ sub fetch_input {
     
     $self->throw("No input id") unless defined($self->input_id);
 
+    print STDERR "Input id " . $self->input_id . "\n";
+    print STDERR "Dbobj " . $self->dbobj . "\n";
+    
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
@@ -194,15 +200,19 @@ sub runnable {
     {
         #extract parameters into a hash
         my ($parameter_string) = $self->parameters() ;
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
         my %parameters;
-        foreach my $pair (@pairs)
+        if ($parameter_string)
         {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
+            $parameter_string =~ s/\s+//g;
+            my @pairs = split (/,/, $parameter_string);
+            
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $parameters{$key} = $value;
+            }
         }
-        #creates empty Bio::EneEMBL::Runnable::RepeatMasker object
+        #creates empty Bio::EnsEMBL::Runnable::RepeatMasker object
         $self->{'_runnable'} = $runnable->new(%parameters);;
     }
     return $self->{'_runnable'};

@@ -94,7 +94,7 @@ sub new {
     $self->throw("Analysis object required") unless ($analysis);
     $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-    $self->set_parameters($analysis);
+    $self->analysis($analysis);
     
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast');
     $self->threshold(1e-6);
@@ -102,15 +102,17 @@ sub new {
     return $self;
 }
 
-sub set_parameters {
+sub analysis {
     my ($self, $analysis) = @_;
     
     if ($analysis)
     {
         $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
             unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-        $self->parameters($analysis->parameters());
+        $self->{'_analysis'} = $analysis;
+        $self->parameters($analysis->parameters);
     }
+    return $self->{'_analysis'}
 }
 
 =head2 threshold
@@ -143,8 +145,8 @@ sub threshold {
 
 sub parameters {
     my ($self, $parameters) = @_;
-    $self->{'_parameters'} = $parameters if ($parameters);
-    return $self->{'_parameters'};
+    $self->analysis->parameters($parameters) if ($parameters);
+    return $self->analysis->parameters();
 }
 
 =head2 dbobj
@@ -216,15 +218,20 @@ sub runnable {
     if ($runnable)
     {
         #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
+        my ($parameter_string) = $self->analysis->parameters() ;
         my %parameters;
-        foreach my $pair (@pairs)
+        if ($parameter_string)
         {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
+            $parameter_string =~ s/\s+//g;
+            my @pairs = split (/,/, $parameter_string);
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $parameters{$key} = $value;
+            }
         }
+        $parameters {'-db'}      = $self->analysis->db();
+        $parameters {'-blast'}   = $self->analysis->program();  
         #creates empty Bio::EnsEMBL::Runnable::Blast object
         $self->{'_runnable'} = $runnable->new(%parameters);
     }
