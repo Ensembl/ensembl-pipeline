@@ -322,6 +322,20 @@ sub fetch_by_input_id {
   return @result;
 }
 
+
+sub fetch_hash_by_input_id{
+    my $self = shift;
+    my $inputid = shift;
+
+    my @results = $self->fetch_by_input_id($inputid);
+    my %hash;
+    foreach my $result(@results){
+       $hash{$result->analysis->dbID} = $result;
+    }
+
+    return \%hash;
+}
+
 =head2 store
 
   Title   : store
