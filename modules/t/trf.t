@@ -2,7 +2,7 @@ use lib 't';
 use Test;
 use strict;
 
-BEGIN { $| = 1; plan test => 5;}
+BEGIN { $| = 1; plan test => 7;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::TRF;
 use Bio::PrimarySeq;
@@ -38,6 +38,7 @@ sub display {
       printf ("%10s = $value\n", $method_name);
     }
   }
+  1;
 }
 
 sub set_seq {
