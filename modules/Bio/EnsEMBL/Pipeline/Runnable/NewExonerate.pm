@@ -99,16 +99,19 @@ sub new {
       $query_type,
       $target_type,
       $exonerate,
-      $options) = $self->_rearrange([qw(
+      $options,
+      $verbose) = $self->_rearrange([qw(
 					DATABASE
 					QUERY_SEQS
 					QUERY_TYPE
 					TARGET_TYPE
 					EXONERATE
 					OPTIONS
+					VERBOSE
 				       )
 				    ], @args);
 
+  $self->_verbose($verbose) if $verbose;
 
   $self->{_output} = [];
   # must have a target and a query sequences
@@ -155,7 +158,7 @@ sub new {
 
   ############################################################
   # options
-  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %ps %ql %g %V\\n\" "; 
+  my $basic_options = " --exhaustive FALSE --model est2genome --ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
 
   # can add extra options as a string
   if ($options){
@@ -208,7 +211,7 @@ sub run {
 
   # Execute command and parse results
 
-  print STDERR "Exonerate command : $command\n" 
+  print STDERR "Exonerate command : $command\n"
     if $self->_verbose;
 
   open( EXO, "$command |" ) || $self->throw("Error running exonerate $!");
@@ -237,7 +240,7 @@ sub parse_results {
       ############################################################
       # the output is of the format:
       #
-      # --ryo "RESULT: %S %ps %ql %g %V\n"
+      # --ryo "RESULT: %S %pi %ql %g %V\n"
       # 
       # It shows the alignments in "sugar" + percent_id + gene orientation + "vulgar blocks" format. 
       #
