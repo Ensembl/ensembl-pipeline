@@ -1,3 +1,4 @@
+#!/usr/local/bin/perl
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
