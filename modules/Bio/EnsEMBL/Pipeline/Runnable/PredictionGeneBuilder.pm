@@ -109,20 +109,20 @@ sub run{
   
   # get all exons from the PredictionTranscripts, take only exons with overlapping similarity features, which
   # are incorporated as supporting evidence
+  print STDERR "making exons...\n";
   my @supported_exons = $self->make_Exons;
 
-  print STDERR "\nNumber of exons supported out of predictions ".scalar( @supported_exons )."\n";
+  print STDERR "Number of exons supported out of predictions ".scalar( @supported_exons )."\n";
   
   # pair up the exons according to consecutive overlapping supporting evidence
   # pairs can be retrieved using 'get_all_ExonPairs'
+  print STDERR "making exonpairs...\n";
   $self->make_ExonPairs(@supported_exons);
-
-  print STDERR "\n".scalar($self->get_all_ExonPairs)." Exon pairs created\n";
+  print STDERR scalar($self->get_all_ExonPairs)." Exon pairs created\n";
 
   # link exons recursively according to the exon pairs with shared evidence to form transcripts
   my @linked_predictions = $self->link_ExonPairs(@supported_exons);
-
-  print STDERR "\n".scalar(@linked_predictions)." linked transcripts generated\n";
+  print STDERR scalar(@linked_predictions)." linked transcripts generated\n";
 
   # check the generated transcripts:
   my @checked_predictions;
@@ -131,7 +131,7 @@ sub run{
     push( @checked_predictions, $prediction );
   }
 
-  print STDERR "\n".scalar(@checked_predictions)." checked transcripts generated\n";
+  print STDERR scalar(@checked_predictions)." checked predictions generated\n";
   return @checked_predictions;
 }  
 
@@ -171,7 +171,7 @@ sub make_Exons {
       # Don't include any genscans that are inside a genewise/combined transcript
       if ($self->annotations){
       OTHER_GENES:
-	foreach my $gene ($self->genewise_combined_Transcripts) {
+	foreach my $gene ($self->annotations) {
 	  my @exons    = sort {$a->start <=> $b->start} @{$gene->get_all_Exons};
 	  my $g_start  = $exons[0]->start;
 	  my $g_end    = $exons[$#exons]->end;
@@ -211,17 +211,14 @@ sub make_Exons {
 sub _make_Exon { 
   my ($self,$exon_prediction,$stub) = @_;
   
-  my $slice_name = $self->slice->name;
   my $exon       = new Bio::EnsEMBL::Exon;
   
-  $exon->{'temporary_id'} = ("TMPE_" . $slice_name . "." . $exon_prediction->seqname . "." . $stub);
   $exon->seqname   ($exon_prediction->seqname);
-  $exon->contig    ($self->slice);
+  $exon->contig    ($exon_prediction->contig);
   $exon->start     ($exon_prediction->start);
   $exon->end       ($exon_prediction->end  );
   $exon->strand    ($exon_prediction->strand);
   $exon->phase     ($exon_prediction->phase);
-  #$exon->add_supporting_features($exon_prediction);
   
   return $exon;
 }
@@ -631,7 +628,8 @@ sub _recurseTranscript {
   }
   
   
- PAIR: foreach my $pair (@pairs) {
+ PAIR: 
+  foreach my $pair (@pairs) {
     next PAIR if ($exons[$#exons]->end_phase != $pair->exon2->phase);
     
     if ($count > 0) {
@@ -867,6 +865,209 @@ sub add_ExonPhase {
 }
 ############################################################
 
+
+=head2 split_transcript
+
+ Title   : split_transcript 
+ Usage   : my @splits = $self->split_transcript($transcript)
+ Function: splits a transcript into multiple transcripts at long introns. Rejects single exon 
+           transcripts that result. 
+ Returns : @Bio::EnsEMBL::Transcript
+ Args    : Bio::EnsEMBL::Transcript
+
+=cut
+
+
+sub split_transcript{
+  my ($self, $transcript) = @_;
+  $transcript->sort;
+  my @split_transcripts   = ();
+
+  if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
+    $self->warn("[$transcript] is not a Bio::EnsEMBL::Transcript - cannot split");
+    return (); # empty array
+  }
+  
+  my $prev_exon;
+  my $exon_added = 0;
+  my $curr_transcript = new Bio::EnsEMBL::Transcript;
+  my $translation     = new Bio::EnsEMBL::Translation;
+  $curr_transcript->type($transcript->type);
+  $curr_transcript->translation($translation);
+
+
+EXON:   
+  foreach my $exon( @{$transcript->get_all_Exons} ){
+    
+    $exon_added = 0;
+      # is this the very first exon?
+    if($exon == $transcript->start_Exon){
+      $prev_exon = $exon;      
+      # set $curr_transcript->translation start and start_exon
+      $curr_transcript->add_Exon($exon);
+      $exon_added = 1;
+      $curr_transcript->translation->start_Exon($exon);
+      $curr_transcript->translation->start($transcript->translation->start);
+      push(@split_transcripts, $curr_transcript);
+      next EXON;
+    }
+    
+    if ($exon->strand != $prev_exon->strand){
+      return (); # empty array
+    }
+
+    # We need to start a new transcript if the intron size between $exon and $prev_exon is too large
+    my $intron = 0;
+    if ($exon->strand == 1) {
+      $intron = abs($exon->start - $prev_exon->end + 1);
+    } else {
+      $intron = abs($exon->end   - $prev_exon->start + 1);
+    }
+    
+    if ($intron > $GB_GENSCAN_MAX_INTRON) {
+      $curr_transcript->translation->end_Exon($prev_exon);
+      # need to account for end_phase of $prev_exon when setting translation->end
+      $curr_transcript->translation->end($prev_exon->end - $prev_exon->start + 1 - $prev_exon->end_phase);
+      
+      # start a new transcript 
+      my $t  = new Bio::EnsEMBL::Transcript;
+      my $tr = new Bio::EnsEMBL::Translation;
+      $t->type($transcript->type);
+      $t->translation($tr);
+
+      # add exon unless already added, and set translation start and start_exon
+      $t->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+
+      $t->translation->start_Exon($exon);
+
+      if ($exon->phase == 0) {
+	$t->translation->start(1);
+      } elsif ($exon->phase == 1) {
+	$t->translation->start(3);
+      } elsif ($exon->phase == 2) {
+	$t->translation->start(2);
+      }
+
+      # start exon always has phase 0
+      $exon->phase(0);      
+
+      # this new transcript becomes the current transcript
+      $curr_transcript = $t;
+
+      push(@split_transcripts, $curr_transcript);
+    }
+
+    if($exon == $transcript->end_Exon){
+      # add it unless already added
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+      $exon_added = 1;
+
+      # set $curr_transcript end_exon and end
+      $curr_transcript->translation->end_Exon($exon);
+      $curr_transcript->translation->end($transcript->translation->end);
+    }
+
+    else{
+      # just add the exon
+      $curr_transcript->add_Exon($exon) unless $exon_added;
+    }
+    
+    # this exon becomes $prev_exon for the next one
+    $prev_exon = $exon;
+
+  }
+
+  # discard any single exon transcripts
+  my @t = ();
+  my $count = 1;
+  
+  foreach my $st(@split_transcripts){
+    $st->sort;
+    my @ex = @{$st->get_all_Exons};
+    if(scalar(@ex) > 1){
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
+      $count++;
+      push(@t, $st);
+    }
+  }
+
+  return @t;
+
+}
+
+############################################################
+
+=head2 validate_transcript
+
+ Title   : validate_transcript 
+ Usage   : my @valid = $self->validate_transcript($transcript)
+ Function: Validates a transcript - rejects if mixed strands, splits if long introns
+ Returns : @Bio::EnsEMBL::Transcript
+ Args    : Bio::EnsEMBL::Transcript
+
+=cut
+
+sub validate_transcript{
+  my ($self, $transcript) = @_;
+  my @valid_transcripts;
+
+  my $valid = 1;
+  my $split = 0;
+
+  # check exon phases:
+  my @exons = @{$transcript->get_all_Exons};
+  $transcript->sort;
+  for (my $i=0; $i<(scalar(@exons-1)); $i++){
+    my $end_phase = $exons[$i]->end_phase;
+    my $phase    = $exons[$i+1]->phase;
+    if ( $phase != $end_phase ){
+      $self->warn("rejecting transcript with inconsistent phases( $phase <-> $end_phase) ");
+      return undef;
+    }
+  }
+  
+
+  my $previous_exon;
+  foreach my $exon (@exons){
+    if (defined($previous_exon)) {
+      my $intron;
+      
+      if ($exon->strand == 1) {
+	$intron = abs($exon->start - $previous_exon->end + 1);
+      } else {
+	$intron = abs($exon->end   - $previous_exon->start + 1);
+      }
+      
+      if ($intron > $GB_GENSCAN_MAX_INTRON) {
+	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
+	$split = 1;
+	$valid = 0;
+      }
+      
+      if ($exon->strand != $previous_exon->strand) {
+	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
+	$valid = 0;
+	return;
+      }
+    }
+    $previous_exon = $exon;
+  }
+  
+       if ($valid) {
+	 push(@valid_transcripts,$transcript);
+       }
+       elsif ($split){
+	 # split the transcript up.
+	 my @split_transcripts = $self->split_transcript($transcript);
+    push(@valid_transcripts, @split_transcripts);
+  }
+       return @valid_transcripts;
+}
+
+############################################################
+
+
 sub _check_Transcript{
   my ($self,$transcript) = @_;
   my $slice = $self->slice;
@@ -985,7 +1186,7 @@ sub linked_predictions {
 sub flush_linked_predictions{
   my ($self) = @_;
   $self->{_linked_predictions} = [];
-  return @{ $self->{_linked_transcripts}};
+  return;
 }
 
 ###################################################
@@ -1096,5 +1297,31 @@ sub threshold {
 
 ############################################################
 
+
+sub _print_Transcript{
+  my ($self,$transcript) = @_;
+  my @exons = @{$transcript->get_all_Exons};
+  my $id;
+  if ( $transcript->dbID ){
+    $id = $transcript->dbID;
+  }
+  else{
+    $id = "no id";
+  }
+  print STDERR "transcript id: ".$id."\n";
+  foreach my $exon ( @exons){
+    $self->print_Exon($exon);
+  }
+  #print STDERR "Translation : ".$transcript->translation."\n";
+  if ( $transcript->translation ){
+    print STDERR "translation start exon: ".
+      $transcript->translation->start_Exon->start."-".$transcript->translation->start_Exon->end.
+	" start: ".$transcript->translation->start."\n";
+    print STDERR "translation end exon: ".
+      $transcript->translation->end_Exon->start."-".$transcript->translation->end_Exon->end.
+	  " end: ".$transcript->translation->end."\n";
+    print STDERR "\n";
+  }
+}
 
 1;
