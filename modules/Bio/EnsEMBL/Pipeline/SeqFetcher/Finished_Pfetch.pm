@@ -43,8 +43,7 @@ use Bio::Root::RootI;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 use IO::Socket;
-use lib '/nfs/team71/analysis/rds';
-#use embl;
+
 use Bio::EnsEMBL::Pipeline::Tools::Embl;
 use vars qw(@ISA);
 
@@ -212,94 +211,13 @@ sub get_Seq_by_acc {
         return $seq_list[0];
     }
 }
-
-sub get_descriptions {
-    my ( $self, @id_list ) = @_;
-
-    unless (@id_list) {
-        $self->throw("No accession input");
-    }
-
-    my $server = $self->get_server();
-    print $server "-D @id_list\n";
-    my (@desc_list);
-    for ( my $i = 0 ; $i < @id_list ; $i++ ) {
-        chomp( my $desc = <$server> );
-        if ( $desc eq 'no match' ) {
-            $desc_list[$i] = undef;
-        }
-        else {
-            $desc_list[$i] = $desc;
-        }
-    }
-
-    if (wantarray) {
-
-        # an array was passed - return array of Bio:Seq objects
-        return @desc_list;
-
-    }
-    else {
-
-        # one acc was passed then return the first(and only) element of the array    
-        return $desc_list[0];
-    }
-
-}
-
-sub get_lengths {
-    my ( $self, @id_list ) = @_;
-
-    unless (@id_list) {
-        $self->throw("No accession input");
-    }
-    my $server = $self->get_server();
-    print $server "-l @id_list\n";
-    my (@length_list);
-    for ( my $i = 0 ; $i < @id_list ; $i++ ) {
-        chomp( my $length = <$server> );
-        if ( $length eq 'no match' ) {
-            $length_list[$i] = undef;
-        }
-        else {
-            $length_list[$i] = $length;
-        }
-    }
-
-    if (wantarray) {
-
-        # an array was passed - return array of Bio:Seq objects
-        return @length_list;
-
-    }
-    else {
-
-        # one acc was passed then return the first(and only) element of the array    
-        return $length_list[0];
-    }
-}
-
 sub write_descriptions {
     my ( $self, $dbobj, @ids, ) = @_;
-
-#    my ( $hid, $desc );
-
-#    my @desc_line = $self->get_descriptions(@ids);
-#    my @lengths   = $self->get_lengths(@ids);
-
-#    if ( scalar(@lengths) != scalar(@ids) ) {
-#        die qq{scalar(@ids) elements in id_list\t scalar(@lengths) elements in Lengths};
-#    }
-#    if ( scalar(@desc_line) != scalar(@ids) ) {
-#        die qq{scalar(@ids) elements in id_list\t scalar(@desc_line) elements in Descriptions};
-#    }
-
     my $sth = $dbobj->prepare( qq{ 
                                 REPLACE DELAYED INTO 
                                 hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
                                 VALUES (?,?,?,?,?)}
     );
-#	my $embl_parser = embl->new();
 	my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new();
 	my $server = $self->get_server();
 	print  $server "-F " . join(" ", @ids) . "\n";
@@ -323,84 +241,5 @@ sub write_descriptions {
 	}
 	
 }
-
 1;
 __END__
-
-    for ( my $i = 0 ; $i < @ids ; $i++ ) {
-
-        # parse description from dbEST
-        if ( $desc_line[$i] =~ /^[^\|]+\|[^\|]+\|[^\|]+\|(\w+\.\d+)\|\w+\s+(.*)/ ) {
-            ( $hid, $desc ) = ( $1, $2 );
-            if ( $hid ne $ids[$i] ) {
-                warn qq{Hid : $hid    does not match    Query_hid : $i};
-                next;
-            }
-
-            my $hit_db_prefix = 'Em:';
-            my $l             = $lengths[$i];
-
-            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
-            next;
-
-        }
-
-        # parse description from vertrna, dbSTS and dbGSS
-        elsif ( $desc_line[$i] =~ /^\S+\s+(\S+\.\d+)(.*)/ ) {
-            ( $hid, $desc ) = ( $1, $2 );
-            if ( $hid ne $ids[$i] ) {
-                warn qq{Hid : $hid    does not match    Query_hid : $i};
-                next;
-            }
-
-           
-            my $hit_db_prefix = 'Em:';
-
-            my $l = $lengths[$i];
-
-            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
-            next;
-
-        }
-
-        # parse description from Swall
-        elsif ( $desc_line[$i] =~ /Desc:\s(.*)/ ) {
-
-            $desc = $1;
-
-            # is the id present anywhere in the swall description line? 
-            if ( grep /$ids[$i]/, $desc_line[$i] ) {
-                $hid = $ids[$i];
-            }
-            else {
-                next;
-            }
-
-            # next decide whether this swall hit is Swissprot or Trembl.
-            # logic in operation here is that only swall ids will 
-            # ever have a '_'. So grep fro '_' in ids leading up to 
-            # the descripton line.
-            my ($pre_desc) = $desc_line[$i] =~ /(^.*)\sDesc:/;
-            my $hit_db_prefix;
-            if ( grep /_/, $pre_desc ) {
-
-                # swall hit 
-                $hit_db_prefix = 'Sw:';
-            }
-            else {
-
-                # trembl hit 
-                $hit_db_prefix = 'Tr:';
-            }
-
-            my $l = $lengths[$i];
-
-            $sth->execute( $hid, $hit_db_prefix, $l, $desc );
-            next;
-        }
-
-    }
-
-}
-
-1;
