@@ -278,7 +278,7 @@ sub run {
   };  
   
   #clean up temp files
-#  $self->_deletefiles($genfile, $estfile);
+  $self->_deletefiles($genfile, $estfile);
   if ($@) {
     $self->throw("Error running exonerate :$@ \n");
   } 
