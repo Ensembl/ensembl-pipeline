@@ -1,9 +1,4 @@
-
-####   todo before using this module - 
-#1      work out where it is going to live (ensembl-otter directory somewhere?)
-#2      rename the " package Submission; " line - to include the new location 
-#3      change the "use" statements in the ana_notes script
-#4      change the other times when it is used in ana_notes (usually when new is called or something)
+#!/usr/local/bin/perl5.6.1 -w
 package Bio::EnsEMBL::Pipeline::AnaSubmission;
 
 use strict;
