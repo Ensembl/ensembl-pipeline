@@ -56,6 +56,8 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
+use Bio::EnsEMBL::Analysis;
+
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBNAME
@@ -74,6 +76,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_MASKING
 							      GB_SIMILARITY_SOFTMASK
 							      GB_SIMILARITY_GENETYPEMASKED
+							      GB_SIMILARITY_BLAST_FILTER
 							      
 							    );
 
@@ -275,13 +278,28 @@ sub write_output {
 	if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	    defined($f->hseqname) &&
 	    $redids{$f->hseqname} != 1) {
-	  $idhash{$f->hseqname} = 1;
+
+            # $idhash{$f->hseqname} = 1;
 	  
+	    push(@{$idhash{$f->hseqname}},$f);
 	}
       }
       
-
+      
       my @ids = keys %idhash;
+
+      if ($GB_SIMILARITY_BLAST_FILTER) {
+	  print STDERR "Filtering blast hits\n";
+	  print "NB IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
+	  
+	  my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
+	  
+	  my @newids = $self->prune_features($seq,\@sortedids,\%idhash);
+	  
+	  print "NB IDS AFTER FILTER: ".scalar(@newids)."\n"; 
+	  
+	  @ids = @newids;
+      }
 
       my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
       #print STDERR "Feature ids are @ids\n";
@@ -685,4 +703,364 @@ sub fill_kill_list {
   return \%kill_list;
 }
 
+
+=head2 sort_hids_by_coverage
+
+ Title   : sort_hids_by_coverage
+ Usage   : my @sorted_ids = $self->sort_hids_by_coverage($database,\%hids)
+ Function: This is supposed to order each hid in function of there coverage with the sequence they            have been build with
+ Example :
+ Returns : an array of ordered hids
+ Args    : Database description(where to fetch the feature from). A hash refererence containing hid           and its features.
+
+
+=cut
+
+sub sort_hids_by_coverage{
+   my ($self,$database,$hash_ref) = @_;
+   my @id =  keys %{$hash_ref};
+   my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+   my $forward_start;
+   my $forward_end;
+   my $reverse_start;
+   my $reverse_end;
+   my $f_matches = 0;
+   my $r_matches = 0;
+   my $protname;
+   my $seq;
+   my $plength;
+   my $features;
+   my $best_cov;
+   my %idsreturned;
+   my @sorted;
+
+ IDS: foreach my $id (@id) {
+
+     $protname = undef;
+     $seq = undef;
+     $plength = 0;
+     $forward_start = 0;
+     $forward_end = 0;
+     $reverse_start = 0;
+     $reverse_end = 0;
+     $best_cov = 0;
+     $features = $hash_ref->{$id};
+     
+
+   FEAT: foreach my $feat(@$features) {
+	  if ($feat->strand == 1) {
+	      if (!defined($protname)){
+		  $protname = $feat->hseqname;
+	      }
+	      if($protname ne $feat->hseqname){
+		  warn ("$protname ne " . $feat->hseqname . "\n");
+	      }
+	      
+	      
+      
+	      if((!$forward_start) || $forward_start > $feat->hstart){
+		  $forward_start = $feat->hstart;
+	      }
+	      
+	      if((!$forward_end) || $forward_end < $feat->hend){
+		  $forward_end= $feat->hend;
+	      }
+	  }
+
+	  if ($feat->strand == -1) {
+	      if (!defined($protname)){
+		  $protname = $feat->hseqname;
+	      }
+	      if($protname ne $feat->hseqname){
+		  warn ("$protname ne " . $feat->hseqname . "\n");
+	      }
+	      
+	      
+      
+	      if((!$reverse_start) || $reverse_start > $feat->hstart){
+		  $reverse_start = $feat->hstart;
+	      }
+	      
+	      if((!$reverse_end) || $reverse_end < $feat->hend){
+		  $reverse_end= $feat->hend;
+	      }
+	  }
+	      
+      }
+
+ 
+     $f_matches = ($forward_end - $forward_start + 1);
+     $r_matches = ($reverse_end - $reverse_start + 1);
+
+     if($self->get_length_by_id($protname)) {
+	 $plength = $self->get_length_by_id($protname);
+     }
+
+     else {
+     
+       SEQFETCHER:
+	 foreach my $seqfetcher( $self->each_seqfetcher){
+	     eval{
+		 $seq = $seqfetcher->get_Seq_by_acc($protname);
+	     };
+	 
+	     if ($@) {
+		 $self->warn("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+	     }
+	 
+	     if (defined $seq) {
+		 last SEQFETCHER;
+	     }
+	 
+	 }
+     
+	 if(!defined $seq){
+	     $self->warn("FPC_BMG:No sequence fetched for [$protname] - can't check coverage - set coverage to 1 (entry will be considered as having low coverage...sorry\n");
+	 }
+     
+	 eval {
+	     $plength = $seq->length
+	     };
+
+	 if($plength) {
+	     $self->add_length_by_id($protname,$plength);
+	 }
+     }	 
+
+     my $f_coverage;
+     my $r_coverage;
+     
+#check the low complexity
+     my $valid = 0;
+     if ($seq) {
+	 
+	 eval {
+	     # Ugh! 
+	     my $analysis = Bio::EnsEMBL::Analysis->new(
+							-db           => 'low_complexity',
+							-program      => '/usr/local/ensembl/bin/seg',
+							-program_file => '/usr/local/ensembl/bin/seg',
+							-gff_source   => 'Seg',
+							-gff_feature  => 'annot',
+							-module       => 'Seg',
+							-logic_name   => 'Seg'
+							
+						    );
+	     
+	     my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
+									       -query    => $seq,
+									       -analysis => $analysis,
+									   );
+	     
+	     $seg->run;
+	     
+	     
+	     if($seg->get_low_complexity_length > $GB_SIMILARITY_MAX_LOW_COMPLEXITY){
+		 warn("discarding feature too much low complexity\n");
+		 $valid = 0;
+	     }
+	 $valid = 1;
+	 
+	 
+	 };
+     
+	 if($@){
+	     print STDERR "problem running seg: \n[$@]\n";
+	     $valid = 1;		# let transcript through
+	 }
+     }
+ 
+
+#
+
+
+
+
+   if(!defined($plength) || $plength == 0 || $valid == 0){
+       warn("no sensible length for $protname - can't get coverage - or too much low complexity\n");
+       
+       #Can't check the length of the protein, set the coverage to 1 for both strand
+       $f_matches = 1;
+       $r_matches = 1;
+       $plength = 100;
+   }
+
+
+   $f_coverage = $f_matches/$plength;
+   $r_coverage = $r_matches/$plength;
+   $f_coverage *= 100;
+   $r_coverage *= 100;
+     
+     if ($f_coverage > $r_coverage) {
+	 $best_cov = $f_coverage;
+     }
+     else {
+	 $best_cov = $r_coverage;
+     }
+
+     $idsreturned{$protname} = $best_cov;
+ }
+   
+   @sorted = sort { $idsreturned{$b} <=> $idsreturned{$a} }  keys %idsreturned;
+   
+   return @sorted;
+}
+
+
+=head2 prune_features
+
+ Title   : prune_features
+ Usage   : my @pruned_ids = $self->prune_features($genseq,\@sortedids,\%idhash);
+ Function: This method as for goal to limit the number of hids sent to BlastMiniGenewise.
+ Example :
+ Returns : An array of pruned hids
+ Args    : genomic sequence, an array of sorted hids, an array reference of all the hids and their             features
+
+
+=cut
+
+sub prune_features{
+    my ($self,$genseq,$sortedids_array_ref,$hash_ref) = @_;
+    my $forwardcountstring = '0' x $genseq->length;
+    my $reversecountstring = '0' x $genseq->length;
+    my %ids;
+    my %hidcount;
+    my %finalids;
+    
+    my @ident = @$sortedids_array_ref;
+
+  IDS: foreach my $id (@ident) {
+      my $features = $hash_ref->{$id};
+      
+      my @exons;
+      
+      next IDS unless (ref($features) eq "ARRAY");
+      
+      next IDS unless (scalar(@$features) >= 1);
+      
+    FEAT: foreach my $feat(@$features) {
+	my $length = $feat->end - $feat->start + 1;
+		
+	if($feat->strand == 1) {
+	    my $count = 0;
+	    
+	    my $str = substr($forwardcountstring,$feat->start,$length);
+	    
+	    foreach my $byte (split //, $str) {
+		$count = $count + $byte;
+	    }
+	   
+
+	    $hidcount{$id}->{'lengthforward'} = $hidcount{$id}->{'lengthforward'} + $length;
+	    $hidcount{$id}->{'coverageforward'} = $hidcount{$id}->{'coverageforward'} + $count;
+	   
+	     
+	    if ($count > 10) {
+		next FEAT;
+	    }
+	   
+	    else {
+		substr($forwardcountstring,$feat->start,$length) = '1' x $length; 
+		$ids{$feat->hseqname} = 1;
+	    }
+	}
+	   
+	elsif ($feat->strand == -1) {
+	    my $count = 0;
+	    my $length = $feat->end - $feat->start + 1;
+	    
+	   
+
+	    my $str = substr($reversecountstring,$feat->start,$length);
+	       
+	    foreach my $byte (split //, $str) {
+		$count = $count + $byte;
+	    }
+	    $hidcount{$id}->{'lengthreverse'} = $hidcount{$id}->{'lengthreverse'} + $length;
+	    $hidcount{$id}->{'coveragereverse'} = $hidcount{$id}->{'coveragereverse'} + $count;
+	    
+	    if ($count > 10) {
+		next FEAT;
+	    }
+
+	    else {
+		substr($reversecountstring,$feat->start,$length) = '1' x $length; 
+		
+		$ids{$feat->hseqname} = 1;
+
+	    }
+	}
+   }
+  }
+    
+    foreach my $hidk (keys %ids) {
+	my $percforward;
+	my $percreverse;
+	
+	if ($hidcount{$hidk}->{'lengthforward'} > 0) {
+	    $percforward = $hidcount{$hidk}->{'coverageforward'} * 100 / $hidcount{$hidk}->{'lengthforward'};
+	}
+	
+	if ($hidcount{$hidk}->{'lengthreverse'} > 0) {
+	    $percreverse = $hidcount{$hidk}->{'coveragereverse'} * 100 / $hidcount{$hidk}->{'lengthreverse'};
+	}
+
+	if (($percforward <= 90)&&($percreverse <= 90)) {
+	    $finalids{$hidk} = 1;
+	}
+    }
+   
+    my @returnids = keys %finalids;
+    return @returnids;
+}
+
+
+=head2 add_length_by_id
+
+ Title   : add_length_by_id
+ Usage   : $self->add_length_by_id("QE345",345)
+ Function: Caches the length of a protein
+ Example :
+ Returns : nothing
+ Args    : protein id and its length
+
+
+=cut
+
+sub add_length_by_id{
+   my ($self,$id,$length) = @_;
+   $self->throw("no id specified\n") unless defined ($id); 
+   $self->throw("no length specified\n") unless defined ($length);
+   
+   if (!defined $self->{'_idlength'}{$id}) {
+       $self->{'_idlength'}{$id} = $length;
+   }
+}
+
+=head2 get_length_by_id
+
+ Title   : get_length_by_id
+ Usage   : $self->get_length_by_id("QGY7980")
+ Function: retrieves the length of a given protein
+ Example :
+ Returns : Length of a protein
+ Args    : Protein id
+
+
+=cut
+
+sub get_length_by_id{
+   my ($self,$id) = @_;
+   my %idlength = $self->{'_idlength'};
+   if ($idlength{$id}) {
+       return $idlength{$id};
+   }
+}
+
+
+
+
 1;
+
+
+
