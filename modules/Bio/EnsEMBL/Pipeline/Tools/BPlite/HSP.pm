@@ -96,8 +96,8 @@ sub new {
     $self->significance($p);
     $self->query->frac_identical($match);
     $self->subject->frac_identical($match);
-    $self->{'PERCENT'} = int((1000 * $match)/
-			     $self->query->length)/10;
+#    $self->{'PERCENT'} = int( (1000 * $match) / $self->query->length ) / 10;
+    $self->{'PERCENT'} = 100 * ($match / $self->subject->length);
     $self->{'POSITIVE'} = $positive;
     $self->{'QS'} = $qs;
     $self->{'SS'} = $ss;
