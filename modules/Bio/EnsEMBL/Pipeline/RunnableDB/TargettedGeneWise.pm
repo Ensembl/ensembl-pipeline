@@ -153,9 +153,8 @@ sub fetch_input{
   my $protein_id; 
 
   # chr12:10602496,10603128:Q9UGV6:
-  #print STDERR $entry."\n";
-  if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
-#  if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
+#  print STDERR $entry."\n";
+  if( !($entry =~ /([^\:]+):(\d+),(\d+):([^\:]+):/)) {
       $self->throw("Not a valid input id... $entry");
   }
   
@@ -534,7 +533,7 @@ sub validate_transcript {
     $newtranscript->translation->end($transcript->translation->end);
     foreach my $exon($transcript->get_all_Exons){
       $newtranscript->add_Exon($exon);
-      foreach my $sf($exon->each_Supporting_Feature){
+      foreach my $sf($exon->get_all_supporting_features){
 	  $sf->feature1->seqname($exon->contig_id);
       }
     }
@@ -601,8 +600,8 @@ GENE:  foreach my $gene (@genes) {
       foreach my $tran ($newgene->get_all_Transcripts) {
 	#print STDERR "transcript has ".$tran->get_all_Exons." exons\n";
 	foreach my $exon($tran->get_all_Exons) {
-#	  print STDERR "exon has ".$exon->each_Supporting_Feature." supporting features\n";
-	  foreach my $sf($exon->each_Supporting_Feature) {
+#	  print STDERR "exon has ".$exon->get_all_supporting_features." supporting features\n";
+	  foreach my $sf($exon->get_all_supporting_features) {
 #	   print STDERR "have ".$sf."\n";
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
@@ -690,7 +689,7 @@ sub check_coverage{
     #}else{
     #  print "exon adaptor is ".$exonadp."\n";
     #}
-    foreach my $f($exon->each_Supporting_Feature){
+    foreach my $f($exon->get_all_supporting_features){
       
       if (!defined($protname)){
 	$protname = $f->hseqname;
@@ -793,7 +792,7 @@ sub make_transcript{
       $align->score(100);
       $align->analysis($analysis_obj);
       
-      $exon->add_Supporting_Feature($align);
+      $exon->add_supporting_features($align);
     }
     
     push(@exons,$exon);
@@ -991,7 +990,7 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
       # just add the exon
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
-    foreach my $sf($exon->each_Supporting_Feature){
+    foreach my $sf($exon->get_all_supporting_features){
 	  $sf->feature1->seqname($exon->contig_id);
 
       }
