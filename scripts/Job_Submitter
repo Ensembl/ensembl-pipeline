@@ -27,7 +27,6 @@ submits a chunk of jobs.
 
     -pass      For RDBs, what password to use (dbpass= in locator)
 
-    -chunk     The number of jobs to pull off the queue and submit
 =cut
 
 
@@ -55,7 +54,6 @@ my $anapass     =  undef;
 	    'anadbname:s'   => \$anadbname,
 	    'anadbuser:s'   => \$anadbuser,
 	    'anapass:s'     => \$anapass,
-	    'chunk:s'    => \$chunk,
 	    );
 
 
@@ -72,7 +70,7 @@ my @jobs = $anadb->get_JobsByCurrentStatus('CREATED');
 foreach my $job (@jobs) {
     
     print(STDERR "Id is " . $job->id . "\t" . $job->analysis->module . "\t" . $job->input_id . "\n");
-
+    my $module   = $job->analysis->module;
     my $runnable = "$module"->new(-input_id => $job->input_id,
 				  -dbobj    => $anadb);
 
