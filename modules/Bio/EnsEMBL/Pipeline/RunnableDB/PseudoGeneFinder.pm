@@ -173,6 +173,10 @@ sub fetch_input {
   my @chr_names = $self->get_chr_names;
 
   foreach my $chr_name ( @chr_names ){
+    
+    next unless $chr_name eq '22';
+    print STDERR "Running only with chr22\n";
+    
     my $database = $target."/".$chr_name.".fa";
     
     # check that the file exists:
@@ -238,12 +242,8 @@ sub run{
   my @processed_pseudogenes = $self->_test_homology( @genes );
  
   ############################################################
-  # check that pseudogenes are not overlapping each other
-  my @final_genes = $self->check_for_overlap( @processed_pseudogenes );
-
-  ############################################################
   # map candidates into one-block structures
-  my @candidate_genes = $self->_convert_to_block( @final_genes );
+  my @candidate_genes = $self->_convert_to_block( @processed_pseudogenes );
 
   
   ############################################################
@@ -522,8 +522,9 @@ sub _has_repeat_in_intron{
   
   # instantiate a db with repeats
   my $repeat_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						     -host             => $REPEAT_DBHOST,
-						     -dbname           => $REPEAT_DBNAME,
+						     -host   => $REPEAT_DBHOST,
+						     -dbname => $REPEAT_DBNAME,
+						     -user   => 'ensro',  
 						    );
   
   ############################################################
