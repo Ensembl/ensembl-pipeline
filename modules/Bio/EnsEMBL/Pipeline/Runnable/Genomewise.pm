@@ -208,9 +208,11 @@ sub run{
   
   my $switch = $self->switch;
   my $smell  = $self->smell;
+  print STDERR "running genomewise with smell: $smell and switch: $switch\n";
+  if ( $self->_skip_small_exons ){
+      print STDERR "skipping exons smaller than ".$self->_skip_small_exons\n";
+  }
 
-  #print STDERR "running genomewise with smell: $smell and switch: $switch\n";
-  
   #### Steve's version (fixed)
   #  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
   
@@ -428,10 +430,6 @@ sub run{
 	  print STDERR "after genomewise\n:";
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence( $trans_out[0] );
       }
-      
-      
-      
-
 
   }
   else{
@@ -572,7 +570,7 @@ sub _skip_small_exons{
     if ( $skip_small_exons ){
 	$self->{_skip_small_exons} = $skip_small_exons;
     }
-    return $skip_small_exons;
+    return $self->{_skip_small_exons};
 }
 
 ############################################################
