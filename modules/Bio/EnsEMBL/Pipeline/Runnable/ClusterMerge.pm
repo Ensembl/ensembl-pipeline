@@ -1106,7 +1106,6 @@ sub compare{
 	    -exon_match                       => $self->_exon_match,
 	    -splice_mismatch                  => $self->_splice_mismatch,
 	    -intron_mismatch                  => $self->_intron_mismatch,
-	    -minimum_order                    => 2,
 	    -internal_splice_overlap => 0,
 	   );
   
@@ -1515,6 +1514,11 @@ sub _merge_Transcripts{
 	foreach my $t ( @$list ){
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $t );
 	}
+      }
+      my $order = scalar( @$list );
+      if ( $order < $self->_minimum_order ){
+	print STDERR "list has only $order elements and the minimum allowed is ".$self->_minimum_order." - rejecting\n";
+	next LIST;
       }
       
       my @allexons;
