@@ -336,6 +336,7 @@ sub make_miniseq {
     # features are on the reverse strand - handled by is_reversed
     @genomic_features = sort {$a->start <=> $b->start } @genomic_features;
 
+    #print STDERR "MiniGenewise: features used to make miniseq:\n";
     foreach my $f (@genomic_features) {
 	$f->strand(1);
 	my $cdna_start = $current_coord;
@@ -352,7 +353,7 @@ sub make_miniseq {
 	
 	$pairaln->addFeaturePair($fp);
 	
-#	$self->print_FeaturePair($fp);
+	#$self->print_FeaturePair($fp);
 
 	$current_coord = $cdna_end+1;
     }
@@ -385,22 +386,22 @@ sub exon_padding {
 	$self->{'_padding'} = $arg;
     }
 
-    return $self->{'_padding'} || 100;
+    return $self->{'_padding'} || 200;
 
 }
 
 sub print_FeaturePair {
     my ($self,$nf) = @_;
     #changed $nf->id to $nf->seqname
-    print(STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
-	  $nf->start . "\t" . 
-	  $nf->end   . "\t(" . 
+    print STDERR "FeaturePair is " . $nf->seqname    . "\t" . 
+      $nf->start . "\t" . 
+	$nf->end   . "\t(" . 
 	  $nf->strand . ")\t" .
-	  $nf->hseqname  . "\t" . 
-	  $nf->hstart   . "\t" . 
-	  $nf->hend     . "\t(" .
-	  $nf->hstrand  . ")\n");
-}
+	    $nf->hseqname  . "\t" . 
+	      $nf->hstart   . "\t" . 
+		$nf->hend     . "\t(" .
+		  $nf->hstrand  . ")\n";
+  }
 
 =head2 get_Sequence
 
@@ -664,14 +665,21 @@ sub run_blastwise {
     # need to convert whole exon back to genomic coordinates
     my @genomics = $miniseq->convert_SeqFeature($f);         
     
+    
     if ($#genomics > 0) {
       # all hell will break loose as the sub alignments will probably not map cheerfully 
       # and we may start introducing in frame stops ...
       # for now, ignore this feature.
       print STDERR "Warning : feature converts into > 1 features " . scalar(@genomics) . " ignoring exon $ec\n";
+      #print STDERR "feature is: ".$f->gffstring."\n";
+      #print STDERR "genomics are:\n";
+      foreach my $g (@genomics){
+	print STDERR $g->start."-".$g->end."\n";
+      }
       next FEAT;
     }
-    
+    #print STDERR "feature is: ".$f->gffstring."\n";
+    #print STDERR $genomics[0]->gffstring."\n";
     # also need to convert each of the sub alignments back to genomic coordinates
     foreach my $aln($f->sub_SeqFeature) {
       my @alns = $miniseq->convert_PepFeaturePair($aln);
