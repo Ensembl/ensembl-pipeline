@@ -103,11 +103,10 @@ my ($class, @args) = @_;
 
 sub fetch_input {
  my ($self) = @_;
-
  my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
-
+ 
  my $prot;
- my $peptide;
+    my $peptide;
 
     eval {
 	$prot = $proteinAdaptor->fetch_Protein_by_dbid ($self->input_id);
@@ -197,7 +196,7 @@ sub runnable {
     
     if (!defined($self->{'_runnable'})) {
 	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-clone     => $self->genseq,
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-query     => $self->genseq,
 									-analysis  => $self->analysis	);
 	
 	

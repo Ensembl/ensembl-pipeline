@@ -156,7 +156,6 @@ sub write_output {
 
 
     if (@features) { 
-#        print STDERR "Features: ".$features[0]->feature1->start."\n";
         foreach my $feat(@features) {
 	    $proteinFeatureAdaptor->write_Protein_feature($feat);
         }
@@ -183,7 +182,7 @@ sub runnable {
     
     if (!defined($self->{'_runnable'})) {
 	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Coil->new(-clone     => $self->genseq,
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Coil->new(-query     => $self->genseq,
 								       -analysis  => $self->analysis	);
 	
 	$self->{'_runnable'} = $run;
