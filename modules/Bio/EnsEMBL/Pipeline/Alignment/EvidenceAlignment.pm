@@ -22,7 +22,8 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
                            '-dbadaptor'         => $db,
 			   '-seqfetcher'        => $seqfetcher,
-			   '-transcript'        => $transcript);
+			   '-transcript'        => $transcript,
+			   '-padding'           => 10);
 
 my $alignment = $alignment_tool->retrieve_alignment('-type' => 'all');  
                              # Type can be 'all', 'nucleotide' or 'protein'
@@ -31,6 +32,11 @@ foreach my $align_seq (@$alignment){
   print $align_seq->seq . "\n";
 }
 
+# The '-padding' option specifies the amount of tailing
+# sequence left attached to each 'exon'.  If you set this
+# to zero be careful, as you could be truncating some
+# sequence from the aligned evidence sequences.  If this 
+# happens a warning is issued.
 
 # Other alignment presentation options exist.  The intronic
 # regions of the alignment can make it _very_ big.  Introns
@@ -38,14 +44,7 @@ foreach my $align_seq (@$alignment){
 
 my $alignment = $align_tool->retrieve_alignment('-type'            => 'all',
 						'-remove_introns'  => 1,
-						'-padding'         => 10,
                                                 '-merge_sequences' => 1);
-
-# The '-padding' option specifies the amount of tailing
-# sequence left attached to each 'exon'.  If you set this
-# to zero be careful, as you could be truncating some
-# sequence from the aligned evidence sequences.  If this 
-# happens a warning is issued.
 
 # Importantly, if you need to see non-aligned portions of 
 # the evidence sequences use the following '-show_unaligned'
@@ -65,11 +64,12 @@ my $alignment = $align_tool->retrieve_alignment('-type'           => 'all',
 # you aren't unwittingly throwing these intronic fragments
 # away.  A warning is raised if this happens.
 
-# It is possible to align a transcript to a set of external supporting
-# features.  In this case, the supporting features attached to
-# the transcript and ignored and the external set used instead.  It
+# It is possible to display a transcript with a set of external 
+# supporting features that can come from any source.  Where external
+# features are used, the supporting features attached to
+# the transcript are ignored and the external set used instead.  It
 # usually helps if the external supporting features actually overlap
-# the transcript sequence.  This option is used by passing in 
+# the transcript sequence :)  This option is used by passing in 
 # supporting features at the time of object creation.
 
 my $alignment_tool = Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
@@ -194,7 +194,7 @@ sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
-  
+
   my ($db, 
       $transcript, 
       $seqfetcher, 
@@ -209,7 +209,6 @@ sub new {
 						    IDENTITY_CUTOFF
 						    SUPPORTING_FEATURES
 						   )],@args);
-  
 
   # Throw an error if any of the below are undefined or
   # are the wrong thing.
@@ -231,18 +230,14 @@ sub new {
   # Without padding, these sequences are truncated.  The default
   # of 50bp works OK, but you would want to set this manually
   # higher if you are interested in up- or down-stream goings-on.
-  if (defined $padding) {
-    $self->{'_transcript_padding'} = $padding;
-  } else { 
-    $self->{'_transcript_padding'} = 50;
-  }
+  $self->_padding($padding) if (defined $padding);
 
   # Store our SeqFetcher
 
   $self->_seq_fetcher($seqfetcher);
 
   # Create the slice we will work on
-  
+
   $self->_slice($transcript);
 
   # Due to padding, it is necessary to re-construct our transcript
@@ -311,26 +306,18 @@ sub retrieve_alignment {
 
   my ($type, 
       $remove_introns, 
-      $intron_padding, 
       $show_missing_evidence,
       $merge_sequences) = $self->_rearrange([qw(TYPE
 						REMOVE_INTRONS
-						INTRON_PADDING
 						SHOW_UNALIGNED
 						MERGE_SEQUENCES
 					       )],@_);
-  
 
-  unless ($type) {
-    $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
-		 "of \'all\', \'nucleotide\' or \'protein\'.");
-  }
-
-  $intron_padding = 100 unless (defined $intron_padding);
+  $self->_type($type);
 
   unless ($self->_is_computed($type)){
     $self->_align($type, $show_missing_evidence, $remove_introns, 
-		  $intron_padding, $merge_sequences);
+		  $self->_padding, $merge_sequences);
   }
 
   return $self->_create_Alignment_object($type, $show_missing_evidence);
@@ -436,7 +423,7 @@ sub rogue_exons {
 
 sub _align {
   my ($self, $type, $show_missing_evidence, $truncate_introns, 
-      $padding, $merge_sequences) = @_;
+      $merge_sequences) = @_;
 
   # Collect all our sequences for aligning
 
@@ -451,46 +438,69 @@ sub _align {
 
   my $evidence_sequences = $self->_corroborating_sequences($type);
 
-  # Use information about 'deletions' (originally from the
-  # cigar string and stored in the hashes returned by 
-  # $self->_semialigned_sequences) to insert gaps into the genomic 
-  # and exonic sequences.  This aligns the evidence with
-  # the parent sequence (with a bit of fiddling to place
-  # gaps into the evidence sequences that need them).
+  # Insert deletions in the appropriate places in the genomic
+  # sequence.  This will complete the alignment of the evidence
+  # with the genomic sequence.  A bit of fiddling is needed to 
+  # propagate gaps into the evidence sequences that need them.
 
-  for (my $i = 1; ($i <= $self->_slice->length) 
-       && ($self->_there_are_deletions); $i++) {
-    my $is_deletion = 0;
+    # Make some handy data structures
 
-  DELETION_HUNT:
-    foreach my $unaligned_sequence (@$evidence_sequences){
+  my %deletion_sets;
+  my %all_deletions;
+  my %evidence_sequence_hash;
 
-      if ($unaligned_sequence->fetch_deletion_at_position($i) eq 'D'){
-	$is_deletion = 1;
-	last DELETION_HUNT;
+  foreach my $evidence_sequence (@$evidence_sequences) {
+
+    # Note:  Purposely using the memory address for our evidence sequence objects
+    # as they otherwise have non-unique names.
+
+    $evidence_sequence_hash{$evidence_sequence} = $evidence_sequence;
+
+    foreach my $deletion_coord (@{$evidence_sequence->deletions}){
+      $deletion_sets{$evidence_sequence}->{$deletion_coord}++;
+      $all_deletions{$deletion_coord}++
+    }
+  }
+
+  my @all_deletions = sort {$a <=> $b} keys %all_deletions;
+
+  foreach my $deletion_coord (@all_deletions) {
+
+    # Add a gap to the genomic and exonic sequence
+
+    $self->_genomic_sequence->insert_gap($deletion_coord, 1);
+    $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, 1);
+    $self->_exon_protein_translation->insert_gap($deletion_coord, 1);
+
+    foreach my $evidence_name (keys %evidence_sequence_hash) {
+
+      # Propagate any needed gaps into the aligned evidence
+      # sequences
+
+      if (! $deletion_sets{$evidence_name}->{$deletion_coord}) {
+	$evidence_sequence_hash{$evidence_name}->insert_gap($deletion_coord, 1)
       }
     }
-    
-    if ($is_deletion) {
 
-      $genomic_sequence->insert_gap($i, 1);
-      $exon_nucleotide_sequence->insert_gap($i, 1);
+    # Increment all deletion coords that are greater than this one.
 
-      if ($self->_translatable
-	  &&(($type eq 'protein')||($type eq 'all'))){
-	$exon_protein_sequence->insert_gap($i, 1);  
-      }
+      # @all_deletions
 
+    for (my $i = 0; $i < scalar @all_deletions; $i++) {
+      $all_deletions[$i]++ if ($all_deletions[$i] > $deletion_coord);
+    }
 
-      for (my $j = 0; $j < scalar @$evidence_sequences; $j++) {
-	unless ($evidence_sequences->[$j]->fetch_deletion_at_position($i) eq 'D') {
+      # %deletion_sets
 
-	  $evidence_sequences->[$j]->insert_gap($i, 1);
-
+    foreach my $evidence_name (keys %evidence_sequence_hash) {
+      my @coords = keys %{$deletion_sets{$evidence_name}};
+      for (my $i = 0; $i < scalar @coords; $i++) {
+	if ($deletion_sets{$evidence_name}->{$coords[$i]}){
+	  delete $deletion_sets{$evidence_name}->{$coords[$i]};
+	  $deletion_sets{$evidence_name}->{$coords[$i]+1} = 1;
 	}
       }
     }
-    
   }
 
   # Put our working alignments somewhere handy
@@ -503,8 +513,10 @@ sub _align {
     $self->_working_alignment('exon_protein', $exon_protein_sequence);
   }
 
-  foreach my $evidence_sequence (@$evidence_sequences) {
-    $self->_working_alignment('evidence', $evidence_sequence);
+  # Place our finalised evidence sequence alignments into the right place.
+  foreach my $evidence_key (keys %evidence_sequence_hash) {
+    $self->_working_alignment('evidence', 
+			      $evidence_sequence_hash{$evidence_key});
   }
 
   # If sequences are to be merged, do this now.
@@ -522,13 +534,13 @@ sub _align {
   # If introns are to be truncated, do this now.
 
   if ($truncate_introns) {
-    $self->_truncate_introns($padding);
+    $self->_truncate_introns;
   }
 
   # Set flag to indicate that the alignment has been computed.
 
   $self->_is_computed($type, 1);
- 
+
   return 1;
 }
 
@@ -957,9 +969,7 @@ sub _derive_unmatched_sequences {
 =cut
 
 sub _truncate_introns {
-  my ($self, $padding) = @_;
-
-  my $transcript_padding = $self->{'_transcript_padding'};
+  my ($self) = @_;
 
   # Get sequences from the working alignment.
 
@@ -970,7 +980,7 @@ sub _truncate_introns {
 
   if (($self->_type eq 'all')||($self->_type eq 'protein')){
     push (@sequences, $self->_working_alignment('exon_protein'));
-  }  
+  }
 
   foreach my $aligned_seq (@{$self->_working_alignment('evidence')}){
     push (@sequences, $aligned_seq);
@@ -988,15 +998,26 @@ sub _truncate_introns {
   foreach my $exon (@{$self->_transcript->get_all_Exons}){
 
     my $exon_start = $exon->start;
-    my $exon_end = $exon->end;
+    my $exon_end   = $exon->end;
 
     if ($self->_strand == -1) {
-      $exon_start = $self->_slice->length - $exon_start - ($exon_end - $exon_start);
-      $exon_end = $self->_slice->length - $exon_start;
+      $exon_start = $self->_slice->length - $exon_start + 1;
+      $exon_end   = $self->_slice->length - $exon_end + 1;
     }
-    
-    push(@coordinates, $exon->start);
-    push(@coordinates, $exon->end);
+    push(@coordinates, $exon_start, $exon_end);
+  }
+
+  # Get locations of gaps in genomic sequence.
+
+  my $genomic_gaps = $self->_genomic_sequence->all_gaps;
+
+  # Work through the list of genomic gaps and increment all
+  # coordinates that are greater than a gap position.
+
+  foreach my $gap_coord (@$genomic_gaps) {
+    for (my $i = 0; $i < scalar @coordinates; $i++) {
+      $coordinates[$i]++ if $coordinates[$i] >= $gap_coord;
+    }
   }
 
   # Sort in reverse, such that we splice out introns from the
@@ -1022,10 +1043,10 @@ sub _truncate_introns {
       my $intron_end = (shift @working_coordinates) - 1;
       my $intron_start = (shift @working_coordinates);
 
-      next INTRON unless ($intron_start + $padding + 22) < ($intron_end - $padding - 22);
+      next INTRON unless ($intron_start + $self->_padding + 22) < ($intron_end - $self->_padding - 22);
 
-      my @offcut = splice (@$seq_array, $intron_start + $padding, 
-			   ($intron_end - 2*$padding - $intron_start), 
+      my @offcut = splice (@$seq_array, $intron_start + $self->_padding, 
+			   ($intron_end - 2*$self->_padding - $intron_start), 
 			   '---intron-truncated---');
 
 
@@ -1039,13 +1060,10 @@ sub _truncate_introns {
 		    "to be discarded.  Try again with a higher amount of padding\n".
 		    "around the exon sequences.\n");
       }
-      
     }
-    
-    
     $align_seq->store_seq_array($seq_array);
   }
-  
+
   return 1;
 }
 
@@ -1083,10 +1101,10 @@ sub _merge_same_sequences {
     my @chimera = split (//, $chimera);
 
     foreach my $alike_sequence (@{$same_sequences_hash{$sequence_name}}){
-      
+
       my $seq_array = $alike_sequence->seq_array;
 
-      for (my $i = 0; $i <= scalar @$seq_array; $i++) {
+      for (my $i = 0; $i < scalar @$seq_array; $i++) {
 
 	if ($seq_array->[$i] ne '-'){
 	  if ($chimera[$i] && $chimera[$i] ne '-'){
@@ -1189,12 +1207,22 @@ sub _type {
   my ($self, $type) = @_;
 
   if (defined $type) {
+    unless ($type eq 'all' ||
+	    $type eq 'nucleotide' ||
+	    $type eq 'protein') {
+      $self->throw("Type of alignment to retrieve not recognised.  Please use one " . 
+		   "of \'all\', \'nucleotide\' or \'protein\'.");
+    }
+
     $self->{'_computed_type'} = $type;
   }
 
+  $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
+	       "of \'all\', \'nucleotide\' or \'protein\'.") 
+    unless $self->{'_computed_type'};
+
   return $self->{'_computed_type'};
 }
-
 
 
 ##### Alignment information handling methods #####
@@ -1352,16 +1380,16 @@ sub _slice {
 
       $self->{'_slice'} = 
 	$slice_adaptor->fetch_by_transcript_stable_id($transcript->stable_id, 
-						      $self->{'_transcript_padding'});
+						      $self->_padding);
     } else {
-      
+
       $self->{'_slice'} = 
 	$slice_adaptor->fetch_by_transcript_id($transcript->dbID, 
-						      $self->{'_transcript_padding'});
+					       $self->_padding);
 
     }
   }
-  
+
   return $self->{'_slice'};
 }
 
@@ -1463,8 +1491,7 @@ sub _corroborating_sequences {
     }
 
     if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
-      my $align_seq = $self->_fiddly_bits($base_align_feature, 
-					    $base_align_feature->hstrand);
+      my $align_seq = $self->_fiddly_bits($base_align_feature);
       next FEATURE unless $align_seq;
 
       $align_seq->exon($exon_placemarker);
@@ -1512,7 +1539,11 @@ sub _corroborating_sequences {
 
   Arg [1]    :
   Example    : 
-  Description: 
+  Description: Takes a single align feature and constructs an aligned
+               sequence of the correct portion of the hit sequence
+               including all of the right gaps.  Creates a reference
+               array that allows the correct insertion of gaps in the
+               genomic sequence.
   Returntype : 
   Exceptions : 
   Caller     : 
@@ -1520,9 +1551,21 @@ sub _corroborating_sequences {
 =cut
 
 sub _fiddly_bits {
-  my ($self, $base_align_feature, $orientation) = @_;
-  my $hstart = $base_align_feature->hstart;
-  my $hend = $base_align_feature->hend;
+  my ($self, $base_align_feature) = @_;
+
+  # Create a AlignmentSeq object that will store our sequences
+  # for this feature
+
+  my $partially_aligned = 
+    Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
+          '-name'       => $base_align_feature->hseqname,
+	  '-start'      => $base_align_feature->start);
+
+  # For convenience, localise a few coordinate variables.
+
+  my $hstart  = $base_align_feature->hstart;
+  my $hend    = $base_align_feature->hend;
+  my $hstrand = $base_align_feature->hstrand;
 
   # Fetch our sequence from the cache.  If the sequence
   # is missing it means that it could not be fetched and
@@ -1531,10 +1574,10 @@ sub _fiddly_bits {
   my $fetched_seq = $self->_fetch_sequence($base_align_feature->hseqname);
 
   if ( ! $fetched_seq) {
+    $self->warn("Error fetching sequence " . 
+		$base_align_feature->hseqname . 
+		".  Ignoring.");
 
-    $self->warn("Error fetching sequence " 
-		. $base_align_feature->hseqname . ".  Ignoring.");
-    
     return 0;
   }
 
@@ -1558,7 +1601,7 @@ sub _fiddly_bits {
     my $length = $last_aa - $first_aa + 1;
 
     @fetched_seq = splice(@full_seq, $first_aa, $length);
-  } 
+  }
 
   # If we have a dna align feature, extracting the correct portion
   # of the hit sequence is a bit easier than the method required
@@ -1570,13 +1613,13 @@ sub _fiddly_bits {
 	
     # Splice out the matched region of our feature sequence
     @fetched_seq = splice(@fetched_seq, ($hstart - 1), ($hend -$hstart + 1));
-    
-    # This is a pest, but if the evidence is reverse-stranded we have
-    # to reverse complement the exon sequence. We dont seem to be able to
-    # just reverse complement the whole sequence as this screws up the 
-    # internal coordinates.
 
-    if ($orientation == -1) {
+    # The coordinates for dna_align_features are stored with reference
+    # to the way the sequence is was found in dbEST or whatever.  Hence,
+    # if the EST is the reverse strand, it is necessary to chop out our 
+    # fragment first, then reverse compliment it.
+
+    if ($base_align_feature->hstrand == -1) {
       my $wrong_way_around_exon;
 
       foreach my $nucleotide (@fetched_seq) {
@@ -1590,7 +1633,6 @@ sub _fiddly_bits {
       @fetched_seq = split //, $forwards_seq->seq;
 
     }
-
   }
 
   # Add the needed insertion gaps to our supporting
@@ -1603,36 +1645,53 @@ sub _fiddly_bits {
 
   my @cigar_instructions = $self->_cigar_reader($base_align_feature->cigar_string);
 
-  my $added_gaps = 0;
-  my $hit_sequence_position = $base_align_feature->start > 0 ? $base_align_feature->start : 1;
-  my @deletion_sequence;
+  my $hit_position = 1;
+
+    # Note to self - all genomic coordinates are actually the coordinates
+    # within the slice.  This slice is not in chromosomal coordinates.  As
+    # the slice was derived using a transcript, the slice will be oriented
+    # in the same direction as the transcript.  As the transcript alignment 
+    # will be displayed 5'-3' the slice will be in the correct orientation
+    # with respect to the transcript and thus the genomic strand can be 
+    # treated as being on the forward strand.
+
+  my $slice_position = $base_align_feature->start;
+
   my $deletions;
 
   foreach my $instruction (@cigar_instructions) {
+
     if ($instruction->{'type'} eq 'I') {
       my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
 
-      $self->warn("Sequence manipulations fall outside sequence bounds.") 
-	if $hit_sequence_position > scalar @fetched_seq;
+      if ($hit_position < scalar @fetched_seq){
+	splice(@fetched_seq, $hit_position, 0, @gap)
+      } else {
+	$self->throw("Gap in sequence [" . $base_align_feature->hseqname . 
+		     "] lies outside feature.  Code problem.")
+      }
 
-      splice(@fetched_seq, $hit_sequence_position, 0, @gap)
-	unless $hit_sequence_position > scalar @fetched_seq;
-
-      $hit_sequence_position += $instruction->{'length'};
+      $hit_position   += $instruction->{'length'};
+      $slice_position += $instruction->{'length'};
 
     } elsif ($instruction->{'type'} eq 'M') {
 
-      $hit_sequence_position += $instruction->{'length'};
+      $hit_position   += $instruction->{'length'};
+      $slice_position += $instruction->{'length'};
 
     } elsif ($instruction->{'type'} eq 'D') {
 
       $deletions++;
 
-      for (my $i = $hit_sequence_position; $i < ($hit_sequence_position + $instruction->{'length'}); $i++){
-	$deletion_sequence[$i] = 'D';
+      for (my $i = 1; $i <= $instruction->{'length'}; $i++){
+	next unless $slice_position + $i >= 0;
+	$partially_aligned->add_deletion($slice_position + $i);
+	my $thing = $slice_position + $i;
       }
 
+      $hit_position   += $instruction->{'length'};
+      $slice_position += $instruction->{'length'};
     }
   }
 
@@ -1640,70 +1699,143 @@ sub _fiddly_bits {
     $self->_there_are_deletions(1);
   }
 
-  # Determine the point in the genomic sequence that the
-  # features starts at.  Need to worry about strand and whether 
-  # the feature starts or ends outside of our slice.
-
-  my $genomic_start;  # Feature insertion point
-  if ($self->_strand == 1) {
-    $genomic_start = $base_align_feature->start - 1;
-  } elsif ($self->_strand == -1) {
-    $genomic_start = $self->_slice->length - $base_align_feature->end;
-  }
-
-  
   # This little section of code handles any sequence that
-  # overshoots the beginning of our slice.  Chop.
+  # overshoots the beginning or end of our slice.  Chop.
 
-  if ($genomic_start < 0) {
-    $self->warn("Feature extends past the ends of genomic slice.  Truncating it to fit.");
+  if ($base_align_feature->start < 0 || 
+      $base_align_feature->start > $self->_slice->length ||
+      $base_align_feature->end > $self->_slice->length || 
+      $base_align_feature->end < 0) {
+    $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
+		$base_align_feature->start . " end:" . $base_align_feature->end 
+		."] extends past the start or end of genomic slice.  Truncating " . 
+		"overhanging sequence");
 
-    my $overshoot = $genomic_start * -1;      
-        
-    $genomic_start = 0;
-
-    splice (@fetched_seq, 0, $overshoot);
+    if (($base_align_feature->start < 0 && 
+	 $base_align_feature->end < 0)||
+	($base_align_feature->start > $self->_slice->length &&
+	 $base_align_feature->end > $self->_slice->length)) {
+      print STDERR "Feature lies completely outside the bounds of Slice.  Chuck.\n";
+      splice (@fetched_seq, 0, scalar @fetched_seq);
+    } elsif ($self->_strand == 1) {
+      my $start_overshoot = 0;
+      if ($base_align_feature->start < 0) {
+print STDERR "Case 1.\n";
+	$start_overshoot = $base_align_feature->start * -1;
+	splice (@fetched_seq, 0, $start_overshoot + 1);
+      }
+      if ($base_align_feature->end > $self->_slice->length) {
+print STDERR "Case 2.\n";
+	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
+	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
+      }
+    } elsif ($self->_strand == -1) {
+      my $start_overshoot = 0;
+      if ($base_align_feature->end < 0) {
+print STDERR "Case 3.\n";
+	$start_overshoot = $base_align_feature->end * -1;
+	splice (@fetched_seq, 0, $start_overshoot + 1);
+      }
+      if ($base_align_feature->start > $self->_slice->length) {
+print STDERR "Case 4.\n";
+	my $end_overshoot = $base_align_feature->start - $self->_slice->length - 1;
+	splice (@fetched_seq, (scalar @fetched_seq) - $start_overshoot - 1, $end_overshoot);
+      }
+    }
   }
-  
+
   # Here we are actually building the sequence that will
   # align to our slice
 
   my $feature_sequence = '-' x $self->_slice->length;
   my @feature_sequence = split //, $feature_sequence;
 
-  splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq);
+  my $genomic_start;
+
+  if ($self->_strand == 1){
+    $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start - 1 : 0;
+  } elsif ($self->_strand == -1) {
+    $genomic_start = $base_align_feature->end > 0 ? $base_align_feature->end - 1 : 0;
+  }
+
+  if ($genomic_start <= scalar @feature_sequence){
+    if ($self->_strand == -1){
+      $genomic_start = scalar @feature_sequence - $genomic_start - 1;
+    }
+    splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
+  } else {
+    $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
+		$base_align_feature->start . " end:" . $base_align_feature->end . 
+		" strand:" . $base_align_feature->strand 
+		."] starts beyond end of genomic slice.");
+  }
 
   $feature_sequence = '';
-  
+
   foreach my $element (@feature_sequence) {
     $feature_sequence .= $element;
   }
 
-  # Munch our array of deletion information into a string
-  # This is not pretty, but will work for now.
-
-  my $deletion_sequence = '';
-
-  foreach my $element (@deletion_sequence){
- 
-    unless ($element){
-      $deletion_sequence .= '-';
-      next;
-    }
-
-    $deletion_sequence .= $element;
-  }
-
-  # Create a AlignmentSeq object with our valuable sequence:
-
-
-  my $partially_aligned = Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq->new(
-                                          '-name'      => $base_align_feature->hseqname,
-					  '-seq'       => $feature_sequence,
-					  '-deletions' => $deletion_sequence,
-					  '-start'      => $base_align_feature->start);
+  $partially_aligned->seq($feature_sequence);
 
   return $partially_aligned;
+}
+
+
+=head2 _print_tabulated_coordinates
+
+  Arg [1]    :
+  Example    : 
+  Description: A debugging subroutine for printing the coordinate locations 
+               of our gene, exons, feature and evidence.
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _print_tabulated_coordinates {
+  my $self = shift;
+
+  print STDERR 
+    "Slice :      length    - " . $self->_slice->length    . "\n" .
+    "             chr       - " . $self->_slice->chr_name  . "\n" .
+    "             chr start - " . $self->_slice->chr_start . "\n" .
+    "             chr end   - " . $self->_slice->chr_end   . "\n" .
+    "             strand    - " . $self->_slice->strand    . "\n";
+
+  print STDERR "\n";
+
+  my $exons = $self->_transcript->get_all_Exons;
+
+  print STDERR 
+    "Transcript : id         - " . $self->_transcript->stable_id . "\n" . 
+    "             coding     - (start) " . $self->_transcript->coding_start . " (end) " . 
+      $self->_transcript->coding_end . "\n" .
+    "             exon count - " . scalar @$exons . "\n";
+  foreach my $exon (@$exons) {
+    print STDERR 
+    "             exon       - (start) " . $exon->start . 
+      " (end) " . $exon->end . " (strand) " . $exon->strand . "\n";
+  }
+
+  print STDERR "\n";
+
+  my $supporting_features = $self->_all_supporting_features;
+
+  print STDERR 
+    "Evidence : total features - " . @$supporting_features . "\n";
+  foreach my $feature (@$supporting_features){
+    print STDERR
+    "           Feature : " . $feature->hseqname . "\n" .
+    "                     (start)  " . $feature->start . "\t(end)  " . 
+      $feature->end . "\t(strand)  " . $feature->strand . "\n" . 
+    "                     (hstart) " . $feature->hstart . "\t(hend) " . 
+      $feature->hend . "\t(hstrand) " . $feature->hstrand . "\n" . 
+    "                     (CIGAR)  " . $feature->cigar_string . "\n";
+  }
+
+  return 1
 }
 
 
@@ -1728,7 +1860,7 @@ sub _genomic_sequence {
     if ($self->_strand == 1) {
       $genomic_sequence = $self->_slice->seq;
     } elsif ($self->_strand == -1) {
-print STDERR "Reverse complimenting genomic sequence.\n";
+      print STDERR "Reverse complimenting genomic sequence.\n";
       $genomic_sequence = $self->_slice->revcom->seq;
     }
 
@@ -1971,7 +2103,7 @@ sub _all_supporting_features {
 		   "of Bio::EnsEMBL::BaseAlignFeature")
 	unless $baf->isa("Bio::EnsEMBL::BaseAlignFeature");
 
-      $baf->transform($self->_slice);
+      $baf = $baf->transfer($self->_slice);
 
       push @{$self->{_all_supporting_features}}, $baf;
     }
@@ -2056,6 +2188,8 @@ sub _build_sequence_cache {
 
   foreach my $fetched_seq (@$fetched_seqs){
 
+    next unless defined $fetched_seq;
+
     $self->{'_fetched_seq_cache'}->{$fetched_seq->accession_number} = $fetched_seq;
 
   }
@@ -2091,6 +2225,28 @@ sub _fetch_sequence {
 
 
 ### Miscellaneous utilities ###
+
+=head2 _padding
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+
+sub _padding {
+  my $self = shift;
+
+  if (@_) {
+    $self->{'_padding'} = shift;
+  }
+
+  return $self->{'_padding'} ? $self->{'_padding'} : 0;
+}
 
 
 =head2 _line_length
