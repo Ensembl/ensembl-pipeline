@@ -63,12 +63,11 @@ if (scalar @ARGV == 0) {
 
 
 my $alnprog = 'bl2seq';
-my $alntype = 'blastn';
+my $alntype = '';
 my $min_score = 40;
 my $masked = 1;
 my $filter = "Bio::EnsEMBL::Compara::Filter::Greedy";
 my $parameters = "-g T -W 10 -G 1 -E 2";
-#blastz "C=2 K=3000 H=2200"
 
 unless (GetOptions('help' => \$help,
 		   'h=s' => \$host,
@@ -95,12 +94,19 @@ unless (scalar @ARGV) {
   die $usage;
 }
 
-print STDERR "starttime: ",time,"\n";
+if ($alnprog eq "bl2seq" && $alntype eq "") {
+  $alntype = "blastn";
+}
 
-#my $input_file = $ARGV[0].$ENV{LSB_JOBINDEX};
-#my $input_file = $ENV{LSB_JOBINDEX} || $ARGV[0];
+print STDERR "
+Unix start time           : ",time,"
+Compara database used     : $dbname @ $host
+Alignment program used    : alnprog \"$alnprog\"; alntype \"$alntype\"; parameters \"$parameters\";
+Filter perl module used   : \"$filter\"
+Type of masking           : $masked
+";
+
 my $input_file = $ARGV[0];
-#$input_file = "bl2seq_fourth_$input_file";
 
 if (! defined $input_file) {
   die "Must call run_compara with an input file!";
@@ -169,7 +175,7 @@ exit 1";
 
   # run the runnabledb
   
-  print STDERR "$line\n";
+  print STDERR "Input comparison          : $line\n";
   
   $rundb->fetch_input();
   $rundb->run();
@@ -184,4 +190,4 @@ exit 1";
 close LOG;
 close INPUT;
 
-print STDERR "endtime: ",time,"\n";
+print STDERR "Unix end time             : ",time,"\n";
