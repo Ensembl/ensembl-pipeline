@@ -337,7 +337,7 @@ sub align_hits_to_contig {
   
   my $pep = $trans->translate();
   
-  foreach my $exon ($trans->get_all_Exons) {
+  foreach my $exon (@{$trans->get_all_Exons}) {
     
     my %ex_align;
     

@@ -65,7 +65,8 @@ $exon->end_phase(1);
 
 $pred_transcript->add_Exon($exon);
 
-unless (defined($pred_transcript) && scalar ($pred_transcript->get_all_Exons) > 0)
+unless (defined($pred_transcript) && 
+	scalar (@{$pred_transcript->get_all_Exons}) > 0)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
