@@ -503,14 +503,34 @@ sub translation {
     if ($exons[0]->strand == 1)
     {
         @exons = sort {$a->start <=> $b->start} @exons;
-        $translation->start($exons[0]->start);
-        $translation->end($exons[$#exons]->end);
+	my $startpos;
+	if( $exons[0]->phase == 0) {
+	  $startpos = 1;
+	} elsif ( $exons[0]->phase == 1 ) {
+	  $startpos = 3;
+	} else {
+	  $startpos = 2;
+	}
+
+        $translation->start($startpos);
+        $translation->end($exons[$#exons]->length);
     }
     else
     {
         @exons = sort {$b->start <=> $a->start} @exons;
-        $translation->start($exons[0]->end);
-        $translation->end($exons[$#exons]->start);
+
+	my $startpos;
+	if( $exons[0]->phase == 0) {
+	  $startpos = 1;
+	} elsif ( $exons[0]->phase == 1 ) {
+	  $startpos = 3;
+	} else {
+	  $startpos = 2;
+	}
+
+
+        $translation->start($startpos);
+        $translation->end($exons[$#exons]->length);
     }
 
     $translation->start_exon_id($exons[0]->id);
