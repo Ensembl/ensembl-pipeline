@@ -209,7 +209,6 @@ sub run {
         my %parameters = $self->formatted_parameters();
         my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(%parameters);
         $runnable->clone($peptide);
-        $runnable->threshold($self->threshold());
         $runnable->run();
         $self->runnable($runnable);                                        
     }
@@ -323,7 +322,7 @@ sub align_hit_to_contig {
         push (@exon_aligns, \%ex_align);
         
         $dna_align {'exon_dna_limit'} += $exon->length;   
-        #print "Exon: ".$ex_align {'name'}
+        #print STDERR "Exon: ".$ex_align {'name'}
         #        ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
         #        ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
         #        ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";

@@ -51,9 +51,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
 use vars qw(@ISA);
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
 
@@ -100,57 +101,6 @@ sub new {
     return $self;
 }
 
-sub analysis {
-    my ($self, $analysis) = @_;
-    
-    if ($analysis)
-    {
-        $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
-            unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
-        $self->{'_analysis'} = $analysis;
-        $self->parameters($analysis->parameters);
-    }
-    return $self->{'_analysis'}
-}
-
-=head2 parameters
-
-    Title   :   parameters
-    Usage   :   $self->parameters($param);
-    Function:   Gets or sets the value of parameters
-    Returns :   A string containing parameters for Bio::EnsEMBL::Runnable run
-    Args    :   A string containing parameters for Bio::EnsEMBL::Runnable run
-
-=cut
-
-sub parameters {
-    my ($self, $parameters) = @_;
-    $self->analysis->parameters($parameters) if ($parameters);
-    return $self->analysis->parameters();
-}
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=cut
-
-sub dbobj {
-    my( $self, $value ) = @_;
-    
-    if ($value) {
-        $value->isa("Bio::EnsEMBL::DB::ObjI")
-            || $self->throw("Input [$value] isn't a Bio::EnsEMBL::DB::ObjI");
-        $self->{'_dbobj'} = $value;
-    }
-    return $self->{'_dbobj'};
-}
-
 =head2 fetch_input
 
     Title   :   fetch_input
@@ -165,32 +115,11 @@ sub fetch_input {
     my( $self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
-
-    print STDERR "Input id " . $self->input_id . "\n";
-    print STDERR "Dbobj " . $self->dbobj . "\n";
     
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
-}
-
-sub input_id {
-    my ($self, $input) = @_;
-    if ($input)
-    {
-        $self->{'_input_id'} = $input;
-    }
-    return $self->{'_input_id'};
-}
-
-sub genseq {
-    my ($self, $genseq) = @_;
-    if ($genseq)
-    {
-        $self->{'_genseq'} = $genseq;
-    }
-    return $self->{'_genseq'}
 }
 
 #get/set for runnable and args
@@ -218,119 +147,3 @@ sub runnable {
     return $self->{'_runnable'};
 }
 
-=head2 run
-
-    Title   :   run
-    Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->run()
-    Returns :   none
-    Args    :   none
-
-=cut
-
-sub run {
-    my ($self) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched") unless ($self->genseq());
-    $self->runnable->clone($self->genseq());
-    $self->runnable->run();
-}
-
-=head2 output
-
-    Title   :   output
-    Usage   :   $self->output();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->output()
-    Returns :   An array of Bio::EnsEMBL::Repeat objects (FeaturePairs)
-    Args    :   none
-
-=cut
-
-sub output {
-    my ($self) = @_;
-
-    my $runnable = $self->runnable;
-    $runnable || $self->throw("Can't return output - no runnable object");
-
-    return $runnable->output;
-}
-
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of repeats (with start and end)
-    Args    :   none
-
-=cut
-
-#cut & pasted from Vert_Est2genome
-sub fetch_output {
-    my($self,$output) = @_;
-    
-    $output || $self->throw("No frozen object passed for the output");
-    
-    my $object;
-    open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
-    
-    while (<IN>) 
-    {
-        $_ =~ s/\[//;
-	    $_ =~ s/\]//;
-	    $object .= $_;
-    }
-    close(IN);
-    my @out;
-   
-    if (defined($object)) 
-    {
-        my (@obj) = FreezeThaw::thaw($object);
-        foreach my $array (@obj) 
-        {
-	        foreach my $object (@$array) 
-            {
-	            push @out, $object;
-	        }
-        }
-    }
-    return @out;
-}
-
-=head2 write_output
-
-    Title   :   write_output
-    Usage   :   $self->write_output
-    Function:   Writes output data to db
-    Returns :   array of repeats (with start and end)
-    Args    :   none
-
-=cut
-
-sub write_output {
-    my($self) = @_;
-
-    my $db=$self->dbobj();
-    my @repeats = $self->output();
-    
-    my $contig;
-    eval 
-    {
-	    $contig = $db->get_Contig($self->input_id);
-    };
-    if ($@) 
-    {
-	    print STDERR "Contig not found, skipping writing output to db\n";
-    }
-    elsif (@repeats) 
-    {
-	    foreach my $repeat (@repeats)
-        {
-            print STDERR ($repeat->hseqname()."\t");
-        }
-        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	    $feat_Obj->write($contig, @repeats);
-    }
-    return 1;
-}

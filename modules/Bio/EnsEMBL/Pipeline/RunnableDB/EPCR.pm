@@ -51,10 +51,11 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::EPCR;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
+use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 
 use vars qw(@ISA);
-@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDBI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
 
