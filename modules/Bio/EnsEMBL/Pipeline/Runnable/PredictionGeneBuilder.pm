@@ -147,10 +147,10 @@ sub run{
   # check the generated transcripts:
   my @checked_predictions;
   foreach my $prediction ( @linked_predictions ){
-    next unless ( $self->_check_Transcript($prediction) && $self->_check_Translation($prediction) );
-    push( @checked_predictions, $prediction );
+      next unless ( $self->_check_Transcript($prediction) && $self->_check_Translation($prediction) );
+      push( @checked_predictions, $prediction );
   }
-
+  
   print STDERR scalar(@checked_predictions)." checked predictions generated\n";
   return @checked_predictions;
 }  
@@ -198,23 +198,23 @@ sub make_Exons {
 	  my $g_strand = $exons[0]->strand;
 	  
 	  if (!(($g_end < $prediction_exon->start) || $g_start > $prediction_exon->end)) {
-	    if ($g_strand == $prediction_exon->strand) {
-	      $ignored_exons++;
-	      next EXON;
-	    }
+	      if ($g_strand == $prediction_exon->strand) {
+		  $ignored_exons++;
+		  next EXON;
+	      }
 	  }
-	}
       }
+    }
       
       my $newexon = $self->_make_Exon($prediction_exon,$excount,"genscan." . $gscount . "." . $excount );
       $newexon->find_supporting_evidence(\@features);
       
       # take only the exons that get supporting evidence
       if ( @{ $newexon->get_all_supporting_features } ){
-	push(@supported_exons,$newexon);
-	$excount++;
+	  push(@supported_exons,$newexon);
+	  $excount++;
       }
-    }
+  }
     
     $gscount++;
   }
@@ -245,6 +245,7 @@ sub _make_Exon {
 }
 
 ############################################################
+
 =head2 make_ExonPairs
 
  Description: Links exons with supporting evidence into ExonPairs
@@ -271,14 +272,13 @@ sub  make_ExonPairs {
     
     my $jend   = $i + 2;  
     if ( $jend >= scalar(@exons)) {
-      $jend    = scalar(@exons) - 1;
+	$jend  = scalar(@exons) - 1;
     }
     
   J: 
     for (my $j = $jstart ; $j <= $jend; $j++) {
       next J if ($i == $j);
       next J if ($exons[$i]->strand != $exons[$j]->strand);
-      next J if ($exons[$i]->{'temporary_id'}  eq $exons[$j]->{'temporary_id'});
       
       my $exon2 = $exons[$j];
       my %doneidhash;
@@ -287,98 +287,105 @@ sub  make_ExonPairs {
       # If any of the supporting features of the two exons
       # span across an intron a pair is made.
       my @f1 = sort {$b->score <=> $a->score} @{$exon1->get_all_supporting_features};
+      #print STDERR scalar(@f1)." supp features for exon1($i)\n";
       
     F1: 
       foreach my $f1 (@f1) {
-	next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
-	my @f = sort {$b->score <=> $a->score} @{$exon2->get_all_supporting_features};
-       	
+	  #next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
+	  my @f = sort {$b->score <=> $a->score} @{$exon2->get_all_supporting_features};
+	  #print STDERR scalar(@f)." supp features for exon2($j)\n";
+
       F2: 
-	foreach my $f2 (@f) {
-	  next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
+	  foreach my $f2 (@f) {
+	      #next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
 	  
-	  my @pairs = $self->get_all_ExonPairs;		
-	  
-	  # Do we have hits from the same sequence
-	  # n.b. We only allow each database hit to span once
-	  # across the intron (%idhash) and once the pair coverage between
-	  # the two exons reaches $minimum_coverage we 
-	  # stop finding evidence. (%pairhash)
-	  
-	  if ($f1->hseqname eq $f2->hseqname &&
-	      $f1->strand   == $f2->strand   &&
-	      !(defined($idhash{$f1->hseqname})) &&
-	      !(defined($pairhash{$exon1}{$exon2}))) {
-	    
-	    my $ispair = 0;
-	    my $thresh = $self->threshold;
-	    
-	    if ($f1->strand == 1) {
-	      if (abs($f2->hstart - $f1->hend) < $gap) {
-		
-		if (!(defined($doneidhash{$f1->hseqname}))) {
-		  $ispair = 1;
-		}
-	      }
-	    } 
-	    elsif ($f1->strand == -1) {
-	      if (abs($f1->hend - $f2->hstart) < $gap) {
-		if (!(defined($doneidhash{$f1->hseqname}))) {
-		  $ispair = 1;
-		}
-	      }
-	    }
-	    
-	    # This checks if the coordinates are consistent if the 
-	    # exons are on the same contig
-	    if ($ispair == 1) {
-	      if ($exon1->contig->name eq $exon2->contig->name) {
-		if ($f1->strand == 1) {
-		  if ($f1->end >  $f2->start) {
-		    $ispair = 0;
-		  }
-		} 
-		else {
-		  if ($f2->end >  $f1->start) {
-		    $ispair = 0;
-		  }
-		}
-	      }
-	    }
-	    
-	    # We finally get to make a pair
-	    if ($ispair == 1) {
-	      eval {
-		my $check = $self->check_link($exon1,$exon2,$f1,$f2);
-		next J unless $check;
-		
-		# we make an exon pair
-		my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
-		
-		if ( $pair) {
-		  $idhash    {$f1->hseqname} = 1;
-		  $doneidhash{$f1->hseqname} = 1;
+	      my @pairs = $self->get_all_ExonPairs;		
+	      
+	      # Do we have hits from the same sequence
+	      # n.b. We only allow each database hit to span once
+	      # across the intron (%idhash) and once the pair coverage between
+	      # the two exons reaches $minimum_coverage we 
+	      # stop finding evidence. (%pairhash)
+	      
+	      if ($f1->hseqname eq $f2->hseqname &&
+		  $f1->strand   == $f2->strand   &&
+		  !(defined($idhash{$f1->hseqname})) &&
+		  !(defined($pairhash{$exon1}{$exon2}))) {
 		  
-		  $pair->add_Evidence($f1);
-		  $pair->add_Evidence($f2);
+		  my $ispair = 0;
+		  my $thresh = $self->threshold;
 		  
-		  if ($pair->is_Covered == 1) {
-		    $pairhash{$exon1}{$exon2}  = 1;
+		  if ($f1->strand == 1) {
+		      if (abs($f2->hstart - $f1->hend) < $gap) {
+			  
+			  if (!(defined($doneidhash{$f1->hseqname}))) {
+			      $ispair = 1;
+			  }
+		      }
+		  } 
+		  elsif ($f1->strand == -1) {
+		      if (abs($f1->hend - $f2->hstart) < $gap) {
+			  if (!(defined($doneidhash{$f1->hseqname}))) {
+			      $ispair = 1;
+			  }
+		      }
 		  }
-		  next EXON;
-		}
-		
-		
-	      };
-	      if ($@) {
-		warn("Error making ExonPair from [" . $exon1->{'temporary_id'} . "][" .$exon2->{'temporary_id'} ."] $@");
+		  
+		  # This checks if the coordinates are consistent if the 
+		  # exons are on the same contig
+		  if ($ispair == 1) {
+		      if ($exon1->contig->name eq $exon2->contig->name) {
+			  if ($f1->strand == 1) {
+			      if ($f1->end >  $f2->start) {
+				  $ispair = 0;
+			      }
+			  } 
+			  else {
+			      if ($f2->end >  $f1->start) {
+				  $ispair = 0;
+			      }
+			  }
+		      }
+		  }
+		  
+		  # We finally get to make a pair
+		  if ($ispair == 1) {
+		      eval {
+			  my $check = $self->check_link($exon1,$exon2,$f1,$f2);
+			  print STDERR "check failed for this pair\n" unless $check;
+			  next J unless $check;
+			  
+			  # we make an exon pair
+			  my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
+			  
+			  if ( $pair) {
+			      print STDERR "pair created\n";
+			      $idhash    {$f1->hseqname} = 1;
+			      $doneidhash{$f1->hseqname} = 1;
+			      
+			      $pair->add_Evidence($f1);
+			      $pair->add_Evidence($f2);
+			      
+			      if ($pair->is_Covered == 1) {
+				  $pairhash{$exon1}{$exon2}  = 1;
+			      }
+			      next EXON;
+			  }
+			  else{
+			      print STDERR "pair has not been created\n";
+			  }
+			  
+			  
+		      };
+		      if ($@) {
+			  $self->throw("Error making ExonPair from\n".$exon1->gffstring."\nand\n".$exon2->gffstring."\n$@");
+		      }
+		  }
 	      }
-	    }
 	  }
-	}
       }
-    }
   }
+}
   return $self->get_all_ExonPairs;
 }
 
@@ -397,7 +404,8 @@ sub makePair {
   my ($self,$exon1,$exon2,$type) = @_;
   
   if (!defined($exon1) || !defined($exon2)) {
-    $self->throw("Wrong number of arguments [$exon1][$exon2] to makePair");
+      $self->warn("Wrong number of arguments [$exon1][$exon2] to makePair");
+      return 0;
   }
   
   $self->throw("[$exon1] is not a Bio::EnsEMBL::Exon") unless $exon1->isa("Bio::EnsEMBL::Exon");
@@ -407,23 +415,24 @@ sub makePair {
   my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
 						     -exon2 => $exon2,
 						     -type  => $type,
-						    );
+						     );
   
   my $found = 0;
   foreach my $pair ($self->get_all_ExonPairs) {
-    if ($pair->compare($tmppair) == 1) {
-      $pair->add_coverage;
-      $tmppair = $pair;
-      $found = 1;
-    }
+      if ($pair->compare($tmppair) == 1) {
+	  $pair->add_coverage;
+	  $tmppair = $pair;
+	  $found = 1;
+      }
   }
   
-  if ($found == 0 && $self->check_ExonPair($tmppair)) {
-    $self->add_ExonPair($tmppair);
-    return $tmppair;
+  if ($found == 0 ){
+      print STDERR "adding exon pair\n";
+      $self->add_ExonPair($tmppair);
+      return $tmppair;
   }
   else{
-    return 0;
+      return 0;
   }
 }
 
@@ -479,52 +488,54 @@ sub prune_features {
 =cut
 
 sub check_link {
-  my ($self,$exon1,$exon2,$f1,$f2) = @_;
-
-  my @pairs = $self->get_all_ExonPairs;
-  
-  # are these 2 exons already linked in another pair
-  foreach my $pair (@pairs) {
+    my ($self,$exon1,$exon2,$f1,$f2) = @_;
     
-    if ($exon1->strand == 1) {
-      if ($exon1 == $pair->exon1) {
-	my @linked_features = @{$pair->get_all_Evidence};
+    my @pairs = $self->get_all_ExonPairs;
+    print STDERR "Comparing with ".scalar(@pairs)." exixsting pairs\n";
+    
+    # are these 2 exons already linked in another pair
+    foreach my $pair (@pairs) {
 	
-	foreach my $f (@linked_features) {
-	  
-	  if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
-	    return 0;
-	  }
+	if ($exon1->strand == 1) {
+	    if ($exon1 == $pair->exon1) {
+		my @linked_features = @{$pair->get_all_Evidence};
+		
+		foreach my $f (@linked_features) {
+		    
+		    if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
+			return 0;
+		    }
+		}
+	    }
+	} 
+	else {
+	    if ($exon2 == $pair->exon2) {
+		my @linked_features = @{$pair->get_all_Evidence};
+		
+		foreach my $f (@linked_features) {
+		    
+		    if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
+			return 0;
+		    }
+		}
+	    }
 	}
-      }
-    } 
-    else {
-      if ($exon2 == $pair->exon2) {
-	my @linked_features = @{$pair->get_all_Evidence};
 	
-	foreach my $f (@linked_features) {
-	  
-	  if ($f->hseqname eq $f2->hseqname && $f->hstrand == $f2->hstrand) {
+	# if we're still here, are these 2 exons already part of a pair but linked by different evidence?
+	if(($exon1 == $pair->exon1 && $exon2 == $pair->exon2) || 
+	   ($exon1 == $pair->exon2 && $exon2 == $pair->exon1)    ){
+	    
+	    # add in new evidence
+	    $pair->add_Evidence($f1);
+	    $pair->add_Evidence($f2);
+	    
 	    return 0;
-	  }
 	}
-      }
     }
     
-    # if we're still here, are these 2 exons already part of a pair but linked by different evidence?
-    if(($exon1 == $pair->exon1 && $exon2 == $pair->exon2) || 
-       ($exon1 == $pair->exon2 && $exon2 == $pair->exon1)    ){
-      
-      # add in new evidence
-      $pair->add_Evidence($f1);
-      $pair->add_Evidence($f2);
-      
-      return 0;
-    }
-  }
-  
-  # exons are not linked
-  return 1;
+    # exons are not already linked
+    print STDERR "returning 1 from check link\n";
+    return 1;
 }
 
 ############################################################
@@ -568,7 +579,7 @@ sub link_ExonPairs {
   
   # create a translation
   foreach my $tran ( @t ) {
-    $self->make_Translation($tran);
+      $self->make_Translation($tran);
   }
   
   # flush transcripts & re-add valid ones.
@@ -576,13 +587,13 @@ sub link_ExonPairs {
   
   # validate the transcripts
   foreach my $transcript (@t){
-    my @valid = $self->validate_transcript($transcript);
-    foreach my $vt(@valid){
-      @tmpexons = @{$vt->get_all_Exons};
-      if(scalar (@tmpexons) >= $GB_MIN_GENSCAN_EXONS){
-	$self->linked_predictions($vt);
+      my @valid = $self->validate_transcript($transcript);
+      foreach my $vt (@valid){
+	  @tmpexons = @{$vt->get_all_Exons};
+	  if(scalar (@tmpexons) >= $GB_MIN_GENSCAN_EXONS){
+	      $self->linked_predictions($vt);
+	  }
       }
-    }
   }
   return $self->linked_predictions;
 }
@@ -656,7 +667,7 @@ sub _recurseTranscript {
     if ($count > 0) {
       my $newtran = new Bio::EnsEMBL::Transcript;
       $newtran->type($GB_ABINITIO_SUPPORTED_TYPE);
-      $self->add_Transcript($newtran);
+      $self->linked_predictions($newtran);
       
       foreach my $tmpex (@{$tmptran->get_all_Exons}) {
 	$newtran->add_Exon($tmpex);
@@ -808,6 +819,7 @@ sub make_Translation{
 
 =head2 check_ExonPair
 
+    Note(eae): at the moment it is not being used
   example    : unless ( $self->check_ExonPair($pair) ){ ... };
  Description : builds a translation for a Transcript object
                At the moment it is merely informative and 
@@ -1055,35 +1067,37 @@ sub validate_transcript{
       my $intron;
       
       if ($exon->strand == 1) {
-	$intron = abs($exon->start - $previous_exon->end + 1);
-      } else {
-	$intron = abs($exon->end   - $previous_exon->start + 1);
+	$intron = abs($exon->start - $previous_exon->end - 1);
+      } 
+      else {
+	$intron = abs($exon->end   - $previous_exon->start - 1);
       }
       
       if ($intron > $GB_GENSCAN_MAX_INTRON) {
-	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . "\n";
-	$split = 1;
-	$valid = 0;
+	  print STDERR "Intron too long $intron  for transcript\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	  $split = 1;
+	  $valid = 0;
       }
       
       if ($exon->strand != $previous_exon->strand) {
-	print STDERR "Mixed strands for gene " . $transcript->{'temporary_id'} . "\n";
-	$valid = 0;
-	return;
+	  print STDERR "Mixed strands for transcript\n";
+	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	  $valid = 0;
       }
-    }
-    $previous_exon = $exon;
+   }
+     $previous_exon = $exon;
   }
   
-       if ($valid) {
-	 push(@valid_transcripts,$transcript);
-       }
-       elsif ($split){
-	 # split the transcript up.
-	 my @split_transcripts = $self->split_transcript($transcript);
-    push(@valid_transcripts, @split_transcripts);
+  if ($valid) {
+      push(@valid_transcripts,$transcript);
   }
-       return @valid_transcripts;
+  elsif ($split){
+      # split the transcript up.
+      my @split_transcripts = $self->split_transcript($transcript);
+      push(@valid_transcripts, @split_transcripts);
+  }
+  return @valid_transcripts;
 }
 
 ############################################################
