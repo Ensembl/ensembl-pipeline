@@ -451,26 +451,23 @@ sub mask_gene_region_lists {
 =cut
 
 sub convert_output {
-  my ($self) =@_;
+  my ($self) = @_;
   my $trancount = 1;
   my $genetype = $GB_SIMILARITY_GENETYPE;
 
   foreach my $runnable ($self->runnable) {
-    &throw("I don't know what to do with $runnable") 
-        unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
-										 
+    &throw("I don't know what to do with $runnable")
+      unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
+
     if(!defined($genetype) || $genetype eq ''){
       $genetype = 'similarity_genewise';
       &warning("Setting genetype to $genetype\n");
     }
-    
-    my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-    # print STDERR $anaAdaptor . "\n";
 
+    my $anaAdaptor = $self->db->get_AnalysisAdaptor;
     my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
 
     if ( !defined $analysis_obj ){
-      # make a new analysis object
       $analysis_obj = new Bio::EnsEMBL::Analysis
 	(-db              => 'NULL',
 	 -db_version      => 1,
@@ -488,21 +485,21 @@ sub convert_output {
     # filter out masked genes here if appropriate
     if ($GB_SIMILARITY_POST_GENEMASK or $GB_SIMILARITY_POST_EXONMASK) {
       my (@mask_regions, @filtered_results);
-      
+
       my ($exonmask_regions, $genemask_regions) = $self->mask_gene_region_lists;
-      
+
       if ($GB_SIMILARITY_POST_GENEMASK) {
         @mask_regions = @$genemask_regions;
-        
+
       } else {
         @mask_regions = @$exonmask_regions;
       }
 
-      GENE: foreach my $gene (@results) {
+    GENE: foreach my $gene (@results) {
         my $keep_gene = 1;
         my $mask_reg_idx = 0;
-        
-        my @exons = sort {$a->start <=> $b->start} ($gene->sub_SeqFeature);
+
+        my @exons = sort {$a->start <=> $b->start} ($gene->get_all_Exons);
         my @test_regions;
         
         if ($GB_SIMILARITY_POST_GENEMASK) {
@@ -539,103 +536,88 @@ sub convert_output {
       @results = @filtered_results;
     }
 
-    my $genes = $self->make_genes($genetype, $analysis_obj, \@results);
+    my $genes = $self->process_genes($genetype, $analysis_obj, \@results);
     $self->output(@$genes);
   }
 }
 
 
-=head2 make_genes
+=head2 process_genes
 
-  Title   :   make_genes
-  Usage   :   $self->make_genes
-  Function:   makes Bio::EnsEMBL::Genes out of the output from runnables
-  Returns :   array of Bio::EnsEMBL::Gene  
+  Title   :   process_genes
+  Usage   :   $self->process_genes
+  Function:   validates genes output from Genewise modules
+  Returns :   array of Bio::EnsEMBL::Gene
   Args    :   $genetype: string
               $analysis_obj: Bio::EnsEMBL::Analysis
-              $results: reference to an array of FeaturePairs
+  $results: reference to an array of Bio::EnsEMBL::Gene
 
 =cut
 
-sub make_genes {
+sub process_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
   my @genes;
+  my @seqfetchers = $self->each_seqfetcher;
 
   &throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
       unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
-  my $count = 0;
-  foreach my $tmpf (@{$results}) {
-    $count++;
+  PROCESS_GENE:
+  foreach my $unprocessed_gene (@{$results}) {
+    print "VAC: $unprocessed_gene\n";
+    foreach my $unchecked_transcript(@{$unprocessed_gene->get_all_Transcripts}){
+    print "VAC: $unchecked_transcript\n";
+      my @exons = @{$unchecked_transcript->get_all_Exons};
+      my @supp_feat =  @{$exons[0]->get_all_supporting_features};
+      my ($first_supp_feat) = $supp_feat[0];
+      my $prot_id = $first_supp_feat ? $first_supp_feat->hseqname : "Unknown protein";
 
-    my ($first_exon) = $tmpf->sub_SeqFeature;
-    my ($first_supp_feat) = $first_exon->sub_SeqFeature;
-    my $prot_id = $first_supp_feat ? $first_supp_feat->hseqname : "Unknown protein";
-
-    my $unchecked_transcript = 
-        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->SeqFeature_to_Transcript($tmpf, 
-                                                                           $self->query, 
-                                                                           $analysis_obj, 
-                                                                           $self->genewise_db, 
-                                                                           0);
-    if (not defined $unchecked_transcript) {
-      printf(STDERR "   Transcript %d (%s) : REJECTED (could not make from SeqFeatures)\n", $count, $prot_id);
-      next;
-    }
-        
-    # validate transcript
-    my @seqfetchers = $self->each_seqfetcher;
-    
-    my $valid_transcripts = 
-        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($unchecked_transcript, 
-                                                                      $self->query, 
-                                                                      $GB_SIMILARITY_MULTI_EXON_COVERAGE, 
-                                                                      $GB_SIMILARITY_SINGLE_EXON_COVERAGE, 
-                                                                      $GB_SIMILARITY_MAX_INTRON, 
-                                                                      $GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
-                                                                      \@seqfetchers, 
+      my $valid_transcripts = 
+        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($unchecked_transcript,
+                                                                      $self->query,
+                                                                      $GB_SIMILARITY_MULTI_EXON_COVERAGE,
+                                                                      $GB_SIMILARITY_SINGLE_EXON_COVERAGE,
+                                                                      $GB_SIMILARITY_MAX_INTRON,
+                                                                      $GB_SIMILARITY_MIN_SPLIT_COVERAGE,
+                                                                      \@seqfetchers,
                                                                       $GB_SIMILARITY_MAX_LOW_COMPLEXITY);
 
-    if (not defined $valid_transcripts) {
-      printf (STDERR "   Transcript %d (%s) : REJECTED (validation failed)\n", $count, $prot_id);
-      next;
-    }
-    else {
-      printf (STDERR "   Transcript %d (%s) : ACCEPTED\n", $count, $prot_id);
-    }
-      
-    # make genes from valid transcripts
-    foreach my $checked_transcript(@$valid_transcripts){
-      # add start codon if appropriate
-      $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
+      next PROCESS_GENE unless defined $valid_transcripts;
 
-      # add terminal stop codon if appropriate
-      $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+      # make genes from valid transcripts
+      foreach my $checked_transcript(@$valid_transcripts){
 
-      # flip reverse strand supporting features. This used to be done 
-      # during remapping, whch is not necessary any more
+	# add start codon if appropriate
+	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
 
-      foreach my $exon(@{$checked_transcript->get_all_Exons}) {
-        foreach my $sf(@{$exon->get_all_supporting_features}) {
-          # this should be sorted out by the remapping to rawcontig ... strand is fine
-          if ($sf->start > $sf->end) {
-            my $tmp = $sf->start;
-            $sf->start($sf->end);
-            $sf->end($tmp);
-          }
-        }
+	# add terminal stop codon if appropriate
+	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+
+	# flip reverse strand supporting features. This used to be done 
+	# during remapping, whch is not necessary any more
+
+	foreach my $exon(@{$checked_transcript->get_all_Exons}) {
+	  foreach my $sf(@{$exon->get_all_supporting_features}) {
+	    $sf->analysis($analysis_obj);
+
+	    # this should be sorted out by the remapping to rawcontig ... strand is fine
+	    if ($sf->start > $sf->end) {
+	      my $tmp = $sf->start;
+	      $sf->start($sf->end);
+	      $sf->end($tmp);
+	    }
+	  }
+	
+	}
+
+	my $gene = new Bio::EnsEMBL::Gene;
+	$gene->type($genetype);
+	$gene->analysis($analysis_obj);
+	$gene->add_Transcript($checked_transcript);
+	push (@genes, $gene);
       }
-
-      my $gene = new Bio::EnsEMBL::Gene;
-      $gene->type($genetype);
-      $gene->analysis($analysis_obj);
-      $gene->add_Transcript($checked_transcript);
-
-      
-      push (@genes, $gene);
     }
   }
-  
   return \@genes;
 
 }
