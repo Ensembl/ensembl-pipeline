@@ -224,8 +224,8 @@ sub write_sequence_to_file {
     if (!defined($seqobj)) {
 	$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
     }
-    if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeq")) {
-        $self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file. Currently [$seqobj]");
+    if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeqI")) {
+        $self->throw("Must enter a Bio::Seq or a Bio::PrimarySeqI object to the write_sequence_to_file. Currently [$seqobj]");
     }
 
     my $file      = $self->get_tmp_file($self->workdir,"seq","fa");
