@@ -125,7 +125,7 @@ sub new {
     $self->{'_results'}   = undef;     # file to store results of analysis
     $self->{'_prune'}     = 1;         # 
     $self->{'_coverage'}  = 10;
-
+    #print "@args\n";
     # Now parse the input options and store them in the object
     my( $query, $program, $database, $threshold, $threshold_type, $filter,$coverage,$prune,$options) = 
 	    $self->_rearrange([qw(QUERY 
@@ -168,7 +168,7 @@ sub new {
     } else {
       $self->options(' -p1 ');  
     }
-    #print "options = ".$self->options."\n";
+    
     if (defined($threshold)) {
       $self->threshold($threshold);
     }
@@ -262,6 +262,8 @@ sub run_analysis {
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
 	$command .= ($::pipeConf{'blast'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
 	$command .= ' '.$self->options. ' > '.$self->results . ".$db";
+	#system(pwd);
+	#print $command."\n";
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
   }
@@ -386,9 +388,9 @@ sub parse_results {
     
   }
 
-  print STDERR "Ids " . keys(%ids) . "\n";
+  #print STDERR "Ids " . keys(%ids) . "\n";
 
-  my @parsers = ();
+  @parsers = ();
 
   if (defined($fh)) {
     my $parser = new Bio::Tools::BPlite(-fh => $fh);
@@ -398,12 +400,12 @@ sub parse_results {
   }
 
   foreach my $parser (@parsers) {
-    print STDERR "New parser\n";
+    #print STDERR "New parser\n";
   NAME: while  ( my $sbjct =$parser->nextSbjct) {
       
     my $name = $sbjct->name ;	  
 
-    print STDERR "Name " . $name . "\n";
+    #print STDERR "Name " . $name . "\n";
      if (($self->filter == 1) && !defined($ids{$name})) {
       next NAME;
     }
@@ -425,7 +427,7 @@ sub parse_results {
 	  $name = $1 || $2;
       }
 
-    print "Parsing name $name\n";
+    #print "Parsing name $name\n";
     HSP: while (my $hsp = $sbjct->nextHSP) {
 
 	if ($self->threshold_type eq "PID") {
@@ -436,7 +438,7 @@ sub parse_results {
 	# Each HSP is a gapped alignment.
 	# This method splits the gapped alignment into
 	# ungapped pieces
-	print "HSP " . $hsp->P . "\n";
+	#print "HSP " . $hsp->P . "\n";
 	$self->split_HSP($hsp,$name);
 
       }
@@ -464,7 +466,7 @@ sub parse_results {
 
       my @pruned = $search->run(@allfeatures);
 
-      print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
+      #print STDERR "dbg", scalar(@allfeatures), " ", scalar(@pruned), "\n";
       $self->output(@pruned);
     }
   }
@@ -674,7 +676,7 @@ sub split_HSP {
 	    if ($found == 1) {
 
 		my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-		print "Found " . $fp->gffstring . "\n";		
+		#print "Found " . $fp->gffstring . "\n";		
 		$self->growfplist($fp);                             	    
 	    }
 	
@@ -704,7 +706,7 @@ sub split_HSP {
     # Remember the last feature
     if ($found == 1) {
 	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-	print "Found " . $fp->gffstring . "\n";
+	#print "Found " . $fp->gffstring . "\n";
 	$self->growfplist($fp);                             	    
     }
 
@@ -884,7 +886,7 @@ sub select_features {
  
         my @selected_features;
  
-        my $best_hit = @features[0];
+        my $best_hit = $features[0];
  
         foreach my $feat (@features){
                 if ($feat->overlaps($best_hit,'strong')) {

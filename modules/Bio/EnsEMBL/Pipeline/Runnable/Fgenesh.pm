@@ -114,7 +114,7 @@ sub new{
 
      my($clone, $fgenesh, $parameters, $matrix) = 
           $self->_rearrange([qw(CLONE FGENESH PARAM MATRIX)], @args);
-     print "@args\n";
+     #print "@args\n";
       $self->clone($clone) if ($clone);
 
 
@@ -442,12 +442,12 @@ sub run {
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
     #write sequence to file
-    print STDERR "have checked directory writing file next\n";
+    #print STDERR "have checked directory writing file next\n";
     $self->writefile(); 
-    print STDERR "about to run Fgenesh\n";
+    #print STDERR "about to run Fgenesh\n";
 #run fgenesh       
     $self->run_fgenesh();
-    print "have run fgenesh\n";
+    #print "have run fgenesh\n";
     #parse output and create features
     $self->parse_results();
     $self->deletefiles();
@@ -465,11 +465,11 @@ sub run {
 
 sub run_fgenesh {
     my ($self) = @_;
-    print STDERR "Running fgenesh on ".$self->filename."\n";
-    print "command = ".$self->fgenesh." ".$self->matrix." ".$self->filename ." > ".$self->results."\n";
+    #print STDERR "Running fgenesh on ".$self->filename."\n";
+    #print "command = ".$self->fgenesh." ".$self->matrix." ".$self->filename ." > ".$self->results."\n";
     system ($self->fgenesh.' '.$self->matrix.' '.$self->filename .' > '.$self->results);
     $self->throw($self->results." not created by fgenesh\n") unless (-e $self->results);
-    print "leaving run_fgenesh\n";
+    #print "leaving run_fgenesh\n";
 }
 
 =head2 parse_results
@@ -781,10 +781,10 @@ sub translation_test{
     $self->make_translation($transcript, $count);
     $count++;
     if($transcript->translate->seq =~  /\*/){
-      print "translation = ".$transcript->translate->seq."\n";
+      #print "translation = ".$transcript->translate->seq."\n";
       $self->warn("transcript doesn't translate properly : $!");
     } else {
-       print "translation = ".$transcript->translate->seq."\n";
+      # print "translation = ".$transcript->translate->seq."\n";
       $self->add_translating_Fgenesh_Gene($gene);
     }
       
@@ -808,7 +808,7 @@ sub make_translation{
     if ($exon->phase != 0) {
 	my $tmpphase = $exon->phase;
 	
-	print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
+	#print("Starting phase is not 0 " . $tmpphase . "\t" . $exon->strand ."\n");
 	
 	if ($exon->strand == 1) {
 	  my $tmpstart = $exon->start;

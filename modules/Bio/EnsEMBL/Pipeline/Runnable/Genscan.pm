@@ -352,6 +352,7 @@ sub parse_results {
                    my ($gene, $exon) = split (/\./, $element[0]); 
 
                    $feature {name} = $gene + ($exon/1000); #name must be a number
+		   #print "name $feature{name}\n";
                    #arrange numbers so that start is always < end
                    if ($element[2] eq '+')
                    {
@@ -420,7 +421,7 @@ sub parse_results {
 
 sub calculate_and_set_phases_new {
     my ($self) = @_;
-
+  
     my @genes       = $self->genscan_genes();
     my @peptides    = $self->genscan_peptides();
 
@@ -432,14 +433,11 @@ sub calculate_and_set_phases_new {
     my $count = 1;
   GENE: while ($i < scalar(@genes)) {
 
-#      print STDERR "Gene " . $genes[$i]->seqname . "\n";
+
 
       my $peptide = $peptides[$i];
       my @exons   = $genes[$i]->sub_SeqFeature();
-#      print STDERR "Exons are $#exons\n";
       my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
-
-#      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 
       my $translation_found = 0;
 
@@ -447,12 +445,12 @@ sub calculate_and_set_phases_new {
 
         my $temp_tran = $tran->translate->seq;
 
-#       print STDERR "Translation is " . $temp->tran . "\n";
+
 
         # clean the translated sequence
 
         #genscan translated partial genes correctly whilst exon translation begin with M
-        #$temp_tran =~ s/^M//i; #remove initial M from exon
+        #$temp_tran =~ s/^M//i; #remove initial M from exon was removed as it updets the comparision
 
         # remove any initial X's from the translation
         $temp_tran =~ s/^x//i;
@@ -462,27 +460,23 @@ sub calculate_and_set_phases_new {
 	my $genscan = $peptides[$i];
 	my $x = 0;
 	while (($x = index($temp_tran, 'X', $x)) != -1) {
-	  #print STDERR "Found an 'X' at ", $i + 1, "\n";
+	
 	  substr($genscan, $x, 1) = 'X';
 	  $x++;
 	}
     
-	#print "\nafter\ngenscan: $genscan\nensembl: $ensembl\n";
-        if (index($genscan ,$temp_tran) >= 0) {
-#         print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
+    
+        if (index($genscan ,$temp_tran) >= 0) 
 
           $translation_found = 1;
-          foreach my $exon ($tran->get_all_Exons) {
-           #print "exon ".$exon->seqname." ".$exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
-          }
+        
           $tran->temporary_id($self->clone->id . "." . $count);
           $count++;
-	  #print "translation = ".$temp_tran."\n";
+	 
 	  if($temp_tran =~/\*/){
-	    #print "translation ".$tran->temporary_id." = ".$temp_tran."\n";
-	    #print "transcript contains stop codons!";
+	    
 	  } else {
-	   #print "adding translation ".$tran->temporary_id." \n";
+	   
 	    $self->add_Transcript($tran);
 	  }
 	  $i++;
@@ -494,11 +488,10 @@ sub calculate_and_set_phases_new {
         $self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
                      " in a translation\n");
       }
-
-#      print "\n";
-      $i++;
-    }
+    
+    $i++;
   }
+}
 
 sub add_Transcript {
   my ($self,$transcript) = @_;
@@ -536,7 +529,7 @@ sub create_feature {
 
     #create and fill Bio::EnsEMBL::Seqfeature objects   
     my $exon = Bio::EnsEMBL::SeqFeature->new
-                        (   -seqname => $feat->{'name'},
+                        (   -seqname => $feat->{name},
                             -start   => $feat->{'start'},
                             -end     => $feat->{'end'},
                             -strand  => $feat->{'strand'},
@@ -655,6 +648,7 @@ sub output {
 #    print STDERR "\n" .$transcript->temporary_id . "\n";
 #    print "\ntranscript ".$transcript->temporary_id." translates to ".$transcript->translate->seq."\n\n";
     foreach my $exon (@exons) {
+     
       my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->clone->id.".".$exon->seqname,
                                            -start   => $exon->start,
                                            -end     => $exon->end,

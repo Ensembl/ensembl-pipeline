@@ -95,7 +95,7 @@ sub run {
         $self->throw("Genomic sequence not provided");
     my $estseq = $self->est_sequence ||
         $self->throw("EST sequence not provided");
-    
+    #print "running est2genome\n";
     #extract filenames from args and check/create files and directory
     my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
     my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
@@ -114,7 +114,7 @@ sub run {
     }
         
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    #my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
+    # my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
     my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile | tee -a $output_file | "; 
     #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
@@ -188,13 +188,15 @@ sub run {
                     $est_strand *= -1;
                 }
             }
-            
+            #print "results score ",$score," percent_id ", $percent_id," start ",$gen_start," end ",$gen_end," id ", $gen_id," hstart ",$est_start," hend ", $est_end," hid ", $est_id,"\n";
+	    $source_tag, 
+	    $gen_strand, $est_strand,
  	    $self->_createfeatures ($score, $percent_id,
-                $gen_start, $gen_end, $gen_id, 
-		$est_start, $est_end, $est_id,
-                $source_tag, 
-                $gen_strand, $est_strand,   # est_strand is NOT stored in the db!
-		$primary);
+				    $gen_start, $gen_end, $gen_id, 
+				    $est_start, $est_end, $est_id,
+				    $source_tag, 
+				    $gen_strand, $est_strand,   # est_strand is NOT stored in the db!
+				    $primary);
        }    
 
       }
@@ -220,10 +222,9 @@ sub run {
 
 
 sub _createfeatures {
-    my ($self, $f1score, $f1percent_id, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-        $f1source, $f1strand, $f2strand, $f1primary) = @_;
+    my ($self, $f1score, $f1percent_id, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id, $f1source, $f1strand, $f2strand, $f1primary) = @_;
     
-
+    #print "creating feature pair ".$f1primary." ".$f1source." \n";
     my $analysis_obj    = new Bio::EnsEMBL::Analysis
                                 (-db              => "none",
                                  -db_version      => "none",
@@ -256,7 +257,34 @@ sub _createfeatures {
     my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
                                              -feature2 => $feat2) ;
 
-        push(@{$self->{'_fplist'}}, $fp);
+    push(@{$self->{'_fplist'}}, $fp);
+    #print "the new fp has ".$fp->source_tag." ".$fp->primary_tag."\n";
+}
+
+
+sub convert_output {
+  my ($self) = @_;
+  my @genes;
+  my @exons;
+  my @supp_feat;
+
+  # split the different features up
+  foreach my $f(@{$self->{'_fplist'}}){
+    if ($f->primary_tag eq 'Span'){
+      push(@genes, $f);
+    }
+    elsif($f->primary_tag eq 'Exon'){
+      push(@exons, $f);
+    }
+    elsif($f->primary_tag eq 'Segment'){
+      push(@supp_feat, $f);
+    }
+  }
+  
+ 
+  
+  push(@{$self->{'_output'}},@supp_feat);
+
 }
 
 

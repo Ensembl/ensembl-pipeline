@@ -58,7 +58,7 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use Bio::Tools::BPlite;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm;
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;
 use DB_File;
 use Fcntl;
 
@@ -92,7 +92,7 @@ sub new {
     $self->{'_hmmfilename'} = undef; #file to store protein profile hmms 
     $self->{'_errorfile'} = undef; #file to store any errors hmmfetch throw
     $self->{'_dbm_file'} = undef;
-    print"args = @args\n";
+    #print"args = @args\n";
     my ($genomic, $features, $hmmfetch, $hmmdb, $dbmfile, $memory) = $self->_rearrange([qw(GENOMIC
 											   FEATURES
 											   HMMFETCH
@@ -383,7 +383,7 @@ sub get_pfam_ids{
     my $pfam = $swiss_pfam{$swiss_id};
     #print "found these pfam domains ".$pfam." \n";
     if(!$pfam){
-      $self->warn("the swissprot ".$swiss_id ."entry has no pfam domains :!")
+      #$self->warn("the swissprot ".$swiss_id ."entry has no pfam domains :!")
     }
     my @pfams = split /,/, $pfam;
     #print "pfams = @pfams\n";
@@ -402,6 +402,10 @@ sub get_pfam_ids{
       }
     }
   }
+ # my @ids = keys(%pfams);
+ # foreach my $id(@ids){
+ #   print $id."\n";
+ # }
   return %pfams;
 }
  
@@ -420,15 +424,16 @@ sub create_genewisehmm{
  #print "getting hmms\n";
  $self->workdir('/tmp') unless ($self->workdir($dir)); 
  $self->checkdir();
- print "running HalfwiseHMM\n";
- system("pwd");
+ #print "running HalfwiseHMM\n";
+ #system("pwd");
  my @ids = keys(%$pfam_ids);
  my $genewisehmm;
  my @features;
  my $memory = $self->memory;
+ my %pfam_run;
  #print "there are ".scalar(@ids)." pfam ids to run\n";
  foreach my $id (@ids){
-   print "running for pfam ".$id."\n";
+   
    my $strand = $pfam_ids->{$id};
 
    $self->get_hmm($id);
@@ -436,31 +441,46 @@ sub create_genewisehmm{
     $self->warn("hmm file not created :$!");
     next;
   }
-   #print "got hmm \n";
+   #print $id."\n";
+   if($pfam_run{$id}){
+     #print "running twice on ".$id."\n";
+   }else{
+     $pfam_run{$id} = 1;
+   }
    if($strand == 1){
-    
-    $genewisehmm = $self->run_genewisehmm($strand, $memory);
-    $genewisehmm->run();
-    @features = $genewisehmm->output();
-    #print "adding ".scalar(@features)." to output\n";
-    unlink $self->hmmfilename();
-    $self->add_output_features(\@features);
-  }elsif($strand == -1){
-    $genewisehmm = $self->run_genewisehmm($strand, $memory);
-    $genewisehmm->run();
-    @features = $genewisehmm->output();
-    #print "adding ".scalar(@features)." to output\n";
-    unlink $self->hmmfilename();
-    $self->add_output_features(\@features);
+     @features = [];
+     #print "running on ".$strand."\n";
+     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+     #$self->display_genes(\@features);
+     #print "adding ".scalar(@features)." to output\n";
+     unlink $self->hmmfilename();
+     $self->add_output_features(\@features);
+   }elsif($strand == -1){
+     @features = [];
+     #print "running on ".$strand."\n";
+     $genewisehmm = $self->run_genewisehmm($strand, $memory);
+     $genewisehmm->run();
+     @features = $genewisehmm->output();
+     #$self->display_genes(\@features);
+     #print "adding ".scalar(@features)." to output\n";
+     unlink $self->hmmfilename();
+     $self->add_output_features(\@features);
   }elsif($strand == 0){
+    @features = [];
+    #print "running on ".$strand."\n";
     $genewisehmm = $self->run_genewisehmm(1, $memory);
     $genewisehmm->run();
-    @features = $genewisehmm->output(); 
+    @features = $genewisehmm->output();
+    #$self->display_genes(\@features); 
     #print "adding ".scalar(@features)." to output\n";
     $self->add_output_features(\@features);
     $genewisehmm = $self->run_genewisehmm(-1, $memory);
     $genewisehmm->run();
+    @features = [];
     @features = $genewisehmm->output();
+    #$self->display_genes(\@features);
     #print "adding ".scalar(@features)." to output\n";
     unlink $self->hmmfilename();
     $self->add_output_features(\@features);
@@ -492,7 +512,7 @@ sub run_genewisehmm{
     $reverse = undef;
   }
   #print "creating genewisehmm\n";
-  my $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new('-genomic' => $self->genomic_sequence(),
+  my $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm->new('-genomic' => $self->genomic_sequence(),
                                                                     '-memory' => $memory,
                                                                     '-hmmfile' => $self->hmmfilename(),
                                                                     '-reverse' => $reverse);
@@ -520,7 +540,7 @@ sub get_hmm{
   my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." > ".$self->hmmfilename;
 
   #print "command = ".$command."\n";
-  system ('pwd');
+  #system ('pwd');
   eval{
     system($command);
   };
@@ -590,4 +610,29 @@ sub output{
   return @{$self->{'_output_features'}};
 
 }
+
+sub display_genes {
+  my ($self, $result) = @_;
+  #Display output
+  my @results = @$result;
+  foreach my $obj (@results)
+    {
+      print STDERR ("gene:  ".$obj->gffstring. "\n");
+      if ($obj->sub_SeqFeature)
+	{
+	  foreach my $exon ($obj->sub_SeqFeature)
+	    {
+	      print STDERR "Exon:  ".$exon->gffstring."\n";
+	      if ($exon->sub_SeqFeature)
+		{
+		  foreach my $sub ($exon->sub_SeqFeature){
+		    print STDERR "supporting features:  ".$sub->gffstring."\n";
+		  }
+		}
+	    }
+	}
+    }
+}
+
+
 1;
