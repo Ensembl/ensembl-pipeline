@@ -5,7 +5,7 @@
 load_scaffolds.pl
 
 =head1 SYNOPSIS
- 
+
   load_scaffolds.pl -pipe blabla.fa
 
 =head1 DESCRIPTION
@@ -16,45 +16,43 @@ If the option -pipe is set it also fills the ensembl pipeline InputIdAnalysis wi
 
 =head1 OPTIONS
 
-
     -host    host name for database (gets put as host= in locator)
     -dbname    For RDBs, what name to connect to (dbname= in locator)
     -dbuser    For RDBs, what username to connect as (dbuser= in locator)
     -dbpass    For RDBs, what password to use (dbpass= in locator)
-    -module    Module name to load (Defaults to Bio::EnsEMBL::DBSQL::DBAdaptor)
     -help      displays this documentation with PERLDOC
+
 =cut
 
 use strict;
-use vars qw($USER $PASS $DB $HOST $DSN);
-use Bio::EnsEMBL::DBLoader;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Bio::EnsEMBL::PerlDB::Contig;
 use Bio::EnsEMBL::PerlDB::Clone;
 use Getopt::Long;
 
 my $dbtype = 'rdb';
-my $host   = 'localhost';
+my $host   = '';
 my $port   = '';
-my $dbname = 'main_trunk_pipeline';
-my $dbuser = 'root';
-my $dbpass = undef;
-my $module = 'Bio::EnsEMBL::DBSQL::DBAdaptor';
+my $dbname = '';
+my $dbuser = 'ensadmin';
+my $dbpass = '';
+my $write  = 0;
 
 my $help = 0;
 my $pipe = 0;
 my $verbose = 0;
 
-&GetOptions( 
+&GetOptions(
 	     'dbtype:s'   => \$dbtype,
 	     'host:s'     => \$host,
 	     'port:n'     => \$port,
 	     'dbname:s'   => \$dbname,
 	     'dbuser:s'   => \$dbuser,
 	     'dbpass:s'   => \$dbpass,
-	     'module:s'   => \$module,
              'pipe'       => \$pipe,
 	     'verbose'    => \$verbose,
+	     'write'      => \$write,
 	     'h|help'     => \$help
 	     );
 if ($help) {
@@ -62,20 +60,20 @@ if ($help) {
 }
 
 $SIG{INT} = sub {my $sig=shift;die "exited after SIG$sig";};
-my $locator;
-if ($dbpass) {
-   $locator = "$module/host=$host;port=;dbname=$dbname;user=$dbuser;pass=$dbpass";
-}
-else {
-   $locator = "$module/host=$host;port=;dbname=$dbname;user=$dbuser;pass=";
-}
-my $db =  Bio::EnsEMBL::DBLoader->new($locator);
+
+my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+    -dbname => $dbname,
+    -host   => $host,
+    -user   => $dbuser,
+    -port   => $port,
+    -pass   => $dbpass
+);
 
 my ($seqfile) = @ARGV;
 
 if( !defined $seqfile ) { die 'cannot load because sequence file to load sequences from was not passed in as argument';}
 
-my $seqio = new Bio::SeqIO(-format=>'Fasta', 
+my $seqio = new Bio::SeqIO(-format=>'Fasta',
 			   -file=>$seqfile);
 my $count = 0;
 while ( my $seq = $seqio->next_seq ) {
@@ -84,22 +82,27 @@ while ( my $seq = $seqio->next_seq ) {
     $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
     my $clone     = new Bio::EnsEMBL::PerlDB::Clone;
     my $contig    = new Bio::EnsEMBL::PerlDB::Contig;
-    $clone->htg_phase(3);
+    $clone->htg_phase(-1);
     $clone->id($cloneid);
+    $clone->version(1);
+    $clone->embl_id("");
+    $clone->embl_version(0);
     $contig->id($contigid);
     $contig->internal_id($count++);
-    $contig->seq($seq);    
+    $contig->seq($seq);
     $clone->add_Contig($contig);
-    eval { 
-       $db->write_Clone($clone);
-       $verbose && print STDERR "Written ".$clone->id." scaffold into db\n";
-    };
-    if( $@ ) {
-      print STDERR "Could not write clone into database, error was $@\n";
-    }
-    if ($pipe) {
-      my $sth = $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values('".$contigid."','contig',1,now())");
-      $sth->execute;
-      $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
+    if ($write) {
+       eval {
+          $db->get_CloneAdaptor->store($clone);
+          $verbose && print STDERR "Written ".$clone->id." scaffold into db\n";
+       };
+       if( $@ ) {
+         print STDERR "Could not write clone into database, error was $@\n";
+       }
+       if ($pipe) {
+          my $sth = $db->prepare("insert into InputIdAnalysis (inputId,class,analysisId,created) values('".$contigid."','contig',1,now())");
+         $sth->execute;
+         $verbose && print STDERR "Written InputIdAnalysis entry for ".$clone->id."\n";
+       }
     }
 }
