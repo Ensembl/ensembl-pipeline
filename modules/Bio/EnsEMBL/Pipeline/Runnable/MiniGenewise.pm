@@ -612,7 +612,7 @@ sub minirun {
 
 	    print STDERR "Number of extra features = " . scalar(@extras) . "\n";
 
-	    next ID unless (scalar(@extras) >= 1);
+	    next ID unless (scalar(@extras) > 1);
 
 	    my $miniseq = $self->make_miniseq(@$features);
 	    my $hseq    = $self->get_Sequence($id);
