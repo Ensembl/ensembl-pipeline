@@ -53,17 +53,13 @@ sub new {
 				     EXON
 				     TYPE)],@args);
 
-  # Mandatory argument
-  $self->seq($seq);
-  $self->deletions($deletions); # Even if there isn't a sequence
-                                # an undefined value will cause
-                                # a full sequence of '-' to be made.
 
   # Optional arguments
-  $self->name($name)           if $name;
-  $self->start($start)         if $start;
-  $self->exon($exon)           if $exon;
-  $self->type($type)           if $type;
+  $self->seq($seq)     if $seq;
+  $self->name($name)   if $name;
+  $self->start($start) if $start;
+  $self->exon($exon)   if $exon;
+  $self->type($type)   if $type;
 
   return $self;
 }
@@ -85,6 +81,9 @@ sub seq {
   if (@_) {
     $self->{'_seq'} = shift;
   }
+
+  $self->throw('No sequence attached to object')
+    unless $self->{'_seq'};
 
   return $self->{'_seq'};
 }
@@ -175,17 +174,22 @@ sub insert_gap {
 
   $insert_position--;
 
-  my $gap = '-' x $gap_length;
+  my $gap = '*' x $gap_length;
   my @gap = split //, $gap;
-  
+
+  # Stick the gap in the sequence
+
   my $sequence_as_array = $self->seq_array;
-  my $deletions_as_array = $self->deletion_array;
-
   splice (@$sequence_as_array, $insert_position, 0, @gap);
-  splice (@$deletions_as_array, $insert_position, 0, @gap);
-
   $self->store_seq_array($sequence_as_array);
-  $self->store_deletion_array($deletions_as_array);
+
+  # Take note of the gap in our set of deletion coordinates
+
+  for (my $i = 0; $i < $gap_length; $i++) {
+    $self->increment_deletions_above($insert_position+$i)
+  }
+
+print ">SEQUENCE\n" . $self->seq_with_newlines . "\n";
 
   return 1;
 }
@@ -193,71 +197,91 @@ sub insert_gap {
 sub deletions {
   my $self = shift;
 
-  if ((@_)||(!$self->{'_deletions'})) {
-    my $value = shift;
+  my @sorted_array_of_deletion_coords = 
+    sort {$a <=> $b} keys %{$self->{_deletion_hash}};
 
-    if (!$value) {
-      $value = '-';
-    }
+  return \@sorted_array_of_deletion_coords
+}
 
-    $self->throw("Deletion list needs to be a string, you have probably passed in an array.")
-      if (ref $value);
+sub add_deletion {
+  my $self = shift;
 
-    # If the deletion string is empty or shorter
-    # than the sequence string, pad the end with
-    # '-'.
+  if (@_) {
+    my $position = shift;
 
-    my @deletion_array = split //, $value;
+    $self->throw("Add deletion requires a numeric argument, not this [" .
+		 ref($position) . "]") 
+      if (ref($position) ne '');
 
-    my $length_difference = (scalar @{$self->seq_array}) - (scalar @deletion_array);
-
-    while ($length_difference) {
-      $value .= '-';
-      $length_difference--;
-    }
-    
-    $self->{'_deletions'} = $value;
+    $self->_deletion_hash->{$position}++
   }
 
-  return $self->{'_deletions'};
+  return 1
 }
+
+sub is_a_deletion {
+  my $self = shift;
+
+  my $position = shift;
+
+  if ($self->_deletion_hash->{$position}) {
+    return 1
+  }
+
+  return 0
+}
+
+sub increment_deletions_above {
+  my ($self, $coord) = @_;
+
+print "Increment above this coord : " . $coord . "\n";
+
+  my $coords = keys %{$self->_deletion_hash};
+
+
+  for (my $i = 0; $i < scalar @$coords; $i++) {
+    if ($self->_deletion_hash->{$coords->[$i]}){
+      delete $self->_deletion_hash->{$coords->[$i]};
+      $self->_deletion_hash->{$coords->[$i]+1} = 1;
+    }
+  }
+
+  return 1
+}
+
+sub _deletion_hash {
+  my $self = shift;
+
+  unless ($self->{'_deletions'}){
+    $self->{'_deletions'} = {};
+  }
+
+  return $self->{'_deletions'}
+}
+
 
 sub deletion_array {
   my $self = shift;
 
-  my @array = split //, $self->deletions;
-
-  return \@array;
+  $self->throw("deletion_array method removed due to" .
+	       " the antisocial manner in which it hammers memory.");
 }
 
 sub store_deletion_array {
   my ($self, $input_array) = @_;
 
-  $self->throw("Array for storage contains nothing.")
-    unless (scalar @$input_array > 0);
-
-  my $concat_seq = '';
-
-  foreach my $element (@$input_array) {
-    $concat_seq .= $element;
-  } 
-
-  $self->deletions($concat_seq);
-
-  return 1;
+  $self->throw("store_deletion_array method removed due to" .
+	       " the antisocial manner in which it hammers memory.");
 
 }
 
 sub fetch_deletion_at_position {
   my ($self, $base_position) = @_;
 
-  $self->throw("Must specify a base position to retrieve a specific position from the sequence.")
-    unless $base_position;
+  $self->throw("fetch_deletion_at_position method removed due to" .
+		 " the antisocial manner in which it hammers memory.");
 
-  $base_position--;
-
-  return substr $self->deletions, $base_position, 1;
-} 
+}
 
 
 # I'm not sure what this is used for...
