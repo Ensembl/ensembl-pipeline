@@ -206,7 +206,7 @@ sub run_est_genome_on_strand {
             }
         }
 
-        print "MADE ",scalar(@sets)," LINEAR MATCHES\N";
+        print "MADE ",scalar(@sets)," LINEAR MATCHES\n";
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
         }
