@@ -26,6 +26,18 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
 
+my $gene_type;
+&GetOptions(
+	    'gene_type:s'       => \$gene_type,
+	   );
+
+
+if ( $gene_type ){
+  print STDERR "restricting to genes of type $gene_type\n";
+}
+else{
+  print STDERR "considering all gene types\n";
+}
 
 my %chrhash;
 
@@ -39,24 +51,31 @@ my @gene_ids = &get_gene_ids();
 &make_directories();
 
 # create jobs file for Exonerate
-&make_pseudogene_bsubs( @gene_ids);
+&make_pseudogene_bsubs( \@gene_ids);
 
 ############################################################
 
 sub get_gene_ids{
-    my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-						 '-host'   => $LABEL_DBHOST,
-						 '-user'   => 'ensro',
-						 '-dbname' => $LABEL_DBNAME,
-						 );
-    return $db->get_GeneAdaptor->list_geneIds;
+  my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+					       '-host'   => $LABEL_DBHOST,
+					       '-user'   => 'ensro',
+					       '-dbname' => $LABEL_DBNAME,
+					      );
+  if ( $gene_type ){
+    my @ids = &get_genes_by_type($db,$gene_type);
+    return @ids;
+  }
+  else{
+    my $gene_ids = $db->get_GeneAdaptor->list_geneIds;
+    return @{$gene_ids};
+  }
 }
 
 ############################################################
 
 sub make_directories {
   my $scratchdir =  $TMPDIR ;
-
+  
   makedir($scratchdir);
   # bsub output directories
   my $bsubdir = $scratchdir . "/" . $pseudogene_bsubdir . "/";
@@ -67,26 +86,26 @@ sub make_directories {
 ############################################################
 
 sub make_pseudogene_bsubs {
-    my @gene_ids = shift;
+  my $gene_ids = shift;
+  
+  my $jobfile = $BSUBS_FILE;
+  open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
+  
+  my $lsf_options   = $LSF_OPTIONS;
+  my $check         = $LABEL_PRE_EXEC;
+  my $pseudogene    = $LABEL_SCRIPT;
+  my $bsubdir       = $TMPDIR . "/" . $pseudogene_bsubdir . "/";
+  
+  foreach my $id (@$gene_ids){
+    my $outfile   = $bsubdir . $id. "_out";
+    my $errfile   = $bsubdir . $id. "_err";
     
-    my $jobfile = $BSUBS_FILE;
-    open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
-    
-    my $lsf_options   = $LSF_OPTIONS;
-    my $check         = $LABEL_PRE_EXEC;
-    my $pseudogene    = $LABEL_SCRIPT;
-    my $bsubdir       = $TMPDIR . "/" . $pseudogene_bsubdir . "/";
-        
-    foreach my $id (@gene_ids){
-	my $outfile   = $bsubdir . $id. "_out";
-	my $errfile   = $bsubdir . $id. "_err";
-	
-	my $command = 
-	    "bsub $lsf_options -o $outfile -e $errfile -E \"$check \" $pseudogene -gene_id  $id";
-	print OUT "$command\n";
-    }
-    
-    close (OUT) or die (" Error closing $jobfile: $!");
+    my $command = 
+      "bsub $lsf_options -o $outfile -e $errfile -E \"$check \" $pseudogene -gene_id  $id";
+    print OUT "$command\n";
+  }
+  
+  close (OUT) or die (" Error closing $jobfile: $!");
 }
 
 ############################################################
@@ -98,3 +117,22 @@ sub makedir{
 }
 
 ############################################################
+
+sub get_genes_by_type{
+  my ($db, $type ) = @_;
+  my $query = qq{
+    SELECT gene_id
+      FROM gene
+     WHERE gene.type = "$type"
+   };
+
+  my $sth = $db->prepare( $query );
+  $sth->execute();
+  my @ids;
+  while( my $id = $sth->fetchrow_array() ) {
+    push( @ids, $id );
+  }
+  return @ids;
+}
+
+
