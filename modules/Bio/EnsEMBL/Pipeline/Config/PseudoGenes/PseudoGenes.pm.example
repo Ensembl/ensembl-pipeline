@@ -4,7 +4,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes
+Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
 
 =head1 SYNOPSIS
     use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
@@ -38,7 +38,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
+package Bio::EnsEMBL::Pipeline::Config::PseudoGenes::PseudoGenes;
 
 use strict;
 use vars qw( %PseudoGenes );
@@ -50,13 +50,13 @@ use vars qw( %PseudoGenes );
 	# parameters common to both types of
 	# pseudogene analysis
 
-        TMPDIR      => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/',
-        BSUBS_FILE  => '/ecs2/scratch3/ensembl/eae/NCBI_31/Pseudogenes/pseudogenes_jobs',
+        TMPDIR      => '/ecs2/scratch1/ensembl/eae/Rat_PseudoGenes',
+        BSUBS_FILE  => '/ecs2/scratch1/ensembl/eae/Rat_PseudoGenes/jobs',
         LSF_OPTIONS => ' -C0 -q acari ',
 	      
         # database with the syntenic regions. orthologs, etc
 	COMPARA_DBNAME  => 'ensembl_compara_16_1',
-	COMPARA_DBHOST  => 'ecs2d',
+	COMPARA_DBHOST  => 'ecs2f',
 				
 	
 	# Species we compare to:
@@ -64,24 +64,24 @@ use vars qw( %PseudoGenes );
 	# compatible with the compara database use above.
 	# We do it like this and not using a compara_config file to
 	# avoid having multiple config files
-	FOCUS_SPECIES => 'Mus musculus',
+	FOCUS_SPECIES => 'Rattus norvegicus',
 	COMPARATIVE_DBS    => [
 				       {
 					SPECIES => 'Homo sapiens',
 					DBHOST  => 'ecs2f',
 					DBNAME  => 'homo_sapiens_core_16_33',
-					PATH    => 'NCBI33',
+					PATH    => 'NCBI34',
 				       },
 				       {
-					SPECIES => 'Rattus norvegicus',
+					SPECIES => 'Mus musculus',
 					DBHOST  => 'ecs2f',
-					DBNAME  => 'Rattus_noervegicus',
-					PATH    => 'RGSC2',
+					DBNAME  => 'mus_musculus_core_16_30',
+					PATH    => 'NCBIM30',
 				       },
 				      ],
 
 	# refdb, where the sequence is, sometimes this can be different from genewise_db
-	REF_DBNAME   => 'mus_musculus_core_16_30',
+	REF_DBNAME   => 'rattus_norvegicus_core_16_2',
 	REF_DBHOST   => 'ecs2f',	
 
 	############################################################
@@ -95,14 +95,13 @@ use vars qw( %PseudoGenes );
 	# that are possible processed-pseudogenes
 	# will be labelled as 'pseudogenes'
 
-        LABEL_PRE_EXEC;
-        LABEL_SCRIPT => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/label_pseudogenes.pl';
+        LABEL_SCRIPT => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/label_pseudogenes.pl',
 	LABEL_PRE_EXEC   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/Pseudogenes/label_pseudogenes.pl -check',
 	
 	# database where the genes to be labelled are
-	LABEL_DBNAME => 'mus_musculus_core_16_30',
+	LABEL_DBNAME => 'rattus_norvegicus_core_16_2',
         LABEL_DBHOST => 'ecs2f',
-
+	LABEL_PATH   => 'RGSC2',	
 
 	############################################################
 	#
