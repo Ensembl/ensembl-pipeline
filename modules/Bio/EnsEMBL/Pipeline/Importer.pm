@@ -25,6 +25,7 @@ Importer
   my $importer   = new Importer(-dbobj      => $dbobj,
                                 -mirror_dir => $mirror_dir);
 
+  $importer->files(['xxx.gz', 'yyy.gz']);
   $importer->importClones;
 
 =head1 DESCRIPTION
@@ -114,7 +115,22 @@ sub _initialize {
 sub importClones {
   my ($self) = @_;
 
-  my @files   = $self->getNewFiles;
+  my @files;
+  if (defined $self->files) {
+    my $tmp = $self->files;
+    foreach my $file (@{$tmp}) {
+      if (-e ($self->mirror_dir . '/embl_files/' . $file)) {
+        push @files, $file;
+      }
+      else {
+        print STDERR "Can't find file $file\n";
+      }
+    }
+    $self->throw("Couldn't find any of the specified files") unless scalar @files > 0;
+  }
+  else {
+    @files = $self->getNewFiles;
+  }
   my $logfile = $self->logfile;
 
   open(LOG,">>$logfile") || $self->throw("Can't write to logfile $logfile");
@@ -443,26 +459,34 @@ sub readFile {
   my $accession;
   
   if (! $finished) {
-  while (<CC>) {
-    chomp;
-    if ($_ =~ /^SV\s+(.*)\.(.*)/) {
-      $accession = $1;
+    while (<CC>) {
+      chomp;
+      if ($_ =~ /^SV\s+(.*)\.(.*)/) {
+	$accession = $1;
       
-      $clonehash->{$1}{version} = $2;
-      $clonehash->{$1}{contigs} = [];
-    } elsif ($_ =~ /(\d+)\s+(\d+):? contig of/) {
+	$clonehash->{$1}{version} = $2;
+	$clonehash->{$1}{contigs} = [];
+      } elsif ($_ =~ /(\d+)\s+(\d+):? contig of/) {
     # disclaimer: this re (^^) should work, but not guaranteed, e.g.
     # needed ? after : because of file format "inconsistencies"... arrgh!
-      my %contighash;
+        my %contighash;
       
-      $contighash{start} = $1;
-      $contighash{end}   = $2;
+	$contighash{start} = $1;
+	$contighash{end}   = $2;
       
-      push(@{$clonehash->{$accession}{contigs}},\%contighash);
+        push(@{$clonehash->{$accession}{contigs}},\%contighash);
       
+      } elsif ($_ =~ /Contig (\d+):\s+(\d+)\-(\d+)/) {
+        my %contighash;
+      
+	$contighash{start} = $2;
+	$contighash{end}   = $3;
+      
+        push(@{$clonehash->{$accession}{contigs}},\%contighash);
+      
+      }
     }
-  }
-  close(CC);
+    close(CC);
   }
 
   return ($clonehash);
@@ -549,6 +573,18 @@ sub makeClones {
       
       if ($phase != 4) {
 	my @contigs = @{$clones->{$acc}{contigs}};
+
+	# if we haven't got a list of clones by reading the cc file
+	# need to divide clone into contigs the dirty way ...
+	if (scalar @contigs == 0) {
+	  my @limits = $self->scanClone($seq->seq);
+	  foreach my $l (@limits) {
+	    push @contigs, {
+	      'start' => $l->[0],
+	      'end'   => $l->[1]
+	    };
+	  }
+	}
 	
 	my $count = 1;
 	print STDERR "\nContigs : " . scalar(@contigs) . "\n";
@@ -726,6 +762,75 @@ sub retain_old_versions {
     }
   }
   return $self->{_retain_old_versions};
+}
+
+=head2 scanClone
+
+    Title   :   scanClone
+    Usage   :   @contigs = $obj->scanClone($seq)
+    Function:   Scans the clone sequence to find positions of contigs
+		by assuming at least x n's  between contigs
+    Returns :   contig positions: list of lists (start, end)
+    Args    :   seq: string
+
+=cut
+
+sub scanClone {
+  my($self, $seq) = @_;
+  my(@gaps, @contig);
+  my($start, $gap);
+
+  # get a list of gaps - at least 50 bp
+  my $pos = 0;
+  while ($pos < length $seq) {
+    my $unused = substr $seq, $pos;
+    ($gap) = $unused =~ /(n{50,})/;
+    last unless $gap;
+    $start = 1 + index $seq, $gap, $pos;
+    push @gaps, [ $start, $start + length($gap) - 1 ];
+    $pos = $start + length $gap;
+  }
+
+  # calc coords of contigs
+
+  if (@gaps){
+    # 1st contig before 1st gap unless the sequence starts off with a gap
+    push @contig, [1, $gaps[0]->[0] - 1] unless $gaps[0]->[0] == 1;
+
+    # contigs other than 1st and last are between gaps
+    foreach my $i (0 .. $#gaps - 1) {
+      push @contig, [$gaps[$i]->[1] + 1, $gaps[$i + 1]->[0] - 1];
+    }
+
+    # last contig after last gap unless the sequence ends with a gap
+    push @contig, [$gaps[$#gaps]->[1] + 1, length($seq)]
+     unless $gaps[$#gaps]->[1] == length($seq);
+  }
+  else {
+    # no gaps
+    push @contig, [1, length($seq)];
+  }
+
+  return @contig;
+}
+
+=head2 files
+
+    Title   :   files
+    Usage   :   $obj->files([...])
+    Function:   Get/set for a specific list of files to read
+    Returns :   array ref
+    Args    :   array ref
+
+=cut
+
+sub files {
+  my($self, $files) = @_;
+
+  if (defined $files) {
+    $self->{'_files'} = $files;
+  }
+  return $self->{'_files'};
 }
 
 1;
