@@ -75,6 +75,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::TranscriptFactory;
+use Bio::EnsEMBL::PredictionTranscript;
 use Bio::Seq;
 use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
@@ -377,6 +378,16 @@ sub each_Fgenesh_Transcript {
   }
   return @{$self->{'_transcripts'}};
 }
+
+sub get_all_Transcripts {
+  my ( $self ) = @_;
+
+  if (!defined($self->{_transcripts})) {
+    $self->{_transcripts} = [];
+  }
+  return $self->{_transcripts};
+}
+
 
 ##################
 #Analysis methods#
@@ -728,66 +739,36 @@ sub create_feature {
 
 =cut
 
+
 sub output {
+    my ($self) = @_;
+    my @pred;
 
-  my ($self) = @_;
+    my $analysis = Bio::EnsEMBL::Analysis->new(
+        -db              => undef,
+        -db_version      => undef,
+        -program         => 'genscan',
+        -program_version => 1,
+        -gff_source      => 'genscan',
+        -gff_feature     => 'prediction',
+        -logic_name      => 'genscan',
+    );
 
-  my @feat;
+    foreach my $transcript (@{$self->get_all_Transcripts}) {
 
-  my $analysis = Bio::EnsEMBL::Analysis->new(   -db              => undef,
-						-db_version      => undef,
-						-program         => 'fgenesh',
-						-program_version => 1,
-						-gff_source      => 'fgenesh',
-						-gff_feature     => 'prediction',
-						-logic_name      => 'fgenesh',
-						);
+        my $exons = $transcript->get_all_Exons();
+        my @exons;
 
-  
-  foreach my $gene ($self->each_Fgenesh_Gene) {
-    my @exons = $gene->sub_SeqFeature;
+        if ($exons->[0]->strand == 1) {
+            @exons = sort {$a->start <=> $b->start } @{$exons};
+        } else {
+            @exons = sort {$b->start <=> $a->start } @{$exons};
+        }
 
-    if ($exons[0]->strand == 1) {
-      @exons = sort {$a->start <=> $b->start } @exons;
-    } else {
-      @exons = sort {$b->start <=> $a->start } @exons;
+        push @pred, Bio::EnsEMBL::PredictionTranscript->new(@exons);
     }
-#    print STDERR "\n" .$transcript->temporary_id . "\n";
-
-    foreach my $exon (@exons) {
-      my $f = new Bio::EnsEMBL::SeqFeature(-seqname => $self->query->id.".".$exon->seqname,
-					   -start   => $exon->start,
-					   -end     => $exon->end,
-					   -strand  => $exon->strand,
-					   -phase   => $exon->phase,
-					   -end_phase => $exon->end_phase,
-					   -score   => $exon->score,
-					   -analysis     => $analysis);
-      my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname =>  $self->query->id.".".$exon->seqname,
-					    -start   => $exon->start,
-					    -end     => $exon->end,
-					    -strand  => $exon->strand,
-					    -phase   => $exon->phase,
-					    -end_phase => $exon->end_phase,
-					    -score   => $exon->score,
-					    -p_value   => $exon->p_value,
-					    -analysis     => $analysis);
-
-#      print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
-
-      $f->analysis($analysis);
-      $f2->analysis($analysis);
-
-      my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $f,
-					     -feature2 => $f2);
-
-      push(@feat,$fp);
-    }
-
-  }
-  return @feat;
+    return @pred;
 }
-
 
 
 1;
