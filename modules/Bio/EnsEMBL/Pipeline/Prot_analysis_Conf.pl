@@ -76,10 +76,6 @@ package main;
 		  #'Seg_chunk'         => '3',
 		  'Seg_chunk'         => '',
 
-#paracel use 0 from no, 1 for yes. If nothing is set, suppose that the paracel is not used
-
-		  'paracel'  => '',
-
 #Define the chunk size (how many protein are going to be in each chunks)
 		  #'chunk_size' => '100'
 		  'chunk_size' => ''
