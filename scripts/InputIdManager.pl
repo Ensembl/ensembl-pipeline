@@ -64,9 +64,9 @@ use strict;
 use FileHandle;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
+use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 $Getopt::Long::autoabbrev = 0;
 
@@ -118,7 +118,7 @@ if (($delete && $insert) || ($filename && $id)) {
     exit 2;
 }
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::Obj->new(
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -user   => $dbuser,
     -dbname => $dbname,
     -host   => $dbhost,
@@ -183,7 +183,7 @@ sub insert_delete {
     }
     if ($insert) {
 	print "Inserting $id into DB\n";
-	my $res = $sic->store_inputId_class_analysis($id, $class, $anal);
+	my $res = $sic->store_input_id_class_analysis($id, $class, $anal);
 	print STDERR "Warning: inputid $id not stored\n" unless $res == 1;
     } else {
 	if ($allanals) {
