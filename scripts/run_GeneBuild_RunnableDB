@@ -41,7 +41,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 					                     GB_DBNAME
 					                     GB_DBUSER
 					                     GB_DBPASS
-							     GB_DBPOT
+							     GB_DBPORT
                                                             );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts  qw  (
