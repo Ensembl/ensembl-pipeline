@@ -12,6 +12,8 @@ my $dbuser    = 'ensro';
 my $dbname;
 my $dnadbname;
 my $dbpass    = undef;
+my $introns;
+my $transcripts;
 
 my $genetype;
 
@@ -23,6 +25,8 @@ GetOptions(
 #	   'dnadbname:s'  => \$dnadbname,
 #	   'dnadbhost:s'  => \$dnadbhost,
 	   'genetype:s'  => \$genetype,
+	   'intron_info_file:s' => \$introns,
+	   'transcript_info_file:s' => \$transcripts,
 	  );
 
 unless ( $dbname && $dbhost ){
@@ -87,18 +91,62 @@ foreach my $gene_id ( @gene_ids){
 
 ############################################################
 
-my $introns = "intron_sizes";
-my $transcripts = "transcripts_per_intron_size";
+my $total_intron_size = 0;
+my $total_number_of_introns = 0;
+my $one;
+my $lesstwenty = 0;
+my $lessfifty = 0;
+my $maximum;
+my $median;
+my $mode = 0;
+#my $introns = "/ecs2/work2/lec/code/rat_build/data/".$dbname.$dbhost."intron_size.txt";
+#my $transcripts = "/ecs2/work2/lec/code/rat_build/data/".$dbname.$dbhost."transcripts_per_intron_size";
 
+$introns = "intron_size.txt" if(!$introns);
+$transcripts = "transcripts_per_intron_size.txt". if(!$transcripts);
+
+my $total = scalar(keys(%intron_size));
+my $middle = $total/2;
+my $rounded = sprintf("%d", $middle);  
+print "have opened ".$introns."\n";
 open (INTRONS,">$introns") or die;
+my $intron_count = 1;
 
 print INTRONS "#intron sizes\n";
 foreach my $size ( sort{ $a <=> $b } keys %intron_size ){
   print INTRONS $size."\t".$intron_size{$size}."\n";
+  if($size == 1){
+    $one = $intron_size{$size};
+  }
+  if($size <= 20){
+    $lesstwenty += $intron_size{$size};
+  }
+  if($size <= 50){
+    $lessfifty += $intron_size{$size};
+  }
+  if($intron_size{$size} > $mode){
+    $mode = $intron_size{$size};
+  }
+  $total_intron_size += $size;
+  $total_number_of_introns += $intron_size{$size};
+  $maximum = $size;
+  if($intron_count == $rounded){
+    $median = $size;
+  }
+  $intron_count++;
 }
-
 close INTRONS;
 
+
+print "1bp ".$one."\n<=20bp ".$lesstwenty."\n<=50bp ".$lessfifty."\n";
+
+my $average = $total_intron_size/$total_number_of_introns;
+
+print "average intron size = ".$average."\nmaximum intron size = ".
+  $maximum."\nmedian intron size ".$median."\nmode intron size ".
+  $mode."\n";
+
+print "have opened ".$transcripts."\n";
 open(TRANS,">$transcripts") or die;
 
 print TRANS "#transcripts per intron size\n";
