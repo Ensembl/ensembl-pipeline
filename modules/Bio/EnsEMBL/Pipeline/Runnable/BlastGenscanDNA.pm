@@ -171,14 +171,10 @@ sub run {
 								 -program   => $self->program,
 								 -database  => $self->database,
 								 -threshold => $self->threshold,
-								 -options   => $self->options,);
+								 -options   => $self->options,
+                                                                 -filter    => 0);
 
-    my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new(
-                                               -runnable => $runnable
-    );
-
-    $search->run;
-   # $runnable->run();
+    $runnable->run();
   
     $self->align_hits_to_contig($runnable->output);
     #$self->check_features($transcript->translate->seq,$self->featurepairs);
