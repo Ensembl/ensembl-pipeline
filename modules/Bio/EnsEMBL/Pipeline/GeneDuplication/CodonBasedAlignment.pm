@@ -1,14 +1,47 @@
 package Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
 use strict;
+use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Tools::Run::Alignment::Clustalw;
+
+use vars qw(@ISA);
+
+@ISA = qw(Bio::EnsEMBL::Root);
+
+
+#Synopsis:
+
+#use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
+
+#my $cba =
+#Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new;
+
+#$cba->sequences(@seqs); #Add array of nt Bio::Seq's to align.
+#my $aligned_seqs = $cba->run_alignment;
+
+#Alignment is and array of Bio::Seq objects. 
+
+#---
+
+# Genetic codes:
+# Universal                : 1
+# Vertebrate mitochondrial : 2
+
+
+
 
 sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
+
+  my ($genetic_code) = 
+    $self->_rearrange([qw(GENETIC_CODE)],
+		      @args);
+
+  $self->genetic_code($genetic_code) if $genetic_code;
 
   return $self;
 }
@@ -71,8 +104,7 @@ sub run_alignment {
 
   my @aa_seqs;
   foreach my $seq (@$seqs) {
-    push (@aa_seqs, $seq->translate(undef, undef, undef, 1));  ### !!! UNIVERSAL TRANSLATION !!! ###
-#    push (@aa_seqs, $seq->translate(undef, undef, undef, 2));  ### !!! VERT MITO TRANSLATION !!! ###
+    push (@aa_seqs, $seq->translate(undef, undef, undef, $self->genetic_code));
   }
 
   my $alignment = $clustalw->align(\@aa_seqs);
@@ -136,6 +168,19 @@ sub _alignment {
   }
   
   return $self->{_alignment};
+}
+
+sub genetic_code {
+  my $self = shift;
+
+  if (@_){
+    $self->{_genetic_code} = shift;
+  }
+ 
+  $self->throw("Genetic code not specified.") 
+    unless $self->{_genetic_code};
+
+  return $self->{_genetic_code}
 }
 
 return 1;
