@@ -141,6 +141,7 @@ sub query {
         $self->{'_query'} = $seq ;
         
         $self->filename($self->query->id.".$$.seq");
+        $self->file($self->filename);
         $self->results($self->filename.".out");
     }
     return $self->{'_query'};
@@ -249,6 +250,10 @@ sub run_repeatmasker {
     print "cmd: ", $self->repeatmasker.' '.$arguments.' '.$filename, "\n";
     $self->throw("Error running RepeatMasker on ".$self->filename."\n") 
     if (system ($self->repeatmasker.' '.$arguments.' '.$filename)); 
+
+    foreach my $file (glob $self->filename . "*") {
+        $self->file($file);
+    }
 }
 
 #New and improved! takes filenames and handles, therefore pipe compliant!
