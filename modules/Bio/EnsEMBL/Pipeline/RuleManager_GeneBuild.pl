@@ -299,7 +299,7 @@ while (1) {
 
             my $anal = $rule->check_for_analysis (@anals);
 
-            if ($anal) {
+            if (UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')) {
 
              #   print " fullfilled.\n";
                 $analHash{$anal->dbID} = $anal;
