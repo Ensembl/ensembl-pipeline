@@ -305,7 +305,7 @@ sub stdout_file{
    }
 
    if(!$self->{'stdout'}){
-     $self->{'stdout'} ='/dev/null'
+     $self->{'stdout'} ='/dev/zero'
    }
    return $self->{'stdout'};
 }
@@ -319,7 +319,7 @@ sub stderr_file{
      $self->{'stderr'} = $arg;
    }
    if(!$self->{'stderr'}){
-     $self->{'stderr'} ='/dev/null'
+     $self->{'stderr'} ='/dev/zero'
    }
    return $self->{'stderr'};
 }
@@ -391,18 +391,23 @@ sub copy_output{
     
     my $err_copy = $command." ".$err_file." ".$self->lsf_user."@".$self->submission_host.":".$stderr_file." 2>&1 ";
    
-
+    #print STDOUT " copying error file with ".$err_copy."\n";
     if(system($err_copy)){
       $self->throw("Couldn't execute ".$err_copy);
     }
+  }else{
+    print STDOUT " error file ".$err_file." doesn't exist\n";
   }
   if(-e $out_file){
+    
     my $out_copy = $command." ".$out_file." ".$self->lsf_user."@".$self->submission_host.":".$stdout_file." 2>&1";
-   
+    #print STDOUT " copying out file with ".$out_copy."\n";
     if(system($out_copy)){
       $self->throw("Couldn't execute ".$out_copy);
     }
    
+  }else{
+    print STDERR " out file ".$out_file." doesn't exist\n";
   }
 
 }
