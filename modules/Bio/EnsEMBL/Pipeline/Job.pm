@@ -276,7 +276,7 @@ sub flush_runs {
 
   my $runner = $self->runner;
 
-  if(!$runner || ! -x runner){
+  if(!$runner || ! -x $runner){
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);

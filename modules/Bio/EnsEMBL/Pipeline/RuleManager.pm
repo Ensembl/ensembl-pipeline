@@ -593,7 +593,7 @@ sub create_and_store_job{
 =cut
 
 sub can_job_run{
-  my ($self, $input_id, $analysis,$current_jobs) = @_;
+  my ($self, $input_id, $analysis, $current_jobs) = @_;
 
   if (!$input_id || !$analysis) {
     throw("Can't create job without an input_id $input_id or analysis ".
@@ -604,12 +604,19 @@ sub can_job_run{
 
   if ($current_jobs->{$analysis->dbID}) {
     my $cj = $current_jobs->{$analysis->dbID};
-    my $status = $cj->current_status->status;
+    #my $status = $cj->current_status->status;
 
-    if(($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry){
+    # This is a hack to get the status at the same time as the job was retrieved
+    # _status should be private but current_status is not useful to us here as 
+    # it will do a new query. Here we don't need the absolutely up-to-the-second
+    # status, we can always get the status on the next round of checks. This
+    # will also significantly reduce the number of queries of the job table
+    my $status = $cj->{_status}->status;
+
+    if (($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry) {
       print "\nRetrying job with status $status!!!!\n" if $self->be_verbose;
 
-      if($self->rename_on_retry){
+      if ($self->rename_on_retry) {
         $self->rename_files($cj);
       }
       $cj->set_status('CREATED');
@@ -690,6 +697,15 @@ sub job_stats{
     $job_limit = $self->job_limit;
   }
 
+
+  # Do job_stats call before getting jobs
+  if (!$self->batch_q_module->can('job_stats')) {
+    throw($self->batch_q_module." doesn't have the job_stats method");
+  }
+  my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in
+                                                                #BatchQueue.pm
+  my %job_stats = %{$self->batch_q_module->job_stats};
+
   my @jobs;
   if (!$jobs) {
     @jobs = $self->job_adaptor->fetch_all;
@@ -697,12 +713,6 @@ sub job_stats{
     @jobs = @$jobs;
   }
 
-  if (!$self->batch_q_module->can('job_stats')) {
-    throw($self->batch_q_module." doesn't have the job_stats method");
-  }
-  my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in
-                                                                #BatchQueue.pm
-  my %job_stats = %{$self->batch_q_module->job_stats};
   my @awol_jobs;
   my $job_count = 0;
   JOB:foreach my $job (@jobs) {
@@ -1149,12 +1159,13 @@ sub input_id_setup{
 
 =cut
 
-sub check_if_done{
+sub check_if_done {
   my ($self) = @_;
   my @jobs = $self->job_adaptor->fetch_all;
   my $continue;
 
- JOB: foreach my $job (@jobs){
+ JOB: 
+  foreach my $job (@jobs) {
     my $status = $job->current_status->status;
 
     if ($status eq 'KILLED' || $status eq 'SUCCESSFUL') {
@@ -1169,5 +1180,6 @@ sub check_if_done{
       return 1;
     }
   }
+
   return 0;
 }

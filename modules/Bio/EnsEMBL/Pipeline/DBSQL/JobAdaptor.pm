@@ -47,6 +47,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::Job;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Exception qw(stack_trace_dump);
 
 use vars qw(@ISA);
 use strict;
@@ -346,16 +347,42 @@ sub fetch_by_input_id {
 
 
 sub fetch_hash_by_input_id{
-    my $self = shift;
-    my $inputid = shift;
+  my $self = shift;
+  my $inputid = shift;
 
-    my @results = $self->fetch_by_input_id($inputid);
-    my %hash;
-    foreach my $result(@results){
-       $hash{$result->analysis->dbID} = $result;
-    }
+  my $sth = $self->prepare(q{
+    SELECT j.job_id, j.input_id, j.analysis_id, j.submission_id,
+           j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, j.exec_host,
+           js.status, js.time, js.is_current
+    FROM   job j, job_status js
+    WHERE  j.input_id = ? 
+      AND  j.job_id = js.job_id
+      AND  js.is_current = 'y'
+  });
 
-    return \%hash;
+  my @results;
+
+  $sth->execute($inputid);
+  while( my $rowHashRef = $sth->fetchrow_hashref ) {
+    my $job = $self->_objFromHashref($rowHashRef);
+    push(@results, $job);
+
+    my $status = Bio::EnsEMBL::Pipeline::Status->new
+          (
+           '-jobid'   => $rowHashRef->{job_id},
+           '-status'  => $rowHashRef->{status},
+           '-created' => $rowHashRef->{time},
+          );
+        
+    $self->current_status($job, $status);
+  }
+
+  my %hash;
+  foreach my $result (@results) {
+    $hash{$result->analysis->dbID} = $result;
+  }
+
+  return \%hash;
 }
 
 =head2 store
@@ -666,6 +693,8 @@ sub current_status {
           $self->warn("Have found no status for ".$job->dbID." ".
                       $job->input_id." ".$job->analysis->dbID.
                       " assuming is sucessful $f:$l\n");
+          my $std = stack_trace_dump();
+          print STDERR "$std\n";
           $status = 'SUCCESSFUL';
         }
         my $statusobj = Bio::EnsEMBL::Pipeline::Status->new(
