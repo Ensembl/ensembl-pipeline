@@ -108,6 +108,8 @@ sub new {
 
   my $bindir = $::pipeConf{'bindir'} || undef;
 
+  $epojar = 'eponine-scan.jar' unless $epojar;
+
   if (-x $java) {
     # passed from RunnableDB (full path assumed)
     $self->java($java);
@@ -127,14 +129,8 @@ sub new {
       $self->throw("Can't find executable java");
     }
   }
-  
-  if (-e $epojar) {
-      $self->epojar($epojar);
-  } elsif ($::pipeConf{'bin_EPONINE'} && -e ($epojar = $::pipeConf{'bin_EPONINE'})) {
-      $self->epojar($epojar);
-  } else {
-      $self->throw("Can't find eponine-scan.jar");
-  }
+
+  $self->epojar (find_file($epojar));
   
   if (defined $threshold && $threshold >=0 ){
       $self->threshold($threshold);
