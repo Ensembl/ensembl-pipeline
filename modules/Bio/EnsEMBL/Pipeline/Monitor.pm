@@ -287,7 +287,7 @@ sub show_analysisprocess {
   $maxmodule++;
   $maxdb++;
   
-  $self->print_header("Analysisprocess");
+  $self->print_header("Analysis");
 
   printf("%-${maxname}s %-${maxid}s %-${maxdb}s %-${maxprog}s %-${maxparam}s %-${maxmodule}s \n","Name","Id","db","Program","Params","Module");
   printf("%-${maxname}s %-${maxid}s %-${maxdb}s %-${maxprog}s %-${maxparam}s %-${maxmodule}s \n","----","--","--","-------","------","------");
@@ -466,5 +466,107 @@ sub show_jobs_by_status_and_analysis {
 
   print "\n";
 }
-1;
 
+
+# ==================================================== #
+
+sub rules_cache{
+	my $self = shift;
+	unless($self->{'_rules_cache'}){
+		my $rule_adaptor = $self->dbobj->get_RuleAdaptor();
+		my @rules = $rule_adaptor->fetch_all;
+		foreach my $rule (@rules)  {
+			$self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name;
+		}
+	}
+	return $self->{'_rules_cache'};
+}
+
+=head2 get_unfinished_analyses***
+
+The following methods return an anonymous list of arrays, with the following data spec:
+ [
+   [ input_id, logic_name, analysis_id ]
+   [ input_id, logic_name, analysis_id ]
+   ...
+ ]
+ 
+ get_unfinished_analyses_for_input_id( $input_id )
+ get_unfinished_analyses_for_assembly_type( $assembly_type )
+ get_unfinished_analyses
+ 
+ They all take an optional print (Boolean) which prints the arrays for you.
+
+=head2 get_no_hit_contigs_for_analysis
+
+ Takes two arguments, and finds all the finished input_ids for which the given analysis
+did NOT find any hits.
+ Returns data structure as above.
+ 
+ get_no_hit_contigs_for_analysis($feature_table, $analysis_id)
+
+=cut
+
+sub get_unfinished_analyses_for_input_id{
+	my ($self, $contig_name, $print, $unfinished) = @_;
+	my $rules_cache = $self->rules_cache();
+	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
+							FROM contig c STRAIGHT_JOIN analysis a 
+							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
+							WHERE i.input_id IS NULL && c.name = ?});
+	$sth->execute($contig_name);
+	while(my $row  = $sth->fetchrow_hashref){
+		push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+				if $rules_cache->{$row->{'a_id'}};
+	}
+	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+	return $unfinished;
+}
+sub get_unfinished_analyses_for_assembly_type{
+	my ($self, $assembly_type, $print, $unfinished) = @_;
+	my $rules_cache = $self->rules_cache();
+	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name, b.type 
+							FROM assembly b, contig c STRAIGHT_JOIN analysis a 
+							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id
+							WHERE i.input_id IS NULL && b.type = ?  && b.contig_id = c.contig_id});
+	$sth->execute($assembly_type);
+	while(my $row  = $sth->fetchrow_hashref){
+		push(@{$unfinished}, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+				if $rules_cache->{$row->{'a_id'}};
+	}
+	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+	return $unfinished;
+}
+sub get_unfinished_analyses{
+	my ($self, $print, $unfinished) = @_;
+	my $rules_cache = $self->rules_cache();
+	my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
+							FROM contig c STRAIGHT_JOIN analysis a 
+							LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
+							WHERE i.input_id IS NULL ORDER BY c.name});
+	$sth->execute();
+	while(my $row  = $sth->fetchrow_hashref){
+		push(@$unfinished, [ $row->{'name'}, $row->{'logic_name'}, $row->{'a_id'} ])
+				if $rules_cache->{$row->{'a_id'}};
+	}
+	map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
+	print "Waiting for " . scalar(@$unfinished) . " to complete.\n" if $print;
+	return $unfinished;
+}
+
+sub get_no_hit_contigs_for_analysis{
+	my $self = shift;
+	my ($feature_table, $analysis_id, $print, $no_hits) = @_;
+	my $sth = $self->dbobj->prepare(qq{SELECT c.contig_id, c.name
+							FROM contig c STRAIGHT_JOIN input_id_analysis i 
+							LEFT JOIN $feature_table f ON f.analysis_id = i.analysis_id && f.contig_id = c.contig_id  
+							WHERE f.contig_id IS NULL && f.analysis_id IS NULL && i.analysis_id = ? && c.name = i.input_id});
+	$sth->execute($analysis_id);
+	$no_hits = [];
+	while(my $row = $sth->fetchrow_hashref){
+		push(@{$no_hits}, [ $row->{'name'}, undef, $analysis_id ] );
+	}
+	map {print join("\t: ", @$_) . "\n"} @$no_hits if $print;
+	return $no_hits;
+}
+1;

@@ -8,40 +8,49 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 
-my $host = 'ecs2a';
-my $port;
+my $host   = 'ecs2a';
+my $port   = '3306';
 my $dbname = 'rat_Nov02';
-my $user = 'ensro';
-my $pass = undef;
+my $user   = 'ensro';
+my $pass   = undef;
 
-my $current = 1;
-my $current_summary = 1;
-my $finished = 1;
-my $analysis;
-my $rules;
-my $conditions;
-my $status_analysis;
+my $current         = 0;
+my $current_summary = 0;
+my $finished        = 0;
+my $analysis        = 0;
+my $rules           = 0;
+my $conditions      = 0;
+my $status_analysis = 0;
+my $unfin           = 0;
+my $ft_ana_id       = undef; # feature_table:analysis_id
+my $assembly_type   = undef; # 
+my $input_id        = undef;
 
 &GetOptions( 
-	    'host:s'    => \$host,
-	    'port:n'    => \$port,
-	    'user:s'    => \$user,
-	    'pass:s'    => \$pass,
-	    'dbname:s'  => \$dbname,
-	    'current'   => \$current,
-	    'current_summary' => \$current_summary,
-	    'finished'  => \$finished,
-	    'rules'     => \$rules,
-	    'conditions'=> \$conditions,
-	    'status_analysis:s'    => \$status_analysis,
-	    'analysis'  => \$analysis,
+	    'host:s'            => \$host,
+	    'port:n'            => \$port,
+	    'user:s'            => \$user,
+	    'pass:s'            => \$pass,
+	    'dbname:s'          => \$dbname,
+	    'current'           => \$current,
+	    'current_summary'   => \$current_summary,
+	    'finished'          => \$finished,
+	    'analysis'          => \$analysis,
+	    'rules'             => \$rules,
+	    'conditions'        => \$conditions,
+	    'status_analysis:s' => \$status_analysis,
+	    'unfinished'        => \$unfin,
+	    'nohits=s'          => \$ft_ana_id,
+	    'assembly=s'        => \$assembly_type,
+	    'input_id=s'        => \$input_id,
 	   );
 
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
 						      -user   => $user,
 						      -pass   => $pass,
-						      -dbname => $dbname);
+						      -dbname => $dbname,
+						      -port   => $port);
 
 my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 
@@ -51,9 +60,26 @@ $monitor->show_finished_summary               if ($finished);
 $monitor->show_analysisprocess                if ($analysis);
 $monitor->show_Rules                          if ($rules);
 $monitor->show_Rules_and_Conditions           if ($conditions);
+$monitor->get_unfinished_analyses(1)          if ($unfin);
 
 if ($status_analysis) {
   my ($status,$analysis)  = split(/:/,$status_analysis);
 
   $monitor->show_jobs_by_status_and_analysis($status,$analysis);
+}
+if ($input_id){
+	$monitor->print_header("Unfinshed Analyses for $input_id");
+	my $unfin = $monitor->get_unfinished_analyses_for_input_id($input_id);
+	map { print join(" : ", @$_) . "\n"} @$unfin;
+}
+if ($assembly_type){
+	$monitor->print_header("Unfinshed Analyses for set: <$assembly_type>");
+	my $unfin = $monitor->get_unfinished_analyses_for_assembly_type($assembly_type);
+	map { print join(" : ", @$_) . "\n"} @$unfin;
+}
+if ($ft_ana_id =~ /:/){
+	my ($ft, $ana_id) = split(/:/, $ft_ana_id);
+	my $nohits = $monitor->get_no_hit_contigs_for_analysis($ft, $ana_id) if ($ana_id);
+	$monitor->print_header("Contigs with no hits in <$ft> with analysis_id <$ana_id>");
+	map { print $_->[0] . "\n"} @$nohits;
 }
