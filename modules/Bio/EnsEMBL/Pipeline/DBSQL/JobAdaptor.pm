@@ -328,18 +328,19 @@ sub remove_by_dbID {
 =head2 update
 
   Title   : update
-  Usage   : $job->update; $jobAdaptor->update( $job )
+  Usage   : $job->update;
+            $jobAdaptor->update($job);
+            $jobAdaptor->update(@jobs)
   Function: a job which is already in db can update its contents
             it only updates stdout_file, stderr_file, retry_count
             and LSF_id
   Returns : throws exception when something goes wrong.
-  Args    :
+  Args    : an array of Pipeline::Job objects
 
 =cut
 
 sub update {
-  my $self = shift;
-  my $job = shift;
+  my ($self, @jobs) = @_;
 
   # only stdout, stderr, retry, LSF_id and status are likely to be updated
 
@@ -353,12 +354,14 @@ sub update {
     WHERE  job_id = ?
   });
 
-  $sth->execute( $job->stdout_file,
-		 $job->stderr_file,
-		 $job->input_object_file,
-		 $job->retry_count,
-		 $job->LSF_id,
-		 $job->dbID );
+  foreach my $job (@jobs) {
+    $sth->execute( $job->stdout_file,
+		   $job->stderr_file,
+		   $job->input_object_file,
+		   $job->retry_count,
+		   $job->LSF_id,
+		   $job->dbID );
+  }
 }
 
 
