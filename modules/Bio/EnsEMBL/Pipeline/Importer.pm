@@ -282,7 +282,7 @@ sub checkClones {
 	      print STDERR "Deleting clone : Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "\n";
 	    
 	      foreach my $contig ($oldclone->get_all_Contigs) {
-	        $sic->delete_InputId($contig->id,'contig',$analysis[0]);
+	        $sic->delete_input_id($contig->id,'contig',$analysis[0]);
 	      }
 	    
 	      $oldclone->delete;
@@ -322,7 +322,7 @@ sub writeClones {
     };
     if (!$@) {
       foreach my $contig ($clone->get_all_Contigs) {
-	$sic->store_inputId_class_analysis($contig->id,'contig',$analysis[0]);
+	$sic->store_input_id_class_analysis($contig->id,'contig',$analysis[0]);
       }
     } else {
       $self->warn("Couldn't write clone " . $clone->id . " [$@]");
