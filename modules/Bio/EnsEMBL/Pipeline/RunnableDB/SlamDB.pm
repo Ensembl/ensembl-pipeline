@@ -24,7 +24,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::SlamDB
 
  This object wraps Bio::EnsEMBL::Pipeline::Runnable::Slam (and uses also Avid and ApproxAlign)
  to add functionality to read and write to databases.
- A Bio::EnsEMBL::Pipeline::DBSQL::Obj is required for databse access.
+ A Bio::EnsEMBL::Pipeline::DBSQL::Obj is required for databse access, SlamDB.pm takes input-ids
+ like chromosome:NCBI28:10:6505243:6805220:1---chromosome:MGSCv3:2:10992338:11279941:-1
 
 =head1 CONTACT
 
