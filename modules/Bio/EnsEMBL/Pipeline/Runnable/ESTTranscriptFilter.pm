@@ -146,6 +146,9 @@ sub _end{
 
 sub filter {
   my ($self,$transcripts) = @_;  
+  
+  my $verbose = 0;
+
   my $min_coverage = $self->coverage_threshold;
   my $min_perc_id  = $self->perc_id_threshold;
   my $depth        = $self->depth_threshold;
@@ -202,7 +205,9 @@ sub filter {
 sub depth_filter {
   my ($self,$exons,$exon2est) = @_;
 
-  print STDERR "filtering ".scalar(@$exons)." exons\n";
+  my $verbose = 0;
+
+  print STDERR "filtering ".scalar(@$exons)." exons\n" if $verbose;
   # no point if there are no exons!
   return unless ( scalar( @$exons) > 0 );   
 
@@ -268,7 +273,7 @@ sub depth_filter {
   my %taken;
   my @accepted_ests;
   
-  print STDERR "looking at depth of ".scalar(@sorted_clusters)." clusters\n";
+  print STDERR "looking at depth of ".scalar(@sorted_clusters)." clusters\n" if $verbose;
   foreach my $cluster ( @sorted_clusters ){
       my @exons = sort { $self->_exon_score($b) <=> $self->_exon_score($a)
 			   or
@@ -294,10 +299,12 @@ sub depth_filter {
       }
   }
 
-  print STDERR "returning ".scalar(@accepted_ests)." ests after scores and depth filtering\n";
-  foreach my $est ( @accepted_ests ){
-    print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
+  if ($verbose){
+    print STDERR "returning ".scalar(@accepted_ests)." ests after scores and depth filtering\n";
+    foreach my $est ( @accepted_ests ){
+      print STDERR $self->_id($est)." coverage:".$self->_coverage($est)." perc_id:".$self->_perc_id($est)."\n";
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($est);
+    }
   }
   return @accepted_ests;
 }
