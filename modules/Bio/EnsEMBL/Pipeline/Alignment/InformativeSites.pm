@@ -32,7 +32,10 @@ sub new {
 
   $self->_alignments($alignments);
 
-  throw("Ids of translatable sequences do not fully match with alignment ids.")
+  throw("Ids of translatable sequences do not fully match with " . 
+	"alignment ids.  This sometimes happens because one of " . 
+	"the clustered genes has zero EST matches and hence no " . 
+	"alignment.")
     unless $self->_check_ids;
 
   return $self
@@ -46,6 +49,11 @@ sub informative_sites {
   my %inform_site_aligns;
 
   foreach my $seq (@{$self->_seqs}) {
+    # Avoid making sequences where no informative sites exist
+    # ie. identical sequences.
+    next 
+      unless $gene_informative_sites->{$seq->display_id} =~ /\*/; 
+
     $inform_site_aligns{$seq->display_id} = 
       $self->_derive_informative_site_alignment(
 	 $seq, 
