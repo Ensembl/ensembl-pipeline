@@ -410,7 +410,7 @@ sub runLocally {
     $self->set_status( "FAILED" );
     return;
   }
-       print STDERR "Running inLSF\n"; 
+  print STDERR "Running inLSF\n"; 
   $self->runInLSF();
 }
 
