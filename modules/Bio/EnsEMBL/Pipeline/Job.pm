@@ -564,12 +564,16 @@ sub run_module {
 	    # -------------------------------------------------------------
 	};
 	if ($err = $@) {
-	    print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
-	    $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
+            my $error_msg = "Job finished successfully, but could not be recorded as finished.  Job : [" 
+              . $self->input_id . "]\n[$err]";
+
             eval {
               $self->set_status("FAIL_NO_RETRY");
             };
-            $self->throw("Error updating input_id_analysis table [$@]") if $@;
+            $error_msg .= "(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") 
+              if $@;
+        
+            $self->throw($error_msg);
 	}
 	else {
 	    print STDERR "Updated successful job ".$self->dbID."\n";
