@@ -1045,8 +1045,8 @@ sub _truncate_introns {
     my $intron_coord_2 = $exon->end + 1;
 
     if ($self->_strand == -1) {
-      $intron_coord_1 = $self->_slice->length - ($exon->start + 1) + 1;
-      $intron_coord_2 = $self->_slice->length - ($exon->end - 1) + 1;
+      $intron_coord_1 = $self->_slice->length - ($exon->start - 1) + 1;
+      $intron_coord_2 = $self->_slice->length - ($exon->end + 1) + 1;
     }
     push(@coordinates, $intron_coord_1, $intron_coord_2);
 
