@@ -50,23 +50,25 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 sub new {
   my ($class,@args) = @_;
 
-  my $self = $class->SUPER::new(@args);    
-           
+  my $self = $class->SUPER::new(@args);
+
   my ($sequences,
       $dbfile, 
       $type,
+      $molecule_type,
       $workdir,
       $copy,
       $index_type,
       $make_fetchable_index) = $self->_rearrange([qw(SEQUENCES
 						     DBFILE
 						     TYPE
+						     MOLECULE_TYPE
 						     WORKDIR
 						     COPY
 						     INDEX_TYPE
 						     MAKE_FETCHABLE_INDEX
 						    )], @args);
-  
+
   if (!defined($dbfile) && !defined($sequences)) {
     $self->throw("No dbfile or sequence array ref entered for indexing");
   }
@@ -74,20 +76,16 @@ sub new {
     $self->throw("Not database type entered");
   }
 
-  $self->dbfile($dbfile)             if defined($dbfile);
-  $self->sequences($sequences)       if defined($sequences);
-  $self->type($type)                 if defined($type);
-  $self->workdir($workdir)           if defined($workdir);
+  $self->dbfile($dbfile)               if defined($dbfile);
+  $self->sequences($sequences)         if defined($sequences);
+  $self->molecule_type($type)          if defined($type);
+  $self->molecule_type($molecule_type) if defined($molecule_type);
+  $self->workdir($workdir)             if defined($workdir);
   $self->index_type($index_type);
   $self->make_fetchable_index($make_fetchable_index) 
     if defined($make_fetchable_index);
 
-  if (defined($dbfile) && $copy) {
-print "COPYING DATABASE.\n";
-    system("cp $dbfile " . $self->blastdb_dir);
-    $self->dbfile($self->blastdb_dir."\/".$self->dbname);
-    $self->copied_dbfile(1);
-  }
+  $self->copy_db($dbfile) if (defined($dbfile) && $copy);
 
   return $self;
 }
@@ -96,6 +94,21 @@ sub DESTROY {
   my $self = shift;
 
   $self->remove_index_files;
+}
+
+sub copy_db {
+  my ($self, $dbfile) = @_;
+
+  system("cp $dbfile " . $self->blastdb_dir);
+
+  $dbfile =~ /([^\/]+)$/;
+
+print "Database name is " . $1 . "\n";
+
+  $self->throw("Didnt parse database names successfully.") unless $1;
+
+  $self->dbfile($self->blastdb_dir."\/".$1);
+  $self->copied_dbfile(1);
 }
 
 sub sequences {
@@ -165,24 +178,21 @@ sub make_seqfile {
 
 sub dbname {
   my ($self) = @_;
-  
+
   if (!$self->dbfile) {
     $self->throw("No database file defined.");
   }
-  
+
   my $dbname = $self->dbfile;
-  #print STDERR "dbname ".$dbname."\n";
-  if($dbname =~/\/tmp\//){
-    $dbname =~ s/\/tmp\///g;
-  }
-  #print STDERR $dbname."\n";
-  return $dbname;
+  $dbname =~ /([^\/]+)$/;
+
+  return $1;
 }
 
 sub remove_index_files {
   my ($self) = @_;
 
-#print "Sating my appetite for destruction.\n";
+  #print "Removing index files created by $self.\n";
   
   if (!defined($self->dbfile)) {
     $self->throw("No database file defined - can't remove index files.");
@@ -228,22 +238,36 @@ sub dbfile {
   my ($self,$value) = @_;
 
   if(defined $value) {
-    if ($value !~ /^\//) {
-      my $pwd = `pwd`;
-      chomp($pwd);
-      $value = $pwd . "/" . $value;
-    }
     $self->{_dbfile} = $value;
   }
 
   return $self->{_dbfile};  
 }
 
-=head2 type
+=head2 db
 
- Title   : type
- Usage   : $obj->type($newval)
- Function: 
+ Title   : db
+ Usage   : $obj->db
+ Function: DEPRECATED
+ Example : 
+ Returns : DEPRECATED returns $self->dbfile
+ Args    : none
+
+
+=cut
+
+sub db {
+  my $self = shift;
+
+  return $self->dbfile
+}
+
+
+=head2 molecule_type
+
+ Title   : molecule_type
+ Usage   : $self->molecule_type($newval)
+ Function: Stores the sequence type - PROTEIN or DNA
  Example : 
  Returns : value of type
  Args    : newvalue (optional)
@@ -251,13 +275,42 @@ sub dbfile {
 
 =cut
 
-sub type{
-  my ($obj,$value) = @_;
-  if( defined $value) {
-    $obj->{'type'} = $value;
+sub molecule_type{
+  my $self = shift;
+
+  if(@_) {
+    $self->{_molecule_type} = shift;
   }
-  return $obj->{'type'}; 
+
+  $self->warn("Molecule type not set.") 
+    unless $self->{_molecule_type};
+
+  return $self->{_molecule_type}
 }
+
+=head2 type
+
+ Title   : type
+ Usage   : $self->type($newval)
+ Function: Maintains backwards compatibility.  Replaced by molecule_type.
+ Example :
+ Returns : value of type
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub type {
+  my $self = shift;
+
+  if (@_) {
+    my $type = shift;
+    $self->molecule_type($type);
+  }
+
+  return $self->molecule_type;
+}
+
 
 sub db_formatted {
   my $self = shift;
@@ -296,13 +349,13 @@ sub index_type {
       unless $value;
 
     if ($value =~ /wu/i) {
-      
-      if (($value =~ /new/i)&&($self->type eq 'DNA')) {
+
+      if (($value =~ /new/i)&&($self->molecule_type eq 'DNA')) {
 	$self->{_format_command}   = 'xdformat -n -I';
 	$self->{_seqfetch_command} = ['xdget -n' , 'blastdb' , 'seqid'];
 	$self->{_index_type} = 'new_wu';
 	
-      } elsif (($value =~ /new/i)&&($self->type eq 'PROTEIN')) {
+      } elsif (($value =~ /new/i)&&($self->molecule_type eq 'PROTEIN')) {
 	$self->{_format_command}   = 'xdformat -p -I';
 	$self->{_seqfetch_command} = ['xdget -p' , 'blastdb' , 'seqid'];
 	$self->{_index_type} = 'new_wu';
@@ -311,29 +364,27 @@ sub index_type {
 	
 	$self->{_index_type} = 'old_wu';
 	
-	if ($self->type eq 'DNA') {
+	if ($self->molecule_type eq 'DNA') {
 	  $self->{_format_command}   = 'pressdb';
 ### Can this be fixed?
 	  $self->{_seqfetch_command} = 'throw';
-	  
-	} elsif ($self->type eq 'PROTEIN') {
+
+	} elsif ($self->molecule_type eq 'PROTEIN') {
 	  $self->{_format_command}   = 'setdb';
 ### Can this be fixed?
 	  $self->{_seqfetch_command} = 'throw';
 	}
       }
-      
     } elsif ($value =~ /ncbi/i) {
       $self->{_format_command}   = 'formatdb -o T -i ';
+      $self->{_format_command}  .= '-p F ' if $self->molecule_type eq 'DNA';
       $self->{_seqfetch_command} = ['fastacmd -d' , 'blastdb' , '-s', 'seqid'];
       $self->{_index_type} = 'ncbi';
-      
-    } 
-    
+    }
+
     $self->throw("Database indexing method [$value] not recognised.")
       unless ($self->{_format_command} 
 	      && $self->{_seqfetch_command});
-    
   }
 
   return $self->{_index_type}
@@ -391,8 +442,9 @@ sub work_dir {
 
   if (@_) {
     $self->{_work_dir} = shift;
-    $self->{_work_dir} .= '/';
-    return 1;
+    $self->{_work_dir} .= '/' 
+      unless $self->{_work_dir} =~ /\/$/;
+    return 1
   } else {
     $self->{_work_dir} = '/tmp/' if !defined $self->{_work_dir};
     return $self->{_work_dir}
@@ -405,25 +457,16 @@ sub blastdb_dir {
   unless ($self->{_blastdb_dir} && -d $self->{_blastdb_dir}) {
 
     my $blastdb_dir = $self->work_dir . "\/tempblast." . $$ . '/';
- 
+
     mkdir $blastdb_dir;
 
-    $self->throw("Cant create a working directory for the blast database") 
+    $self->throw("Failed to create a working directory for the blast database.") 
       unless (-d $blastdb_dir);
-    
+
     $self->{_blastdb_dir} = $blastdb_dir;
   }
 
   return $self->{_blastdb_dir};
 }
-
-# Database (including full path). 
-
-sub db {
-  my $self = shift;
-
-  return $self->blastdb_dir . '/' . $self->dbname;
-}
-
 
 1;
