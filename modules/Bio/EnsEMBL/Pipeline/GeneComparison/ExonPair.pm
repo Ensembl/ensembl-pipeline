@@ -128,8 +128,9 @@ sub blast_Exons{
   
   ############################################################
   # Ian's parameters:
-  my $options = "W=$word M=1 N=-1 Q=3 R=3"; 
+  #my $options = "W=$word M=1 N=-1 Q=3 R=3 S2=8"; 
   #my $options = "W=5";
+  my $options = "W=$word";
   
   # tblastx options:
   #my $options = 'altscore="* any na" altscore="any * na" S2=12';
@@ -153,7 +154,16 @@ sub blast_Exons{
   
   
   $blast->add_regex($file,'(\S+)');
-  $blast->run();
+
+  eval{
+    $blast->run();
+  };
+  if ( $@ ){
+    print STDERR "Blast failed for\n";
+    print STDERR "exon1: ".$seq1->seq."\n";
+    print STDERR "exon2: ".$seq2->seq."\n";
+    return (0);
+  }    
   
   unlink( $database );
   
