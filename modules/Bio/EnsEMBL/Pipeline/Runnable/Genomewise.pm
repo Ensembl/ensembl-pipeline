@@ -75,6 +75,7 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -382,6 +383,7 @@ sub run{
   ############################################################
   ##### need to put back the supporting evidence
   ############################################################
+#  my $comparator = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new();
 
   # since exons have been created anew, need to check overlaps
   my @trans_out = $self->output;
@@ -389,12 +391,11 @@ sub run{
   
   # let's try to make it fast:
   if ( scalar( @trans_out) == 1 && scalar( @trans_in ) == 1 ){
-      my ( $consecutive_overlap, $mismatches ) = 
-	  $self->_check_consecutive_overlap( $trans_in[0], $trans_out[0] );
-      
-      if ( $consecutive_overlap == 1 ){
-	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
-	  my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+      my $consecutive_overlap = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->_test_for_Simple_Merge($trans_in[0], $trans_out[0]);
+      my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
+      my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
+
+      if ( $consecutive_overlap == 1 && scalar( @exons_in) == scalar( @exons_out ) ){
 	  
 	EXON_2_EXON:
 	  while ( scalar ( @exons_in ) > 0 ){
@@ -410,10 +411,6 @@ sub run{
 	  } # end of EXON_2_EXON
       }
       else{
-	  
-	  my @exons_in  = sort { $a->start <=> $b->start } @{$trans_in[0] ->get_all_Exons};
-	  my @exons_out = sort { $a->start <=> $b->start } @{$trans_out[0]->get_all_Exons};
-	  
 	  print STDERR "passing evi info between 2 transcripts with non-consecutive overlaping exons\n";
 	  foreach my $exon_in ( @exons_in ){
 	      foreach my $exon_out( @exons_out ){
