@@ -1,0 +1,55 @@
+[DEFAULT_DATABASE]
+host=127.0.0.1
+user=ensadmin
+pass=ensembl
+port=5000
+
+#
+# Database where pipeline config is stored
+# as well as jobs & job_status
+#
+[PIPELINE_DATABASE]
+dbname = mcvicker_test_briggsae
+
+[ENSEMBL_DATABASE]
+dbname = mcvicker_test_briggsae
+
+[DNA_DATABASE]
+dbname = mcvicker_test_briggsae
+
+[LSF]
+output_dir = /tmp
+path = /usr/local/lsfv42/4.2/alpha5/bin/
+
+[LOCAL]
+output_dir = /tmp
+
+[PIPELINE_MANAGER]
+check_interval = 35
+
+#
+# This is a list of tasks to be run by the pipeline manager
+#
+[TASKS]
+dummy_task = Bio::EnsEMBL::Pipeline::Task::Dummy
+
+#
+# configuration for tasks follows
+#
+[DEFAULT_TASK]
+ensdb = ensembl_database
+dnadb = dna_database
+where = 
+batchsize = 500
+#timeout in seconds 86400 = 24hours
+timeout = 86400
+retries	= 0
+#max create represents the maxumim number of jobs a Task will create at
+#one time
+max_create = 50
+
+[DUMMY_TASK]
+timeout  = 3600
+where = Local
+retries = 3
+
