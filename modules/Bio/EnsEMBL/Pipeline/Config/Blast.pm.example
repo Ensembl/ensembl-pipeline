@@ -50,13 +50,16 @@ use vars qw(%Config);
             type    => 'dna',
             header  => '\w+\s+(\w+)',
 	    flavour => 'wu',
-	    ungapped => 0
+	    ungapped => 0,
+	    refilter => 0,
         },
         { 
             name    => 'swall',
             type    => 'protein',
             header  => '^\w+\s+(\w+)',
-	    flavour => 'wu'
+	    flavour => 'wu',
+	    ungapped => 0,
+	    refilter => 0,
         }
     ]
 );
