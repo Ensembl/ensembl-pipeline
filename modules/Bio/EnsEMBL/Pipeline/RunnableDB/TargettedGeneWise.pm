@@ -56,7 +56,7 @@ use Bio::SeqIO;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
-
+use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_SINGLE_EXON_COVERAGE
@@ -154,8 +154,8 @@ sub fetch_input{
 
   # chr12:10602496,10603128:Q9UGV6:
   print STDERR $entry."\n";
-#  if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
-  if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
+  if( !($entry =~ /(\S+\.\S+):(\d+),(\d+):(\S+):/)) {
+#  if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):/)) {
       $self->throw("Not a valid input id... $entry");
   }
   
@@ -184,11 +184,11 @@ sub fetch_input{
   if ( $end > $chunk_end ){
     $self->throw("the end of the protein match passed in ($end) is larger than the genomic chunk we are in ($chunk_end)");
   }
-  my $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
-  my $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
+  $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
+  $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   
-  my $sgpa = $self->db->get_StaticGoldenPathAdaptor();
-  my $vcontig = $sgpa->fetch_VirtualContig_by_chr_start_end($chr_name,$new_start,$new_end);
+  my $sliceadp = $self->db->get_SliceAdaptor();
+  my $vcontig = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
   
   $self->vcontig($vcontig);
   $self->protein_id($protein_id);
@@ -254,7 +254,7 @@ sub output{
      $self->{'_output'} = [];
    }
     
-   if(defined @genes){
+   if(@genes){
      push(@{$self->{'_output'}},@genes);
    }
 
@@ -600,6 +600,7 @@ GENE:  foreach my $gene (@genes) {
       foreach my $tran ($newgene->get_all_Transcripts) {
 	foreach my $exon($tran->get_all_Exons) {
 	  foreach my $sf($exon->each_Supporting_Feature) {
+	   # print STDERR "have ".$sf."\n";
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
 	    if ($sf->start > $sf->end) {
 	      my $tmp = $sf->start;
@@ -777,24 +778,25 @@ sub make_transcript{
     $exon->adaptor($self->db->get_ExonAdaptor);
     
     # sort out supporting evidence for this exon prediction
-    foreach my $subf($exon_pred->sub_SeqFeature){
-#      $subf->feature1->source_tag($genetype);
-#      $subf->feature1->primary_tag('similarity');
-      $subf->feature1->score(100);
-      $subf->feature1->analysis($analysis_obj);
-	
-#      $subf->feature2->source_tag($genetype);
-#      $subf->feature2->primary_tag('similarity');
-      $subf->feature2->score(100);
-      $subf->feature2->analysis($analysis_obj);
-      
-      $exon->add_Supporting_Feature($subf);
-    }
+    my @sf = $exon_pred->sub_SeqFeature;
+    
+    my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
+    
+    $align->seqname($contig->dbID);
+    $align->contig($contig);
+    my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
+    $align->adaptor($prot_adp);
+    $align->score(100);
+    $align->analysis($analysis_obj);
+    
+    $exon->add_Supporting_Feature($align);
+  
     
     push(@exons,$exon);
     
     $excount++;
   }
+
   
   if ($#exons < 0) {
     print STDERR "Odd.  No exons found\n";
