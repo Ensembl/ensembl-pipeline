@@ -40,13 +40,14 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   &verbose('WARNING');
-  my ($species, $verbose, $conf_file) = 
-    rearrange (['SPECIES', 'VERBOSE', 'CONF_FILE'], @args);
+  my ($species, $verbose, $conf_file, $local) = 
+    rearrange (['SPECIES', 'VERBOSE', 'CONF_FILE', 'LOCAL'], @args);
   my $curr_dir = $ENV{'PWD'};
   $self->curr_dir($curr_dir);
   $self->species($species);  
   $self->verbosity($verbose);
   $self->conf_file($conf_file);
+  $self->islocal($local);
   $self->load_databases;
   return $self;
 }
@@ -78,6 +79,12 @@ sub curr_dir{
   my $self = shift;
   $self->{'curr_dir'} = shift if(@_);
   return $self->{'curr_dir'};
+}
+
+sub islocal{
+  my $self = shift;
+  $self->{'islocal'} = shift if(@_);
+  return $self->{'islocal'};
 }
 
 sub species{
@@ -357,7 +364,8 @@ sub load_data{
   my $pass = $db_conf->{'pass'};
   my $user = $db_conf->{'user'};
   my $dbname = $db_conf->{'dbname'};
-  my $cmd = "mysqlimport -h$host -u$user -p$pass -P$port $dbname $file";
+  my $cmd = "mysqlimport -h$host -u$user -p$pass -P$port ".
+            ( $self->islocal ? "--local " : "") . " $dbname $file";
   print $cmd."\n" if($self->verbosity);
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   return 1;
@@ -455,7 +463,7 @@ sub load_raw_compute_tables{
 sub load_tables{
   my ($self, $tables, $data_dir) = @_;
   foreach my $table(@$tables){
-    my $file = $data_dir."/".$table.".sql";
+    my $file = $data_dir."/".$table;
     #print STDERR "Trying to load ".$file."\n";
     if(! -e $file){
       $self->exception("Can't load ".$data_dir."/".$table." it doesn't exist");
