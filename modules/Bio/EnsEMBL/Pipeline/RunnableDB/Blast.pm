@@ -80,8 +80,8 @@ sub new {
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
         
-    my ( $dbobj, $input_id, $analysis, $threshold) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
+    my ( $dbobj, $input_id, $analysis) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
     
     $self->throw('Need database handle') unless ($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
@@ -97,14 +97,6 @@ sub new {
     $self->analysis($analysis);
     
     $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Blast');
-    if ($threshold)
-    {
-        $self->threshold($threshold);
-    }
-    else
-    {
-        $self->threshold(1e-6);
-    }
     
     return $self;
 }
@@ -120,24 +112,6 @@ sub analysis {
         $self->parameters($analysis->parameters);
     }
     return $self->{'_analysis'}
-}
-
-=head2 threshold
-
-    Title   :   threshold
-    Usage   :   $obj->threshold($value);
-    Function:   Get/set method for threshold score required for writing
-                Feature/FeaturePair to database.
-    Args    :   Optional value (depends on type of Analysis)
-
-=cut
-
-sub threshold {
-    my ($self, $value) = @_;
-        
-    $self->{'_threshold'} = $value if ($value);
-    
-    return  $self->{'_threshold'};
 }
 
 =head2 parameters
@@ -260,7 +234,6 @@ sub run {
     $self->throw("Runnable module not set") unless ($self->runnable());
     $self->throw("Input not fetched") unless ($self->genseq());
     $self->runnable->clone($self->genseq());
-    $self->runnable->threshold($self->threshold());
     $self->runnable->run();
 }
 
@@ -356,10 +329,6 @@ sub write_output {
     {
         #should add conditional for evalue here
 	    print STDERR "Writing features to database\n";
-        foreach my $feature (@features)
-        {
-            print STDERR ($feature->hseqname()."\t");
-        }
         my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
 	    $feat_Obj->write($contig, @features);
     }

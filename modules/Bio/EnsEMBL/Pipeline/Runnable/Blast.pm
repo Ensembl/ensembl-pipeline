@@ -129,7 +129,7 @@ sub _initialize {
     if ($threshold) 
     {   $self->threshold($threshold) ;}
     else
-    { $self->threshold(0);     }
+    { $self->threshold(1e-6);     }
     
     return $self; # success - we hope!
 }
@@ -429,7 +429,7 @@ sub parse_results {
             }
             else
             {
-                print STDERR "Discarding ".$feat2{name}." p ".$feat1{p}." threshold ($threshold)\t";
+                #print STDERR "Discarding ".$feat2{name}." p ".$feat1{p}." threshold ($threshold)\t";
             }
         }
 
