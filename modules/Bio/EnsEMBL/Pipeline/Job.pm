@@ -298,7 +298,8 @@ sub flush_runs {
 
   for my $queue ( @queues ) {
 
-    if (! (defined $batched_jobs{$queue}) || ! scalar (@{$batched_jobs{$queue}})) {
+    # skip if $queue empty or not defined in %batched_jobs
+    unless (defined ($batched_jobs{$queue}) && scalar (@{$batched_jobs{$queue}})) {
       next;
     }
 
@@ -424,11 +425,13 @@ sub runLocally {
 
   if( ! open ( STDOUT, ">".$self->stdout_file )) {
     $self->set_status( "FAILED" );
+    $self->LSF_id(-1);
     return;
   }
         
   if( ! open ( STDERR, ">".$self->stderr_file )) {
     $self->set_status( "FAILED" );
+    $self->LSF_id(-1);
     return;
   }
        print STDERR "Running inLSF\n"; 
@@ -521,6 +524,7 @@ sub runInLSF {
   my $rdb;
   my $err;
   my $autoupdate = $::pipeConf{'autoupdate'};
+  my $adaptor = $self->adaptor;
   
 
   eval {
@@ -530,19 +534,21 @@ sub runInLSF {
 	  $rdb = "${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+		-dbobj => $adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
 	  $module =~ s/\//::/g;
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
 	      ( -analysis => $self->analysis,
 		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+		-dbobj => $adaptor->db );
       }
   };
   if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
+      $self->LSF_id(-1);
+      $adaptor->update($self);
       $self->throw( "Problems creating runnable $module for " . $self->input_id . " [$err]\n");
   }
   eval {   
@@ -551,6 +557,8 @@ sub runInLSF {
   };
   if ($err = $@) {
       $self->set_status( "FAILED" );
+      $self->LSF_id(-1);
+      $adaptor->update($self);
       print (STDERR "READING: Lost the will to live Error\n");
       die "Problems with $module fetching input for " . $self->input_id . " [$err]\n";
   }
@@ -560,6 +568,8 @@ sub runInLSF {
   };
   if ($err = $@) {
       $self->set_status( "FAILED" );
+      $self->LSF_id(-1);
+      $adaptor->update($self);
       print (STDERR "RUNNING: Lost the will to live Error\n");
       die "Problems running $module for " . $self->input_id . " [$err]\n";
   }
@@ -570,12 +580,14 @@ sub runInLSF {
   }; 
   if ($err = $@) {
       $self->set_status( "FAILED" );
+      $self->LSF_id(-1);
+      $adaptor->update($self);
       print (STDERR "WRITING: Lost the will to live Error\n");
       die "Problems for $module writing output for " . $self->input_id . " [$err]" ;
   }
   if ($autoupdate) {
     eval {
-      my $sic = $self->adaptor->db->get_StateInfoContainer;
+      my $sic = $adaptor->db->get_StateInfoContainer;
       $sic->store_inputId_class_analysis(
         $self->input_id,
         $self->class,
