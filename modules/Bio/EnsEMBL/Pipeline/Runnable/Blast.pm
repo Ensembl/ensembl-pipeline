@@ -82,7 +82,8 @@ use Data::Dumper;
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-CLONE => $seq);
     Function:   Initialises Blast object
     Returns :   a Blast Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for blast (-ARGS) 
+    Args    :   A Bio::Seq object (-CLONE), any arguments for blast (-ARGS)
+                The blast executable (-BLAST) and database (-DB).
 
 =cut
 
@@ -155,6 +156,16 @@ sub clone {
     Usage   :   $obj->protect('.masked', '.p');
     Function:   Protects files with suffix from deletion when execution ends
     Args    :   File suffixes
+
+=cut
+
+=head2 threshold
+
+    Title   :   threshold
+    Usage   :   $obj->threshold($value);
+    Function:   Get/set method for threshold p_value required for outputting
+                Feature/FeaturePair
+    Args    :   Optional value (blast p_value)
 
 =cut
 
@@ -391,7 +402,14 @@ sub parse_results {
             $feat1 {source}  = $feat2{program};
             $feat2 {primary} = 'similarity';
             $feat2 {source}  = $feat2{program};
-            $self->createfeaturepair(\%feat1, \%feat2); 
+            if ($self->threshold() && $feat1{p} >= $self->threshold())
+            { 
+                $self->createfeaturepair(\%feat1, \%feat2); 
+            }
+            else
+            {
+                print STDERR "Discarding ".$feat2{name}." score ".$feat1{score}."\n";
+            }
         }
 
     }
