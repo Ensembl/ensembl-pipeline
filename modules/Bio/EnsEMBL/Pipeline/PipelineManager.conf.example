@@ -22,11 +22,13 @@ dbname =
 dbname = 
 
 [LSF]
-ouput_dir = /tmp
+ouput_dir = 
 path = /usr/local/lsfv42/4.2/alpha5/bin/
+max_pending = 1000
+runner =
 
 [LOCAL]
-ouput_dir = /tmp
+ouput_dir = 
 
 [PIPELINE_MANAGER]
 check_interval = 35
@@ -35,7 +37,7 @@ check_interval = 35
 #
 [TASKS]
 repeatmasker_task = Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMasker
-
+genscan_task = Bio::EnsEMBL::Pipeline::Task::RDB::Genscan
 #
 # configuration for tasks follows
 #
@@ -43,7 +45,7 @@ repeatmasker_task = Bio::EnsEMBL::Pipeline::Task::RDB::RepeatMasker
 ensdb = ensembl_database
 dnadb = dna_database
 where = 
-batchsize = 500
+batchsize = 50
 #timeout in seconds 86400 = 24hours
 timeout = 86400
 retries	= 0
@@ -53,11 +55,19 @@ max_create = 50
 
 [REPEATMASKER_TASK]
 timeout  = 3600
-where = Local
+where = LSF:acarilong
 retries = 3
+input_id = contig #type of input_id can be contig, slice, chromosome 
+                  #and file
+logic_name = RepeatMask #all tasks which use runnabledbs need a 
+			#logic_name which matches their analysis object
 
 [GENSCAN_TASK]
 timeout = 3600
+where = LSF:acarilong
+retries = 3
+input_id = contig 
+logic_name = Genscan
 
 [TRIBE_MCL_TASK]
 where = 

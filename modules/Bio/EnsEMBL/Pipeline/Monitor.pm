@@ -62,23 +62,59 @@ sub show_current_status {
   my $results = $jobadp->list_current_status;
   
   my %status;
-  foreach my $result(@$results){
-    my ($job_id, $taskname, $input_id, $s, $timestamp) = @$result;
-    if(!$status{$s}){
-      $status{$s} = {};
+  my %tasks;
+ JOB:foreach my $result(@$results){
+    my ($job_id, $t, $input_id, $s, $timestamp) = @$result;
+    #print STDERR "status = ".$s."\n";
+    if($s eq 'SUCCESSFUL'){
+      next JOB;
     }
-    if(!$status{$s}{$taskname}){
-      $status{$s}{$taskname} = 0;
+    #print STDERR "have task ".$t." status ".$s."\n";
+    if(!$tasks{$t}){
+      $tasks{$t} = {};
+      
     }
-    $status{$s}{$taskname}++;
+    if(!$tasks{$t}{$s}){
+      $tasks{$t}{$s} = 0;
+     
+    }
+    $tasks{$t}{$s}++;
+   
   }
   
-  $self->print_header("Pipeline current status");
-  foreach my $s(keys(%status)){
-    my %hash = %{$status{$s}};
+  my $maxcount = 0;
+  my $maxstatus = 0;
+  my $maxname = 0;
+  foreach my $s(keys(%tasks)){
+    my %hash = %{$tasks{$s}};
     my @tasks = keys(%hash);
     foreach my $t(@tasks){
-      print $t."\t".$s."\t".$status{$s}{$t}."\n";
+      my $count = $status{$s}{$t};
+      my $status = $t;
+      my $name = $s;
+      if(length($count) > $maxcount){
+	$maxcount = length($count);
+      }
+      if (length($status) > $maxstatus) {
+	$maxstatus = length($status);
+      }
+      if (length($name) > $maxname) {
+	$maxname = length($name);
+      }
+    }
+  }
+  $maxcount++;
+  $maxstatus++;
+  $maxname++;
+  $self->print_header("Pipeline current status");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","Name","Status","Count");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","----","------","-----");
+
+  foreach my $s(keys(%tasks)){
+    my %hash = %{$tasks{$s}};
+    my @tasks = keys(%hash);
+    foreach my $t(@tasks){
+      printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n",$s,$t,$tasks{$s}{$t});
     }
   }
   print "\n\n";
@@ -108,9 +144,28 @@ sub show_current_status_summary {
     $status{$s}++;
   }
   
-  $self->print_header("Pipeline current status summary");
   foreach my $s(keys(%status)){
-    print $s."\t".$status{$s}."\n";
+  
+  }
+  my $maxcount = 0;
+  my $maxstatus = 0;
+  foreach my $s(keys(%status)){
+    my $count = $status{$s};
+    my $status = $s;
+    if(length($count) > $maxcount){
+      $maxcount = length($count);
+    }
+    if (length($status) > $maxstatus) {
+      $maxstatus = length($status);
+    }
+  }
+  $maxcount++;
+  $maxstatus++;
+  $self->print_header("Pipeline current status summary");
+   printf("%-${maxstatus}s %-${maxcount}s\n","Status","Count");
+  printf("%-${maxstatus}s %-${maxcount}s\n","------","-----");
+  foreach my $s(keys(%status)){
+   printf("%-${maxstatus}s %-${maxcount}s\n", $s, $status{$s});
   }
   print "\n\n";
 		
@@ -134,9 +189,25 @@ sub show_finished{
     }
     $tasks{$job->taskname}++;
   }
+  my $maxcount = 0;
+  my $maxname = 0;
+  foreach my $s(keys(%tasks)){
+    my $count = $tasks{$s};
+    my $name = $s;
+    if(length($count) > $maxcount){
+      $maxcount = length($count);
+    }
+    if (length($name) > $maxname) {
+      $maxname = length($name);
+    }
+  }
+  $maxcount++;
+  $maxname++;
   $self->print_header("Pipeline finished jobs");
+  printf("%-${maxcount}s %-${maxname}s\n","Count","Name");
+  printf("%-${maxcount}s %-${maxname}s\n","-----","----");
   foreach my $t(keys(%tasks)){
-    print $t."\t".$tasks{$t}."\n";
+    printf("%-${maxcount}s %-${maxname}s\n", $tasks{$t}, $t);
   }
   print "\n\n";
 

@@ -69,6 +69,7 @@ sub new{
   $self->{'_failed'} = undef;
   $self->{'_fatal'} = undef;
   $self->{'_existing'} = undef;
+  $self->{'is_finished'} = undef;
 
   $self->add_created($created) if($created);
   $self->add_submitted($submitted) if($submitted);
@@ -594,6 +595,16 @@ sub clean_existing{
   }else{
     $self->{'_existing'} = undef;
   }
+}
+
+
+
+sub is_finished{
+  my ($self) = shift;
+  if(@_){
+    $self->{'is_finished'} = shift;
+  }
+  return $self->{'is_finished'};
 }
 
 1;

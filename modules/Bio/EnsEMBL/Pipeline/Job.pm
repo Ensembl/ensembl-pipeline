@@ -82,7 +82,7 @@ sub new{
    $self->{'_parameters'}    = $parameters;
    $self->{'_module'}        = $module;
    $self->{'_stderr_file'}   = $stderr_file;
-   $self->{'_stderr_out'}    = $stdout_file;
+   $self->{'_stdout_file'}    = $stdout_file;
    $self->{'_status'}        = $status;
    $self->{'_adaptor'}       = $adaptor;
    $self->{'_job_name'}      = $job_name;
@@ -268,7 +268,7 @@ sub set_current_status{
 
 sub run{
   my ($self) = @_;
-  print STDERR "have ".$self." object\n";
+  #print STDERR "have ".$self." object\n";
   my $rdb;
   my $module = $self->module;
 
@@ -330,6 +330,18 @@ sub run{
   return;
 }
 
+
+sub cleanup{
+  my $self = shift;
+  
+  if( -e $self->stdout_file ){ 
+    unlink( $self->stdout_file ); 
+  }
+  if( -e $self->stderr_file ){ 
+    unlink( $self->stderr_file ); 
+  }
+
+}
 
 
 1;

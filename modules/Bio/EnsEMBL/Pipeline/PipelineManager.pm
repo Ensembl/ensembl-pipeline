@@ -123,6 +123,7 @@ sub _create_tasks {
   #get the config and instantiate all tasks
   my $config = $self->get_Config();
   foreach my $taskname ($config->get_keys('TASKS')) {
+    #print STDERR "instantiating task ".$taskname."\n";
     my $module = $config->get_parameter('TASKS', $taskname); 
     eval "require $module";
 
@@ -190,7 +191,7 @@ sub _create_submission_systems {
       $self->throw("$module cannot be found for submission system $ss.\n" .
 									 "Exception $@\n");
     }
-
+    
     my $subsys = $module->new($config);
 
     $submission_systems{$ss} = $subsys;
@@ -243,16 +244,17 @@ sub run {
   #
  MAIN: while(!$self->stop()) {
 
+    
     if(!keys(%pending_tasks) && !keys(%running_tasks)) {
       print STDERR "\n\nNothing left to do, shutting down\n";
       last MAIN;
     }
 
+
     if(time() - $last_check >= $CHECK_INTERVAL) {	
       #
       # update task status by contacting job adaptor
       #
-      #print STDERR "UPDATING STATUS!\n";
       $self->_update_task_status($just_started);
       $just_started = 0;
       $last_check = time();
@@ -263,8 +265,8 @@ sub run {
     #
     foreach my $taskname (keys %pending_tasks) {
       my $task = $pending_tasks{$taskname};
-      #print STDERR "Checking pending tasks ".$taskname."\n";
       if($task->can_start()) {
+	#print STDERR $taskname." can start\n";
         delete $pending_tasks{$taskname};
         $running_tasks{$taskname} = $task;
       }
@@ -278,23 +280,25 @@ sub run {
     # and give each running task a bit of time to create jobs
     #
     foreach my $taskname (keys %running_tasks) {
-      #print STDERR "Checking running tasks ".$taskname."\n";
       my $task = $running_tasks{$taskname};
       my $subsystem = $self->_submission_systems->{$taskname};
 
       if($task->is_finished()) {
         delete $running_tasks{$taskname};
         $finished_tasks{$taskname} = $task;
+	$task->get_TaskStatus->is_finished(1);
       } else {
         my $retcode = $task->run();
 	
         if($retcode eq 'TASK_FAILED') {
           $self->warn("Task [$taskname] failure");
         } elsif ($retcode eq 'TASK_DONE') {
+	  
           $subsystem->flush($taskname);
         } elsif ($retcode ne 'TASK_OK') {
           $self->warn("Task [$taskname] returned unknown status $retcode");
         }
+	
       }
 
       last MAIN if($self->stop());
@@ -401,7 +405,7 @@ sub _update_task_status {
 
   my %task_status;
   my %timeout_values;
-
+  my %cleanup;
   #
   # clean the current task status objects
   #
@@ -409,6 +413,9 @@ sub _update_task_status {
     $task->get_TaskStatus()->clean();
     $timeout_values{$task->name()} =
       $config->get_parameter($task->name(), 'timeout');
+    $cleanup{$task->name()} = 
+      $config->get_parameter($task->name(), 'cleanup');
+    
   }
 
   #
@@ -425,6 +432,12 @@ sub _update_task_status {
     }
 
     push(@{$task_status{$taskname}->{'EXISTING'}}, $input_id);
+
+    if($status eq 'SUCCESSFUL' && $cleanup{$taskname}){
+      
+      my $job = $job_adaptor->fetch_by_dbID($job_id);
+      $job->cleanup;
+    }
 
     #check if this is still running but has timed out
     if($status ne 'SUCCESSFUL' && $status ne 'FAILED' && $status ne 'FATAL'
@@ -511,9 +524,12 @@ sub _update_task_status {
 sub create_Job {
   my ($self, $taskname, $modulename, $input_id, $parms) = @_;
   my $ssystem = $self->_submission_systems()->{$taskname};
-
   my $job = $ssystem->create_Job($taskname, $modulename, $input_id, $parms);
-
+  #print STDERR "Have job ".$job." \n";
+  if(!$job){
+    #print STDERR "no job was returned must be too many pending jobs\n";
+    return undef;
+  }
   #add the id to the taskstatus as existing and created...
   my $ts = $self->get_TaskStatus($taskname);
 
@@ -522,6 +538,7 @@ sub create_Job {
   $ts->add_created($idset);
 
   $ssystem->submit($job);
+  return $job;
 }
 
 	
@@ -567,8 +584,11 @@ sub create_Jobs {
   #
   # submit the jobs
   #
-  foreach my $id (@{$id_set->ID_list}) {
-    $self->create_Job($taskname, $modulename, $id, $parms);
+  JOB:foreach my $id (@{$id_set->ID_list}) {
+    my $job = $self->create_Job($taskname, $modulename, $id, $parms);
+    if(!$job){
+      last JOB;
+    }
   }
 }
 
