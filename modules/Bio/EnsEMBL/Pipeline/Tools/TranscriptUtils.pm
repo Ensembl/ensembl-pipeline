@@ -92,7 +92,7 @@ sub _check_Transcript{
 	    $valid = 0;
 	}
 	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    print STDERR "check: transcript $id falls off the slice by its lower end\n";
+	    #print STDERR "check: transcript $id falls off the slice by its lower end\n";
 	    $valid = 0;
 	}
     }
@@ -101,7 +101,7 @@ sub _check_Transcript{
 #    my @exons = @{$transcript->get_all_Exons};
     
     if (scalar(@exons) > 1 ) {
-
+     
     EXON:
 	for (my $i = 0; $i <= $#exons; $i++) {
 
@@ -183,7 +183,7 @@ sub _check_Transcript{
 	$valid = 0;
     }
     if ($valid == 0 ){
-#	$self->_print_Transcript($transcript);
+      #	$self->_print_Transcript($transcript);
     }
     return $valid;
 }
@@ -195,13 +195,13 @@ sub _check_Transcript{
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
 sub _check_introns{
-    my ($self,$transcript, $slice) = @_;
+    my ($self,$transcript, $slice, $maxintron) = @_;
     
     # hardcoded stuff, to go in a config file
-    my $MAX_INTRON_LENGTH = 200000;
+    my $MAX_INTRON_LENGTH = $maxintron || 200000;
     
     #my $MAX_INTRON_LENGTH = 25000;
-
+    
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
     $transcript->sort;    
@@ -226,9 +226,8 @@ sub _check_introns{
 	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
 	    print STDERR "transcript $id outside the slice\n";
 	    $valid = 0;
-	}
-	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    print STDERR "transcript $id falls off the slice by its lower end\n";
+	}elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+	    #print STDERR "transcript $id falls off the slice by its lower end\n";
 	    $valid = 0;
 	}
     }
@@ -241,7 +240,6 @@ sub _check_introns{
       $valid = 0;
     }
     elsif (scalar(@exons) > 1 ) {
-      
     EXON:
       for (my $i = 0; $i <= $#exons; $i++) {
 	
@@ -250,6 +248,7 @@ sub _check_introns{
 	##############################
 	if ( $strand == 1 ){
 	  my $intron_length = $exons[$i]->start - $exons[$i-1]->end -1;
+    
 	  if ( $intron_length > $MAX_INTRON_LENGTH ){
 	    print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
 	    $valid = 0;
@@ -258,6 +257,7 @@ sub _check_introns{
 	}
 	elsif( $strand == -1 ){
 	  my $intron_length = $exons[$i-1]->start - $exons[$i]->end -1;
+    
 	  if ( $intron_length > $MAX_INTRON_LENGTH ){
 	    print STDERR "intron too long: length = $intron_length >  MAX_INTRON_ENGTH = $MAX_INTRON_LENGTH\n";
 	    $valid = 0;
@@ -268,7 +268,7 @@ sub _check_introns{
     }
       
     if ($valid == 0 ){
-      $self->_print_Transcript($transcript);
+      #$self->_print_Transcript($transcript);
     }
     return $valid;
   }
@@ -333,7 +333,7 @@ sub _check_rawcontig_Transcript{
 	$valid = 0;
     }
     if ($valid == 0 ){
-	$self->_print_Transcript($transcript);
+      #$self->_print_Transcript($transcript);
     }
     return $valid;
 }
@@ -353,7 +353,6 @@ ReturnType  : a BOOLEAN.
 
 sub _check_Translation{
   my ($self,$transcript) = @_;
-  
   my $id = $self->transcript_id( $transcript );
   
   my $valid = 1;
@@ -475,7 +474,7 @@ sub transcript_id {
   }
   
   if ($t->type){
-      $id .= " ".$t->type."\n";
+      $id .= " ".$t->type;
   }
   return $id;
 }
@@ -1596,7 +1595,6 @@ sub set_start_codon{
   my ( $self, $transcript ) = @_;
 
   my  $verbose = 0;
-
   # check transcript has a translation
   if((!defined $transcript->translation) || (!defined $transcript->translation->start_Exon)){
     print STDERR "Transcript has no translation, or no start exon - maybe a pseudogene?\n" if $verbose;
@@ -1881,14 +1879,15 @@ sub set_start_codon{
 	$transcript->start_Exon->phase($current_start_exon_phase);
 	$transcript->start_Exon->end_phase($current_start_exon_endphase);
       }
-
+     
       if($verbose){
-	  print STDERR "Translation seq AFTER:\n";
-	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
+        print STDERR "Translation seq AFTER:\n";
+        Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
       }
       return $transcript;
     }
   }
+  
 }
 
 ############################################################

@@ -108,6 +108,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_ABINITIO_SUPPORTED_TYPE
 							       GB_ABINITIO_PROTEIN_EVIDENCE
 							       GB_ABINITIO_DNA_EVIDENCE
+                     GB_ABINITIO_LOGIC_NAME
 							       GB_MAXSHORTINTRONLEN
 							       GB_MINSHORTINTRONLEN
 							       GB_MAX_TRANSCRIPTS_PER_GENE
@@ -186,11 +187,11 @@ sub input_id {
 sub build_Genes{
   my ($self) = @_;
   
-  print STDERR "Building genes...\n";
+  #print STDERR "Building genes...\n";
   
   # get all genes of type defined in gene_types() on this slice
   $self->get_Genes;
-  print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
+  #print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->combined_Transcripts) . "\n";
   
   #test
 #  foreach my $t ( $self->combined_Transcripts ){
@@ -202,11 +203,11 @@ sub build_Genes{
   if ( $GB_USE_ABINITIO ){
     # get all Genscan predictions on this slice
     $self->get_Predictions;
-    print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
+    #print STDERR "Number of ab initio predictions ". scalar($self->predictions)  . "\n";
     
     # get all the dna/protein align features from the pre-computes pipeline on this slice
     $self->get_Similarities;
-    print STDERR "Number of similarity features ". scalar($self->features) . "\n";
+    #print STDERR "Number of similarity features ". scalar($self->features) . "\n";
   }
   
   my @supported_predictions;
@@ -217,6 +218,8 @@ sub build_Genes{
       
       my @predictions = $self->predictions;
       my @features    = $self->features;
+      print STDERR "Passing ".@predictions." predictions ".@features.
+        " features and ".@annotations." annotations into Genebuilder\n";
       if(@predictions && @features){
 	  my $genecooker  = Bio::EnsEMBL::Pipeline::Runnable::PredictionGeneBuilder->new(
 											 -predictions => \@predictions,
@@ -244,21 +247,21 @@ sub build_Genes{
   }
   
   unless( @all_transcripts ){
-      print STDERR "no transcripts left to cook. Exiting...\n";
+      #print STDERR "no transcripts left to cook. Exiting...\n";
       return;
   }
 
-  print STDERR "clustering transcripts...\n";
+  #print STDERR "clustering transcripts...\n";
   my @transcript_clusters = $self->cluster_Transcripts(@all_transcripts);
-  print STDERR scalar(@transcript_clusters)." clusters formed\n";
+  #print STDERR scalar(@transcript_clusters)." clusters formed\n";
   
   # prune the redundant transcripts for each cluster
-  print STDERR "pruning transcripts...\n";
+  #print STDERR "pruning transcripts...\n";
   my @pruned_transcripts = $self->prune_Transcripts(@transcript_clusters);
-  print STDERR scalar(@pruned_transcripts)." transcripts obtained\n";
+  #print STDERR scalar(@pruned_transcripts)." transcripts obtained\n";
   
   # cluster transcripts into genes
-  print STDERR "clustering into genes...\n";
+  #print STDERR "clustering into genes...\n";
   
   # do a preliminary clustering
   my @preliminary_genes = $self->cluster_into_Genes(@pruned_transcripts);
@@ -278,18 +281,18 @@ sub build_Genes{
   # make shared exons unique objects
   my @genes =  $self->_make_shared_exons_unique( @tmp_genes );
   
-  print STDERR scalar(@genes)." genes built\n";
+  #print STDERR scalar(@genes)." genes built\n";
   
-  print STDERR "Final_results:\n";
+  #print STDERR "Final_results:\n";
   my $count = 0;
   foreach my $gene ( @genes ){
     $count++;
-    print STDERR "Gene $count:\n";
+    #print STDERR "Gene $count:\n";
     foreach my $tran ( @{$gene->get_all_Transcripts} ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     }
   }    
-  print STDERR scalar( @genes )." final genes\n";
+  #print STDERR scalar( @genes )." final genes\n";
   $self->final_genes( @genes );
 }
 
@@ -587,7 +590,7 @@ sub get_Genes {
 
   foreach my $type ($self->gene_types) {
     my @genes = @{$slice->get_all_Genes_by_type($type)};
-    print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
+    #print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
     foreach my $gene ( @genes ){
     
     TRANSCRIPT:
@@ -752,7 +755,7 @@ sub prune_Transcripts {
  CLUSTER:
   foreach my $transcript_cluster ( @transcript_clusters ){
     $cluster_count++;
-    print STDERR "Cluster $cluster_count\n";
+    #print STDERR "Cluster $cluster_count\n";
     my @mytranscripts = @{$transcript_cluster->get_Transcripts};
 
     ########################
@@ -761,7 +764,7 @@ sub prune_Transcripts {
     #
     ########################
 
-    print STDERR "sorting transcripts in cluster $cluster_count...\n";
+    #print STDERR "sorting transcripts in cluster $cluster_count...\n";
     my @transcripts = $self->_bin_sort_transcripts( @mytranscripts );
 
     ##############################
@@ -1111,13 +1114,13 @@ sub _bin_sort_transcripts{
   my $debug = 0;
   if ($debug == 1 ){
 
-    print STDERR "2.- sorted transcripts:\n";
+    #print STDERR "2.- sorted transcripts:\n";
 
     foreach my $tran (@transcripts){
       if ( $tran->dbID ){
 	print STDERR $tran->dbID." ";
       }
-      print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+      #print STDERR "orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
       my @exons = @{$tran->get_all_Exons};
       if ( $exons[0]->strand == 1 ){
 	@exons = sort { $a->start <=> $b->start } @exons;
@@ -1126,7 +1129,7 @@ sub _bin_sort_transcripts{
 	@exons = sort { $b->start <=> $a->start } @exons;
       }
       foreach my $exon ( @{$tran->get_all_Exons} ){
-	print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
+	#print "  ".$exon->start."-".$exon->end." ".( $exon->end - $exon->start + 1)." phase: ".$exon->phase." end_phase ".$exon->end_phase." strand: ".$exon->strand."\n";
       }
     }
   }
@@ -1150,7 +1153,7 @@ sub cluster_into_Genes{
   my ($self, @transcripts_unsorted) = @_;
   
   my $num_trans = scalar(@transcripts_unsorted);
-  print STDERR "clustering $num_trans transcripts into genes\n";
+  #print STDERR "clustering $num_trans transcripts into genes\n";
 
   
   # flusold genes
@@ -1223,7 +1226,7 @@ sub cluster_into_Genes{
   $self->check_Clusters(scalar(@transcripts), \@clusters);
   
   # make and store genes
-  print STDERR scalar(@clusters)." created, turning them into genes...\n";
+  #print STDERR scalar(@clusters)." created, turning them into genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
     my $count = 0;
@@ -1400,7 +1403,8 @@ Args    : none
 sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
-  foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
+  foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts 
+                            ($GB_ABINITIO_LOGIC_NAME)} ){
     $prediction->type("ab-initio");
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
@@ -1450,7 +1454,7 @@ sub get_Similarities {
       push @features, @{ $self->query->get_all_DnaAlignFeatures('',$GB_MIN_FEATURE_SCORE) };
   }
   
-  print STDERR "retrieved ".scalar(@features)." features\n";
+  #print STDERR "retrieved ".scalar(@features)." features\n";
   my %idhash;
   my @other_features;
   
@@ -1510,16 +1514,16 @@ sub merge {
 	
 	@features = sort { $a->start <=> $b->start} @features;
 	unless ( @features ){
-	    print STDERR "No features here for id: $id\n";
+	    #print STDERR "No features here for id: $id\n";
 	    next ID;
 	}
 	while ( @features && !defined $features[0] ){
-	    print STDERR "jumping an undefined feature\n";
+	    #print STDERR "jumping an undefined feature\n";
 	    shift @features;
 	}
 	
 	# put the first feature in the new array;
-	print STDERR "pushing feature[0]: ".$features[0]->gffstring."\n";
+	#print STDERR "pushing feature[0]: ".$features[0]->gffstring."\n";
 	push(@newfeatures,$features[0]);
 
 	
@@ -1527,14 +1531,14 @@ sub merge {
 	    my $id  = $features[$i]  ->id;
 	    my $id2 = $features[$i+1]->id;
 	    
-	    print STDERR "Comparing:\n";
-	    print STDERR "feature[$i]: ".$features[$i]->gffstring."\n";
-	    print STDERR "feature[".($i+1)."]: ".$features[$i+1]->gffstring."\n";
+	    #print STDERR "Comparing:\n";
+	    #print STDERR "feature[$i]: ".$features[$i]->gffstring."\n";
+	    #print STDERR "feature[".($i+1)."]: ".$features[$i+1]->gffstring."\n";
 	    
 	    # First case is if start of next hit is < end of previous
 	    if ( $features[$i]->end > $features[$i+1]->start && 
 		 ($features[$i]->end - $features[$i+1]->start + 1) < $overlap) {
-		print STDERR "overlap\n";
+		#print STDERR "overlap\n";
 		
 		if ($features[$i]->strand == 1) {
 		    $newfeatures[$count]-> end($features[$i+1]->end);
@@ -1554,7 +1558,7 @@ sub merge {
 		    $features[$i+1]->strand($features[$i]->strand);
 		}
 		
-		print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
+		#print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
 		
 	    }
 	    # Allow a small gap if < $query_gap, $homol_gap
@@ -1577,7 +1581,7 @@ sub merge {
 		if ($features[$i+1]->hstart == $features[$i+1]->hend) {
 		    $features[$i+1]->strand($features[$i]->strand);
 		}
-		print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
+		#print STDERR "newfeature[$count]: ".$newfeatures[$count]->gffstring."\n";
 		
 	    } 
 	    else {
@@ -1594,7 +1598,7 @@ sub merge {
 		$count++;
 		$i++;
 		
-		print STDERR "pushing feature[$i]: ".$features[$i]->gffstring."\n";
+		#print STDERR "pushing feature[$i]: ".$features[$i]->gffstring."\n";
 		push(@newfeatures,$features[$i]);
 		$i--;
 	    }
@@ -1613,7 +1617,7 @@ sub merge {
 	    push(@mergedfeatures,@pruned);
 	}
 	else{
-	    print STDERR "No features merged\n";
+	    #print STDERR "No features merged\n";
 	}
     }
     
@@ -1641,11 +1645,11 @@ sub prune_features {
 	@features = sort {$a->start <=> $b->start} @features;
 	
 	unless ( @features ){
-	    print STDERR "No features here for id: $id\n";
+	    #print STDERR "No features here for id: $id\n";
 	    next ID;
 	}
 	while ( @features && !defined $features[0] ){
-	    print STDERR "jumping an undefined feature\n";
+	    #print STDERR "jumping an undefined feature\n";
 	    shift @features;
 	}
 	
