@@ -65,9 +65,8 @@ sub db{
 sub generate_slice_input_ids {
     my ($self,$cs_name, $cs_version, $size,$overlap) = @_;
 
-    $overlap = 0 if (!$overlap);
-    $size = 0 if (!$size);
-    if ($size < 0) {
+   
+    if ($size && $size < 0) {
        $self->throw("Slice size must be >= 0. Currently " . $size);
     }
 
