@@ -236,9 +236,9 @@ sub run {
 sub run_program {
     my ($self) = @_;
     # run program
-    print STDERR "running ".$self->analysis->program."\n";
+    print STDERR "running ".$self->analysis->program." ".$self->filename."\n";
     $self->throw ("Error running ".$self->analysis->program." on ".$self->filename) 
-        unless ((system ($self->analysis->program." ".$self->filename." > ".$self->results)) == 0); 
+        unless ((system ("perl ".$self->analysis->program." ".$self->filename." > ".$self->results)) == 0); 
 }
 
 
@@ -278,12 +278,13 @@ sub parse_results {
     # parse
     my $id;
     while (<$filehandle>) {
-        chomp;
+	chomp;
         next if /^$/;
         if (/^\>(\S+)/) {
             $id = $1;
 	}
         elsif (/^%pred/) {
+	    print STDERR "HERE\n";
             my ($junk, $values) = split /:/;
             my @tm = split (/,/, $values);
             foreach (@tm) {
@@ -301,6 +302,7 @@ sub parse_results {
 	            $feature{primary}= 'transmembrane';
 	            ($feature{program}) = $self->analysis->program =~ /([^\/]+)$/;
                     $feature{logic_name} = 'transmembrane';
+		    $self->create_feature(\%feature);
 		}
 	    }
 	}
