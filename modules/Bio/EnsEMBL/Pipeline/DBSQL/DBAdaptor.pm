@@ -59,7 +59,7 @@ use Bio::Root::RootI;
 
 # Inherits from the base bioperl object
 
-@ISA = qw(Bio::EnsEMBL::DBSQL::DBAdaptor Bio::EnsEMBL::DBSQL::Obj);
+@ISA = qw(Bio::EnsEMBL::DBSQL::DBAdaptor);
 
 
 # sub new {
