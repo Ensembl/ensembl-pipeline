@@ -70,7 +70,7 @@ use vars qw( %PseudoGenes );
 					SPECIES => 'Homo sapiens',
 					DBHOST  => 'ecs2f',
 					DBNAME  => 'homo_sapiens_core_16_33',
-					PATH    => 'NCBI34',
+					PATH    => 'NCBI33',
 				       },
 				       {
 					SPECIES => 'Mus musculus',
