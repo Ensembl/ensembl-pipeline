@@ -700,15 +700,14 @@ sub run_est2genome {
   #print "est2 genome outputted ".scalar(@features)."\n";
   my @output;
   foreach my $f (@features) {
-        if( $f->percent_id >= 98 && $f->score > 6  ){
-	  $f->start($f->start+$start-1);
-	  $f->end($f->end+$start-1);
-	  #$f->strand($strand);
-	  #print "outputting ".$f->seqname." ".$f->start." ".$f->end." ".$f->strand."\n";
-	  push(@output, $f);
-
-	}
+      if( $f->percent_id >= 98 && $f->score > 6  ){
+        $f->start($f->start + $start - 1);
+        $f->end  ($f->end   + $start - 1);
+        #$f->strand($strand);
+        #print "outputting ".$f->seqname." ".$f->start." ".$f->end." ".$f->strand."\n";
+        push(@output, $f);
       }
+  }
   #print "there are ".scalar(@output)." outputted\n";
    
   

@@ -114,8 +114,8 @@ sub run {
     }
         
     #The -reverse switch ensures correct numbering on EST seq in either orientation
-    # my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
-    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile | tee -a $output_file | "; 
+    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
+    #my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile | tee -a $output_file | "; 
     #print STDERR "running for " . $estseq->display_id . "\n";
     eval {
       #print (STDERR "Running command $est_genome_command\n");
@@ -149,7 +149,7 @@ sub run {
                                                          6,7,8];
           
             ### Skip puny little bits? ###
-            #next unless $score > 6;
+            next unless $score > 6;
 
             # Switch the starts and ends if we have a reverse strand gene
             if ($estOrientation == -1) {
@@ -264,17 +264,17 @@ sub _createfeatures {
 
 sub convert_output {
   my ($self) = @_;
-  my @genes;
-  my @exons;
+  #my @genes;
+  #my @exons;
   my @supp_feat;
 
   # split the different features up
   foreach my $f(@{$self->{'_fplist'}}){
     if ($f->primary_tag eq 'Span'){
-      push(@genes, $f);
+      #push(@genes, $f);
     }
     elsif($f->primary_tag eq 'Exon'){
-      push(@exons, $f);
+      #push(@exons, $f);
     }
     elsif($f->primary_tag eq 'Segment'){
       push(@supp_feat, $f);

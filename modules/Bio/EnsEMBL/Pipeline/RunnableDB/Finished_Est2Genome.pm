@@ -83,7 +83,6 @@ sub fetch_input {
   #print "percent_id ".$percent_id."\n";
   my $no_blast = undef;
   my $percent_filter;
-  my $tandem =  1;
   my $no_blast = 1;
   #print "getting features\n";
   my @features = $contig->get_all_SimilarityFeatures_above_score($type, 200);
@@ -104,14 +103,12 @@ sub fetch_input {
       $percent_filter = undef;
     }
   }
-  
-   
-  #print $genseq." ".$self->seqfetcher." ".$percent_filter." ".$percent_id." ".$tandem." ".$no_blast." \n";
+
+  #print $genseq." ".$self->seqfetcher." ".$percent_filter." ".$percent_id." ".$no_blast." \n";
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new('-unmasked' => $genseq,
 								'-seqfetcher' => $self->seqfetcher,
 								'-percent_filter' => $percent_filter,
 								'-percent_id' => $percent_id,
-								'-tandem_check' => $tandem,
 								'-no_blast' => $no_blast,
 								'-features' => \@fps);
   
