@@ -553,7 +553,7 @@ sub filter_hits {
     @features = sort {$a->p_value <=> $b->p_value} @features;
   } 
   
-  my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(-coverage => $self->coverage);
+  my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter("-coverage" => $self->coverage);
   
   my @newfeatures = $search->run(@features);
   
