@@ -538,11 +538,30 @@ INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_conse
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluJb', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MLT1A', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'CT-rich', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'G-rich', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSg', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L2', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MIR', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER5A', '', 'N');
 INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER5B', '', 'N');
-
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MLT1J2', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER33', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER20B', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER69', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MIR3', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER92B', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER58', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'FRAM', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'T-rich', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AT_rich', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluS', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER4E', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'MER4B', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1MEc', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1MB3', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'AluSc', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1M4', '', 'N');
+INSERT INTO repeat_consensus (repeat_id, repeat_name, repeat_class, repeat_consensus) VALUES (NULL, 'L1MA9', '', 'N');
 
 #
 # Dumping data for table 'species'
