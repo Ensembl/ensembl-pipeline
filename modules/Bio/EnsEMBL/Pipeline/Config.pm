@@ -58,7 +58,7 @@ sub new {
     $self->{'_dbobj'} = $db;
 
     my $config_rows = $self->_read_db($db);
-    print "Read $config_rows rows from database.\n";
+    #print "Read $config_rows rows from database.\n";
 
   }
 
@@ -99,10 +99,10 @@ sub _write_config_to_db {
 
   # get the config values that will be required to set up the DBAdaptor
   my @required_params = ( "host", "user", "pass", "dbname", "port" );
-  my %params = {};
+  my %params;
   foreach my $param (@required_params) {
     $params{$param} =  $self->get_parameter('pipeline_database', $param);
-    print "Got pipeline database parameter $param, value = $params{$param}\n";
+    #print "Got pipeline database parameter $param, value = $params{$param}\n";
   }
 
   # create the DBAdaptor
@@ -151,7 +151,7 @@ sub _parse_files {
 
   foreach my $file (@files) {
 
-    print "Parsing $file \n";
+    #print "Parsing $file \n";
 
     my $header = "";
 
@@ -167,7 +167,6 @@ sub _parse_files {
 	$header = lc($1);
 	$headers{$header} = 0;
 	#print "Reading stanza $header\n";
-
       }
 
       # key=value
@@ -186,11 +185,10 @@ sub _parse_files {
 	if (exists($self->{'config'}->{$header}->{$key})) {
 	  $self->throw("$key is already defined for [$header]; cannot be redefined");
 	} else {
-	  # store them
+	  # store them in the config hash
 	  $self->{'config'}->{$header}->{$key} = $value;
 	  #print "$header:$key=$value\n";
-	  $headers{$header}++;
-
+	  $headers{$header}++;  # will be used to check for headers with no keys
 	}
 
       }
@@ -204,7 +202,7 @@ sub _parse_files {
   # add a blank key/value for any headers that have no keys
   foreach my $h (keys (%headers)) {
     if ($headers{$h} == 0) {
-      print "$h has no keys; adding blank key/value\n";
+      #print "$h has no keys; adding blank key/value\n";
       $self->{'config'}->{$h}->{""} = "";
     }
   }
@@ -249,7 +247,7 @@ sub _update_single_header_defaults {
     if (!grep /^$key$/, @current_keys) {
       my $value = $self->get_parameter($default_header, $key);
       $self->{'config'}->{$header}->{$key} = $value;
-      print "added default value of $value (from $default_header) for $key in $header\n";
+      #print "added default value of $value (from $default_header) for $key in $header\n";
     }
   }
 
