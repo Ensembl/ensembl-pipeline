@@ -73,20 +73,26 @@ sub submit{
 	
       } else {
         #CHILD
-        my $file_prefix = $self->_generate_filename_prefix($job);
+
+	my $config = $self->get_Config();
+	my $temp_dir = $config->get_parameter('LOCAL', 'tmpdir');
+        my $file_prefix = $job->_generate_filename_prefix($job, $temp_dir);
+
+	# redirect stdout/stderr
         $job->stdout_file("${file_prefix}.out");
         $job->stderr_file("${file_prefix}.err");
-	close(STDERR); 
+	close(STDERR);
 	close(STDOUT);
 	open(STDERR, ">" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
         open(STDOUT, ">" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
-        print "Executing $job with PID $$\n";
+
+        #print "Executing $job with PID $$\n";
         $job->submission_id($$);
         $job->adaptor->update($job);
         $job->set_current_status('SUBMITTED');
 
         $job->run();
-        exit(0); #child process is finished now!
+        exit(0); # child process is finished now!
       }
 
     } else {
@@ -198,18 +204,30 @@ sub flush {
 sub _generate_filename_prefix {
 
   my $self = shift;
-  my $job  = shift;
+  my $job = shift;
 
   # get temp dir from config
   my $config = $self->get_Config();
   my $temp_dir = $config->get_parameter('LOCAL', 'output_dir');
   $temp_dir || $self->throw('Could not determine output dir for job ' . $job->taskname() . ' ID ' . $job->dbID() . '\n');
 
-  # don't need to distribute files through subdirectories like in LSF as there will only be a few
+  # have a subdirectory for each type of task
+  $temp_dir .= "/" .$self->taskname;
+
+  #distribute temp files evenly into 10 different dirs so that we don't
+  #get too many files in the same dir
+  $self->{'dir_num'} = 0 if(!defined($self->{'dir_num'}));
+  $self->{'dir_num'} = $self->{'dir_num'} +1 % 10;
+	
+  $temp_dir .= "/" . $self->{'dir_num'};
+
+  #create the dir if it doesn't exist
+  mkdir($temp_dir) if(! -e $temp_dir);
+
   my $time = localtime(time());
   $time =~ tr/ :/_./;
 
-  return "$temp_dir/" . $job->taskname() . "_job" . $job->dbID() . "$time";
+  return "$temp_dir/" . "_job_" . $self->dbID() . "$time";
 
 }
 
