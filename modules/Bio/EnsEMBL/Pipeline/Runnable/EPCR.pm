@@ -285,10 +285,10 @@ sub parse_results {
         $feat1 {'strand'}       = 0;
         $feat2 {'strand'}       = 0;
         #misc
-        $feat1 {'score'}        = undef;
-        $feat2 {'score'}        = undef;
+        $feat1 {'score'}        = -1000;
+        $feat2 {'score'}        = -1000;
         $feat2 {'db'}           = $self->db || undef;
-        $feat2 {'db_version'}   = undef;
+        $feat2 {'db_version'}   = 1;
         $feat2 {'program'}      = 'e-PCR';
         $feat2 {'p_version'}    ='1';
         $feat2 {'source'}       = 'e-PCR';
