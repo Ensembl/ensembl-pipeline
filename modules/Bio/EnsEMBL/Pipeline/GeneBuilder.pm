@@ -295,11 +295,10 @@ sub get_Genes {
   my $start = $2;
   my $end   = $3;
   my $slice = $sa->fetch_by_chr_start_end($chr,$start,$end);
-  
   my @unchecked_genes;
 
   foreach my $type ($self->gene_types) {
-    my @genes = @{$slice->get_all_Genes_by_type($type, 'evidence')};
+    my @genes = @{$slice->get_all_Genes_by_type($type)};
     print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
     foreach my $gene ( @genes ){
     
