@@ -370,13 +370,13 @@ sub create_repeat {
 
 sub growfplist {
     my ($self, $fp) =@_;    
-    #load fp onto array using command _grow_fplist
+    
     push(@{$self->{'_fplist'}}, $fp);
 }
 
 sub shrinkfplist {
     my ($self) =@_;    
-    #load fp onto array using command _grow_fplist
+    
     return pop(@{$self->{'_fplist'}});
 }
 

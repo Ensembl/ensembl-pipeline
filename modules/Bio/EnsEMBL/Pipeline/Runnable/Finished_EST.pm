@@ -84,36 +84,31 @@ sub analysis {
     return $self->{'_analysis'};
 }
 
-sub _make_blast_paramters {
+sub default_blast_parameters {
+    my( $self ) = @_;
+
+    return (
+        '-query'            => $self->query,
+        '-database'         => $ana->db,
+        '-program'          => $ana->program || 'wublastn',
+        '-threshold_type'   => 'PVALUE',
+        '-threshold'        => 1e-4,
+        '-options'          => 'Z=500000000 cpus=1',
+        );
+}
+
+sub _make_blast_parameters {
     my( $self ) = @_;
     
     # Set parameters from analysis object, or use defaults
+    my %param = $self->default_parameters;
     my $ana = $self->analysis or $self->throw('analysis not set');
-    
-    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ecs1b',
-                                            -user => 'ensadmin',
-                                            -pass => 'ensembl',
-                                            -dbname => 'chr_6_13_finished');
-
-    
-    my %param = (
-        '-query'            => $self->query,
-        '-database'         => $ana->db,
-        '-program'          => $ana->program || 'wublastn.new',
-        '-threshold_type'   => 'PVALUE',
-        '-threshold'        => 1e-4,
-        '-options'          => 'Z=500000000',
-        -dbobj              => $db,
-        );
-    
     
     my( $arguments );
     foreach my $ele (split /\s*,\s*/, $ana->parameters) {
         if (my ($key, $value) = split /\s*=>\s*/, $ele) {
             if (defined $value) {
-                if ($key eq '-threshold_type' or $key eq '-threshold') {
-                    $param{$key} = $value;
-                }
+                $param{$key} = $value;
             } else {
 	        # remaining arguments not of '=>' form
 	        # are simple flags (like -p1)
@@ -131,17 +126,17 @@ sub run {
     
     my $seq = $self->query;
     my $blast = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast
-        ->new($self->_make_blast_paramters);
+        ->new($self->_make_blast_parameters);
     
     $blast->run;
     my $features = [$blast->output];
     
     
-        print STDERR "\nPlus strand est_genome\n";
-        $self->run_est_genome_on_strand( 1, $features);
+    print STDERR "\nPlus strand est_genome\n";
+    $self->run_est_genome_on_strand( 1, $features);
 
-        print STDERR "\nMinus strand est_genome\n";
-        $self->run_est_genome_on_strand(-1, $features);
+    print STDERR "\nMinus strand est_genome\n";
+    $self->run_est_genome_on_strand(-1, $features);
     
 }
 

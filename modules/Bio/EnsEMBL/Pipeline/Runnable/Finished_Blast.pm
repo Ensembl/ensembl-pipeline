@@ -8,6 +8,15 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use vars '@ISA';
 @ISA = qw{ Bio::EnsEMBL::Pipeline::Runnable::Blast };
 
+sub split_gapped_alignments {
+    my( $self, $flag ) = @_;
+    
+    if (defined $flag) {
+        $self->{'_split_gapped_alignments'} = $flag ? 1 : 0;
+    }
+    return $self->{'_split_gapped_alignments'} || 0;
+}
+
 sub get_analysis {
     my( $self ) = @_;
     
@@ -133,6 +142,8 @@ sub _apply_coverage_filter {
         $self->throw("Unknown threshold type '$thresh_type'");
     }
     
+    my $split_flag = $self->split_gapped_alignments;
+    
     ### Set max coveage -- should be a config parameter
     my $max_coverage = 10;
     $self->throw("Max coverage '$max_coverage' is beyond limit of method '255'")
@@ -177,43 +188,33 @@ sub _apply_coverage_filter {
                 # Make FeaturePairs if we want to keep this hit
                 if ($keep_hit) {
                     #print STDERR "KEEP\n";
-                    my( @feat );
-                    foreach my $hsp (@hsps) {
-                        my $q = $hsp->query;
-                        my $s = $hsp->subject;
-                        my $fp = $self->_makeFeaturePair(
-                            $q->start, $q->end, $q->strand,
-                            $s->start, $s->end, $s->strand,
-                            $hsp->score, $hsp->percent, $hsp->P,
-                            $name, $ana,
-                            );
-                        push(@feat, $fp);
+                    
+                    if ($split_flag) {
+                        # Split gapped HSPs into ungapped feature pairs
+                        foreach my $hsp (@hsps) {
+                            $self->split_HSP($hsp, $name, $ana);
+                        }
+                    } else {
+                        # Don't bother splitting gapped alignments
+                        my( @feat );
+                        foreach my $hsp (@hsps) {
+                            my $q = $hsp->query;
+                            my $s = $hsp->subject;
+                            my $fp = $self->_makeFeaturePair(
+                                $q->start, $q->end, $q->strand,
+                                $s->start, $s->end, $s->strand,
+                                $hsp->score, $hsp->percent, $hsp->P,
+                                $name, $ana,
+                                );
+                            $self->growfplist($fp);
+                        }
                     }
-                    $self->add_output(@feat);
                 }
             }
         }
     }
 }
 
-sub add_output {
-    my( $self, @features ) = @_;
-    
-    my $o = $self->{'_output'} ||= [];
-    push(@$o, @features);
-}
-
-sub output {
-    my $self = shift;
-    
-    $self->throw("output takes no arguments - got (@_)") if @_;
-    
-    if (my $o = $self->{'_output'}) {
-        return @$o;
-    } else {
-        return;
-    }
-}
 
 1;
 

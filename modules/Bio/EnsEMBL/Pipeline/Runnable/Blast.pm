@@ -620,13 +620,25 @@ sub filter_hits {
     Function:   Takes a gapped blast HSP 
                 and turns it into an array of ungapped feature pairs.
     Returns :   Nothing
-    Args    :   BPlite::HSP,name string
-                 
+    Args    :   BPlite::HSP, name string, optional Bio::EnsEMBL::Analysis object. 
 
 =cut
 
 sub split_HSP {
-    my ( $self, $hsp, $name ) = @_;
+    my ( $self, $hsp, $name, $analysis ) = @_;
+
+    # set source to last element of program path
+    my ($source) = $self->program =~ m{([^/]+)$};
+
+    $analysis ||= new Bio::EnsEMBL::Analysis(
+        -db              => $self->database,
+        -db_version      => 1,
+        -program         => $source,
+        -program_version => 1,
+        -gff_source      => $source,
+        -gff_feature     => 'similarity',
+        -logic_name      => 'blast'
+    );
 
     # First of all some jiggery pokery to find out what sort of alignment
     # we have - (dna-dna, dna-pep, pep-dna etc).
@@ -695,19 +707,6 @@ sub split_HSP {
 
     my $count = 0;    # counter for the bases in the alignment
     my $found = 0;    # flag saying whether we have a feature pair
-
-    my $source = $self->program;
-    $source =~ s/\/.*\/(.*)/$1/;
-
-    my $analysis = new Bio::EnsEMBL::Analysis(
-        -db              => $self->database,
-        -db_version      => 1,
-        -program         => $source,
-        -program_version => 1,
-        -gff_source      => $source,
-        -gff_feature     => 'similarity',
-        -logic_name      => 'blast'
-    );
 
     # Here goes...
 
