@@ -60,8 +60,43 @@ use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::SeqIO;
 
-# all the parameters are read from GeneConf.pm
-use Bio::EnsEMBL::Pipeline::GeneConf;
+# all the parameters are read from GeneBuild config files
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
+							     GB_INPUTID_REGEX 	   
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined  qw (
+							     GB_COMBINED_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							     GB_GW_DBNAME
+							     GB_cDNA_DBHOST
+							     GB_cDNA_DBUSER
+							     GB_cDNA_DBNAME
+							     GB_cDNA_DBPASS
+							     GB_COMB_DBHOST
+							     GB_COMB_DBUSER
+							     GB_COMB_DBNAME
+							     GB_COMB_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
+							     GB_TARGETTED_GW_GENETYPE
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
+							      GB_SIMILARITY_GENETYPE
+							     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
+							    GB_cDNA_GENETYPE
+							    GB_COMBINED_MAX_INTRON
+							    GB_COMBINED_GENETYPE
+							   );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -91,6 +126,7 @@ sub new {
 						    '-host'   => $GB_cDNA_DBHOST,
 						    '-user'   => $GB_cDNA_DBUSER,
 						    '-dbname' => $GB_cDNA_DBNAME,
+						    '-pass'   => $GB_cDNA_DBPASS,
 						    ); 
   
   $cdna_db->dnadb($self->db);
@@ -124,7 +160,7 @@ sub fetch_input{
   my $start;
   my $end;
   
-  # input format is given by GeneConf::$GB_INPUTID_REGEX and is usually of the form '(^\S+\.\S+)\.(\d+)-(\d+)',
+  # input format is given by Config::GeneBuild::General::$GB_INPUTID_REGEX and is usually of the form '(^\S+\.\S+)\.(\d+)-(\d+)',
   
   if(!($entry =~ /$GB_INPUTID_REGEX/ ) ){
     $self->throw("Not a valid input id... $entry");
@@ -132,18 +168,21 @@ sub fetch_input{
   $chr_name = $1;
   $start    = $2;
   $end      = $3;
-  #print STDERR "input_id id : $chr_name .  $start - $end\n";  
+
+  print STDERR "input_id id : $chr_name .  $start - $end\n";  
   
-  # genewises db
   my $slice_adaptor = $self->genewise_db->get_SliceAdaptor();
   my $slice         = $slice_adaptor->fetch_by_chr_start_end($chr_name,$start,$end);
+
   $self->query($slice);
 
   # get genewise genes
   my @similarity_genes = @{$self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE,'evidence')};
   my @targetted_genes  = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE,'evidence')};
-  #print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
-  #print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
+
+  print STDERR "got " . scalar(@similarity_genes) . " similarity genewise genes\n";
+  print STDERR "got " . scalar(@targetted_genes) . " targetted genewise genes\n";
+
   $self->gw_genes( @similarity_genes, @targetted_genes );
   
   # cdnas db
@@ -446,10 +485,10 @@ sub write_output {
 sub make_gene{
   my ($self,@transcripts) = @_;
   
-  # the genetype should be given in Bio::EnsEMBL::Pipeline::GeneConf
+  # the genetype should be given in Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined
   my $genetype = $GB_COMBINED_GENETYPE;
   unless ( $genetype ){
-    $self->throw("You must define  to GB_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::GeneConf");
+    $self->throw("You must define GB_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined");
   }
   
   # an analysis should be passed in via the RunnableDB.m parent class:
@@ -1845,6 +1884,8 @@ sub remap_genes {
   my $contig = $self->query;
   
   my @genes = $self->combined_genes;
+
+  print STDERR "REMAPPING " . scalar(@genes) . " GENES\n";
 
 GENE:  
   foreach my $gene (@genes) {
