@@ -58,137 +58,117 @@ use Bio::EnsEMBL::PredictionTranscript;
 # note - intron lengths now checked separately using _check_introns
 
 sub _check_Transcript{
-    my ($self,$transcript, $slice) = @_;
-    
-    # hardcoded stuff, to go in a config file
-    my $MAX_EXON_LENGTH   = 20000;
-    my $UNWANTED_EVIDENCE = "NG_";
-    my $MAX_INTRON_LENGTH = 200000;
-    
-    my $id = $self->transcript_id( $transcript );
-    my $valid = 1;
-    
-    my $strand;
+  my ($self,$transcript, $slice) = @_;
 
-    $transcript->sort;    
-    my @exons = @{$transcript->get_all_Exons};
-    eval {
-      $strand =  $exons[0]->strand;
-    };
-    if ($@) {
-	$self->throw;
+  # hardcoded stuff, to go in a config file
+  my $MAX_EXON_LENGTH   = 20000;
+  my $UNWANTED_EVIDENCE = "NG_";
+  my $MAX_INTRON_LENGTH = 200000;
+  my $id = $self->transcript_id( $transcript );
+  my $valid = 1;
+  my $strand;
+
+  $transcript->sort;
+  my @exons = @{$transcript->get_all_Exons};
+  eval {
+    $strand =  $exons[0]->strand;
+  };
+  if ($@) {
+    $self->throw;
+  }
+
+  ############################################################
+  # check that transcripts are not completely outside the slice
+  # allow transcripts that fall partially off the slice only at 
+  # one end, the 'higher' end of the slice
+  ############################################################
+  if ( $slice ){
+
+    if ( $transcript->start > $slice->length || $transcript->end < 1 ){
+      print STDERR "check: transcript $id outside the slice\n";
+      $valid = 0;
     }
-
-    
-    ############################################################
-    # check that transcripts are not completely outside the slice
-    # allow transcripts that fall partially off the slice only at 
-    # one end, the 'higher' end of the slice
-    ############################################################
-    if ( $slice ){
-
-	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	    print STDERR "check: transcript $id outside the slice\n";
-	    $valid = 0;
-	}
-	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    #print STDERR "check: transcript $id falls off the slice by its lower end\n";
-	    $valid = 0;
-	}
+    elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+      #print STDERR "check: transcript $id falls off the slice by its lower end\n";
+      $valid = 0;
     }
-    
+  }
 
-#    my @exons = @{$transcript->get_all_Exons};
-    
-    if (scalar(@exons) > 1 ) {
-     
-    EXON:
-	for (my $i = 0; $i <= $#exons; $i++) {
+  if (scalar(@exons) > 1 ) {
+  EXON:
+    for (my $i = 0; $i <= $#exons; $i++) {
 
-	  ##############################
-	  # check exon length
-	  ##############################
-	  my $length = $exons[$i]->end - $exons[$i]->start + 1;
-	  if ( $length > $MAX_EXON_LENGTH ){
-	    print STDERR "check: exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+      # check exon coords are valid
+      if (! Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exons[$i])){
+	$valid = 0;
+	last EXON;
+      }
+
+      # check exon length
+      my $length = $exons[$i]->end - $exons[$i]->start + 1;
+      if ( $length > $MAX_EXON_LENGTH ){
+	print STDERR "check: exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+	$valid = 0;
+	last EXON;
+      }
+
+      if ( $i>0 ){
+	# check strand consistency:
+	if($exons[$i]->strand != $exons[$i-1]->strand){
+	  print STDERR "check: transcript $id has mixed strands\n";
+	  $valid = 0;
+	  last EXON;
+	}
+
+	# check phase consistency:
+	if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+	  #print STDERR "check: transcript $id has phase inconsistency\n";
+	  $valid = 0;
+	  last EXON;
+	}
+		
+	# check for folded transcripts
+	if ($exons[0]->strand == 1) {
+	  if ($exons[$i]->start < $exons[$i-1]->end) {
+	    print STDERR "check: transcript $id folds back on itself\n";
 	    $valid = 0;
 	    last EXON;
 	  }
-	  
-	    
-	    if ( $i>0 ){
-
-	      
-		##############################
-		# check strand consistency:
-		##############################
-	        if($exons[$i]->strand != $exons[$i-1]->strand){
-	            print STDERR "check: transcript $id has mixed strands\n";
-	            $valid = 0;
-		    last EXON;
-	        }
-	      
-		##############################
-		# check phase consistency:
-		##############################
-		if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-		    #print STDERR "check: transcript $id has phase inconsistency\n";
-		    $valid = 0;
-		    last EXON;
-		}
-	    
-
-	    
-		
-		##############################
-		# check for folded transcripts
-		##############################
-		if ($exons[0]->strand == 1) {
-		    if ($exons[$i]->start < $exons[$i-1]->end) {
-			print STDERR "check: transcript $id folds back on itself\n";
-			$valid = 0;
-			last EXON;
-		    } 
-		} 
-		elsif ($exons[0]->strand == -1) {
-		    if ($exons[$i]->end > $exons[$i-1]->start) {
-			print STDERR "check: transcript $id folds back on itself\n";
-			$valid = 0;
-			last EXON;
-		    } 
-		}
-	    }
-	    ############################################################
-	    # we don't want the NG_ entries going through, they are evil
-	    ############################################################
-    if($exons[$i]->get_all_supporting_features){
-      foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
-        if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
-          print STDERR "check: transcript with evil evidence: ".$evidence->hseqname." skippping\n";
-          $valid = 0;
-          last EXON;
-        }
+	}
+	elsif ($exons[0]->strand == -1) {
+	  if ($exons[$i]->end > $exons[$i-1]->start) {
+	    print STDERR "check: transcript $id folds back on itself\n";
+	    $valid = 0;
+	    last EXON;
+	  }
+	}
+      }
+      # we don't want the NG_ entries going through, they are evil
+      if($exons[$i]->get_all_supporting_features){
+	foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
+	  if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
+	    print STDERR "check: transcript with evil evidence: ".$evidence->hseqname." skippping\n";
+	    $valid = 0;
+	    last EXON;
+	  }
+	}
       }
     }
   }
-  
-	
+  elsif( scalar(@exons) == 1 ){
+    my $length =  $exons[0]->end - $exons[0]->start + 1;
+    if ( $length >  $MAX_EXON_LENGTH ){
+      print STDERR "check: single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
+      $valid = 0;
     }
-    elsif( scalar(@exons) == 1 ){
-	my $length =  $exons[0]->end - $exons[0]->start + 1;
-	if ( $length >  $MAX_EXON_LENGTH ){
-	    print STDERR "check: single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
-	    $valid = 0;
-	}
-    }
-    else{
-	print STDERR "check: transcript with no exons\n";
-	$valid = 0;
-    }
-    if ($valid == 0 ){
-#	$self->_print_Transcript($transcript);
-    }
-    return $valid;
+  }
+  else{
+    print STDERR "check: transcript with no exons\n";
+    $valid = 0;
+  }
+  if ($valid == 0 ){
+  }
+  return $valid;
 }
 
 
@@ -347,8 +327,8 @@ sub _check_rawcontig_Transcript{
 
 =head2 _check_Translation
 
-Description : it returns TRUE if a transcript has a translation, and this has 
-              no  stop codons. It returns FALSE otherwise. 
+Description : it returns TRUE if a transcript has a translation, and this has
+              no  stop codons. It returns FALSE otherwise.
   IMPORTANT : we want to check translation independently from other
               properties of the transcripts. Basically because
               we may have some transcripts whih are valid but
@@ -358,25 +338,22 @@ ReturnType  : a BOOLEAN.
 
 sub _check_Translation{
   my ($self,$transcript) = @_;
-  
   my $id = $self->transcript_id( $transcript );
-  
   my $valid = 1;
-  
   my $translation = $transcript->translation;
 
   # double check sane translation start & end
   if( $translation->start < 1){
-      print STDERR "dodgy translation start: ".$translation->start."\n";
-      $valid = 0;
+    print STDERR "dodgy translation start: " . $translation->start . "\n";
+    $valid = 0;
   }
-  
+
   if( $translation->end < 1 || $translation->end > $translation->end_Exon->length ){
-     print STDERR "dodgy translation end: " . $translation->end . " end-exon length: ".
-	 $translation->end_Exon->length."\n";
-     $valid = 0;
+    print STDERR "dodgy translation end: " . $translation->end . " end-exon length: " .
+      $translation->end_Exon->length . "\n";
+    $valid = 0;
   }
-    
+
   my $sequence;
   eval{
     $sequence = $transcript->translate;
@@ -387,17 +364,19 @@ sub _check_Translation{
   }
   if ( $sequence ){
     my $peptide = $sequence->seq;
-    #print STDERR "peptide: $peptide\n";
-    # check only terminal stops
-    if ( $peptide =~ /\*./ ){
+    # report terminal stops
+    if($peptide =~ /\*$/){
+      print STDERR "translation of transcript $id terminates in a stop\n";
+      $peptide =~ s/\*$//;
+    }
+
+    # check for internal stops
+    if ( $peptide =~ /\*/ ){
       print STDERR "translation of transcript $id has STOP codons\n";
       $valid = 0;
     }
   }
-  if ($valid == 0 ){
-    #print STDERR "Transcript ".$id." isn't valid\n";
-    #$self->_print_Transcript($transcript);
-  }
+
   return $valid;
 }
 
