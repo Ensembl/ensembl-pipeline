@@ -27,13 +27,13 @@ Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter - Filters a search runnable
 =head1 DESCRIPTION
 
 Filters search results, such as Blast, on several criteria. The most
-important ones are minscore, maxevalue, coverage. Crudely, coverage
+important ones are minscore, maxevalue and coverage. Crudely, coverage
 reduces redundant data (e.g., almost-identical ESTs with different
-accession numbers) and prune reduces overlapping features (e.g., hits
+accession numbers), and prune reduces overlapping features (e.g., hits
 to a repetitive sequence).
 
-Coverage filtering is compulsory and is intended to reduce coverage of
-the query to a given depth per strand. In detail, coverage filtering
+Coverage filtering is compulsory and is intended to reduce excessive
+coverage of each strand of the query. In detail, coverage filtering
 does this:
 
   sort hit-sequence-accessions in decreasing order of
@@ -51,9 +51,17 @@ does this:
 
 Where two or more hit-sequence-accessions have equal maximum feature
 score, secondary sorting is in decreasing order of total score,
-followed by alphabetical order of hit-sequence accession number.
-Within the set of features for a given hit-sequence-accession,
+followed by alphabetical order of hit-sequence accession number. The
+last criterion is arbitrary but ensures equal ordering on repeated
+calls. Within the set of features for a given hit-sequence-accession,
 features are considered in decreasing order of score.
+
+Coverage filtering is conservative in that it keeps all features for
+a hit-sequence-accession unless all features for that
+hit-sequence-accession are covered too deeply. If there is but one
+feature that isn't covered so deeply, this will save all features
+for this hit-sequence-accession. Hence coverage filtering does not
+provide a hard limit on the depth of coverage.
 
 The option prune, if on, allows only a maximum number of features
 per strand per genomic base per hit sequence accession, this number
@@ -61,7 +69,9 @@ also being specified by the coverage parameter. Prune works on a
 per-hit-sequence-accession basis and removes features (not entire
 hit-sequence-accessions) until the criterion is met for each
 hit-sequence-accession. Prune filtering occurs after coverage
-filtering.
+filtering. It provides a hard limit on the depth of coverage by
+each hit-sequence-accession, but does not prevent deep overall
+coverage by many different hit-sequence-accessions.
 
 =head1 CONTACT
 
