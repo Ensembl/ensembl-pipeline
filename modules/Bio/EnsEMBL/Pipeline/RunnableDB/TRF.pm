@@ -94,9 +94,8 @@ sub fetch_input {
     
     my $contigid  = $self->input_id;
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
-    my $genseq    = $contig->primary_seq()
-     or $self->throw("Unable to fetch contig");
-    $self->genseq($genseq);
+
+    $self->genseq($contig);
     
 }
 
