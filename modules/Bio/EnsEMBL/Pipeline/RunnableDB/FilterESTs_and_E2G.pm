@@ -49,7 +49,7 @@ use POSIX;  #(used for ceil in the latter part of fetch_input)
 # Object preamble
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
-use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
+use Bio::EnsEMBL::Pipeline::Runnable::ESTFeatureFilter;
 use Bio::EnsEMBL::Pipeline::DBSQL::ESTFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Gene;
@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::BPlite;
-
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBHOST
 					EST_REFDBNAME
@@ -265,7 +265,7 @@ sub fetch_input {
 
   # find exonerate features amongst all the other features  
   my $allfeatures = $self->estdb->get_DnaAlignFeatureAdaptor->fetch_all_by_Slice($slice);
-
+  print STDERR "have ".@$allfeatures." feature from feature table\n";
   my @exonerate_features;
   my %exonerate_ests;
   my $est_source = $EST_SOURCE;
@@ -293,9 +293,9 @@ sub fetch_input {
   # empty out massive arrays
   $allfeatures = undef;
 
-  #print STDERR "exonerate features left with percent_id >= $EST_MIN_PERCENT_ID : " 
-  # . scalar(@exonerate_features) . "\n";
-  #print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
+  print STDERR "exonerate features left with percent_id >= $EST_MIN_PERCENT_ID : " 
+   . scalar(@exonerate_features) . "\n";
+  print STDERR "num ests " . scalar(keys %exonerate_ests) . "\n\n";
   
   unless( @exonerate_features ){
     print STDERR "No exonerate features left, exiting...\n";
@@ -310,7 +310,7 @@ sub fetch_input {
   my $coverage  = $EST_FEATFILT_COVERAGE;
   my $min_score = $EST_FEATFILT_MINSCORE;
 
-  my $filter = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new('-coverage' => $coverage,
+  my $filter = Bio::EnsEMBL::Pipeline::Runnable::ESTFeatureFilter->new('-coverage' => $coverage,
 								    '-minscore' => $min_score,
 								    '-prune'    => 1,
 								   );
@@ -322,16 +322,16 @@ sub fetch_input {
   foreach my $f(@filteredfeats){
     push(@{$filtered_ests{$f->hseqname}}, $f);
   }
-  #print STDERR "num filtered features ". scalar( @filteredfeats) . "\n";  
+  print STDERR "num filtered features ". scalar( @filteredfeats) . "\n";  
 
   # empty out massive arrays
   @filteredfeats = ();
 
-  #print STDERR "num filtered ests " . scalar(keys %filtered_ests) . "\n";
+  print STDERR "num filtered ests " . scalar(keys %filtered_ests) . "\n";
 
   # reinstate blast
   my @blast_features = $self->blast(keys %filtered_ests);
-  #print STDERR "back from blast with " . scalar(@blast_features) . " features\n";
+  print STDERR "back from blast with " . scalar(@blast_features) . " features\n";
   
   unless (@blast_features) {
     $self->warn("Odd - no exonerate features, cannot make runnables\n");
@@ -464,29 +464,15 @@ sub convert_output {
   foreach my $runnable ($self->runnable) {
     my @results = $runnable->output;
     foreach my $result (@results){
-print STDERR "RESULT is a " . $result . "\n";
-    }
-    #print STDERR "runnable produced ".@results." results\n";
     my @g = $self->make_genes($count, \@results);
     #print STDERR "have made ".@g." genes\n";
     $count++;
     push(@genes, @g);
   }
-###
-#foreach my $gene (@genes){
-#  my $transcripts = $gene->get_all_Transcripts;
-#  foreach my $transcript (@$transcripts){
-#    my $exons = $transcript->get_all_Exons;
-#    foreach my $exon (@$exons){
-#      my $supporting_evidence = $exon->get_all_supporting_features;
-#      foreach my $supp_feat (@$supporting_evidence){
-#	print STDERR $supp_feat . "\n";
-#      }
-#    }
-#  }
-#}
-###
-  my @remapped = $self->remap_genes(@genes);	
+
+  print STDERR "have made ".@genes." genes\n";
+  my @remapped = $self->remap_genes(@genes);
+  print STDERR "have made ".@remapped." remapped genes\n";	
   $self->output(@remapped);
 }
 
@@ -581,11 +567,28 @@ sub make_transcript{
     $exon->contig     ($slice);
     $exon->score      ($exon_pred->score);
     $exon->adaptor    ($self->estdb->get_ExonAdaptor);
+<<<<<<< FilterESTs_and_E2G.pm
+    my @sfs = $exon_pred->sub_SeqFeature;
+=======
 
 
 
     my @sfs = $exon_pred->sub_SeqFeature;
+>>>>>>> 1.27
     # sort out supporting evidence for this exon prediction
+<<<<<<< FilterESTs_and_E2G.pm
+    if(@sfs){
+      my $align = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@sfs); 
+      
+      $align->seqname($self->input_id);
+      $align->contig($slice);
+      $align->score(100);
+      $align->analysis($self->analysis);
+      
+      $exon->add_supporting_features($align);
+    }
+  
+=======
     if(@sfs){
       my $align = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@sfs);
       $align->seqname($self->input_id);
@@ -595,6 +598,7 @@ sub make_transcript{
       $exon->add_supporting_features($align);
     } 
     
+>>>>>>> 1.27
     push(@exons,$exon);
     
     $excount++;
@@ -729,7 +733,7 @@ sub output {
 sub blast{
    my ($self, @allids) = @_;
 
-   #print STDERR "retrieving ".scalar(@allids)." EST sequences\n";
+   print STDERR "retrieving ".scalar(@allids)." EST sequences\n";
       
    my @estseq = $self->get_Sequences(\@allids);
 
@@ -738,7 +742,7 @@ sub blast{
      return ();
    }
 
-   #print STDERR scalar(@estseq) . " ests retrieved\n";
+   print STDERR scalar(@estseq) . " ests retrieved\n";
 
    my $numests = scalar(@estseq);
 
