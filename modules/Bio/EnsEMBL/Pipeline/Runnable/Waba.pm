@@ -19,7 +19,7 @@
                                   );
   $seq = $seqstream->next_seq;
 
-  my $waba = Bio::EnsEMBL::Pipeline::Runnable::Waba->new ( -CLONE => $seq);
+  my $waba = Bio::EnsEMBL::Pipeline::Runnable::Waba->new ( -QUERY => $seq);
   $waba->workdir ($workdir);
   $waba->run;
   my @results = $waba->output;
@@ -62,7 +62,7 @@ use Bio::EnsEMBL::Analysis;
  Title    : new
  Usage    : my $waba =  Bio::EnsEMBL::Pipeline::Runnable::Waba->new
                         ( -program    => '/usr/local/pubseq/bin/waba',
-                          -clone      => $clone,
+                          -query      => $query,
                           -database   => $database
                         );
  Function : initialises Waba object
@@ -86,7 +86,7 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of waba run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis) = $self->_rearrange([qw(CLONE
+    my ($query, $analysis) = $self->_rearrange([qw(QUERY
                                                    ANALYSIS)],
 					        @args);
   
@@ -96,7 +96,7 @@ sub new {
         $self->throw("Waba needs an analysis");
     }
 
-    $self->clone ($clone) if ($clone);       
+    $self->query ($query) if ($query);       
 
     $self->program ($self->find_executable ($self->analysis->program_file));
 
@@ -113,11 +113,11 @@ sub new {
 # get/set methods 
 ###################
 
-=head2 clone
+=head2 query
 
- Title    : clone
- Usage    : $self->clone ($clone);
- Function : get/set method for the Sequence object; assigns clone, filename and results
+ Title    : query
+ Usage    : $self->query ($query);
+ Function : get/set method for the Sequence object; assigns query, filename and results
  Example  :
  Returns  : a Bio::Seq or Bio::PrimarySeq object
  Args     : a Bio::Seq or Bio::PrimarySeq object (optional)
@@ -125,14 +125,14 @@ sub new {
 
 =cut
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq) {
 	($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
 	    || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
 	$self->{'_sequence'} = $seq ;
-	$self->clonename ($self->clone->id);
-	$self->filename ($self->clone->id.".$$.seq");
+	$self->queryname ($self->query->id);
+	$self->filename ($self->query->id.".$$.seq");
 	$self->results ($self->filename.".out");
     }
     return $self->{'_sequence'};
@@ -228,7 +228,7 @@ sub run {
     # nothing to be done with $args
 
     # check clone
-    my $seq = $self->clone || $self->throw("Clone required for Program\n");
+    my $seq = $self->query || $self->throw("Clone required for Program\n");
 
     # set directory if provided
     $self->workdir ('/tmp') unless ($self->workdir($dir));
@@ -467,7 +467,7 @@ sub parse_results {
 			}
                         # build the featurepair
                         my %feature;
-                        $feature{name} = $self->clone->id;
+                        $feature{name} = $self->query->id;
                         $feature{percent_id} = $pid;
                         $feature{start} = $tmp_substart;
                         $feature{end} = $tmp_subend;
@@ -477,6 +477,8 @@ sub parse_results {
                         $feature{hstart} = $hsubstart;
                         $feature{hend} = $hsubend;
                         $feature{hstrand} = 1;
+                        # p_value needs to be set - TODO: fix this properly
+                        $feature{p_value} = 0;
                         ($feature{source}) = $self->program =~ /([^\/]+)$/;
                         $feature{primary} = 'similarity';
                         ($feature{program}) = $self->program =~ /([^\/]+)$/;
@@ -520,12 +522,13 @@ sub parse_results {
             my $total_score = sprintf ("%.2f", 2*($total_match-$total_mismatch)-$total_block_score);
             my $total_pid = int(100*($total_match/($total_match+$total_mismatch+$total_query_insert+$total_target_insert)));
             my %feature;
-            $feature{name} = $self->clone->id;
+            $feature{name} = $self->query->id;
             $feature{score} = $total_score;
             $feature{percent_id} = $total_pid;
             $feature{start} = $start+1;
             $feature{end} = $end;
             $feature{strand} = $strand;
+            $feature{p_value} = 0;
             $feature{hname} = $hid;
             $feature{hstart} = $hstart+1;
             $feature{hend} = $hend;
@@ -577,8 +580,6 @@ sub create_feature {
     $feature1->score ($feat->{score});
     $feature1->p_value ($feat->{p_value});
     $feature1->percent_id ($feat->{percent_id});
-    $feature1->source_tag ($feat->{source});
-    $feature1->primary_tag ($feat->{primary});
     $feature1->analysis ($analysis);
 
     if ($feat->{cigar}) {
@@ -596,8 +597,6 @@ sub create_feature {
     $feature2->score ($feat->{score});
     $feature2->p_value ($feat->{p_value});
     $feature2->percent_id ($feat->{percent_id});
-    $feature2->source_tag ($feat->{source});
-    $feature2->primary_tag ($feat->{primary});
     $feature2->analysis ($analysis);
 
     my $featurepair = Bio::EnsEMBL::FeaturePair->new ();
