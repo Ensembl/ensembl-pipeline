@@ -5,9 +5,9 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;
 
-my $dbhost;
+my $dbhost    = 'ecs2d';
 my $dbuser    = 'ensro';
-my $dbname;
+my $dbname    = 'homo_sapiens_vega_12_31';
 my $dbpass    = undef;
 my $dnadbhost;
 my $dnadbname;
@@ -18,7 +18,7 @@ my $dnadbname;
 my $targetted_protein  = "rodent-protein";
 my $similarity_protein = "other-protein";
 
-my $genetype = "ensembl"; # default genetype
+my $genetype;
 
 $dbuser = "ensro";
 &GetOptions(
@@ -30,7 +30,7 @@ $dbuser = "ensro";
 );
 
 unless ( $dbname && $dbhost && $dnadbname && $dnadbhost ){
-    print STDERR "Usage: $0 -dbname -dbhost -genetype (default: ensembl)\n";
+    print STDERR "Usage: $0 -dbname -dbhost -dnadbhost -dnadbname [ -genetype]\n";
     exit(0);
 }
 
@@ -51,7 +51,10 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print STDERR "connected to $dbname : $dbhost\n";
-print STDERR "looking for pseudogenes in $genetype genes\n";
+
+if ($genetype){
+  print STDERR "looking for pseudogenes in $genetype genes\n";
+}
 
 my %list_per_hid;
 
@@ -65,14 +68,27 @@ my $count = 0;
 # first classify the transcripts according to their evidence
 ############################################################
 
+my %chr_name;
+
+
 GENE:
 foreach my $gene_id ( @{$db->get_GeneAdaptor->list_geneIds} ){
+  
+  my $gene;
+  eval{
+    $gene = $gene_adaptor->fetch_by_dbID($gene_id);
+  };
+  unless ($gene){
+    print STDERR "could not retrieve gene\n";
+    next GENE;
+  }
   $count++;
   #last GENE if $count>100;
-  my $gene = $gene_adaptor->fetch_by_dbID($gene_id);
+  
   if ( $genetype ){
     next unless ( $genetype eq $gene->type );
   }
+
  TRAN:
   foreach my $trans ( @{$gene->get_all_Transcripts} ) {
     
@@ -87,6 +103,7 @@ foreach my $gene_id ( @{$db->get_GeneAdaptor->list_geneIds} ){
       ############################################################
       # note that a transcript can appear in more than one list
       ############################################################
+      $chr_name{$transcripts[0]} = $tmp_gene->chr_name;
       foreach my $evidence ( @evidence ){
 	push ( @{$list_per_hid{$evidence}}, $transcripts[0] );
       }
@@ -94,6 +111,8 @@ foreach my $gene_id ( @{$db->get_GeneAdaptor->list_geneIds} ){
   }
   
 }
+
+#print STDERR "$count genes retrieved\n";
 
 my %pseudos_per_id;
 my %parent_transcript;
@@ -136,11 +155,11 @@ PSEUDOS:
 foreach my $protein_id ( keys %parent_transcript ){
   my $parent = $parent_transcript{$protein_id};
   foreach my $pseudo ( @{$pseudos_per_id{ $protein_id } } ){
-    if ( &compare_translations( $parent, $pseudo ) ){
-      push ( @{$pseudogenes_per_id{$protein_id}}, $pseudo );
-      my $id = $pseudo->stable_id || $pseudo->dbID;
-      print $protein_id."\t".$pseudo->stable_id."\t".$pseudo->dbID."\n";
-    }
+    #if ( &compare_translations( $parent, $pseudo ) ){
+    push ( @{$pseudogenes_per_id{$protein_id}}, $pseudo );
+    my $id = $pseudo->stable_id || $pseudo->dbID;
+    print $protein_id."\t".$pseudo->stable_id."\t".$pseudo->dbID."\t".$chr_name{$pseudo}."\t".$pseudo->start."\t".$pseudo->end."\n";
+    #}
   }
 }
 
