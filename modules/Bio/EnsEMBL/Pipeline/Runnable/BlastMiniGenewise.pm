@@ -251,7 +251,7 @@ sub run_blast {
     $seqio->write_seq($seq);
     close($seqio->_filehandle);
 
-    my $command  = "tblastn $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
+    my $command  = "tblast2n $db $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
 
     print (STDERR "Running command $command\n");
     my $status = system($command );

@@ -268,38 +268,37 @@ sub make_miniseq {
     my $prevend     = 0;
     my $prevcdnaend = 0;
     
-    FEAT: foreach my $f (@features) {
-	 print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
-	if ($f->strand != $strand) {
-	    $self->warn("Mixed strands in features set - skipping feature");
-	    next FEAT;
-	}
+  FEAT: foreach my $f (@features) {
+      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
+      if ($f->strand != $strand) {
+	  $self->warn("Mixed strands in features set - skipping feature");
+	  next FEAT;
+      }
+      
+      my $start = $f->start;
+      my $end   = $f->end;
+      
+      $start = $f->start - $self->exon_padding;
+      $end   = $f->end   + $self->exon_padding;
 
-	my $start = $f->start;
-	my $end   = $f->end;
+      if ($start < 1) { $start = 1;}
+      if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
 
-	$start = $f->start - $self->exon_padding;
-	$end   = $f->end   + $self->exon_padding;
+      my $gap     =    ($start - $prevend);
 
-        if ($start < 1) { $start = 1;}
-        if ($end   > $self->genomic_sequence->length) {$end = $self->genomic_sequence->length;}
+      print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
+      print STDERR "Padding feature - new start end are $start $end\n";
 
-	my $gap     =    ($start - $prevend);
-	my $cdnagap = abs($f->hstart - $prevcdnaend);
+      print STDERR "Count is $count : $mingap " . $gap  . "\n";
 
-	print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
-	print STDERR "Padding feature - new start end are $start $end ($cdnagap)\n";
-
-	print STDERR "Count is $count : $mingap " . $gap  . "\n";
-
-#	if ($count > 0 && (($gap <  $mingap) || ($cdnagap > 20))) {
-	if ($count > 0 && ($gap < $mingap)) {
-	    print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
+      if ($count > 0 && ($gap < $mingap)) {
+	  if ($end < $prevend) { $end = $prevend;}
+	  print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
-	    $genomic_features[$#genomic_features]->end($end);
-	    $prevend     = $end;
-	    $prevcdnaend = $f->hend;
-	} else {
+	  $genomic_features[$#genomic_features]->end($end);
+	  $prevend     = $end;
+	  $prevcdnaend = $f->hend;
+      } else {
 	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
 
@@ -388,7 +387,7 @@ sub exon_padding {
 	$self->{_padding} = $arg;
     }
 
-    return $self->{_padding} || 20;
+    return $self->{_padding} || 100;
 }
 
 sub print_FeaturePair {
