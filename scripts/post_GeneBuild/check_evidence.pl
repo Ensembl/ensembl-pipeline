@@ -45,8 +45,7 @@ my $t_id;
 	    'dbname:s'        => \$dbname,
 	    'dbuser:s'        => \$dbuser,
 	    'genetype:s'      => \$genetype,
-            'path:s'          => \$path,
-);
+            );
 
 unless ( $t_id || $tstable_id){
   print STDERR "script to print out all the evidence info from a transcript. useful for sanity checks.\n";
@@ -65,7 +64,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 
 
 print "connected to $dbname : $dbhost\n";
-#my $path = $db->assembly_type;
+my $path = $db->assembly_type;
 
 
 #my $sa = $db->get_SliceAdaptor();
