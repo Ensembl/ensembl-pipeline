@@ -30,18 +30,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_FINALDBHOST
-					 GB_FINALDBNAME
-					 GB_DBHOST
-					 GB_DBNAME
-					 GB_FINAL_GENETYPE
-					);
-
-
-
-
-use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
+use Bio::EnsEMBL::Pipeline::GeneConf;
 
 my $dbhost;
 my $dbuser    = 'ensro';
@@ -66,8 +55,9 @@ $dbuser = "ensro";
 );
 
 unless ( $dbname && $dbhost && $dnadbname && $dnadbhost && $genetype){
-  print STDERR "script to check the sanity of genes and transcripts after a build\n";
-  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost -genetype\n";
+  print STDERR "\nscript to check the sanity of genes and transcripts after a build\n";
+  print STDERR "parameters are read from Bio::EnsEMBL::Pipeline::GeneConf\n";
+  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost -genetype\n\n";
   exit(0);
 }
 
@@ -127,19 +117,44 @@ foreach my $gene_id ( @gene_ids){
       unless ( $strand ){
 	$strand = $info{strand}{$exon_id};
       }      
+
       if ( $info{strand}{$exon_id} != $strand ){
 	print STDERR "Problem with the strands in transcript $tran_id:\n";
 	&print_transcript( $exons,$info);
       }
-     
+
+      # look for tiny exons
+      unless ( $info{sticky}{$exon_id} == 1 ){
+	my $exon_length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
+	if ($exon_length < $GB_MAXSHORTEXONLEN ){
+	  print STDERR "TINY EXON (dbID = $exon_id) of length: $exon_length in transcript $tran_id\n";      
+	}
+      }
+      
+      # check for tiny introns
+      if ($exon_count>1){
+	my $intron_length;
+	if ( $strand == - 1 ){
+	  $intron_length = $info{start}{$previous_exon} - $info{end}{$exon_id} - 1;
+	}
+	elsif( $strand == 1 ){
+	  $intron_length = $info{start}{$exon_id} - $info{end}{$previous_exon} - 1;
+	}
+	if ( $intron_length < $GB_MAXSHORTINTRONLEN ){
+	  print STDERR "TINY INTRON of length: $intron_length in transcript $tran_id, between exons dbID = $previous_exon and  dbID = $exon_id\n";      
+	  #print STDERR "$previous_exon:\t$info{start}{$previous_exon}-$info{end}{$previous_exon}\n";
+	  #print STDERR "$exon_id:\t$info{start}{$exon_id}-$info{end}{$exon_id}\n";
+	}
+      }
+
       # mark single exon transcripts
       if ( scalar(@exons) == 1){
 	my $length = $info{end}{$exon_id} - $info{start}{$exon_id} + 1;
 	print STDERR "single exon transcript $tran_id of length: $length\n";      
       }
       
-      # are phases consistent?
-      if ($exon_count>1){
+	# are phases consistent?
+	if ($exon_count>1){
 	unless ( $info{sticky}{$exon_id} == 1 && $info{sticky}{$previous_exon} == $info{sticky}{$exon_id} ){
 	  if ( $end_phase != $info{start_phase}{$exon_id} ){
 	    print STDERR "Inconsistent phases in transcript $tran_id:\n";

@@ -34,7 +34,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_FINALDBNAME
 					 GB_DBHOST
 					 GB_DBNAME
-					 GB_GOLDEN_PATH
+
 					);
 
 
@@ -47,22 +47,25 @@ use Bio::EnsEMBL::Utils::Eprof('eprof_start','eprof_end','eprof_dump');
 #my $dbname    = $GB_FINALDBNAME;
 #my $dbpass    = undef;
 
-my $path      = $GB_GOLDEN_PATH;
+my $path      = 'CHR';
+#my $path      = $GB_GOLDEN_PATH;
 
-my $dnadbhost = $GB_DBHOST;
+#my $dnadbhost = $GB_DBHOST;
+my $dnadbhost = 'ecs1f';
 my $dnadbuser = 'ensro';
-my $dnadbname = $GB_DBNAME;
+#my $dnadbname = $GB_DBNAME;
+my $dnadbname = 'mouse_Sanger_Nov01_denormalised';
 my $dnadbpass = undef;
 
-#my $dbhost    = 'ecs1a';
-#my $dbuser    = 'ensro';
-#my $dbname    = 'mouse_Sanger_Nov01_est_genes';
-#my $dbpass    = undef;
-
-my $dbhost    = 'ecs1f';
+my $dbhost    = 'ecs1a';
 my $dbuser    = 'ensro';
-my $dbname    = 'mouse_Sanger_Nov01_denormalised';
+my $dbname    = 'mouse_Sanger_Nov01_est_genes';
 my $dbpass    = undef;
+
+#my $dbhost    = 'ecs1f';
+#my $dbuser    = 'ensro';
+#my $dbname    = 'mouse_Sanger_Nov01_denormalised';
+#my $dbpass    = undef;
 
 
 
