@@ -60,7 +60,39 @@ sub new {
   return $self;
 }
 
+=head2 fetch_all
 
+  Title   : fetch_all
+  Usage   : @analyses = $self->fetch_all;
+  Function: retrieves all analyses from db;
+  Returns : List of Bio::EnsEMBL::Pipeline::Analysis
+  Args    : -
+
+=cut
+
+sub fetch_all {
+  my $self = shift;
+  my %analyses;
+  my ( $analysis, $dbID );
+  my $rowHashRef;
+
+  my $sth = $self->prepare( q {
+    SELECT analysisId, logic_name,
+           program,program_version,program_file,
+           db,db_version,db_file,
+           module,module_version,
+           gff_source,gff_feature,
+           created, parameters
+    FROM analysisprocess } );
+  $sth->execute;
+
+  while( $rowHashRef = $sth->fetchrow_hashref ) {
+    my $analysis = $self->_objFromHashref( $rowHashRef  );
+    $analyses{$analysis->dbID} = $analysis;
+  }
+
+  return values %analyses;
+}
 
 =head2 fetch_by_dbID
 
@@ -283,7 +315,7 @@ sub exists {
     push( @conditions, "parameters=\"".$anal->parameters."\""), if( defined  $anal->parameters );
     push( @conditions, "logic_name=\"".$anal->logic_name."\""), if( defined  $anal->logic_name );
 
-    my $query = qq { SELECT analysisId, logic_name,
+    $query = qq { SELECT analysisId, logic_name,
 		     program,program_version,program_file,
 		     db,db_version,db_file,
 		     module,module_version,
