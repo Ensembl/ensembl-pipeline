@@ -531,10 +531,10 @@ sub parse_results{
       $self->create_feature($start, $end, $score, $strand, $phase, $end_phase, $exonname,);
       $phase =  $end_phase;
       my $count++;
-      if($values[$count] =~ /U(\d)/){
-	if($phase != $1){
-	  $self->warn(" phase ".$phase." and continuation phase ".$1." aren't the same may be issues with translation\n");
-	}
+      if($values[$count] && $values[$count] =~ /U(\d)/){
+        if($phase != $1){
+          $self->warn(" phase ".$phase." and continuation phase ".$1." aren't the same may be issues with translation\n");
+        }
       }
     }
     $phase = 0;
