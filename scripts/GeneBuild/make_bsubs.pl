@@ -24,7 +24,7 @@ if($GB_DBUSER eq 'ensadmin' && $GB_DBPASS eq ''){
 
 foreach my $arg($GB_RUNNER, $GB_DBNAME, $GB_DBHOST, $GB_DBUSER, $GB_QUEUE, $GB_TMPDIR){
     if ($arg eq '' ){
-      print "You need to set various parameters in GB_conf.pl\n" .  
+      print "You need to set various parameters in GeneConf.pl\n" .  
 	"Here are your current values for required settings: \n" .
 	"runner      => $GB_RUNNER\n" .
 	"dbname      => $GB_DBNAME\n" .
@@ -91,7 +91,7 @@ sub make_tbsubs {
   # check them!
   foreach my $arg($pm_out){
     if ($arg eq '' ){
-      print "You need to set various parameters in GB_conf.pl\n" .  
+      print "You need to set various parameters in GeneConf.pl\n" .  
 	"Here are your current values for required settings: \n" .
 	"pm_output  => $GB_PM_OUTPUT\n" ;
 
