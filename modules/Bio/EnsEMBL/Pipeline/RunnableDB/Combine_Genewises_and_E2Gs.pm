@@ -207,7 +207,7 @@ sub run {
 
   foreach my $e2g (@e2g) {
     my $found = 0;
-    foreach my $tran ($e2g->each_Transcript) {
+    foreach my $tran ($e2g->get_all_Transcripts) {
       my @exons = $tran->get_all_Exons;
       @exons = sort {$a->start <=> $b->start} @exons;
       my $i;
@@ -233,7 +233,7 @@ sub run {
  GENEWISE:
   foreach my $gw(@merged_gw_genes){
     # should be only 1 transcript
-    my @gw_tran  = $gw->each_Transcript;
+    my @gw_tran  = $gw->get_all_Transcripts;
     my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
     my $strand   = $gw_exons[0]->strand;
     
@@ -487,7 +487,7 @@ sub match_gw_to_e2g{
   my ($self, $gw) = @_;
 
   my @matching_e2g;
-  my @gw_tran = $gw->each_Transcript;
+  my @gw_tran = $gw->get_all_Transcripts;
   my @gw_exons = $gw_tran[0]->get_all_Exons;
   
   my $strand   = $gw_exons[0]->strand;
@@ -501,7 +501,7 @@ sub match_gw_to_e2g{
  E2G:
   foreach my $e2g($self->e2g_genes){
 #    print STDERR "trying " . $gw->dbID . " against " . $e2g->dbID . "\n";
-    my @egtran  = $e2g->each_Transcript;
+    my @egtran  = $e2g->get_all_Transcripts;
     my @eg_exons = $egtran[0]->get_all_Exons;
 
     $strand   = $eg_exons[0]->strand;
@@ -607,7 +607,7 @@ sub _merge_gw_genes {
     my $ecount = 0;
     
     # order is crucial
-    my @trans = $gwg->each_Transcript;
+    my @trans = $gwg->get_all_Transcripts;
     if(scalar(@trans) != 1) { $self->throw("expected one transcript for $gwg\n"); }
     
   EXON:      
@@ -696,9 +696,9 @@ sub _make_newtranscript {
   my @combined_transcripts  = ();
   
   # should be only 1 transcript
-  my @gw_tran  = $gw->each_Transcript;
+  my @gw_tran  = $gw->get_all_Transcripts;
   my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
-  my @egtran = $e2g->each_Transcript;
+  my @egtran = $e2g->get_all_Transcripts;
   my @e2g_exons  = $egtran[0]->get_all_Exons; # ordered array of exons
   
   # OK, let's see if we need a new gene
@@ -798,7 +798,7 @@ sub _make_newtranscript {
 	foreach my $gwg($self->gw_genes) {
 	  if($gw->dbID == $gwg->dbID){
 	    print STDERR "comparing transcripts\n";
-	    my @tran = $gwg->each_Transcript;
+	    my @tran = $gwg->get_all_Transcripts;
 #	    print STDERR "GWG " . $tran[0]->translate->seq . "\n";
 #	    print STDERR "NEW " . $newtranscript->translate->seq . "\n";
 	    $foundtrans = $self->compare_transcripts($gwg, $newtranscript);
@@ -829,7 +829,7 @@ sub _make_newtranscript {
 
 sub compare_transcripts{
   my ($self, $genewise_gene, $combined_transcript) = @_;
-  my @genewise_transcripts = $genewise_gene->each_Transcript;
+  my @genewise_transcripts = $genewise_gene->get_all_Transcripts;
   if(scalar(@genewise_transcripts != 1)) {
     $self->warn("Panic! Got " . scalar(@genewise_transcripts) . " transcripts, expecting only 1!\n");
     return 0;
@@ -960,10 +960,10 @@ sub transcript_from_single_exon_genewise {
 sub transcript_from_multi_exon_genewise {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
 
-  my @gwtran  = $gw_gene->each_Transcript;
+  my @gwtran  = $gw_gene->get_all_Transcripts;
   my @gwexons = $gwtran[0]->get_all_Exons;
   
-  my @egtran  = $eg_gene->each_Transcript;
+  my @egtran  = $eg_gene->get_all_Transcripts;
   my @egexons = $egtran[0]->get_all_Exons;
 
   # compare to the first genewise exon
@@ -1157,7 +1157,7 @@ sub remap_genes {
 
 GENE:  foreach my $gene (@genes) {
 
-    my @t = $gene->each_Transcript;
+    my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
 
     # check that it translates - not the est2genome genes
@@ -1179,7 +1179,7 @@ GENE:  foreach my $gene (@genes) {
       $newgene->analysis($gene->analysis);
 
       # sort out supporting feature coordinates
-      foreach my $tran ($newgene->each_Transcript) {
+      foreach my $tran ($newgene->get_all_Transcripts) {
 	foreach my $exon($tran->get_all_Exons) {
 	  foreach my $sf($exon->each_Supporting_Feature) {
 	    # this should be sorted out by the remapping to rawcontig ... strand is fine
@@ -1207,7 +1207,7 @@ GENE:  foreach my $gene (@genes) {
 	  }
 	}
 	
-	foreach my $tran ($newgene->each_Transcript) {
+	foreach my $tran ($newgene->get_all_Transcripts) {
 	  foreach my $exon($tran->get_all_Exons) {
 	    
 	    # oh dear oh dear oh dear
@@ -1401,7 +1401,7 @@ sub validate_gene{
   my ($self, $gene) = @_;
 
   # should be only a single transcript
-  my @transcripts = $gene->each_Transcript;
+  my @transcripts = $gene->get_all_Transcripts;
   if(scalar(@transcripts) != 1) {
     my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
     $self->warn($msg);
