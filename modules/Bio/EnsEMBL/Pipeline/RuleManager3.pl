@@ -78,7 +78,7 @@ my $accumulators = 1; #these two options are on as default but that can
 my $db_sanity = 1; #be switched off by sticiking no infront of the 
                    #standard command line options (see GetOpts long docs)
 my $help;
-my $rename_on_retry = 0;
+my $rename_on_retry = 1;
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -800,10 +800,7 @@ monitor
 
 =head1 SYNOPSIS
 
-Pipeline Monitor Script
-
-A Simple script using the Monitor.pm module to display information on the status of the pipeline.
-
+RuleManager3.pl, a script to run the pipeline
 
 =head1 OPTIONS
 
@@ -848,7 +845,7 @@ Other Options
    -killed_file can overide the path to the $KILLED_INPUT_IDS file from
     General.pm
    -queue_manager can overide the $QUEUE_MANAGER from General.pm
-   -delete_on_retry, this means any output already produced will be deleted
+   -rename_on_retry, this means any output already produced will be deleted
     before a job is retried, this defaults to off currently, it was put in 
     as LSF appends output and error files and sometimes you don't want this'
    
