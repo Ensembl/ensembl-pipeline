@@ -6,7 +6,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Pseudogene
+Bio::EnsEMBL::Pipeline::Runnable::Pseudogene_2
 
 =head1 SYNOPSIS
 
@@ -14,14 +14,13 @@ Bio::EnsEMBL::Pipeline::Runnable::Pseudogene
       ( 
        '-genes' => \@_genes,
        '-repeat_features' => \%repeat_blocks, 
-       '-homologs'        => \%homolog_hash,
-      );
+        );
     $runnable->run;
     $runnable->output;
 
 Where output returns an array of modified genes.
 Repeat blocks is a hash of repeats covering each gene merged into blocks.
-Homolog hash is a hash of transcript objects that are homologous the gene of interest
+
 
 =head1 DESCRIPTION
 
@@ -83,15 +82,13 @@ sub new {
   $self->{'_modified_genes'} =[] ; # array ref to modified genes to write to new db
   $self->{'_discarded_transcripts'} = []; # array ref to discarded transcripts
   $self->{'_genes'} = [];	#array of genes to test;  
-  $self->{'_homologs'} = {};	#2D hash ref of transcript homologs corresponding to single exon genes;
   $self->{'_repeats'} = {};	# hash of repeat blocks corresponding to each gene;
   $self->{'_real'} = 0;		# scalar number of real genes identified
   $self->{'_pseudogenes'} = 0;	#scalar number of pseudogenes identified
   
-  my( $genes,$repeats,$homologs) = $self->_rearrange([qw(
+  my( $genes,$repeats) = $self->_rearrange([qw(
 							 GENES
 							 REPEAT_FEATURES
-							 HOMOLOGS
 							)], @args);
 
   if ($genes) {
@@ -100,13 +97,7 @@ sub new {
   if ($repeats) {
     $self->repeats($repeats);
   }
-  if ($homologs) {
-    $self->homologs($homologs);
-  }
 
-  #test for same number of repeats and genes?
-  print "config things $PS_SPAN_RATIO, $PS_MIN_EXONS, $PS_PERCENT_ID_CUTOFF\n";
-  print "more things $PS_MAX_INTRON_LENGTH, $PS_NUM_FRAMESHIFT_INTRONS, $PS_NUM_REAL_INTRONS, $PS_MAX_INTRON_COVERAGE\n";
   return $self;
 }
 
@@ -124,7 +115,6 @@ Arg [none] :
 
 sub run {
   my ($self) = @_;
-
   $self->test_genes;
   $self->summary;
   return 1;
@@ -168,77 +158,81 @@ sub test_genes{
   my $self = shift;
   my @evidence;
   my $num=0;
-  my $pseudo= undef;
+  my $pseudo= 0;
+  my $possible = 0;
   my @genes = @{$self->genes};
  
-  foreach my $gene (@genes) {
+ GENE:  foreach my $gene (@genes) {
     my @pseudo_trans ;
     my @real_trans ;
 
     ###################################################
-    # if gene is single exon look for spliced elsewhere
+    # if gene is single exon assume its real for now...
 
-    if (scalar(@{$gene->get_all_Exons()})==1){
-	my $judgement = $self->spliced_elsewhere($gene);
-	if ($judgement eq 'pseudogene') {
-	  push (@pseudo_trans,@{$gene->get_all_Transcripts}[0]);
-	} else {
-	  push (@real_trans,@{$gene->get_all_Transcripts}[0]);
-	}
-      }
-    else {
+    if (scalar(@{$gene->get_all_Exons()})==1) {
+      $self->modified_genes($gene); 
+      $self->real(1);
+      next GENE;
+    }
+
 
     ####################################
     # gene is multiexon, run other tests
 
-	foreach my $transcript (@{$gene->get_all_Transcripts}) {
-	  $num++;
-	  my $evidence = $self->transcript_evidence($transcript,$gene);
-	  
-	$pseudo = undef;
-	#transcript tests
+  TRANS: foreach my $transcript (@{$gene->get_all_Transcripts}) {
+      $num++;
+      my $evidence = $self->transcript_evidence($transcript,$gene);
 
-	#CALL PSEUDOGENE IF AT LEAST 80% COVERAGE OF INTRONS BY REPEATS
-	#AT LEAST 1 F/S EXON AND 1 REAL EXON (?)
-	#TOTAL INTRON LENGTH < 5K
-	
+      #transcript tests
 
-
-	if ($evidence->{'total_intron_len'} < $PS_MAX_INTRON_LENGTH &&
-	    $evidence->{'frameshift_introns'} >= $PS_NUM_FRAMESHIFT_INTRONS &&
-	    $evidence->{'real_introns'} >= $PS_NUM_REAL_INTRONS &&
-	    $evidence->{'covered_introns'} >= $PS_MAX_INTRON_COVERAGE  ) {
-	  $pseudo = 1;
-	  print STDERR $gene->stable_id." - repeats in introns in transcript ".$transcript->stable_id."\n";
-	  print STDERR join (', ',%{$evidence}),"\n"
-	}
-	#ALL FRAMESHIFTED
+      #CALL PSEUDOGENE IF AT LEAST 80% COVERAGE OF INTRONS BY REPEATS
+      #AT LEAST 1 F/S EXON AND 1 REAL EXON (?)
+      #TOTAL INTRON LENGTH < 5K
 	
-	if ($evidence->{'num_introns'} && $evidence->{'frameshift_introns'} == $evidence->{'num_introns'}) {
-	  $pseudo = 1;
-	}
-	
-	#EXONS CONTAMINATED
-	
-	#    if($evidence->{'covered_exons'} >= $PS_MAX_EXON_COVERAGE){$pseudo = 1;}
-	
-	
-	if ($pseudo) {
-	  push (@pseudo_trans,$transcript);	
-	} else {
-	  push (@real_trans,$transcript);	
-	}
+      if ($evidence->{'total_intron_len'} < $PS_MAX_INTRON_LENGTH &&
+	  $evidence->{'frameshift_introns'} >= $PS_NUM_FRAMESHIFT_INTRONS &&
+	  $evidence->{'real_introns'} >= $PS_NUM_REAL_INTRONS &&
+	  $evidence->{'covered_introns'} >= $PS_MAX_INTRON_COVERAGE  ) {
+	push @pseudo_trans, $transcript;
+	print STDERR $gene->stable_id." - repeats in introns in transcript ".$transcript->stable_id."\n";
+	print STDERR join (', ',%{$evidence}),"\n";
+	next TRANS;
       }
+
+
+      #ALL FRAMESHIFTED - it is a pseudogene
+	
+      if ($evidence->{'num_introns'} && 
+	  $evidence->{'frameshift_introns'} == $evidence->{'num_introns'}) {
+	push @pseudo_trans, $transcript;
+	next TRANS;
+      }
+
+      # Tests for situation where 2 exon gene has a protein feasture
+      # covering intron, ie it has spliced around somthing bad...
+
+      if ($evidence->{'real_introns'} == 1) {
+	my $judgement = $self->protein_covered_intron($transcript,$gene);
+	if ($judgement eq "dodgy"){
+	  push @pseudo_trans, $transcript;
+	  next TRANS;
+	}	
+      }
+
+      # transcript passes all tests, it is real
+
+      push @real_trans, $transcript;
     }
-    
+
     #########################################
     # gene tests
-      
+
     #############################################
     # gene is pseudogene, set type to pseudogene
     # chuck away all but the longest transcript
-      
-    if (scalar(@pseudo_trans) > 0 && scalar(@real_trans) == 0) {
+
+    if (scalar(@pseudo_trans) > 0 && 
+	scalar(@real_trans) == 0) {
       $gene->type('pseudogene');
       @pseudo_trans = sort {$a->length <=> $b->length} @pseudo_trans;
       my $only_transcript_to_keep = pop  @pseudo_trans;
@@ -250,15 +244,15 @@ sub test_genes{
       }
       $self->modified_genes($gene);
       $self->pseudogenes(1);
+      next GENE;
     }
-
 
     ###############################################
     # gene is real but has some dodgy transcripts
     # delete the dodgy transcripts from the gene
 
-
-    if (scalar(@pseudo_trans) > 0 && scalar(@real_trans) > 0) {
+    if (scalar(@pseudo_trans) > 0 && 
+	scalar(@real_trans) > 0) {
       foreach my $trans (@pseudo_trans) {
 	$trans->translation(undef);
 	$self->_remove_transcript_from_gene($gene,$trans); 
@@ -266,18 +260,20 @@ sub test_genes{
       $self->modified_genes($gene);
       $self->discarded_transcripts(@pseudo_trans);
       $self->real(1);
+      next GENE;
     }
 
     ####################################
-    # gene and transcripts are real real
+    # gene and transcripts are real
 
 
-    if (scalar(@pseudo_trans) == 0 && scalar(@real_trans) > 0) {
+    if (scalar(@pseudo_trans) == 0 && 
+	scalar(@real_trans) > 0) {
       $self->modified_genes($gene); 
       $self->real(1);
+      next GENE;
     }
   }
-  
   return 1;
 }
 
@@ -376,11 +372,10 @@ sub transcript_evidence{
 
 sub _len_covered {
   my ($self,$feat,$repeat_blocks_ref) = @_;
-
+#   print STDERR  "FT " . $feat->start . " " . $feat->end . "\n";
   my $covered_len = 0;
  RBLOOP: foreach my $repeat_block (@$repeat_blocks_ref) {
-    # print STDERR  "RB " . $repeat_block->start . " " . $repeat_block->end . "\n";
-    # print STDERR  "FT " . $feat->start . " " . $feat->end . "\n";
+#    print STDERR  "RB " . $repeat_block->start . " " . $repeat_block->end . "\n";
     if ($repeat_block->overlaps($feat, 'ignore')) {
       my $inter = $feat->intersection($repeat_block);
       $covered_len += $inter->length;
@@ -391,61 +386,108 @@ sub _len_covered {
   return  $covered_len;
 }
 
-##############################################################
-# Spliced elsewhere - tests for retrotransposition
-##############################################################
+=head2 protein_covered_intron
 
-=head2 spliced_elsewhere
-
-Args : Bio::EnsEMBL::Gene object 
-  Description: fetches all homologous transcripts for a given single exon  gene and runs a tblastx of the two transcripts, makes a judgement about retrotransposition   based on the stats returned. Looks at top scoring hit of each transcript homolog of the given gene and compares %ID and spans of the transcripts  looks for sequences > 80% id with a ratio of real transcript span over processed  transcript span of > 1.5
+  Args       : Bio::EnsEMBL::Transcript object, Bio::EnsEMBL::Gene object 
+  Description: decides if 'real' intron in transcript is covered with a protein feature
   Returntype : scalar
 
 =cut 
 
-sub spliced_elsewhere {
-  my ($self,$gene) = @_;
-  my $judgement = 'undecided';
 
-  # If there is evidence to suggest that it may be spliced elsewhere
+sub protein_covered_intron{
+  my ($self,$transcript,$gene) =@_;
+  my %seq_features;
+  my $identified;
+  my @all_exons  = @{$transcript->get_all_Exons};
+  @all_exons = sort {$a->start <=> $b->start} @all_exons;  
 
-  if ($self->get_homologs_by_gene($gene)){
-
-    my %homolog_hash = %{$self->get_homologs_by_gene($gene)};
-    my $workdir = $self->workdir;
-    my $seq1 =   @{$gene->get_all_Transcripts}[0]->seq;
-    my $length = @{$gene->get_all_Transcripts}[0]->length;
-    my $ratio;
-    my @results;
-    
-    foreach my $homogene (keys %homolog_hash){
-      my $seq2 = $homolog_hash{$homogene}->seq;
-      my $span = $homolog_hash{$homogene}->end-$homolog_hash{$homogene}->start;
-      my $n_exons = scalar(@{$homolog_hash{$homogene}->get_all_Exons});
-      my $obj = Bio::EnsEMBL::Pipeline::Runnable::Bl2seq->new(
-							      -seq1    => $seq1,
-							      -seq2    => $seq2,
-							      -alntype => 'tblastx',
-							      -workdir => $workdir,
-							     );
-      $obj->run;
-      my @output = $obj->output();
-      @output = sort {$a->score <=> $b->score} @output;
-      my $result = $output[0];
-      $ratio = $span / $length;
-      if ($result && $result->percent_id > $PS_PERCENT_ID_CUTOFF){
-	push @results,$result;
-	print  STDERR "\n".$gene->stable_id." "."matches transcript ".$homolog_hash{$homogene}->stable_id." with ".$result->percent_id."% ID,score - ".$result->score." s/l - ".$ratio." length - ".$length." span - ".$span."  exon no - ".$n_exons."\n";
-
-	if ($ratio > $PS_SPAN_RATIO && $n_exons >= $PS_MIN_EXONS){
-	  $judgement = 'pseudogene';
-	  print STDERR "Calling it a pseudogene\n";
-	}
-      }
-      print STDERR "\n";
+  my @exons;
+  # find real intron
+ EXON: for (my $i = 1 ; $i <= $#all_exons ; $i++){
+    my $intron_length  = $all_exons[$i]->start - $all_exons[$i-1]->end;
+    if ($intron_length > 9) {
+      # real intron
+      push @exons , $all_exons[$i-1];
+      push @exons , $all_exons[$i];
+      last EXON;
     }
   }
- return $judgement;
+  $self->throw("real intron not found for gene " . $gene->stable_id . " exons : @all_exons\n")  unless (scalar(@exons) == 2); 
+  my @exon_features = @{$exons[0]->get_all_supporting_features};
+  push @exon_features,@{$exons[1]->get_all_supporting_features};
+
+  
+  ########################################
+  # make a seq feature represening the intron
+  
+  my $intron = Bio::EnsEMBL::SeqFeature->new(
+					     -START => $exons[0]->end+1,
+					     -END => $exons[1]->start-1,
+					     -STRAND => $exons[0]->strand
+					    );
+  if (@exon_features) {
+    ###########################################################
+    # get featues off both exons, split them into ungapped
+    # sections and test them against the intron
+    # feature see if there is an overlap (80% by default)
+    # need to group features by sequence name
+
+  FEATURES:   foreach my $feat (@exon_features) {
+      my @sub_features = $feat->ungapped_features;
+      foreach my $subfeature (@sub_features) {
+	my $seq_feature = Bio::EnsEMBL::SeqFeature->new(
+							-START => $subfeature->start,
+							-END => $subfeature->end,
+							-STRAND => $subfeature->strand
+						       );
+	push @{$seq_features{$feat->hseqname}}, $seq_feature;
+      }
+    }
+  }
+  foreach my $key (keys %seq_features){
+    if ($intron && scalar(@{$seq_features{$key}}) > 0) {
+      my @features = @{$seq_features{$key}};
+      my @feature_blocks;
+
+      #########################################################
+      # merge overlapping features together for protein features
+      # grouped by name
+
+      my $curblock = undef;
+      @features = sort {$a->start <=> $b->start} @features;
+      foreach my $feature (@features){
+	if (defined($curblock) && $curblock->end >= $feature->start) {
+	  if ($feature->end > $curblock->end) { 
+	    $curblock->end($feature->end); 
+	  }
+	} else {
+	  $curblock = Bio::EnsEMBL::SeqFeature->new(
+						    -START => $feature->start,
+						    -END => $feature->end, 
+						    -STRAND => $feature->strand
+						   );
+	  push (@feature_blocks,$curblock);
+	}
+      }
+      my $coverage =  $self->_len_covered($intron,\@feature_blocks)."\n";
+      if ($coverage/$intron->length*100 > $PS_MAX_INTRON_COVERAGE) {
+	$identified++;
+	print STDERR $transcript->stable_id." two exon with $key covering intron ".$coverage/$intron->length*100 . "%.\t";
+
+	# need more than one peice of protein evidence to make the call
+
+	if ($identified >1){
+	  print STDERR "\ncalling ".$transcript->stable_id." as having a protein covered intron\n";
+	  return "dodgy";
+	}
+	else{
+	  print "need another piece of evidence though....\n";
+	  }
+      }
+    }
+  }
+  return 1;
 }
 
 =head2 remove_transcript_from_gene
@@ -605,42 +647,6 @@ sub get_repeats {
   return  $self->{'_repeats'}->{$gene};
 }
 
-=head2 homologs
-
-Arg [1]    : hash ref
-  Description: ref to 2d hash containing single exon genes and homologous transcripts
-  Returntype : 2d hash ref
-  Exceptions : none
-  Caller     : general
-
-=cut
-
-sub homologs {
-  my ($self, $homologs) = @_;
-  if ($homologs) {
-    $self->{'_homologs'}= $homologs;
-  } 
-  return  $self->{'_homologs'};
-}
-
-=head2 get_homologs_by_gene
-
-  Arg [1]    : hash ref
-  Description: returns ref to hash of homologues given a gene
-  Returntype : hash ref
-  Exceptions : throws if _homologs not initialised
-  Caller     : general
-
-=cut
-
-sub get_homologs_by_gene {
-  my ($self, $gene) = @_;
-  my %hash = %{$self->{'_homologs'}};
-  unless ($hash{$gene}){
-    warn ("homolog hash not found for gene $gene");
-    }
-  return $hash{$gene};
-}
 
 =head2 real
 
