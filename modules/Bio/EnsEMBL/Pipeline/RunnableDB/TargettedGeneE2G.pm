@@ -71,9 +71,7 @@ sub new {
 
   if(!defined $self->seqfetcher) {
     # will look for pfetch in $PATH - change this once PipeConf up to date
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch(
-								    '-executable' => '/work2/vac/UberBuild/scripts/pfetch'
-								   ); 
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch; 
     $self->seqfetcher($seqfetcher);
   }
 
