@@ -283,7 +283,7 @@ sub run_analysis {
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
-	#print STDERR "\n".$database."\n";
+        print STDERR "\n".$database."\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
 
         my $command = $self->program ;
@@ -300,7 +300,7 @@ sub run_analysis {
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-        $self->throw("Failed during blast run: $command". ($?/256) . " ". $!) unless (system ($command) == 0);
+        #$self->throw("Failed during blast run: $command". ($?/256) . " ". $!) unless (system ($command) == 0);
       }
   
 }
@@ -340,12 +340,16 @@ sub fetch_databases {
     #
     # If it doesn't exist then see if $database-1,$database-2 exist
     # and put them in the database array
+    print STDERR "Checking if ".$dbname." exists\n";
     if (-f $dbname) {
       push(@databases,$dbname);
     } else {
       my $count = 1;
-      push(@databases,$dbname . "-$count");
-      $count++;
+      while (-f $dbname . "-$count") 
+        {
+          push(@databases,$dbname . "-$count"); 	 
+          $count++; 	 
+        }
     }
     
 
