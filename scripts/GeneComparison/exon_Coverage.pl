@@ -40,13 +40,18 @@ my $type2   = $GENETYPES2;
 my $user2   = $DBUSER2;
 
 # reference db
-my $ref_host   = $REF_DBHOST;
-my $ref_dbname = $REF_DBNAME;
-my $ref_path   = $REF_PATH;
-my $ref_user   = $REF_DBUSER;
+my $ref_host1   = $REF_DBHOST1;
+my $ref_dbname1 = $REF_DBNAME1;
+my $ref_path1   = $REF_PATH1;
+my $ref_user1   = $REF_DBUSER1;
 
 
-my $runnable;
+
+my $ref_host2   = $REF_DBHOST2;
+my $ref_dbname2 = $REF_DBNAME2;
+my $ref_path2   = $REF_PATH2;
+my $ref_user2   = $REF_DBUSER2;
+
 my $input_id;
 my $write  = 0;
 my $check  = 0;
@@ -77,17 +82,22 @@ unless ( $chr && $chrstart && $chrend ){
 }
 
 # connect to the databases 
-my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host,
-					       -user  => $ref_user,
-					       -dbname=> $ref_dbname);
-$dna_db->static_golden_path_type($ref_path); 
+my $dna_db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host1,
+					       -user  => $ref_user1,
+					       -dbname=> $ref_dbname1);
+$dna_db1->static_golden_path_type($ref_path1); 
 
+my $dna_db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host2,
+						-user  => $ref_user2,
+
+						-dbname=> $ref_dbname2);
+$dna_db2->static_golden_path_type($ref_path2);
 
 
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
 					    -dbname=> $dbname1,
-					    -dnadb => $dna_db,
+					    -dnadb => $dna_db1,
 					   );
 print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 
@@ -95,7 +105,7 @@ print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 my $db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host2,
 					    -user  => $user2,
 					    -dbname=> $dbname2,
-					    -dnadb => $dna_db);
+					    -dnadb => $dna_db2);
 print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
 
 
@@ -106,8 +116,8 @@ $db2->static_golden_path_type($path2);
 
 my $sgp1 = $db1->get_StaticGoldenPathAdaptor;
 my $sgp2 = $db2->get_StaticGoldenPathAdaptor;
-#extra genes
-my $sgp3 = $dna_db->get_StaticGoldenPathAdaptor;
+
+
 
 
 # get a virtual contig with a piece-of chromosome #
