@@ -56,7 +56,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Utils::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
 # config file; parameters searched for here if not passed in as @args
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
@@ -797,7 +797,7 @@ sub _cluster_Transcripts{
   #}
   
   # create a new cluster 
-  my $cluster = Bio::EnsEMBL::Utils::TranscriptCluster->new();
+  my $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
   my $cluster_count = 1;
 
   # put the first transcript into this cluster
@@ -892,7 +892,7 @@ sub _cluster_Transcripts{
     # if not-clustered create a new TranscriptCluster
     #print STDERR "  found = $found\n";
     if ( $found == 0 ){  
-      $cluster = new Bio::EnsEMBL::Utils::TranscriptCluster; 
+      $cluster = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster; 
       $cluster->put_Transcripts( $sorted_transcripts[$c] );
       $start{ $cluster } = $sorted_transcripts[$c]->start_exon->start;
       $end{ $cluster }   = $sorted_transcripts[$c]->end_exon->end;
@@ -994,7 +994,7 @@ sub _merge_Transcripts{
   foreach my $cluster ( @{ $ref_transcript_clusters } ){
     
     $count++;
-    print STDERR "\nCLUSTER $count\n\n";
+    #print STDERR "\n****** CLUSTER $count *******\n\n";
        
     # keep track of the transcripts originating each newly created one
     # each $origin_list{$new_transcript} is an array of transcripts
@@ -2337,7 +2337,7 @@ sub make_genes {
     my $translation = $transcript->translation;
     $translation->temporary_id($contig->id . ".$genetype.$count");
   
-    # store only genes that translate ( to check it, we the Bio::Seq )
+    # store only genes that translate ( to check it, we get the Bio::Seq )
     my $sequence = $transcript->translate;
     unless ( $sequence ){
       print STDERR "TRANSCRIPT WITHOUT A TRANSLATION!!\n";
@@ -2367,7 +2367,8 @@ sub make_genes {
       }
 
       # only store the genes whose translation has no stop codons
-      if ( $sequence =~ /\*/ ){
+      my $peptide = $sequence->seq;
+      if ( $peptide =~ /\*/ ){
 	print STDERR "TRANSLATION HAS STOP CODONS!!\n";
       }
       else{
@@ -2555,7 +2556,7 @@ sub output{
      $self->{'_output'} = [];
    }
     
-   if(defined @genes){
+   if(@genes){
      push(@{$self->{'_output'}},@genes);
    }
 
