@@ -5,6 +5,7 @@ use warnings;
 
 use Bio::EnsEMBL::Pipeline::SubmissionSystem;
 use Bio::EnsEMBL::Pipeline::Job;
+use POSIX;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::SubmissionSystem);
 
@@ -49,7 +50,6 @@ sub new {
 =cut
 
 sub submit{
-
   my $self = shift;
   my $job  = shift;
   print STDERR "have ".$self." and job ".$job."\n";
@@ -58,58 +58,46 @@ sub submit{
     $self->throw('expected Bio::EnsEMBL::Pipeline::Job argument');
   }
 
-
+  #place the job on the end of the queue
   unshift @_queue, $job;
 
-  while (@_queue > 0) {
-    if ($children < 1) {
-      my $job = shift @_queue;
+  #if there aren't too many jobs executing take one off the start of the queue
+  if ($children < 1) {
+    my $job = shift @_queue;
 
-      if (my $pid = fork) { # fork returns PID of child to parent, 0 to child
-        # PARENT
-        $children++;
-        print "Size of children is now " . $children . "; " . 
-          scalar(@_queue) . " jobs left in queue\n";
+    if (my $pid = fork) {       # fork returns PID of child to parent, 0 to child
+      # PARENT
+      $children++;
+      print "Size of children is now " . $children . "; " . 
+        scalar(@_queue) . " jobs left in queue\n";
 	
-      } else {
-        #CHILD
-
-	my $config = $self->get_Config();
-	my $temp_dir = $config->get_parameter('LOCAL', 'tmpdir');
-        my $file_prefix = $job->_generate_filename_prefix($job, $temp_dir);
-
-	# redirect stdout/stderr
-        $job->stdout_file("${file_prefix}.out");
-        $job->stderr_file("${file_prefix}.err");
-	close(STDERR);
-	close(STDOUT);
-	open(STDERR, ">" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
-        open(STDOUT, ">" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
-
-        #print "Executing $job with PID $$\n";
-        $job->submission_id($$);
-        $job->adaptor->update($job);
-        $job->set_current_status('SUBMITTED');
-
-        $job->run();
-        exit(0); # child process is finished now!
-      }
-
     } else {
+      #CHILD
 
-      sleep(2);
+      my $file_prefix = $self->_generate_filename_prefix($job);
 
+      # redirect stdout/stderr to files
+      # read stdin from /dev/null
+      $job->stdout_file("${file_prefix}.out");
+      $job->stderr_file("${file_prefix}.err");
+      POSIX::setsid();          #make session leader, and effectively a daemon
+      close(STDERR);
+      close(STDOUT);
+      close(STDIN);
+      open(STDERR, "+>" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
+      open(STDOUT, "+>" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
+      open(STDIN,  "+>/dev/null");
+
+      #print "Executing $job with PID $$\n";
+      $job->submission_id($$);
+      $job->adaptor->update($job);
+      $job->set_current_status('SUBMITTED');
+
+      $job->run();
+      exit(0);                  # child process is finished now!
     }
 
   }
-
-  # wait for any children to complete
-  while ($children > 0) {
-    print "$children children still running, waiting ...\n";
-    sleep(2);
-  }
-
-
 }
 
 
@@ -202,7 +190,6 @@ sub flush {
 }
 
 sub _generate_filename_prefix {
-
   my $self = shift;
   my $job = shift;
 
@@ -212,7 +199,12 @@ sub _generate_filename_prefix {
   $temp_dir || $self->throw('Could not determine output dir for job ' . $job->taskname() . ' ID ' . $job->dbID() . '\n');
 
   # have a subdirectory for each type of task
-  $temp_dir .= "/" .$self->taskname;
+  $temp_dir .= "/" .$job->taskname;
+
+  if(! -e $temp_dir) {
+    mkdir($temp_dir);
+  }
+
 
   #distribute temp files evenly into 10 different dirs so that we don't
   #get too many files in the same dir
@@ -221,14 +213,17 @@ sub _generate_filename_prefix {
 	
   $temp_dir .= "/" . $self->{'dir_num'};
 
-  #create the dir if it doesn't exist
-  mkdir($temp_dir) if(! -e $temp_dir);
+  if(! -e $temp_dir) {
+    mkdir($temp_dir);
+  }
+
 
   my $time = localtime(time());
   $time =~ tr/ :/_./;
 
-  return "$temp_dir/" . "_job_" . $self->dbID() . "$time";
-
+ print STDERR "$temp_dir/" . "_job_" . $job->dbID() . "$time";
+  return "$temp_dir/" . "_job_" . $job->dbID() . "$time";
+ 
 }
 
 1;
