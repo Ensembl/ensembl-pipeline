@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::Runnable::Avid
 =head1 SYNOPSIS
 @sequences = a list of Bio::Seq objects,
 $avid      = a location for the binary,
-$options   = a string with options ,
+$options   = a string with options (default is to produce binary output)
 
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Avid->new(
 								 -query_seqs    => \@sequences,
@@ -79,9 +79,10 @@ sub new {
 					OPTIONS
 				       )
 				    ], @args);
-
   $self->{_output} = [];
   $self->{_verbose} = 1 ;
+
+
 
 
   ########### TESTING TYPES OF PASSED OBJECTS ###########
@@ -95,6 +96,8 @@ sub new {
   }
   $self->query_sequences($query_seqs);
 
+
+
   ########### LOCATION OF USED BINARY ###################
   # if not given, we use the  default:avid-2.1b0
 
@@ -104,18 +107,17 @@ sub new {
       $self->avid_binary('/nfs/acari/jhv/bin/avid');
   }
 
+
+
   ########### PASSED OPTIONS ############################
 
-  my $basic_options = " ";
-  if ($options){
-    $basic_options .= " ".$options;
-  }
-  $self->options( $basic_options);
+  $self->options( $options);
+
 
   ########### SETTING 4 PID-DEPENDED FILENAMES #########
 
-  my $pid=$$;
-  $self->filenames($pid);
+  $self->filenames($$);
+
 
   return $self;
 }
@@ -153,16 +155,22 @@ sub run {
   # Write query sequences into files
    $self->write_sequences;
 
-  # Build command
-  my $command =$self->avid_binary  . " " .$self->options;
+  my ($file1, $file2) = ($self->filenames)[0,2];
+
+  my $command   = $self->avid_binary  . " " .$self->options;
+     $command .=  " " . $file1 . " " . $file2;
+
+
   print STDERR "Avid command : $command\n"  if $self->_verbose;
 
 
-#  open( EXO, "$command |" ) || $self->throw("Error running avid $!");
+  open( EXO, "$command |" ) || $self->throw("Error running avid $!");
 #  $self->parse_results(\*EXO);
-#  close(EXO);
+  close(EXO);
   return 1
 }
+
+
 
 ############################################################
 # get/set methods
@@ -195,6 +203,8 @@ sub options {
   my ($self, $options) = @_;
   if ($options) {
     $self->{_options} = $options ;
+  }else{
+    $self->{_options} = " -obin";
   }
   return $self->{_options};
 }
@@ -229,25 +239,26 @@ sub write_sequences {
         print "Writing out sequence $file\n" if ($self->_verbose);
 
 
-        $file      =  shift  @filenames;
+       $file       =  shift  @filenames;
     my $rm_slice   = $slice->get_repeatmasked_seq();
        $seqobj     = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
        $seqobj     -> write_seq($rm_slice);
-        print "Writing out sequence $file\n";
-
+        print "Writing out sequence $file\n" if ($self->_verbose);
   }
 }
 
 
+
 ########### BUILDING FILENAMES ###########
+
 sub filenames {
   my ($self,$pid) = @_;
-  my $wd          = $self->workdir;
-  my @filenames; 
+
+  my @filenames;
   if ( $pid ) {
     for(my $i=1;$i<=2;$i++) {
       push @filenames, $self->workdir."/seq$i.$pid.fasta"; 
-      push @filenames, "$wd/seq$i.$pid.fasta.masked";
+      push @filenames, $self->workdir."/seq$i.$pid.fasta.masked";
     }
     $self->{_filenames}=\@filenames;
   }
@@ -260,6 +271,7 @@ sub _verbose {
     $self->{_verbose} = shift if @_ ;
     return $self->{_verbose}
 }
+
 
 sub printVars {
   my $self = shift;
