@@ -43,7 +43,6 @@ use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
