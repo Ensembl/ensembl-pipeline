@@ -273,17 +273,20 @@ sub run {
       
       #Use the first line to get gene orientation
       my $firstline = <ESTGENOME>;
-      print STDERR "firstline: \n$firstline\n";
+      print STDERR "firstline: \t$firstline\n";
       # put the gene on the minus strand iff splice sites imply reversed gene
       if ($firstline =~ /REVERSE/) { print STDERR "***reversed gene***\n"; $estOrientation = -1; }
       else {$estOrientation = 1}
      
       #read output
       while (<ESTGENOME>) {
-	
-	if ($_ =~ /^(Segment|Exon|Span)/) {
+	if ($_ =~ /Segmentation fault/) {
+	  $self->warn("Segmentation fault from est_genome\n");
+	  close (ESTGENOME) or $self->warn("problem running est_genome: $!\n");
+	  return(0);
+	}
+	elsif ($_ =~ /^(Segment|Exon|Span)/) {
 	  
-#	  print STDERR "$_";
 	  #split on whitespace
 	  my @elements = split;
 	  
@@ -319,9 +322,12 @@ sub run {
 				  $f2source, $f1strand, $f2strand, 
 				  $f1primary, $f2primary);
         }    
-      }
 
-      close(ESTGENOME);
+      }
+      if(!close(ESTGENOME)){
+	$self->warn("problem running est_genome: $!\n");
+	return(0);
+      }
 
       $self->convert_output;
 
@@ -346,12 +352,14 @@ sub run {
 =cut
 
 sub output {
-    my ($self) = @_;
-    return @{$self->{'_output'}};
+  my ($self) = @_;
+  if (!defined($self->{'_output'})) {
+    $self->{'_output'} = [];
+  }
+  return @{$self->{'_output'}};
 }
 
 sub convert_output {
-
   my ($self) = @_;
   my @genes;
   my @exons;
@@ -360,11 +368,9 @@ sub convert_output {
   # split the different features up
   foreach my $f(@{$self->{'_fplist'}}){
     if ($f->primary_tag eq 'Span'){
-#      push(@genes, $f->feature1);
       push(@genes, $f);
     }
     elsif($f->primary_tag eq 'Exon'){
-#      push(@exons, $f->feature1);
       push(@exons, $f);
     }
     elsif($f->primary_tag eq 'Segment'){
