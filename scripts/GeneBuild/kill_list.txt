@@ -45,8 +45,8 @@ P11367 Retrovirus-related POL polyprotein (Endonuclease) (Fragment). lec
 Q8R596 Hypothetical 4.4 kDa protein. lec
 Q8BNJ4 Transient receptor protein 7. lec
 Q60713 Reverse transcriptase. lec
-P17013
-Q99784
+P17013 poly X vac
+Q99784 NOE1_HUMAN Q99784 Noelin precursor vac
 AK057787	supports transposable elements - Daniel
 NP_079244	supports transposable elements - Daniel
 O00360	supports transposable elements - Daniel
@@ -94,4 +94,25 @@ O88329 large numbers of X's in sequence lec
 Q9Z1L2 large numbers of X's in sequence lec                      
 Q8VEW3 large numbers of X's in sequence lec                      
 Q8JZM8 large numbers of X's in sequence lec 
+Q96NT6 spuriously long introns in NCBI33/34 vac
+Q12903 spuriously long introns in NCBI33/34 vac
+Q96GA6 spuriously long introns in NCBI33/34 vac
+Q8IV24 spuriously long introns in NCBI33/34 vac
+Q16009 spuriously long introns in NCBI33/34 vac
+Q9NR89 spuriously long introns in NCBI33/34 vac
+P08399 un-genewiseable - predominantly ACTG vac
+P24856 un-genewiseable - predominantly ACTG vac
+O13028 un-genewiseable - predominantly ACTG vac
+O13083 un-genewiseable - predominantly ACTG vac
+Q8VIY9 un-genewiseable - predominantly ACTG vac
+O53552 un-genewiseable - predominantly ACTG vac
+O53553 un-genewiseable - predominantly ACTG vac
+O53535 un-genewiseable - predominantly ACTG vac
+O53557 un-genewiseable - predominantly ACTG vac
+O53559 un-genewiseable - predominantly ACTG vac
+Q8VIZ0 un-genewiseable - predominantly ACTG vac
+Q8VIZ1 un-genewiseable - predominantly ACTG vac
+P05790 un-genewiseable - predominantly ACTG vac
+AAN10358 crashes blast
+
 
