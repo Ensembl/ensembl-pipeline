@@ -326,7 +326,7 @@ sub parse_results {
         $filehandle = $self->results;
     }
 
-    if (<$filehandle> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE| )
+    if (<$filehandle> =~ m|NO EXONS/GENES PREDICTED IN SEQUENCE|i )
     {
         print STDERR "No genes predicted\n";
         return;
@@ -460,8 +460,14 @@ sub calculate_and_set_phases {
                 
             }
             $translated_exons = $self->translation(@exons);
-            #Due to odd tranlslation by genscan must chop first base away if peptide begins with M
-            $translated_exons = substr($translated_exons, 1, 999999) if ($peptide =~ /^M/i); 
+            if ($peptide =~ /^x/i)
+            {
+                $peptide =~ s/^\w//;
+                $translated_exons =~ s/^\w//;
+            }
+            #genscan translated partial genes correctly whilst exon translation begin with M
+            $translated_exons =~ s/^M//i; #remove intial M from exon
+            
             if (index ($peptide, $translated_exons) > -1)
             {
                 $translation_found = 1;
