@@ -278,8 +278,11 @@ sub make_genscanExons {
 	  # Don't include any genscans that are inside a genewise
 	  foreach my $gw ($self->genewise) {
 	      if (!(($gw->end < $f->start) || $gw->start > $f->end)) {
-		  print STDERR "Ignoring genscan exon\n";
-		  next EXON;
+		  my @gwf = $gw->sub_SeqFeature;
+		  if ($#gwf > 0) {
+		      print STDERR "Ignoring genscan exon\n";
+		      next EXON;
+		  }
 	      }
 	  }
 	  
@@ -311,26 +314,21 @@ sub make_genewiseExons {
 
     my @fset = $self->genewise;
 
-    @fset = sort {$b->sub_SeqFeature <=> $a->sub_SeqFeature} @fset;
-
+#    @fset = sort {$a->start <=> $b->start} @fset;
     my @newfset;
 
-     # Remove overlapping genewise sets - this confuses the exon pair building process
-     # 
-     #FSET:  foreach my $f (@fset) {
-     # foreach my $f2 (@newfset) {
-#	  if (!($f->start > $f2->end || $f->end < $f2->start)) {
-#	      next FSET;
-#	  } else {
-#	      push(@newfset,$f);
-#	  }
-#      }
-#  }
-
-      foreach my $f (@fset) {
+    FSET: foreach my $f (@fset) {
 	my @gwexons;
 
 	my $excount = 1;
+
+	# throw out single genewises
+	my @sf = $f->sub_SeqFeature;
+
+	if ($#sf == 0) {
+	    next FSET;
+	}
+
       SUBF: foreach my $subf ($f->sub_SeqFeature) {
 
 	  my $found   = 0;
@@ -390,55 +388,143 @@ sub make_genewise_ExonPairs {
     my $count = 0;
     my @exons = $self->genewise_exons;
 
-    foreach my $ex (@exons) {
+
+    # First of all make pairs within the genewise fsets.
+
+  EX: foreach my $ex (@exons) {
+      print "Exon $ex\n";
+      eval {
+	  if ($count > 0) {
+	      my $makepair = 0;
+	      
+	      my $f1 = $exons[$count-1];
+	      my $f2 = $exons[$count];
+
+	      print "\nExon pair comparison $count\n";
+	      $self->print_Exon($f1);
+	      $self->print_Exon($f2);
+
+	      if ($f1->strand == $f2->strand) {
+		  print "found\n";
+		  my $spliceseq = $f1->{_3splice} . $f2->{_5splice};
+		  print "splice " . $spliceseq;
+		  if ($spliceseq eq "GTAG") {
+		      $makepair = 1;
+		      
+		  } elsif ($f1->strand == $f2->strand) {
+		      if ($f1->strand == 1) {
+			  if (abs($f1->end - $f2->start) <= 20) {
+			      $makepair = 1;
+			  }
+		      } elsif ($f1->strand == -1) {
+			  if (abs($f1->start - $f2->end) <= 20) {
+			      $makepair = 1;
+			  }
+		      } 
+		  } 
+		  if ($makepair == 1) {
+		      print "Making pair\n";
+		      
+		      my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $f1,
+									 -exon2 => $f2,
+									 -type  => 'ABUTTING',
+									 );
+		      my $found = 0;
+		      
+		      foreach my $p ($self->get_all_ExonPairs) {
+			  if ($p->compare($tmppair) == 1) {
+			      $p->add_coverage;
+			      $found = 1;
+			      print "foudn pair\n";
+			  }
+		      } 
+		      if ($found == 0) {
+			  print "Adding pair\n";
+			  $self->add_ExonPair($tmppair);
+			  $tmppair->add_Evidence($f1->each_Supporting_Feature);
+			  $tmppair->add_Evidence($f2->each_Supporting_Feature);
+			  $tmppair->splice_seq(new Bio::Seq(-id => "splice", 
+							    -seq => $f1->{_3splice} . $f2->{_5splice}));
+		      }
+		  }
+	      }
+	  }
+      };
+	
+      if ($@) {
+	  print STDERR "ERROR making exon pair $@\n";
+      }
+      $count++;
+  }
+
+    # Now try and merge exons but only if we haven't already made a pair with it
+    
+    
+    my $count = 0;
+
+    foreach my $exon (@exons) {
 	eval {
-	if ($count > 0) {
+	if ($count < $#exons) {
 	    my $makepair = 0;
+	    my $foundexon;
+	    
+	    my $exon2  = $exons[$count+1];
+	    
+	    if ($self->isTail($exon) && ($self->isHead($exon2))) {
+		my $spliceseq = $exon->{_3splice} . $exon2->{_5splice};
 
-	    my $f1 = $exons[$count-1];
-	    my $f2 = $exons[$count];
-
-	    my $spliceseq = $f1->{_3splice} . $f2->{_5splice};
-
-	    if ($spliceseq eq "GTAG") {
-		$makepair = 1;
-	    } elsif ($f1->strand == $f2->strand) {
-		if ($f1->strand == 1) {
-		    if (abs($f1->end - $f2->start) <= 20) {
+		if ($exon->strand == $exon2->strand) {
+		    # join together if they splice
+		    if ($spliceseq eq "GTAG") {
+			print STDERR "Merging different genewises due to correct splicing\n";
 			$makepair = 1;
-		    }
-		} elsif ($f1->strand == -1) {
-		    if (abs($f1->start - $f2->end) <= 20) {
-			$makepair = 1;
-		    }
-		} 
-	    } 
-	    if ($makepair == 1) {
-		my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $f1,
-								   -exon2 => $f2,
+			$foundexon = $exon2;
+			
+			# or if they are close enough together to merge into one exon
+		    } else {
+			if ($exon->strand == 1) {
+			    if (abs($exon->end - $exon2->start) <= 20) {
+				$makepair = 1;
+				$foundexon = $exon2;
+			    }
+			} elsif ($exon->strand == -1) {
+			    if (abs($exon->start - $exon2->end) <= 20) {
+				$makepair = 1;
+				$foundexon = $exon2;
+			    }
+			} 
+		    } 
+		}
+	    }
+		       
+	    if ($makepair == 1 && defined($foundexon)) {
+		
+		my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon,
+								   -exon2 => $foundexon,
 								   -type  => 'ABUTTING',
 								   );
 		my $found = 0;
-
+		
 		foreach my $p ($self->get_all_ExonPairs) {
 		    if ($p->compare($tmppair) == 1) {
 			$p->add_coverage;
-			$found = 1;
+			$found = 0;
 		    }
 		} 
-		if ($found == 0) {
+		if ($found == 1) {
+		    print STDERR "Adding genewise merge exon pair\n";
 		    $self->add_ExonPair($tmppair);
-		    $tmppair->add_Evidence($f1->each_Supporting_Feature);
-		    $tmppair->add_Evidence($f2->each_Supporting_Feature);
+		    $tmppair->add_Evidence($exon->each_Supporting_Feature);
+		    $tmppair->add_Evidence($foundexon->each_Supporting_Feature);
 		    $tmppair->splice_seq(new Bio::Seq(-id => "splice", 
-						      -seq => $f1->{_3splice} . $f2->{_5splice}));
+						      -seq => $exon->{_3splice} . $foundexon->{_5splice}));
 		}
 	    }
 	}
+
     };
-	
 	if ($@) {
-	    print STDERR "ERROR making exon pair $@\n";
+	    print STDERR "Error making inter genewise exon pairs [$@]\n";
 	}
 	$count++;
     }
@@ -494,8 +580,8 @@ sub  make_ExonPairs {
 
 	    my %doneidhash;
 
-	    print ("EXONS : " . $exon1->id . "\t" . $exon1->start . "\t" . $exon1->end . "\t" . $exon1->strand . "\n");
-	    print ("EXONS : " . $exon2->id . "\t" . $exon2->start . "\t" . $exon2->end . "\t" . $exon2->strand . "\n");
+#	    print ("EXONS : " . $exon1->id . "\t" . $exon1->start . "\t" . $exon1->end . "\t" . $exon1->strand . "\n");
+#	    print ("EXONS : " . $exon2->id . "\t" . $exon2->start . "\t" . $exon2->end . "\t" . $exon2->strand . "\n");
 
 	    # For the two exons we compare all of their supporting features.
 	    # If any of the supporting features of the two exons
@@ -717,8 +803,6 @@ sub link_ExonPairs {
 sub _recurseTranscript {
     my ($self,$exon,$tran) = @_;
     
-    print STDERR "\nRecursing transcript \n";
-
     if (defined($exon) && defined($tran)) {
 	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon")       unless $exon->isa("Bio::EnsEMBL::Exon");
 	$self->throw("[$tran] is not a Bio::EnsEMBL::Transcript") unless $tran->isa("Bio::EnsEMBL::Transcript");
@@ -753,10 +837,6 @@ sub _recurseTranscript {
     my $count = 0;
 
     my @pairs = $self->_getPairs($exon);
-
-    foreach my $pair (@pairs) {
-	$self->print_ExonPair($pair);
-    }
 
     my @exons = $tran->each_Exon;;
     
@@ -1538,7 +1618,10 @@ sub set_phases {
 # some of the pathological cases
 
 sub filter_Transcripts {
-    my ($self,@transcripts) = @_;
+    my ($self) = @_;
+
+    print STDERR "Filtering transcripts\n";
+    my @transcripts = $self->get_all_Transcripts;
 
     my @new;
 
@@ -1546,7 +1629,7 @@ sub filter_Transcripts {
 	my $foundstart = 0;
 	my $foundend   = 0;
 
-	TRAN2: foreach my $tran2 (@transcripts) {
+      TRAN2: foreach my $tran2 (@transcripts) {
 	    
 	    next TRAN2 if ($tran1 == $tran2);
 	    
@@ -1563,7 +1646,113 @@ sub filter_Transcripts {
 	    push(@new,$tran1);
 	}
     }
-    return @new;
+    print "Done first filter\n";
+    
+
+    # We now also have to filter transcripts to trim off the satellite single exon genscan genes that
+    # happen at the end of genewise genes.
+
+	my @exons = $self->genewise_exons;
+    push(@exons,$self->genscan_exons);
+    
+    my @new2;
+
+    print STDERR "Starting second filter @new\n";
+    foreach my $tran (@new) {
+	my @gexons = $tran->each_Exon;
+
+	print ("Looking at " . $tran->id . "\t" . $#gexons . "\n");
+	if ($#gexons == 0) {
+	    # find nearest 5' exon
+	    my $exon5;
+	    my $exon3;
+	    my $gap = 10000000000;
+	    my $found_genewise = 0;
+
+	    print STDERR "\nFound single exon gene " . $tran->id . "\n";
+	    $self->print_Exon($gexons[0]);
+
+	  EX2: foreach my $ex (@exons) {
+	      next EX2 if ($ex == $gexons[0]);
+
+		  $self->print_Exon($ex);
+
+	      if ($ex->strand == $gexons[0]->strand &&
+		  ($gexons[0]->start - $ex->end)  > 0 &&
+		  ($gexons[0]->start - $ex->end) < $gap) {
+		  $exon5 = $ex;
+		  $gap = ($gexons[0]->start - $ex->end);
+	      }
+	      $self->print_Exon($ex);
+
+	  }
+	    if (defined($exon5)) {
+		print STDERR "Found exon5\n";
+		$self->print_Exon($exon5);
+		# get evidence
+		my @evidence = $exon5->each_Supporting_Feature;
+		
+		# any of it genewise?
+		
+		foreach my $ev (@evidence) {
+		    if ($ev->source_tag eq "genewise") {
+		      print ("Tag " . $ev->source_tag . "\n");
+			# don't use transcript
+			$found_genewise = 1;
+		    }
+		}
+		
+	    }
+
+	    $gap = 1000000000000;
+
+	  EX3: foreach my $ex (@exons) {
+	      next EX3 if ($ex == $gexons[0]);
+		  print STDERR "\t Gap $gap";
+		  $self->print_Exon($ex);
+
+	      # find nearest 3' exon
+	      if ($ex->strand == $gexons[0]->strand &&
+		  ($ex->start - $gexons[0]->end)  > 0 &&
+		  ($ex->start - $gexons[0]->end) < $gap) {
+		  $exon3 = $ex;
+		  $gap = ($ex->start - $gexons[0]->end);
+	      }
+	    print STDERR "\t Gap $gap";
+	    $self->print_Exon($ex);
+
+	  }
+
+	    if (defined($exon3)) {
+		# get evidence
+		my @evidence = $exon3->each_Supporting_Feature;
+		
+		# any of it genewise?
+		  
+		  foreach my $ev (@evidence) {
+		      print ("Tag " . $ev->source_tag . "\n");
+		      if ($ev->source_tag eq "genewise") {
+			  # don't use transcript
+			  $found_genewise = 1;
+		      }
+		  }
+		  
+	    }
+
+	    # else add to the array	
+	    if ($found_genewise == 0) {
+		push(@new2,$tran);
+	    }
+
+	} else {
+	    push(@new2,$tran);
+	}
+    }
+
+    $self->{_transcripts} = [];
+
+    push(@{$self->{_transcripts}},@new2);
+
 }
 
 
@@ -1731,8 +1920,8 @@ sub find_phase {
 	print STDERR "Couldn't find correct phase for transcript. Translations were :\n";
 
 	print STDERR "Phase 0 : $tran0\n";
-	print STDERR "Phase 1 : $tran0\n";
-	print STDERR "Phase 2 : $tran0\n";
+	print STDERR "Phase 1 : $tran1\n";
+	print STDERR "Phase 2 : $tran2\n";
     } else {
 	print(STDERR "\n\tTranslation ($phase) =  " . $dna->translate('*','X',(3-$phase)%3)->seq . " " . $phase . "\n\n");
     }
