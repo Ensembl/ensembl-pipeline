@@ -72,8 +72,7 @@ use vars qw( %WormBaseConf );
 		 WB_OPERON_LOGIC_NAME => '', #logic names
 		 WB_RNAI_LOGIC_NAME => '',  # for simple features to be 
 		 WB_EXPR_LOGIC_NAME => '', # parsed out of the gff
-		 WB_SL1_LOGIC_NAME => '',
-		 WB_SL2_LOGIC_NAME => '',
+		 WB_PSEUDO_LOGIC_NAME => 'Pseudogene',
 		);
 
 sub import {
