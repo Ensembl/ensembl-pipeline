@@ -100,7 +100,7 @@ sub kill {
 
   my $arg;
   if($array_idx) {
-    $arg = '"' . $sub_id . "[$array_idx]" . '"';
+    $arg = $sub_id . "[$array_idx]";
   } else {
     $arg = $sub_id;
   }
