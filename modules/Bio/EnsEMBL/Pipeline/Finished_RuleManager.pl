@@ -4,26 +4,50 @@
 #
 # You may distribute this code under the same terms as perl itself
 
-$ENV{'BLASTDB'} = '/usr/local/ensembl/data/blastdb/Ensembl';
-$ENV{'BLASTMAT'} = '/usr/local/ensembl/data/blastmat';
+$ENV{'BLASTDB'}     = '/data/blastdb/Ensembl';
+$ENV{'BLASTMAT'}    = '/usr/local/ensembl/data/blastmat';
 $ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
+
 
 use strict;
 use Getopt::Long;
 use Sys::Hostname;
 use Socket;
-
+use POSIX 'setsid';
+use FindBin ();
+use File::Basename ();
+use File::Spec::Functions;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-
+use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+
+my $script = File::Basename::basename($0);
+my $SELF = catfile $FindBin::Bin, $script;
+
+my $DEFAULT_HOME          = '';
+my $HOME                  = $DEFAULT_HOME;
+my $HOSTNAME              = Sys::Hostname::hostname();
+my $PID_FILE              = $DEFAULT_HOME . "$SELF.$HOSTNAME.pid";
+my $DEBUG                 = 1;
+my $NAMED                 = 'FINISHED_PIPELINE';
+my $OUT                   = $ENV{$NAMED."_OUTFILE"};
+
+
+# POSIX unmasks the sigprocmask properly
+my $sigset = POSIX::SigSet->new();
+my $action = POSIX::SigAction->new('sigHUP_handler',
+                                $sigset,
+                                &POSIX::SA_NODEFER);
+POSIX::sigaction(&POSIX::SIGHUP, $action);
+# remove daemon control args from ARGV copy
+
 
 
 unless (&config_sanity_check) {
     exit 1;
 }
-
 
 # Also, an alarm is set to go off every (say) 2 minutes (or not at all if
 # $wakeup is false). When the script receives this it looks to see how many
@@ -87,10 +111,19 @@ my $runner;
 my $shuffle;  
 my $output_dir;
 my @start_from;
+my $db_sanity      = 1;
 my %analyses;
-my $verbose = 1;
-my $rerun_sleep = 3600;
+my $verbose        = 1;
+my $rerun_sleep    = 3600;
 my $overload_sleep = 300;
+my ($start, $stop, $restart, $status, $daemonFree);
+my @controls = ('start'     => \$start,
+                'stop'      => \$stop,
+                'restart'   => \$restart,
+                'status'    => \$status,
+                'buffyMode' => \$daemonFree);
+restart_string(@ARGV);
+
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -107,7 +140,9 @@ GetOptions(
     'norun'         => \$no_run,
     'start_from=s@' => \@start_from,
     'analysis=s@'   => \@analyses,
-    'v!'            => \$verbose
+    'dbsanity!'     => \$db_sanity,
+    'v!'            => \$verbose,
+    @controls
 )
 or die ("Couldn't get options");
 
@@ -115,7 +150,19 @@ unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     exit 1;
 }
-
+# -------------------------------------
+# Handle daemon control all sub routines called must exit!
+# check uniqueness of control parameters
+if($start + $stop + $status + $restart + $daemonFree > 1){ useage(); }
+# decide which one
+elsif($start)      { daemonize($OUT); }
+elsif($stop)       { stop_daemon();   }
+elsif($status)     { daemon_status(); }
+elsif($restart)    { restart();       }
+elsif($daemonFree) { print "$NAMED : Odd I'm not running as a daemon. Hit Ctrl-C quick\n" unless eval{ get_pid() }; }
+else               { useage();        } # Catch when no daemon control specified
+# -------------------------------------
+# this is now the daemon's code
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -host   => $dbhost,
@@ -124,6 +171,20 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
     -pass   => $dbpass,
     -port   => $dbport,
 );
+if($db_sanity){
+    &db_sanity_check($db);
+}else{
+    print STDERR "$NAMED : NO DB SANITY CHECK.  OK?\n" if($verbose);
+}
+my @restart = restart_array();
+
+sub sigHUP_handler {
+    print STDERR "\n";
+    print STDERR "$NAMED : got SIGHUP @ ".localtime()."\n";
+    print STDERR "$NAMED : execing: $SELF @restart\n";
+    $db->pipeline_unlock() if $db;
+    exec($SELF, @restart) or die "Couldn't restart: $!\n";
+}
 
 my $rule_adaptor = $db->get_RuleAdaptor;
 my $job_adaptor  = $db->get_JobAdaptor;
@@ -285,17 +346,27 @@ while (1) {
         my @current_jobs = $job_adaptor->fetch_by_input_id($id);
 
         RULE: for my $rule (@rules)  {
+            # what does this check ????
             if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
             print "Check ",$rule->goalAnalysis->logic_name, " - " . $id if $verbose;
+            # hard wiring makes devil happy.
+            my $anal = $rule->check_for_analysis (\@anals, 'CONTIG');
 
-            my $anal = $rule->check_for_analysis (@anals);
-
-            if ($anal) {
-
-                print " fullfilled.\n" if $verbose;
+            if (UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')) { # checks whether its a reference[obj] maybe should be UNIVERSAL::isa() check
+                print " fullfilled. got a ".ref($anal)."\n" if $verbose;
                 $analHash{$anal->dbID} = $anal;
+            } elsif(!($anal & 1)) { # checks if its returned a value passing Input_Id_Type Check.
+                # now do some more bit checking
+                # only interesting to see if condition check[4] NOT failed && complete check[2] failed
+                # translates to  !($anal & 4) && ($anal & 2)
+                if(!($anal & 4) && ($anal & 2) && !$sic->check_is_current($rule->goalAnalysis->dbID, $id)){
+                    print " fullfilled **** IS_CURRENT FALSE ****\n" if $verbose;
+                    $analHash{$rule->goalAnalysis->dbID} = $rule->goalAnalysis();
+                }else{
+                    print " not fullfilled **** is_current true ****\n" if $verbose;
+                }
             } else {
                 print " not fullfilled.\n" if $verbose;
             }
@@ -378,6 +449,10 @@ while (1) {
     @id_list = ();
     print "Waking up and run again!\n" if $verbose;
 }
+
+# --------------------------------------------------------
+# Subroutines
+# --------------------------------------------------------
 
 
 # remove 'lock'
@@ -495,7 +570,7 @@ sub shuffle {
 sub config_sanity_check {
     my $ok = 1;
     no strict 'vars';
-    print STDERR "checking config sanity\n";
+    print STDERR "$NAMED : Checking config sanity\n";
     unless ($QUEUE_MANAGER) {
         print "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
 	$ok = 0;
@@ -515,7 +590,51 @@ sub config_sanity_check {
 
     return $ok;
 }
+sub db_sanity_check{
+  my ($db) = @_;
 
+  my ($sth, $query, $msg);
+  #check all rules in the rule_goal table have existing analyses
+  $query = qq{SELECT COUNT(DISTINCT g.rule_id)
+                FROM rule_goal g
+                LEFT JOIN analysis a ON g.goal = a.analysis_id
+	        WHERE a.analysis_id IS NULL};
+  $msg = "Some of your goals in the rule_goal table don't seem".
+         " to have entries in the analysis table";
+  execute_sanity_check($db, $query, $msg);
+  #check all rules in the rule_condition table have existing analyses
+  $query = qq{SELECT COUNT(DISTINCT c.rule_id)
+                FROM rule_conditions c
+                LEFT JOIN analysis a ON c.condition = a.logic_name
+	        WHERE a.logic_name IS NULL};
+  $msg = "Some of your conditions in the rule_condition table don't" .
+         " seem to have entries in the analysis table";
+  execute_sanity_check($db, $query, $msg);
+  #check all the analyses have types
+  $query = qq{SELECT COUNT(DISTINCT(a.analysis_id))
+                FROM analysis a
+                LEFT JOIN input_id_type_analysis t ON a.analysis_id = t.analysis_id
+	        WHERE t.analysis_id IS NULL};
+  $msg = "Some of your analyses don't have entries in the".
+         " input_id_type_analysis table"; 
+  execute_sanity_check($db, $query, $msg);
+  #check that all types which aren't accumulators have entries in
+  #input__id_analysis table
+  $query = qq{SELECT DISTINCT(t.input_id_type)
+                FROM input_id_type_analysis t
+                LEFT JOIN input_id_analysis i ON t.input_id_type = i.input_id_type
+	        WHERE i.input_id_type IS NULL
+                && t.input_id_type != 'ACCUMULATOR'};
+  $msg = "Some of your types don't have entries in the".
+         " input_id_type_analysis table";
+  execute_sanity_check($db, $query, $msg);
+}
+sub execute_sanity_check{
+    my ($db, $query, $msg) = @_;
+    my $sth = $db->prepare($query);
+    $sth->execute();
+    die $msg if $sth->fetchrow();
+}
 
 sub logic_name2dbID {
     my ($ana_adaptor, @analyses) = @_;
@@ -537,3 +656,171 @@ sub logic_name2dbID {
     }
     return %analyses;
 }
+
+# ---------------------------------------------
+# for the daemon control
+sub daemonize {
+    my $output = shift || '/dev/null';
+    if(! -e $PID_FILE){
+        print STDERR "$NAMED : Starting up Rule Manager on $HOSTNAME....\n"    if $DEBUG;
+        print STDERR "$NAMED : Using database configured from $HOME\n"         if $DEBUG;
+        print STDERR "$NAMED : PID file at $PID_FILE\n"                        if $DEBUG;
+        chdir '/'		    or die "Can't chdir to /: $!";
+        open (STDIN, '/dev/null')   or die "Can't read /dev/null: $!";
+        open (STDOUT, ">$output")   or die "Can't write to $output: $!";
+        defined(my $pid = fork)	    or die "Can't fork: $!";
+        if($pid){
+            open(PID,">$PID_FILE")  or die "Can't write to $PID_FILE: $!";
+            print PID $pid;
+            close PID;
+            exit if $pid;
+        }
+        setsid			    or die "Can't start a new session: $!";
+        open (STDERR, '>&STDOUT')   or die "Can't dup stdout: $!";
+    }else{
+        print STDERR "$NAMED : $0 is already running as a daemon using pid file: <$PID_FILE>\n";
+        exit;
+    }
+}  
+sub stop_daemon{
+    if(my $pid = eval{get_pid()}){
+        kill 9, $pid;
+        unlink $PID_FILE;
+        my $db;
+        eval{ 
+            $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+                                                                -host   => $dbhost,
+                                                                -dbname => $dbname,
+                                                                -user   => $dbuser,
+                                                                -pass   => $dbpass,
+                                                                -port   => $dbport,
+                                                            );
+            
+        };
+        if($@){
+            print STDERR $@;
+            print STDERR "\nTo remove the lock  from the database I need host port name etc...\n";
+        }else{
+            if(my @lock = split("[\@:]", $db->pipeline_lock())){
+                unless($pid ne $lock[2]){
+                    $db->pipeline_unlock();
+                    print STDERR "$NAMED : killed PID <$lock[2]> and removed pipeline.lock\n";
+                    exit;
+                }
+                print STDERR "PID: <$pid> from file does not match PID: <$lock[2]> from db\n";
+            }else{
+                print STDERR "Couldn't find the lock. Does this process exist?\n";
+            }
+        }
+    }else{
+        print STDERR "$NAMED : Instance using pid file <$PID_FILE> is not currently running\n";
+    }
+    exit;
+}
+sub daemon_status{
+    if(my $pid = eval{get_pid()}){
+        print STDERR "$NAMED : Instance running under PID: $pid\n";
+        
+        print STDERR "$NAMED : Checking the database...\n";
+        my $db;
+        eval{ 
+            $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+                                                                -host   => $dbhost,
+                                                                -dbname => $dbname,
+                                                                -user   => $dbuser,
+                                                                -pass   => $dbpass,
+                                                                -port   => $dbport,
+                                                            );
+            
+        };
+        if($@){
+            print STDERR $@;
+            print STDERR "\nTo check the databases for a lock I need host port name etc...\n";
+        }else{
+            if(my @lock = split("[\@:]", $db->pipeline_lock())){
+                $lock[3] = localtime($lock[5] = $lock[3]);
+                print STDERR <<EOF;
+This pipeline appears to be running!
+
+    db       $dbname\@$dbhost
+    pid      $lock[2] on host $lock[1]
+    started  $lock[3] ($lock[5])
+
+The process above can be terminated by rerunning this script with
+-stop option rather than -status.
+If the process does not exist, remove the lock by removing the lock
+from the pipeline database:
+
+    delete from meta where meta_key = 'pipeline.lock';
+
+You probably need to remove $PID_FILE too.
+
+Thank you.
+
+EOF
+            }else{
+                print STDERR "$NAMED : No lock present in the database! This is wrong\n";
+            }
+        }
+    }else{
+        print STDERR "$NAMED : Instance using pid file <$PID_FILE> is not currently running\n";
+    }
+    exit;
+}
+sub get_pid{
+    open(PID,"$PID_FILE") or die "Can't read $PID_FILE: $!";
+    my $pid = <PID>;
+    close PID;
+    return $pid;
+}
+sub restart{
+    print STDERR "$NAMED : ****************************************\n";
+    print STDERR "$NAMED : Please use -stop then -start to restart\n";
+    print STDERR "$NAMED : ****************************************\n";
+    if(my $pid = eval{get_pid()}){
+        kill 1, $pid;
+    }else{
+        print STDERR "$NAMED : \n";
+    }
+    exit;
+}
+{
+    my $restart_string;
+    sub restart_string{
+        my (@passed) = @_;
+        my %controls = @controls;
+        my @control = keys %controls;
+        if(@passed){
+            foreach my $option(splice @passed){
+                if($option =~ /^\-/){
+                    $option = substr($option,1);
+                    my $ok = 0;
+                    map { $ok = 1 if $_ =~ /^$option(.+)?/ } @control;
+                    $restart_string .= " -" . $option unless $ok;
+                }else{
+                    $restart_string .= " " . $option;
+                }
+            }
+            print STDERR "$NAMED : RestartString <$SELF$restart_string -buffyMode>\n";
+        }
+        return $restart_string . " -buffyMode\n";
+    }
+    sub restart_array{
+        unless($restart_string){
+            return ();
+        }
+        return split(" ", $restart_string), '-buffyMode';
+    }
+
+}
+sub useage{
+    exit( exec('perldoc', $0) or die "Can't perldoc $0: $!" );
+}
+
+=pod
+
+=head1
+
+FinishedRuleManager
+
+=cut
