@@ -43,7 +43,6 @@ use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
@@ -74,7 +73,7 @@ sub pseudogene_test{
        $focus_db, $focus_species, 
        $target_db, $target_species,
        $target_db2, $target_species2,
-       $threshold
+       $threshold, $gene_id
      ) = @_;
   
   my ( $frameshift, $polyA, $Met, $spliced_elsewhere, $mouse_homology, $rat_homology, $break_synteny_mouse, $break_synteny_rat, $repeat );
@@ -139,10 +138,10 @@ sub pseudogene_test{
     $spliced_elsewhere = 0;
   }
   
-    ############################################################
-    # if is spliced, has it got canonical splice sites?
-    if ( scalar( @{$transcript->get_all_Exons} ) > 1 ){
-	if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+  ############################################################
+  # if is spliced, has it got canonical splice sites?
+  if ( scalar( @{$transcript->get_all_Exons} ) > 1 ){
+    if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
 	     ->check_splice_sites( $transcript ) ){
 	    print STDERR "Canonical splice sites:\tYES\n";
 	}
@@ -154,7 +153,7 @@ sub pseudogene_test{
   ############################################################
   # has it got homology in mouse?
   my $orthologues = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold );
+    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold, $gene_id );
   if ( $orthologues && @{$orthologues} ){
     $mouse_homology = 1;
   }
@@ -166,7 +165,7 @@ sub pseudogene_test{
   ############################################################
   # has it got homology in rat?
   my $orthologues2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold );
+    ->test_for_orthology($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2, $threshold, $gene_id );
   if ( $orthologues2 && @{$orthologues2} ){
     $rat_homology = 1;
   }
@@ -178,7 +177,7 @@ sub pseudogene_test{
   ############################################################
   # Does it break synteny in mouse?
   my $synteny_breaking = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-    ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species );
+    ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db, $target_species, $threshold);
   if ( $synteny_breaking ){
     print STDERR "synteny in mouse is broken\n";
     $break_synteny_mouse = 1;
@@ -191,7 +190,7 @@ sub pseudogene_test{
   ############################################################
     # Does it break synteny in rat?
     my $synteny_breaking2 = Bio::EnsEMBL::Pipeline::GeneComparison::ComparativeTools
-      ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2 );
+      ->test_for_synteny_breaking($transcript, $db, $focus_db, $focus_species, $compara_db, $target_db2, $target_species2 , $threshold);
   if ( $synteny_breaking2 ){
     print STDERR "synteny in rat is broken\n";
     $break_synteny_rat= 1;
@@ -240,8 +239,8 @@ sub has_polyA_track{
   
   ############################################################
   # we take X bases downstream:
-  my $poly_start = $end - 4;
-  my $poly_end   = $end + 16;
+  my $poly_start = $end - 9;
+  my $poly_end   = $end + 5;
   my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $poly_start, $poly_end )->seq;
   
   #####################################################################
@@ -395,12 +394,16 @@ sub check_for_spliced_real_gene{
 	->find_transcripts_by_protein_evidence($id,$db);
       print STDERR scalar(@trans)." found with protein evidence $id\n";
       if ( @trans ){
-	my @sorted = 
-	  sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @trans;
-	
-	if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($sorted[0]) && !$self->overlap( $transcript, $sorted[0] ) ) {
-	  push ( @spliced_transcripts, $sorted[0] );
+	my @selected;
+	foreach my $tran ( @trans ){
+	  if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+	       && !$self->overlap($transcript, $tran ) ) { 
+	    push ( @selected, $tran );
+	  } 
 	}
+	my @sorted = 
+	  sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected;
+	push ( @spliced_transcripts, $sorted[0] );
       }
     }
   }
@@ -412,12 +415,16 @@ sub check_for_spliced_real_gene{
       print STDERR scalar(@trans)." found with cdna evidence $id\n";
 
       if ( @trans ){
-	my @sorted = 
-	  sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @trans;
-	
-	if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($sorted[0]) && !$self->overlap( $transcript, $sorted[0] ) ){
-	  push ( @spliced_transcripts, $sorted[0] );
-	}
+	my @selected; 
+        foreach my $tran ( @trans ){ 
+          if ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced($tran)
+	       && !$self->overlap($transcript, $tran ) ) {  
+            push ( @selected, $tran ); 
+          }  
+        } 
+        my @sorted =  
+          sort { scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) } @selected; 
+        push ( @spliced_transcripts, $sorted[0] ); 
       }
     }
   }
@@ -495,12 +502,9 @@ sub read_probabilities{
     my @att = split;
     next unless ( $att[1] eq '1' || $att[1] eq '0' );
     
-    $positivo{frameshift}     += $att[0];
-    $positivo{polyA}          += $att[1];
-    $positivo{Met}            += $att[2];
-    $positivo{mouse_homology} += $att[3];
-    $positivo{break_synteny}  += $att[4];
-    $positivo{repeat}         += $att[5];
+    for (my $i=0; $i<=$#attributes; $i++ ){ 
+      $positivo{$attributes[$i]}      += $att[$i]; 
+    } 
     
     $pos_count++;
   }
@@ -523,14 +527,9 @@ sub read_probabilities{
     chomp;
     my @att = split;
     next unless ( $att[1] eq '1' || $att[1] eq '0' );
-    
-    $negativo{frameshift}     += $att[0];
-    $negativo{polyA}          += $att[1];
-    $negativo{Met}            += $att[2];
-    $negativo{mouse_homology} += $att[3];
-    $negativo{break_synteny}  += $att[4];
-    $negativo{repeat}         += $att[5];
-    
+    for (my $i=0; $i<=$#attributes; $i++ ){ 
+      $negativo{$attributes[$i]}      += $att[$i]; 
+    } 
     $neg_count++;
   }
 
