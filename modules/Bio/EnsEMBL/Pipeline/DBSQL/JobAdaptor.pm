@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Pipeline::Job;
 sub fetch_by_dbID{
   my ($self, $dbID) = @_;
 
-	my $cols = $self->_cols();
+  my $cols = $self->_cols();
 
   my $query = qq {
     SELECT $cols
@@ -72,9 +72,9 @@ sub fetch_by_dbID{
 
   $sth->finish();
 
-	return undef if(!@$jobs);
+  return undef if(!@$jobs);
 
-	return $jobs->[0];
+  return $jobs->[0];
 }
 
 
@@ -92,21 +92,19 @@ sub fetch_by_dbID{
 sub fetch_all_by_dbID_list {
   my ($self, $dbIDs) = @_;
 
-	if(@$dbIDs == 0) {
-		return [];
-	}
+  if(@$dbIDs == 0) {
+    return [];
+  }
 
-	my $id_list = join(', ', @$dbIDs);
+  my $id_list = join(', ', @$dbIDs);
 
-	my $cols = $self->_cols;
+  my $cols = $self->_cols;
 
   my $query = qq {
     SELECT $cols
     FROM job
     WHERE job_id IN ($id_list) };
 	
-  print STDERR "\n\nSQL:\n$query\n\n";
-
   my $sth = $self->prepare($query);
   $sth->execute;
 	
@@ -114,7 +112,7 @@ sub fetch_all_by_dbID_list {
 
   $sth->finish();
 
-	return $result;
+  return $result;
 }
 
 
@@ -224,10 +222,10 @@ sub fetch_all_by_status{
 # the implementation of _jobs_from_sth depends on this method
 #
 sub _cols {
-	my $self = shift;
+  my $self = shift;
 	
-	return  'job_id
-   , taskname
+  return 'job_id
+         , taskname
 	 , input_id
 	 , submission_id
 	 , job_name
@@ -254,9 +252,9 @@ sub _cols {
 sub fetch_all_by_taskname{
   my ($self, $taskname) = @_;
 
-	my $cols = $self->_cols();
+  my $cols = $self->_cols();
 
-   my $query = qq {
+  my $query = qq {
     SELECT $cols
     FROM job
     WHERE taskname = ? };
@@ -264,11 +262,11 @@ sub fetch_all_by_taskname{
   my $sth = $self->prepare($query);
   $sth->execute("$taskname");
 
-	my $jobs = $self->_jobs_from_sth($sth);
+  my $jobs = $self->_jobs_from_sth($sth);
 
   $sth->finish();
 
-	foreach my $job (@$jobs) {
+  foreach my $job (@$jobs) {
     my $status = $self->fetch_current_status($job);
     $job->status($status);
   }
@@ -297,26 +295,25 @@ sub _jobs_from_sth{
 
   $sth->bind_columns(\$job_id, \$taskname, \$input_id, 
                      \$submission_id, \$job_name, \$array_index,
-                     \$parameters, \$module,
-										 \$stderr_file, \$stdout_file, \$retry_count);
+                     \$parameters, \$module,							     \$stderr_file, \$stdout_file, \$retry_count);
 
-	my @jobs;
+  my @jobs;
 
-	while($sth->fetch) {
-		push @jobs, Bio::EnsEMBL::Pipeline::Job->new
-			(-input_id => $input_id,
-	     -taskname => $taskname,
-	     -module => $module,
-		   -dbID => $job_id,
-			 -submission_id => $submission_id,
-			 -job_name => $job_name,
-			 -array_index => $array_index,
-			 -parameters => $parameters,
-			 -module => $module,
-			 -stderr_file => $stderr_file,
-			 -stdout_file => $stdout_file,
-			 -retry_count => $retry_count,
-			 -adaptor => $self);
+  while($sth->fetch) {
+    push @jobs, Bio::EnsEMBL::Pipeline::Job->new
+      (-input_id => $input_id,
+       -taskname => $taskname,
+       -module => $module,
+       -dbID => $job_id,
+       -submission_id => $submission_id,
+       -job_name => $job_name,
+       -array_index => $array_index,
+       -parameters => $parameters,
+       -module => $module,
+       -stderr_file => $stderr_file,
+       -stdout_file => $stdout_file,
+       -retry_count => $retry_count,
+       -adaptor => $self);
   }
 
   $sth->finish();
@@ -390,11 +387,11 @@ sub list_current_status {
 
   my $result = [];
   my ( $job_id, $input_id, $taskname, $max_status );
-	$sth->bind_columns(\$job_id, \$input_id, \$taskname, \$max_status);
+  $sth->bind_columns(\$job_id, \$input_id, \$taskname, \$max_status);
   while($sth->fetch() ) {
-		my ($seqnum, $timestamp, $status) = split(':', $max_status);
+    my ($seqnum, $timestamp, $status) = split(':', $max_status);
     push( @$result,
-	    [ $job_id, $taskname, $input_id,  $status, $timestamp ]);
+	  [ $job_id, $taskname, $input_id,  $status, $timestamp ]);
   }
 
   $sth->finish();
@@ -420,8 +417,8 @@ sub update_status {
   my $job = shift;
   my $status = shift;
 
-	$self->throw('status argument is required') if(!$status);
-	$self->throw('job must be stored in database') if(!$job->dbID);
+  $self->throw('status argument is required') if(!$status);
+  $self->throw('job must be stored in database') if(!$job->dbID);
 
   my $query =
     "INSERT INTO job_status (job_id, time, status)
@@ -448,13 +445,13 @@ sub update_status {
 
 sub update {
   my $self = shift;
-	my $job  = shift;
+  my $job  = shift;
 
   $self->throw('Cannot update job that does not have dbID') if(!$job->dbID);
 
-	my $sth = $self->prepare(
-		'UPDATE job SET taskname = ?,
-                    input_id = ?,
+  my $sth = $self->prepare(
+	  'UPDATE job SET taskname = ?,
+                          input_id = ?,
 	                  submission_id = ?,
 	                  job_name = ?,
 	                  array_index = ?,
@@ -462,21 +459,21 @@ sub update {
 	                  module = ?,
 	                  stderr_file = ?,
 	                  stdout_file = ?,
-                    retry_count = ?
-    WHERE job_id = ?');
+                          retry_count = ?
+           WHERE job_id = ?');
 
-	$sth->execute($job->taskname,
-								$job->input_id,
-								$job->submission_id,
-								$job->job_name,
-								$job->array_index,
-								$job->parameters,
-								$job->module,
-								$job->stderr_file,
-								$job->stdout_file,
-								$job->retry_count,
-							$job->dbID);
-
+  $sth->execute($job->taskname,
+		$job->input_id,
+		$job->submission_id,
+		$job->job_name,
+		$job->array_index,
+		$job->parameters,
+		$job->module,
+		$job->stderr_file,
+		$job->stdout_file,
+		$job->retry_count,
+		$job->dbID);
+  
   $sth->finish();
 }
 
