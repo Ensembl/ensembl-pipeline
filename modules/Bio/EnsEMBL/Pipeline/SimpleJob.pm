@@ -75,6 +75,8 @@ use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
+use Bio::EnsEMBL::Pipeline::Runnable::TransferClone;
+use Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
 
@@ -163,17 +165,14 @@ sub run {
     my ($self) = @_;
 
     my $status = $self->set_status("RUNNING");
-    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
 
     $self->runnable->run;
 
     my $status = $self->set_status("DONE");
-    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
 
     $self->store     ($self);
 
     my $status = $self->set_status("STORED_OUTPUT");
-    print("Status for job [" . $self->id . "] set to " . $status->status . "\n");
 }
 
 =head2 output
@@ -442,6 +441,74 @@ sub _dbobj {
     return $self->jobobj->_dbobj($arg);
 }
 
+
+
+
+=head2 stdout_file
+
+  Title   : stdout_file
+  Usage   : my $file = $self->stdout_file
+  Function: Get/set method for stdout.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stdout_file {
+    my ($self,$arg) = @_;
+
+    return $self->jobobj->stdout_file($arg);
+}
+
+=head2 stderr_file
+
+  Title   : stderr_file
+  Usage   : my $file = $self->stderr_file
+  Function: Get/set method for stderr.
+  Returns : string
+  Args    : string
+
+=cut
+
+sub stderr_file {
+    my ($self,$arg) = @_;
+
+    return $self->jobobj->stderr_file($arg);
+}
+
+=head2 output_file
+
+  Title   : output_file
+  Usage   : my $file = $self->output_file
+  Function: Get/set method for output
+  Returns : string
+  Args    : string
+
+=cut
+
+sub output_file {
+    my ($self,$arg) = @_;
+
+    return $self->jobobj->output_file($arg);
+
+}
+
+
+=head2 input_object_file
+
+  Title   : intput_object_file
+  Usage   : my $file = $self->input_object_file
+  Function: Get/set method for the input object file
+  Returns : string
+  Args    : string
+
+=cut
+
+sub input_object_file {
+    my ($self,$arg) = @_;
+
+    return $self->jobobj->input_object_file($arg);
+}
 
 1;
 

@@ -17,7 +17,8 @@ Bio::EnsEMBL::Pipeline::Analysis.pm - Stores details of an analysis run
 
 =head1 SYNOPSIS
 
-    my $obj    = new Bio::EnsEMBL::Analysis::Analysis(-db              => $db,
+    my $obj    = new Bio::EnsEMBL::Analysis::Analysis(-id              => $id,
+						      -db              => $db,
 						      -db_version      => $db_version,
 						      -db_file         => $db_file,
 						      -program         => $program,
@@ -71,20 +72,20 @@ sub _initialize {
   my ($id,$db,$db_version,$db_file,$program,$program_version,$program_file,
       $gff_source,$gff_feature,$module,$module_version,$parameters,$created) = 
 
-      $self->_rearrange([qw(ID
-			    DB
-			    DB_VERSION
-			    DB_FILE
-			    PROGRAM
-			    PROGRAM_VERSION
-			    PROGRAM_FILE
-			    GFF_SOURCE
-			    GFF_FEATURE
-			    MODULE
-			    MODULE_VERSION
-			    PARAMETERS
-			    CREATED
-			    )],@args);
+	  $self->_rearrange([qw(ID
+				DB
+				DB_VERSION
+				DB_FILE
+				PROGRAM
+				PROGRAM_VERSION
+				PROGRAM_FILE
+				GFF_SOURCE
+				GFF_FEATURE
+				MODULE
+				MODULE_VERSION
+				PARAMETERS
+				CREATED
+				)],@args);
 
   $self->id             ($id);
   $self->db             ($db);
@@ -120,7 +121,6 @@ sub id {
     if (defined($arg)) {
 	$self->{_id} = $arg;
     }
-
     return $self->{_id};
 }
 
