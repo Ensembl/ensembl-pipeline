@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
 
 # config file; parameters searched for here if not passed in as @args
@@ -207,22 +208,28 @@ sub estgene_vc{
 
 sub ensembl_genes{
   my ( $self, @genes ) = @_;
+  unless( $self->{_ensembl_genes} ){
+    $self->{_ensembl_genes} =[];
+  }
   if ( @genes ){
     $genes[0]->isa("Bio::EnsEMBL::Gene") || $self->throw("$genes[0] is not a Bio::EnsEMBL::Gene");
-    push ( @{ $self->{'_ensembl_genes'} }, @genes );
+    push ( @{ $self->{_ensembl_genes} }, @genes );
   }
-  return @{ $self->{'_ensembl_genes'} };
+  return @{ $self->{_ensembl_genes} };
 }
 
 #############################################################
 
 sub estgenes{
   my ( $self, @genes ) = @_;
+  unless( $self->{_estgenes} ){
+    $self->{_estgenes} =[];
+  }
   if ( @genes ){
     $genes[0]->isa("Bio::EnsEMBL::Gene") || $self->throw("$genes[0] is not a Bio::EnsEMBL::Gene");
-    push ( @{ $self->{'_estgenes'} }, @genes );
+    push ( @{ $self->{_estgenes} }, @genes );
   }
-  return @{ $self->{'_estgenes'} };
+  return @{ $self->{_estgenes} };
 }
 
 #########################################################################
@@ -279,22 +286,49 @@ sub fetch_input {
 sub run{
   my ($self,@args) = @_;
 
-  # get ensembl genes (from GeneBuilder)
-  $self->ensembl_genes( $self->ensembl_vc->get_Genes_by_Type( $ENSEMBL_TYPE, 'evidence' ) );
-  
   # get estgenes ( from EST_GeneBuilder )
-  $self->estgenes( $self->estgene_vc->get_Genes_by_Type( $ESTGENE_TYPE, 'evidence' ) ); 
+  $self->estgenes($self->estgene_vc->get_Genes_by_Type( $ESTGENE_TYPE, 'evidence' ));
+
+  # get ensembl genes (from GeneBuilder)
+  my @ensembl_genes = $self->ensembl_vc->get_Genes_by_Type( $ENSEMBL_TYPE, 'evidence' );
+
+  # if there no genes, we finish a bit earlier
+  unless ( $self->estgenes ){
+    unless (@ensembl_genes){
+      print STDERR "no genes found, leaving...\n";
+      exit(0);
+    }
+    print STDERR "No estgenes found, writin ensembl genes as they are\n";
+    my @transcripts;
+    foreach my $gene (@ensembl_genes){
+      push(@transcripts, $gene->each_Transcript);
+    }
+    my @newgenes = $self->_make_Genes(\@transcripts);
+    my @remapped = $self->_remap_Genes(\@newgenes);
+    $self->output(@remapped);
+    return;
+  }
+  
+  # need to clone all ensembl genes, as their transcripts may share exon objects
+  # which makes it dangerous when modifying exon coordinates
+  my @cloned_ensembl_genes;
+  foreach my $gene (@ensembl_genes){
+    my $newgene = $self->_clone_Gene($gene);
+    push( @cloned_ensembl_genes, $newgene);
+  }
+  $self->ensembl_genes( @cloned_ensembl_genes );
   
   # store the original transcripts, just for the numbers
   my @original_ens_transcripts;
   foreach my $gene ( $self->ensembl_genes ){
     my @transcripts = $gene->each_Transcript;
+  TRAN1:
     foreach my $transcript (@transcripts){
       $self->_transcript_Type($transcript,$ENSEMBL_TYPE);
       my $valid = $self->_check_Transcript($transcript);
       unless ($valid == 1){
 	print STDERR "skipping this transcript\n";
-	next;
+	next TRAN1;
       }
       push (  @original_ens_transcripts, $transcript );
     }
@@ -302,12 +336,13 @@ sub run{
   my @original_est_transcripts;
   foreach my $gene ( $self->estgenes ){
     my @transcripts = $gene->each_Transcript;
+  TRAN2:
     foreach my $transcript (@transcripts){
       $self->_transcript_Type($transcript,$ESTGENE_TYPE);
       my $valid = $self->_check_Transcript($transcript);
       unless ($valid == 1){
 	print STDERR "skipping this transcript\n";
-	next;
+	next TRAN2;
       }
       push (  @original_est_transcripts, $transcript );
     }
@@ -397,17 +432,21 @@ sub run{
   my $count = 0;
   foreach my $gene (@newgenes){
     $count++;
-    print STDERR "gene $count:\n";
+    print STDERR "gene $count: ".$gene->type."\n";
     foreach my $transcript ($gene->each_Transcript){
       $self->_print_Transcript($transcript);
     }
   }
 
+  print STDERR scalar(@newgenes)." genes 2b remapped\n";
   # remap them to raw contig coordinates
   my @remapped = $self->_remap_Genes(\@newgenes);
-
+  print STDERR scalar(@remapped)." genes remapped\n";
+  
   # store the genes
   $self->output(@remapped);
+  print STDERR scalar($self->output)." stored, to be written on the db\n";
+
 
   return @remapped;
 
@@ -616,7 +655,7 @@ sub _pair_Transcripts{
 			   } @est_transcripts;
   
 
-  ###### LOOK FOR ESTs THAT EXTEND UTRs
+  ###### LOOK FOR ESTGENES THAT EXTEND UTRs
 
   # matrix holding the number and length of exon overlap for each pair of transcripts
   my $overlap_number_matrix;
@@ -697,7 +736,8 @@ sub _pair_Transcripts{
     # try to merge it, if succeeded, mark the chosen one and leave the rest
   MODIFY:
     for (my $i = 0; $i< scalar(@sorted_lists); $i++){
-	my $est_tran = $sorted_lists[$i][3];
+      print STDERR "trying to modify ".$ens_tran->dbID."\n";
+      my $est_tran = $sorted_lists[$i][3];
 	unless( $used_est_transcript{ $est_tran } && $used_est_transcript{ $est_tran } == 1){
 	    my $modified;
 	    ( $ens_tran, $modified ) = $self->_extend_UTRs($ens_tran,$est_tran);
@@ -709,6 +749,7 @@ sub _pair_Transcripts{
 	     }
 	 }
      }
+
   }  # end of ENS_TRANSCRIPT
  
   ###### LOOK FOR POSSIBLE ALTERNATIVE TRANSCRIPTS
@@ -735,36 +776,49 @@ sub _pair_Transcripts{
 	  my $similar_protein = 0;
 	  my $exon_in_intron  = 0;
 	  my $exact_merge     = 0;
+	  my $fuzzy_merge     = 0;
 
+	  # check first it does not merge with anything in the cluster
+	  foreach my $ens_tran ( @ens_transcripts ){
+	    my $comparator = new Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
+	    $exact_merge     = $comparator->_test_for_semiexact_Merge($est_tran, $ens_tran);
+	    $fuzzy_merge     = $comparator->_test_for_fuzzy_semiexact_Merge($est_tran, $ens_tran);
+	    if ($exact_merge == 1){
+	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges exactly with an ensembl transcript, skipping it\n";
+	      next CANDIDATE;
+	    }
+	    if ( $fuzzy_merge == 1){
+	      print STDERR "est transcript ".$est_tran->dbID." is redundant, it merges 'fuzzily' with an ensembl transcript, skipping it\n";
+	      next CANDIDATE;
+	    }
+	  }
 	  
 	  foreach my $ens_tran ( @ens_transcripts ){
-	      $one_exon_shared = $self->_check_exact_exon_Match( $est_tran, $ens_tran);
-	      $similar_protein = $self->_check_protein_Match(    $est_tran, $ens_tran);
-	      $exon_in_intron  = $self->_check_exon_Skipping( $est_tran, $ens_tran);
-	      $exact_merge     = $self->_test_for_semiexact_Merge(   $est_tran, $ens_tran);
-	      
-	      print "Comparing\n";
-	      $self->_print_Transcript($est_tran);
-	      $self->_print_Transcript($ens_tran);
-	      print STDERR "shared_exon    : $one_exon_shared\n";
-	      print STDERR "similar protein: $similar_protein\n";
-	      print STDERR "exon_in_intron : $exon_in_intron\n";
-	      print STDERR "exact_merge    : $exact_merge\n";
-	      
-	      ## PROBABLY should check that it doesn't merge with any ens_tran before accepting it
-
-	      print STDERR "not using the protein info\n";
-	      if ( $one_exon_shared == 1 
-		   #&& $similar_protein == 1
-		   && $exon_in_intron  == 1
-		   && $exact_merge     == 0 
-		   ){
-		  print STDERR "BINGO, and ISOFORM found !!\n";
-		  push ( @accepted_isoforms, $est_tran );
-		  next CANDIDATE; 
-	      }
+	    $one_exon_shared = $self->_check_exact_exon_Match(  $est_tran, $ens_tran);
+	    $similar_protein = $self->_check_protein_Match(     $est_tran, $ens_tran);
+	    $exon_in_intron  = $self->_check_exon_Skipping(     $est_tran, $ens_tran);
+	    #$exact_merge     = $self->_test_for_semiexact_Merge($est_tran, $ens_tran);
+	    
+	    print "Comparing\n";
+	    $self->_print_Transcript($est_tran);
+	    $self->_print_Transcript($ens_tran);
+	    print STDERR "shared_exon    : $one_exon_shared\n";
+	    print STDERR "similar protein: $similar_protein\n";
+	    print STDERR "exon_in_intron : $exon_in_intron\n";
+	    #print STDERR "exact_merge    : $exact_merge\n";
+	    
+	    print STDERR "not using the protein info\n";
+	    if ( $one_exon_shared == 1 
+		 #&& $similar_protein == 1
+		 && $exon_in_intron  == 1
+		 #&& $exact_merge     == 0 
+	       ){
+	      print STDERR "BINGO, and ISOFORM found !!\n";
+	      push ( @accepted_isoforms, $est_tran );
+	      next CANDIDATE; 
+	    }
 	  }
-      }      
+	} # end of CANDIDATE 
   }  # end of 'if (@candidates)'
   else{
       # nothing to do then
@@ -912,13 +966,86 @@ sub _print_Transcript{
     print $exon->start."-".$exon->end."[".$exon->phase.",".$exon->end_phase."] ";
   }
   print STDERR "\n";
-  print STDERR "Translation : ".$transcript->translation."\n";
+  #print STDERR "Translation : ".$transcript->translation."\n";
   print STDERR "translation start exon: ".
     $transcript->translation->start_exon->start."-".$transcript->translation->start_exon->end.
       " start: ".$transcript->translation->start."\n";
   print STDERR "translation end exon: ".
     $transcript->translation->end_exon->start."-".$transcript->translation->end_exon->end.
       " end: ".$transcript->translation->end."\n";
+}
+
+#########################################################################
+
+sub _clone_Gene{
+  my ($self,$gene) = @_;
+  
+  my $newgene = new Bio::EnsEMBL::Gene;
+  $newgene->type( $gene->type);
+  $newgene->dbID($gene->dbID);
+  foreach my $transcript ($gene->each_Transcript){
+    my $newtranscript = $self->_clone_Transcript($transcript);
+    $newgene->add_Transcript($newtranscript);
+  }
+  return $newgene;
+}
+
+#########################################################################
+
+sub _clone_Transcript{
+  my ($self,$transcript) = @_;
+  
+  #print STDERR "Cloning:\n";
+  #$self->_print_Transcript($transcript);
+  my $newtranscript  = new Bio::EnsEMBL::Transcript;
+  my $newtranslation = new Bio::EnsEMBL::Translation;
+  
+  my $translation_start_exon = $transcript->translation->start_exon;
+  my $translation_end_exon   = $transcript->translation->end_exon; 
+  
+  foreach my $exon ( $transcript->get_all_Exons ){
+    my $newexon = $self->_clone_Exon($exon);
+    if ($exon == $translation_start_exon){
+      $newtranslation->start_exon($newexon);
+      $newtranslation->start($transcript->translation->start);
+    }
+    if ($exon == $translation_end_exon){
+      $newtranslation->end_exon($newexon);
+      $newtranslation->end($transcript->translation->end);
+    }
+    $newtranscript->add_Exon($newexon);
+  }
+  #$newtranscript->sort;
+  $newtranscript->dbID($transcript->dbID);
+  $self->_transcript_Type($newtranscript,$self->_transcript_Type($transcript));
+  $newtranscript->translation($newtranslation);
+  
+  #print STDERR "Cloning Result:\n";
+  #$self->_print_Transcript($newtranscript);
+
+  return $newtranscript;
+}
+
+#########################################################################
+
+sub _clone_Exon{
+  my ($self,$exon) = @_;
+  my $newexon = new Bio::EnsEMBL::Exon;
+  $newexon->start      ($exon->start);
+  $newexon->end        ($exon->end);
+  $newexon->phase      ($exon->phase);
+  $newexon->end_phase  ($exon->end_phase);
+  $newexon->strand     ($exon->strand);
+  $newexon->dbID       ($exon->dbID);
+  $newexon->contig_id  ($exon->contig_id);
+  $newexon->sticky_rank($exon->sticky_rank);
+  $newexon->seqname    ($exon->seqname);
+  $newexon->attach_seq ($self->ensembl_vc->primary_seq);
+
+  foreach my $evidence ( $exon->each_Supporting_Feature ){
+    $newexon->add_Supporting_Feature( $evidence );
+  }
+  return $newexon;
 }
 
 #########################################################################
@@ -1310,7 +1437,121 @@ sub _test_for_semiexact_Merge{
   
   return $merge;
 }
+
+#########################################################################
+# this function checks whether two transcripts merge
+# with fuzzy exon matches: there is consecutive exon overlap 
+# but there are mismatches of 2 base allowed at the edges of any exon pair
+#
+# Why 2 bases: 2 bases is perhaps not meaningful enough to be considered
+# a biological difference, and it is possibly an artifact of any of the
+# analysis previously run: genomewise, est2genome,... it is more likely to
+# happen 
+
+sub _test_for_fuzzy_semiexact_Merge{
+  my ($self,$est_tran,$ens_tran) = @_;
   
+  my @exons1 = $est_tran->get_all_Exons;
+  my @exons2 = $ens_tran->get_all_Exons;	
+  
+  @exons1 = sort {$a->start <=> $b->start} @exons1;
+  @exons2 = sort {$a->start <=> $b->start} @exons2;
+
+  my $foundlink = 0; # flag that gets set when starting to link exons
+  my $start     = 0; # start looking at the first one
+  my $merge     = 0; # =1 if they merge
+  
+ EXON1:
+  for (my $j=0; $j<=$#exons1; $j++) {
+      
+    EXON2:
+      for (my $k=$start; $k<=$#exons2; $k++){
+	#print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
+	#  " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+	
+	  # we allow some mismatches at the extremities
+	  #                        ____     ____     ___   
+	  #              exons1   |____|---|____|---|___|  $j
+	  #                         ___     ____     ____  
+	  #              exons2    |___|---|____|---|____|  $k
+	  
+	  # if there is no overlap, go to the next EXON2
+	  if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
+	    #print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
+	    next EXON2;
+	  }
+	  # if there is no overlap and we had found a link, there is no merge
+	  if ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
+	      #print STDERR "foundlink = 1 and no overlap --> leaving\n";
+	      $merge = 0;
+	      last EXON1;
+	  }	
+	  
+	  # the first exon can have a mismatch ( any number of bases) in the start
+	  # and a 2base mismatch at the end
+	  if ( ($k == 0 || $j == 0) && abs($exons1[$j]->end - $exons2[$k]->end)<3 ){
+	      
+	      # but if it is also the last exon
+	      if ( ( ( $k == 0 && $k == $#exons2 )   || 
+		     ( $j == 0 && $j == $#exons1 ) ) ){
+		  
+		  # we force it to match the start (with a mismatch of 2bases allowed)
+		  if ( abs($exons1[$j]->start - $exons2[$k]->start)< 3 ){
+		      $foundlink  = 1;
+		      $merge      = 1;
+		      #print STDERR "merged single exon transcript\n";
+		      last EXON1;
+		  }
+		  # we call it a non-merge
+		  else{
+		      $foundlink = 0;
+		      $merge     = 0;
+		      #print STDERR "non-merged single exon transcript\n";
+		      last EXON1;
+		  }
+	      }
+	      else{
+		  #else, we have a link
+		  $foundlink = 1;
+		  $start = $k+1;
+		  #print STDERR "found a link\n";
+		  next EXON1;
+	      }
+	  }
+	  # the last one can have any mismatch on the end
+	  # but must have a match at the start (wiht 2bases mismatch allowed)
+	  elsif ( ( $k == $#exons2 || $j == $#exons1 ) &&
+		  ( $foundlink == 1 )                  &&
+		  ( abs($exons1[$j]->start - $exons2[$k]->start)<3 ) 
+		  ){
+	      #print STDERR "link completed, merged transcripts\n";
+	      $merge = 1;
+	      last EXON1;
+	  }
+	# the middle one must have exact matches
+	# (up to a 2base mismatch)
+	elsif ( ($k != 0 && $k != $#exons2) && 
+		($j != 0 && $j != $#exons1) &&
+		( $foundlink == 1)          &&
+		abs( $exons1[$j]->start - $exons2[$k]->start )<3 &&
+		abs( $exons1[$j]->end   - $exons2[$k]->end   )<3
+		  ){
+	      $start = $k+1;
+	      #print STDERR "continue link\n";
+	      next EXON1;
+	  }
+
+      } # end of EXON2 
+    
+      if ($foundlink == 0){
+	  $start = 0;
+      }
+      
+  }   # end of EXON1      
+  
+  return $merge;
+}
+
 #########################################################################
 # this gets the left most start coordinate for the transcript, regardless of the strand
 
@@ -1809,26 +2050,6 @@ sub _add_3prime_exons{
 }
 
 #########################################################################
-
-sub _clone_Exon{
-  my ($self,$old_exon) = @_;
-  my $new_exon = new Bio::EnsEMBL::Exon;
-  $new_exon->start( $old_exon->start );
-  $new_exon->end( $old_exon->end );
-  $new_exon->strand( $old_exon->strand );
-  $new_exon->phase( $old_exon->phase ); # this should be -1 as is in UTR
-  $new_exon->contig_id( $old_exon->contig_id );
-  $new_exon->attach_seq($self->vc);
-  
-  # transfer supporting evidence
-  foreach my $evidence ( $old_exon->each_Supporting_Feature ){
-    $new_exon->add_Supporting_Feature( $evidence );
-  }
-  return $new_exon;
-}
-
-
-#########################################################################
 #
 # METHODS INVOLVED IN WRITTING THE RESULTS
 #
@@ -1854,6 +2075,7 @@ sub _make_Genes{
   }
   elsif(scalar(@analyses) == 1){
     $analysis_obj = $analyses[0];
+    print STDERR "make_Genes():found one analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
   }
   else{
     # make a new analysis object
@@ -1866,6 +2088,8 @@ sub _make_Genes{
 					        -logic_name      => $genetype,
 					        -module          => 'GeneCombiner',
 					      );
+    print STDERR "make_Genes():Created an analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
+    
   }
 
   $self->_analysis($analysis_obj);
@@ -1882,6 +2106,10 @@ sub _make_Genes{
     push(@selected_transcripts,$transcript);
   } 
   my @genes = $self->_cluster_into_Genes(@transcripts);
+  foreach my $gene ( @genes ){
+    $gene->type($genetype);
+    $gene->analysis($analysis_obj);
+  }
 
   return @genes;
 }
@@ -1906,10 +2134,10 @@ sub _check_Transcript{
     
     # check contig consistency
     if ( !( $exons[$i-1]->seqname eq $exons[$i]->seqname ) ){
-	print STDERR "transcript ".$transcript->dbID." is partly outside the contig\n";
+      print STDERR "transcript ".$transcript->dbID." is partly outside the contig\n";
       return 0;
     }
-}
+  }
 
   my $translation = $transcript->translation;
   #$translation->temporary_id($contig->id . ".$genetype.$count");
@@ -1920,7 +2148,14 @@ sub _check_Transcript{
     $sequence = $transcript->translate;
   };
   unless ( $sequence ){
-    print STDERR "TRANSCRIPT WITHOUT A TRANSLATION!!\n";
+    my $id;
+    if ( $transcript->dbID ){
+      $id = $transcript->dbID;
+    }
+    else{
+      $id = 'no-dbID';
+    }
+    print STDERR "TRANSCRIPT WITHOUT A TRANSLATION: $id !!\n";
     return 0;
   }
   if ( $sequence ){
@@ -1964,21 +2199,82 @@ sub _remap_Genes {
   my ($self,$genes) = @_;
   my @genes = @$genes;
   my @new_genes;
-  my $contig = $self->vc;
+
+  my $final_db  = $self->final_db; 
+  my $final_gpa = $self->final_db->get_StaticGoldenPathAdaptor();
+  my $chrid     = $self->input_id;
+  print STDERR "input_id: $chrid\n";
+  if ( !( $chrid =~ s/\.(.*)-(.*)// ) ){
+    $self->throw("Not a valid input_id... $chrid");
+  }
+  $chrid       =~ s/\.(.*)-(.*)//;
+  my $chrstart = $1;
+  my $chrend   = $2;
+  my $final_vc = $final_gpa->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $genetype = $FINAL_TYPE;
+
+
+
+  ## sort out analysis
+#  unless ($genetype){
+#    $self->throw("No genetype set, you must set variable FINAL_TYPE in GeneCombinerConf");
+#  }
+#  my $anaAdaptor = $final_db->get_AnalysisAdaptor;
   
-GENE:  
+#  my $anal_logic_name = $genetype;
+  
+#  if (defined $self->analysis){
+#    #use logic name from $self->analysis object is possible, else take $genetype;
+#    $anal_logic_name = ($self->analysis->logic_name)     ?       $self->analysis->logic_name : $genetype     ;
+#  }
+  
+#  my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
+  
+#  my $analysis_obj;
+  
+#  if(scalar(@analyses) > 1){
+#    $self->throw("panic! > 1 analysis for $genetype\n");
+#  }
+#  elsif(scalar(@analyses) == 1){
+#    $analysis_obj = $analyses[0];
+#    print STDERR "found one analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
+#  }
+#  else{
+#    # make a new analysis object
+#    $analysis_obj = new Bio::EnsEMBL::Analysis
+#      (-db              => 'NULL',
+#       -db_version      => 1,
+#       -program         => $genetype,
+#       -program_version => 1,
+#       -gff_source      => $genetype,
+#       -gff_feature     => 'gene',
+#       -logic_name      => $genetype,
+#       -module          => 'GeneCombiner',
+#      );
+#     print STDERR "Created an analysis: $analysis_obj : ".$analysis_obj->logic_name." : ".$analysis_obj->module."\n";
+    
+#  }
+
+ 
+  
+ GENE:  
   foreach my $gene (@genes) {
     
- #   eval {
-#      my $genetype = $gene->type;
-#      my $new_gene = $contig->convert_Gene_to_raw_contig($gene);
+    eval {
+      $gene->analysis($self->_analysis);
+      $gene->type($genetype);
+      #print STDERR "about to convert a $gene\n";
+      #print STDERR "with $final_vc, ".$final_vc->length."\n";
+
+      my $new_gene = $final_vc->convert_Gene_to_raw_contig($gene);
+      push( @new_genes, $new_gene);
       
-#      # need to explicitly add back genetype and analysis.
-#      $new_gene->type($genetype);
-#      $new_gene->analysis($gene->analysis);
+      # need to explicitly add back genetype and analysis.
+      #$new_gene->type($genetype);
+      #$new_gene->analysis($gene->analysis);
       
-#      # DO WE REALLY NEED TO DO THIS???
-#      # sort out supporting feature coordinates
+      #      # DO WE REALLY NEED TO DO THIS???
+      #      # sort out supporting feature coordinates
 #      foreach my $tran ($new_gene->each_Transcript) {
 #	foreach my $exon($tran->get_all_Exons) {
 #	  foreach my $sf ($exon->each_Supporting_Feature) {
@@ -2056,8 +2352,9 @@ GENE:
 #      # if we get to here, the gene is fine, so push it onto the array to be returned
 #      push( @new_genes, $new_gene );
       
-#    };
+    };
     
+   
     # did we throw exceptions?
     if ($@) {
       print STDERR "Couldn't reverse map gene:  [$@]\n";
@@ -2317,10 +2614,11 @@ sub _analysis {
 
 
 sub write_output {
-  my($self, @genes) = @_;
+  my ($self, @genes) = @_;
   unless (@genes){
     @genes = $self->output;
   }
+  #print STDERR "about to write ".scalar(@genes)." into the db\n";
 
   # dbobj holds a reference to FINAL_DB
   my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
