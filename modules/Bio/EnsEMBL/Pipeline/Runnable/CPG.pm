@@ -106,11 +106,28 @@ sub new {
 							   @args);
   
   $self->clone($sequence) if ($sequence);       
-  
-  if ($cpg) {   
-    $self->cpg($cpg); }
-  else {   
-    $self->cpg($self->locate_executable('cpg')); }
+
+  my $bindir = $::pipeConf{'bindir'} || undef;
+
+  if (-x $cpg) {
+    # passed from RunnableDB (full path assumed)
+    $self->cpg($cpg);
+  }
+  elsif ($::pipeConf{'bin_CPG'} && -x ($cpg = "$::pipeConf{'bin_CPG'}")) {
+    $self->cpg($cpg);
+  }
+  elsif ($bindir && -x ($cpg = "$bindir/cpg")) {
+    $self->cpg($cpg);
+    }
+  else {
+    # search shell $PATH
+    eval {
+      $self->cpg($self->locate_executable('cpg'));
+    };
+    if ($@) {
+      $self->throw("Can't find executable cpg");
+    }
+  }
   
   if (defined $len && $len >=0 ) { 
     $self->min_length($len); }
