@@ -48,6 +48,8 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 use Bio::EnsEMBL::DBSQL::Obj;
 use Bio::EnsEMBL::DBLoader;
 
+use Bio::EnsEMBL::Analysis;
+
 use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::Object);
@@ -203,17 +205,17 @@ sub make_contig {
 sub write_analysis {
     my ($tdb) = @_;
 
-    my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (-db              => '__NONE__',
-							  -db_version      => '__NONE__',
-							  -db_file         => '__NONE__',
-							  -program         => 'exon_pair_test',
-							  -program_version => -1,
-							  -program_file    => '__NONE__',
-							  -module          => 'Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair.pm',
-							  -module_version  => 1,
-							  -gff_source      => 'exon_pair',
-							  -gff_feature     => 'prediction',
-							  -parameters      => "");
+    my $analysis = new Bio::EnsEMBL::Analysis  (-db              => '__NONE__',
+						-db_version      => '__NONE__',
+						-db_file         => '__NONE__',
+						-program         => 'exon_pair_test',
+						-program_version => -1,
+						-program_file    => '__NONE__',
+						-module          => 'Bio::EnsEMBL::Pipeline::Runnable::CloneExonPair.pm',
+						-module_version  => 1,
+						-gff_source      => 'exon_pair',
+						-gff_feature     => 'prediction',
+						-parameters      => "");
     
     
     $tdb->write_Analysis($analysis);

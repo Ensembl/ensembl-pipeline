@@ -80,7 +80,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs;
                 object
     Args    :   -db:           A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:        Contig input id (required), or filename
-                -analysis:        A Bio::EnsEMBL::Pipeline::Analysis (optional)
+                -analysis:        A Bio::EnsEMBL::Analysis (optional)
                 -estfile:         filename
                 -exonerate:       path to exonerate executable (optional)
                 -exonerate_args : string (optional) 

@@ -58,7 +58,7 @@ use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 

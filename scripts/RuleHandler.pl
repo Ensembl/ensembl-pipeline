@@ -53,7 +53,6 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule;
-use Bio::EnsEMBL::Pipeline::Analysis;
 
 my $goal;
 my @conditions;

@@ -28,7 +28,7 @@
 
  This object wraps Bio::EnsEMBL::Pipeline::Runnable::Waba to add
  functionality to read and write to databases.
- The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
+ The appropriate Bio::EnsEMBL::Analysis object must be passed for
  extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
  required for database access.
 
@@ -64,7 +64,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Waba object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
+                -analysis:  A Bio::EnsEMBL::Analysis
 
 =cut
 

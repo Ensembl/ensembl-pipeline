@@ -1222,7 +1222,6 @@ sub make_genes {
   my $contig = $self->vcontig;
   my @genes;
   
-#$self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Pipeline::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Pipeline::Analysis");
 $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
   foreach my $tmpf (@$results) {

@@ -211,7 +211,7 @@ sub analysis {
     my $self = shift;
     if (@_) {
         $self->{'_analysis'} = shift;
-        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))             || $self->throw("Input isn't a Bio::EnsEMBL::AnalysisI or Bio::EnsEMBL::Analysis");
+        ($self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis") || $self->{'_analysis'}->isa ("Bio::EnsEMBL::Analysis"))             || $self->throw("Input isn't a Bio::EnsEMBL::Analysis");
     }
     return $self->{'_analysis'};
 } 

@@ -28,7 +28,7 @@ Where the analysis id can be either a translation internal id or the location of
   to add functionality to read and write to databases.
   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
   The query sequence is provided through the input_id.
-  The appropriate Bio::EnsEMBL::Pipeline::Analysis object
+  The appropriate Bio::EnsEMBL::Analysis object
   must be passed for extraction of parameters.
 
 =head1 CONTACT
@@ -68,7 +68,7 @@ use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 

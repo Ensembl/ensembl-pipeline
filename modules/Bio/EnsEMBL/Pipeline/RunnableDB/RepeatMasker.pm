@@ -154,7 +154,7 @@ sub write_output{
     $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
   };
 
-  if ($@) {
+  if ($@ || !defined $contig) {
     print STDERR "Contig not found, skipping writing output to db: $@\n";
   }
 

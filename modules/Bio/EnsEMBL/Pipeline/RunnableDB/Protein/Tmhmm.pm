@@ -31,7 +31,7 @@
   to add functionality to read and write to databases.
   A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
   The query sequence is provided through the input_id.
-  The appropriate Bio::EnsEMBL::Pipeline::Analysis object
+  The appropriate Bio::EnsEMBL::Analysis object
   must be passed for extraction of parameters.
 
 
@@ -69,7 +69,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm;
  Returns  : a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm object
  Args     : -dbobj    :  a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
             -input_id :  input id
-            -analysis :  a Bio::EnsEMBL::Pipeline::Analysis
+            -analysis :  a Bio::EnsEMBL::Analysis
  Throws   :
 
 =cut

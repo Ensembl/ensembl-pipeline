@@ -36,7 +36,7 @@ $eponine->write_output(); #writes to DB
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::EponineTSS to add
 functionality to read and write to databases. The appropriate
-Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+Bio::EnsEMBL::Analysis object must be passed for extraction
 of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 is required for database access.
 
@@ -70,7 +70,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::EponineTSS object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
+                -analysis:  A Bio::EnsEMBL::Analysis
 
 =cut
 
