@@ -477,6 +477,9 @@ while (1) {
 	  if(UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')){
 	    print " fullfilled.\n" if $verbose;
 	    if ($rule->goalAnalysis->input_id_type ne 'ACCUMULATOR') {
+        if($anal->dbID == 5){
+          print STDERR "Can run ".$anal->logic_name."\n";
+        }
 	      $analHash{$anal->dbID} = $anal;
 	    }
 	  } else {
@@ -501,25 +504,25 @@ while (1) {
 	# number of jobs created. When $flushsize jobs have been stored
 	# send to LSF.
 	
-  my $current_jobs = $job_adaptor->fetch_hash_by_input_id($id);
- ANAL: for my $anal (values %analHash) {
-    
-	  my $result_flag = run_if_new($id,
-                                 $anal,
-                                 $current_jobs,
-                                 $local,
-                                 $verbose,
-                                 $output_dir,
-                                 $job_adaptor);
+        my $current_jobs = $job_adaptor->fetch_hash_by_input_id($id);
+      ANAL: for my $anal (values %analHash) {
+          
+          my $result_flag = run_if_new($id,
+                                       $anal,
+                                       $current_jobs,
+                                       $local,
+                                       $verbose,
+                                       $output_dir,
+                                       $job_adaptor);
 	  
-	  if ($result_flag == -1) {
-	    next JOBID;
-	  } elsif ($result_flag == 0) {
-	    next ANAL;
-	  } else { 
-	    $submitted++;
-	  }
-	}
+          if ($result_flag == -1) {
+            next JOBID;
+          } elsif ($result_flag == 0) {
+            next ANAL;
+          } else { 
+            $submitted++;
+          }
+        }
       }
     }
     
@@ -597,6 +600,9 @@ while (1) {
 sub run_if_new {
     my ($id, $anal, $current_jobs, $local, $verbose, $output_dir, $job_adaptor) = @_;
     my $flag;
+    if($anal->logic_name eq 'Genefinder'){
+      $verbose = 1;
+    }
     print "Checking analysis " . $anal->dbID . " ".$anal->logic_name."\n\n" if $verbose;
     # Check whether it is already running in the current_status table?
     my %current_jobs = %$current_jobs;
@@ -604,11 +610,11 @@ sub run_if_new {
     eval {
       if($current_jobs{$anal->dbID}){
         my $cj = $current_jobs{$anal->dbID};
-        # print "Comparing to current_job " . $cj->input_id . " " .
-        #                  $cj->analysis->dbID . " " .
-        #                  $cj->current_status->status . " " .
-        #                  $anal->dbID . "\n" if $verbose;
-        #             print STDERR "comparing ".$anal->dbID." to ".$cj->analysis->dbID."\n";
+        print "Comparing to current_job " . $cj->input_id . " " .
+                          $cj->analysis->dbID . " " .
+                          $cj->current_status->status . " " .
+                          $anal->dbID . "\n" if $verbose;
+        print STDERR "comparing ".$anal->dbID." to ".$cj->analysis->dbID."\n";
         my $status = $cj->current_status->status;
         if (($status eq 'FAILED' || $status eq 'AWOL')
             && $cj->can_retry) {
@@ -624,6 +630,7 @@ sub run_if_new {
               system($cmd);
             }
           }
+          $cj->set_status('CREATED');
           $cj->batch_runRemote;
           
           print "Retrying job\n" if $verbose;
