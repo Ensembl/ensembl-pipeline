@@ -89,11 +89,20 @@ sub get_chrlengths{
 					      -user   => $EST_REFDBUSER,
 					      -dbname => $EST_REFDBNAME,
 					     );
-  my $q = "SELECT c.name, max(a.chr_end) 
-           FROM   chromosome c, assembly a
-           WHERE  c.chromosome_id = a.chromosome_id
-           GROUP BY c.name";
-  
+#  my $q = "SELECT c.name, max(a.chr_end) 
+#           FROM   chromosome c, assembly a
+#           WHERE  c.chromosome_id = a.chromosome_id
+#           GROUP BY c.name";
+ 
+  my $q = "select distinct sr.name,sr.length 
+           from seq_region_attrib sra, 
+                attrib_type at,
+                seq_region sr 
+           where sra.seq_region_id = sr.seq_region_id and 
+                 sra.attrib_type_id = at.attrib_type_id and 
+                 at.code = \'toplevel\'";
+
+
   my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
   my $res = $sth->execute || $db->throw("can't execute: $q");
   
