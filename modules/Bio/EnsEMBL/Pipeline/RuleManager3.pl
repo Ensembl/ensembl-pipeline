@@ -88,6 +88,7 @@ my $verbose;
 my $rerun_sleep = 3600;
 my $overload_sleep = 300;
 my $db_sanity = 1; 
+my $help;
 
 GetOptions(
     'dbhost=s'      => \$dbhost,
@@ -104,8 +105,17 @@ GetOptions(
     'analysis=s@'   => \@analyses,
     'v!'            => \$verbose,
     'dbsanity!'     => \$db_sanity,
+    'h|help'	    => \$help,	   
 )
-or die ("Couldn't get options");
+or useage();
+
+if(!$dbhost || !$dbname || !$dbuser){
+  print STDERR " you must provide a host and a database name and a user".
+  " for you db connection\n";
+  $help = 1;
+}
+
+useage() if $help;
 
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
@@ -703,3 +713,65 @@ sub job_time_check{
   }
 
 }
+
+sub useage{
+	exec('perldoc', $0);
+	exit;
+}
+
+=pod
+
+=head1 NAME
+
+monitor
+
+=head1 SYNOPSIS
+
+Pipeline Monitor Script
+
+A Simple script using the Monitor.pm module to display information on the status of the pipeline.
+
+
+=head1 OPTIONS
+
+=head2 [DB Connection Details]
+
+   -dbhost     The host where the pipeline database is.
+   -dbport     The port.
+   -dbuser     The user to connect as.
+   -dbpass     The password to use.
+   -dbname   The database name.
+
+=head2 [Other Options]
+
+   -local run the pipeline locally and not using LSF
+   -idlist_file a path to a file containing a list of input ids to use
+   -runner path to a runner script (if you want to overide the setting
+				    in BatchQueue.pm)
+   -output_dir path to a output dir (if you want to overide the 
+				     setting in BatchQueue.pm)
+   -once only run through the RuleManager loop once
+   -shuffle before running though the loop shuffle the order of the 
+    input ids
+   -analysis only run with these analyses objects, can be logic_names or
+    analysis ids
+   -v verbose mode
+   -dbsanity peform some db sanity checks, can be switched of with 
+    -nodbsanity
+   
+-h or -help will print out the help again
+
+=head1 EXAMPLES
+
+
+
+
+=head1 SEE ALSO
+
+  Bio::EnsEMBL::Pipeline::Job
+  Bio::EnsEMBL::Pipeline::Config::General
+  Bio::EnsEMBL::Pipeline::Config::BatchQueue
+
+and also using_the_ensembl_pipeline.txt in the ensembl-docs cvs module
+
+=cut
