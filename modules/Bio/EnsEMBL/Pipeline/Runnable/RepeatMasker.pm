@@ -17,13 +17,28 @@
 Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
 
 =head1 SYNOPSIS
-
-
+#create and fill Bio::Seq object
+my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+my $seq = Bio::Seq->new();
+my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+$seq = $seqstream->next_seq();
+#create Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker object
+my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
+$repmask->workdir($workdir);
+$repmask->run();
+my @results = $repmask->output();
     
 =head1 DESCRIPTION
+RepeatMasker takes a Bio::Seq object and runs RepeatMaskerHum on it. The
+resulting .out file is parsed to produce a set of feature pairs.
+Arguments can be passed to RepeatMaskerHum through the run() method. 
 
 =head2 Methods:
-
+new($seq_obj)
+repeatmasker($path_to_RepeatMaskerHum)
+workdir($directory_name)
+run()
+output()
 
 =head1 CONTACT
 
@@ -53,6 +68,14 @@ use Data::Dumper;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::Object );
 
+=head2 new
+    Title   :   new
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
+    Function:   Initialises RepeatMasker object
+    Returns :   a RepeatMasker Object
+    Args    :   A Bio::Seq object
+
+=cut
 sub _initialize {
     my ($self,@args) = @_;
     my $make = $self->SUPER::_initialize(@_);    
@@ -90,6 +113,13 @@ sub filename {
     return $self->{_filename};
 }
 
+=head2 repeatmasker
+    Title   :   repeatmasker
+    Usage   :   $obj->repeatmasker('~humpub/scripts/RepeatMaskerHum');
+    Function:   Get/set method for the location of RepeatMaskerHum script
+    Args    :   File path (optional)
+    
+=cut
 sub repeatmasker {
     my ($self, $location) = @_;
     if ($location)
@@ -101,12 +131,19 @@ sub repeatmasker {
     return $self->{_repeatmasker};
 }
 
+=head2 workdir
+    Title   :   workdir
+    Usage   :   $obj->wordir('~humpub/temp');
+    Function:   Get/set method for the location of a directory to contain temp files
+    Args    :   File path (optional)
+    
+=cut
 sub workdir {
     my ($self, $directory) = @_;
     if ($directory)
     {
-        #mkdir ($directory) unless (-d $directory);
-        print "$directory doesn't exist\n" unless (-d $directory);
+        mkdir ($directory, '777') unless (-d $directory);
+        $self->throw ("$directory doesn't exist\n") unless (-d $directory);
         $self->{_workdir} = $directory;
     }
     return $self->{_workdir};
@@ -115,6 +152,14 @@ sub workdir {
 ###########
 # Analysis methods
 ##########
+=head2 run
+    Title   :  run
+    Usage   :   $obj->run($workdir, $args)
+    Function:   Runs RepeatMaskerHum script and creates array of featurepairs
+    Returns :   none
+    Args    :   optional $workdir and $args (e.g. '-ace' for ace file output)
+
+=cut
     
 sub run {
     my ($self, $dir, $args) = @_;
@@ -130,7 +175,7 @@ sub run {
     $self->run_repeatmasker($args);
     #parse output of repeat masker 
     $self->parse_repmask();
-    #$self->deletefiles();
+    $self->deletefiles();
 }
 
 sub run_repeatmasker {
@@ -230,7 +275,14 @@ sub _growfplist {
 ##############
 # input/output methods
 #############
+=head2 output
+    Title   :   output
+    Usage   :   obj->output()
+    Function:   Returns an array of feature pairs
+    Returns :   Returns an array of feature pairs
+    Args    :   none
 
+=cut
 sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
@@ -250,7 +302,11 @@ sub writefile {
 sub deletefiles {
     my ($self) = @_;
     #delete all analysis files? probably need to 'glob' or something
-    unlink ($self->filename);
+    @list = glob($self->filename."*");
+    foreach (@list)
+    {
+        unlink ($_) or $self->throw ("Coudln't delete $_ :$!");
+    }
 }
 
 sub checkdir {
