@@ -31,7 +31,7 @@ if ( $check ){
 }
 
 unless ( $refseq_mapping && $gene_id1 && $gene_id2 ){
-  print STDERR "Usage: $0 -file -gene_id1 -gene_id2\n";
+  print STDERR "Usage: $0 -refseq_mapping -gene_id1 -gene_id2\n";
   exit(0);
 }
 
