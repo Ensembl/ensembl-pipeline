@@ -49,6 +49,7 @@ use strict;
 require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
@@ -216,29 +217,69 @@ sub fetch_input {
 
     my @features;
     if ($::genebuild_conf{'bioperldb'}) {
+	  print STDERR "Fetching all similarity features\n";
+	  my @features  = $contig->get_all_SimilarityFeatures;
+
+	  # _select_features() to pick out the best HSPs with in a region.
+      my %selected_ids = $self->_select_features (@features); 
+
+	  my %bdbs;
+      foreach my $feat (@features){
+          if ($selected_ids{$feat->hseqname}){
+              my $bioperldb = $feat->analysis->db;
+              push (@{$bdbs{$bioperldb}},$feat);
+          }
+      }
+
       my $bpDBAdaptor = $self->bpDBAdaptor;
       my (@bioperldbs) = split /\,/,$::genebuild_conf{'supporting_databases'};
 
-      foreach my $bioperldb (@bioperldbs){
-
-		print STDERR "Fetching features with analysis_type: $bioperldb\n";
-		my @features  = $contig->get_all_SimilarityFeatures_above_score($bioperldb,10);
-		print STDERR "Number of features fetched : ".scalar(@features)."\n";
-
-		# _select_features() to pick out the best HSPs with in a region.
-		my @ids= $self->_select_features (@features);
+      MINIRUN:foreach my $bioperldb (@bioperldbs){
+		
+		print STDERR "Creating MiniGenewise for $bioperldb\n";
 
 		$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
-	
-		my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
-									       '-ids'        => \@ids,
-									       '-seqfetcher' => $self->seqfetcher,
-									       '-trim'       => 1);
-	
-	
-    	$self->runnable($runnable);
-      }
 
+		if ($::genebuild_conf{'skip_bmg'}) {
+
+			unless (defined @{$bdbs{$bioperldb}}){
+				print STDERR "Contig has no associated features in $bioperldb\n";
+				next MINIRUN;
+			}	
+				
+			my %scorehash;
+			foreach my $f (@{$bdbs{$bioperldb}}) {
+			print STDERR $f->hseqname."\n";
+      			if (!defined $scorehash{$f->hseqname} || $f->score > $scorehash{$f->hseqname})  {
+        			$scorehash{$f->hseqname} = $f->score;
+     			}
+    		}
+
+			my @forder = sort { $scorehash{$b} <=> $scorehash{$a}} keys %scorehash;
+
+			my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise('-genomic'    => $genseq,
+                                                                     '-features'   => \@{$bdbs{$bioperldb}},
+                                                                     '-seqfetcher' => $self->seqfetcher,
+                                                                     '-forder'     => \@forder,
+                                                                     '-endbias'    => 0);
+        	$self->runnable($runnable);
+			
+		}
+		else{
+ 
+                        my @ids;
+                        foreach my $f (@{$bdbs{$bioperldb}}){
+                                push (@ids, $f->hseqname);
+                        }
+ 
+                         my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+                                           '-ids'        => \@ids,
+                                           '-seqfetcher' => $self->seqfetcher,
+                                           '-trim'       => 1);
+                $self->runnable($runnable);
+ 
+		}
+      }
     }
     else {
       @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
@@ -265,6 +306,7 @@ sub fetch_input {
       
       $self->runnable($runnable);
     }
+
     # at present, we'll only ever have one ...
     $self->vc($contig);
 }     
@@ -284,7 +326,11 @@ sub run {
 
     #Now there is more than one...
     foreach my $runnable ($self->runnable) {
-      $runnable->run;
+		if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise")){
+			$runnable->minirun;
+		}else{
+      		$runnable->run;
+		}
     }
     
     $self->convert_output;
@@ -307,7 +353,7 @@ sub convert_output {
   my $trancount = 1;
   my $genetype;
   foreach my $runnable ($self->runnable) {
-    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
+    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise") || $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise")){
       $genetype = "similarity_genewise";
     }
     else{
@@ -580,33 +626,31 @@ sub bpDBAdaptor {
 
 sub _select_features {
 
-	my ($self,@features) = @_;
-	
-	@features= sort {
-		$a->strand<=> $b->strand
-			||
-		$a->start<=> $b->start
-		} @features;
+        my ($self,@features) = @_;
 
-	my @selected_hids;
- 
-    my $best_hit = @features[0];
- 
-    foreach my $feat (@features){
-		if ($feat->isa("Bio::EnsEMBL::FeaturePair") && defined($feat->hseqname)){ 
-          if ($feat->overlaps($best_hit,'strong')) {
-            if ($feat->score > $best_hit->score) {
-                $best_hit = $feat;
-            }
-          }else {
-            push (@selected_hids,$best_hit->hseqname);
-            $best_hit = $feat;
-          }
-		}
-    } 
+        @features= sort {
+                $a->strand<=> $b->strand
+                       ||
+                $a->start<=> $b->start
+        } @features;
 
-	return @selected_hids;
+        my %selected_ids;
+
+        my $best_hit = @features[0];
+        my $best_hit = @features[0];
+ 
+        foreach my $feat (@features){
+                if ($feat->overlaps($best_hit,'strong')) {
+                        if ($feat->score > $best_hit->score) {
+                                $best_hit = $feat;
+                        }
+                        }else {
+                                $selected_ids{$best_hit->hseqname} = 1;
+                                $best_hit = $feat;
+                        }
+        }
+ 
+        return %selected_ids;
 }
-
 
 1;
