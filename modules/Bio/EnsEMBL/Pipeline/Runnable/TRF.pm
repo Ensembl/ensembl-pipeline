@@ -167,6 +167,11 @@ sub query {
 
         # output has (equally annoyingly) parameters in the filename
         $self->results($self->filename . "." . join('.', @arg_list) . '.dat');
+        $self->file($self->results);
+        $self->file($self->filename . "." . join('.', @arg_list) . '.1.html');
+        $self->file($self->filename . "." . join('.', @arg_list) . '.1.txt.html');
+        $self->file($self->filename . "." . join('.', @arg_list) . '.2.html');
+        $self->file($self->filename . "." . join('.', @arg_list) . '.2.txt.html');
     }
     return $self->{'_query'};
 }
