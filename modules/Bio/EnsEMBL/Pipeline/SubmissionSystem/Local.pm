@@ -110,7 +110,6 @@ sub new {
 =cut
 
 sub submit {
-
   my $self = shift;
   my $job  = shift;
 
@@ -125,20 +124,18 @@ sub submit {
   #put the just received job onto the end of the queue
   push @{$self->{'_queue'}}, $job;
 
-  # if there aren't too many jobs executing take one off the start of the
-  # queue and run it
-  if ($children < $max_jobs) {
-
+  # if there aren't too many jobs executing take as many off the queue as
+  # possible
+  while(scalar(@{$self->{'_queue'}}) && ($children < $max_jobs)) {
     $self->_start_job(shift @{$self->{'_queue'}});
-
   }
-
 }
 
 
 sub sig_chld {
   $children--;
 }
+
 
 =head2 create_job
 
@@ -170,7 +167,6 @@ sub create_Job {
   $job_adaptor->store($job);
 
   return $job;
-
 }
 
 
@@ -223,18 +219,16 @@ sub flush {
   my $config = $self->get_Config();
   my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
 
-  if (scalar(@{$self->{'_queue'}}) > 0) {
-
-    if ($children < $max_jobs) {
-      my $job = shift @{$self->{'_queue'}};
-      $self->_start_job($job);
-    }
-
+  #
+  # Take as many jobs off the queue as we can
+  #
+  while(scalar(@{$self->{'_queue'}}) && ($children < $max_jobs)) {
+    $self->_start_job(shift @{$self->{'_queue'}});
   }
 
   return;
-
 }
+
 
 sub _generate_filename_prefix {
   my $self = shift;
@@ -269,8 +263,7 @@ sub _generate_filename_prefix {
   my $time = localtime(time());
   $time =~ tr/ :/_./;
 
-  return "$temp_dir/" . "job_" . $job->dbID() . "$time";
- 
+  return "$temp_dir/" . "job_" . $job->dbID() . "$time"; 
 }
 
 
@@ -305,9 +298,8 @@ sub _start_job {
        -pass     => $pass,
        -port     => $port);
 
-    #re-retrive the job so it is using the new dbhandle
-
-    $job = $db->get_JobAdaptor->fetch_by_dbID($job->dbID);
+    #point the adaptor of the job to one from the new dbconnection
+    $job->adaptor($db->get_JobAdaptor);
 
     my $file_prefix = $self->_generate_filename_prefix($job);
 
@@ -336,7 +328,6 @@ sub _start_job {
   }
 
   return;
-
 }
 
 1;
