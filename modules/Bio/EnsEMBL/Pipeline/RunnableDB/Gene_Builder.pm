@@ -295,19 +295,28 @@ sub fetch_input {
 
     $self->throw("No input id") unless defined($self->input_id);
 
-  #  $self->dbobj->static_golden_path_type('UCSC');
+    $self->dbobj->static_golden_path_type('UCSC');
 
-  #  my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
 
     my $contigid  = $self->input_id;
+    $contigid =~ /(.*)\.(.*)\-(.*)/;
+    
+    my $chr   = $1;
+    my $start = $2;
+    my $end   = $3;
+    
+    print STDERR "Chr $chr - $start : $end\n";
+    my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chr,$start,$end);
+
 #	$contigid =~ s/\.(.*)//;
 #    my $contignum = $1;
 
-    print STDERR "Contig id = $contigid \n";
+    #print STDERR "Contig id = $contigid \n";
 
     #my @contig	  = $stadaptor->fetch_VirtualContig_list_sized($contigid,500000,10000,1000000,100);
 
-    my $contig	  = $self->dbobj->get_Contig($contigid);
+    #my $contig	  = $self->dbobj->get_Contig($contigid);
 
 
     $contig->primary_seq;
