@@ -1,5 +1,5 @@
 #
-# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
+# Cared for by Eduardo Eyras  <eae@sanger.ac.uk>
 #
 # Copyright GRL & EBI
 #
@@ -33,7 +33,7 @@ The algorithm is different from the original EST_GeneBuilder. This one is more s
 
 =head1 CONTACT
 
-Describe contact details here
+eae@sanger.ac.uk
 
 =head1 APPENDIX
 
@@ -64,7 +64,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_REFDBUSER
 					EST_REFDBNAME
 					EST_REFDBPASS
-					EST_INDEX
 					EST_GENEBUILDER_INPUT_GENETYPE
 					EST_EVIDENCE_TAG
 					EST_MIN_EVIDENCE_SIMILARITY
@@ -127,25 +126,6 @@ sub new {
 
 =cut
 
-#sub make_seqfetcher {
-#  my ( $self ) = @_;
-#  my $index   = $EST_INDEX;
-
-#  my $seqfetcher;
-
-#  if(defined $index && $index ne ''){
-#    my @db = ( $index );
-#    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
-#  }
-#  else{
-#    # default to Pfetch
-#    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-#  }
-
-#  return $seqfetcher;
-
-#}
-
 
 =head2 RunnableDB methods
 
@@ -189,32 +169,39 @@ sub new {
 sub write_output {
   my ($self) = @_;
   
+  #print STDERR "not writting genes yet\n";
+  #return;
+
   my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
   
  GENE: 
   foreach my $gene ($self->output) {	
+    
     # test
-    #my @transcripts = $gene->each_Transcript;
+    my @transcripts = $gene->each_Transcript;
     #my $tran = $transcripts[0];
     #my $strand = $tran->start_exon->strand;
     #print STDERR "EST_GeneBuilder. you would be writting a gene on strand $strand\n";
-      
-
-# VAC - setting the analysis type of supporting features. We may 
-# end up changing it back but at least we can then see what has 
-# come from where - makes it possible
-# to distinguish supp feat from e2g genes from supp feat from genomewise genes
-
-    foreach my $exon($gene->get_all_Exons){
-      foreach my $sf($exon->each_Supporting_Feature){
-
-	$sf->analysis($gene->analysis);
-	$sf->source_tag($gene->analysis->logic_name);
-      }
-    }
-
+    
+    # test of the supporting evidence. It seems to wrok fine.
+    #foreach my $tran (@transcripts){
+    #  print STDERR "\ntranscript: $tran\n";
+    #  print STDERR "exons:\n";
+    #  foreach my $exon ($tran->get_all_Exons){
+    #  print STDERR $exon->start."-".$exon->end."\n";
+    #  print STDERR "evidence:\n";
+    #  foreach my $sf ( $exon->each_Supporting_Feature ){
+    #  $self->print_FeaturePair($sf);
+    #  print STDERR "source_tag: ".$sf->source_tag."\n";
+    #  print STDERR "analysis  : ".$sf->analysis->dbID."\n";
+    #  print STDERR "logic_name: ".$sf->analysis->logic_name."\n";
+    #  }
+    # }
+    #}
+    
+    
     eval {
-     $gene_adaptor->store($gene);
+      $gene_adaptor->store($gene);
       print STDERR "wrote gene " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
@@ -244,6 +231,10 @@ sub fetch_input {
     # the type of the genes being read is specified in Bio/EnsEMBL/Pipeline/EST_conf.pl 
     my $genetype =  $EST_GENEBUILDER_INPUT_GENETYPE;
 
+    # make an analysis
+    $self->analysis($self->_make_Analysis);
+    print STDERR "Analysis for the output\n";
+
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
@@ -267,9 +258,7 @@ sub fetch_input {
     print STDERR "\n****** forward strand ******\n\n";
 
     # get genes
-    # VAC - this won't get supporting evidence out
-    #    my @genes  = $contig->get_Genes_by_Type($genetype);
-    my @genes  = $contig->get_Genes_by_Type($genetype,'evidence');
+    my @genes  = $contig->get_Genes_by_Type($genetype);
     
     print STDERR "Number of genes = " . scalar(@genes) . "\n";
     if(!scalar(@genes)){
@@ -312,6 +301,7 @@ GENE:
       
       # make a genomewise runnable for each cluster of transcripts
 
+
       foreach my $tran (@transcripts){
 	#print STDERR "In EST_GeneBuilder, creating a Runnable::MiniGenomewise for\n";
 	#my $excount = 0;
@@ -324,19 +314,20 @@ GENE:
 	#    print STDERR $evi." - ".$evi->gffstring."\n";
 	#  }
 	#}
-      
-
+	
+	
 	# use MiniSeq
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic => $contig->primary_seq,
+									    -genomic  => $contig->primary_seq,
+									    -analysis => $self->analysis,
 									   );
-
+	
 	$self->add_runnable($runnable,$strand);
 	$runnable->add_Transcript($tran);
-
+	
 	#my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 	#$runnable->seq($contig->primary_seq);
-
+	
       }
     }
     
@@ -348,9 +339,7 @@ GENE:
 
     $strand = -1;
     my $revcontig = $contig->invert;
-    # VAC - this won't get evidence
-    #    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
-    my @revgenes  = $revcontig->get_Genes_by_Type($genetype, 'evidence');
+    my @revgenes  = $revcontig->get_Genes_by_Type($genetype);
     my @minus_transcripts;
     
     print STDERR "Number of genes = " . scalar(@revgenes) . "\n";
@@ -392,8 +381,9 @@ GENE:
       foreach my $tran (@transcripts) {
 	
 	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise(
-									    -genomic => $revcontig->primary_seq,
-      								   );
+									    -genomic  => $revcontig->primary_seq,
+									    -analysis => $self->analysis,
+									   );
 #	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Genomewise();
 
 	$self->add_runnable($runnable, $strand);
@@ -540,6 +530,58 @@ sub _check_Transcripts {
 	next TRANSCRIPT;
       }
 
+     
+      # get the supporting_evidence for each exon
+      # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
+
+      my @nonsorted_sf = $exon->each_Supporting_Feature;      
+      my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
+            
+      # check that you get suporting_evidence at all
+      if ( scalar( @sf ) == 0 ){
+	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
+		    "exon_id =".$exon->dbID."\n");
+      }
+      
+      ####### check the gap with the evidence of the next exon
+      # if the ESTs are of good quality, this should not reject any
+      if ( $exon_count > 1 ){
+	my $est_gap = 0;
+		
+	# $exon_adaptor->fetch_evidence_by_Exon( $exon2 );
+	my @prev_nonsorted_sf = $previous_exon->each_Supporting_Feature; 
+	my @previous_sf = sort { $a->hstart <=> $b->hstart } @prev_nonsorted_sf;
+
+	if ( scalar( @previous_sf ) != 0 ){
+
+	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
+	  if ( $previous_sf[0]->hstart < $sf[0]->hstart ){
+	    $est_gap = abs( $sf[0]->hstart - $previous_sf[$#previous_sf]->hend ) - 1;
+	  }
+	  # if hstart decreases that means that the EST runs in the opposite direction
+	  elsif (  $previous_sf[0]->hstart > $sf[0]->hstart ){
+	    $est_gap = abs( $previous_sf[0]->hstart - $sf[$#sf]->hend) - 1;
+	  }
+	  # else, same EST piece is hitting two exons, not good!
+	  else{
+	    print STDERR "same bit of evidence is hitting two exons!\n";
+	  }
+	  # test:
+	  #print STDERR "EST evidence with gap: $est_gap\n";
+	  #print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
+	  #print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
+	  
+	  # check the evidence gap between both exons, do not reject anything yet
+	  if ( $est_gap > $max_est_gap ){
+	    print STDERR "EST evidence with gap too large: $est_gap\n";
+	    print STDERR "prev_exon: ".$previous_exon->start."-".$previous_exon->end.  "\texon : ".$exon->start."-".$exon->end."\n";
+	    print STDERR "prev_sf  : ".$previous_sf[0]->hstart."-".$previous_sf[$#previous_sf]->hend."\tsf[0]: ".$sf[0]->hstart."-".$sf[0]->hend."\n";
+	    # print STDERR "EST with too large gaps skipping it\n";
+	    # next TRANSCRIPT;
+	  }
+	}
+      }
+     
       # reject transcript with too large intron length
       my $intron_length;
 
@@ -561,22 +603,12 @@ sub _check_Transcripts {
 	#print STDERR " $s  - $e  - 1 = $intron_length\n";
 
 	if ( $intron_length > $max_intron_length ){
-	  print STDERR "Rejecting transcript $transcript for having inton too long: $intron_length\n";
+	  print STDERR "Rejecting transcript $transcript for having intron too long: $intron_length\n";
 	  next TRANSCRIPT;
 	}
       }
-	
-      # get the supporting_evidence for each exon
-      # no need to use ExonAdaptor, this has been already handled by contig->get_Genes_by_Type
-      my @nonsorted_sf = $exon->each_Supporting_Feature;      
-      my @sf = sort { $a->hstart <=> $b->hstart } @nonsorted_sf;
-            
-      # check that you get suporting_evidence at all
-      if ( scalar( @sf ) == 0 ){
-	$self->warn("exon $exon with no supporting evidence, possible sticky exon, ".
-		    "exon_id =".$exon->dbID."\n");
-      }
-      
+
+
       $previous_exon = $exon;
 
 
@@ -706,42 +738,8 @@ sub _check_Transcripts {
 #      }
 
 
-
-####### check the gap with the evidence of the next exon
-#      # if the ESTs are of good quality, this should not reject any
-#      if ( $exon_count != $#exons ){
-#	my $est_gap = 0;
-#	my $exon2 = $exons[$exon_count+1];
-	
-#	$exon_adaptor->fetch_evidence_by_Exon( $exon2 );
-#	my @nonsorted_sf2 = $exon2->each_Supporting_Feature; 
-#	my @sf2 = sort { $a->hstart <=> $b->hend } @nonsorted_sf2;
-
-#	if ( scalar( @sf2 ) != 0 ){
-
-#	  # if the hstart increases per exon, the EST runs in the same direction of the gene 
-#	  if ( $sf[0]->hstart < $sf2[0]->hstart ){
-#	    $est_gap = abs( $sf2[0]->hstart  - $sf[$#sf]->hend );
-#	  }
-#	  # if hstart decreases that means that the EST runs in the opposite direction
-#	  elsif (  $sf[0]->hstart > $sf2[0]->hstart ){
-#	    $est_gap = abs( $sf[0]->hstart - $sf2[$#sf2]->hend);
-#	  }
-#	  # else, same EST piece is hitting two exons, not good!
-#	  else{
-#	    $self->warn( "same bit of evidence is hitting two exons!\n");
-#	  }
-	  
-#	  # skip EXONS that have too large gaps in the EST hit
-#	  if ( $est_gap > $max_est_gap ){
-#	    print STDERR "EST with too large gaps skipping it\n";
-#	    next TRANSCRIPT;
-#	  }
-#	}
-#      }
-     
-
     } # end of EXON
+
 
 
 #    # put the accepted exons into this transcript
@@ -1471,14 +1469,11 @@ sub _produce_Transcript{
     # the real strand will be dealt with in the run method
     $new_exon->strand(1);
 
+    my %evidence_hash;
+    my %evidence_obj;
     foreach my $exon ( $exon_cluster->sub_SeqFeature ){
-      #if ( $exon->dbID ){
-      #$exon_adaptor->fetch_evidence_by_Exon($exon);
-      #}
-      foreach my $evidence ( $exon->each_Supporting_Feature ){
-	#print STDERR "adding evidence: ".$evidence." - ".$evidence->gffstring."\n";
-	$new_exon->add_Supporting_Feature($evidence);
-      }
+      #print STDERR "\ntransferring evidence from $exon to $new_exon\n";
+      $self->_transfer_Supporting_Evidence($exon,$new_exon);
     }
     $transcript->add_Exon($new_exon);
   }
@@ -1499,6 +1494,88 @@ sub _produce_Transcript{
 			
   return $transcript;
 }
+
+############################################################
+
+=head2 _transfer_Supporting_Evidence
+
+ Title   : transfer_supporting_evidence
+ Usage   : $self->transfer_supporting_evidence($source_exon, $target_exon)
+ Function: Transfers supporting evidence from source_exon to target_exon, 
+           after checking the coordinates are sane and that the evidence is not already in place.
+ Returns : nothing, but $target_exon has additional supporting evidence
+
+=cut
+
+sub _transfer_Supporting_Evidence{
+  my ($self, $source_exon, $target_exon) = @_;
+  
+  # this method fails when first called in a new exon without any evidence
+  my @target_sf;
+  eval{
+    @target_sf = $target_exon->each_Supporting_Feature;
+  };   
+
+  # keep track of features already transferred, so that we do not duplicate
+  my %unique_evidence;
+  my %hold_evidence;
+
+ SOURCE_FEAT:
+  foreach my $feat ($source_exon->each_Supporting_Feature){
+    next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
+    
+    # skip duplicated evidence objects
+    next SOURCE_FEAT if ( $unique_evidence{ $feat } );
+    
+    # skip duplicated evidence 
+    if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
+      #print STDERR "Skipping duplicated evidence\n";
+      #$self->print_FeaturePair($feat);
+      next SOURCE_FEAT;
+    }
+
+    #$self->print_FeaturePair($feat);
+    
+    if ( @target_sf){
+   TARGET_FEAT:
+     foreach my $tsf (@target_sf){
+       next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
+      
+       if($feat->start    == $tsf->start &&
+	  $feat->end      == $tsf->end &&
+	  $feat->strand   == $tsf->strand &&
+	  $feat->hseqname eq $tsf->hseqname &&
+	  $feat->hstart   == $tsf->hstart &&
+	  $feat->hend     == $tsf->hend){
+	
+ 	#print STDERR "feature already in target exon\n";
+        #$self->print_FeaturePair($feat);
+	next SOURCE_FEAT;
+      }
+     }
+    }
+    #print STDERR "transferring evidence\n";
+    #$self->print_FeaturePair($feat);
+    #$feat->analysis($self->analysis);
+    $target_exon->add_Supporting_Feature($feat);
+    $unique_evidence{ $feat } = 1;
+    $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
+  }
+}
+
+sub print_FeaturePair{
+  my ($self, $fp) = @_;
+  return unless $fp->isa("Bio::EnsEMBL::FeaturePair");
+  print STDERR $fp;
+  print STDERR $fp->seqname . " " .
+    $fp->start . " " .
+      $fp->end . " " .
+	$fp->strand . " " .
+	  $fp->hseqname . " " .
+	    $fp->hstart . " " .
+	      $fp->hend . "\n";
+}
+
 
 ############################################################
 
@@ -1612,7 +1689,7 @@ sub _set_splice_Ends {
       push ( @{ $exons_from_transcript{ $exon2transcript{ $exon } } }, $exon );  
 
       if ( $seen_transcript{ $exon2transcript{$exon} } && 1 == $seen_transcript{ $exon2transcript{$exon} } ){
-	print STDERR "There is more than one exon from transcript $exon2transcript{ $exon }\n"; 
+	#print STDERR "There is more than one exon from transcript $exon2transcript{ $exon }\n"; 
 	$fused = 1;
 	$need_to_recluster = 1;
       }
@@ -2186,6 +2263,8 @@ sub run {
   $self->genetype($genetype);
   $self->analysis($analysis_obj);
 
+  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
+
   # plus strand
   $strand = 1;
   my $tcount=0;
@@ -2255,6 +2334,43 @@ sub analysis {
   return $self->{'_analysis'};
 }
 
+sub _make_Analysis{
+  my ($self) = @_;
+  
+  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+  my $genetype = $EST_GENOMEWISE_GENETYPE;
+    
+  # sort out analysis here or we will get into trouble with duplicate analyses
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->warn("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'EST_GeneBuilder',
+      );
+  }
+  $self->analysis($analysis_obj);
+  
+  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
+  
+ return $self->analysis;
+}
+
+
 ############################################
 ### convert genomewise output into genes ###
 ############################################
@@ -2268,7 +2384,6 @@ sub convert_output {
 
   # store genes
   $self->output(@remapped);
- 
 }
 
 ############################################################
@@ -2384,6 +2499,7 @@ sub make_genes {
 
       # only store the genes whose translation has no stop codons
       my $peptide = $sequence->seq;
+      #print STDERR "peptide: $peptide\n";
       if ( $peptide =~ /\*/ ){
 	print STDERR "TRANSLATION HAS STOP CODONS!!\n";
       }
