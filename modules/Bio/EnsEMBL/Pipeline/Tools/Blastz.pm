@@ -69,6 +69,7 @@ sub new {
   $self->{'_command_line'} = "";
   $self->{'_matrix'} = "";
   $self->{'_options'} = "";
+  $self->{'_alignment_reported_before'} = {};
   
   
   my ($fh,$file) = $self->_rearrange([qw(FH FILE)], @args);
@@ -139,6 +140,7 @@ sub nextAlignment {
   return undef if ($self->eof);
 
   my $fh = $self->fh;
+  my $l_line_fault = 0;
 
   while (defined (my $line = <$fh>)) {
     next if ($line =~ /^\#:lav$/);
@@ -209,32 +211,74 @@ sub nextAlignment {
 	next if ($line =~ /^\s+e\s+\d+\s+\d+$/);
 	if ($line =~ /^\s+l\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)\s+(\d+)$/) {
 	   my ($start,$hstart,$end,$hend,$percid) = ($1,$2,$3,$4,$5);
+           if ($start > $end || $hstart > $hend) {
+             # this is a blastz bug that has been reported to the author. No bug fix yet, and 
+             # probably not for a long time
+             # so in the meantime, a code hack tries to recover a well format alignment
+             # see below
+             $l_line_fault = 1;
+             next;
+           };
 
-	   my $block_length = $end - $start + 1;
-	   $sum_match_bases += $percid*$block_length/100;
-	   $sum_block_length += $block_length;
+           my $block_length = $end - $start + 1;
+           $sum_match_bases += $percid*$block_length/100;
+           $sum_block_length += $block_length;
+           
+           if ($self->strand == -1) {
+             $start = $self->length - $end + 1;
+             $end = $start + $block_length - 1;
+           }
+           if ($self->hstrand == -1) {
+             $hstart = $self->hlength - $hend + 1;
+             $hend = $hstart + $block_length - 1;
+           }
 
-	   if ($self->strand == -1) {
-	     $start = $self->length - $end + 1;
-	     $end = $start + $block_length - 1;
-	   }
-	   if ($self->hstrand == -1) {
-	     $hstart = $self->hlength - $hend + 1;
-	     $hend = $hstart + $block_length - 1;
-	   }
+           if (scalar @feature_pairs == 0 || $l_line_fault == 0) {
+             $l_line_fault = 0;
+           }
+           if ($l_line_fault) {
+             warn("Dealing with a faulty l line\n");
+             # code hack to fix faulty l lines where start>end or hstart>hend that are ignored.
+             # We extend the previous gap-free piece until it hits the closest
+             # query or target sequence in the next piece
+             # The perc_id and score for this arranged featurepair will not be consistent
+             # but then again, it is a bug in blastz not in the parser...
+             my $f = pop @feature_pairs;
 
-	   my $feature_pair = new Bio::EnsEMBL::FeaturePair;
-	   $feature_pair->seqname($self->seqname);
-	   $feature_pair->start($start);
-	   $feature_pair->end($end);
-	   $feature_pair->strand($self->strand);
-	   $feature_pair->hseqname($self->hseqname);
-	   $feature_pair->hstart($hstart);
-	   $feature_pair->hend($hend);
-	   $feature_pair->hstrand($self->hstrand);
-	   $feature_pair->score($score);
-	   push @feature_pairs,$feature_pair;
-	}
+             my $diff;
+
+             if ($self->strand == 1) {
+               $diff = $start - $f->end - 1;
+             } else {
+               $diff = $f->start - $end - 1;
+             }
+             if ($self->hstrand == 1 && $diff > $hstart - $f->hend - 1) {
+               $diff = $hstart - $f->hend - 1;
+             } elsif ($diff > $f->hstart - $hend - 1) {
+               $diff = $f->hstart - $hend - 1;
+             }
+
+             $f->end($f->end + $diff) if ($self->strand == 1);
+             $f->start($f->start - $diff) if ($self->strand == -1);
+             $f->hend($f->hend + $diff) if ($self->hstrand == 1);
+             $f->hstart($f->hstart - $diff) if ($self->hstrand == -1);
+             
+             push @feature_pairs, $f;
+             $l_line_fault = 0;
+           }
+
+           my $feature_pair = new Bio::EnsEMBL::FeaturePair;
+           $feature_pair->seqname($self->seqname);
+           $feature_pair->start($start);
+           $feature_pair->end($end);
+           $feature_pair->strand($self->strand);
+           $feature_pair->hseqname($self->hseqname);
+           $feature_pair->hstart($hstart);
+           $feature_pair->hend($hend);
+           $feature_pair->hstrand($self->hstrand);
+           $feature_pair->score($score);
+           push @feature_pairs,$feature_pair;
+         }
       }
 
       # calculating the average of percentage identity over the whole HSP-like
@@ -246,6 +290,12 @@ sub nextAlignment {
       }
 
       my $alignment = new Bio::EnsEMBL::DnaDnaAlignFeature(-features => \@feature_pairs);
+      my $key = "";
+      map {$key .= $alignment->$_ . "_"} qw(seqname start end strand hseqname hstart hend hstrand score cigar_string);
+      if (defined $self->{'_alignment_reported_before'}{$key}) {
+        next;
+      }
+      $self->{'_alignment_reported_before'}{$key} = 1;
       return $alignment;
     }
   }
