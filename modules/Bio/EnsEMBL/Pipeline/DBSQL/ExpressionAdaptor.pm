@@ -611,5 +611,40 @@ sub get_Vocabulary_by_Ontology{
   return @vocabulary;
 }
 
+########################################
+#
+# Methods associated to storage of data
+#
+########################################
+
+sub store_ensembl_link{
+  my ($self, $transcript_id, $est_ids) = @;
+  my @est_ids = @$est_ids;
+  my $q = qq(
+	     INSERT into EnsemblTranscript ( Id, ESTAccession )
+	     VALUES ( ?, ? ) 
+	   );
+  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
+  foreach my $est_id ( @est_ids ){
+    $sth->execute($transcript_id, $est_id) || $self->throw("can't execute: $q");
+  }
+}
+
+############################################################
+
+sub store_est_transcript_link{
+  my ($self, $transcript_id, $est_ids) = @;
+  my @est_ids = @$est_ids;
+  my $q = qq(
+	     INSERT into EstTranscript ( Id, ESTAccession )
+	     VALUES ( ?, ? ) 
+	   );
+  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
+  foreach my $est_id ( @est_ids ){
+    $sth->execute($transcript_id, $est_id) || $self->throw("can't execute: $q");
+  }
+}
+  
+
 
 1;
