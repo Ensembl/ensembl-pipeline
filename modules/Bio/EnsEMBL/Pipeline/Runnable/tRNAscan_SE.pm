@@ -86,7 +86,7 @@ sub new {
 						   @args);
 
 
-  $tRNAscan_SE = 'tRNAscan-SE' unless defined($tRNAscan_SE);
+  $tRNAscan_SE = 'tRNAscan-SE' unless $tRNAscan_SE;
 
   $self->clone($sequence) if ($sequence);       
   $self->tRNAscan_SE($self->find_executable($tRNAscan_SE));
