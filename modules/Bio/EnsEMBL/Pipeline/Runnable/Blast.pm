@@ -261,7 +261,7 @@ sub run_analysis {
 	$command .= ($::blastconf{'blast_type'} eq 'ncbi') ? ' -d '.$database : ' '.$database;
 	$command .= ($::blastconf{'blast_type'} eq 'ncbi') ? ' -i ' .$self->filename :  ' '.$self->filename;
 	$command .= ' '.$self->options. ' > '.$self->results . ".$db";
-        print STDERR "XXX $command\n";
+
 	$self->throw("Failed during blast run $!\n") unless (system ($command) == 0) ;
       }
 }
