@@ -486,10 +486,10 @@ sub split_HSP {
     my ($qstrand,$hstrand) = $self->_findStrands   ($hsp);
     my ($qinc,   $hinc)    = $self->_findIncrements($hsp,$qstrand,$hstrand,$qtype,$htype);
 
-    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
-    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
+#    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
+#    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
 
-    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
+#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
 
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap
@@ -541,7 +541,6 @@ sub split_HSP {
 	if ($qchars[$count] ne '-' &&
 	    $hchars[$count] ne '-') {
 
-	  print STDERR "Counting " . $count ." " . $qend . " " . $hend . "\n";
 	    $qend += $qinc;
 	    $hend += $hinc;
 	    
@@ -582,9 +581,7 @@ sub split_HSP {
 
     # Remember the last feature
     if ($found == 1) {
-      print $hstart . " " . $hend . " " . $qstart . " " . $qend . "\n";
 	my $fp = $self->_convert2FeaturePair($qstart,$qend,$qstrand,$hstart,$hend,$hstrand,$qinc,$hinc,$hsp,$name,$analysis);
-	print "Feature is " . $fp->gffstring . "\n";
 	$self->growfplist($fp);                             	    
     }
 
