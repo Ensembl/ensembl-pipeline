@@ -64,6 +64,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_GW_GENETYPE
 					 GB_SIMILARITY_GENETYPE
 					 GB_COMBINED_GENETYPE
+					 GB_COMBINED_MAX_INTRON
 					);
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					 EST_DBHOST
