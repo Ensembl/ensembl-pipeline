@@ -264,7 +264,7 @@ sub run {
      $self->runnable->run();
    };
    if($@){
-     $self->throw("Error in BlastMiniGenewise run: \n[$@]\n");
+     throw("Error in BlastMiniGenewise run: \n[$@]\n");
    }
    
    $self->convert_gw_output;
