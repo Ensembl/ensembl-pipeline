@@ -1383,11 +1383,11 @@ sub set_stop_codon{
 		    
 		    ############################################################
 		    # calculate the next codon start/end in chr coordinates 
-		    print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n";
+		    print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n" if $verbose;
 		    
 		    my $codon_end   = $slice_start + $end_exon->end - $end - 1;
 		    my $codon_start = $codon_end - 2;
-		    print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
+		    print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n" if $verbose;
 		    
 		    my $codon_slice = $adaptor
 			->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
