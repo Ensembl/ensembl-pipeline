@@ -57,6 +57,10 @@ use vars qw( %ESTConf );
 
 	    # path to run_ESTRunnableDB
 	    EST_RUNNER                  => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/run_EST_RunnableDB', 	    
+	
+	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
+	    # we use a different on from EST_RUNNER to use different EST_DB's
+	    EST_RUNNER			=> '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
 	    
 	    # path to ensembl-pipeline/scripts/EST
 	    EST_SCRIPTDIR               => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/EST/', 	    
