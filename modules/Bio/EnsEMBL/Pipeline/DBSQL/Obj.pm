@@ -198,7 +198,7 @@ sub get_Job {
   Usage   : my @jobs = $db->get_JobsByInputId($id)
   Function: Retrieves all jobs in the database
             that have a certain input id.
-	    Input id will usually be associated with
+	        Input id will usually be associated with
             a sequence in the main ensembl database.
   Returns : @Bio::EnsEMBL::Pipeline::DB::JobI
   Args    : int
@@ -215,17 +215,15 @@ sub get_JobsByInputId {
 	",stdout_file,stderr_file,input_object_file,output_file,status_file " .
         "from job " . 
 	"where input_id = \"$id\"";
-
+    
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
-
+    
     my @jobs;
-
     while (my $row = $sth->fetchrow_hashref) {
 	my $job = $self->_parseJob($row);
 	push(@jobs,$job);
     }
-
     return @jobs;
 }
 
@@ -243,6 +241,34 @@ sub get_JobsByCurrentStatus {
     my $sth = $self->prepare($query);
     my $res = $sth->execute();
 
+    my @jobs;
+
+    while (my $row = $sth->fetchrow_hashref) {
+	my $job = $self->_parseJob($row);
+	push(@jobs,$job);
+    }
+
+    return @jobs;
+}
+
+sub get_JobsByAge {
+    my ($self,$age) = @_;
+
+    $self->throw("No input status for get_JobsByAge") 
+        unless defined($age);
+    #convert age from minutes to seconds
+    my $ageinseconds = $age * 60;
+    my $query = 'SELECT j.id, j.input_id, j.analysis, j.LSF_id, j.machine, '
+                    .'j.queue, j.stdout_file, j.stderr_file, j.input_object_file, '
+                    .'j.output_file, j.status_file, js.status '
+                .'FROM job as j, jobstatus as js, current_status as cs ' 
+                .'WHERE cs.id = js.id '
+                    .'AND js.id = j.id '
+                    .'AND Unix_TIMESTAMP(time) > Unix_TIMESTAMP()-'.$ageinseconds;
+    
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute();
+    
     my @jobs;
 
     while (my $row = $sth->fetchrow_hashref) {
@@ -278,7 +304,7 @@ sub get_JobsByAnalysis {
 sub _parseJob {
     my ($self,$row) = @_;
 
-    $self->throw("Now row object input") unless defined($row);
+    $self->throw("No row object input") unless defined($row);
 
     my $jobid             = $row->{id};
     my $input_id          = $row->{input_id};
