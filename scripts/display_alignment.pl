@@ -43,8 +43,8 @@ If you dont have a stable id, use the dbID.
 more compact alignment.
 
 -padding :
-(optional) When introns are truncated, number of
-bases of padding around exons.
+(optional)  Number of bases padding upstream and
+downstream of transcript.
 
 -type :
 (optional) Type of evidence sequences to display in
@@ -119,8 +119,8 @@ unless (@ARGV) {
 	     " -transcript_dbid :      If you dont have a stable id, use the dbID.",
 	     " -remove_introns :       (optional) Truncate intron sequences to display a",
 	     "                           more compact alignment.",
-	     " -padding :              (optional) When introns are truncated, number of",
-	     "                           bases of padding around exons.",
+	     " -padding :              (optional) Number of bases padding upstream and",
+	     "                           downstream of transcript.",
 	     " -type :                 (optional) Type of evidence sequences to display",
 	     "                           in alignment, one of 'all', 'nucleotide'",
 	     "                           or 'protein'.",
@@ -158,7 +158,7 @@ if (defined $type && ($type ne 'all' &&
   throw('Unrecognised alignment type.  The -type flag should be ' .
 	'set to one of all, nucleotide or protein')
 
-} else {
+} elsif (! defined $type) {
   $type = 'all'
 }
 
@@ -213,8 +213,10 @@ my $align_seqs = $alignment->fetch_AlignmentSeqs;
 open(OUT, ">$output_file") or die "Unable to write to output file [$output_file]";
 
 foreach my $align_seq (@$align_seqs){
-  print OUT ">" . $align_seq->name . "\n" . 
-    $align_seq->seq . "\n";
+  my $seq = $align_seq->seq;
+  $seq =~ s/(.{$fasta_line_length})/$1\n/g;
+
+  print OUT ">" . $align_seq->name . "\n" . $seq . "\n";
 }
 
 close(OUT);
