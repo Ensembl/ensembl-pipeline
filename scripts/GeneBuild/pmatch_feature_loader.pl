@@ -141,16 +141,16 @@ sub process_proteins {
     # not used anymore, we deal with cDNAs separately
     my $cdna_id = $pmfa->get_cdna_id($protein);
 
-    my $pmf = new Bio::EnsEMBL::Pipeline::PmatchFeature(-protein_id  => $protein,
-							-start       => $start,
-							-end         => $end,
-							-chr_name    => $chr,
-							-cdna_id     => $cdna_id,
-							-coverage    => $coverage,
-							-analysis => $analysis,
-						       );
+    my $pmf = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $protein,
+								       -start       => $start,
+								       -end         => $end,
+								       -chr_name    => $chr,
+								       -cdna_id     => $cdna_id,
+								       -coverage    => $coverage,
+								       -analysis => $analysis,
+								      );
     push(@features, $pmf);
-
+    
   }
   
   close PMATCHES;
