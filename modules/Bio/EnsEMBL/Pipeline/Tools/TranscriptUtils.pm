@@ -416,7 +416,17 @@ sub _print_Evidence{
   my $count = 0;
   foreach my $exon ( @exons){
     $count++;
-    print STDERR "Exon $exon: ".$exon->gffstring."\n";
+    my $exon_id;
+    if ($exon->stable_id){
+      $exon_id = $exon->stable_id;
+    }
+    elsif ( $exon->dbID ){
+      $exon_id = $exon->dbID;
+    }
+    else{
+      $exon_id = "no id";
+    }
+    print STDERR "Exon $exon_id: ".$exon->gffstring."\n";
     my @evidence = @{$exon->get_all_supporting_features};
     if (@evidence){
       foreach my $evi ( @evidence ){
