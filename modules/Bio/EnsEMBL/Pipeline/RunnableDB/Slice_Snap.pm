@@ -78,7 +78,7 @@ sub fetch_input {
     $self->db->assembly_type($sgp) if $sgp;
 
     my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr, $start, $end) or $self->throw("Unable ot fetch Slice");;
-
+    $self->query($slice);
     my $genseq;
 
     if (@$SNAP_MASKING) {
@@ -90,19 +90,17 @@ sub fetch_input {
     }
 
     $self->throw("Unable to fetch virtual contig") unless $slice;
-    #print STDERR $slice->seq."\n";
-    $self->query($genseq);
-    
 
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Snap(
-							      -query   => $self->query,
-							      -snap => $self->analysis->program_file,
-							      -hmmfile  => $self->analysis->db_file,
-							      -args    => $self->arguments
-							      );
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::Snap
+      (
+       -query   => $genseq,
+       -snap => $self->analysis->program_file,
+       -hmmfile  => $self->analysis->db_file,
+       -args    => $self->arguments
+      );
     
     $self->runnable($runnable);
-
+    
     return 1;
 }
 
@@ -123,7 +121,9 @@ sub write_output {
 
     GENE: foreach my $f ($self->output) {
 	$f->analysis($self->analysis);
-	
+	foreach my $e(@{$f->get_all_Exons}){
+	  $e->contig($self->query);
+	}
 	eval {
 	    $f->transform
 	    };
@@ -133,7 +133,7 @@ sub write_output {
 	}
 	    
 
-	print STDERR "FE: ".$f."\n";
+	#print STDERR "FE: ".$f."\n";
 	push(@mapped_features,$f);
 
     }
