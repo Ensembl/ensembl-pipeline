@@ -124,6 +124,25 @@ sub list_inputId_by_analysis {
   return @result;
 }
 
+sub list_inputId_created_by_analysis {
+  my $self = shift;
+  my $analysis = shift;
+  my @result;
+  my @row;
+
+  my $sth = $self->prepare( q {
+    SELECT inputId, unix_timestamp(created)
+      FROM InputIdAnalysis
+     WHERE analysisId = ? } );
+  $sth->execute( $analysis->dbID );
+
+  while( @row = $sth->fetchrow_array ) {
+    push( @result, [$row[0], $row[1]] );
+  }
+
+  return @result;
+}
+
 sub list_inputId_class_by_start_count {
   my $self = shift;
   my ($start,$count) = @_;
