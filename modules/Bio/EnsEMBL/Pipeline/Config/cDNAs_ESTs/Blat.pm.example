@@ -46,7 +46,7 @@ variables.
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::Config::;
+package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Blat;
 
 use strict;
 use vars qw( %Blat );
