@@ -1,5 +1,51 @@
 #!/usr/local/ensembl/bin/perl -w
 
+=head1 NAME
+
+load_scaffolds.pl
+
+=head1 SYNOPSIS
+
+  load_scaffolds.pl 
+
+=head1 DESCRIPTION
+
+this script will load a fasta file into a new schema database. It parses
+the file using Bio::SeqIO and then turns each sequence into a Slice
+before storing it
+
+as standard this script takes what ever SeqIO parses as the id for the
+slice name, you may need to edit this so it works properly and uses the 
+names you actually want
+
+here is an example commandline
+
+./load_scaffolds.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-seqfile sequence.fa -coord_system_name contig 
+
+=head1 OPTIONS
+
+    -dbhost    host name for database (gets put as host= in locator)
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+
+    -seqfile   the fasta file which contains the sequence
+    -coord_system_name the name of the coordinate system being stored
+    -coord_system_version the version of the coordinate system being stored
+    -default_version shows this version is the default version of the 
+                     coordinate system
+    -top_level  reflects this is the top level of sequence in the database
+    -sequence_level reflects this is a sequence level coordinate system
+    -agp_file shows the file you are passing in is an agp file and will 
+                     be treated appropriately
+    -fasta_file, shows the file you are passing in is a fasta file
+                 the sequence will only be stored if the -sequence_level
+                 option is also set the sequence will not be stored
+    -help      displays this documentation with PERLDOC
+
+=cut
+
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
@@ -48,7 +94,14 @@ if(!$host || !$dbuser || !$dbname || !$dbpass){
 if(!$cs_name || !$seqfile){
   print STDERR "Need coord_system_name and seqfile to beable to run\n";
   print STDERR "-coord_system_name $cs_name -seqfile $seqfile\n";
+  $help = 1;
 }
+if($agp && $sequence_level){
+  print STDERR ("Can't use an agp file ".$seq_file." to store a ".
+                "sequence level coordinate system ".$cs_name."\n");
+  $help = 1;
+}
+
 
 if ($help) {
     exec('perldoc', $0);
@@ -113,7 +166,7 @@ sub parse_fasta{
     #you are getting you may want to comment out the warning about this
     
     my @values = split /\s+/, $seq->desc;
-    my $name = $values[0];
+    my $name = $seq->id;
     warning("You are going to store with name ".$name." are you sure ".
             "this is what you wanted");
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
