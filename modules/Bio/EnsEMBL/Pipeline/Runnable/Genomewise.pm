@@ -91,6 +91,7 @@ Returntype: it does not return anything, but instead it populates the get/set co
 sub run{
   my ($self) = @_;
   
+  $self->analysis($self->_make_Analysis) unless $self->analysis;
   if( !defined $self->workdir ) {
     $self->workdir('/tmp');
   }
@@ -170,7 +171,7 @@ sub run{
 #  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
 #  open(GW,"</tmp/test.out");
   
-
+ 
 # in acari, genomewise is in '/nfs/acari/birney/prog/wise2/src/bin/'
 # or in '/usr/local/ensembl/bin/genomewise'
 
@@ -203,7 +204,7 @@ sub run{
 	my $seen_utr3 = 0;
 	my $prev = undef;
 	while( <GW> ) {
-	  print STDERR "$_";
+	  #print STDERR "$_";
 	  chomp;
 	  #print "Seen $_\n";
 	  if( /End/ ) {
@@ -341,6 +342,8 @@ sub run{
 	# check just in case
 	if ( $exon_in->overlaps( $exon_out ) ){
 	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	    $feature->analysis($self->analysis);
+	    $feature->source_tag($self->analysis->logic_name);
 	    $exon_out->add_Supporting_Feature( $feature );
 	  }
 	}
@@ -356,6 +359,8 @@ sub run{
 	foreach my $exon_out( @exons_out ){
 	  if ( $exon_out->overlaps($exon_in) ){
 	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+	      $feature->analysis($self->analysis);
+	      $feature->source_tag($self->analysis->logic_name);
 	      $exon_out->add_Supporting_Feature( $feature );
 	    }
 	  }
@@ -378,6 +383,8 @@ sub run{
 	  foreach my $exon_out( @exons_out ){
 	    if ( $exon_out->overlaps($exon_in) ){
 	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+		$feature->analysis($self->analysis);
+		$feature->source_tag($self->analysis->logic_name);
 		$exon_out->add_Supporting_Feature( $feature );
 	      }
 	    }
@@ -521,5 +528,50 @@ sub seq{
     return $obj->{'_seq'};
 
 }
+
+sub _make_Analysis{
+  my ($self) = @_;
+  
+  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+  my $genetype = "genomewise";
+    
+  # sort out analysis here or we will get into trouble with duplicate analyses
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+  my $analysis_obj;
+  if(scalar(@analyses) > 1){
+    $self->warn("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis_obj = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis_obj = new Bio::EnsEMBL::Analysis
+      (-db              => 'NULL',
+       -db_version      => 1,
+       -program         => $genetype,
+       -program_version => 1,
+       -gff_source      => $genetype,
+       -gff_feature     => 'gene',
+       -logic_name      => $genetype,
+       -module          => 'EST_GeneBuilder',
+      );
+  }
+  $self->analysis($analysis_obj);
+  
+  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
+  
+ return $self->analysis;
+}
+
+sub analysis{
+  my ($self,$analysis) = @_;
+  if ( $analysis ){
+    $self->{analysis} = $analysis;
+  }
+  return $self->{analysis};
+}
+
 
 1;
