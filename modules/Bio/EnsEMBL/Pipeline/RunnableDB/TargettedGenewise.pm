@@ -66,18 +66,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_SEQFETCHER
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
-							     GB_TARGETTED_SINGLE_EXON_COVERAGE
-							     GB_TARGETTED_MULTI_EXON_COVERAGE
-							     GB_TARGETTED_MAX_INTRON
-							     GB_TARGETTED_MIN_SPLIT_COVERAGE
-							     GB_TARGETTED_GW_GENETYPE
-							     GB_TARGETTED_MASKING
-							     GB_TARGETTED_SOFTMASK
-							     GB_TARGETTED_TERMINAL_PADDING
-							     GB_TARGETTED_EXON_PADDING
-							     GB_TARGETTED_MINIMUM_INTRON
-							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
@@ -249,12 +238,15 @@ sub fetch_input{
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
 								    '-ids'            => [ $protein_id ] ,
 								    '-seqfetcher'     => $self->seqfetcher,
-								    '-endbias'          => 1,
+								    '-endbias'        => 1,
+								    '-gap'            => $GB_TARGETTED_GENEWISE_GAP,
+								    '-extension'      => $GB_TARGETTED_GENEWISE_EXTENSION,
+								    '-matrix'         => $GB_TARGETTED_GENEWISE_MATRIX,
 								    '-terminal_padding' => $GB_TARGETTED_TERMINAL_PADDING,
 								    '-exon_padding'     => $GB_TARGETTED_EXON_PADDING,
 								    '-minimum_intron'   => $GB_TARGETTED_MINIMUM_INTRON,
 								    '-check_repeated' => 1);
- 
+
   $self->runnable($r);
 
 }
