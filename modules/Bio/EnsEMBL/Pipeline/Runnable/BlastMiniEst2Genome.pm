@@ -46,6 +46,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
+use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
@@ -54,7 +55,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_INPUTID_REGEX
 					);
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder);
 
 =head2 new
 
@@ -79,10 +80,11 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     #print "@args\n";
-    my( $genomic, $queryseq, $seqfetcher, $threshold) = $self->_rearrange([qw(GENOMIC
+    my( $genomic, $queryseq, $seqfetcher, $threshold, $check_repeated) = $self->_rearrange([qw(GENOMIC
                                                                                QUERYSEQ
                                                                                SEQFETCHER
-                                                                               THRESHOLD)],
+                                                                               THRESHOLD
+									       CHECK_REPEATED)],
                                                                            @args);
          
     $self->throw("No genomic sequence input")           
@@ -107,6 +109,13 @@ sub new {
     else{
       $self->blast_threshold(10e-60);
     } 
+
+    if (defined $check_repeated){
+      $self->check_repeated($check_repeated);
+    }else {
+      $self->check_repeated(0);
+    }
+
 
     return $self; 
 }
@@ -243,7 +252,8 @@ sub run {
 
     print STDERR "BlastMiniEst2Genome->run ***Have " . scalar(@blast_res) . " blast hits.\n";
     
-    my %blast_ests;
+#    my %blast_ests;
+    my @blast_ests;
     my @feat;
     foreach my $res(@blast_res ) {
       my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
@@ -253,29 +263,66 @@ sub run {
 
       $res->hseqname($seqname);
 
-      push(@{$blast_ests{$seqname}}, $res);
+      push(@blast_ests, $res);
     }
 
-    foreach my $est(keys %blast_ests) {
-      my @features = @{$blast_ests{$est}};
- 
-      # make MiniEst2Genome runnables
-      
-      my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
-                           '-genomic'    => $self->genomic_sequence,
-                           '-features'   => \@features,
-                           '-seqfetcher' => $self->seqfetcher);
+#    foreach my $est(keys %blast_ests) {
+#      my @features = @{$blast_ests{$est}};
+#    }
 
-      # run runnable
-      $e2g->run;
-      
-      # sort out output
-      my @f = $e2g->output;
-      print "Features returned from e2g: " . scalar @f . "\n";;      
-      push(@{$self->{'_output'}},@f);
+
+    my @feature_pairs;
+
+    foreach my $f (@blast_ests){
+
+      my $feature_pair = new Bio::EnsEMBL::FeaturePair(-feature1 => $f->feature1,
+						       -feature2 => $f->feature2);
+      push(@feature_pairs, $feature_pair);
+
     }
 
-    return 1;
+
+    # make MiniEst2Genome runnables
+      
+    my $me2g_runnables;
+
+    if ($self->check_repeated > 0){ 
+      $me2g_runnables = $self->build_runnables(@feature_pairs);
+    } else {
+      my $runnable = $self->make_object($self->genomic_sequence, \@feature_pairs);
+      push (@$me2g_runnables, $runnable); 
+    }
+
+  foreach my $me2g (@$me2g_runnables){
+    $me2g->run;
+    my @f = $me2g->output;
+    #print STDERR "There were " . scalar @f . " $f[0]  " 
+    #  . " features after the MiniGenewise run.\n";
+
+    push(@{$self->{'_output'}},@f);
+  }
+  
+  return 1;
+
+
+
+
+
+#      my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
+#                           '-genomic'    => $self->genomic_sequence,
+#                           '-features'   => \@features,
+#                           '-seqfetcher' => $self->seqfetcher);
+
+#      # run runnable
+#      $e2g->run;
+      
+#      # sort out output
+#      my @f = $e2g->output;
+#      print "Features returned from e2g: " . scalar @f . "\n";;      
+#      push(@{$self->{'_output'}},@f);
+#    }
+
+#    return 1;
 }
 
 sub run_blast {
@@ -324,6 +371,18 @@ sub run_blast {
   unlink $blastdb->dbfile;
   
   return @blast_features;
+}
+
+sub make_object {
+
+  my ($self, $miniseq, $features) = @_;
+
+  my $me2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
+			 '-genomic'    => $miniseq,
+			 '-features'   => $features,
+			 '-seqfetcher' => $self->seqfetcher);
+  
+  return $me2g    
 }
 
 
@@ -390,5 +449,42 @@ sub output {
     }
     return @{$self->{'_output'}};
 }
+
+
+=head2 get_Sequence
+
+  Title   : get_Sequence
+  Usage   : my $seq = get_Sequence($id)
+  Function: Fetches sequences with id $id
+  Returns : Bio::PrimarySeq
+  Args    : none
+
+=cut
+    
+sub get_Sequence {
+  my ($self,$id) = @_;
+  my $seqfetcher = $self->seqfetcher;
+  my $seq;
+  
+  if (!defined($id)) {
+    $self->warn("No id input to get_Sequence");
+  }  
+  
+  eval {
+    $seq = $seqfetcher->get_Seq_by_acc($id);
+  };
+  
+  if($@) {
+    $self->warn("Problem fetching sequence for id [$id] $@\n");
+    return undef;
+  }
+  
+  if(!defined($seq)){
+    $self->warn("Could not find sequence for [$id]");
+  }
+  
+  return $seq;
+}
+
 
 1;
