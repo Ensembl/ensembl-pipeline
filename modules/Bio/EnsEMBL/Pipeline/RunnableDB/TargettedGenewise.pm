@@ -42,7 +42,7 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
+package Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise;
 
 use vars qw(@ISA);
 use strict;
@@ -76,11 +76,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-							     GB_GW_DBHOST
-							     GB_GW_DBUSER
-							     GB_GW_DBPASS
-							     GB_GW_DBNAME
-							    );
+                                                             GB_GW_DBHOST
+                                                             GB_GW_DBUSER
+                                                             GB_GW_DBPASS
+                                                             GB_GW_DBNAME
+                                                             GB_GW_DBPORT
+                                                            );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -91,12 +92,14 @@ sub new {
   my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
 
   # makes it easier to run standalone if required
-  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						  '-host'   => $GB_GW_DBHOST,
-						  '-user'   => $GB_GW_DBUSER,
-						  '-pass'   => $GB_GW_DBPASS,
-						  '-dbname' => $GB_GW_DBNAME,
-						 ) if(!$output_db);
+  $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     '-host'   => $GB_GW_DBHOST,
+     '-user'   => $GB_GW_DBUSER,
+     '-pass'   => $GB_GW_DBPASS,
+     '-dbname' => $GB_GW_DBNAME,
+     '-port' => $GB_GW_DBPORT,
+    ) if(!$output_db);
   
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
@@ -189,7 +192,7 @@ sub fetch_input{
   # chr12:10602496,10603128:Q9UGV6:
 #  print STDERR $entry."\n";
   if( !($entry =~ /([^\:]+):(\d+),(\d+):([^\:]+):/)) {
-      $self->throw("Not a valid input id... $entry");
+    $self->throw("Not a valid input id... $entry");
   }
   
   $chr_name    = $1;
@@ -200,13 +203,13 @@ sub fetch_input{
       $start  = $3;
       $end    = $2;
   }
- print STDERR "Parsed input id name ".$chr_name." start ".$start." end ".$end."\n";
+ #print STDERR "Parsed input id name ".$chr_name." start ".$start." end ".$end."\n";
   
   # we want to give genewise a bit more genomic than the one found by pmatch, 
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
   
-  print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
+  #print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
   my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
   
@@ -220,7 +223,7 @@ sub fetch_input{
   }
   $self->protein_id($protein_id);
   #print STDERR $protein_id."\n";
-  print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
+  #print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
 
   # genewise runnable
   # repmasking?
@@ -263,7 +266,7 @@ sub run {
    # remap genes to raw contig coords
    my @remapped = $self->remap_genes();
    #print STDERR "remapped output\n";
-   print STDERR "have ".@remapped." remapped gene\n";
+   #print STDERR "have ".@remapped." remapped gene\n";
    $self->output(@remapped);
    #print STDERR "defined output\n";
 }
@@ -392,7 +395,7 @@ sub convert_gw_output {
     $self->warn("Setting genetype to $genetype\n");
   }
   my @results  = $self->runnable->output;
-  print STDERR "BlastMiniGenewise produced ".@results." results\n";
+  #print STDERR "BlastMiniGenewise produced ".@results." results\n";
 
   # Throw here if zero results? Suggests something v. bad has happened 
   # - usually corrupt sequence file means sequences not fetched. We should 
@@ -424,7 +427,7 @@ sub convert_gw_output {
   
   # check for stops?
   #print STDERR "have made ".@genes." genes\n";
-  print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
+  #print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
   $self->gw_genes(@genes);
   
 }

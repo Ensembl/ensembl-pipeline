@@ -33,20 +33,21 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise;
+package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGenewise;
 
 use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
+use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBNAME
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
+                   GB_GW_DBPORT                                          
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
@@ -172,10 +173,13 @@ sub make_targetted_runnables {
   # extend the VC? that will completely screw up the final genebuild. Hmmm.
   # do it, track it & see how many are affected.
   #input_id cb25.fpc4118.1-298757 has invalid format - expecting chr_name.start-end
-  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-dbname => $self->db->dbname,
-								-user => $self->db->username,
-								-pass => $self->db->password,
-								-host => $self->db->host);
+  my $pipeline_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+    (-dbname => $self->db->dbname,
+     -user => $self->db->username,
+     -pass => $self->db->password,
+     -host => $self->db->host,
+     -port => $self->db->port,
+    );
   my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
   #print STDERR "have ".$pmfa." adaptor\n";
   my $input_id = $self->input_id;
@@ -194,6 +198,7 @@ sub make_targetted_runnables {
 						       '-user'   => $GB_GW_DBUSER,
 						       '-pass'   => $GB_GW_DBPASS,
 						       '-dbname' => $GB_GW_DBNAME,
+                   '-port' => $GB_GW_DBPORT,                               
 						      );
   
   
@@ -205,7 +210,7 @@ sub make_targetted_runnables {
 
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
-      print STDERR "skipping " . $feat->protein_id . "\n";
+      #rpint STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
 
@@ -217,7 +222,7 @@ sub make_targetted_runnables {
 
     #print STDERR "TGW input: $input\n";
 
-    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise(
+    my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise(
 									-db => $self->db,
 									-input_id => $input,
 									-seqfetcher => $protein_fetcher,
@@ -295,21 +300,8 @@ sub run {
       $self->warn("problems running TargettedGeneWise: [$@]\n");
       next TGE;
     }
-    
-    eval{
-     my @genes = $tge->write_output;
-     $count += @genes;
-     #print "\n\n";
-    };
-
-    if($@){
-      $self->warn("problems writing output for TargettedGeneWise: [$@]\n");
-      next TGE;
-    }
+     
   }
-  
-  #print "there were ".$count." genes produce TargettedGenewise\n";
-  $self->{'_targetted_runnables'} = [];
 
 }
 
@@ -327,7 +319,11 @@ sub run {
 
 sub output{
   my ($self) = @_;
-  # nothing to output ...
+  my @output;
+  foreach my $tge($self->targetted_runnable){
+    push(@output, $tge->output);
+  }
+  return @output;
 }
 
 =head2 write_output
@@ -343,6 +339,17 @@ sub output{
 
 sub write_output {
   my ($self) = @_;
+  foreach my $tge($self->targetted_runnable){
+   eval{
+     $tge->write_output;
+     #print "\n\n";
+    };
+
+    if($@){
+      $self->warn("problems writing output for TargettedGeneWise: [$@]\n");
+      next TGE;
+    }
+ }
   # data has already been written out, so no need to do anything here.
 }
 
