@@ -162,7 +162,7 @@ sub run{
 	$totalscore{$f->hseqname} = 0;
       }
 
-      $totalscore{$f->hseqname} =+ $f->score;
+      $totalscore{$f->hseqname} += $f->score;
       
       if( $f->can('evalue') && defined $f->evalue ) {
 	if( $f->evalue < $maxevalue ) {
