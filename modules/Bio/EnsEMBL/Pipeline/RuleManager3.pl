@@ -822,12 +822,31 @@ A Simple script using the Monitor.pm module to display information on the status
    
 -h or -help will print out the help again
 
+NOTE: using the -start_from, -input_id_types, -analysis or -idlist_file
+options automatically switched off the accumulators
+
 =head1 EXAMPLES
 
-a standard rule of the pipeline would look like this
+a standard run of the pipeline would look like this
 
 
+perl RuleManager3.pl -dbhost ecs2b -dbuser ensadmin -dbpass ****
+ -dbname pipeline_db -shuffle
 
+if you wished to specify specific analysis to 
+
+perl RuleManager3.pl -dbhost ecs2b -dbuser ensadmin -dbpass ****
+ -dbname pipeline_db -analysis RepeatMask -analysis Swall
+
+this would only run the RepeatMask and Swall analyses
+
+perl RuleManager3.pl -dbhost ecs2b -dbuser ensadmin -dbpass ****
+ -dbname pipeline_db -analysis RepeatMask -local
+
+this would only run the RepeatMask analysis locally
+
+obviously when specific analyses are specified their conditions must be 
+met otherwise they still won't be run'
 
 =head1 SEE ALSO
 
