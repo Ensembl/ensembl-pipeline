@@ -1,9 +1,8 @@
 #
 #
-# Cared for by Laura Clarke  <lec@sanger.ac.uk>
+# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
 #
-# Copyright Laura Clarke
-
+# Copyright GRL & EBI
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -13,26 +12,21 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RunnableDB:HalfwiseHMM
+Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM
+
 =head1 SYNOPSIS
 
-my $db          = Bio::EnsEMBL::DBLoader->new($locator);
-my $halfwisehmm     = Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM->new ( 
-                                                    -dbobj      => $db,
-			                                        -input_id   => $input_id
-                                                    -analysis   => $analysis );
-$halfwisehmm->fetch_input();
-$halfwisehmm->run();
-$halfwisehmm->output();
-$halfwisehmm->write_output(); #writes to DB
+    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM->new(
+					     -dbobj     => $db,
+					     -input_id  => $id
+                                             );
+    $obj->fetch_input
+    $obj->run
+
+    my @newfeatures = $obj->output;
+
 
 =head1 DESCRIPTION
-
-This object wraps Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM to add
-functionality for reading and writing to databases. The appropriate
-Bio::EnsEMBL::Analysis object must be passed for extraction
-of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-is required for database access.
 
 =head1 CONTACT
 
@@ -45,129 +39,356 @@ Internal methods are usually preceded with a _
 
 =cut
 
+# Let the code begin...
+
 package Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM;
 
-use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
-use Data::Dumper;
+use Bio::Root::RootI;
 
 use vars qw(@ISA);
+use strict;
+
+use Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
+
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
 
     Title   :   new
     Usage   :   $self->new(-DBOBJ       => $db
-                           -INPUT_ID    => $id
-                           -ANALYSIS    => $analysis);      
-                          
+                           -INPUT_ID    => $id);
+                           
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM object
-    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Analysis 
-
+    Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
+                -input_id:   Contig input id (required), 
+                -seqfetcher: A Bio::DB::RandomAccessI Object (required)
 =cut
 
 sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-    
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    $self->{'_parameters'}  = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    $self->init('Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM');
-    
+    my ($new,@args) = @_;
+    my $self = $new->SUPER::new(@args);    
+           
+    # dbobj, input_id, seqfetcher, and analysis objects are all set in
+    # in superclass constructor (RunnableDB.pm)
+
+    $self->{'_fplist'} = []; #create key to an array of feature pairs
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->seqfetcher($seqfetcher);
+	
     return $self;
 }
+
+
+=head2 dbobj
+
+    Title   :   dbobj
+    Usage   :   $self->dbobj($obj);
+    Function:   Gets or sets the value of dbobj
+    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+                (which extends Bio::EnsEMBL::DB::ObjI)
+    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
+
+=head2 input_id
+
+    Title   :   input_id
+    Usage   :   $self->input_id($input_id);
+    Function:   Gets or sets the value of input_id
+    Returns :   valid input id for this analysis (if set) 
+    Args    :   input id for this analysis 
+
+=head2 seqfetcher
+
+    Title   :   seqfetcher
+    Usage   :   $self->seqfetcher($seqfetcher)
+    Function:   Get/set method for SeqFetcher
+    Returns :   Bio::DB::RandomAccessI object
+    Args    :   Bio::DB::RandomAccessI object
+
+=head2 fetch_output
+
+    Title   :   fetch_output
+    Usage   :   $self->fetch_output
+    Function:   Fetchs output data from a frozen perl object
+    Returns :   array of exons (with start and end)
+    Args    :   none
+
+=cut
+
+
 
 
 =head2 fetch_input
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for HalfwiseHMM from the database
-    Returns :   none
+    Function:   Fetchs input data for est2genome from the database
+    Returns :   nothing
     Args    :   none
 
 =cut
 
 sub fetch_input {
-    my($self) = @_;
+  my( $self) = @_;
+  print "running fetch input\n";  
+  my @fps;
+  my %ests;
+  my @estseqs;
+  $self->throw("No input id") unless defined($self->input_id);
+  
+  my $contigid  = $self->input_id;
+  my $contig    = $self->dbobj->get_Contig($contigid);
+  print "got contig\n";
+  my $genseq   = $contig->primary_seq;
+  print "got dnaseq\n";
+  my @features = $contig->get_all_SimilarityFeatures_above_score("swall", 1);
+  print $features[0]."\n";
+  print "got data\n";
+  
+  foreach my $f (@features) {
+    if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+	defined($f->hseqname)) {
+      push(@fps, $f);
+    }
+  }
+  print "got feature pairs\n";
+
+  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-genomic'     => $genseq, 
+									    '-features' => \@fps,
+									    '-hmmdb'  => $self->analysis->db_file);
+  print "created HalfwiseHMM Runnable\n";  
+  $self->runnable($runnable);
+  print "finshed fetching input\n";
+}    
+      
+  
     
-    $self->throw("No input id") unless defined($self->input_id);
-
-    my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
-    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
-    $self->genseq($genseq);
-
-}
-
-=head2 init
-
-    Title   :   init
-    Usage   :   $self->init
-    Function:   initializes the halfwisehmm runnable
-    Returns :   nothing
-    Args    :   name of runnable
-
-=cut
-
-#get/set for runnable and args
-sub init {
-    my ($self, $runnable) = @_;
     
-    if ($runnable) {
-      #extract parameters into a hash
-      my %parameters;
-      my ($parameter_string) = $self->parameters();
-      if ($parameter_string) {
-	my @pairs = split (/,/, $parameter_string);
-	foreach my $pair (@pairs) {
-	  
-	  my ($key, $value) = split (/=>/, $pair);
-	  $key =~ s/\s+//g;
-	  $parameters{$key} = $value;
-	}
+    
+    
+
+
+
+sub runnable {
+    my ($self,$arg) = @_;
+
+    if (defined($arg)) {
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::RunnableI") unless $arg->isa("Bio::EnsEMBL::Pipeline::RunnableI");
 	
-      }
-      $parameters {'-genewise'}  = $self->analysis->program_file;
-      $parameters {'-hmmdb'}   = $self->analysis->db_file;
-      #creates empty Bio::EnsEMBL::Runnable::HalfwiseHMM object
-      my $runnable = $runnable->new(%parameters);
-      $self->runnable($runnable);
+	$self->{_runnable} = $arg;
     }
+
+    return $self->{_runnable};
 }
 
-
-=head2 result_quality_tag
-
-    Title   :   result_quality_tag
-    Usage   :   $self->result_quality_tag
-    Function:   Returns an indication of whether the data is suitable for 
-                further analyses. Allows distinction between failed run and 
-                no hits on a sequence.
-    Returns :   'VALID' or 'INVALID'
-    Args    :   none
-
-=cut
-#a method of writing back result quality
-sub result_quality_tag {
+sub run {
     my ($self) = @_;
+
+    my $runnable = $self->runnable;
+    $runnable || $self->throw("Can't run - no runnable object");
+
+    $runnable->run;
+    $self->_convert_output();
     
-    if ($self->output)
-    {
-        return 'VALID';
-    }
-    else
-    {
-        return 'INVALID';
-    }
 }
+
+sub output {
+    my ($self) = @_;
+    return @{$self->{_output}};
+}
+
+sub write_output {
+
+  my($self) = @_;
+  
+  my @genes    = $self->output();
+  
+  my $db       = $self->dbobj();
+
+
+  my $gene_adaptor= $self->dbobj->get_GeneAdaptor;
+
+ 
+    
+    
+  
+ GENE: foreach my $gene (@genes) {	
+    # do a per gene eval...
+    eval {
+      print "gene = ".$gene."\n";
+      $gene_adaptor->store($gene);
+    }; 
+    if( $@ ) {
+      print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
+    }
+    
+  }
+  
+  return 1;
+}
+
+
+sub _convert_output {
+  my ($self) = @_;
+  my $count  = 1;
+  my $time   = time; chomp($time);
+  my @genes;
+  my $genetype = 'HalfwiseHMM';
+  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+  my $analysis;
+  if(scalar(@analyses) > 1){
+    $self->throw("panic! > 1 analysis for $genetype\n");
+  }
+  elsif(scalar(@analyses) == 1){
+    $analysis = $analyses[0];
+  }
+  else{
+    # make a new analysis object
+    $analysis = new Bio::EnsEMBL::Analysis
+      (-db              => 'dbEST',
+       -db_version      => '1',
+       -program         => 'HalfwiseHMM',
+       -program_version => 1,
+       -gff_source      => 'HalfwiseHMM',
+       -gff_feature     => 'gene',
+       -logic_name      => 'HalfwiseHMM',
+       -module          => 'HalfwiseHMM',
+      );
+  } 
+  # make an array of genes for each runnable
+  foreach my $runnable ($self->runnable) {
+    my @g = $self->_make_genes($count, $time, $runnable, $analysis);
+    push(@genes, @g);
+  }
+  #print STDOUT "genes = @genes\n";
+
+    
+  if (!defined($self->{_output})) {
+    $self->{_output} = [];
+  }
+  
+  push(@{$self->{_output}},@genes);
+}
+
+
+sub _make_genes {
+  my ($self, $count, $time, $runnable, $analysis) = @_;
+  my $contig = $self->dbobj->get_Contig($self->input_id);
+  my $genetype = 'eg';
+  my $internal_id = $contig->internal_id;
+  my @tmpf = $runnable->output; # an array of SeqFeaturesm one per gene prediction, with subseqfeatures
+  print STDERR "we'll have " . scalar(@tmpf) . " genes\n";
+  my @genes;
+  
+  foreach my $tmpf(@tmpf) {
+    my $gene   = new Bio::EnsEMBL::Gene;
+    my $tran   = new Bio::EnsEMBL::Transcript;
+    my $transl = new Bio::EnsEMBL::Translation;
+    
+    $gene->type($genetype);
+    $gene->analysis($analysis);
+    
+  
+    
+    $count++;
+    
+    $gene->add_Transcript($tran);
+    $tran->translation($transl);
+    
+    my $excount = 1;
+    my @exons;
+    
+    foreach my $exon_pred ($tmpf->sub_SeqFeature) {
+      # make an exon
+      my $exon = new Bio::EnsEMBL::Exon;
+      
+     
+      $exon->contig_id($internal_id);
+    
+      $exon->seqname($self->input_id);
+      $exon->start($exon_pred->start);
+      $exon->end  ($exon_pred->end);
+      $exon->strand($exon_pred->strand);
+      
+      #	$exon->phase($subf->feature1->{_phase});
+      
+      $exon->phase($exon_pred->phase);
+      $exon->attach_seq($contig->primary_seq);
+      # fix source tag and primary tag for $exon_pred - this isn;t the right place to do this.
+      $exon_pred->source_tag('E2G');
+      $exon_pred->primary_tag('E2G');
+
+      $exon_pred->score(100); # ooooooohhhhhh
+      
+      print "num subfeatures: " . scalar($exon_pred->sub_SeqFeature) . "\n";
+
+      # sort out supporting evidence for this exon prediction
+      foreach my $subf($exon_pred->sub_SeqFeature){
+	$subf->feature1->source_tag($genetype);
+	$subf->feature1->primary_tag('similarity');
+	$subf->feature1->analysis($exon_pred->analysis);
+	
+	$subf->feature2->source_tag($genetype);
+	$subf->feature2->primary_tag('similarity');
+	$subf->feature2->analysis($exon_pred->analysis);
+	
+	$exon->add_Supporting_Feature($subf);
+      }
+      
+      push(@exons,$exon);
+      
+      $excount++;
+    }
+    
+    if ($#exons < 0) {
+      print STDERR "Odd.  No exons found\n";
+    } else {
+      print "gene = ".$gene."\n";
+      push(@genes,$gene);
+      
+      if ($exons[0]->strand == -1) {
+	@exons = sort {$b->start <=> $a->start} @exons;
+      } else {
+	@exons = sort {$a->start <=> $b->start} @exons;
+      }
+      
+      foreach my $exon (@exons) {
+	$tran->add_Exon($exon);
+      }
+      
+      $transl->start_exon($exons[0]);
+      $transl->end_exon($exons[$#exons]);
+      
+      if ($exons[0]->phase == 0) {
+	$transl->start(1);
+      } elsif ($exons[0]->phase == 1) {
+	$transl->start(3);
+      } elsif ($exons[0]->phase == 2) {
+	$transl->start(2);
+      }
+      
+      my $endexon = $exons[$#exons];
+      
+      if( $endexon->end_phase == 1 ) {
+	$transl->end($endexon->length -1 );
+      } elsif ( $endexon->end_phase == 2 ) {
+	$transl->end($endexon->length -2 );
+      } else {
+	$transl->end($endexon->length);
+      }
+      
+
+    }
+  }
+  print "_make genes made genes @genes\n";
+  return @genes
+
+
+}
+
+
 
 1;
