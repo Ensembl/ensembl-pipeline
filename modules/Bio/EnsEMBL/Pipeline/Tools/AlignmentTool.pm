@@ -1035,32 +1035,19 @@ sub _fiddly_bits {
   my $hstart = $base_align_feature->hstart;
   my $hend = $base_align_feature->hend;
 
-  my $fetched_seq;
 
-  # Fetching the hit sequence with our seqfetcher.  Often
-  # these sequences are missing, so we have to fetch in
-  # an eval mediated manner.
+  # Fetch our sequence from the cache.  If the sequence
+  # is missing it means that it could not be fetched and
+  # we will have to ignore it.
 
-  # Here we have a bit of fiddling around to cache sequences.
+  my $fetched_seq = $self->_fetch_sequence($base_align_feature->hseqname);
 
-  if ($self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname}) {
+  if ( ! $fetched_seq) {
 
-    $fetched_seq = $self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname};
-
-  } else {
+    $self->warn("Error fetching sequence " 
+		. $base_align_feature->hseqname . ".  Ignoring.");
     
-    eval {  
-      $fetched_seq = $self->_seq_fetcher->get_Seq_by_acc($base_align_feature->hseqname);
-    };
-    
-    if ($@) {
-      $self->warn("Error fetching sequence " 
-		  . $base_align_feature->hseqname . ".  Ignoring.");
-      return 0;
-    }
-
-    $self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname} = $fetched_seq;
-
+    return 0;
   }
 
   my @fetched_seq;
@@ -1409,6 +1396,97 @@ sub _exon_protein_translation {
   
   return $self->{'_exon_protein_translation'};
 }
+
+##### Methods that take care of sequence fetching and caching #####
+
+=head2 _build_sequence_cache
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _build_sequence_cache {
+  my ($self) = @_;
+
+  # Determine which sequences are likely to be needed.
+
+  my %hash_of_accessions;
+
+  foreach my $exon (@{$self->_transcript->get_all_Exons}){
+
+    foreach my $supporting_feature (@{$exon->get_all_supporting_features}){
+      $hash_of_accessions{$supporting_feature->hseqname}++;
+    }
+
+  }  
+
+  my @array_of_accessions = keys %hash_of_accessions;
+
+  # Retrieve sequences.
+
+  my $fetched_seqs;
+
+  eval {
+    $fetched_seqs = $self->_seq_fetcher->batch_fetch(@array_of_accessions);
+  };
+
+  if ($@){
+    $self->warn("Not all evidence sequences could be pfetched.\n".
+		"Ignoring missing sequences.\n$@\n");
+  }
+  
+  # Build cache.
+print STDERR "Have " . scalar @$fetched_seqs . " fetched sequences.\n";
+my $countthing = 0;
+ BAILOUT:
+  foreach my $fetched_seq (@$fetched_seqs){
+print STDERR "Count : $countthing\t\tAccession : $array_of_accessions[$countthing]\n";
+$countthing++;
+unless ($fetched_seq) {
+print STDERR "BAILING OUT\n";
+  next BAILOUT;
+}
+#print STDERR "Count : $countthing\tFetched seq : " . $fetched_seq . "\n";
+    $self->{'_fetched_seq_cache'}->{$fetched_seq->accession_number} = $fetched_seq;
+
+  }
+
+  $self->{'_cache_is_built'} = 1;
+}
+
+
+
+=head2 _fetch_sequence
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _fetch_sequence {
+  my ($self, $accession) = @_;
+
+  $self->_build_sequence_cache 
+    unless $self->{'_cache_is_built'};
+
+  unless ($self->{'_fetched_seq_cache'}->{$accession}){
+    $self->warn("Sequence $accession could not be retrieved from cache.");
+  }
+
+  return $self->{'_fetched_seq_cache'}->{$accession}; 
+}
+
+
+
 
 
 ##### CIGAR string handlers #####
