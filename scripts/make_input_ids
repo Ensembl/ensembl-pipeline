@@ -180,8 +180,7 @@ if($seq_level){
   $coord_system = 'toplevel';
 }
 
-if (!($slice) && !($single) && !($file) && !($translation_id) 
-    && !($non_redundant)) {
+if (!($slice) && !($single) && !($file) && !($translation_id)) {
   throw("Must define input as either contig, slice, file, translation_id ".
   "single, seq_level or top_level");
   exec('perldoc', $0);
@@ -198,10 +197,10 @@ my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 
 
 
-if( ($slice + $non_redundant + $single + $file + $translation_id) > 1){
+if( ($slice + $single + $file + $translation_id) > 1){
   die "must only define one of these options on the commandline ".
-    "-slice $slice -non_redundant $non_redundant -single $single -file $file ".
-    " -translation_id $translation_id";
+    "-slice $slice  -single $single -file $file  -translation_id ".
+      "$translation_id";
 }
 
 $input_type = $analysis->input_id_type unless($input_type);
@@ -215,7 +214,7 @@ if ($slice) {
     unless($coord_system);
 
   $cs_version = '' unless($cs_version);
-  
+  print STDERR "Fetching slices for ".$coord_system." coord system\n";
   @ids = $inputIDFactory->generate_slice_input_ids($coord_system, $cs_version, $slice_size, $slice_overlap); 
 }elsif($single){
   $input_type = 'GENOME' unless $input_type;

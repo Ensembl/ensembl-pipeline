@@ -56,7 +56,7 @@ if(!$write){
   $update = 0;
 }
 
-#print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n" if($verbose);
+print STDERR "args: $dbhost : $dbuser : $dbpass : $dbname : $input_id : $logic_name\n" if($verbose);
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
@@ -76,9 +76,9 @@ $analysis = $aa->fetch_by_logic_name($logic_name);
 if(!$analysis){
   die("Can't create an analysis without a module and input type") 
     unless($module && $input_type);
-  #print STDERR "creating analysis object ".$logic_name." ".$module.
+  print STDERR "creating analysis object ".$logic_name." ".$module.
     " ".$input_type."\n" if($verbose);
-  #print STDERR "This object will be stored in the database when the ".
+  print STDERR "This object will be stored in the database when the ".
     "features are written\n" if($verbose && $write);
   $analysis = new Bio::EnsEMBL::Pipeline::Analysis
     (-logic_name => $logic_name,
@@ -91,22 +91,22 @@ if(!$analysis){
 my $runnable = "Bio::EnsEMBL::Pipeline::RunnableDB::".$analysis->module;
 (my $file = $runnable) =~ s/::/\//g;
 require "$file.pm";
-#print STDERR "creating runnable ".$file."\n" if($verbose);
+print STDERR "creating runnable ".$file."\n" if($verbose);
 
 $runnable =~ s/\//::/g;
 my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
 			     );
-#print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
+print STDERR "Instantiated ".$runnable." runnabledb\n" if($verbose);
 $runobj->fetch_input;
-#print STDERR "Fetched input\n" if($verbose);
+print STDERR "Fetched input\n" if($verbose);
 $runobj->run;
-#print STDERR "Run ".$runobj."\n" if($verbose);
+print STDERR "Run ".$runobj."\n" if($verbose);
 
 if($write){
   $runobj->write_output;
-  #print STDERR "written output\n" if($verbose);
+  print STDERR "written output\n" if($verbose);
 }
 
 my $sql = "insert into input_id_analysis(input_id, input_id_type, analysis_id, created) values( ?, ?, ?, now())";
@@ -118,7 +118,7 @@ if($write){
   }
 }
 
-#print "There is ".$runobj->output." features output\n\n\n";
+print "There is ".$runobj->output." features output\n\n";
 
 #$verbose = 1;
 if($verbose){
@@ -128,16 +128,23 @@ if($verbose){
       $runobj->output." or your analysis hasn't produced any output\n";
   }
   print STDERR "have ".@output." results\n";
-  foreach my $out (@output) {
+  my $exon_count = 0;
+  my $transcript_count = 0;
+  foreach my $out (@output) { 
     if ($out->isa("Bio::EnsEMBL::Gene")) {
-      print "\n";
+      #print "\n";
+      my $type = $out->type;
       foreach my $tran (@{$out->get_all_Transcripts}) {
         foreach my $exon (@{$tran->get_all_Exons}) {
-          print "Exon " . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\t" . $exon->phase . "\n";
+          print($exon->dbID."\t".$type."\texon\t".$exon->start."\t".
+                $exon->end."\t300\t".$exon->strand."\t.\t".
+                $transcript_count." \n");
           foreach my $ev (@{$exon->get_all_supporting_features}) {
-            print "  - " . print_gff($ev) . "\n";
+            print print_gff($ev) . "\n";
           }
+          $exon_count++;
         }
+        $transcript_count++;
       }
     } else {
       print $out->slice;
@@ -146,6 +153,7 @@ if($verbose){
       print_gff($out, $name);
     }
   }
+  print "have ".$exon_count." exons\n";
 }
 
 
@@ -160,7 +168,8 @@ sub print_gff{
   $str .= ($feature->end)      ?  $feature->end."\t":"\t";
   $str .= ($feature->score)    ?  $feature->score."\t" :"\t";
   $str .= ($feature->strand)   ?  $feature->strand."\t":  ".\t";
-  $str .= ($feature->hseqname) ?  $feature->hseqname()."\t": "\t";
+  $str .= ($feature->hseqname) ?  $feature->hseqname()."\t": "\t" 
+    if($feature->can('hseqname'));
   $str .=  ".\t"; #phase
   $str .=  ".\t"; #end phase
   print $str."\n";

@@ -9,11 +9,11 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 use Data::Dumper;
 
-my $host   = '';
-my $port   = '3306';
+my $dbhost   = '';
+my $dbport   = '';
 my $dbname = '';
-my $user   = 'ensro';
-my $pass   = undef;
+my $dbuser   = '';
+my $dbpass   = undef;
 my $help            = 0;
 my $current         = 0;
 my $current_summary = 0;
@@ -30,10 +30,10 @@ my $lock            = 0;
 my $no_submit = 0;
 
 &GetOptions( 
-	    'dbhost:s'          => \$host,
-	    'dbport:n'          => \$port,
-	    'dbuser:s'          => \$user,
-	    'dbpass:s'          => \$pass,
+	    'dbhost:s'          => \$dbhost,
+	    'dbport:n'          => \$dbport,
+	    'dbuser:s'          => \$dbuser,
+	    'dbpass:s'          => \$dbpass,
 	    'dbname:s'          => \$dbname,
 	    'current'           => \$current,
 	    'current_summary'   => \$current_summary,
@@ -51,7 +51,7 @@ my $no_submit = 0;
 	    'lock'              => \$lock
 	   ) or useage();
 
-if(!$host || !$dbname){
+if(!$dbhost || !$dbname){
   print STDERR " you must provide a host and a database name for you db ".
     "connection\n";
   $help = 1;
@@ -67,13 +67,17 @@ if(!$current && !$current_summary && !$finished && !$analysis && !$rules
 useage() if $help;
 
 
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+  (
+   -host => $dbhost,
+   -user => $dbuser,
+   -dbname => $dbname,
+   -pass  => $dbpass,
+   -port => $dbport,
+  );
 
 
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(-host   => $host,
-						      -user   => $user,
-						      -pass   => $pass,
-						      -dbname => $dbname,
-						      -port   => $port);
+
 
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 
