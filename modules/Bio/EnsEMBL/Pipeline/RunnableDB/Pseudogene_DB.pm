@@ -20,7 +20,7 @@ my $runnabledb = Bio::EnsEMBL::Pipeline::RunnableDB::Pseudogene_DB->new(
 $runnabledb->fetch_input();
 $runnabledb->run();
 my @array = @{$runnabledb->output};
-$runnabledb->write_output();
+$runnabledb->write_output();2
 
 array ref returned by output contain all the genes found on the slice, modified to relflect pseudogene status
 
@@ -75,21 +75,17 @@ Title   :   fetch_input
 
 =cut
 
-
-
 sub fetch_input {
   my( $self) = @_;
-
   $self->throw("No input id") unless defined($self->input_id);
 
   my $results = [];		# array ref to store the output
-  my %parameters = $self->parameter_hash;
   my %repeat_blocks;
   my %homolog_hash;
-  $parameters{'-query'} = $self->query;
-  $self->fetch_sequence;
+  my @transferred_genes;
   my $runname = "Bio::EnsEMBL::Pipeline::Runnable::Pseudogene";
-  
+  $self->fetch_sequence;
+
   my $rep_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
      '-host'   => $GB_DBHOST,
@@ -100,6 +96,7 @@ sub fetch_input {
     );
   #store repeat db internally
   $self->rep_db($rep_db);
+  my $rsa = $rep_db->get_SliceAdaptor;
 
   #genes come from final genebuild database
   my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
@@ -111,47 +108,42 @@ sub fetch_input {
      '-port'   => $GB_FINALDBPORT,
     );
 
+  # genes_slice holds all genes on input id slice
   $self->gene_db($genes_db);
-
   my $genedb_sa = $genes_db->get_SliceAdaptor;
-  my $genes_slice = $genedb_sa->fetch_by_region(
-						'chromosome',
-						$self->query->chr_name,
-						$self->query->start,
-						$self->query->end
-					       );
+  my $genes_slice = $genedb_sa->fetch_by_name($self->input_id);
   my $genes = $genes_slice->get_all_Genes;
-  my @transferred_genes;
 
   foreach my $gene (@{$genes}) {
-    my $rsa = $rep_db->get_SliceAdaptor;
 
-    #repeats come from core database
-    my $rep_gene_slice = $rsa->fetch_by_region(
-					       'chromosome',
-					       $self->query->chr_name,
-					       $gene->start,
-					       $gene->end,
-					      );
-
-    ##########################################################################
-    #transfer gene coordinates to entire chromosome to prevent problems arising 
+    ############################################################################
+    # transfer gene coordinates to entire chromosome to prevent problems arising
     # due to offset with repeat features 
-
     my $chromosome_slice = $rsa->fetch_by_region(
 						 'chromosome',
 						 $self->query->chr_name,
 						);
 
     my $transferred_gene = $gene->transfer($chromosome_slice);
-
     push @transferred_genes,$transferred_gene;
 
+    # repeats come from core database
+    # repeat slice only covers gene to avoid sorting repeats unnecessarily
+    my $rep_gene_slice = $rsa->fetch_by_region(
+					       'chromosome',
+					       $self->query->chr_name,
+					       $transferred_gene->start,
+					       $transferred_gene->end,
+					      );
+    # Only look for repeats in multiexon genes
     if (scalar(@{$transferred_gene->get_all_Exons()}) > 1){
-      # multiexon - check for repeats in introns
-      $repeat_blocks{$transferred_gene} = $self->get_all_repeat_blocks($rep_gene_slice->get_all_RepeatFeatures);
+      my $blocks = $self->get_all_repeat_blocks($rep_gene_slice->get_all_RepeatFeatures);
+      # make hash of repeat blocks using the gene as the key
+      $repeat_blocks{$transferred_gene} = $blocks;
     }
   }
+  # Make and run the runnable
+
   if ($self->validate_genes(\@transferred_genes)) {
     my $runnable = $runname->new
       ( 
@@ -181,9 +173,9 @@ sub get_all_repeat_blocks {
 
  REPLOOP: foreach my $repeat (@repeats) {
     my $rc = $repeat->repeat_consensus;
-    if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) { 
-      next REPLOOP;
-    }
+    if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) {  
+    next REPLOOP;
+   }
     if ($repeat->start <= 0) { 
       $repeat->start(1); 
     }
@@ -192,15 +184,15 @@ sub get_all_repeat_blocks {
 	$curblock->end($repeat->end); 
       }
     } else {
-      $curblock = Bio::EnsEMBL::SeqFeature->new(
+      $curblock = Bio::EnsEMBL::Feature->new(
 						-START => $repeat->start,
 						-END => $repeat->end, 
 						-STRAND => $repeat->strand
-					       );
+					    );
       push (@repeat_blocks,$curblock);
     }
   }
-  @repeat_blocks = sort {$a->start <=> $b->start} @repeat_blocks;
+    @repeat_blocks = sort {$a->start <=> $b->start} @repeat_blocks;
   return\@repeat_blocks;
 }
 

@@ -309,18 +309,18 @@ sub transcript_evidence{
   my $covered_exons = 0 ;
   
   foreach my $exon (@exons) {
-    ###########################################
-    #Need to convert exon object to seq feature
-    #in order to use range methods
+    ##############################################################
+    # Need to make intron and exon Features to compare with repeats
+    # features are relative to gene as are the repeats
 
-    my $seq_feature_exon = Bio::EnsEMBL::SeqFeature->new(
+    my $seq_feature_exon = Bio::EnsEMBL::Feature->new(
 							 -START => $exon->start-$gene->start,
 							 -END => $exon->end-$gene->start,
 							 -STRAND => $exon->strand
 							);
     # Do intron
     if (defined($prev_exon)) {
-      my $intron = Bio::EnsEMBL::SeqFeature->new(
+      my $intron = Bio::EnsEMBL::Feature->new(
 						 -START => $prev_exon->end+1-$gene->start,
 						 -END => $exon->start-1-$gene->start,
 						 -STRAND => $exon->strand
@@ -377,7 +377,7 @@ sub _len_covered {
  RBLOOP: foreach my $repeat_block (@$repeat_blocks_ref) {
 #    print STDERR  "RB " . $repeat_block->start . " " . $repeat_block->end . "\n";
     if ($repeat_block->overlaps($feat, 'ignore')) {
-      my $inter = $feat->intersection($repeat_block);
+      my $inter = $self->intersection($feat,$repeat_block);
       $covered_len += $inter->length;
     } elsif ($repeat_block->start > $feat->end) {
       last RBLOOP;
@@ -421,11 +421,11 @@ sub protein_covered_intron{
   ########################################
   # make a seq feature represening the intron
   
-  my $intron = Bio::EnsEMBL::SeqFeature->new(
-					     -START => $exons[0]->end+1,
-					     -END => $exons[1]->start-1,
-					     -STRAND => $exons[0]->strand
-					    );
+  my $intron = Bio::EnsEMBL::Feature->new(
+					  -START => $exons[0]->end+1,
+					  -END => $exons[1]->start-1,
+					  -STRAND => $exons[0]->strand
+					 );
   if (@exon_features) {
     ###########################################################
     # get featues off both exons, split them into ungapped
@@ -436,10 +436,10 @@ sub protein_covered_intron{
   FEATURES:   foreach my $feat (@exon_features) {
       my @sub_features = $feat->ungapped_features;
       foreach my $subfeature (@sub_features) {
-	my $seq_feature = Bio::EnsEMBL::SeqFeature->new(
-							-START => $subfeature->start,
-							-END => $subfeature->end,
-							-STRAND => $subfeature->strand
+	my $seq_feature = Bio::EnsEMBL::Feature->new(
+						     -START => $subfeature->start,
+						     -END => $subfeature->end,
+						     -STRAND => $subfeature->strand
 						       );
 	push @{$seq_features{$feat->hseqname}}, $seq_feature;
       }
@@ -462,11 +462,11 @@ sub protein_covered_intron{
 	    $curblock->end($feature->end); 
 	  }
 	} else {
-	  $curblock = Bio::EnsEMBL::SeqFeature->new(
-						    -START => $feature->start,
-						    -END => $feature->end, 
-						    -STRAND => $feature->strand
-						   );
+	  $curblock = Bio::EnsEMBL::Feature->new(
+						 -START => $feature->start,
+						 -END => $feature->end, 
+						 -STRAND => $feature->strand
+						);
 	  push (@feature_blocks,$curblock);
 	}
       }
@@ -517,6 +517,39 @@ sub _remove_transcript_from_gene {
   }
 
   return scalar(@newtrans);
+}
+
+=head2 intersection
+
+Arg [none] :
+  Description: returns length of intersecion of two features
+  Returntype : scalar
+  Exceptions : throws if not given two Bio::EsEMBL::Feature objects
+  Caller     : len_covered
+
+=cut
+
+sub intersection {
+  my ($self,$feat1,$feat2) = @_;
+    unless ($feat1->isa("Bio::EnsEMBL::Feature") && $feat2->isa("Bio::EnsEMBL::Feature")){
+    $self->throw("object is not a Bio::EnsEMBL::Feature they are feat1 $feat1, feat2 $feat2\n$@\n");
+  }
+  my @start = sort {$a<=>$b}
+    ($feat1->start(), $feat2->start());
+    my @end   = sort {$a<=>$b}
+    ($feat1->end(),   $feat2->end());
+
+    my $start = pop @start;
+    my $end = shift @end;
+
+    if($start > $end) {
+	return undef;
+    } else {
+	return Bio::EnsEMBL::Feature->new('-start'  => $start,
+			                  '-end'    => $end,
+			                  '-strand' => $feat1->strand
+                       			  );
+    }
 }
 
 =head2 output
@@ -620,8 +653,8 @@ sub repeats {
   my ($self, $repeats) = @_;
   foreach my $repeat_array (values %{$repeats}) {
     foreach my $repeat (@{$repeat_array}) {
-      unless ($repeat->isa("Bio::EnsEMBL::SeqFeature")){
-        $self->throw("Input is not a Bio::EnsEMBL::SeqFeature, it is a $repeat");
+      unless ($repeat->isa("Bio::EnsEMBL::Feature")){
+        $self->throw("Input is not a Bio::EnsEMBL::Feature, it is a $repeat");
       }
     }
   }
