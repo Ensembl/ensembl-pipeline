@@ -125,19 +125,33 @@ sub list_inputId_class_by_start_count {
   my @result;
   my @row;
 
-  my $query = qq{
-    SELECT inputId, class 
-      FROM InputIdAnalysis
-     GROUP by inputId, class };
+  my $query = qq {
+      SELECT inputId,class 
+      FROM   InputIdAnalysis
+  };
+	 
+#  my $query = qq{
+#    SELECT inputId, class 
+#      FROM InputIdAnalysis
+#     GROUP by inputId, class };
   
   if( defined $start && defined $count ) {
-    $query .= "LIMIT $start,$count";
+    $query .= " LIMIT $start,$count";
   }
+
   my $sth = $self->prepare( $query );
   $sth->execute;
 
+  my %seenhash;
+
   while( @row = $sth->fetchrow_array ) {
-    push( @result, [ $row[0], $row[1] ] );
+      my $id    = $row[0];
+      my $class = $row[1];
+
+      if (!defined($seenhash{$id . "-" . $class})) {
+	  push( @result, [ $id, $class ] );
+      }
+      $seenhash{$id . "-" . $class} = 1;
   }
 
   return @result;
