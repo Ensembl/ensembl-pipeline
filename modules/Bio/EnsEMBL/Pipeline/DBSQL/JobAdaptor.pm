@@ -67,14 +67,15 @@ sub fetch_by_dbID{
          , taskname
 	 , input_id
 	 , submission_id
-	 , array_index  
-	 , parameters 
+	 , job_name
+	 , array_index
+	 , parameters
 	 , module
 	 , stderr_file
 	 , stdout_file
     FROM job
-    WHERE job_id = $dbID };  
-	   
+    WHERE job_id = $dbID };
+	
   my $sth = $self->prepare($query);
   $sth->execute;
   my $hashRef;
@@ -103,22 +104,22 @@ sub fetch_by_dbID{
 sub fetch_all_by_taskname{
   my ($self, $taskname) = @_;
 
-
    my $query = qq {
     SELECT job_id
-         , taskname
+   , taskname
 	 , input_id
 	 , submission_id
-	 , array_index  
-	 , parameters 
+	 , job_name
+	 , array_index
+	 , parameters
 	 , module
 	 , stderr_file
 	 , stdout_file
     FROM job
-    WHERE taskname = '$taskname' };  
-	   
+    WHERE taskname = ? };
+
   my $sth = $self->prepare($query);
-  $sth->execute;
+  $sth->execute("$taskname");
   my $hashRef;
   my @jobs;
   while($hashRef = $sth->fetchrow_hashref()){
@@ -149,13 +150,13 @@ sub _job_from_hashref{
   my ($self, $hashref) = @_;
   
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
-					     -input_id => $hashref->{'input_id'},
-					     -taskname => $hashref->{'taskname'},
-					     -module => $hashref->{'module'},
-					    );
+	     -input_id => $hashref->{'input_id'},
+	     -taskname => $hashref->{'taskname'},
+	     -module => $hashref->{'module'});
 
   $job->dbID($hashref->{'job_id'});
   $job->submission_id($hashref->{'submission_id'});
+  $job->job_name($hashref->{'job_name'});
   $job->array_index($hashref->{'array_index'});
   $job->parameters($hashref->{'parameters'});
   $job->stderr_file($hashref->{'stderr_file'});
@@ -186,8 +187,8 @@ sub fetch_current_status{
     SELECT status
     FROM job_status
     WHERE job_id = ?
-    ORDER by time  
-    DESC 
+    ORDER by time
+    DESC
     LIMIT 1};
 
   my $sth = $self->prepare($query);
@@ -243,7 +244,8 @@ sub list_current_status {
   Description: Updates the status of a single job by adding a row to the
                job_status table.
   Returntype : none
-  Exceptions : none
+  Exceptions : thrown if the job does not have a dbID, or the status is not
+               set
   Caller     : Job
 
 =cut
@@ -253,14 +255,60 @@ sub update_status {
   my $job = shift;
   my $status = shift;
 
-  my $current_time = time();
-  my $query = 
+	$self->throw('status argument is required') if(!$status);
+	$self->throw('job must be stored in database') if(!$job->dbID);
+
+  my $query =
     "INSERT INTO job_status (job_id, time, status)
-     VALUES (?, FROM_UNIXTIME(?), ?)";
+     VALUES (?, NOW(), ?)";
 
   my $sth = $self->prepare( $query );
-  $sth->execute( $job->dbID(), $current_time, $status );
+  $sth->execute( $job->dbID(), $status );
 }
+
+
+
+=head2 update
+
+  Arg [1]    : Bio::EnsEMBL::Pipeline::Job
+  Example    : $job_adaptor->update($job);
+  Description: updates a job that has already been stored
+  Returntype : none
+  Exceptions : thrown if the job argument does not already have a dbID
+  Caller     : general
+
+=cut
+
+sub update {
+  my $self = shift;
+	my $job  = shift;
+
+  $self->throw('Cannot update job that does not have dbID') if(!$job->dbID);
+
+	my $sth = $self->prepare(
+		'UPDATE job SET taskname = ?,
+                    input_id = ?,
+	                  submission_id = ?,
+	                  job_name = ?,
+	                  array_index = ?,
+	                  parameters = ?,
+	                  module = ?,
+	                  stderr_file = ?,
+	                  stdout_file = ?
+    WHERE job_id = ?');
+
+	$sth->execute($job->taskname,
+								$job->input_id,
+								$job->submission_id,
+								$job->job_name,
+								$job->array_index,
+								$job->parameters,
+								$job->module,
+								$job->stderr_file,
+								$job->stdout_file,
+							 $job->dbID);
+}
+
 
 
 =head2 store
@@ -283,25 +331,20 @@ sub store{
     INSERT INTO job ( taskname,
 		      input_id,
 		      submission_id,
+		      job_name,
 		      array_index,
 		      parameters,
 		      module,
 		      stdout_file,
 		      stderr_file )
-             VALUES (  ?,
-		       ?,
-		       ?,
-		       ?,
-		       ?,
-		       ?,
-		       ?,
-		       ? ) };
+             VALUES (  ?, ?, ?, ?, ?, ?, ?, ?, ? ) };
 
   my $sth = $self->prepare($query);
 
   $sth->execute( $job->taskname,
 		 $job->input_id,
 		 $job->submission_id,
+		 $job->job_name,
 		 $job->array_index,
 		 $job->parameters,
 		 $job->module,
@@ -343,10 +386,9 @@ sub remove{
   my $second = qq {
     DELETE from job_status
     WHERE job_id = ? };
-  
+
   $sth = $self->prepare($second);
   $sth->execute($job_id);
-  
 }
 
 1;
