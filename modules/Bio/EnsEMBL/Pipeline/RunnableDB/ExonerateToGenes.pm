@@ -160,16 +160,16 @@ sub fetch_input {
     # check that the file exists:
     if ( -s $database){
       
-      print STDERR "creating runnable for target: $database\n";
+      #print STDERR "creating runnable for target: $database\n";
       my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
-	  ->new(
-		-database    => $database,
-		-query_seqs  => \@sequences,
-		-exonerate   => $self->exonerate,
-		-options     => $self->options,
-		-target_type => $self->target_type,
-		-query_type  => $self->query_type,
-		);
+	->new(
+	      -database    => $database,
+	      -query_seqs  => \@sequences,
+	      -exonerate   => $self->exonerate,
+	      -options     => $self->options,
+	      -target_type => $self->target_type,
+	      -query_type  => $self->query_type,
+	     );
       $self->runnables($runnable);
     }
     else{
@@ -194,7 +194,7 @@ sub run{
       
       # store the results
       push ( @results, $runnable->output );
-      print STDERR scalar(@results)." matches found\n";
+      print STDERR scalar(@results)." matches found in ".$runnable->database."\n";
       
   }
   
@@ -219,7 +219,7 @@ sub run{
   my @mapped_genes = $self->convert_coordinates( @genes );
   
   unless ( @mapped_genes ){
-    print STDERR "Sorry, no genes found - exiting\n";
+    print STDERR "No genes stored - exiting\n";
     exit(0);
   }
 
@@ -237,43 +237,54 @@ sub filter_output{
 
   my %matches;
   foreach my $transcript (@results ){
-      my $id = $self->_evidence_id($transcript);
-      push ( @{$matches{$id}}, $transcript );
+    my $id = $self->_evidence_id($transcript);
+    push ( @{$matches{$id}}, $transcript );
   }
   
   my %matches_sorted_by_coverage;
   my %selected_matches;
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
-      @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->_coverage($a) } @{$matches{$rna_id}};
-      
-      my $max_score;
-      print STDERR "matches for $rna_id:\n";
-    TRANSCRIPT:
-      foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
-	  unless ($max_score){
-	      $max_score = $self->_coverage($transcript);
-	  }
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($transcript);
-	  my $score   = $self->_coverage($transcript);
-	  my $perc_id = $self->_percent_id($transcript);
-	  print STDERR "coverage: $score perc_id: $perc_id\n";
-	  
-	  ############################################################
-	  # we keep anything which is 
-	  # within the 2% of the best score
-	  # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
-	  if ( $score >= (0.98*$max_score) && 
-	       $score >= $EST_MIN_COVERAGE && 
-	       $perc_id >= $EST_MIN_PERCENT_ID ){
-	      
-	      print STDERR "Accept!\n";
-	      push( @good_matches, $transcript);
-	  }
-	  else{
-	      print STDERR "Reject!\n";
-	  }
+    @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->_coverage($a) } @{$matches{$rna_id}};
+    
+    my $max_score;
+    print STDERR "####################\n";
+    print STDERR "Matches for $rna_id:\n";
+  TRANSCRIPT:
+    foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
+      unless ($max_score){
+	$max_score = $self->_coverage($transcript);
       }
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+      my $score   = $self->_coverage($transcript);
+      my $perc_id = $self->_percent_id($transcript);
+      my @exons  = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
+      my $start  = $exons[0]->start;
+      my $end    = $exons[$#exons]->end;
+      my $strand = $exons[0]->strand;
+      my $seqname= $exons[0]->seqname;
+      $seqname   =~ s/\.\d+-\d+$//;
+      my $extent = $seqname."-".$start."-".$end;
+      print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand\n";
+      
+      ############################################################
+      # we keep anything which is 
+      # within the 2% of the best score
+      # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
+      if ( $score >= (0.98*$max_score) && 
+	   $score >= $EST_MIN_COVERAGE && 
+	   $perc_id >= $EST_MIN_PERCENT_ID ){
+	
+	print STDERR "Accepted!\n";
+	push( @good_matches, $transcript);
+      }
+      else{
+	print STDERR "Rejected!\n";
+      }
+      print STDERR "--------------------\n";
+      
+    }
+        
   }
   
   return @good_matches;
@@ -433,9 +444,19 @@ sub convert_coordinates{
       }
     }
     
-
-    my $transformed_gene = $gene->transform;
-    push( @transformed_genes, $transformed_gene);
+    my $transformed_gene;
+    eval{
+      $transformed_gene = $gene->transform;
+    };
+    if ( !$transformed_gene || $@ ){
+      my @t        = @{$gene->get_all_Transcripts};
+      my $id       = $self->_evidence_id( $t[0] );
+      my $coverage = $self->_coverage( $t[0] );
+      print STDERR "gene $id with coverage $coverage falls on a gap\n";
+    }
+    else{
+      push( @transformed_genes, $transformed_gene);
+    }
   }
   return @transformed_genes;
 }
