@@ -72,8 +72,8 @@ sub new {
   if (!defined($dbfile) && !defined($sequences)) {
     $self->throw("No dbfile or sequence array ref entered for indexing");
   }
-  if (!defined($type))  { 
-    $self->throw("Not database type entered");
+  if (!defined($type) & !defined($molecule_type))  { 
+    $self->throw("Molecule type has not been set.");
   }
 
   $self->dbfile($dbfile)               if defined($dbfile);
