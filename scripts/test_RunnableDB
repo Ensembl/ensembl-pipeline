@@ -119,7 +119,7 @@ foreach my $p(split /,/, $params){
   $hparams{$sp[0]} =  $sp[1];
 }
 
-my $runobj = "$runnable"->new(-db       => $db,
+my $runobj = "$runnable"->new(-db    => $db,
 			      -input_id => $input_id,
 			      -analysis => $analysis,
 			      -seqfetcher => $sf,

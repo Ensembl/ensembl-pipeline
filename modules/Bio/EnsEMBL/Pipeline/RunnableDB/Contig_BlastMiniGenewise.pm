@@ -283,7 +283,10 @@ sub fetch_input {
     else {
       my $alignadaptor = $self->db->get_ProteinAlignFeatureAdaptor();
       foreach my $database(@{$GB_SIMILARITY_DATABASES}){
-      @features  = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
+      @features  = 
+	$alignadaptor->fetch_by_Contig_and_score($contig, 
+						 $database->{'threshold'}, 
+						 $database->{'type'});
       
       #print STDERR "Number of features = " . scalar(@features) . "\n";
       my @filtered_features;

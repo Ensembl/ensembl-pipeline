@@ -63,12 +63,12 @@ sub new {
     my ($class, @args) = @_;
     my $self = bless {}, $class;
 
-    my ($db,$query,$target,$exonerate,$exargs,$max_query,$max_target) = $self->_rearrange([qw(DBOBJ QUERYDB TARGETDB EXONERATE EXARGS MAXQUERY MAXTARGET)],@args);
+    my ($db,$query,$target,$exonerate,$exargs,$max_query,$max_target) = $self->_rearrange([qw(DB QUERYDB TARGETDB EXONERATE EXARGS MAXQUERY MAXTARGET)],@args);
     
     $query || $self->throw("Did not specify query EnsEMBL db");
     $target || $self->throw("Did not specify target EnsEMBL db");
 
-    $self->dbobj($db);
+    $self->db($db);
     $self->exonerate($exonerate) if defined $exonerate;
     $self->querydb($query);
     $self->targetdb($target);
@@ -254,6 +254,7 @@ sub write_output {
 #    return 1;
     my @features;
     my %contig_hash;
+
     if ($out) {
 	@features = @$out;
 	print STDERR "Found out var, with ".scalar(@features)." features\n";
@@ -261,42 +262,34 @@ sub write_output {
     else {
 	@features = @{$self->output};
     }
-    my $db = $self->dbobj();
-    print STDERR "Going to write to ".$db->dbname."\n";
-
-    my %c_features;
+    
     foreach my $f (@features) {
-	my $c = $f->seqname;
-        my $targetid = $f->hseqname;
-	$f->hseqname("mouse_$targetid");
-	my $contig;
-	if (! $contig_hash{$c}) {
-	    eval 
-	    {
-		$contig = $db->get_Contig($c);
-	    };
+      my $c = $f->seqname();
+      my $targetid = $f->hseqname;
+      $f->hseqname("mouse_$targetid");
+
+      my $contig = $contig_hash{$c};
+      unless($contig) {
+	#cache contigs that have been obtained for speed purposes
+	eval {
+	  $contig = 
+	    $self->db->get_RawContigAdaptor->fetch_by_name($c);
+	  $contig_hash{$c} = $contig;
+	};
 	    
-	    if ($@) {
-		print STDERR "Contig not found, skipping writing output to db: $@\n";
-	    }
-	    else {
-		$contig_hash{$c}=$contig;
-		push (@{$c_features{$c}},$f);
-	    }
+	if ($@) {
+	  print STDERR "Contig not found, skipping writing output to db: $@\n";
+	  return;
 	}
-	else {
-	    $contig = $contig_hash{$c};
-	    push (@{$c_features{$c}},$f);
-	}
-    }	    
-    foreach my $c (keys (%c_features)) {
-	my @feats = @{$c_features{$c}};
-	if (@feats) {
-	    my $contig = $contig_hash{$c};
-	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
-	    $feat_adp->store($contig, @features);
-	}
+
+	#attach contigs to features
+	$f->attach_seq($contig);
+      }
     }
+    
+    my $feat_adp = Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+    $feat_adp->store(@features);
+    
     return 1;
 }
 

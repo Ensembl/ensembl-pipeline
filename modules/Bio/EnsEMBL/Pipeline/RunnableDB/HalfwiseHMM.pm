@@ -137,7 +137,10 @@ sub fetch_input {
   
   foreach my $database(@{$GB_SIMILARITY_DATABASES}){
      my @fps;
-    my @features  = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
+    my @features = 
+      $alignadaptor->fetch_by_Contig_and_score($contig, 
+					       $database->{'threshold'}, 
+					       $database->{'type'});
   
     #print STDERR "Number of features = " . scalar(@features) . "\n";
 

@@ -113,7 +113,9 @@ sub fetch_input {
 
     $self->genseq($contig);
     #need to get features predicted by genscan
-    my @genscan_peps = $self->db->get_PredictionTranscriptAdaptor->fetch_by_contig_id($contig->dbID, 'Genscan');
+    my @genscan_peps = 
+      $self->db->get_PredictionTranscriptAdaptor->fetch_by_Contig($contig, 
+								  'Genscan');
     $self->transcripts(@genscan_peps);
    
 }
@@ -251,19 +253,19 @@ sub write_output{
   my @features = $self->output();
   my $pep_f_a = $self->db->get_ProteinAlignFeatureAdaptor();
   my $contig;
-  eval 
-    {
-      $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    };
+  eval {
+    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+  };
 
-  if ($@) 
-    {
-      print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
+  if ($@) {
+    print STDERR "Contig not found, skipping writing output to db: $@\n";
+    return;
+  }
   foreach my $f(@features){
     $f->analysis($self->analysis);
+    $f->attach_seq($contig);
     if($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
-      $pep_f_a->store($contig->dbID, $f);
+      $pep_f_a->store($f);
     }else{
       $self->throw("don't know how to store $f\n");
     }

@@ -185,7 +185,10 @@ sub fetch_input {
     print STDERR "Fetching features for " . $database->{'type'} . 
       " with score above " . $database->{'threshold'}. "\n";
     
-    my @features = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
+    my @features = 
+      $alignadaptor->fetch_by_Contig_and_score($contig, 
+					       $database->{'threshold'}, 
+					       $database->{'type'});
     print STDERR "have ".scalar(@features)." to run against est2genome\n\n";
     foreach my $f (@features) {
       my $hid = $f->hseqname;

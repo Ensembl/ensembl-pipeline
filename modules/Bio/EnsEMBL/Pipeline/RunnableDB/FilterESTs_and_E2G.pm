@@ -273,7 +273,7 @@ sub write_exons_as_features {
   my $feat_adaptor = $self->db->get_FeatureAdaptor;
   my $contig_adaptor = $self->db->get_RawContigAdaptor;
   my %contig_cache; # keep track of which contig internal_ids we have looked up so far
-  my %contig_features;
+  my @features;
 
 
   my $analysis     = $self->get_exon_analysis;
@@ -337,33 +337,23 @@ sub write_exons_as_features {
 	my $fp      = new Bio::EnsEMBL::FeaturePair (-feature1 => $genomic,
 						     -feature2 => $est) ;
 	
-	my $cid = $contig_cache{$exon->contig_id};
-	if(!defined $cid){
-	  $cid = $contig_adaptor->get_id_by_internal_id($exon->contig_id);
-	  if (defined $cid){ $contig_cache{$exon->contig_id} = $cid; }
+	#cache contigs as many of the same contig will be required
+	my $contig = $contig_cache{$exon->contig_id};
+	unless($contig) {
+	  $contig = $contig_adaptor->fetch_by_name($exon->contig_id);
+	  $contig_cache{$exon->contig_id} = $contig;
 	}
-	if(defined $cid){ push(@{$contig_features{$cid}}, $fp); }
+
+	#attach appropriate contig to each feature
+	$fp->attach_seq($contig);
+
+	push @features, $fp;
       }
     }
   }
   
   # write the features
-CONTIG:  foreach my $contig_id( keys %contig_features){
-    my $contig;
-    eval{
-      $contig =   $self->db->get_Contig($contig_id);
-    };
-    if($@){
-      print STDERR "No contig for $contig_id part 1\n$@\n";
-      next CONTIG;
-    }
-
-    # lock db only once per contig - may still be too slow.
-    my @features = @{$contig_features{$contig_id}};
-    print STDERR "writing exon features for $contig_id\n";
-    $feat_adaptor->store($contig, @features);
-  }
-
+  $feat_adaptor->store(@features);
 }
 
 =head2 get_exon_analysis

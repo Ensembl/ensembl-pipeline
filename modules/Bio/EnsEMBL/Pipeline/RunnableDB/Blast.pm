@@ -200,16 +200,17 @@ sub write_output{
       $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
 
-  if ($@) 
-    {
+  if ($@) {
       print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
+      return 1;
+  }
   foreach my $f(@features){
     $f->analysis($self->analysis);
+    $f->attach_seq($contig);
     if($f->isa('Bio::EnsEMBL::DnaDnaAlignFeature')){
-      $dna_f_a->store($contig->dbID, $f);
+      $dna_f_a->store($f);
     }elsif($f->isa('Bio::EnsEMBL::DnaPepAlignFeature')){
-      $pep_f_a->store($contig->dbID, $f);
+      $pep_f_a->store($f);
     }else{
       $self->throw("don't know how to store $f\n");
     }

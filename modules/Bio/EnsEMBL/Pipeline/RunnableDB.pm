@@ -348,28 +348,27 @@ sub write_output {
 
     my $db=$self->db();
     my @features = $self->output();
-  
-    foreach my $f (@features) {
-	$f->analysis($self->analysis);
-    }
 
-    my $contig;
-    eval 
-    {
+    eval {
       $contig = $db->get_RawContigAdaptor->fetch_by_name($self->input_id);
     };
 
-    if ($@) 
-    {
+    if ($@) {
 	print STDERR "Contig not found, skipping writing output to db: $@\n";
+	return 1;
     }
-    elsif (@features) 
-    {
+  
+    foreach my $f (@features) {
+	$f->analysis($self->analysis);
+	$f->attach_seq($contig);
+    }
+
+    if (@features) {
 	print STDERR "Writing features to database\n";
 
         my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
 	print STDERR $feat_adp." is a feature adpator\n";
-	$feat_adp->store($contig, @features);
+	$feat_adp->store(@features);
     }
     return 1;
 }

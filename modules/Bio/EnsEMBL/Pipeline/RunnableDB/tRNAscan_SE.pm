@@ -156,18 +156,19 @@ sub write_output{
   my @features = $self->output();
   my $simple_f_a = $self->db->get_SimpleFeatureAdaptor();
   my $contig;
-  eval 
-    {
-      $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
-    };
+  eval {
+    $contig = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
+  };
 
-  if ($@) 
-    {
-      print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
+  if ($@) {
+    print STDERR "Contig not found, skipping writing output to db: $@\n";
+    return;
+  }
+
   foreach my $f(@features){
+    $f->attach_seq($contig);
     $f->analysis($self->analysis);
-    $simple_f_a->store($contig->dbID, $f);
+    $simple_f_a->store($f);
   }
 
 
