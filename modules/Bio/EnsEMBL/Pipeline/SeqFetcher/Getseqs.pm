@@ -147,7 +147,7 @@ sub  get_Seq_by_acc {
 
     last SEQDB unless defined $database;
     my $cmd = "$getseqs $acc $database";
-    
+    #print $cmd."\n";
     open(IN,"$cmd 2>/dev/null |") or $self->throw("Error forking getseqs for accession [$acc]: getseqs");
     my $seqstr;
     while(<IN>){

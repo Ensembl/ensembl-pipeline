@@ -135,7 +135,7 @@ sub  get_Seq_by_acc {
 
   $command .= $acc;
 
-  print STDERR "$command\n";
+  #print STDERR "$command\n";
 
   open(IN,"$command |") or $self->throw("Error opening pipe to pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
