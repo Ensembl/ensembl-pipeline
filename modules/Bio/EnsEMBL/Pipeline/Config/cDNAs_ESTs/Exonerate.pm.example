@@ -127,7 +127,7 @@ use vars qw( %Exonerate );
 	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
 	      
 	      #EST_EXONERATE_OPTIONS       => ' --showcigar --score 500 --fsmmemory 300 --softmasktarget',
-	      EST_EXONERATE_OPTIONS       => ' --softmasquery --softmasktarget  --dnawordlen 14  --useworddropoff TRUE --wordthreshold 40 --hspthreshold 60 --score 500 --fsmmemory 800  --hspdropoff 15  --saturatethreshold 100',
+	      EST_EXONERATE_OPTIONS       => ' --softmaskquery --softmasktarget  --dnawordlen 14  --useworddropoff TRUE --wordthreshold 40 --hspthreshold 60 --score 500 --fsmmemory 800  --hspdropoff 15  --saturatethreshold 100',
 	      
 	      EST_MIN_COVERAGE            => 90,
 	      EST_MIN_PERCENT_ID          => 97,
