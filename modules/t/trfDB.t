@@ -3,7 +3,7 @@ use Test;
 use strict;
 
 
-BEGIN { $| = 1; plan test => 6;}
+BEGIN { $| = 1; plan test => 16;}
 
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TRF;
@@ -51,4 +51,5 @@ sub display {
     foreach my $obj (@results) {
        print ($obj->gffstring."\n");
     }
+    1;
 }
