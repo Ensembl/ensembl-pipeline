@@ -10,10 +10,10 @@ use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-ok(1);
+ok(1); 
 
 ok(my $ens_test = EnsTestDB->new());
-ok($ens_test->do_sql_file("t/TargettedGene.dump"));
+ok($ens_test->do_sql_file("t/dumps/TargettedGene.dump"));
 ok(my $db = $ens_test->get_DBSQL_Obj);
 
 my @id = ('16:13850772,13850951:HBA_HUMAN:');
@@ -22,10 +22,14 @@ my @id = ('16:13850772,13850951:HBA_HUMAN:');
 ok(my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch);
 
 ok(my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise');
+ok(my $ana_adaptor = $db->get_AnalysisAdaptor);             
+ok(my $ana = $ana_adaptor->fetch_by_logic_name('human_swall_protein'));
+
 
 my $tgw = "$runnable"->new(-db         => $db,	
-                           -input_id   => @id,	
-													 -seqfetcher => $fetcher);		 
+                           -input_id   => @id,
+			   -analysis => $ana,	
+			   -seqfetcher => $fetcher);		 
 
 ok($tgw);
 
