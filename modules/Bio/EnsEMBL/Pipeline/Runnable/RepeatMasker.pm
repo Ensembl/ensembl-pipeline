@@ -70,7 +70,8 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Repeat;
-use Bio::EnsEMBL::SeqFeature;
+use Bio::EnsEMBL::RepeatFeature;
+use Bio::EnsEMBL::RepeatConsensus;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
 use Bio::SeqIO;
@@ -94,7 +95,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_fplist'} = [];           #an array of feature pairs
+    $self->{'_rflist'} = [];           #an array of feature pairs
     $self->{'_query'}  = undef;        #location of Bio::Seq object
     $self->{'_repeatmasker'} = undef;  #location of RepeatMasker executable
     $self->{'_workdir'}   = undef;     #location of temp directory
@@ -102,6 +103,7 @@ sub new {
     $self->{'_results'}   =undef;      #file to store results of RepeatMasker
     $self->{'_protected'} =[];         #a list of files protected from deletion
     $self->{'_arguments'} =undef;      #arguments for RepeatMasker
+    $self->{'_consensi'}  =undef;
     
     my( $query, $arguments, $repmask) = $self->_rearrange([qw(QUERY
 							      ARGS
@@ -295,56 +297,58 @@ sub parse_results {
             # ignore features with negatives 
             next if ($element[11-13] =~ /-/); 
             my (%feat1, %feat2);
-            $feat1 {name} = $element[4];
-            $feat1 {score} = $element[0];
-            $feat1 {start} = $element[5];
-            $feat1 {end} = $element[6];
-            #The start and end values are in different columns depending 
-            #on orientation!
-            if ($element[8] eq '+')
-            {
-                $feat2 {strand} = 1;
-                $feat2 {start} = $element[11];     
-                $feat2 {end} = $element[12];
-            }
-            elsif ($element[8] eq 'C')
-            {
-                $feat2 {strand} = -1 ;
-                $feat2 {start} = $element[13];     
-                $feat2 {end} = $element[12];
-            }
-            $feat2 {name} = $element[9];
-            $feat2 {score} = $feat1 {score};
-            $feat1 {strand} = $feat2 {strand};
-            #misc
-	    # this shouldn't happen, but it does ...
-	    # find hit start and end the wrong way round
-	    # somewhere inside RepeatMasker (eek!)
-	    # fix by swapping back, not sure if this is correct
-	    if ($feat2{start} > $feat2{end}) {
-		$self->warn("Hit start > end");
-		($feat2{start}, $feat2{end}) = ($feat2{end}, $feat2{start});
-	    }
-	    # only seems to happen to the *hit* start/end
-	    # if ($feat1{start} > $feat1{end}) {
-	    #     $self->warn("Found query seq start > end");
-	    #     ($feat1{start}, $feat1{end}) = ($feat1{end}, $feat1{start});
-	    # }
 
-            $feat2 {db} = undef;
-            $feat2 {db_version} = undef;
-            $feat2 {program} = 'RepeatMasker';
-            $feat2 {p_version}='1';
-            $feat2 {source}= 'RepeatMasker';
-            $feat2 {primary}= 'repeat';
-            $feat1 {source}= 'RepeatMasker';
-            $feat1 {primary}= 'repeat';
-            $self->create_Repeat(\%feat1, \%feat2);
+	    my ($score, $query_name, $query_start, $query_end, $strand,
+	        $repeat_name, $repeat_class, $hit_start, $hit_end);
+
+            (
+	        $score, $query_name, $query_start, $query_end, $strand,
+	        $repeat_name, $repeat_class
+	    ) = (split)[0, 4, 5, 6, 8, 9, 10];
+
+	    if ($strand eq '+') {
+	        ($hit_start, $hit_end) = (split)[11, 12];
+		$strand = 1;
+	    }
+            elsif ($strand eq 'C') {
+	        ($hit_start, $hit_end) = (split)[12, 13];
+		$strand = -1;
+	    }
+
+	    my $rc = $self->_get_consensus($repeat_name);
+
+	    my $rf = Bio::EnsEMBL::RepeatFeature->new;
+	    $rf->score            ($score);
+	    $rf->start            ($query_start);
+	    $rf->end              ($query_end);
+	    $rf->strand           ($strand);
+	    $rf->hstart           ($hit_start);
+	    $rf->hend             ($hit_end);
+	    $rf->repeat_consensus ($rc);
+
+            push @{$self->{'_rflist'}}, $rf;
         }
     }
     close $filehandle;   
 }
 
+
+# generate and store RepeatConsensus's
+# to attach to RepeatFeature's
+
+sub _get_consensus {
+    my ($self, $name) = @_;
+    my $cons;
+
+    unless (defined ($cons = $self->{'_consensi'}{$name})) {
+	$cons = new Bio::EnsEMBL::RepeatConsensus;
+	$cons->name($name);
+	$self->{'_consensi'}{$name} = $cons;
+    }
+
+    return $cons;
+
+}
 
 ##############
 # input/output methods
@@ -362,7 +366,7 @@ sub parse_results {
 
 sub output {
     my ($self) = @_;
-    return @{$self->{'_fplist'}};
+    return @{$self->{'_rflist'}};
 }
 
 1;
