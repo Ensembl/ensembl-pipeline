@@ -94,7 +94,7 @@ sub fetch_input {
     
     my $contigid  = $self->input_id;
     my $contig    = $self->dbobj->get_Contig($contigid);
-    my $genseq    = $contig->primary_seq()
+    my $genseq    = $contig->get_repeatmasked_seq()
      or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
 }
@@ -125,7 +125,7 @@ sub runnable {
 		}
             }
         }
-        $parameters{'-trf'} = $self->analysis->program_file || undef;
+        $parameters{'-trf'} = $self->analysis->program;
         #creates empty Bio::EnsEMBL::Runnable::TRF object
         $self->{'_runnable'} = $runnable->new(%parameters);;
     }
