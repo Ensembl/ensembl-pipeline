@@ -134,10 +134,12 @@ use vars qw( %ESTConf );
 	    EST_GENOMEWISE_GENETYPE     => 'genomewise',
 	    EST_EVIDENCE_TAG            => 'exonerate_e2g',
 
+	    EST_MAX_EVIDENCE_DISCONTINUITY => 10,
+	    EST_MAX_INTRON_SIZE => 100000,
+	    
 	    # not used at this moment
 	    EST_STRICT_LOWER_BOUND      => '', # 1 for ESTs only, 0 for cDNAs/mRNAs only
 	    EST_MIN_EVIDENCE_SIMILARITY => 65,
-	    EST_MAX_EVIDENCE_DISCONTINUITY => 10,
 
 	    # database config
 	    # IMPORTANT: make sure that all databases involved in each analysis are
