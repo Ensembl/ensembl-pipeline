@@ -1,4 +1,3 @@
-
 # TABLE job - Stores information about all jobs in the pipeline system
 # job_id        - job internal ID
 # input_id      - name (e.g. accession/Ensembl ID) of input
@@ -14,19 +13,20 @@
 # *_file        - files created to contain job output/error
 
 CREATE TABLE job (
-  job_id            int(10) unsigned NOT NULL auto_increment,
-  taskname          varchar(40) NOT NULL,
-  input_id          varchar(40) NOT NULL,
-  submission_id     varchar(40),
+  job_id            int unsigned NOT NULL auto_increment,
+  taskname          varchar(255) NOT NULL,
+  input_id          varchar(255) NOT NULL,
+  submission_id     int unsigned,
   job_name          varchar(255),
-  array_index       varchar(255),
+  array_index       mediumint unsigned,
   parameters        varchar(255),
   module            varchar(255),
-  stdout_file       varchar(100),
-  stderr_file       varchar(100),
-	retry_count       tinyint unsigned NOT NULL,
+  stdout_file       varchar(255),
+  stderr_file       varchar(255),
+  retry_count       tinyint unsigned NOT NULL,
 
   PRIMARY KEY (job_id),
+  KEY         (job_name, array_index),
   KEY         (input_id),
   KEY         (taskname)
 );
