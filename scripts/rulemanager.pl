@@ -564,7 +564,6 @@ as this way you can get the pipeline to considered a limited number of
 input_ids and as such is causes less problems if things go wrong
 
 
-
 =head1 SEE ALSO
 
   Bio::EnsEMBL::Pipeline::Job
