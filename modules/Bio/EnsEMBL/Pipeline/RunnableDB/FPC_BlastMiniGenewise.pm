@@ -123,7 +123,7 @@ sub type {
 
 sub write_output {
     my($self,@features) = @_;
-
+    
     my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
   GENE: foreach my $gene ($self->output) {	
@@ -169,12 +169,12 @@ sub write_output {
 
     $contig->_chr_name($chrid);
 
-    print STDERR "Chromosome id : $chrid\n";
-    print STDERR "Range         : $chrstart - $chrend\n";
-    print STDERR "Contig        : " . $contig->id . " \n";
-    print STDERR "Length is     : " . $genseq->length . "\n\n";
+#    print STDERR "Chromosome id : $chrid\n";
+#    print STDERR "Range         : $chrstart - $chrend\n";
+#    print STDERR "Contig        : " . $contig->id . " \n";
+#    print STDERR "Length is     : " . $genseq->length . "\n\n";
 
-    print STDERR "Fetching features \n\n";
+#    print STDERR "Fetching features \n\n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
     my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold, 0);
@@ -199,13 +199,13 @@ sub write_output {
 
     foreach my $gene (@genes) {
 
-      print STDERR "Found genewise gene " . $gene->dbID . "\n";
+#      print STDERR "Found genewise gene " . $gene->dbID . "\n";
 
       foreach my $tran ($gene->each_Transcript) {
 
 	foreach my $exon ($tran->get_all_Exons) {
 	  
-	  print STDERR "Exon " . $exon->dbID . " " . $exon->strand . "\n";
+#	  print STDERR "Exon " . $exon->dbID . " " . $exon->strand . "\n";
 
 	  if ($exon->seqname eq $contig->id) {
 	    
@@ -224,7 +224,7 @@ sub write_output {
     my %idhash;
     
     foreach my $f (@features) {
-      print "Feature : " . $f->gffstring . "\n";
+#      print "Feature : " . $f->gffstring . "\n";
       
       if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	  defined($f->hseqname) &&
@@ -236,7 +236,7 @@ sub write_output {
     
     my @ids = keys %idhash;
 
-    print STDERR "Feature ids are @ids\n";
+#    print STDERR "Feature ids are @ids\n";
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $genseq,
 									   '-ids'      => \@ids,
@@ -321,7 +321,10 @@ sub convert_output {
     my @results = $runnable->output;
     my @genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
-    my @remapped = $self->remap_genes(@genes);
+    my @checked = $self->check_genes(@genes);
+
+    my @remapped = $self->remap_genes(@checked);
+#    my @remapped = $self->remap_genes(@genes);
 
     $self->output(@remapped);
 
@@ -361,6 +364,205 @@ sub make_genes {
   return @genes;
 
 }
+
+=head2 check_genes
+
+ Title   : check_genes
+ Usage   :
+ Function: Checks coverage of parent protein, and checks all exons are sane
+ Example :
+ Returns : array of checked Bio::EnsEMBL::Gene
+ Args    : array of Bio::EnsEMBL::Gene
+
+
+=cut
+
+sub check_genes{
+  my ($self, @genes) = @_;
+
+  my @checked;
+
+  GENE:
+  foreach my $gene(@genes) {
+     # single exon genes must cover 80% of the protein length; multi exon ones 
+    # can get away with 25% though we might raise this later
+    
+    my $threshold = 80;    
+    my @t = $gene->each_Transcript;
+    my @exons = $t[0]->get_all_Exons;
+    if(scalar(@exons) > 1){
+      $threshold = 25;
+    }
+
+    my $covered = $self->_check_coverage($gene, $threshold);
+    if(!$covered){
+#      my $msg = "rejecting gene because < $threshold% coverage of parent protein\n";
+#      $self->warn($msg);
+      next GENE;
+    }
+
+    if($self->validate_gene($gene)){
+      push (@checked, $gene);
+    }
+    else{
+      my $msg = "rejecting gene\n";
+      $self->warn($msg);
+      next GENE;
+    }
+  }
+  
+  return @checked;
+  
+}
+
+=head2 _check_coverage
+
+ Title   : _check_coverage
+ Usage   :
+ Function: checks how much of the parent protein is covered by the genewise prediction
+ Example :
+ Returns : 1 if > $threshold% coverage, otherwise 0
+ Args    :
+
+
+=cut
+
+sub _check_coverage{
+  my ($self, $gene, $threshold) = @_;
+  my $pstart = 0;
+  my $pend = 0;
+  my $protname;
+  my $plength;
+  my $fetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+
+  my @gw_tran = $gene->each_Transcript;
+  
+  my $matches = 0;
+
+  foreach my $exon($gw_tran[0]->get_all_Exons) {
+    $pstart = 0;
+    $pend   = 0;
+    
+    foreach my $f($exon->each_Supporting_Feature){
+      
+      if (!defined($protname)){
+	$protname = $f->hseqname;
+      }
+      if($protname ne $f->hseqname){
+	warn("$protname ne " . $f->hseqname . "\n");
+      }
+      
+      if((!$pstart) || $pstart > $f->hstart){
+	$pstart = $f->hstart;
+      }
+      
+      if((!$pend) || $pend < $f->hend){
+	$pend= $f->hend;
+      }
+    }
+    $matches += ($pend - $pstart + 1);
+  }
+  
+  my $seq; 
+  eval{
+    $seq = $self->seqfetcher->get_Seq_by_acc($protname);
+  };
+  if ($@) {
+    $self->throw("Error fetching sequence for [$protname]: [$@]\n");
+  }
+  
+  $self->throw("No sequence fetched for [$protname]\n") unless defined $seq;
+  
+  $plength = $seq->length;
+
+  if(!defined($plength) || $plength == 0){
+    warn("no sensible length for $protname - can't get coverage\n");
+    return 0;
+  }
+
+  my $coverage = $matches/$plength;
+  $coverage *= 100;
+  if ($coverage < $threshold){
+    $self->warn ("Coverage of $protname is only $coverage - will be rejected\n");
+    return 0;
+  }
+  
+  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
+  return 1;
+}
+
+=head2 validate_gene
+
+ Title   : validate_gene
+ Usage   : $self->validate_gene($gene)
+ Function: checks start and end coordinates of each exon of each transcript are sane
+ Example : 
+ Returns : 1 if gene is valid, otherwise zero
+ Args    : $gene: Bio::EnsEMBL::Gene
+
+
+=cut
+
+sub validate_gene{
+  my ($self, $gene) = @_;
+
+  # should be only a single transcript
+  my @transcripts = $gene->each_Transcript;
+  if(scalar(@transcripts) != 1) {
+    my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  foreach my $transcript(@transcripts){
+    foreach my $exon($transcript->get_all_Exons){
+      if(!$self->validate_exon($exon)){
+	my $msg = "Rejecting gene because of invalid exon\n";
+	$self->warn($msg);
+	return 0;
+      }
+    }
+  }
+  
+  return 1;
+}
+
+=head2 validate_exon
+
+ Title   : validate_exon
+ Usage   : $self->validate_exon($exon)
+ Function: checks start and end coordinates of exon are sane
+ Example : 
+ Returns : 1 if exon is valid, otherwise zero
+ Args    : $exon: Bio::EnsEMBL::Exon
+
+
+=cut
+
+sub validate_exon{
+  my ($self, $exon) = @_;
+
+  if($exon->start < 0){
+    my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  elsif($exon->start > $exon->end){
+    my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  elsif($exon->start == $exon->end){
+    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - letting it through\n";
+    $self->warn($msg);
+    return 1;
+  }
+  
+  return 1;
+}
+
 
 =head2 _make_transcript
 
@@ -430,7 +632,7 @@ sub _make_transcript{
   } 
   else {
     
-    print STDERR "num exons: " . scalar(@exons) . "\n";
+#    print STDERR "num exons: " . scalar(@exons) . "\n";
 
     if ($exons[0]->strand == -1) {
       @exons = sort {$b->start <=> $a->start} @exons;
