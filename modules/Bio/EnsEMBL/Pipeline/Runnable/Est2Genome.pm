@@ -76,15 +76,14 @@ sub _initialize {
     my $make = $self->SUPER::_initialize(@_);    
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
-    $self->{'_genomic_sequence'}  = undef; #location of Bio::Seq object
-    $self->{'_est_sequence'}  = undef; #location of Bio::Seq object
-    $self->{'_est_genome'} = undef;    #location of est2genome
-    $self->{'_workdir'}   = undef;     #location of temp directory
-    $self->{'_filename'}  =undef;      #file to store Bio::Seq object
-    $self->{'_estfilename'} = undef    #file to store EST Bio::Seq object
-    $self->{'_results'}   =undef;      #file to store results of analysis
-    $self->{'_protected'} =[];         #a list of files protected from deletion
-    $self->{'_arguments'} =undef;      #arguments for est2genome
+    $self->{_clone}  = undef;        #location of Bio::Seq object
+    $self->{_est_genome} = undef;    #location of est2genome
+    $self->{_workdir}   = undef;     #location of temp directory
+    $self->{_filename}  =undef;      #file to store Bio::Seq object
+    $self->{_estfilename} = undef;    #file to store EST Bio::Seq object
+    $self->{_results}   =undef;      #file to store results of analysis
+    $self->{_protected} =[];         #a list of files protected from deletion
+    $self->{_arguments} =undef;      #arguments for est2genome
     
     my( $genomic, $est, $est_genome, $arguments ) = 
         $self->_rearrange(['GENOMIC','EST', 'E2G', 'ARGS'], @args);
@@ -96,15 +95,15 @@ sub _initialize {
     else
     {   
         eval 
-        { $self->est_genome( $self->locate_executable ('est_genome')); };
+        { $self->est_genome($self->locate_executable('est_genome')); };
         if ($@)
         { $self->est_genome('/usr/local/pubseq/bin/est_genome'); }
     }
-    if ($arguments)  {
-       $self->arguments($arguments) ;
-    } else {
-       $self->arguments(' -reverse ') ;      
-    }    
+    if ($arguments) 
+    {   $self->arguments($arguments) ;}
+    else
+    { $self->arguments(' -reverse ') ;      }
+    
     return $self; # success - we hope!
 }
 
@@ -128,7 +127,7 @@ sub genomic_sequence {
         #need to check if passed sequence is Bio::Seq object
         $value->isa("Bio::PrimarySeq") || $self->throw("Input isn't a Bio::PrimarySeq");
         $self->{'_genomic_sequence'} = $value;
-        $self->filename($value->id .".$$.seq");
+        $self->filename($value->id.".$$.seq");
         $self->results($self->filename.".est_genome.out");
     }
     return $self->{'_genomic_sequence'};
@@ -180,26 +179,6 @@ sub estfilename {
 
 =cut
 
-=head2 est_genome
-
-    Title   :   est_genome
-    Usage   :   $obj->est_genome('~humpub/scripts/est_genomeHum');
-    Function:   Get/set method for the location of est_genomeHum script
-    Args    :   File path (optional)
-
-=cut
-
-sub est_genome {
-    my ($self, $location) = @_;
-    if ($location)
-    {
-        $self->throw("est_genome not found at $location: $!\n") 
-                                                    unless (-e $location);
-        $self->{_est_genome} = $location ;
-    }
-    return $self->{_est_genome};
-}
-
 =head2 arguments
 
     Title   :   arguments
@@ -222,110 +201,116 @@ sub arguments {
 # Analysis methods
 ##########
 
-## UPDATING: need to do some careful rearranging here to avoid breaking module 
-
 =head2 run
 
   Title   : run
   Usage   : $self->run()
             or
-            $self->run("genomic.seq", "est.seq", 'tmp')
+            $self->run("genomic.seq", "est.seq")
   Function: Runs est2genome and stores results as FeaturePairs
-  Returns : none
-  Args    : Temporary filenames for genomic and est sequences and working directory
+  Returns : TRUE on success, FALSE on failure.
+  Args    : Temporary filenames for genomic and est sequences
 
 =cut
 
 sub run {
     my ($self, @args) = @_;
-    my ($genname, $estname, $dir) = $self->_rearrange(['genomic', 'est', 'dir'], @args);
-    #check clone
-    my $seq = $self->genomic_sequence() || $self->throw("Clone required for Est2Genome\n");
-    my $est = $self->est_sequence() || $self->throw("Est Clone required for Est2Genome\n");
-    #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
-    $self->checkdir();
-    #write sequences to file - pass method names required for access to Bio::Seq's
-    $self->writefile('genomic_sequence', 'filename');
-    $self->writefile('est_sequence', 'estfilename');
-    #run genscan       
-    $self->run_est_genome();
-    #parse output and create features
-    $self->parse_results();
-    $self->deletefiles();
-}
- 
-sub run_est_genome {
-    my ($self) = @_;        
+    
+    # some constant strings
+    my $source_tag  = "est2genome";
+    my $primary_tag = "similarity";
+    my $dirname     = "/tmp";
+
+    #flag for est strand orientation
+    my $estOrientation; 
+    
+    #check inputs
+    my $genomicseq = $self->genomic_sequence ||
+        $self->throw("Genomic sequence not provided");
+    my $estseq = $self->est_sequence ||
+        $self->throw("EST sequence not provided");
+    
+    #extract filenames from args and check/create files and directory
+    my ($genname, $estname) = $self->_rearrange(['genomic', 'est'], @args);
+    my ($genfile, $estfile) = $self->_createfiles($genname, $estname, $dirname);
+        
+    #use appropriate Bio::Seq method to write fasta format files
+    {
+        my $genOutput = Bio::SeqIO->new(-file => ">$genfile" , '-format' => 'Fasta')
+                    or $self->throw("Can't create new Bio::SeqIO from $genfile '$' : $!");
+        my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
+                    or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
+
+        #fill inputs
+        $genOutput->write_seq($self->{'_genomic_sequence'}); 
+        $estOutput->write_seq($self->{'_est_sequence'});
+
+    }
+        
     #run est_genome 
     #The -reverse switch ensures correct numbering on EST seq in either orientation
+    my $est_genome_command = "est_genome  -reverse -genome $genfile -est $estfile |";
 
-    print (STDERR "Running est_genome\n");
-    system ($self->est_genome." ".$self->arguments
-                      ." -genome ".$self->filename." -est "
-                      .$self->estfilename. " > ".$self->results)
-	or $self->throw("Failed running from est_genome : $!");
-}
-
-sub parse_results {
-      my ($self) = @_;
-      #Use the first line to get EST orientation
-      open (ESTGENOME, '<'.$self->results) 
-            or $self->throw ("Couldn't open file ".$self->results.": $!\n");
-      my $firstline = <ESTGENOME>;
+    eval {
+      print (STDERR "Running command $est_genome_command\n");
+      open (ESTGENOME, $est_genome_command) 
+	or $self->throw("Can't open pipe from '$est_genome_command' : $!");
       
-      my $estOrientation;
+      #Use the first line to get EST orientation
+      my $firstline = <ESTGENOME>;
       if ($firstline =~ /reverse/i) {$estOrientation = -1;}
       else {$estOrientation = 1}
       
       #read output
       while (<ESTGENOME>) {
 
-	  if ($_ =~ /^Segment/) {
+	if ($_ =~ /^Segment/) {
 
 	  print STDERR "$_";
 	  #split on whitespace
 	  my @elements = split;
       
-      my (%feat1, %feat2);
 	  #extract values from output line
-	  $feat1 {score}  = $elements[2];
-      $feat2 {score}  = $feat1 {score};
-	  $feat1 {start}  = $elements[3];
-	  $feat1 {end}    = $elements[4];
-	  $feat1 {name}   = $elements[5];
-	  $feat2 {name}   = $elements[8];
-	  $feat1 {source} = 'est_genome';
-	  $feat2 {source} = 'est_genome';
-	  $feat1 {strand} = 1;
-	  $feat2 {strand} = $estOrientation;
-	  $feat1 {primary} = 'similarity';
-	  $feat2 {primary} = 'similarity';
+	  my $f1score  = $elements[2];
+	  my $f1start  = $elements[3];
+	  my $f1end    = $elements[4];
+	  my $f1id     = $elements[5];
+	  my ($f2start, $f2end);
+	  my $f2id     = $elements[8];
+	  my $f1source = $source_tag;
+	  my $f2source = $source_tag;
+	  my $f1strand = 1;
+	  my $f2strand = $estOrientation;
+	  my $f1primary = $primary_tag;
+	  my $f2primary = $primary_tag;
 	  #ensure start is always less than end
 	  if ($elements[6] < $elements[7])
-	      {
-	        $feat2 {start} =  $elements[6];
-	        $feat2 {end} = $elements[7];
-	      }
+	    {
+	      $f2start =  $elements[6]; 
+	      $f2end = $elements[7];
+	    }
 	  else
-	      {
-	        $feat2 {start} =  $elements[7];
-	        $feat2 {end} = $elements[6];
-	      }
-      $feat2 {db} = undef;
-      $feat2 {db_version} = undef;
-      $feat2 {program} = 'est_genome';
-      $feat2 {p_version} = 'unknown';
+	    {
+	      $f2start =  $elements[7]; 
+	      $f2end = $elements[6];
+	    }              
 	  #create array of featurepairs              
-	  $self->createfeaturepair (\%feat1, \%feat2);
+	  $self->_createfeatures ($f1score, $f1start, $f1end, $f1id, 
+				  $f2start, $f2end, $f2id, $f1source, 
+				  $f2source, $f1strand, $f2strand, 
+				  $f1primary, $f2primary);
         }    
       }
       close(ESTGENOME);
+    };
+    #clean up temp files
+    $self->_deletefiles($genfile, $estfile);
+    if ($@) {
+        $self->throw("Error running est_genome [$@]\n");
+    } else {
+        return 1;
+    }
 }
-
-##############
-# input/output methods
-#############
 
 =head2 output
 
@@ -341,7 +326,6 @@ sub output {
     my ($self) = @_;
     return @{$self->{'_fplist'}};
 }
-
 
 sub _createfeatures {
     my ($self, $f1score, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
@@ -456,10 +440,10 @@ sub _deletefiles {
 
 
 sub est_genome {
-  my ($self,$arg) = @_;
+   my ($self,$arg) = @_;
 
   if (defined($arg)) {
-      $self->{_est_genome} = $arg;
+     $self->{_est_genome} = $arg;
   }
   return $self->{_est_genome};
 }
