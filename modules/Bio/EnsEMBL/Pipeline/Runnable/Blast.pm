@@ -550,7 +550,6 @@ sub parse_results {
     $self->output(@selected_features);
   } else {
     # re-filter, with pruning
-    print STDERR "Have ".@allfeatures." fetures to output\n";
     my @allfeatures = $self->output;
     if($self->threshold_type){
       if ($self->threshold_type eq "PID") {
