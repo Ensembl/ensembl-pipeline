@@ -131,12 +131,13 @@ sub runnable {
         my %parameters;
         if ($parameter_string)
         {
-            $parameter_string =~ s/\s+//g;
             my @pairs = split (/,/, $parameter_string);
             foreach my $pair (@pairs)
             {
 		my ($key, $value) = split (/=>/, $pair);
 		if ($key && $value) {
+                    $key =~ s/^\s+//g;
+                    $key =~ s/\s+$//g;
 		    $parameters{$key} = $value;
 		}
 		else
@@ -160,6 +161,8 @@ sub write_output {
     my $start;
     my $contig;
     my ($raw_start, $raw_end);
+    my ($hit_start, $hit_end);
+    my $max_walk = 15;   # max bp to walk until start of raw contig
 
     my $db=$self->dbobj();
     my @features = $self->output();
@@ -169,37 +172,65 @@ sub write_output {
 
     foreach my $f (@features) {
 	$f->analysis($self->analysis);
-	$start  = $f->start;
-	my ($raw, $raw_pos) = $vc->raw_contig_position($start);
-	if ($raw && $raw_pos) {
-	    if ($raw->static_golden_ori == 1) {
-		$raw_start = $raw_pos;
-		$raw_end = $f->end + $raw_start - $start;
-	    }
-	    else {
-		$raw_end = $raw_pos;
-		$raw_start = $start - $f->end + $raw_end;
-	    }
-	    my $raw_end = $f->end + $raw_start - $start;
-	    $feat_by_contig{$raw->id} = [] unless defined $feat_by_contig{$raw->id};
-	    $f->start($raw_start);
-	    $f->end($raw_end);
-	    push @{$feat_by_contig{$raw->id}}, $f;
+	$hit_start = $f->start;
+	$hit_end   = $f->end;
+	my ($raw1, $raw1_pos);  # contig with hit start
+	my ($raw2, $raw2_pos);  # contig with hit end
+	my $raw;
+
+	# if a primer has N's at the 5' end, the start of the STS as
+	# reported may be in a gap region. need to walk along until
+	# a raw contig is found.
+
+	# get raw ctg/pos correspondong to start of STS
+	# walk along until we can map the STS start to a raw contig
+	my $walkies = 0;
+	while ($walkies < $max_walk and ! ref $raw1) {
+	    ($raw1, $raw1_pos) = $vc->raw_contig_position($hit_start);
+	    $hit_start++;
 	}
+	$hit_start--;
+
+	$walkies = 0;
+	# get raw ctg/pos correspondong to end of STS
+	# walk along until we can map the STS end to a raw contig
+	while ($walkies < $max_walk and ! ref $raw2) {
+	    ($raw2, $raw2_pos) = $vc->raw_contig_position($hit_end);
+	    $hit_end--;
+	}
+	$hit_end++;
+
+	# exclude 'sticky' markers - spanning two raw contigs
+	# we should deal with this somehow ...
+	unless ($raw1->id eq $raw2->id) {
+	    # yikes - sticky marker
+	    print STDERR "Ignoring marker spanning two raw contigs: ";
+	    print STDERR $raw1->id, " ", $raw2->id, "\n";
+	    next;
+	}
+	$raw       = $raw1;
+	$raw_start = $raw1_pos;
+	$raw_end   = $raw2_pos;
+
+	if ($raw->static_golden_ori != 1) {
+	    ($raw_start, $raw_end) = ($raw_end, $raw_start);
+	}
+
+	$feat_by_contig{$raw->id} = [] unless defined $feat_by_contig{$raw->id};
+	$f->start($raw_start);
+	$f->end($raw_end);
+	push @{$feat_by_contig{$raw->id}}, $f;
     }
 
     foreach my $contig_id (keys %feat_by_contig) {
 	eval {
 	    $contig = $db->get_Contig($contig_id);
 	};
-	print $contig, "\n";
-	print length($@), "\n";
 
 	if ($@) {
 	    print STDERR "Contig not found, skipping writing output to db: $@\n";
 	}
 	elsif (@features = @{$feat_by_contig{$contig_id}}) {
-	    print STDERR "Writing features to database\n";
 	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
 	    $feat_adp->store($contig, @features);
 	}
