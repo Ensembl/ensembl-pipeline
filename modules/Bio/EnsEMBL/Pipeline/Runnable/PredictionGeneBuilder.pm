@@ -162,7 +162,9 @@ sub run{
   # check the generated transcripts:
   my @checked_predictions;
   foreach my $prediction ( @linked_predictions ){
-      next unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($prediction,$self->query) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($prediction) );
+      next unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($prediction,$self->query)
+		    && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($prediction,$self->query)
+		    && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($prediction) );
       push( @checked_predictions, $prediction );
   }
   
