@@ -166,7 +166,7 @@ sub build_Genes{
   
   # get all genes of type defined in gene_types() on this slice
   $self->get_Genes;
-  print STDERR "Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n";
+  print STDERR "After checks: Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n";
   
   #test
   #foreach my $t ( $self->genewise_combined_Transcripts ){
@@ -270,7 +270,9 @@ sub get_Genes {
   my @unchecked_genes;
 
   foreach my $type ($self->gene_types) {
-    foreach my $gene ( @{$slice->get_all_Genes_by_type($type, 'evidence')} ){
+    my @genes = @{$slice->get_all_Genes_by_type($type, 'evidence')};
+    print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
+    foreach my $gene ( @genes ){
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
@@ -289,7 +291,6 @@ sub get_Genes {
       }
     }
   }
-  print STDERR "found ".scalar(@transcripts)."\n";
   $self->genewise_combined_Transcripts(@transcripts);
 }
 
@@ -321,12 +322,22 @@ sub cluster_Transcripts {
     }
   }
   
-  my @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
-  my @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
-  my @clusters;
-  push( @clusters, @forward_clusters);
-  push( @clusters, @reverse_clusters);
+  my @forward_clusters;
+  my @reverse_clusters;
   
+  if ( @forward_transcripts ){
+    @forward_clusters = $self->_cluster_Transcripts_by_genomic_range( @forward_transcripts );
+  }
+  if ( @reverse_transcripts ){
+    @reverse_clusters = $self->_cluster_Transcripts_by_genomic_range( @reverse_transcripts );
+  }
+  my @clusters;
+  if ( @forward_clusters ){
+    push( @clusters, @forward_clusters);
+  }
+  if ( @reverse_clusters ){
+    push( @clusters, @reverse_clusters);
+  }
   return @clusters;
 }
 
@@ -344,7 +355,7 @@ sub _cluster_Transcripts_by_genomic_range{
   my ($self,@mytranscripts) = @_;
 
   # first sort the transcripts
-  my @transcripts = sort sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 				 if ($result){
 				     return $result;
 				 }
@@ -895,7 +906,7 @@ sub check_Clusters{
 sub transcript_high{
   my ($self,$tran) = @_;
   my $high;
-  $tran->sort;
+  #$tran->sort;
   if ( $tran->start_Exon->strand == 1){
     $high = $tran->end_Exon->end;
   }
@@ -910,7 +921,7 @@ sub transcript_high{
 sub transcript_low{
   my ($self,$tran) = @_;
   my $low;
-  $tran->sort;
+  #$tran->sort;
   if ( $tran->start_Exon->strand == 1){
     $low = $tran->start_Exon->start;
   }
