@@ -19,8 +19,7 @@ Bio::EnsEMBL::Pipeline::JobAdaptor
 
 =head1 DESCRIPTION
 
-stores a list of input_ids from a pipeline and will generate unions
-intersections and differences between the list it holds and a list it is passed
+adaptor to access and store entries in the job and job_status tables
 
 =head1 CONTACT
 
@@ -42,6 +41,20 @@ use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 use Bio::EnsEMBL::Pipeline::Job;
 
 @ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
+
+
+
+=head2 fetch_by_dbID
+
+  Arg [1]   : database id
+  Function  : to fetch an particular entry from the database based 
+  on dbID
+  Returntype: Bio::EnsEMBL::Pipeline::Job
+  Exceptions: none
+  Caller    : 
+  Example   : my $job = $jobadaptor->fetch_by_dbID(1);
+
+=cut
 
 
 
@@ -72,8 +85,22 @@ sub fetch_by_dbID{
 }
 
 
+=head2 fetch_all_by_taskname
+
+  Arg [1]   : taskname e.g RepeatMasker
+  Function  : to get all the jobs with a particular taskname
+  Returntype: listref
+  Exceptions: none
+  Caller    : 
+  Example   : my @jobs = @{$jobadaptor->fetch_all_by_taskname('RepeatMasker')}
+
+=cut
+
+
+
 sub fetch_all_by_taskname{
   my ($self, $taskname) = @_;
+
 
    my $query = qq {
     SELECT job_id
@@ -102,6 +129,19 @@ sub fetch_all_by_taskname{
 }
 
 
+=head2 _job_from_hashref
+
+  Arg [1]   : hashred
+  Function  : creates a job object from hashref
+  Returntype: Bio::EnsEMBL::Pipeline::Job
+  Exceptions: none
+  Caller    : 
+  Example   : my $job = $self->_job_from_hashref($hashref);
+
+=cut
+
+
+
 sub _job_from_hashref{
   my ($self, $hashref) = @_;
   
@@ -123,6 +163,19 @@ sub _job_from_hashref{
 }
 
 
+=head2 fetch_current_status
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::Job
+  Function  : gets the current status of a particular job
+  Returntype: string (status)
+  Exceptions: none
+  Caller    : 
+  Example   : my $status = $jobadaptor->fetch_current_status($job);
+
+=cut
+
+
+
 sub fetch_current_status{
   my ($self, $job) = @_;
 
@@ -130,8 +183,9 @@ sub fetch_current_status{
     SELECT status
     FROM job_status
     WHERE job_id = ?
-    ORDER by time
-    DESC };
+    ORDER by time  
+    DESC 
+    LIMIT 1};
 
   my $sth = $self->prepare($query);
 
@@ -206,6 +260,19 @@ sub update_status {
 }
 
 
+=head2 store
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::Job
+  Function  : stores a job in the job table
+  Returntype: string, dbID
+  Exceptions: none
+  Caller    : 
+  Example   : $jobadaptor->store($job);
+
+=cut
+
+
+
 sub store{
   my ($self, $job) = @_;
 
@@ -245,6 +312,19 @@ sub store{
 }
 
 
+=head2 remove
+
+  Arg [1]   : Bio::EnsEMBL::Pipeline::Job
+  Function  : removes a job from the job tables
+  Returntype: none
+  Exceptions: none
+  Caller    : 
+  Example   : $jobadaptor->remove($job);
+
+=cut
+
+
+
 sub remove{
   my ($self, $job) = @_;
 
@@ -261,7 +341,7 @@ sub remove{
     DELETE from job_status
     WHERE job_id = ? };
   
-  $sth = $self->prepare($query);
+  $sth = $self->prepare($second);
   $sth->execute($job_id);
   
 }
