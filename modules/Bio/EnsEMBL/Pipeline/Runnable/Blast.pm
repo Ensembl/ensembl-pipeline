@@ -527,15 +527,17 @@ sub parse_results {
     
   HSP: while (my $hsp = $sbjct->nextHSP) {
       
-      if ($self->threshold_type eq "PID") {
-        next HSP
-          if  $self->threshold and ($hsp->percent < $self->threshold);
-      } elsif ($self->threshold_type eq "SCORE") {
-        next HSP
-          if ($self->threshold) and ($hsp->score < $self->threshold);
-      } elsif ($self->threshold_type eq "PVALUE") {
-        next HSP
-          if ($self->threshold) and ($hsp->P > $self->threshold);
+      if($self->threshold_type){
+        if ($self->threshold_type eq "PID") {
+          next HSP
+            if  $self->threshold and ($hsp->percent < $self->threshold);
+        } elsif ($self->threshold_type eq "SCORE") {
+          next HSP
+            if ($self->threshold) and ($hsp->score < $self->threshold);
+        } elsif ($self->threshold_type eq "PVALUE") {
+          next HSP
+            if ($self->threshold) and ($hsp->P > $self->threshold);
+        }
       }
       # Each HSP is a gapped alignment.
       # This method splits the gapped alignment into
@@ -559,12 +561,15 @@ sub parse_results {
   } else {
     # re-filter, with pruning
     my @allfeatures = $self->output;
-    if ($self->threshold_type eq "PID") {
-      @allfeatures = sort {$b->percent_id <=> $a->percent_id} @allfeatures;
-    } elsif ($self->threshold_type eq "SCORE") {
-      @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
-    } else {
-      @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
+    if($self->threshold_type){
+      if ($self->threshold_type eq "PID") {
+        @allfeatures = sort {$b->percent_id 
+                               <=> $a->percent_id} @allfeatures;
+      } elsif ($self->threshold_type eq "SCORE") {
+        @allfeatures = sort {$b->score <=> $a->score} @allfeatures;
+      } else {
+        @allfeatures = sort {$a->p_value <=> $b->p_value} @allfeatures;
+      }
     }
     if ($self->filter) {
       my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
@@ -655,14 +660,15 @@ sub filter_hits {
          }
        }
    }
-  
-  if ($self->threshold_type eq "PID") {
-    @features = sort {$b->percent_id <=> $a->percent_id} @features;
-  } elsif ($self->threshold_type eq "SCORE") {
-    @features = sort {$b->score <=> $a->score} @features;
-  } elsif ($self->threshold_type eq "PVALUE") {
-    @features = sort {$a->p_value <=> $b->p_value} @features;
-  } 
+  if($self->threshold_type){
+    if ($self->threshold_type eq "PID") {
+      @features = sort {$b->percent_id <=> $a->percent_id} @features;
+    } elsif ($self->threshold_type eq "SCORE") {
+      @features = sort {$b->score <=> $a->score} @features;
+    } elsif ($self->threshold_type eq "PVALUE") {
+      @features = sort {$a->p_value <=> $b->p_value} @features;
+    } 
+  }
   
   my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter
     (
@@ -1184,7 +1190,7 @@ sub threshold_type {
     unless  ($allowed{$type}) {
     $self->throw("Unallowed threshold type $type");
     }
-  $self->{'_threshold_type'} = $type;
+    $self->{'_threshold_type'} = $type;
   }
 
   return $self->{'_threshold_type'};

@@ -237,14 +237,14 @@ sub run {
     #print STDERR "Seqname ".$f->seqname." hseqname ".$f->hseqname."\n";
     #push(@feature_pairs, $feature_pair);
   }
-  my @blast_features = sort{$a->start <=> $b->start  
-                              || $a->end <=> $b->end} @blast_features; 
-  foreach my $bf(@blast_features){
+  @blast_features = sort{$a->start <=> $b->start  
+                           || $a->end <=> $b->end} @blast_features; 
+  #foreach my $bf(@blast_features){
     #print STDERR "BLAST RESULTS ".$bf->start." ".$bf->end." ".$bf->strand.
     #  " ".$bf->hseqname." ".$bf->hstart." ".$bf->hend." ".
     #    $bf->hstrand." ".$bf->percent_id." ".$bf->p_value." ".$bf->score.
     #      "\n";
-  }
+  #}
   if ($self->check_repeated > 0){ 
     #print STDERR "BMG:249 Checking if there are repeated genes\n";
     $mg_runnables = $self->build_runnables(@blast_features);
@@ -306,11 +306,13 @@ sub run_blast {
      }
     
      
-     my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
-							   -program  => 'wutblastn',
-							   -database => $blastdb->dbfile,
-							   -filter => 1,
-							  );
+     my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast
+       (
+        -query    => $seq,
+        -program  => 'wutblastn',
+        -database => $blastdb->dbfile,
+        -filter => 1,
+       );
      #print STDERR "Adding ".$dbname." ".$regex."\n";
      $run->add_regex($dbname, $regex);
      $run->run;

@@ -264,7 +264,7 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
   }
 
   foreach my $feature_id (keys %feature_ids){
-    unless ($runnable_featids{$feature_id} > 0){
+    unless ($runnable_featids{$feature_id}){
       my $runnable = $self->make_object($self->genomic_sequence, $unfiltered_partitioned_features{$feature_id});
       push (@runnables, $runnable);
     }

@@ -158,10 +158,5 @@ sub parse_results {
 }
 
 
-sub multiprotein{
-  my ($self) = @_;
-  return 0;
-}
-
 
 1;

@@ -263,7 +263,7 @@ sub run {
 
   my ($fhash,$ids) = $self->get_all_features_by_id;
   #print STDERR "have ".@$ids." ids\n";
- 
+  my $failed_count = 0;
   foreach my $id (@$ids) {
     #print STDERR "$id\n";
     
@@ -277,13 +277,13 @@ sub run {
     my @reverse;
     if ($pepseq) {
       foreach my $f (@features){
-	if($f->strand == 1){
-	  push(@forward, $f);
-	}elsif($f->strand == -1){
-	  push(@reverse, $f);
-	}else{
-	  $self->throw("unstranded feature not much use for gene building\n") 
-	}
+        if($f->strand == 1){
+          push(@forward, $f);
+        }elsif($f->strand == -1){
+          push(@reverse, $f);
+        }else{
+          $self->throw("unstranded feature not much use for gene building\n") 
+        }
       }
       if(@forward){
 	my @extras = $self->_find_extras(@forward);
@@ -328,10 +328,16 @@ sub run {
       }
       
     } else {
-      $self->throw("Can't fetch sequence for " . $features[0]->hseqname . "\n");
+      $self->warn("Can't fetch sequence for " 
+                  . $features[0]->hseqname . "\n");
+      $failed_count++;
     }
   
-  } 
+  }
+  if($failed_count == @$ids){
+    $self->throw("Can't find any sequences for the ids which match ".
+                 $self->genomic_sequence->name); 
+  }
   return 1;
   
 }
@@ -365,7 +371,9 @@ sub _find_extras {
   
  FEAT: 
   foreach my $f (@features) {
+    
     $f->slice($self->genomic_sequence);
+    $f->seqname($f->slice->name);
     my $found = 0;
 
     # does this need to be hardcoded?
@@ -377,7 +385,8 @@ sub _find_extras {
     foreach my $out (@output) {
       foreach my $sf ($out->sub_SeqFeature) {
         $sf->slice($self->genomic_sequence);
-        print STDERR "Comparing ".$sf." to ".$f."\n";
+        $sf->seqname($sf->slice->name);
+        #print STDERR "Comparing ".$sf." to ".$f."\n";
         if ($f->overlaps($sf)) {
           $found = 1;
         }
