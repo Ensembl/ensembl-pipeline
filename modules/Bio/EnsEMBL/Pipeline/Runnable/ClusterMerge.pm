@@ -354,6 +354,16 @@ sub link_Transcripts{
 			  }
 			} @transcripts;
     
+    # just to track the sets
+    # take 10 in each cluster
+    my @reduced_cluster;
+    my $count = 0;
+    while ( @transcripts && $count<10 ){
+	push(@reduced_cluster,shift @transcripts);
+	$count++;
+    }
+    @transcripts = @reduced_cluster;
+    
 
     ############################################################
     # search all the trees
@@ -537,7 +547,7 @@ sub check_tree{
 	elsif ( $result eq 'placed' ){
 	    $placed++;
 	    
-	    print STDERR "placed\n";
+	    print STDERR "placed\n" if $verbose;
 	    # check whether newnode is a new leaf
 	    if ( !$root && !$newnode->is_extended && !$newnode->is_included ){
 		if ( $added{$newnode} ){
@@ -566,40 +576,51 @@ sub check_tree{
 	elsif ($result eq 'extension'){
 	    
 	    ############################################################
-	    # place here
-	    print STDERR "extension: adding new extension\n" if $verbose;
-	    $newnode->add_extension_parent($node);
-	    $node->is_extended(1);
-	    
-	    ############################################################
-	    # add to the root if it is included in it 
-	    if ( $root && $self->compare( $newnode, $root) eq 'inclusion' ){
-		print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$root->transcript->dbID."\n";
-		$root->add_inclusion_child( $newnode );
-		$newnode->is_included(1);
-		$self->tag_extension_ancestors($root);
+	    # before placing here, check that it is a valid extension
+	    if ( $self->_check_for_closed_loops( $newnode, $node ) ){
+		print STDERR "extension: adding new extension\n" if $verbose;
+		$newnode->add_extension_parent($node);
+		$node->is_extended(1);
 		
+		############################################################
+		# add to the root if it is included in it 
+		if ( $root && $self->compare( $newnode, $root) eq 'inclusion' ){
+		    print STDERR "adding inclusion of ".$newnode->transcript->dbID." into ".$root->transcript->dbID."\n";
+		    $root->add_inclusion_child( $newnode );
+		    $newnode->is_included(1);
+		    $self->tag_extension_ancestors($root);
+		    
+		}
+		############################################################
+		# this is a new leaf of this inclusion sub-tree 
+		# ( and of the main tree if it has not been included or extended before
+		unless( $added{$newnode} ){
+		    my $label;
+		    if ($root){
+			$label = "subtree";
+			print STDERR "adding newnode as leaf of this $label\n" if $verbose;
+			push(@$newleaves,$newnode);
+			$added{$newnode} = 1;
+		    }
+		    elsif( !$newnode->is_included && !$newnode->is_extended ){
+			$label = "tree";
+			print STDERR "adding newnode as leaf of this $label\n" if $verbose;
+			push(@$newleaves,$newnode);
+			$added{$newnode} = 1;
+		    }
+		    # tag this node and all the extension ancestors recursively
+		    $self->tag_extension_ancestors($node);
+		    $placed++;
+		    next NODE;
+		}
 	    }
 	    ############################################################
-	    # this is a new leaf of this inclusion sub-tree 
-	    # ( and of the main tree if it has not been included or extended before
-	    unless( $added{$newnode} ){
-		my $label;
-		if ($root){
-		    $label = "subtree";
-		    print STDERR "adding newnode as leaf of this $label\n" if $verbose;
-		    push(@$newleaves,$newnode);
-		    $added{$newnode} = 1;
+	    # else, recover the leaf if it has not been added before and continue
+	    else{
+		if ( $is_leaf{$node} && !$added{$node} && !$node->is_extended ){
+		    push(@$newleaves,$node);
+		    $added{$node} = 1;
 		}
-		elsif( !$newnode->is_included && !$newnode->is_extended ){
-		    $label = "tree";
-		    print STDERR "adding newnode as leaf of this $label\n" if $verbose;
-		    push(@$newleaves,$newnode);
-		    $added{$newnode} = 1;
-		}
-		# tag this node and all the extension ancestors recursively
-		$self->tag_extension_ancestors($node);
-		$placed++;
 		next NODE;
 	    }
 	}
@@ -687,6 +708,46 @@ sub check_tree{
     }
 }  
 
+
+############################################################
+# this method checks for cases like this:
+#   x ==> z ==> w
+#   |          /
+#   |        /
+#   |      /
+#   |    /
+#   |  /
+#    y
+#
+# which give rise to redundant solutions
+
+sub _check_for_closed_loops{
+    my ($self,$newnode,$node) = @_;
+    
+    my $verbose = $self->verbose;
+
+    ############################################################
+    # $newnode extends $node, but we need to check that $node
+    # is not included in any of the extension parents of $newnode.
+
+    ############################################################
+    # the difficult question is how far we should go
+    # In principle let's check the inmediate parents only
+    if ( @{$newnode->extension_parents} ){
+	foreach my $parent ( @{$newnode->extension_parents} ){
+	    next if $parent == $node;
+	    if ( $self->compare( $node, $parent ) eq 'inclusion' ){
+		print STDERR "potential extension parent ".$node->transcript->dbID.
+		    " is included in an extension parent ".$parent->transcript->dbID."\n";
+		return 0;
+	    }
+	}
+	return 1;
+    }
+    else{
+	return 1;
+    }
+}
 
 ############################################################
 
