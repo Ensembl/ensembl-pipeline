@@ -65,7 +65,7 @@ use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis;
 #compile time check for executable - won't work till centrally installed ...
-#use Bio::EnsEMBL::Analysis::Programs qw(exonerate); 
+use Bio::EnsEMBL::Analysis::Programs qw(exonerate); 
 use Bio::PrimarySeq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
