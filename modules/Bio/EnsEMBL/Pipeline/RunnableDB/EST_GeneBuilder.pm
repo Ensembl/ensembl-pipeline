@@ -137,7 +137,8 @@ sub new {
       $self->cdna_db($cdna_db);
     }
     
-    $self->genetype($ESTGENE_TYPE);
+    $self->genetype("estgene_test");
+    #$self->genetype($ESTGENE_TYPE);
 
     $self->{_reverse_transcripts} = [];
     $self->{_forward_transcripts} = [];
@@ -647,12 +648,16 @@ sub _check_Transcripts {
       # check the splice sites
       ############################################################
       if ( $CHECK_SPLICE_SITES ){
-	next TRANSCRIPT unless $self->check_splice_sites($new_transcript,$strand);
+	my $check = $self->check_splice_sites($new_transcript,$strand);
+	unless ( $check ){
+	  print STDERR "rejecting transcript ".$new_transcript->dbID." for not having all splice sites canonical\n";
+	  next TRANSCRIPT;
+	}
       }
       # if the transcript made it to this point, keep it
       push (@alltranscripts, $new_transcript);
       
-    }    # end of TRANSCRIPT
+      }    # end of TRANSCRIPT
   return @alltranscripts;
   
 }
@@ -1260,7 +1265,7 @@ sub run {
   $strand = 1;
   my $tcount=0;
 
-  print STDERR "## forward strand ##\n";
+  print STDERR "\n## forward strand ##\n\n";
 
   my @f_transcripts1 = $self->_forward_transcripts;
   my @f_transcripts2 = $self->_process_Transcripts(\@f_transcripts1,$strand);
@@ -1298,7 +1303,7 @@ sub run {
       }
     }
     print STDERR $tcount." transcripts run in genomewise in the forward strand\n";
-
+    
   }
   ############################################################
   # else use a simpler method
@@ -1311,6 +1316,7 @@ sub run {
     }
   }
   
+  # set slice in exons and place last stop codon in ORF definition
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
   
   # cluster them into genes
@@ -1337,7 +1343,7 @@ sub run {
   $strand = -1;
   my $tcount2=0;
   
-  print STDERR "## reverse strand ##\n";
+  print STDERR "\n## reverse strand ##\n\n";
   my @reverse_transcripts;
   my @r_transcripts1 = $self->_reverse_transcripts;
   my @r_transcripts2 = $self->_process_Transcripts(\@r_transcripts1,$strand);  
@@ -1386,6 +1392,7 @@ sub run {
     }
   }
   
+  # set slice in exons and place last stop codon in ORF definition
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
   
   # cluster them into genes
@@ -1405,6 +1412,9 @@ sub run {
   
   $self->output(@reverse_remapped);
 
+
+  ############################################################
+  # these is the final set of genes:
   foreach my $gene ( $self->output ){
     print STDERR "gene with ".scalar(@{$gene->get_all_Transcripts})." transcripts\n";
   }
