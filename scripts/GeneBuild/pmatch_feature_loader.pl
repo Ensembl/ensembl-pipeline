@@ -77,6 +77,11 @@ $db->static_golden_path_type($path);
 my $sgpa = $db->get_StaticGoldenPathAdaptor;
 my $pmfa = new Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor($db);
 
+# warn that pm_best.out has chr names in the form: chr_name.chr_start-chr_end
+# and that the script will only use chr_name to store it in table pmatch_features
+print STDERR "Note: pm_best.out contains chr_name.chr_start-chr_end\n";
+print STDERR "pmatch_feature_loafer.pl will only store chr_name in pmatch_feature table\n";
+
 &process_proteins;
 
 # SUBROUTINES #
@@ -115,6 +120,18 @@ sub process_proteins {
       $end = $2;
     }
 
+    ## get chr_name from entry chr_name.chr_start-chr_end if necessary
+    my $chr_name;
+    my $chr_start;
+    my $chr_end;
+    if ( $chr =~/(\S+)\.(\d+)-(\d+)/ ){
+      $chr_name  = $1;
+      $chr_start = $2;
+      $chr_end   = $3;
+    }
+    $chr = $chr_name;
+    
+    # not used anymore, we deal with cDNAs separately
     my $cdna_id = $pmfa->get_cdna_id($protein);
 
     my $pmf = new Bio::EnsEMBL::Pipeline::PmatchFeature(-protein_id  => $protein,
