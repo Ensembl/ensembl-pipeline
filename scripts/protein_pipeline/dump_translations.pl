@@ -132,7 +132,9 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_geneIds}) {
           print STDERR "translation of ".$identifier." has stop codons - Skipping! (in clone ". $fe->contig->dbID .")\n";
           next;
         }
-        
+	my $seq = $tseq->seq;
+        $seq =~ s/\*$//;
+	$tseq->seq($seq);
         $tseq->display_id($identifier);
         $tseq->desc("Translation id ".$identifier." gene $gene_id Contig:" .$fe->contig->dbID. " Chr: " . $chr . " Pos: " . $cdna_start."\n");
         $seqio->write_seq($tseq);
