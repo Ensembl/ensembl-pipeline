@@ -44,9 +44,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					);
 
@@ -76,11 +74,6 @@ sub new {
   # dbobj, input_id, seqfetcher, and analysis objects are all set in
   # in superclass constructor (RunnableDB.pm)
 
-  # golden path
-  my $path = $GB_GOLDEN_PATH;
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->static_golden_path_type($path);
-
   return $self;
 }
 
@@ -89,8 +82,7 @@ sub new {
  Title   : make_seqfetcher
  Usage   :
  Function: if $index exists, 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
+           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise throws
  Example :
  Returns : Bio::DB::RandomAccessI
  Args    : $indexname - string
@@ -110,8 +102,7 @@ sub make_seqfetcher {
 								 );
   }
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw("can't make seqfetcher\n");
   }
 
   return $seqfetcher;

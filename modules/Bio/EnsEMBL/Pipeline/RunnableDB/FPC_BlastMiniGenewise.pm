@@ -56,7 +56,6 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_PROTEIN_INDEX
 					 GB_SIMILARITY_TYPE
@@ -471,6 +470,7 @@ sub _make_transcript{
  Usage   : my @valid = $self->validate_transcript($transcript)
  Function: Validates a transcript - rejects if mixed strands, 
                                     rejects if low coverage, 
+                                    rejects if stops in translation
                                     splits if long introns and insufficient coverage of parental protein
  Returns : Ref to @Bio::EnsEMBL::Transcript
  Args    : Bio::EnsEMBL::Transcript
@@ -490,9 +490,15 @@ sub validate_transcript {
     $valid = 0;
     return undef;
   }
+  #  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
   
-#  print STDERR "Coverage of $protname is $coverage - will be accepted\n";
-
+  # check for stops in translation
+  my $translates = $self->check_translation($transcript);
+  if(!$translates){
+    $self->warn("discarding transcript - translation has stop codons\n");
+    return undef;
+  }
+  
   my $previous_exon;
   foreach my $exon($transcript->get_all_Exons){
     if (defined($previous_exon)) {
@@ -681,6 +687,40 @@ EXON:   foreach my $exon($transcript->get_all_Exons){
 
 }
 
+=head2 check_translation
+
+ Title   : check_translation
+ Usage   :
+ Function: 
+ Example :
+ Returns : 1 if transcript translates with no stops, otherwise 0
+ Args    :
+
+
+=cut
+
+sub check_translation {
+  my ($self, $transcript) = @_;
+  my $tseq;
+
+  eval{
+    $tseq = $transcript->translate;
+  };
+
+  if((!defined $tseq) || ($@)){
+    my $msg = "problem translating :\n$@\n";
+    $self->warn($msg);
+    return 0;
+  }
+
+  if ($tseq->seq =~ /\*/ ) {
+    return 0;
+  }
+  else{
+    return 1;
+  }
+}
+
 
 =head2 check_coverage
 
@@ -839,7 +879,7 @@ sub output{
  Usage   :
  Function: makes a Bio::EnsEMBL::SeqFetcher to be used for fetching protein sequences. If 
            GB_PROTEIN_INDEX is specified in GeneConf.pm, then a Getseqs 
-           fetcher is made, otherwise it will be Pfetch
+           fetcher is made, otherwise it throws
  Example :
  Returns : Bio::EnsEMBL::SeqFetcher
  Args    :
@@ -858,8 +898,7 @@ sub make_seqfetcher {
     $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
   }
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;

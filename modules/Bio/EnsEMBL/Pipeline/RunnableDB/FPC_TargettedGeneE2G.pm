@@ -44,7 +44,6 @@ use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G;
 use Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_CDNA_INDEX
@@ -84,8 +83,7 @@ sub new {
  Title   : make_seqfetcher
  Usage   :
  Function: if $index exists, 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise 
-           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch
+           returns a Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs, otherwise throws
  Example :
  Returns : Bio::DB::RandomAccessI
  Args    : $indexname - string
@@ -105,8 +103,7 @@ sub make_seqfetcher {
 								 );
   }
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;

@@ -17,7 +17,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G
 
 my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneE2G(
                                                                       '-db_obj'      => $dbobj,
-                                                                      '-golden_path' => $gp,
                                                                       '-input_id'    => $input_id
                                                                     );
 
@@ -57,11 +56,9 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::Runnable::ExonerateMiniEst2Genome;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_CDNA_INDEX
 					 );
@@ -72,17 +69,8 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($path,$cdna_seqfetcher) = $self->_rearrange([qw(GOLDEN_PATH CDNA_SEQFETCHER)], @args);
+  my ($cdna_seqfetcher) = $self->_rearrange([qw(CDNA_SEQFETCHER)], @args);
 
-  # golden path
-  if(!defined $path){
-    $path = $GB_GOLDEN_PATH;
-  }
-
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->static_golden_path_type($path);
-
-  # broken by test_runnableDB 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
     my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
@@ -125,8 +113,7 @@ sub make_seqfetcher{
 								 );
   }
   else{
-    # default to Pfetch
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    $self->throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -603,7 +590,7 @@ sub convert_gw_output {
 
  Title   : check_gw_genes
  Usage   :
- Function: Checks coverage of parent protein, and checks all exons are sane
+ Function: Checks coverage of parent protein, and checks all exons are sane, rejects transcripts with stop codons
  Example :
  Returns : array of checked Bio::EnsEMBL::Gene
  Args    : array of Bio::EnsEMBL::Gene
