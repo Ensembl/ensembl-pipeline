@@ -81,6 +81,10 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use Bio::Tools::BPlite;
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head2 new
@@ -136,7 +140,13 @@ sub new {
       $self->throw("No query sequence input.");
     }
 
-    if ($program =~ m!/!) { #path to blast is provided 
+    my $bindir  = $::pipeConf{'bindir'}  || undef;
+    my $datadir = $::pipeConf{'datadir'} || undef;
+    
+    if (-x $program) {
+      # passed from RunnableDB (full path assumed)
+      $self->program($program);
+    } elsif ($bindir && -x ($program = "$bindir/$program")) {
       $self->program($program);
     } elsif ($program =~ /blastn|blastx|blastp|tblastn|tblastx/) {
       $self->program($self->locate_executable($program));  
@@ -379,6 +389,9 @@ sub parse_results {
          }
       }
       elsif ($name =~ /\|emb\|(\S+)/) {
+	  $name = $1;
+      }
+      elsif ($name =~ /SWISSNEW:(\S+)/) {
 	  $name = $1;
       }
       elsif ($name =~ /^(\S+) (\S+)/) {
