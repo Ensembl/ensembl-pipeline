@@ -119,47 +119,65 @@ sub run{
    $maxevalue= $self->maxevalue;
    $coverage = $self->coverage;
 
-   FEATURE :
-   foreach my $f ( $self->runnable->output ) {
 
-       #print STDERR "Feature ",$f->score," $minscore ",$f->start," ",$f->end,"\n";
-       if( defined $f->score && $f->score < $minscore ) {
-	   next;
-       }
+   my %validhit;
+   my @input = $self->runnable->output;
 
-       if( $f->can('evalue') && defined $f->evalue && $f->evalue > $maxevalue ) {
-	   next;
-       }
-       # bugger. Coverage. Assumme @accepted is sorted by
-       # start.
-       my $seen = 0;
-       foreach my $a ( @accepted ) {
-	   if( $a->start > $f->end ) {
-	       # accepted.
-	       last;
-	   }
-	   if( $a->end < $f->start ) {
-	       # skip forwards
-	       next;
-	   }
+   # first- scan across all features, considering
+   # valid to be > minscore < maxevalue
 
+   my $maxend   = 0;
 
-	   if( $a->contains($f) ) {
-	       $seen++;
-	       if( $seen > $coverage ) {
-		   # reject
-		   next FEATURE; 
+   # all featurepairs have a score. 
+   # some may have an evalue.
+   foreach my $f ( @input ) {
+       if( $f->score > $minscore ) {
+	   if( $f->can('evalue') && defined $f->evalue ) {
+	       if( $f->evalue < $maxevalue ) {
+		   $validhit{$f->hseqname} = 1;
+		   if( $f->end > $maxend ) {
+		       $maxend = $f->end;
+		   }
+
+	       }
+	   } else {
+	       $validhit{$f->hseqname} = 1;
+	       if( $f->end > $maxend ) {
+		   $maxend = $f->end;
 	       }
 	   }
        }
+   }
+	    
+   # perl will automatically extend this array 
+   my @list;
+   $list[$maxend] = 0;
+
+
+   my @accepted;
+   FEATURE :
+   foreach my $f ( @input ) {
+       if( !exists $validhit{$f->hseqname} ) {
+	   next;
+       }
+       my $hole = 0;
+       for my $i ( $f->start .. $f->end ) {
+	   if( $list[$i] < $coverage ) {
+	       # accept!
+	       $hole = 1;
+	       last;
+	   }
+       }
+
+       if( $hole == 0 ) {
+	   next;
+       }
+
        push(@accepted,$f);
-       #print STDERR "Feature accepted\n";
+       for my $i ( $f->start .. $f->end ) {
+	   $list[$i]++; 
+       }
 
-       # at this point this means we have accepted this
-       # feature. resort the accepted list by start
-
-       @accepted = sort { $a <=> $b} @accepted;
-       
    }
 
    push(@{$self->{'_output'}},@accepted);
