@@ -7,7 +7,7 @@
 #
 # Table structure for table 'analysis'
 #
-CREATE TABLE analysis (
+CREATE TABLE analysisprocess (
   id int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
   created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
   db varchar(40),
@@ -25,23 +25,6 @@ CREATE TABLE analysis (
 );
 
 #
-# Table structure for table 'analysis_list'
-#
-CREATE TABLE analysis_list (
-  set_id int(10) DEFAULT '0' NOT NULL,
-  analysis_id int(10) DEFAULT '0' NOT NULL
-);
-
-#
-# Table structure for table 'analysis_set'
-#
-CREATE TABLE analysis_set (
-  id int(10) DEFAULT '0' NOT NULL auto_increment,
-  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  PRIMARY KEY (id)
-);
-
-#
 # Table structure for table 'current_status'
 #
 CREATE TABLE current_status (
@@ -49,26 +32,6 @@ CREATE TABLE current_status (
   status varchar(40) DEFAULT '' NOT NULL,
   PRIMARY KEY (id),
   KEY status_index (status)
-);
-
-#
-# Table structure for table 'exon'
-#
-CREATE TABLE exon (
-  id varchar(40) DEFAULT '' NOT NULL,
-  contig varchar(40) DEFAULT '' NOT NULL,
-  version int(10) DEFAULT '1' NOT NULL,
-  created datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  modified datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  stored datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
-  seq_start int(10) DEFAULT '0' NOT NULL,
-  seq_end int(10) DEFAULT '0' NOT NULL,
-  strand int(2) DEFAULT '1' NOT NULL,
-  phase int(11) DEFAULT '0' NOT NULL,
-  end_phase int(11) DEFAULT '0' NOT NULL,
-  KEY idx1 (id,contig),
-  PRIMARY KEY (id),
-  KEY contig_index (contig)
 );
 
 #
@@ -101,6 +64,7 @@ CREATE TABLE job (
   stderr_file varchar(100) DEFAULT '' NOT NULL,
   input_object_file varchar(100) DEFAULT '' NOT NULL,
   output_file varchar(100) DEFAULT '' NOT NULL,
+  status_file varchar(100) DEFAULT '' NOT NULL,
   PRIMARY KEY (id),
   KEY input_index (input_id),
   KEY analysis_index (analysis)
@@ -117,9 +81,9 @@ CREATE TABLE jobstatus (
 
  
  #
- # Table structure for table 'clone'
+ # Table structure for table 'timclone'
  #
-CREATE TABLE clone (
+CREATE TABLE timclone (
         disk_id varchar(40) NOT NULL,
         clone_group set("SU","EU","SF","EF") NOT NULL,
         chromosome varchar(10) DEFAULT 'unk' NOT NULL,
@@ -134,15 +98,4 @@ CREATE TABLE clone (
         external_lock int(10) DEFAULT '1' NOT NULL,
         PRIMARY KEY (disk_id)
 );
- 
-#
-# Table structure for table 'contig'
-#
-CREATE TABLE contig (
-  id varchar(40) DEFAULT '' NOT NULL,
-  internal_id int(10) DEFAULT '0' NOT NULL auto_increment,
-  PRIMARY KEY (internal_id),
-  KEY id_index (id)
-);
-
 
