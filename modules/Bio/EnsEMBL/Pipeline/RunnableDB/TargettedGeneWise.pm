@@ -110,9 +110,9 @@ sub fetch_input{
   
   foreach my $entry(@$input) {
     # input format: chr22:10602496,10603128;Q9UGV6:1,105
-    # changed to use _ as field separator - for bsub
+    # changed to use : as field separator - for bsub
 #    if( !($entry =~ /(\S+):(\d+),(\d+);(\S+):(\d+),(\d+)/) ) {
-    if( !($entry =~ /(\S+):(\d+),(\d+)_(\S+):(\d+),(\d+)/) ) {
+    if( !($entry =~ /(\S+):(\d+),(\d+):(\S+):(\d+),(\d+)/) ) {
       $self->throw("Not a valid input id... $entry");
     }
     
