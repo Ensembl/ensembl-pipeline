@@ -538,9 +538,9 @@ sub _check_Transcripts {
 	  next TRANSCRIPT;
       }
       
-      $transcript->sort;
-      my $exons = $transcript->get_all_Exons;
-      #print STDERR "Transcript with ".scalar(@$exons)." exons\n";
+      #$transcript->sort;
+      my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
+      #print STDERR "Transcript with ".scalar(@exons)." exons\n";
       my $hid;
       my $this_strand;
       my @accepted_exons; # here we hold the good exons in this transcript
@@ -550,7 +550,7 @@ sub _check_Transcripts {
       
       my $previous_exon;
     EXON:
-      foreach my $exon (@$exons){
+      foreach my $exon (@exons){
 	  $exon_count++;
 	  
 	  my $hstart;
