@@ -560,7 +560,7 @@ sub _makeFeaturePair {
 						-score       => $score);
 	
     $feature1->percent_id($pid);
-    $feature1->pvalue($evalue);
+    $feature1->p_value($evalue);
 
     my $feature2 = new Bio::EnsEMBL::SeqFeature(-seqname => $name,
 						-start   => $hstart,
