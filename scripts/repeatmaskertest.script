@@ -1,0 +1,45 @@
+#!/usr/local/bin/perl -w
+#A script to test Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
+#MAQ
+
+use strict;
+use Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker;
+use Bio::Seq;
+use Bio::SeqIO;
+
+my ($clonefile, $workdir);
+
+if (!@ARGV)
+{
+    $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+    $workdir = '/nfs/disk65/mq2/temp';
+}
+else
+{
+    ($clonefile, $workdir) = @ARGV; 
+}
+
+#create and fill Bio::Seq object 
+my $seq = Bio::Seq->new();
+my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+$seq = $seqstream->next_seq();
+
+#create Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker object
+my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
+$repmask->workdir($workdir);
+$repmask->repeatmasker('/nfs/disk65/mq2/temp/sources/RepeatMasker04042000/RepeatMasker');
+$repmask->run();
+#$repmask->output();
+
+#get and store the output
+my @methods = qw( seqname start end hseqname hstart hend );
+my @results = $repmask->output();
+
+foreach my $obj (@results)
+{
+    print "\n";
+    foreach my $method_name (@methods) {
+        my $value = $obj->$method_name();
+        printf("%10s = $value\n", $method_name);
+    }
+}
