@@ -104,6 +104,27 @@ use vars qw( %Exonerate );
 	      # fsmmemory: memory given for the target sequence ( max memory required for holding the chromosomes )
 	      # In human this could be around 256
 	      #
+	      # here are a few examples of what it can do at this stage:
+	      #
+	      # 1. Aligning cdnas to genomic sequence:
+	      #    exonerate --exhaustive no --model est2genome cdna.fasta genomic.masked.fasta
+	      #    ( this is the default )
+	      #
+	      # 2. Behaving like est2genome:
+	      #    exonerate --exhaustive yes --model est2genome cdna.fasta genomic.masked.fasta
+	      #
+	      # 3. Behaving like blastn:
+	      #    exonerate --model affine:local dna.fasta genomic.masked.fasta
+	      #
+	      # 4. Smith-Waterman:
+	      #    exonerate --exhaustive --model affine:local query.fasta target.fasta
+	      #
+	      # 5. Needleman-Wunsch:
+	      #    exonerate --exhaustive --model affine:global query.fasta target.fasta
+	      #
+	      # 6. Generate ungapped Protein <---> DNA alignments:
+	      #    exonerate --gapped no --showhsp yes protein.fasta genome.fasta
+	      
 	      EST_EXONERATE_OPTIONS       => ' --score 500 --fsmmemory 300 --softmasktarget',
 	      
 	      
