@@ -294,6 +294,16 @@ sub map_temp_Exons_to_real_Exons{
 
    @oldexons   = sort { $a->end   <=> $b->end } @oldexons;
 
+   if(my $dd==1){
+       my @all = @tempexons;
+       push(@all,@oldexons);
+       @all   = sort { $a->end   <=> $b->end } @all;
+       foreach my $exon (@all){
+	   print"  ". $exon->id." ".$exon->start." ".$exon->end."\n";
+       }
+       exit 0;
+   }
+
    my @tempexons2;
    my %bestfit;
    # go over each exon and map old->new...
