@@ -49,9 +49,10 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Analysis::MSPcrunch;
+#use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::PrimarySeqI;
 use Bio::Tools::Blast;
+use Bio::Tools::BPlite;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
 use Data::Dumper;
@@ -79,11 +80,13 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $blastdb, $seqfetcher) = $self->_rearrange([qw(GENOMIC
-								 BLASTDB
-								 SEQFETCHER)],
-							     @args);
-       
+    my( $genomic, $blastdb, $seqfetcher, $id, $length) = $self->_rearrange([qw(GENOMIC
+									       BLASTDB
+									       SEQFETCHER
+									       ID_THRESHOLD
+									       LENGTH_THRESHOLD)],
+									   @args);
+	 
     $self->throw("No genomic sequence input")           
       unless defined($genomic);
     $self->throw("[$genomic] is not a Bio::PrimarySeqI") 
@@ -99,7 +102,21 @@ sub new {
     $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
       unless $seqfetcher->isa("Bio::DB::RandomAccessI");
     $self->seqfetcher($seqfetcher) if defined($seqfetcher);
+
+    if(defined $id){
+      $self->{'_id_threshold'} = $id;
+    }
+    else{
+      $self->{'_id_threshold'} = 50;
+    }
     
+    if(defined $length){
+      $self->{'_length_threshold'} = $length;
+    }
+    else{
+      $self->{'_length_threshold'} = 50;
+    } 
+
     return $self; 
 }
 
@@ -248,31 +265,89 @@ sub run {
     }
 
     # run blast on genomic seq vs dbEST
-    my @blastres = $self->run_blast(keys %exonerate_ests);
+    my @seq = $self->get_Sequences(keys %exonerate_ests);
+    my $blast_report = $self->run_blast(@seq);
 
-    # get list of hits - 
-    my %esthash;
-    foreach my $result(@blastres) {
-      my $seqname = $result->hseqname;       #gb|AA429061.1|AA429061
-      $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
-      $result->hseqname($seqname);
-      
-      # score cutoff? percentID? any EST with any hit > ... gets used
-      if($result->score > 500 || defined ($esthash{$seqname}) ) {
-	push(@{$esthash{$seqname}},$result);
-      }
+    # store est seqs in a hash keyed by seqname
+    my %est_seqs;
+    foreach my $seq(@seq) {
+      $est_seqs{$seq->id} = $seq;
+      print "est_seq entry for *" . $seq->id . "*\n";
     }
+
+    my $id_threshold = $self->{'_id_threshold'};
+    my $length_threshold = $self->{'_length_threshold'};    
+
+    # get hits - 
+    my %esthash;
+
+    HIT:
+    while (my $hit = $blast_report->nextSbjct) {
+      # est length
+      my $estname;
+      my $covered_length = 0;
+      my @hsps; # we will need these later for building the MiniSeq
+
+      while (my $hsp = $hit->nextHSP) {
+	if(defined $estname && $estname ne $hsp->subject->seqname){
+	  print STDERR "trying to switch querynames halfway through a blast hit - big problem!\n";
+	  next HIT;
+	}
+	else{
+	  $estname = $hsp->subject->seqname;
+	}
+	# check against $id_threshold
+	next HIT unless $hsp->percent >= $id_threshold;
+
+	$covered_length += $hsp->length;
+
+	# need to make a Bio::EnsEMBL::FeaturePair of the hsp
+	# genomic
+	my $sf1 = new Bio::EnsEMBL::SeqFeature(-start  => $hsp->query->start,
+					      -end    => $hsp->query->end,
+					      -strand => $hsp->query->strand);
+	# est
+	my $sf2 = new Bio::EnsEMBL::SeqFeature(-start  => $hsp->subject->start,
+					      -end    => $hsp->subject->end,
+					      -strand => $hsp->subject->strand);
+	$sf1->score($hsp->score);
+	$sf2->score($hsp->score);
+	$sf1->seqname($self->genomic_sequence->id);
+	$sf2->seqname($hsp->subject->seqname);
+	$sf1->primary_tag('similarity');
+	$sf2->primary_tag('similarity');
+	$sf1->source_tag('e2g');
+	$sf2->source_tag('e2g');
+
+	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $sf1,
+					       -feature2 => $sf2,
+					      );
+#	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $sf2,
+#					       -feature2 => $sf1,
+#					      );
+	push(@hsps, $fp);
+      } #end of while $hsp
+      
+      # check against $len_threshold
+      $estname =~ s/\s+//g;
+      my $tmp = $est_seqs{$estname};
+      my $estlength = $tmp->length;
+
+      my $cp = ($covered_length/$estlength) * 100;
+      next HIT unless $cp >= $length_threshold;
+      print STDERR "keeping $estname\n";
+      push(@{$esthash{$estname}},@hsps);$esthash{$estname};
+    } # end of while $hit
     
-ID:    foreach my $id(keys %esthash) {
-      print STDERR "id: $id has "  . scalar(@{$esthash{$id}}) . " blast hits\n";
-      
-      # only use ESTs that have >1 blast hit to cut down on how many e2gs we run.
-      next ID unless scalar(@{$esthash{$id}}) > 1; # ??? too strict?
-      
-      # make a set of features per EST
-      # should we do some ordering? deal with strands?
+  ID:    
+    foreach my $id(keys %esthash) {
+      # get all the HSPs for this EST sequence
       my @features = @{$esthash{$id}};
  
+      # only use ESTs that have >1 blast hit to cut down on how many e2gs we run.
+      print STDERR "id: $id has "  . scalar(@features) . " blast hits\n";
+      next ID unless scalar(@features) > 1; # ??? too strict?
+
       # make MiniEst2Genome runnables
       
       my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome('-genomic'  => $self->genomic_sequence,
@@ -312,10 +387,9 @@ sub run_exonerate {
 
 sub run_blast {
 
-    my ($self, @ests) = @_;
+    my ($self, @seq) = @_;
 
     my $genomic = $self->genomic_sequence;
-    my @seq = $self->get_Sequences(@ests);
     my $blastdb = $self->make_blast_db(@seq);
 
     # tmp files
@@ -328,55 +402,18 @@ sub run_blast {
     $seqio->write_seq($genomic);
     close($seqio->_filehandle);
 
-    my $command  = "wublastn $blastdb $seqfile B=500 -hspmax 1000  2> /dev/null |MSPcrunch -d - >  $blastout";
+    my $command  = "wublastn $blastdb $seqfile B=500 -hspmax 1000  2> /dev/null >  $blastout";
 
     print (STDERR "Running command $command\n");
     my $status = system( $command );
 
     print("Exit status of blast is $status\n");
-    open (BLAST, "<$blastout") 
-        or $self->throw ("Unable to open Blast output $blastout: $!");    
-    if (<BLAST> =~ /BLAST ERROR: FATAL:  Nothing in the database to search!?/)
-    {
-        print "nothing found\n";
-        return;
-    }
-
-    # process the blast output
-    my @pairs;
-
-    eval {
-	my $msp = new Bio::EnsEMBL::Analysis::MSPcrunch(-file => $blastout,
-							-type => 'DNA-DNA',
-							-source_tag => 'e2g',
-							-contig_id => $self->genomic_sequence->id,
-							);
-
-
-	@pairs = $msp->each_Homol;
-	
-	foreach my $pair (@pairs) {
-	    my $strand1 = $pair->feature1->strand;
-	    my $strand2 = $pair->feature2->strand;
-	    
-	    print STDERR "***" . $pair->seqname . " " . $pair->hseqname . " " . $pair->score . "\n\n";
-
-	    $pair->invert;
-	    $pair->feature2->strand($strand2);
-	    $pair->feature1->strand($strand1);
-	    $pair->hseqname($genomic->id);
-	    $pair->invert;
-	    $self->print_FeaturePair($pair);
-	}
-    };
-    if ($@) {
-	$self->warn("Error processing msp file for " . $genomic->id . " [$@]\n");
-    }
+    my $report = new Bio::Tools::BPlite('-file'=>$blastout);
 
     unlink $blastout;
     unlink $seqfile;
+    return $report;
 
-    return @pairs;
 }
 
 sub print_FeaturePair {
