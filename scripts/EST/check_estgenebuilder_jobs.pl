@@ -48,11 +48,6 @@ while(<LS>){
   
   #print STDERR "checking $file_name\n";
   
-  my $exception  = 0;
-  my $wrote_gene = 0;
-  my $exit = 0;
-
-
  THISFILE:
   while (<IN>){
     chomp;
@@ -73,9 +68,6 @@ while(<LS>){
       $file_name =~/(\S+\.\d+-\d+)\./;  
       my $input_id = $1;  
       print "$input_id Out of memory\n";  
-    }
-    if ($line =~ /wrote/i){
-      $wrote_gene++;
     }
   }
   close(IN);
