@@ -38,21 +38,13 @@ use strict;
   
 =cut
 
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  unshift (@INC, $script_dir);
-  require "GB_conf.pl";
-}
 
-my %conf     = %::GB_conf;
-
-my $refseq   = $conf{'refseq'};
-my $sptr     = $conf{'sptr'};
-my $protfile = $conf{'pfasta'};
-my $pmatch   = $conf{'pmatch'};
+my $refseq   = $::scripts_conf{'refseq'};
+my $sptr     = $::scripts_conf{'sptr'};
+my $protfile = $::scripts_conf{'pfasta'};
+my $pmatch   = $::scripts_conf{'pmatch'};
 
 &parse_refseq;
 &parse_sptr;

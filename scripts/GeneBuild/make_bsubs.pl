@@ -1,33 +1,30 @@
-#!/usr/local/bin/perl -w
+#!/usr/local/bin/perl
 use strict;
 
-BEGIN {
-  # oooh this is not nice
-  my $script_dir = $0;
-  $script_dir =~ s/(\S+\/)\S+/$1/;
-  unshift (@INC, $script_dir);
-  require "GB_conf.pl";
-}
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
-my %gbc = %::GB_conf;
-if($gbc{'dbuser'} eq 'ensadmin' && $gbc{'dbpass'} eq ''){
-  print "You cannot have dbuser set to ensadmin with no dbpass set!\nPlease correct the entries in GB_conf\n";
+my %conf    = %::scripts_conf;
+my %db_conf = %::db_conf;
+
+if($db_conf{'dbuser'} eq 'ensadmin' && $db_conf{'dbpass'} eq ''){
+  print "You cannot have dbuser set to ensadmin with no dbpass set!\nPlease correct the entries in GB_conf.pl\n";
   exit(1);
 }
 
-foreach my $arg($gbc{'runner'}, $gbc{'dbname'}, $gbc{'dbhost'}, $gbc{'dbuser'}, $gbc{'queue'},$gbc{'tmpdir'}){
+foreach my $arg($conf{'runner'}, $db_conf{'dbname'}, $db_conf{'dbhost'}, $db_conf{'dbuser'}, $conf{'queue'},$conf{'tmpdir'}){
     if ($arg eq '' ){
       print "You need to set various parameters in GB_conf.pl\n" .  
 	"Here are your current values for required settings: \n" .
-	"runner     => $gbc{'runner'}\n" .
-	"dbname     => $gbc{'dbname'}\n" .
-	"dbhost     => $gbc{'dbhost'}\n" .
-	"dbuser     => $gbc{'dbuser'}\n" .
-	"dbpass     => $gbc{'dbpass'}\n" .
-	"queue      => $gbc{'queue'}\n" .
-	"tmpdir     => $gbc{'tmpdir'}\n" ;
+	"runner     => $conf{'runner'}\n" .
+	"dbname     => $db_conf{'dbname'}\n" .
+	"dbhost     => $db_conf{'dbhost'}\n" .
+	"dbuser     => $db_conf{'dbuser'}\n" .
+	"dbpass     => $db_conf{'dbpass'}\n" .
+	"queue      => $conf{'queue'}\n" .
+	"tmpdir     => $conf{'tmpdir'}\n" .
+	"golden_path => $db_conf{'golden_path'} ( empty string will use UCSC )\n" ;
 
       exit(1);
     }
@@ -37,11 +34,11 @@ my %chrhash;
 
 &get_chrlengths;
 
-foreach my $lr(@{$gbc{'length_runnables'}}) {
+foreach my $lr(@{$conf{'length_runnables'}}) {
   make_lbsubs($lr) unless $lr eq '';
 }
 
-foreach my $tr(@{$gbc{'targetted_runnables'}}) {
+foreach my $tr(@{$conf{'targetted_runnables'}}) {
   make_tbsubs($tr) unless $tr eq '';
 }
 
@@ -50,10 +47,10 @@ foreach my $tr(@{$gbc{'targetted_runnables'}}) {
 
 sub get_chrlengths{
 
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $gbc{'dbhost'},
-					      -user   => $gbc{'dbuser'},
-					      -pass   => $gbc{'dbpass'},
-					      -dbname => $gbc{'dbname'},
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $db_conf{'dbhost'},
+					      -user   => $db_conf{'dbuser'},
+					      -pass   => $db_conf{'dbpass'},
+					      -dbname => $db_conf{'dbname'},
 					     );
   my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
   
@@ -69,23 +66,25 @@ sub get_chrlengths{
 sub make_tbsubs {
   my ($runnable) = @_;
   
-  my $runner = $gbc{'runner'};
-  my $dbname = $gbc{'dbname'};
-  my $dbhost = $gbc{'dbhost'};
-  my $dbuser = $gbc{'dbuser'};
-  my $dbpass = $gbc{'dbpass'};
-  my $queue  = $gbc{'queue'};
-  my $dir    = $gbc{'tmpdir'} . "/$runnable";
-  my $pm_out = $gbc{'pm_output'};
-  $pm_out .= "pm_best.out";
-  my $cdnas  = $gbc{'cdna_pairs'};
+  my $runner      = $conf{'runner'};
+  my $dbname      = $db_conf{'dbname'};
+  my $dbhost      = $db_conf{'dbhost'};
+  my $dbuser      = $db_conf{'dbuser'};
+  my $dbpass      = $db_conf{'dbpass'};
+  my $queue       = $conf{'queue'};
+  my $golden_path = $db_conf{'golden_path'};
+  my $dir         = $conf{'tmpdir'} . "/$runnable";
+  my $pm_out      = $conf{'pm_output'};
+  my $cdnas       = $conf{'cdna_pairs'};
 
+  $pm_out .= "pm_best.out";
+  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
   # check them!
   foreach my $arg($pm_out, $cdnas){
     if ($arg eq '' ){
       print "You need to set various parameters in GB_conf.pl\n" .  
 	"Here are your current values for required settings: \n" .
-	"pm_output  => $gbc{'pm_output'}\n" .
+	"pm_output  => $conf{'pm_output'}\n" .
 	"cdna_pairs => $cdnas\n";
 
       exit(1);
@@ -146,11 +145,11 @@ sub make_tbsubs {
 
     my $outfile  = $resdir . "/$input_id.out";
     my $errfile  = $resdir . "/$input_id.err";
-    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \"";
+    my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable\"";
     $command .= "  $runner ";
     $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
     $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
-    $command .= " -input_id $input_id -write";      
+    $command .= " -input_id $input_id -parameters golden_path=$golden_path -write";      
     print OUTF "$command\n";
     
   }
@@ -164,22 +163,25 @@ sub make_tbsubs {
 sub make_lbsubs {
   my ($runnable) = @_;
   
-  my $runner = $gbc{'runner'};
-  my $dbname = $gbc{'dbname'};
-  my $dbhost = $gbc{'dbhost'};
-  my $dbuser = $gbc{'dbuser'};
-  my $dbpass = $gbc{'dbpass'};
-  my $queue  = $gbc{'queue'};
-  my $size   = $gbc{'size'};
-  my $dir    = $gbc{'tmpdir'} . "/$runnable";
+  my $runner      = $conf{'runner'};
+  my $dbname      = $db_conf{'dbname'};
+  my $dbhost      = $db_conf{'dbhost'};
+  my $dbuser      = $db_conf{'dbuser'};
+  my $dbpass      = $db_conf{'dbpass'};
+  my $golden_path = $db_conf{'golden_path'};
+  my $queue       = $conf{'queue'};
+  my $size        = $conf{'size'};
+  my $dir         = $conf{'tmpdir'} . "/$runnable";
   
+  $golden_path = 'UCSC' unless (defined $golden_path && $golden_path ne '');
+
   # check them!
-  foreach my $arg($size, $gbc{'tmpdir'}){
+  foreach my $arg($size, $conf{'tmpdir'}){
     if ($arg eq '' ){
       print "You need to set various parameters in GB_conf.pl\n" .  
 	"Here are your current values for required settings: \n" .
 	"size   => $size\n" .
-	"tmpdir => $gbc{'tmpdir'}\n";
+	"tmpdir => $conf{'tmpdir'}\n";
 
       exit(1);
     }
@@ -215,11 +217,11 @@ sub make_lbsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check \"";
+      my $command = "bsub -q $queue -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
       $command .= " -dbuser $dbuser -pass $dbpass -dbname $dbname -host $dbhost ";
-      $command .= " -input_id $input_id -write";      
+      $command .= " -input_id $input_id -parameters golden_path=$golden_path -write";      
       print OUTF "$command\n";
       
       $count = $count + $size;
@@ -227,3 +229,4 @@ sub make_lbsubs {
   }
   close OUTF;
 }
+	     

@@ -5,7 +5,6 @@ BEGIN {
   my $script_dir = $0;
   $script_dir =~ s/(\S+\/)\S+/$1/;
   unshift (@INC, $script_dir);
-  require "GB_conf.pl";
 }
 
 =head1 NAME
@@ -72,8 +71,15 @@ use pmatch_modules;
 use Bio::Seq;
 use File::Find;
 use Getopt::Long;
+require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
-my %conf =  %::GB_conf; # configuration options
+my %conf;
+
+{
+  # yes I know I only use it once. It isn't a typo!
+  local $^W = 0;
+  %conf =  %::scripts_conf; # configuration options
+}
 
 # global vars
 my %plengths; # stores lengths of all proteins in $protfile 
@@ -144,12 +150,7 @@ foreach my $file(@files){
 			   -fpcfile  => $fpcfile);
   
   $pmf1->run;
-
-  push (@hits, $pmf1->output);
-}
-
-
- foreach my $hit(@hits) {
+  foreach my $hit($pmf1->output) {
    print OUT $hit->query  . ":" . 
      $hit->qstart . "," . 
      $hit->qend   . ":" . 
@@ -158,6 +159,11 @@ foreach my $file(@files){
      $hit->tend   . " " .
      $hit->coverage . "\n";
  }
+#  push (@hits, $pmf1->output);
+}
+
+
+
 
 close (OUT) or die "Can't close $outfile: $!\n";
 
@@ -206,7 +212,3 @@ sub make_protlist{
   $/ = "\n";
   close INFILE;
 }
-
-
-
-
