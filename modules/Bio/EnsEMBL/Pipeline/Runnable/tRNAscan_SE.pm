@@ -17,12 +17,12 @@ Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE
 =head1 SYNOPSIS
 
 #create and fill Bio::Seq object
-my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq';
 my $seq = Bio::Seq->new();
-my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
 $seq = $seqstream->next_seq();
 #create Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE object
-my $trna = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-CLONE => $seq);
+my $trna = Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-QUERY => $seq);
 $trna->workdir($workdir);
 $trna->run();
 my @results = $trna->output();
@@ -61,10 +61,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE->new (-QUERY => $seq);
     Function:   Initialises tRNAscan_SE object
     Returns :   a tRNAscan_SE Object
-    Args    :   A Bio::Seq object (-CLONE) 
+    Args    :   A Bio::Seq object (-QUERY) 
 
 =cut
 
@@ -81,14 +81,14 @@ sub new {
   $self->{'_results'}   = undef;    #file to store results of tRNAscan_SE
   $self->{'_protected'} = [];       #a list of files protected from deletion
   
-  my( $sequence, $tRNAscan_SE) = $self->_rearrange([qw(CLONE 
+  my( $sequence, $tRNAscan_SE) = $self->_rearrange([qw(QUERY 
 						       TRNASCAN_SE)], 
 						   @args);
 
 
   $tRNAscan_SE = 'tRNAscan-SE' unless $tRNAscan_SE;
 
-  $self->clone($sequence) if ($sequence);       
+  $self->query($sequence) if ($sequence);       
   $self->tRNAscan_SE($self->find_executable($tRNAscan_SE));
 
   return $self;
@@ -99,7 +99,7 @@ sub new {
 #################
 # really ought to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
 # to do!
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -109,8 +109,8 @@ sub clone {
         }
 	$self->{'_sequence'} = $seq ;
 
-	$self->clonename($self->clone->id);
-	$self->filename($self->clone->id.".$$.seq");
+	$self->queryname($self->query->id);
+	$self->filename($self->query->id.".$$.seq");
 	$self->results($self->filename.".out");
     }
     return $self->{'_sequence'};
@@ -153,8 +153,8 @@ sub tRNAscan_SE {
 sub run {
     my ($self, $dir, $args) = @_;
     #set arguments for tRNAscan_SE
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for tRNAscan_SE\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for tRNAscan_SE\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();

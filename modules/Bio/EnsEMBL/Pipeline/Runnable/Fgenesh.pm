@@ -19,12 +19,12 @@ Bio::EnsEMBL::Pipeline::Runnable::Fgenesh
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::Fgenesh object
-  my $fgenesh = Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-CLONE => $seq);
+  my $fgenesh = Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-QUERY => $seq);
   $fgenesh->workdir($workdir);
   $fgenesh->run();
   my @genes = $fgenesh->output();
@@ -86,7 +86,7 @@ use Bio::SeqIO;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Fgenesh->new (-QUERY => $seq);
     Function:   Initialises Fgeneshobject
     Returns :   a FgeneshObject
     Args    :   A Bio::Seq object 
@@ -102,7 +102,7 @@ sub new{
      $self->{'_exons'} = []; #an array of seqfeatures
      $self->{'_transcripts'} = []; #an array of Bio::Ensembl::Transcript
      $self->{'_proteins'} = []; #fgenesh predicted proteins
-     $self->{'_clone'} = undef; #location of Bio::Seq object
+     $self->{'_query'} = undef; #location of Bio::Seq object
      $self->{'_workdir'} = undef; #location of temp dir
      $self->{'_fgenesh'} = undef; #location of fgenesh binary
      $self->{'_filename'} = undef; #file to store Bio::Seq object
@@ -111,10 +111,10 @@ sub new{
      $self->{'_parameters'} = undef; #location of parameters for fgenesh
      $self->{'_matirx'} = undef; #location of matrix used by fgenesh
 
-     my($clone, $fgenesh, $parameters, $matrix) = 
-	  $self->_rearrange([qw(CLONE FGENESH PARAM MATRIX)], @args);
+     my($query, $fgenesh, $parameters, $matrix) = 
+	  $self->_rearrange([qw(QUERY FGENESH PARAM MATRIX)], @args);
 
-      $self->clone($clone) if ($clone);
+      $self->query($query) if ($query);
 
 
      $fgenesh = 'fgenesh' unless ($fgenesh);
@@ -139,10 +139,10 @@ sub new{
 #get/set methods
 ###################
 
-=head2 clone
+=head2 query
 
-    Title   :   clone
-    Usage   :    $Fgenesh->clone($seq);
+    Title   :   query
+    Usage   :    $Fgenesh->query($seq);
     Function:   sets the sequence the fgenesh object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -151,7 +151,7 @@ sub new{
 
 =cut
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -159,11 +159,11 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".fgenesh");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 fgenesh
@@ -391,8 +391,8 @@ sub each_Transcript {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Fgenesh\n");
+    #check query
+    my $seq = $self->query() || $self->throw("Seq required for Fgenesh\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -519,7 +519,7 @@ sub parse_results {
 		    my %feature;
 		    #print "parsing data\n";
 		    my $number = $line->[0]+($exon_num/100);
-		    $feature {'name'} = $self->clone->id.".".$number;
+		    $feature {'name'} = $self->query->id.".".$number;
 		    if($line->[1] eq '+')
 		    {
 			$feature {'start'} = $line->[3];

@@ -18,11 +18,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Inverted
 
  #create and fill Bio::Seq object
  my $seq = Bio::Seq->new();
- my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+ my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
  $seq = $seqstream->next_seq();
 
  #create Bio::EnsEMBL::Pipeline::Runnable::Inverted object
- my $inverted = Bio::EnsEMBL::Pipeline::Runnable::Inverted->new (-CLONE => $seq);
+ my $inverted = Bio::EnsEMBL::Pipeline::Runnable::Inverted->new (-QUERY => $seq);
  $inverted->workdir($workdir);
  $inverted->run();
  @featurepairs = $inverted->output();
@@ -74,10 +74,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Inverted->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Inverted->new (-QUERY => $seq);
     Function:   Initialises Inverted object
     Returns :   an Inverted Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for einverted (-ARGS) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments for einverted (-ARGS) 
 
 =cut
 
@@ -86,7 +86,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'}    = [];       # an array of feature pairs
-    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_query'}     = undef;    # location of Bio::Seq object
     $self->{'_einverted'} = undef;    # location of einverted
     $self->{'_workdir'}   = undef;    # location of temp directory
     $self->{'_filename'}  = undef;    # file to store Bio::Seq object
@@ -94,10 +94,10 @@ sub new {
     $self->{'_protected'} = [];       # a list of files protected from deletion
     $self->{'_arguments'} = undef;    # arguments for einverted    
     
-    my( $clonefile, $arguments, $einverted, $equickinverted) = 
-            $self->_rearrange([qw(CLONE ARGS ETAND EQTAND)], 
+    my( $query, $arguments, $einverted, $equickinverted) = 
+            $self->_rearrange([qw(QUERY ARGS ETAND EQTAND)], 
 			      @args);
-    $self->clone($clonefile) if ($clonefile);       
+    $self->query($query) if ($query);       
     if ($einverted) 
     {   $self->einverted($einverted) ;}
     else
@@ -118,7 +118,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -126,12 +126,12 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->clonename($self->clone->id);
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->queryname($self->query->id);
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".inverted.out");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 protect
@@ -190,12 +190,12 @@ sub arguments {
     return $self->{'_arguments'};
 }
 
-=head2 clonename
+=head2 queryname
 
-    Title   :   clonename
-    Usage   :   $obj->clonename('AC00074');
-    Function:   Get/set method for clone name. 
-                This must be set manually when a file or pipe is parsed and the clonename is 
+    Title   :   queryname
+    Usage   :   $obj->queryname('AC00074');
+    Function:   Get/set method for query name. 
+                This must be set manually when a file or pipe is parsed and the queryname is 
                 not present in the executable output
     Args    :   File suffixes
 
@@ -217,8 +217,8 @@ sub arguments {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Inverted\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for Inverted\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -272,9 +272,9 @@ sub parse_results {
     {
         if (m|^Score\s+(\d+)\D+(\d+)/(\d+)\D+(\d+)|i)
         {
-            if ($self->clonename)
+            if ($self->queryname)
             {
-                $feat1 {name} = $self->clonename;
+                $feat1 {name} = $self->queryname;
             }
             else
             {

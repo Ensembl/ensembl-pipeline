@@ -133,7 +133,7 @@ sub new {
 				  OPTIONS)], 
 			      @args);
     if ($query) {
-      $self->clone($query);
+      $self->query($query);
     } else {
       $self->throw("No query sequence input.");
     }
@@ -195,7 +195,7 @@ sub new {
 sub run {
     my ($self, $dir) = @_;
 
-    my $seq = $self->clone || $self->throw("Query seq required for Blast\n");
+    my $seq = $self->query || $self->throw("Query seq required for Blast\n");
 
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -726,7 +726,7 @@ sub _makeFeaturePair {
     my $source = $self->program;             
     $source =~ s/\/.*\/(.*)/$1/;
 
-    my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->clone->id,
+    my $feature1 = new Bio::EnsEMBL::SeqFeature(-seqname     => $self->query->id,
 						-start       => $qstart,
 						-end         => $qend,
 						-strand      => $qstrand * $hstrand,
@@ -891,7 +891,7 @@ sub output {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq) {
       unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
@@ -900,7 +900,7 @@ sub clone {
 
       $self->{'_query'} = $seq ;
 
-      $self->filename($self->clone->id.".$$.seq");
+      $self->filename($self->query->id.".$$.seq");
       $self->results($self->filename.".blast.out");
       
     }

@@ -17,12 +17,12 @@ Bio::EnsEMBL::Pipeline::Runnable::C
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::GC object
-  my $gc = Bio::EnsEMBL::Pipeline::Runnable::GC->new (-CLONE => $seq);
+  my $gc = Bio::EnsEMBL::Pipeline::Runnable::GC->new (-QUERY => $seq);
   $gc->workdir($workdir);
   $gc->run();
   my @genes = $gc->output();
@@ -81,7 +81,7 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::GC->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::GC->new (-QUERY => $seq);
     Function:   Initialises GC object
     Returns :   a GC object
     Args    :   A Bio::Seq object 
@@ -99,11 +99,11 @@ sub new {
   
   print STDERR "args: ", @args, "\n";  
 
-  my($sequence, $window) = $self->_rearrange([qw(CLONE
+  my($sequence, $window) = $self->_rearrange([qw(QUERY
 						 WINDOW)],
 					     @args);
   #print "sequence : ".$sequence."\n";
-  $self->clone($sequence) if ($sequence);
+  $self->query($sequence) if ($sequence);
 
   if (defined $window && $window>=0){
       $self->window($window);
@@ -118,10 +118,10 @@ sub new {
 #GET/SET METHODS#
 #################
 
-=head2 clone
+=head2 query
 
-    Title   :   clone
-    Usage   :    $GC->clone($seq);
+    Title   :   query
+    Usage   :    $GC->query($seq);
     Function:   sets the sequence the fgenesh object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -131,7 +131,7 @@ sub new {
 =cut
 
 
-sub clone{
+sub query{
     my ($self, $seq) = @_;
     #print "sequence: ".$seq."\n";
     if(defined $seq){
@@ -185,8 +185,8 @@ sub window {
 sub run {
     my ($self) = @_;
     #set arguments for cpg
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for cpg\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for cpg\n");
    
     
     #running the gc analysis
@@ -211,8 +211,8 @@ sub run_gc {
     #print "running GC content analysis\n";
    
 
-    my $length = $self->clone->length;
-    my $seq = $self->clone->seq;
+    my $length = $self->query->length;
+    my $seq = $self->query->seq;
     my $window = $self->window;
     #my $gccount = $seq =~ tr/GC/GC/;
     #my $Ncount = $seq =~ tr/N/N/;
@@ -245,7 +245,7 @@ sub run_gc {
                             -gff_source      => 'gc',
                             -gff_feature     => 'gc_content');
         my $gc = Bio::EnsEMBL::SeqFeature->new
-	    (   -seqname => $self->clone->id,
+	    (   -seqname => $self->query->id,
 		-start   => $start_point,
 		-end     => $end_point,
 		-strand => 0,

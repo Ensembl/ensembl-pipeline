@@ -22,7 +22,7 @@ Bio::EnsEMBL::Pipeline::Runnable::EPCR
   my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::EPCR object
-  my $pcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (-CLONE => $seq);
+  my $pcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (-QUERY => $seq);
   $pcr->workdir($workdir);
   $pcr->run();
   my @results = $pcr->output();
@@ -84,10 +84,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my $obj = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(-CLONE => $seq);
+    Usage   :   my $obj = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new(-QUERY => $seq);
     Function:   Initialises EPCR object
     Returns :   a EPCR Object
-    Args    :   A Bio::Seq object (-CLONE), a database (-DB).
+    Args    :   A Bio::Seq object (-QUERY), a database (-DB).
 
 =cut
 
@@ -96,7 +96,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'}    = [];    # an array of feature pairs
-    $self->{'_clone'}     = undef; # location of Bio::Seq object
+    $self->{'_query'}     = undef; # location of Bio::Seq object
     $self->{'_epcr'}      = undef; # location of EPCR binary
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
@@ -105,13 +105,13 @@ sub new {
     $self->{'_protected'} = [];    # a list of files protected from deletion
     $self->{'_db'}        = undef;
     
-    my( $clone, $epcr, $db, $options) = $self->_rearrange([qw(
-	CLONE PCR DB OPTIONS
+    my( $query, $epcr, $db, $options) = $self->_rearrange([qw(
+	QUERY PCR DB OPTIONS
     )], @args);
 
     $epcr = 'e-PCR' unless ($epcr);
 
-    $self->clone  ($clone)   if ($clone);       
+    $self->query  ($query)   if ($query);       
     $self->options($options) if ($options);       
 
     $self->epcr   ($self->find_executable($epcr));
@@ -129,7 +129,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -137,13 +137,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-        $self->{'_clone'} = $seq ;
+        $self->{'_query'} = $seq ;
         
-        $self->clonename($self->clone->id);
-        $self->filename($self->clone->id.".$$.seq");
+        $self->queryname($self->query->id);
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".PCR.out");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 epcr
@@ -226,7 +226,7 @@ sub run {
     $self->arguments($args) if ($args);
 
     #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for EPCR\n");
+    my $seq = $self->query() || $self->throw("Clone required for EPCR\n");
 
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));

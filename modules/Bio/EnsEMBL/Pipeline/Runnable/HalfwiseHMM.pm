@@ -18,12 +18,12 @@ Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM object
-  my $halfwisehmm = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-CLONE => $seq);
+  my $halfwisehmm = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-QUERY => $seq);
   $halfwisehmm->workdir($workdir);
   $halfwisehmm->run();
   my @genes = $halfwisehmm->output();
@@ -93,7 +93,7 @@ BEGIN {
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new (-QUERY => $seq);
     Function:   Initialises HalfwiseHMMobject
     Returns :   a HalfwiseHMMObject
     Args    :   A Bio::Seq object 
@@ -106,7 +106,7 @@ sub new {
 
     my $self = $class->SUPER::new(@args);    
 
-    $self->{'_clone'} = undef; #location of Bio::Seq object
+    $self->{'_query'} = undef; #location of Bio::Seq object
     $self->{'_blastprog'} = undef; #location of blast program
     $self->{'_blastdb'} = undef; #location fo blast database
     $self->{'_blastobj'} = undef; #location of blast object
@@ -126,10 +126,10 @@ sub new {
     $self->{'_hmmdb'} = undef; #location of hmmdb
     
     print STDERR "args: ", @args, "\n";
-    my ($clone, $blastprog, $blastdb, $threshold, $genewise, $options, $hmmfetch, $hmmdb) 
-	= $self->_rearrange([qw (CLONE BLASTPROG BLASTDB THRESHOLD GENEWISE OPTIONS HMMFETCH HMMDB)], @args);
+    my ($query, $blastprog, $blastdb, $threshold, $genewise, $options, $hmmfetch, $hmmdb) 
+	= $self->_rearrange([qw (QUERY BLASTPROG BLASTDB THRESHOLD GENEWISE OPTIONS HMMFETCH HMMDB)], @args);
     
-    $self->clone($clone) if ($clone);
+    $self->query($query) if ($query);
     if ($blastprog){
        $self->blast_loc($self->find_executable($blastprog));
     } else {
@@ -181,10 +181,10 @@ sub new {
 #GET/SET METHODS#
 #################
 
-=head2 clone
+=head2 query
 
-    Title   :   clone
-    Usage   :    $HalfwiseHMM->clone($seq);
+    Title   :   query
+    Usage   :    $HalfwiseHMM->query($seq);
     Function:   sets the sequence the halfwisehmm object will run on
   and checks it is a Bio::Seq
     Returns :   a seq
@@ -193,7 +193,7 @@ sub new {
 
 =cut
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -201,13 +201,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".hlf");
 	$self->hmmfilename($self->filename."dbhmm.$$");
 	$self->errorfile($self->filename."err.$$");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 blast_loc
@@ -454,12 +454,12 @@ sub create_blast {
     
     my ($self) = @_;
     eval{
-      $self->clone;
+      $self->query;
     };
     if($@){
       $self->throw("cannot create a blast object without a seq object : ".$@."\n");
     }
-    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-QUERY => $self->clone,
+    my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (-QUERY => $self->query,
 							      -PROGRAM => $self->blast_loc,
 							      -DATABASE => $self->blastdb,
 							      -THRESHOLD => 1e-6,

@@ -117,7 +117,7 @@ sub clone {
 	    $self->throw("You shouldn't use the paracel box to run only one peptide, use hmmpfam instead");
 
 	    #$self->{'_sequence'} = $seq ;
-	    #$self->clonename ($self->clone->id);
+	    #$self->queryname ($self->clone->id);
 	    #$self->filename ($self->clone->id.".$$.seq");
 	    #$self->results ($self->filename.".out");
 	}

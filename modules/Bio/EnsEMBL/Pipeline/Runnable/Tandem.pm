@@ -18,11 +18,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Tandem
 
  #create and fill Bio::Seq object
  my $seq = Bio::Seq->new();
- my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+ my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
  $seq = $seqstream->next_seq();
 
  #create Bio::EnsEMBL::Pipeline::Runnable::Tandem object
- my $tandem = Bio::EnsEMBL::Pipeline::Runnable::Tandem->new (-CLONE => $seq);
+ my $tandem = Bio::EnsEMBL::Pipeline::Runnable::Tandem->new (-QUERY => $seq);
  $tandem->workdir($workdir);
  $tandem->run();
  @featurepairs = $tandem->output();
@@ -72,10 +72,10 @@ use Data::Dumper;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Tandem->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Tandem->new (-QUERY => $seq);
     Function:   Initialises Tandem object
     Returns :   a Tandem Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for eTandem (-ARGS) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments for eTandem (-ARGS) 
 
 =cut
 
@@ -84,7 +84,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'}    = [];       # an array of feature pairs
-    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_query'}     = undef;    # location of Bio::Seq object
     $self->{'_etandem'}   = undef;    # location of etandem
     $self->{'_equicktandem'} = undef; # location of equicktandem
     $self->{'_workdir'}   = undef;    # location of temp directory
@@ -94,9 +94,9 @@ sub new {
     $self->{'_arguments'} = undef;    # arguments for etandem
     
     
-    my( $clonefile, $arguments, $etandem, $equicktandem) = 
-            $self->_rearrange([qw(CLONE ARGS ETAND EQTAND)], @args);
-    $self->clone($clonefile) if ($clonefile);       
+    my( $query, $arguments, $etandem, $equicktandem) = 
+            $self->_rearrange([qw(QUERY ARGS ETAND EQTAND)], @args);
+    $self->query($query) if ($query);       
     if ($etandem) 
     {   $self->etandem($etandem) ;}
     else
@@ -126,7 +126,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -134,12 +134,12 @@ sub clone {
         {
             $self->throw("Input [" . $seq . "] isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{_clone} = $seq ;
-        $self->clonename($self->clone->id);
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{_query} = $seq ;
+        $self->queryname($self->query->id);
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".tandem.out");
     }
-    return $self->{_clone};
+    return $self->{_query};
 }
 
 =head2 protect
@@ -234,8 +234,8 @@ sub arguments {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Tandem\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for Tandem\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -248,12 +248,12 @@ sub run {
     $self->deletefiles();
 }
 
-=head2 clonename
+=head2 queryname
 
-    Title   :   clonename
-    Usage   :   $obj->clonename('AC00074');
-    Function:   Get/set method for clone name. 
-                This must be set manually when a file or pipe is parsed and the clonename is 
+    Title   :   queryname
+    Usage   :   $obj->queryname('AC00074');
+    Function:   Get/set method for query name. 
+                This must be set manually when a file or pipe is parsed and the queryname is 
                 not present in the executable output
     Args    :   File suffixes
 
@@ -335,9 +335,9 @@ sub parse_results {
     {
         my @element = split;
         my (%feat1, %feat2);
-        if ($self->clonename)
+        if ($self->queryname)
             {
-                $feat1{name}     = $self->clonename;
+                $feat1{name}     = $self->queryname;
             }
             else
             {

@@ -17,12 +17,12 @@ Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq';
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker object
-  my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
+  my $repmask = Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-QUERY => $seq);
   $repmask->workdir($workdir);
   $repmask->run();
   my @results = $repmask->output();
@@ -87,10 +87,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::RepeatMasker->new (-QUERY => $seq);
     Function:   Initialises RepeatMasker object
     Returns :   a RepeatMasker Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for RepeatMasker (-ARGS) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments for RepeatMasker (-ARGS) 
 
 =cut
 
@@ -99,7 +99,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'} = [];           #an array of feature pairs
-    $self->{'_clone'}  = undef;        #location of Bio::Seq object
+    $self->{'_query'}  = undef;        #location of Bio::Seq object
     $self->{'_repeatmasker'} = undef;  #location of RepeatMasker executable
     $self->{'_workdir'}   = undef;     #location of temp directory
     $self->{'_filename'}  =undef;      #file to store Bio::Seq object
@@ -107,14 +107,14 @@ sub new {
     $self->{'_protected'} =[];         #a list of files protected from deletion
     $self->{'_arguments'} =undef;      #arguments for RepeatMasker
     
-    my( $clone, $arguments, $repmask) = $self->_rearrange([qw(CLONE
+    my( $query, $arguments, $repmask) = $self->_rearrange([qw(QUERY
 							      ARGS
 							      REPM)], 
 							  @args);
 
     $repmask = 'RepeatMasker' unless defined($repmask);
 
-    $self->clone($clone) if ($clone);       
+    $self->query($query) if ($query);       
 
     my $repmask = $self->find_executable($repmask);
 
@@ -133,7 +133,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -141,13 +141,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         }
-        $self->{'_clone'} = $seq ;
+        $self->{'_query'} = $seq ;
         
-        $self->clonename($self->clone->id);
-        $self->filename($self->clone->id.".$$.seq");
+        $self->queryname($self->query->id);
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".out");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 protect
@@ -188,12 +188,12 @@ sub repeatmasker {
 
 =cut
 
-=head2 clonename
+=head2 queryname
 
-    Title   :   clonename
-    Usage   :   $obj->clonename('AC00074');
-    Function:   Get/set method for clone name. 
-                This must be set manually when a file or pipe is parsed and the clonename is 
+    Title   :   queryname
+    Usage   :   $obj->queryname('AC00074');
+    Function:   Get/set method for query name. 
+                This must be set manually when a file or pipe is parsed and the queryname is 
                 not present in the executable output
     Args    :   File suffixes
 
@@ -234,8 +234,8 @@ sub run {
     my ($self, $dir, $args) = @_;
     #set arguments for repeatmasker
     $self->arguments($args) if ($args);
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for RepeatMasker\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for RepeatMasker\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();

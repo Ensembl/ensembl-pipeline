@@ -20,11 +20,11 @@ Bio::EnsEMBL::Pipeline::Runnable::Halfwise
 
   #create and fill Bio::Seq object
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
 
   #create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
-  my $halfwise = Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-CLONE => $seq);
+  my $halfwise = Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-QUERY => $seq);
   $halfwise->workdir($workdir);
   #$halfwise->run();
   $halfwise->parsefile('/nfs/disk65/mq2/temp/halfwise.output');
@@ -70,10 +70,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Halfwise->new (-QUERY => $seq);
     Function:   Initialises Halfwise object
     Returns :   a HAlfwise Object
-    Args    :   A Bio::Seq object (-CLONE) 
+    Args    :   A Bio::Seq object (-QUERY) 
                 (Halfwise location and arguments optional)
 
 =cut
@@ -82,7 +82,7 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
     $self->{'_seqfeature'} = undef;  # Bio::SeqFeature
-    $self->{'_clone'}      = undef;  # location of Bio::Seq object
+    $self->{'_query'}      = undef;  # location of Bio::Seq object
     $self->{'_halfwise'}   = undef;  # location of Genscan script
     $self->{'_workdir'}    = undef;  # location of temp directory
     $self->{'_filename'}   = undef;  # file to store Bio::Seq object
@@ -90,10 +90,10 @@ sub new {
     $self->{'_protected'}  = [];     # a list of file suffixes protected 
                                      # from deletion
     $self->{'_arguments'}    = undef;     #parameters for halfwise
-    my($clonefile, $halfwise, $arguments) 
-	= $self->_rearrange([qw(CLONE HALFW ARGS)], @args);
+    my($query, $halfwise, $arguments) 
+	= $self->_rearrange([qw(QUERY HALFW ARGS)], @args);
     
-    $self->clone($clonefile) if ($clonefile);
+    $self->query($query) if ($query);
     if ($halfwise)  {$self->halfwise($halfwise) ;}
     else                
     {   
@@ -114,7 +114,7 @@ sub new {
 #get/set methods
 ###################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -122,13 +122,13 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
+        $self->{'_query'} = $seq ;
         
-        $self->clonename($self->clone->id);
-        $self->filename($self->clone->id.".$$.seq");
+        $self->queryname($self->query->id);
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.'.halfwise');
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 =head2 protect
@@ -178,12 +178,12 @@ sub arguments {
     return $self->{_arguments};
 }
 
-=head2 clonename
+=head2 queryname
 
-    Title   :   clonename
-    Usage   :   $obj->clonename('AC00074');
-    Function:   Get/set method for clone name. 
-                This must be set manually when a file or pipe is parsed and the clonename is 
+    Title   :   queryname
+    Usage   :   $obj->queryname('AC00074');
+    Function:   Get/set method for query name. 
+                This must be set manually when a file or pipe is parsed and the queryname is 
                 not present in the executable output
     Args    :   File suffixes
 
@@ -214,8 +214,8 @@ sub arguments {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Halfwise\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for Halfwise\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();

@@ -132,7 +132,7 @@ sub clone {
         ($seq->isa ("Bio::PrimarySeqI") || $seq->isa ("Bio::SeqI"))
             || $self->throw("Input isn't a Bio::SeqI or Bio::PrimarySeqI");
         $self->{'_sequence'} = $seq ;
-        $self->clonename ($self->clone->id);
+        $self->queryname ($self->clone->id);
         $self->filename ($self->clone->id.".$$.seq");
         $self->results ($self->filename.".out");
     }

@@ -17,12 +17,12 @@ Bio::EnsEMBL::Pipeline::Runnable::VectorMasker
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq';
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::VectorMasker object
-  my $vectmask = Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-CLONE => $seq);
+  my $vectmask = Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-QUERY => $seq);
   $vectmask->workdir($workdir);
   $vectmask->run();
   @featurepairs = $vectmask->output();
@@ -77,10 +77,10 @@ use Bio::Root::RootI;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::VectorMasker->new (-QUERY => $seq);
     Function:   Initialises VectorMasker object
     Returns :   a VectorMasker Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments for blastn (-ARGS) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments for blastn (-ARGS) 
 
 =cut
 
@@ -89,7 +89,7 @@ sub new {
     my $self = $class->SUPER::new(@args);    
            
     $self->{'_fplist'}    = [];       # an array of feature pairs
-    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_query'}     = undef;    # location of Bio::Seq object
     $self->{'_blastn'}    = undef;    # location of Blastn script
     $self->{'_mspcrunch'} = undef;    # location of MSPcrunch
     $self->{'_vector'}    = undef;    # location of vector sequences
@@ -99,10 +99,10 @@ sub new {
     $self->{'_protected'} = [];       # a list of files protected from deletion
     $self->{'_arguments'} =undef;     # arguments for MSPcrunch    
     
-    my( $clonefile, $arguments, $blastn, $msp, $vector) = 
-            $self->_rearrange([qw(CLONE ARGS BLAST MSPCRUNCH VECTOR)], @args);
+    my( $query, $arguments, $blastn, $msp, $vector) = 
+            $self->_rearrange([qw(QUERY ARGS BLAST MSPCRUNCH VECTOR)], @args);
 
-    $self->clone($clonefile) if ($clonefile);       
+    $self->query($query) if ($query);       
 
     $blastn    = 'blastn'      unless defined($blastn);
     $mspcrunch = 'MSPcrunch'   unless defined($mspcrunch);
@@ -125,7 +125,7 @@ sub new {
 # get/set methods 
 #################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
 
     if ($seq)
@@ -134,19 +134,19 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".VectMask.out");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
-=head2 clonename
+=head2 queryname
 
-    Title   :   clonename
-    Usage   :   $obj->clonename('AC00074');
-    Function:   Get/set method for clone name. 
-                This must be set manually when a file or pipe is parsed and the clonename is 
+    Title   :   queryname
+    Usage   :   $obj->queryname('AC00074');
+    Function:   Get/set method for query name. 
+                This must be set manually when a file or pipe is parsed and the queryname is 
                 not present in the executable output
     Args    :   File suffixes
 
@@ -263,8 +263,8 @@ sub arguments {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Vectormasker\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for Vectormasker\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();

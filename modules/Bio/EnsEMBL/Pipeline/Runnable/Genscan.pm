@@ -17,12 +17,12 @@ Bio::EnsEMBL::Pipeline::Runnable::Genscan
 =head1 SYNOPSIS
 
   #create and fill Bio::Seq object
-  my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
+  my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq'; 
   my $seq = Bio::Seq->new();
-  my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+  my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
   $seq = $seqstream->next_seq();
   #create Bio::EnsEMBL::Pipeline::Runnable::Genscan object
-  my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
+  my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-QUERY => $seq);
   $genscan->workdir($workdir);
   $genscan->run();
   my @genes = $genscan->output();
@@ -90,7 +90,7 @@ use Bio::SeqIO;
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (-QUERY => $seq);
     Function:   Initialises Genscan object
     Returns :   a Genscan Object
     Args    :   A Bio::Seq object 
@@ -106,17 +106,17 @@ sub new {
     $self->{'_genes'}     = [];    # an array of arrays of SeqFeatures
     #$self->{_feature_data} = [];  # an array of data for SeqFeatures
     $self->{'_peptides'}  = [];    # genscan predicted peptide (used for phase)
-    $self->{'_clone'}     = undef; # location of Bio::Seq object
+    $self->{'_query'}     = undef; # location of Bio::Seq object
     $self->{'_genscan'}   = undef; # location of Genscan script
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_results'}   = undef; # file to store results of genscan
     $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
     $self->{'_parameters'} =undef; #location of parameters for genscan
-    my($clonefile, $genscan, $parameters, $matrix) = 
-        $self->_rearrange([qw(CLONE GENSCAN PARAM MATRIX)], @args);
+    my($query, $genscan, $parameters, $matrix) = 
+        $self->_rearrange([qw(QUERY GENSCAN PARAM MATRIX)], @args);
 
-    $self->clone($clonefile) if ($clonefile);
+    $self->query($query) if ($query);
 
 
     $genscan = 'genscan'       unless ($genscan);
@@ -139,7 +139,7 @@ sub new {
 #get/set methods
 ###################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -147,11 +147,11 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".genscan");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 
@@ -265,8 +265,8 @@ sub genscan_peptides {
 
 sub run {
     my ($self, $dir) = @_;
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for Genscan\n");
+    #check seq
+    my $seq = $self->query() || $self->throw("Seq required for Genscan\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
@@ -399,7 +399,7 @@ sub parse_results {
     #end of big loop. Now build up genes
     $self->create_genes();
 
-    unless ($self->clone)
+    unless ($self->query)
     {
         print STDERR "Can't calculate phases if Bio::Seq isn't supplied\n";
         return;
@@ -428,7 +428,7 @@ sub calculate_and_set_phases_new {
       my $peptide = $peptides[$i];
       my @exons   = $genes[$i]->sub_SeqFeature();
 #      print STDERR "Exons are $#exons\n";
-      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->clone);
+      my @newtran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_3frame($genes[$i],$self->query);
 
 #      print STDERR "\nPeptide is " . $peptides[$i] . "\n";
 
@@ -458,7 +458,7 @@ sub calculate_and_set_phases_new {
 	  foreach my $exon ($tran->get_all_Exons) {
 #	    print $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->end_phase . " " .$exon->strand . "\n";
 	  }
-	  $tran->temporary_id($self->clone->id . "." . $count);
+	  $tran->temporary_id($self->query->id . "." . $count);
 	  $count++;
 	  $self->add_Transcript($tran);
 	  $i++;

@@ -253,7 +253,7 @@ sub run {
     foreach my $runnable ($self->runnable) {
       $self->throw("Runnable module not set") unless ($runnable);
       $self->throw("Input not fetched") unless ($self->genseq());
-      $runnable->clone($self->genseq());
+      $runnable->query($self->genseq());
       $runnable->run();
     }
 }

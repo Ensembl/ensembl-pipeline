@@ -123,10 +123,10 @@ sub results {
     return $self->{_results};
 }
 
-sub clonename {
-    my ($self, $clonename) = @_;
-    $self->{_clonename} = $clonename if ($clonename);
-    return $self->{_clonename};
+sub queryname {
+    my ($self, $queryname) = @_;
+    $self->{_queryname} = $queryname if ($queryname);
+    return $self->{_queryname};
 }
 
 
@@ -218,7 +218,7 @@ sub writefile {
       or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
 
     # This is bad.  The subclass has the query method not this interface.
-    $clone_out->write_seq($self->clone)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+    $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
 
   }
 }

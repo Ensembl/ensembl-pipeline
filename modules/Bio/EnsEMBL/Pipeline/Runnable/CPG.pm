@@ -112,7 +112,7 @@ sub new {
 
   $cpg = 'cpg' unless ($cpg);
 
-  $self->clone($sequence) if ($sequence);       
+  $self->query($sequence) if ($sequence);       
   $self->cpg($self->find_executable($cpg));
   
   if (defined $len && $len >=0 ) { 
@@ -138,7 +138,7 @@ sub new {
 #################
 # really ough to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
 # to do!
-sub clone {
+sub query {
   my ($self, $seq) = @_;
   if ($seq)
   {
@@ -148,7 +148,7 @@ sub clone {
       }
       $self->{'_sequence'} = $seq ;
 
-      $self->filename($self->clone->id.".$$.seq");
+      $self->filename($self->query->id.".$$.seq");
       $self->results($self->filename.".out");
   }
   return $self->{'_sequence'};
@@ -245,7 +245,7 @@ sub run {
     my ($self, $dir, $args) = @_;
     #set arguments for cpg
     #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for cpg\n");
+    my $seq = $self->query() || $self->throw("Clone required for cpg\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();

@@ -18,17 +18,17 @@ Bio::EnsEMBL::Pipeline::Runnable::EponineTSS
 
 #create and fill Bio::Seq object
 
-my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
+my $seqfile = '/nfs/disk65/mq2/temp/bA151E14.seq';
 
 my $seq = Bio::Seq->new();
 
-my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
+my $seqstream = Bio::SeqIO->new(-file => $seqfile, -fmt => 'Fasta');
 
 $seq = $seqstream->next_seq();
 
 #create Bio::EnsEMBL::Pipeline::Runnable::EponineTSS object
 
-my $eponine = Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new (-CLONE => $seq);
+my $eponine = Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new (-QUERY => $seq);
 
 $eponine->workdir($workdir);
 
@@ -75,10 +75,10 @@ BEGIN {
 =head2 new
 
     Title   :   new
-    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new (-CLONE => $seq);
+    Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::EponineTSS->new (-QUERY => $seq);
     Function:   Initialises an EponineTSS object
     Returns :   an EponineTSS Object
-    Args    :   A Bio::Seq object (-CLONE), any arguments (-LENGTH, -GC, -OE) 
+    Args    :   A Bio::Seq object (-QUERY), any arguments (-LENGTH, -GC, -OE) 
 
 =cut
 
@@ -98,13 +98,13 @@ sub new {
   
   print STDERR "args: ", @args, "\n";
 
-  my( $sequence, $java, $epojar, $threshold) = $self->_rearrange([qw(CLONE 
+  my( $sequence, $java, $epojar, $threshold) = $self->_rearrange([qw(QUERY 
 								     JAVA
 								     EPOJAR
 								     THRESHOLD)],
 								 @args);
   
-  $self->clone($sequence) if ($sequence);       
+  $self->query($sequence) if ($sequence);       
 
   my $bindir = $::pipeConf{'bindir'} || undef;
 
@@ -150,7 +150,7 @@ sub new {
 #################
 # really ough to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
 # to do!
-sub clone {
+sub query {
   my ($self, $seq) = @_;
   if ($seq)
   {
@@ -160,7 +160,7 @@ sub clone {
       }
       $self->{'_sequence'} = $seq ;
 
-      $self->filename($self->clone->id.".$$.seq");
+      $self->filename($self->query->id.".$$.seq");
       $self->results($self->filename.".out");
   }
   return $self->{'_sequence'};
@@ -242,8 +242,8 @@ sub threshold {
 sub run {
     my ($self, $dir, $args) = @_;
     #set arguments for epo
-    #check clone
-    my $seq = $self->clone() || $self->throw("Clone required for EponineTSS\n");
+    #check query
+    my $seq = $self->query() || $self->throw("Seq required for EponineTSS\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir($dir));
     $self->checkdir();
