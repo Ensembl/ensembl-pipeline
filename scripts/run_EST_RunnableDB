@@ -35,28 +35,27 @@ use strict;
 use Getopt::Long;
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
-                                        EST_E2G_DBNAME
-                                        EST_E2G_DBUSER
-                                        EST_E2G_DBPASS
-                                        EST_E2G_DBHOST
+                                        EST_DBNAME
+                                        EST_DBUSER
+                                        EST_DBPASS
+                                        EST_DBHOST
                                        );
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 my $port   = undef;
-my $dbname = $EST_E2G_DBNAME;
-my $dbuser = $EST_E2G_DBUSER;
-my $dbpass = $EST_E2G_DBPASS;
-my $host   = $EST_E2G_DBHOST;
+my $dbname = $EST_DBNAME;
+my $dbuser = $EST_DBUSER;
+my $dbpass = $EST_DBPASS;
+my $host   = $EST_DBHOST;
 
-
+my $analysis;
 my $runnable;
 my $input_id;
 my $write  = 0;
 my $check  = 0;
 my $params;
 my $pepfile;
-my $analysis;
 
 # can override db options on command line
 &GetOptions( 
