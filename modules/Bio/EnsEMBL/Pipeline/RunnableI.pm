@@ -369,9 +369,7 @@ sub create_Repeat {
                             -percent_id     => $feat2->{percent},
                             -p_value        => $feat2->{p},
                             -analysis       => $analysis_obj);
-    #create featurepair
-    # my $fp = Bio::EnsEMBL::Repeat->new  (  -feature1 => $seqfeature1,
-                                           # -feature2 => $seqfeature2 ) ;
+
 
     #$self->growfplist($fp);                             
 

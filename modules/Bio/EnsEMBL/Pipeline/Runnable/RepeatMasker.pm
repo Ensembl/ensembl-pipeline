@@ -69,7 +69,6 @@ use strict;
 # Object preamble - inherits from Bio::EnsEMBL::Root;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Repeat;
 use Bio::EnsEMBL::RepeatFeature;
 use Bio::EnsEMBL::RepeatConsensus;
 use Bio::EnsEMBL::Analysis; 

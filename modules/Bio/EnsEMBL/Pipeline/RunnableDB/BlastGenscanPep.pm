@@ -228,7 +228,7 @@ sub run {
     Title   :   output
     Usage   :   $self->output();
     Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->output()
-    Returns :   An array of Bio::EnsEMBL::Repeat objects (FeaturePairs)
+    Returns :   An array of Bio::EnsEMBL::FeaturePair objects
     Args    :   none
 
 =cut
