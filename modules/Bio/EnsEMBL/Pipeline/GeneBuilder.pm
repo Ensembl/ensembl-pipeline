@@ -207,7 +207,8 @@ sub get_Features {
 
 	if (defined(@fset) && $f->source_tag eq "genewise") {
 	  push(@genewise,@fset);
-	  
+	} elsif (defined(@fset) && $f->source_tag eq "pruned_TGW") {
+	  push(@genewise,@fset);
 	} elsif (defined(@fset) && $f->source_tag eq "genscan" && $self->genewise_only != 1) {
 	  push(@genscan,@fset);
 	  
@@ -651,14 +652,14 @@ sub  make_ExonPairs {
 
 	  F1: foreach my $f1 (@f1) {
 	      next F1 if (!$f1->isa("Bio::EnsEMBL::FeaturePair"));
-	      print ("FEATURE1 " . $f1->gffstring . "\n");
+#	      print ("FEATURE1 " . $f1->gffstring . "\n");
 	      my @f = $exon2->each_Supporting_Feature;
 	      @f = sort {$b->score <=> $a->score} @f;
 
 	    F2: foreach my $f2 (@f) {
 
 		next F2 if (!$f2->isa("Bio::EnsEMBL::FeaturePair"));
-		print ("FEATURE2 " . $f2->gffstring . "\n");
+#		print ("FEATURE2 " . $f2->gffstring . "\n");
 		my @pairs = $self->get_all_ExonPairs;
 		
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePairI")));
@@ -2057,9 +2058,21 @@ sub get_all_Features {
     my ($self) = @_;
 
     if (!defined($self->{_all_Features})) {
-	my @gw =	 $self->contig->get_Genes_by_Type('genewise',0);
-	
+      my @gw  =	 $self->contig->get_Genes_by_Type('genewise',0);
+      my @tgw =  $self->contig->get_Genes_by_Type('pruned_TGW',0);
+      
+
+
+      push(@gw,@tgw);
+
+      foreach my $g (@gw) {
+	print STDERR "Got gene " . $g->id . "\n";	
+      }
 	@gw = $self->prune(@gw);
+
+      foreach my $g (@gw) {
+	print STDERR "Got pruned gene " . $g->id . "\n";	
+      }
 
         my @tmp;
 
