@@ -52,7 +52,11 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::DnaHmm;
 use vars qw(@ISA);
 use strict;
 
+
 use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Pipeline::Runnable::ORF;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
 
 # Object preamble - inherits from Bio::Root::RootI
 
@@ -95,10 +99,10 @@ sub new {
     $self->throw("No input id provided") unless ($input_id);
     $self->input_id($input_id);
     
-    $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
-    $self->analysis($analysis);
+    #$self->throw("Analysis object required") unless ($analysis);
+    #$self->throw("Analysis object is not Bio::EnsEMBL::Analysis")
+     #           unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
+    #$self->analysis($analysis);
     
 
     return $self;
@@ -150,6 +154,7 @@ sub run{
    my $orf = Bio::EnsEMBL::Pipeline::Runnable::ORF->new( -seq => $self->seq);
    $orf->run;
    my @orf = $orf->output;
+   
    $orf = undef;
 
    # build up a string of seq length, setting 1 when there is 
@@ -157,13 +162,17 @@ sub run{
 
    my $str = '0' x $self->seq->length;
 
+ 
+
    foreach my $bl ( @{$self->{'_blast'}} ) {
-       substr($str,$bl->start,$bl->length,'1' x $bl->length);
+       substr($str,$bl->start,$bl->length) = '1' x $bl->length;
    }
 
    foreach my $rep ( @{$self->{'_repeat'}} ) {
-       substr($str,$rep->start,$rep->length,'1' x $rep->length);
+       substr($str,$rep->start,$rep->length) = '1' x $rep->length;
    }
+
+  #print STDERR "$str\n";
 
    # now loop over ORF hits - if any '1s' in the string, bug out
 
@@ -185,16 +194,60 @@ sub run{
 
    foreach my $orf ( @finalorf ) {
        $count++;
-       my $tempseq = Bio::PrimarySeq->new( -id => $self->input_id."orf".$count , -seq => $orf->{'_peptide'} );
-       my $seg = Bio::EnsEMBL::Pipeline::Runnable::Seg->new( -clone => $tempseq, -mask => 1);
-       $seg->run;
-       my $tempseq2 = Bio::PrimarySeq->new( -id => $self->input_id."seg".$count , -seq => $seg->masked_seq_string );
+       my $tempseq = Bio::PrimarySeq->new( -id => $self->input_id."_orf_".$count , -seq => $orf->{'_peptide'} );
+
+       print STDERR $orf->{'_peptide'}."\n";
        
-       my $pfam = Bio::EnsEMBL::Pipeline::Runnable::Hmmpfam->new(-peptide => $tempseq2,-database => "PfamFrag");
+       my $seganalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_dbID(24);
+
+       my $seg = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-clone => $tempseq, -analysis => $seganalysis);
+       
+       print STDERR "Runing Seg\n";
+       $seg->run;
+    
+       
+       my @out = $seg->output;
+       
+       foreach my $o(@out) {
+	   
+	   my $low_length = $o->end - $o->start + 1;
+	   
+	   substr($orf->{'_peptide'},$o->start,$low_length) = 'X' x $low_length;
+	   
+	   print STDERR $orf->{'_peptide'}."\n";
+       }
+   
+       my $tempseq2 = Bio::PrimarySeq->new( -id => $self->input_id."seg".$count , -seq => $orf->{'_peptide'});
+       
+       
+       my $hmmanalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_dbID(48);
+       
+       my $pfam = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-clone => $tempseq2, -analysis=> $hmmanalysis);
+       
        $pfam->run;
+       
        foreach my $domain ( $pfam->output ) {
-	   if( $domain->bits > 25 ) {
-	       $hmmhash{$domain->hmmname} = 1;
+	   print STDERR "GOT HMM\n";
+	   if($domain->feature1->score > 25) {
+	       
+	       #Get the the genomic sequence corresponding to the orf + dowstream and upstream region (length to be defined)
+	       my $subseq_start = $orf->start - 100;
+	       if ($subseq_start < 1) {
+		   $subseq_start = 1;
+	       }
+	       
+	       my $subseq_end  = $orf->end + 100;
+	       if ($subseq_end > $self->seq->length) {
+		   $subseq_end = $self->seq->length;
+	       }
+	       
+	       my $subseq = $self->seq->subseq($subseq_start,$subseq_end);
+
+	       print STDERR "GOT BIT>25\n";
+	       #$hmmhash{$domain->hmmname} = 1;
+	       
+	       #Push each genomic sequence corresponding to a given Hmm
+	       push (@{$hmmhash{$domain->hmmname}},$subseq);
 	   }
        }
    }
@@ -202,11 +255,21 @@ sub run{
    foreach my $hmmnames ( keys %hmmhash ) {
        my $hmmtemp = "/tmp/hmmtemp".$$;
        system("hmmfetch $hmmnames PfamFrag > $hmmtemp ");
-       my $gw = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
-       $gw->run;
-       my @exons = $gw->each_Exon();
+       
+#Get all of the seqs corresponding for the given HMM
+       my @seqs = @{$hmmhash{$hmmnames}};
+       
+       foreach my $s(@seqs) {
+#NB: -hmmfile hasn't been implemented yet
+	   my $gw = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new( -hmmfile => $hmmtemp, -genomic => $s);
+	   $gw->run;
+	   
+	   #    my $gw = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
+   #    $gw->run;
+	   #    my @exons = $gw->each_Exon();
+       }
    }
-
+       
    return;
        
 }
@@ -230,29 +293,6 @@ sub write_output{
 
 }
 
-
-
-
-=head2 analysis
-
- Title   : analysis
- Usage   : $obj->analysis($newval)
- Function: 
- Example : 
- Returns : value of analysis
- Args    : newvalue (optional)
-
-
-=cut
-
-sub analysis{
-   my ($obj,$value) = @_;
-   if( defined $value) {
-      $obj->{'analysis'} = $value;
-    }
-    return $obj->{'analysis'};
-
-}
 
 =head2 dbobj
 
