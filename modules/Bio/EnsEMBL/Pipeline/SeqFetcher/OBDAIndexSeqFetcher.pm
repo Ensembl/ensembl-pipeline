@@ -68,23 +68,22 @@ sub new {
   my ($db, $format) = $self->_rearrange(['DB', 'FORMAT'], @args);
   
   # expect an array of dbs
+    $self->throw("Sorry, you must specify a database") unless defined($db);
+  #print STDERR "You passed a " . ref($db) . "\n";
   $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
+  
+  $self->db($db);
 
-  # $db is a reference to an array of databases:
-  if ($db) {
-    $self->db($db);
-  }
-  else{
-    $self->throw("Sorry, you must specify a database");
-  }
   
   foreach my $database ( $self->db ){
+    # Prepend $ENV{BLASTDB} if not given a full path
+    if ( $database !~ /^\// ){
+      $database = $ENV{BLASTDB} . "/" . $database;
+    }
     # we want the form '/path/to/index/dir', so remove the last if there is any '/'
     if ( $database =~/(\S+)\/$/ ){
       $database = $1;
     }
-
-    $self->index_name( $database);
 
     # get the index name and the index directory out of $database
     my @path = split /\//, $database;
@@ -94,23 +93,19 @@ sub new {
     if ( $db_name =~/(\S+)\.fa/){
       $db_name = $1;
     }
-    if ( !defined( $db_name ) ){
-      $self->throw("cannot define db_name");
-    }
+    
+    $self->throw("Cannot define db_name") unless ( $db_name );
 
     # the index_dir is the directory path where the db sits
     my $index_dir = join '/', @path;
-    if ( !defined( $index_dir ) ){
-      $self->throw("cannot define index_dir");
-    }
+    $self->throw("Cannot define index_dir") unless ( $index_dir );
+    $self->index_name( $index_dir );
 
     # we take as default format = 'FASTA';
-    unless ( $format ){
-      $format = 'FASTA';
-    }
+    $format = 'FASTA' unless ( $format );
 
 
-    my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $index_dir,
+    my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(-index_dir => $self->index_name,
 						   -dbname    => $db_name,
 						   -format    => $format
 						 );
@@ -192,7 +187,7 @@ sub  get_Seq_by_acc {
       $self->warn("problem fetching sequence for $acc");
     }
     
-    if ( $seq ){
+    if ( defined $seq ){
       $seq->display_id( $acc );
       $seq->accession_number( $acc );
       $seq->desc("");
@@ -200,7 +195,7 @@ sub  get_Seq_by_acc {
     }
   }
 
-  if(!$seq){
+  if(!defined $seq){
     my ($p, $f, $l) = caller;
     $self->warn("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name." $f:$l\n");
     
@@ -239,10 +234,10 @@ sub  get_Seq_by_acc {
   }
 
   if ($seq){
-    #print STDERR "found sequence!\n";
-    #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
-    #print STDERR "display_id: ".$seq->display_id."\n";
-    #print STDERR $seq->seq."\n";
+    ##print STDERR "found sequence!\n";
+    ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+    ##print STDERR "display_id: ".$seq->display_id."\n";
+    ##print STDERR $seq->seq."\n";
   }
   else{
     print STDERR "sequence not found. Returning undef\n";
@@ -306,9 +301,9 @@ sub  get_Seq_by_secondary {
     $self->warn("OBDAIndexSeqFetcher: could not find sequence for $acc");
   }
   
-  #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
-  #print STDERR "display_id: ".$seqs[0]->display_id."\n";
-  #print STDERR $seqs[0]->seq."\n";
+  ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+  ##print STDERR "display_id: ".$seqs[0]->display_id."\n";
+  ##print STDERR $seqs[0]->seq."\n";
   return $seqs[0];
 }
 
