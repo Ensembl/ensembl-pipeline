@@ -1,4 +1,4 @@
-# $Id: Sbjct.pm,v 1.1 2002-07-01 15:31:54 lec Exp $
+# $Id: Sbjct.pm,v 1.2 2004-01-29 10:17:28 klh Exp $
 ###############################################################################
 # Bio::EnsEMBL::Pipeline::Tools::BPlite::Sbjct
 ###############################################################################
@@ -97,12 +97,12 @@ sub nextHSP {
       /Score =\s+(\S+) bits \((\d+)/; # NCBI-BLAST
   }
   
-  my ($match, $length) = $scoreline =~ /Identities = (\d+)\/(\d+)/;
+  my ($match, $length, $percent) = $scoreline =~ /Identities = (\d+)\/(\d+)(?:\s*\((\d+)\%\))?/;
   my ($positive) = $scoreline =~ /Positives = (\d+)/;
   my $frame = '0';
   $positive = $match if not defined $positive;
-  my ($p)        = $scoreline =~ /[Sum ]*P[\(\d+\)]* = (\S+)/;
-  if (not defined $p) {(undef, $p) = $scoreline =~ /Expect(\(\d+\))? =\s+(\S+)/}
+  my ($p)        = $scoreline =~ /[Sum ]*P[\(\d+\)]* = ([^\,\s]+)/;
+  if (not defined $p) {(undef, $p) = $scoreline =~ /Expect(\(\d+\))? =\s+([^\,\s]+)/}
   $self->throw("Unable to parse '$scoreline'") if not defined $score;
   
   #######################
@@ -169,6 +169,7 @@ sub nextHSP {
 					'-bits'=>$bits, 
 					'-match'=>$match,
 					'-positive'=>$positive, 
+					'-percent'=>$percent,
 					'-p'=>$p,
 					'-queryBegin'=>$qb, 
 					'-queryEnd'=>$qe, 
