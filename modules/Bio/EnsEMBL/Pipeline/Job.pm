@@ -308,7 +308,9 @@ sub flush_runs {
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
-       -STDERR     => $lastjob->stderr_file,
+       #-STDERR     => $lastjob->stderr_file, # to do the LSF hack with -e /dev/null
+       # shouldn't this be in the LSF module though so that other submission system users
+       # can get a custom stderr_file
        -PARAMETERS => $queue->{'sub_args'},
        -PRE_EXEC   => $pre_exec,
        -QUEUE      => $queue->{'queue'},
