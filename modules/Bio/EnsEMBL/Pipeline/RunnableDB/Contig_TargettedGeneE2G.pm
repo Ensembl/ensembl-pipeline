@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_TargettedGeneE2G
 =head1 SYNOPSIS
 
 my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::Contig_TargettedGeneE2G(
-                                                                      '-db_obj'      => $dbobj,
+                                                                      '-db_obj'      => $db,
                                                                       '-golden_path' => $gp,
                                                                       '-input_id'    => $input_id
                                                                     );
@@ -85,7 +85,7 @@ sub new {
   }
 
   $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->assembly_type($path);
+  $self->db->assembly_type($path);
 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
@@ -232,7 +232,7 @@ sub fetch_input{
   $protein_id   = $4;
   $cdna_id      = $5;
 
-  my $contig = $self->dbobj->get_Contig($contig_id);
+  my $contig = $self->db->get_Contig($contig_id);
 
   $self->vcontig($contig);
   $self->cdna_id($cdna_id);
@@ -385,7 +385,7 @@ sub runnable{
 sub write_output {
     my($self) = @_;
 
-    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+    my $gene_adaptor = $self->db->get_GeneAdaptor;
 
   GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
@@ -515,7 +515,7 @@ sub convert_e2g_output {
   my $genetype = "TGE_e2g";
   
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
   my $analysis_obj;
@@ -568,7 +568,7 @@ sub convert_gw_output {
   my @results  = $self->runnable->output;
 
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
   my $analysis_obj;
@@ -667,7 +667,7 @@ sub combine_genes{
   my $genetype = 'combined_gw_e2g';
 
   # get the appropriate analysis from the AnalysisAdaptor
-  my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
 
   my $analysis_obj;
@@ -744,7 +744,7 @@ sub _merge_gw_genes {
     my $ecount = 0;
     
     # order is crucial
-    my @trans = $gwg->each_Transcript;
+    my @trans = $gwg->get_all_Transcripts;
     if(scalar(@trans) != 1) { $self->throw("expected one transcript for $gwg\n"); }
     
   EXON:      
@@ -817,7 +817,7 @@ sub _make_newtranscripts {
     my $foundtrans = 0;  
 
     # should be only 1 transcript
-    my @gw_tran  = $gene->each_Transcript;
+    my @gw_tran  = $gene->get_all_Transcripts;
     my @gw_exons = $gw_tran[0]->get_all_Exons; # ordered array of exons
     my $strand   = $gw_exons[0]->strand;
 
@@ -830,7 +830,7 @@ sub _make_newtranscripts {
     foreach my $eg($self->e2g_genes){
       next GENEWISE if $foundtrans;
 
-      my @egtran = $eg->each_Transcript;
+      my @egtran = $eg->get_all_Transcripts;
       my @e2g_exons  = $egtran[0]->get_all_Exons; # ordered array of exons
       
       # OK, let's see if we need a new gene
@@ -925,7 +925,7 @@ sub _make_newtranscripts {
 
 sub compare_transcripts{
   my ($self, $genewise_gene, $combined_transcript) = @_;
-  my @genewise_transcripts = $genewise_gene->each_Transcript;
+  my @genewise_transcripts = $genewise_gene->get_all_Transcripts;
   if(scalar(@genewise_transcripts != 1)) {
     $self->warn("Panic! Got " . scalar(@genewise_transcripts) . " transcripts, expecting only 1!\n");
     return 0;
@@ -1046,10 +1046,10 @@ sub transcript_from_single_exon_genewise {
 sub transcript_from_multi_exon_genewise {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
   
-  my @gwtran  = $gw_gene->each_Transcript;
+  my @gwtran  = $gw_gene->get_all_Transcripts;
   my @gwexons = $gwtran[0]->get_all_Exons;
   
-  my @egtran  = $eg_gene->each_Transcript;
+  my @egtran  = $eg_gene->get_all_Transcripts;
   my @egexons = $egtran[0]->get_all_Exons;
 
   # explicitly set translation start and end exons
@@ -1261,7 +1261,7 @@ sub check_all_genes {
   push(@genes, $self->combined_genes);
 
 GENE:  foreach my $gene (@genes) {
-    my @t = $gene->each_Transcript;
+    my @t = $gene->get_all_Transcripts;
     my $tran = $t[0];
 
     # check that it translates - not the est2genome genes
@@ -1334,7 +1334,7 @@ sub _check_coverage{
   my $plength;
   my $fetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
 
-  my @gw_tran = $gene->each_Transcript;
+  my @gw_tran = $gene->get_all_Transcripts;
   
   my $matches = 0;
 
@@ -1506,7 +1506,7 @@ sub validate_gene{
   my ($self, $gene) = @_;
 
   # should be only a single transcript
-  my @transcripts = $gene->each_Transcript;
+  my @transcripts = $gene->get_all_Transcripts;
   if(scalar(@transcripts) != 1) {
     my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
     $self->warn($msg);

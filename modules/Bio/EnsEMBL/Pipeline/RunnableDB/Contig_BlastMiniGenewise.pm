@@ -17,8 +17,8 @@ Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise->new(
-					     -dbobj     => $db,
-					     -input_id  => $id,
+					     -db          => $db,
+					     -input_id    => $id,
 					     -golden_path => $gp
                                              );
     $obj->fetch_input
@@ -91,7 +91,7 @@ sub new {
     my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
 
    
-    $self->dbobj->assembly_type($path);
+    $self->db->assembly_type($path);
 
     $self->throw("no protein source databases defined in GeneConf::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
@@ -125,11 +125,11 @@ sub threshold {
 
 =head1 RunnableDB implemented methods
 
-=head2 dbobj
+=head2 db
 
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
+    Title   :   db
+    Usage   :   $self->db($obj);
+    Function:   Gets or sets the value of db
     Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
                 (which extends Bio::EnsEMBL::DB::ObjI)
     Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
@@ -183,7 +183,7 @@ sub fetch_output {
 sub write_output {
     my($self,@features) = @_;
 
-    my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
+    my $gene_adaptor = $self->db->get_GeneAdaptor;
 
   GENE: foreach my $gene ($self->output) {	
       # do a per gene eval...
@@ -215,7 +215,7 @@ sub fetch_input {
     #print STDERR "Fetching input: " . $self->input_id. " \n";
     $self->throw("No input id") unless defined($self->input_id);
 
-    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($self->input_id);
 
     my $genseq    = $contig->get_repeatmasked_seq;
 
@@ -290,7 +290,7 @@ sub fetch_input {
       }
     }
     else {
-      my $alignadaptor = $self->dbobj->get_ProteinAlignFeatureAdaptor();
+      my $alignadaptor = $self->db->get_ProteinAlignFeatureAdaptor();
       foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       @features  = $alignadaptor->fetch_by_contig_id_and_score($contig->dbID, $database->{'threshold'}, $database->{'type'});
       
@@ -387,7 +387,7 @@ else{
       $self->throw("I don't know what to do with $runnable");
     }
 
-    my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
+    my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
     #use logic name from analysis object if possible, else take $genetype;
     # if $self->analysis is undefined, this will fall over ...
