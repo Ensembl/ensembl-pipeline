@@ -120,29 +120,40 @@ sub run{
   ####################### IF SEQLENGTH > SLAM_MAXLENGTH WE SPLIT #############################
 
   if ( (${$self->slices}[0]->length  || ${$self->slices}[0]->length ) > $SLAM_MAXLENGTH) {
-    # run avid on uncutted slices
+    # run avid on uncutted slices and cut the seqs
+    print "Hurrah! I will cut the seqs and run avid, Master !!\n";
 
     my $avid = $self->runavid( $self->slices);
 
     # run ApproxAlign on org slices
+    print "And now, I run aat for yo\n";
+
+    print "parsed_binary_filename handend over to avid: " . $avid->parsed_binary_filename . "\n";
+
     my $approx_obj = $self->approx_align( $avid->parsed_binary_filename, $avid->fasta_filename1, $avid->fasta_filename2 );
 
     # cut the first seq according to the positions of the repeats
     # and than try to find equal positions in the second seq by
     # using the aat-file
 
+    print "...and now I will calculate the cutting for you, Master\n";
     my @cuts = @{ $self->calculate_cutting ( $approx_obj ) } ;
-    print "sdb: CALCULATED CUTTING using the repeats out of db:\n";
-    for(@cuts){
+    print "SlamDB.pm: CALCULATED CUTTING using the repeats out of db:\n";
+
+  for(@cuts){
       my @bla =@$_;
       foreach(@bla){ print "$_\t"; }
       print "\n";
     }
     print "\n\n";
 
-
+    print "SlamDB: perhaps the aatfile i have just writen is buggy\n";
     # output for checking the splitting-file
-    my $bug_aat =  $avid->parsed_binary_filename;
+    my $bug_aat =  $ApproxAlign->aatfile;
+    print "$bug_aat\n";
+
+    exit("dieeeee");
+
     my $bug_f1  = "/tmp/". $avid->_filename1.".fasta";
     my $bug_f2  = "/tmp/". $avid->_filename2.".fasta";
     my $bug_rmf = "/tmp/db_repeats.out";
@@ -161,6 +172,7 @@ sub run{
       push @subslices, [$subslice1,$subslice2];
     }
   } else {                      # no cutting
+    print "ok.. your choice.. no cutting\n";
     push @subslices, $self->slices;
   }
 
@@ -171,10 +183,12 @@ sub run{
 
   ####################### RUN AVID APPROXALIGN and SLAM on each SUBSLICE #############################
 
-  for my $slices (@subslices) {
+for my $slices (@subslices) {
 
-    my $avid_obj = $self->runavid( $slices );
-    print "SlamDB.pm:\t  length 1st subslice " . ${$slices}[0]->length;    print "\n\t\t\tlength 2st subslice " . ${$slices}[1]->length;    print "\n";
+  my $avid_obj = $self->runavid( $slices );
+  print "SlamDB.pm:   Length 1st subslice " . ${$slices}[0]->length;
+  print "\nSlamDB.pm: Length 2st subslice " . ${$slices}[1]->length;
+  print "\n";
 
     # run ApproxAlign on subslice
     my $approx = $self->approx_align($avid_obj->parsed_binary_filename,$avid_obj->fasta_filename1,$avid_obj->fasta_filename2);
@@ -313,14 +327,14 @@ sub write_dbresults {
 sub calculate_cutting{
   my ($self,$ApproxAlign) = @_;
 
+print "SlamdB: ApprixAlign: $ApproxAlign\n";
+
   # getting attributes of object
   my @slices  = @{$self->slices};
 
   my @all_repeats = @{$self->get_repeat_features};
 
-
   my $len1 = $slices[0]->length;
-
 
   print "Length1: $len1\n";
   print "MaxLen : $SLAM_MAXLENGTH\n";
@@ -364,33 +378,21 @@ sub calculate_cutting{
   # now we got cutting-positions for the first sequence
 
   push(@cuts1,$len1) if($cuts1[$#cuts1] < $len1);
-
   ################################################################################
-  # Make array of matching cuts in other sequence using the approximate alignement
+  # Make array of matching cuts in other sequence using the approximate alignment
   #
   # what is the lower bound for the first cut ? What generally is a lowerBound ?
   # get first cut for second sequence
-print "myalgo\n";
-  for(my $z=0;$z<100;$z++){
-    print "$z:\t" . ($ApproxAlign->lowerBound($z)) . "\t" . ($ApproxAlign->upperBound($z)) . "\n" ;
-  }
 
   my @cuts2 = (1+$ApproxAlign->lowerBound($cuts1[0]-1));
-  print "XXX Cuts2[0]\t$cuts2[0]\n";
 
   for (my $i=1; $i < (scalar(@cuts1)-1); $i++) {
+    print "pushing in cuts2:";
+    print "ApproxAlign->lowerBound: " . ($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1)/2.0) . "\n";
     push(@cuts2,sprintf("%d",($ApproxAlign->lowerBound($cuts1[$i]-1) + $ApproxAlign->upperBound($cuts1[$i]-1))/2.0));
-    print "ApproxAlign->lowerBound: " . ($ApproxAlign->lowerBound($cuts1[$i]-1)) . "-- upperbound" . ($ApproxAlign->upperBound($cuts1[$i]-1)) . "\n";
   }
 
-
   push(@cuts2,(1+$ApproxAlign->upperBound($cuts1[$#cuts1]-1)));
-  print "val: " . (1+$ApproxAlign->upperBound($cuts1[$#cuts1]-1)) . "\n";
-
-
-
-
-
 
   my @splits = ();              # nr of cuts
   $cuts1[0] = $cuts1[0]-1;
@@ -399,11 +401,11 @@ print "myalgo\n";
 
   ## look at content of cuts1
   ## the error/diffrent values are in the @cuts2-arrray !!!! 
-  print "------------\n";
-  foreach(@cuts1){
-      print "cuts1: $_\n";
-  }
-  print "------------\n\n";
+#  print "------------\n";
+#  foreach(@cuts1){
+#      print "cuts1: $_\n";
+#  }
+#  print "------------\n\n";
 
 
   print "------------\n";
@@ -411,14 +413,19 @@ print "myalgo\n";
       print "cuts2: $_\n";
   }
   print "------------\n\n";
-  for (my $i=0, my $cutCount=0; $i < (scalar(@cuts1)-1); $i++) {
+
+print "################################################################################\n";
+
+  for (my $i=0; $i < (scalar(@cuts1)-1); $i++) {
     if ($cuts2[$i]+1 > $cuts2[$i+1]) {
       # skip if we have an insertion in the base seqeunce.
       next;
     } else {
-      $cutCount++;              # cuts in the first seq   # cuts in the second seq
+                    # cuts in the first seq   # cuts in the second seq
       ##      push(@splits,[sprintf("%s.%d","mycutfile_dir",$cutCount),$cuts1[$i]+1,$cuts1[$i+1],$cuts2[$i]+1,$cuts2[$i+1]]);
       push(@splits,[ $cuts1[$i]+1, $cuts1[$i+1], $cuts2[$i]+1, $cuts2[$i+1] ] );
+      print "cut1: $cuts1[$i]+1 \tcut2: $cuts1[$i+1]\tcut1b: $cuts2[$i]+1\tcut2b: $cuts2[$i+1]\n";
+
       # Format of cutfile:
       # human_contig.fasta_mice_contig.fasta.cut.1      1       100500  1       93943
       # human_contig.fasta_mice_contig.fasta.cut.2      100501  119071  93944   100090
