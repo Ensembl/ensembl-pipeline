@@ -315,6 +315,8 @@ sub get_file_names{
   my @allfiles = readdir DIR;
   closedir DIR;
 	
+  local *FILE;
+
   foreach my $f(@allfiles) {
     if($f eq '.' || $f eq '..'){
       next;
@@ -329,7 +331,16 @@ sub get_file_names{
       }else{
 	$file = $f;
       }
-      push(@input_ids, $file) if($file);
+
+      open FILE, "< $dir/$file" or do {
+          warn "can't open $dir/$file for reading input_id list";
+	  next;
+      };
+      while (<FILE>) {
+	  chomp;
+	  push @input_ids, $_;
+      }
+      close FILE;
     }    
   }
   my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
