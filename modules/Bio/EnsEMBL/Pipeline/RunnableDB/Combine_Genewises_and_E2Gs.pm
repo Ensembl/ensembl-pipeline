@@ -196,37 +196,37 @@ sub run {
   my %used_e2g;
  GENEWISE:
   foreach my $gw (@merged_gw_genes){
-      # should be only 1 transcript
-      my @gw_tran  = @{$gw->get_all_Transcripts};
-      my @gw_exons = @{$gw_tran[0]->get_all_Exons}; # ordered array of exons
-      my $strand   = $gw_exons[0]->strand;
-      
-      if($gw_exons[$#gw_exons]->strand != $strand){
-	  $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
-	  next GENEWISE;
-      }
-      
-      # find the matching cdna
-      my @matching_e2gs = $self->match_gw_to_e2g($gw);
-      
-      next GENEWISE unless scalar(@matching_e2gs);
-      
-      # from the matching ones, take the best fit
-      ##############################
-      #
-      # WE SHOULD TAKE THE CDNA THAT EXTENDS THE UTR THE MOST
-      # This could be calculated returning a hash with the utr extension for
-      # each match
-      ##############################
-
-      my @list;
-      foreach my $e2g ( @matching_e2gs ){
-	  # we check exon_overlap and fraction of overlap in gw and e2g:
-	  my ($exon_overlap, $extent_overlap) = $self->_check_overlap( $gw, $e2g );
-	  push (@list, [$exon_overlap, $extent_overlap,$e2g]);
-      }
-      
-      # sort them
+    # should be only 1 transcript
+    my @gw_tran  = @{$gw->get_all_Transcripts};
+    my @gw_exons = @{$gw_tran[0]->get_all_Exons}; # ordered array of exons
+    my $strand   = $gw_exons[0]->strand;
+    
+    if($gw_exons[$#gw_exons]->strand != $strand){
+      $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n");
+      next GENEWISE;
+    }
+    
+    # find the matching cdna
+    my @matching_e2gs = $self->match_gw_to_e2g($gw);
+    
+    next GENEWISE unless scalar(@matching_e2gs);
+    
+    # from the matching ones, take the best fit
+    ##############################
+    #
+    # WE SHOULD TAKE THE CDNA THAT EXTENDS THE UTR THE MOST
+    # This could be calculated returning a hash with the utr extension for
+    # each match
+    ##############################
+    
+    my @list;
+    foreach my $e2g ( @matching_e2gs ){
+      # we check exon_overlap and fraction of overlap in gw and e2g:
+      my ($exon_overlap, $extent_overlap) = $self->_check_overlap( $gw, $e2g );
+      push (@list, [$exon_overlap, $extent_overlap,$e2g]);
+    }
+    
+    # sort them
       @list = sort{ 
 	  # by number of exon overlap
 	my $result = ( $$b[0] <=> $$a[0] );
@@ -297,38 +297,39 @@ sub run {
 ############################################################
 
 sub _filter_cdnas{
-    my ($self,@e2g) = @_;
-    my @newe2g;
+  my ($self,@e2g) = @_;
+  my @newe2g;
+  
+  print STDERR "filtering ".scalar(@e2g)." cdnas\n";
+ cDNA_GENE:
+  foreach my $e2g (@e2g) {
     
-  cDNA_GENE:
-    foreach my $e2g (@e2g) {
+    print STDERR "e2g is a $e2g\n";
+  cDNA_TRANSCRIPT:
+    foreach my $tran (@{$e2g->get_all_Transcripts}) {
+      
+      next cDNA_TRANSCRIPT unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran,$self->query) );
+      
+      my $found = 0;
+      my @exons = @{$tran->get_all_Exons};
+      @exons = sort {$a->start <=> $b->start} @exons;
+      my $seqname;
+      
+    cDNA_EXON:
+      for (my $i = 1; $i <= $#exons; $i++) {
 	
-	print STDERR "e2g is a $e2g\n";
-      cDNA_TRANSCRIPT:
-	foreach my $tran (@{$e2g->get_all_Transcripts}) {
-	    
-	    next cDNA_TRANSCRIPT unless ( $self->_check_Transcript($tran) );
-
-	    my $found = 0;
-	    my @exons = @{$tran->get_all_Exons};
-	    @exons = sort {$a->start <=> $b->start} @exons;
-	    my $seqname;
-	    
-	  cDNA_EXON:
-	    for (my $i = 1; $i <= $#exons; $i++) {
-		
-		# reject trnascripts with long introns
-		my $intron = $exons[$i]->start - $exons[$i-1]->end - 1;
-		if ($intron > $GB_COMBINED_MAX_INTRON) {
-		    print STDERR "rejecting trans_dbID: ".$tran->dbID." for long intron: ". $intron.">".$GB_COMBINED_MAX_INTRON."\n";
-		    next cDNA_TRANSCRIPT;
-		}
-	    }
-	    print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
-	    push(@newe2g,$e2g);
+	# reject trnascripts with long introns
+	my $intron = $exons[$i]->start - $exons[$i-1]->end - 1;
+	if ($intron > $GB_COMBINED_MAX_INTRON) {
+	  print STDERR "rejecting trans_dbID: ".$tran->dbID." for long intron: ". $intron.">".$GB_COMBINED_MAX_INTRON."\n";
+	  next cDNA_TRANSCRIPT;
 	}
+      }
+      print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
+      push(@newe2g,$e2g);
     }
-    return @newe2g;
+  }
+  return @newe2g;
 }
 
 ############################################################
@@ -485,15 +486,12 @@ sub combine_genes{
       my $strand = $newtrans[0]->start_Exon->strand;
 
       print STDERR "before genomewise:\n";
-      $self->_print_Transcript($newtrans[0]);
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans[0]);
 
       $newtranscript = $self->_recalculate_translation($newtrans[0],$strand); 
 
       print STDERR "after genomewise:\n";
-      $self->_print_Transcript($newtranscript);
-
-      
-
+      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtranscript);
   }
   else{
       $newtranscript = $newtrans[0];
@@ -716,7 +714,7 @@ sub _merge_gw_genes {
     if(scalar(@trans) != 1) { $self->throw("expected one transcript for $gwg\n"); }
     
     # check the sanity of the transcript
-    next GW_GENE unless ( $self->_check_Transcript($trans[0]));
+    next GW_GENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0],$self->query));
     
     ### we follow here 5' -> 3' orientation ###
     $trans[0]->sort;
@@ -862,7 +860,7 @@ sub _make_newtranscript {
   $translation->end_Exon($gw_tran[0]->translation->end_Exon);
   
   $newtranscript->translation($translation);
-  $newtranscript->translation->start_Exon($newtranscript->start_exon);
+  $newtranscript->translation->start_Exon($newtranscript->start_Exon);
   $newtranscript->translation->end_Exon($newtranscript->end_Exon);
   
   my $eecount = 0;
@@ -1952,7 +1950,7 @@ sub _print_Gene{
     $id .= " ".$gene->type;
   }
   foreach my $transcript (@{$gene->get_all_Transcripts} ){
-    $self->_check_Transcript($transcript);
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
   }
 }
 
@@ -2010,7 +2008,7 @@ sub _recalculate_translation{
   
   # check that everything is sane:
   print STDERR "after genomewise:\n";
-  unless ($self->_check_Translation($newtranscript)){
+  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript)){
     print STDERR "problem with the translation. Returning the original transcript\n!";
     return $transcript;
   }
