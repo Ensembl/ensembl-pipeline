@@ -36,7 +36,7 @@ Username for database access.
 Stable identifier of transcript to display.
 
 -transcript_dbid :
-I wish this worked!
+If you dont have a stable id, use the dbID.
 
 -remove_introns :
 (optional) Truncate intron sequences to display a
@@ -116,7 +116,7 @@ unless (@ARGV) {
 	     " -dbpass :               (optional) Database password.",
 	     " -dbport :               (optional) Database access port number.",
 	     " -transcript_stable_id : Stable identifier of transcript to display.",
-	     " -transcript_dbid :      I wish this worked!",
+	     " -transcript_dbid :      If you dont have a stable id, use the dbID.",
 	     " -remove_introns :       (optional) Truncate intron sequences to display a",
 	     "                           more compact alignment.",
 	     " -padding :              (optional) When introns are truncated, number of",
@@ -184,10 +184,10 @@ my $transcript;
 if (defined $transcript_stable_id){
   $transcript = $ta->fetch_by_stable_id($transcript_stable_id)
 } else {
-  $transcript = $ta->fetch_by_stable_id($transcript_dbid)
+  $transcript = $ta->fetch_by_dbID($transcript_dbid)
 }
 
-die "Unable to retrieve gene $transcript_stable_id\n"
+die "Unable to retrieve transcript.\n"
   unless defined $transcript;
 
 my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
