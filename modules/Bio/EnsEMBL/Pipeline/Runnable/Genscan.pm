@@ -614,7 +614,9 @@ sub output {
 					   -end     => $exon->end,
 					   -strand  => $exon->strand,
 					   -phase   => $exon->phase,
+					   -end_phase => $exon->end_phase,
 					   -score   => $exon->score,
+					   -p_value   => $exon->p_value,
 					   -source_tag => 'genscan',
 					   -primary_tag => 'prediction',
 					   -analysis     => $analysis);
@@ -623,7 +625,9 @@ sub output {
 					    -end     => $exon->end,
 					    -strand  => $exon->strand,
 					    -phase   => $exon->phase,
+					    -end_phase => $exon->end_phase,
 					    -score   => $exon->score,
+					    -p_value   => $exon->p_value,
 					    -source_tag => 'genscan',
 					    -primary_tag => 'prediction',
 					    -analysis     => $analysis);
