@@ -287,7 +287,7 @@ sub write_output {
       }
     }
     
-    my $feat_adp = $self->db->get_FeatureAdaptor;
+    my $feat_adp = $self->db->get_DnaAlignFeatureAdaptor;
     $feat_adp->store(@features);
     
     return 1;
