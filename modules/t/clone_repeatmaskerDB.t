@@ -43,17 +43,19 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_RepeatMasker';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'RepeatMasker',
-                                                    -program_version=> 1,
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'RepeatMasker',
-                                                    -gff_feature    => 'repeat', 
-                                                    -parameters     => '',
-						    -logic_name     => 'RepeatMasker'
-                                                );
+my $ana = $ana_adaptor->fetch_by_logic_name('RepeatMasker');
+
+#my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
+#                                                    -db_version     => '__NONE__',
+#                                                    -program        => 'RepeatMasker',
+#                                                    -program_version=> 1,
+#                                                    -module         => $runnable,
+#                                                    -module_version => 1,
+#                                                    -gff_source     => 'RepeatMasker',
+#                                                    -gff_feature    => 'repeat', 
+#                                                    -parameters     => '',
+#						    -logic_name     => 'RepeatMasker'
+#                                                );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -61,7 +63,7 @@ else
 { print "ok 3\n"; }
 $ana_adaptor->exists( $ana );
 my $id = 'AC015914';
-my $runobj = "$runnable"->new(-dbobj      => $db,
+my $runobj = "$runnable"->new(-db      => $db,
 			      -input_id   => $id,
 			      -analysis   => $ana );
 unless ($runobj)
@@ -81,7 +83,7 @@ display(@out);
 
 $runobj->write_output();
 
-my $clone = $db->get_Clone($id);
+my $clone = $db->get_CloneAdaptor()->fetch_by_accession($id);
 my @repeats;
 foreach my $contig ($clone->get_all_Contigs())
 {
@@ -109,3 +111,14 @@ sub display {
        }
     }
 }
+
+
+
+
+
+
+
+
+
+
+
