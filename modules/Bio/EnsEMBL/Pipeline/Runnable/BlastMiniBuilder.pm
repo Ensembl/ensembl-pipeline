@@ -126,8 +126,8 @@ sub build_runnables {
 
     my $coverage = $self->check_coverage($seqname, $partitioned_features{$seqname});
 
-    # If not enough coverage, go home early.
-    unless ($coverage > 0.75) {
+    # If only sparse coverage, go home early.
+    unless ($coverage > 0.5) {
       my $runnable = $self->make_object($self->genomic_sequence, $unfiltered_partitioned_features{$seqname});
       push (@runnables, $runnable);
 
@@ -190,8 +190,18 @@ sub build_runnables {
       foreach my $gene_cluster (@$gene_clusters){
 
 	my @sorted_gene_cluster = sort {$a->{_gsf_start} <=> $b->{_gsf_start};} @$gene_cluster;
-       	my $cluster_start = $sorted_gene_cluster[0]->{_gsf_start} - 1000;
-	my $cluster_end = $sorted_gene_cluster[-1]->{_gsf_end} + 1000;
+
+	my $rough_gene_length = $sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
+
+	my $padding_length;
+	if ($rough_gene_length > 10000) {
+	  $padding_length = 10000;
+	} else {
+	  $padding_length = 1000;
+	}
+
+       	my $cluster_start = $sorted_gene_cluster[0]->{_gsf_start} - $padding_length;
+	my $cluster_end = $sorted_gene_cluster[-1]->{_gsf_end} + $padding_length;
         unless ($cluster_start > 0) {
 	  if ($sorted_gene_cluster[0]->{_gsf_end} > 0) {
 	    $cluster_start = 1;
@@ -497,8 +507,8 @@ sub check_overlap {
   Args [2]   : feature listref - reference to list of align features
                that align to parts of the protein specified in Arg [1]
   Example    : $self->check_coverage($seqname, $features);
-  Description: Using a protein and a list of corresponding align
-               features, calculates the percentage of the protein
+  Description: Using a protein/est and a list of corresponding align
+               features, calculates the percentage of the protein/est
                that the features cover.
   Returntype : A real (e.g. a percentage like 0.80)
   Exceptions : none
