@@ -84,7 +84,7 @@ sub new {
       $threshold = $::similarity_conf{'threshold'};
     }
 
-    $type = 'sptr' unless (defined $type && $type ne '');
+    $type = 'swall' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
     $self->dbobj->static_golden_path_type($path);
@@ -282,6 +282,7 @@ sub fetch_input {
       }
     }
     else {
+      print STDERR "type = ",$self->type." threshold ".$self->threshold."\n";
       @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
       
       print STDERR "Number of features = " . scalar(@features) . "\n";
@@ -353,10 +354,9 @@ sub convert_output {
   my $trancount = 1;
   my $genetype;
   foreach my $runnable ($self->runnable) {
-    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise") || $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise")){
-      $genetype = "similarity_genewise";
-    }
-    else{
+     if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
+      $genetype = "ContigBlastMiniGenewise";
+    }else{
       $self->throw("I don't know what to do with $runnable");
     }
 
@@ -377,13 +377,13 @@ sub convert_output {
       # make a new analysis object
       $analysis_obj = new Bio::EnsEMBL::Analysis
 	(-db              => 'NULL',
-	 -db_version      => 1,
-	 -program         => $genetype,
+	 -db_version      => 'NULL',
+	 -program         => 'genewise',
 	 -program_version => 1,
-	 -gff_source      => $genetype,
+	 -gff_source      => 'genewise',
 	 -gff_feature     => 'gene',
 	 -logic_name      => $genetype,
-	 -module          => 'FPC_BlastMiniGenewise',
+	 -module          => 'BlastMiniGenewise',
       );
     }
 
