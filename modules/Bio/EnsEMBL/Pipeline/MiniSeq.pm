@@ -165,22 +165,15 @@ sub get_cDNA_sequence {
    
    return unless (scalar @exons > 0);
    
-   #print STDERR "exons:\n"; 
+   ##print STDERR "exons:\n"; 
    foreach my $exon (@exons) {
-   # print STDERR $exon->start."-".$exon->end." ";
-     $seqstr .= $exon->seq->seq;
+     ##print STDERR "Have ".$exon."\n";
+     #print STDERR $exon->start."-".$exon->end."\n";
+     #print STDERR $seqstr."\n";
+     $seqstr .= $exon->seq;
    }
-   if ($exons[0]->hstrand == 1) {
-     return new Bio::PrimarySeq('-id' => "genomic" ,
-				-seq => $seqstr);
-   } elsif ($exons[0]->hstrand == -1) {
-     my $tmpseq = new Bio::PrimarySeq('-id' => 'genomic',
-				      -seq  => $seqstr);
-     return $tmpseq->invert;
-   } 
-   else {
-     $self->throw("Invalid strand [".$exons[0]."] on first exon");
-   }
+   return new Bio::PrimarySeq('-id' => "genomic" ,
+                              -seq => $seqstr);
    
 }
 

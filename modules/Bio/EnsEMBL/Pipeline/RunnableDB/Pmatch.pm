@@ -41,10 +41,11 @@ sub new {
 
 sub fetch_input{
   my ($self) = @_;
-  print STDERR "Fetching input\n";
+  #print STDERR "Fetching input\n";
   $self->make_protlist;
-  
- $self->fetch_sequence($GB_PMATCH_MASKING); 
+  #print STDERR "Trying to parse ".$self->input_id." with ".$GB_INPUTID_REGEX."\n";
+  $self->fetch_sequence($GB_PMATCH_MASKING);
+  #print STDERR "Have sequence ".$self->query->name."\n";
   my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Pmatch->new(
 							       '-query' => $self->query,
 							       '-protein_file' => $self->protein_file,
@@ -53,7 +54,7 @@ sub fetch_input{
 							       '-protein_lengths' => $self->prot_lengths,
 							      );
   $self->runnable($runnable);
-  print STDERR "have created runnable\n";
+  #print STDERR "have created runnable\n";
 }
  
 
@@ -62,15 +63,19 @@ sub run{
   my ($self) = @_;
   $self->runnable->run;
   my @hits = $self->runnable->output;
+  #prin STDERR "Have ".@hits." output from pmatch\n";
   my @output;
   foreach my $hit(@hits){
     #print STDERR "have ".$hit."\n";
-     my ($name, $start, $end) = $self->convert_coords_to_genomic($hit->query, $hit->qstart, $hit->qend);
-     $hit->query($name);
-     $hit->qstart($start);
-     $hit->qend($end);
-     push(@output, $hit);
+    my ($name, $start, $end) = $self->convert_coords_to_genomic($hit->query,
+                                                                $hit->qstart,
+                                                                $hit->qend);
+    $hit->query($name);
+    $hit->qstart($start);
+    $hit->qend($end);
+    push(@output, $hit);
   }
+  #print STDERR "Have ".@output." output from conversion\n";
   $self->convert_output(\@output);
 }
 
@@ -214,14 +219,16 @@ sub make_protlist{
 
 sub convert_coords_to_genomic{
   my ($self, $name, $start, $end) = @_;
-
-  my ($chr_name, $chr_start, $chr_end) = $self->input_id =~ /$GB_INPUTID_REGEX/;
+  #print STDERR "Have ".$name." ".$start." ".$end."\n";
+  my $chr_name = $self->query->seq_region_name;
+  my $chr_start = $self->query->start;
+  my $chr_end = $self->query->end; 
   if($start - 1 == 0){
     return ($chr_name, $start, $end);
   }
   my $genomic_start = $start+$chr_start-1;
   my $genomic_end = $end+$chr_start-1;
-  
+  # print STDERR "Have ".$chr_name." ".$genomic_start." ".$genomic_end."\n";
   return($chr_name, $genomic_start, $genomic_end);
 }
 
@@ -234,11 +241,7 @@ sub convert_output{
   
   my @out = $self->uniquify(@results);
   foreach my $f(@out){
-   my $query = $f->chr_name;
-   if($query =~ /$GB_INPUTID_REGEX/){
-     my $chr = $1;
-     $f->chr_name($chr);
-   }
+     $f->chr_name($self->query->seq_region_name);
   }
   $self->output(@out);
 }
@@ -252,7 +255,7 @@ sub uniquify{
  # print STDERR "UNIQUFY\n";
   open (OUT, ">".$file);
   foreach my $hit(@features) {
-    print OUT $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
+    #print OUT $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
   #  print STDERR $hit->query  . ":" .$hit->qstart . "," .$hit->qend   . ":" . $hit->target . ":" .$hit->coverage . "\n";
   }
   #print STDERR "UNIQUFY\n";

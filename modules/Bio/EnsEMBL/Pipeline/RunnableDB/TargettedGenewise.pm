@@ -186,7 +186,7 @@ sub fetch_input{
   my $entry = $self->input_id;
   my $name;
   my $protein_id; 
-
+  #print STDERR "Input id = ".$entry."\n";
   # chr12:10602496,10603128:Q9UGV6:
   #  print STDERR $entry."\n";
   ($name, $protein_id) = split /\|/, $self->input_id;
@@ -200,10 +200,15 @@ sub fetch_input{
   
   my ($cs_name, $cs_version, $seq_region, $start, $end, $strand) = @array;
   # we want to give genewise a bit more genomic than the one found by pmatch, 
+  if($start > $end){
+    my $tmp_start = $end;
+    $end = $start;
+    $start = $tmp_start;
+  }
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
- 
-  print STDERR "fetching slice ".$seq_region." ".$new_start." ".$new_end." \n";
+
+  #print STDERR "Fetching ".$seq_region." ".$start." ".$end."\n";
   my $sliceadp = $self->db->get_SliceAdaptor();
   my $slice = $sliceadp->fetch_by_region($cs_name,$seq_region, $new_start,
                                          $new_end, $strand, $cs_version);
@@ -218,7 +223,7 @@ sub fetch_input{
   }
   $self->protein_id($protein_id);
   #print STDERR $protein_id."\n";
-  print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
+  #print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
 
   # genewise runnable
   # repmasking?
@@ -261,7 +266,7 @@ sub run {
    # remap genes to raw contig coords
    my @remapped = $self->remap_genes();
    #print STDERR "remapped output\n";
-   print STDERR "have ".@remapped." remapped gene\n";
+   #print STDERR "have ".@remapped." remapped gene\n";
    $self->output(@remapped);
    #print STDERR "defined output\n";
 }
@@ -385,25 +390,30 @@ sub convert_gw_output {
   my ($self) = @_;
   my $count = 1;
   my $genetype = $GB_TARGETTED_GW_GENETYPE;
-  if(!defined $genetype || $genetype eq ''){
+  if(!$genetype){
     $genetype = 'TGE_gw';
     $self->warn("Setting genetype to $genetype\n");
   }
   my @results  = $self->runnable->output;
-  print STDERR "BlastMiniGenewise produced ".@results." results\n";
+  #print STDERR "BlastMiniGenewise produced ".@results." results\n";
 
   # Throw here if zero results? Suggests something v. bad has happened 
   # - usually corrupt sequence file means sequences not fetched. We should 
   # never fail to fetch sequences ina a targetted run!
-  $self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
-  
+  #$self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
+  if(!@results){
+    $self->warn("BMG didn't produce any results");
+    return;
+  }
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->db->get_AnalysisAdaptor;
 
-  my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
-  #print STDERR "have adaptor and analysis objects\n";
-
-  if ( !defined $analysis_obj ) {
+  my $analysis_obj = $self->analysis;
+  if(!$analysis_obj){
+    $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
+    #print STDERR "have adaptor and analysis objects\n";
+  }
+  if (!$analysis_obj) {
     # make a new analysis object
     $analysis_obj = new Bio::EnsEMBL::Analysis
       (-db              => 'NULL',
@@ -422,7 +432,7 @@ sub convert_gw_output {
   
   # check for stops?
   #print STDERR "have made ".@genes." genes\n";
-  print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
+  #print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
   $self->gw_genes(@genes);
   
 }
@@ -502,7 +512,7 @@ sub validate_transcript {
   # check exon phases:
   my @exons = @{$transcript->get_all_Exons};
   #print "there are ".@exons." exons\n";
-  $transcript->sort;
+  #$transcript->sort;
   for (my $i=0;$i<(scalar(@exons-1));$i++){
     my $end_phase = $exons[$i]->end_phase;
     my $phase    = $exons[$i+1]->phase;
@@ -732,7 +742,7 @@ sub check_coverage{
   foreach my $exon (@{$transcript->get_all_Exons}) {
     $pstart = 0;
     $pend   = 0;
-    my $exonadp = $exon->adaptor;
+    #my $exonadp = $exon->adaptor;
     #if(!$exonadp){
     #  die "no exon adaptor defined : $!";
     #}else{
@@ -826,8 +836,8 @@ sub make_transcript{
     $exon->phase($exon_pred->phase);
     $exon->end_phase($exon_pred->end_phase);
     
-    $exon->contig($contig);
-    $exon->adaptor($self->db->get_ExonAdaptor);
+    $exon->slice($contig);
+    #$exon->adaptor($self->db->get_ExonAdaptor);
     
     # sort out supporting evidence for this exon prediction
     my @sf = $exon_pred->sub_SeqFeature;
@@ -839,8 +849,8 @@ sub make_transcript{
     if(@sf){
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sf); 
     
-      $align->seqname($contig->dbID);
-      $align->contig($contig);
+      $align->seqname($contig->seq_region_name);
+      $align->slice($contig);
 #      my $prot_adp = $self->db->get_ProteinAlignFeatureAdaptor;
 #      $align->adaptor($prot_adp);
       $align->score(100);
@@ -953,7 +963,7 @@ sub validate_exon{
 
 sub split_transcript{
   my ($self, $transcript) = @_;
-  $transcript->sort;
+  #$transcript->sort;
   my @split_transcripts   = ();
 
   if(!($transcript->isa("Bio::EnsEMBL::Transcript"))){
@@ -1045,7 +1055,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
     foreach my $sf (@{$exon->get_all_supporting_features}){
-	  $sf->feature1->seqname($exon->contig->dbID);
+	  $sf->feature1->seqname($exon->slice->seq_region_name);
 
       }
     # this exon becomes $prev_exon for the next one
@@ -1058,7 +1068,7 @@ EXON:   foreach my $exon (@{$transcript->get_all_Exons}){
   my $count = 1;
   
   foreach my $st(@split_transcripts){
-    $st->sort;
+    #$st->sort;
     my @ex = @{$st->get_all_Exons};
     if(scalar(@ex) > 1){
       $st->{'temporary_id'} = $transcript->dbID . "." . $count;

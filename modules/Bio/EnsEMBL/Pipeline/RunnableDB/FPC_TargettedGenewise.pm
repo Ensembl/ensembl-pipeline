@@ -190,9 +190,7 @@ sub make_targetted_runnables {
   my @features = $pmfa->get_PmatchFeatures_by_chr_start_end
     ($self->query->seq_region_name, $self->query->start, 
      $self->query->end, $GB_FINAL_PMATCH_LOGICNAME );
-  #print STDERR "have ".@features." pmatch features to run with\n";
-  print STDERR "Trying to connect to ".$GB_GW_DBHOST." ".$GB_GW_DBNAME.
-    " ".$GB_GW_DBPORT."\n";
+ 
   my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
      '-host'   => $GB_GW_DBHOST,
@@ -210,27 +208,23 @@ sub make_targetted_runnables {
   foreach my $feat(@features){
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat->protein_id}){
-      print STDERR "skipping " . $feat->protein_id . "\n";
+      #print STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
     
     my ($start, $end);
-    if($feat->start < $feat->end){
-      $start = $feat->end;
-      $end = $feat->start;
-    }else{
-      $start = $feat->start;
-      $end = $feat->end;
-    }
+    
+    $start = $feat->start;
+    $end = $feat->end;
 
     my $input = ($self->query->coord_system->name.":".
                  $self->query->coord_system->version.":".
                  $self->query->seq_region_name.":".
                  $start.":".$end.":".
                  $self->query->strand."|".
-                 $$feat->protein_id);
+                 $feat->protein_id);
 
-    print STDERR "TGW input: $input\n";
+    #print STDERR "TGW input: $input\n";
 
     my $tgr = new Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise(
 									-db => $self->db,
@@ -311,20 +305,10 @@ sub run {
       next TGE;
     }
     
-    eval{
-     my @genes = $tge->write_output;
-     $count += @genes;
-     #print "\n\n";
-    };
-
-    if($@){
-      $self->warn("problems writing output for TargettedGenewise: [$@]\n");
-      next TGE;
-    }
+    
   }
   
-  #print "there were ".$count." genes produce TargettedGenewise\n";
-  $self->{'_targetted_runnables'} = [];
+  
 
 }
 
@@ -342,7 +326,11 @@ sub run {
 
 sub output{
   my ($self) = @_;
-  # nothing to output ...
+  my @output;
+  foreach my $tge($self->targetted_runnable){
+    push(@output, $tge->output);
+  }
+  return @output;
 }
 
 =head2 write_output
@@ -358,6 +346,16 @@ sub output{
 
 sub write_output {
   my ($self) = @_;
+  foreach my $tge($self->targetted_runnable){
+    eval{
+      my @genes = $tge->write_output;
+    };
+    
+    if($@){
+      $self->warn("problems writing output for TargettedGenewise: [$@]\n");
+      next TGE;
+    }
+  }
   # data has already been written out, so no need to do anything here.
 }
 
