@@ -535,8 +535,8 @@ sub run_module {
 	      } else {
 		  $SAVE_RUNTIME_INFO = 0;
 	      }
-	      # -------------------------------------------------------------------
-	      $self->set_status( "SUCCESSFUL" );
+	      # ------------------------------------------------------------------
+             $self->set_status("SUCCESSFUL");
 	  }; 
 	  if ($err = $@) {
 	      $self->set_status( "FAILED" );
@@ -563,6 +563,10 @@ sub run_module {
 	if ($err = $@) {
 	    print STDERR "Error updating successful job ".$self->dbID ."[$err]\n";
 	    $self->throw("Problems for updating sucessful job for " . $self->input_id . " [$err]" );
+            eval {
+              $self->set_status("FAIL_NO_RETRY");
+            };
+            $self->throw("Error updating input_id_analysis table [$@]") if $@;
 	}
 	else {
 	    print STDERR "Updated successful job ".$self->dbID."\n";
