@@ -5,7 +5,7 @@ cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-pipeline
 cvs -d :ext:cvs.sanger.ac.uk:/nfs/ensembl/cvsroot co ensembl-otter
 bioperl ??
 
-setenv ENSDIR /home/ensuser
+setenv ENSDIR /home/ensuser  (or whereever you have checked out the code to)
 setenv PERL5LIB ${ENSDIR}/ensembl/modules:${ENSDIR}/ensembl-pipeline/modules:${ENSDIR}/ensembl-otter/modules
 setenv PATH ${ENSDIR}/ensembl-pipeline/scripts:${ENSDIR}/ensembl-otter/scripts:${PATH}
 
@@ -48,6 +48,14 @@ If you wan t to keep the existing genes skip this step
 
 mysql -u ensadmin -pensembl -h ecs2b my_database < ${ENSDIR}/ensembl-pipeline/sql/delete_genes
 
+
+5.5) Configuring the pipeline BatchQueue,General and ?
+
+   output dirs
+   bin
+   data
+   regexes for blast - need default
+
 6) Generating input ids
 
 Analyses can be run on either individual contigs or on slices (regions of genome).
@@ -65,14 +73,13 @@ To generate slice input ids (size 1Mb) :
 
 We will first set up a simple pipeline with RepeatMasking , Genscan predictions, CpG prediction and a blast against swall.  These will all be done on contigs.
 
-  add_Analysis -logic_name RepeatMask -module RepeatMasker    -db repbase
-  add_Analysis -logic_name Genscan    -module Genscan         -db HumanIso.smat
-  add_Analysis -logic_name Swall      -module BlastGenscanPep -db swall
-  add_Analysis -logic_name CpG        -module CPG
+  add_Analysis -logic_name RepeatMask -module RepeatMasker    -db repbase        -input_type CONTIG
+  add_Analysis -logic_name Genscan    -module Genscan         -db HumanIso.smat  -input_type CONTIG
+  add_Analysis -logic_name Swall      -module BlastGenscanPep -db swall          -input_type CONTIG
+  add_Analysis -logic_name CpG        -module CPG                                -input_type CONTIG
 
 
 Note that the first three analyses all have databases defined but the CpG island predictor doesn't need one.
-
 
 8) Adding Rules
 
@@ -110,7 +117,44 @@ Example output is shown below.
 This script is very useful in showing you the progress of the pipeline as it is running.
 
 
-9) Starting the pipeline
+9)  Starting the pipeline
+
+9a) Monitoring the pipeline
+
+10) Stopping the pipeline
+
+11) Deleting parts of the pipeline and restarting it.
+
+12) GeneBuild pipeline
+
+
+The gene build pipeline is slightly different in that most analysis is done on slices of the genome (in chromosome coordinates) and not individual contigs.  These means you need an assembly in your database (or you used a complete fasta file and chopped it up into pieces, or you downloaded from the ensembl site in which case you already have one).
+
+Before running anything on slices all the analyses on contigs have to finish.  This step is put into the pipeline as an accumulator step as follows
+
+  ./add_Analysis    -host ecs2b -dbname my_database -logic_name RawAccumulator -module PlaceHolder -type ALL
+  ./add_to_Pipeline -host ecs2b -dbname my_database -logic_name RawAccumulator -dependents Swall
+
+
+Note that the analysis has type ALL.  This means it will wait for all its dependents to finish before starting.  In this case this means waiting for all the Swall jobs to finish before starting.
+
+The module itself doesn't do anything.  It is just a way of waiting for all contigs in the pipeline to get to a certain point.
+
+
+12.1)  Now we can start adding in genebuild jobs.  These are 
+
+  - pmatch jobs for human proteins
+  - Best in genome analysis to find the best position for all human proteins
+  - TargettedGenewise jobs to create gene structures on the genome
+  - SimilarityGenewise jobs that run genewise on non-exact protein matches to find novel genes
+  - cDNA?
+  - Combining
+  - Final gene build
+
+
+
+ 
+
 
 
 

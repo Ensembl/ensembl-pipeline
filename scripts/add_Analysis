@@ -25,6 +25,7 @@ my $module;
 my $module_version;
 my $gff_source;
 my $gff_feature;
+my $input_type;
 
 &GetOptions(
             'host:s'    => \$host,
@@ -44,6 +45,7 @@ my $gff_feature;
             'module_version:s'   => \$module_version,
             'gff_sources:s'      => \$gff_source,
             'gff_feature:s'      => \$gff_feature
+	    'input_type:s'       => \$input_type,
            );
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $host,
@@ -62,6 +64,10 @@ if (!defined($module)) {
    die "Analysis must have a module defined";
 }
 
+if (!defined($input_type)) {
+    die "Analysis must have an input type";
+}
+
 if ($logic_name)       {$analysis->logic_name        ($logic_name);}
 if ($database  )       {$analysis->db                ($database);}
 if ($database_file)    {$analysis->db_file           ($database_file);}
@@ -74,6 +80,7 @@ if ($parameters)       {$analysis->parameters        ($parameters);}
 if ($program_version)  {$analysis->program_version   ($program_version);}
 if ($gff_source)       {$analysis->gff_source        ($gff_source);}
 if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
+if ($input_type)       {$analysis->input_type        ($input_type);}
 
 $db->get_AnalysisAdaptor->store($analysis);
 
