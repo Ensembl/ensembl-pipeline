@@ -78,8 +78,8 @@ sub fetch_input {
   my $exonerate = $analysis->program;
   my $version = $analysis->program_version;
   my $options;
-  my $query_file = $MICROARRAY_INPUT_DIR.$input_id;
-  my $target_dir =$MICROARRAY_TARGET_DIR;
+  my $query_file = $PIPELINE_INPUT_DIR.$input_id;
+  my $target_dir =$PIPELINE_TARGET_DIR;
   
   ###Runnable::ExonerateArray take a array of query_seq_obj, so it's need to be generated here###
 
