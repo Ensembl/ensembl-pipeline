@@ -360,7 +360,7 @@ sub convert_output {
   # This BAD! Shouldn't be using internal ids.
   # <sigh> no time to change it now
   # eh? what analysis should this be now? Is it still 7?
-  my $analysis = $self->dbobj->get_OldAnalysis(7);
+  #my $analysis = $self->dbobj->get_OldAnalysis(7);
   my $trancount = 1;
   my $genetype;
   foreach my $runnable ($self->get_Runnables) {
