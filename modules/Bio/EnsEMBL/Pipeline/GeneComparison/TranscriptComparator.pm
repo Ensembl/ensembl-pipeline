@@ -291,7 +291,7 @@ sub _test_for_fuzzy_semiexact_Merge{
 	  # but must have a match at the start (with $allowed_mismatch mismatches allowed)
 	  elsif ( ( $k == $#exons2 || $j == $#exons1 ) &&
 		  ( $foundlink == 1 )                  &&
-		  ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatches ) 
+		  ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
 		  ){
 	      #print STDERR "link completed, merged transcripts\n";
 	      $merge = 1;
