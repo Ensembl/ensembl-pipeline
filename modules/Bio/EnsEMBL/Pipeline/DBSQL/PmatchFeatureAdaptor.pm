@@ -31,7 +31,7 @@ use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 
-@ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
+@ISA = qw(Bio::EnsEMBL::DBSQL::DBConnection);
 
 
 sub write_PmatchFeatures {
@@ -44,8 +44,8 @@ sub write_PmatchFeatures {
     if (!defined($protein{$f->protein_id})) {
       $protein{$f->protein_id} =  $self->write_protein($f->protein_id,$f->cdna_id);
     }
-    if(!$f->analysis){
-      $self->throw("cant store ".$f." without an analysis\n");
+    if(!$f->name){
+      $self->throw("cant store ".$f." without an name\n");
     }
     my $protein_internal_id = $protein{$f->protein_id};
 
@@ -54,7 +54,7 @@ sub write_PmatchFeatures {
     }
 
     my $query = "insert into pmatch_feature values(null," . 
-      $protein_internal_id. ",'" . $f->chr_name . "'," .  $f->start   . ","  . $f->end     . ","  . $f->coverage . ",".$f->analysis->dbID.")";
+      $protein_internal_id. ",'" . $f->chr_name . "'," .  $f->start   . ","  . $f->end     . ","  . $f->coverage . ",'".$f->name."')";
 
     my $sth = $self->prepare($query);
     #print STDERR "query = ".$query."\n";
@@ -152,20 +152,23 @@ sub get_PmatchFeatures_by_protein_id {
     my $start            = $row->{start};
     my $end              = $row->{end};
     my $coverage         = $row->{coverage};
-
+    my $name             = $row->{name};
     if (!defined($cdnas{$prot_internal_id})) {
 
       $cdnas{$prot_internal_id}    = $self->get_cdna_id($prot_internal_id);
 
     }
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $prot_id,
-							    -start    => $start,
-							    -end      => $end,
-							    -chr_name => $chr_name,
-							    -cdna_id  => $cdnas{$prot_internal_id},
-							    -coverage => $coverage,
-							    );
+    my $feature = 
+      new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature
+	(-protein_id  => $prot_id,
+	 -start    => $start,
+	 -end      => $end,
+	 -chr_name => $chr_name,
+	 -cdna_id  => $cdnas{$prot_internal_id},
+	 -coverage => $coverage,
+	 -name => $name,
+	);
 
     push(@pmatch,$feature);
 
@@ -186,19 +189,16 @@ sub get_PmatchFeatures_by_protein_id {
 =cut
 
 sub get_PmatchFeatures_by_chr_start_end {
-  my ($self, $chr_name, $chrstart, $chrend, $logic_name) = @_;
-  my $analysis;
+  my ($self, $chr_name, $chrstart, $chrend, $name) = @_;
   
-  if($logic_name){
-    $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
-  }
+ 
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
               "AND pmf.chr_name = '$chr_name' " .
 	      "AND pmf.start >= $chrstart " .
-	      "AND pmf.end <= $chrend ";
-  if($analysis){
-    $query .= " and analysis_id = ".$analysis->dbID;
+	      "AND pmf.start <= $chrend ";
+  if($name){
+    $query .= " and name = ".$name;
   }
   print $query." ".$self->db->dbname."\n";
   my $sth = $self->prepare($query);
@@ -214,7 +214,7 @@ sub get_PmatchFeatures_by_chr_start_end {
     my $start            = $row->{start};
     my $end              = $row->{end};
     my $coverage         = $row->{coverage};
-
+    my $name             = $row->{name};
     if (!defined($proteins{$prot_internal_id})) {
 
       my $protid = $self->get_protein_id($prot_internal_id);
@@ -238,13 +238,16 @@ sub get_PmatchFeatures_by_chr_start_end {
 
     
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
-							    -start    => $start,
-							    -end      => $end,
-							    -chr_name => $chr_name,
-							    -cdna_id  => $cdnas{$prot_internal_id},
-							    -coverage => $coverage,
-							    );
+    my $feature = 
+      new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature
+	(-protein_id  => $proteins{$prot_internal_id},
+	 -start    => $start,
+	 -end      => $end,
+	 -chr_name => $chr_name,
+	 -cdna_id  => $cdnas{$prot_internal_id},
+	 -coverage => $coverage,
+	 -name => $name,
+	);
 
     push(@pmatch,$feature);
 
@@ -253,15 +256,17 @@ sub get_PmatchFeatures_by_chr_start_end {
   return @pmatch;
 }
 
-sub fetch_by_logic_name {
+
+
+sub fetch_by_name {
   my ($self, $logic_name) = @_;
-  my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+ 
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
-	       "AND pmf.analysis_id = ?";
+	       "AND pmf.name = ?";
 
   my $sth = $self->prepare($query);
-  my $res = $sth->execute($analysis->dbID);
+  my $res = $sth->execute($logic_name);
 
   my @pmatch;
   my %cdnas;
@@ -273,7 +278,7 @@ sub fetch_by_logic_name {
     my $start            = $row->{start};
     my $end              = $row->{end};
     my $coverage         = $row->{coverage};
-
+    my $name             = $row->{name};
     if (!defined($proteins{$prot_internal_id})) {
 
       my $protid = $self->get_protein_id($prot_internal_id);
@@ -297,13 +302,16 @@ sub fetch_by_logic_name {
 
     
 
-    my $feature = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature(-protein_id  => $proteins{$prot_internal_id},
-							    -start    => $start,
-							    -end      => $end,
-							    -chr_name => $chr_name,
-							    -cdna_id  => $cdnas{$prot_internal_id},
-							    -coverage => $coverage,
-							    );
+    my $feature = 
+      Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature->new
+	(-protein_id  => $proteins{$prot_internal_id},
+	 -start    => $start,
+	 -end      => $end,
+	 -chr_name => $chr_name,
+	 -cdna_id  => $cdnas{$prot_internal_id},
+	 -coverage => $coverage,
+	 -name => $name,
+	);
 
     push(@pmatch,$feature);
 

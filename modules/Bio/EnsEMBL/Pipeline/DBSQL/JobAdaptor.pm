@@ -78,7 +78,7 @@ sub fetch_by_dbID{
 }
 
 
-=head2 fetch_by_dbID_list
+=head2 fetch_all_by_dbID_list
 
   Arg [1]   : listref of ints $dbIDs
   Function  : Retrieves a list of jobs from the database
@@ -163,7 +163,10 @@ sub fetch_all_by_job_name {
 sub fetch_all_by_status{
   my ($self, $status) = @_;
   my @jobs;
-  my $q = qq {
+  #print STDERR "fetching all by status ".$status."\n";
+  my @times = times;
+  #print STDERR "!, @times\n";
+  my $q =  qq {
   SELECT j.job_id,
          j.taskname,
          j.input_id,
@@ -179,13 +182,17 @@ sub fetch_all_by_status{
              UNIX_TIMESTAMP(js.time), ':', js.status)) AS max_status
   FROM   job_status js,
          job j
-  WHERE  js.job_id = j.job_id
-  AND    js.status = ?  
-  GROUP BY js.job_id };
+  WHERE  js.job_id = j.job_id 
+  GROUP BY js.job_id 
+  HAVING max_status like '%$status%'};
 
   my $sth = $self->prepare( $q );
-  $sth->execute($status);
-
+  my $p = $q;
+  $p =~ s/\?/$status/;
+  #print $p."\n";
+  $sth->execute();
+  @times = times;
+  #print STDERR "2, @times\n";
   my ($job_id, $taskname, $input_id, $submission_id, $job_name, 
       $array_index, $parameters, $module, $stderr_file, $stdout_file,
       $retry_count, $max_status);
@@ -213,9 +220,11 @@ sub fetch_all_by_status{
   }
 
   $sth->finish();
-
+  @times = times;
+  #print STDERR "3, @times\n\n";
   return \@jobs;
 }
+
 
 #
 # private method, just returns the columns in the job table
