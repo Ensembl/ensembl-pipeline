@@ -1896,32 +1896,52 @@ sub get_all_Features {
     my ($self) = @_;
 
     if (!defined($self->{_all_Features})) {
-#	my @gw =	 $self->contig->get_Genes_by_Type('genewise');
+	my @gw =	 $self->contig->get_Genes_by_Type('genewise',0);
 	
-	#print STDERR "GENEWISES @gw\n";
+	print STDERR "GENEWISES @gw\n";
         my @tmp;
-	
-	#foreach my $gene (@gw) {
-	#    foreach my $tran ($gene->each_Transcript) {
-	#	my $genewise = new Bio::EnsEMBL::SeqFeature;
-	#	push(@tmp,$genewise);
-		
-	#	foreach my $exon ($tran->each_Exon) {
-	#	    my $gwexon = new Bio::EnsEMBL::SeqFeature;
-	#	    $gwexon->start($exon->start);
-	#	    $gwexon->end  ($exon->end);
-	#	    $gwexon->contig_id($exon->contig_id);
-	#	    $gwexon->strand($exon->strand);
-	#	    $gwexon->id($exon->id);
-	#	    $gwexon->primary_tag('similarity');
-	#	    $gwexon->source_tag('genewise');
-	#	    $gwexon->score($exon->score);
-	#	    $genewise->add_subSeqFeature($gwexon,'EXPAND');
+    my $analysis    = new Bio::EnsEMBL::Analysis(
+	-program		=> 'genewise',
+	-program_version => 1,
+	-gff_source	=> 'genewise',
+	-gff_feature	=> 'similarity',
+	);
 
-	#	}
-	#    }
 	
-#	}
+	foreach my $gene (@gw) {
+	    my $split = 0;
+	    foreach my $tran ($gene->each_Transcript) {
+		my $genewise = new Bio::EnsEMBL::SeqFeature;
+                $genewise->source_tag('genewise');
+                $genewise->score(100);
+                $genewise->analysis($analysis);
+
+		
+		foreach my $exon ($tran->each_Exon) {
+		    print STDERR "Comparing seqnames " . $exon->seqname . "\t" . $self->contig->id . "\n";
+		    if ($exon->seqname ne $self->contig->id) {
+			$split = 1;
+		    }
+
+		    my $gwexon = new Bio::EnsEMBL::SeqFeature;
+		    $gwexon->start($exon->start);
+		    $gwexon->end  ($exon->end);
+		    $gwexon->seqname($self->contig->id);
+		    $gwexon->strand($exon->strand);
+		    $gwexon->id($exon->id);
+		    $gwexon->primary_tag('similarity');
+		    $gwexon->source_tag('genewise');
+		    $gwexon->score(100);
+                    $gwexon->analysis($analysis);
+		    $genewise->add_sub_SeqFeature($gwexon,'EXPAND');
+
+		}
+	    
+		if ($split == 0)  {
+		    push(@tmp,$genewise);
+		}
+	    }
+	}
 
 
         if ($self->genewise_only != 1) {
@@ -1940,8 +1960,8 @@ sub get_all_Features {
 	    }
 	}
 		
-	my @gw = $self->readGFF($min,$max);
-	push(@tmp,@gw);
+	#my @gw = $self->readGFF($min,$max);
+	#push(@tmp,@gw);
 
 	print STDERR "Got features " . @tmp . "\n";
 	$self->{_all_Features} = [];
