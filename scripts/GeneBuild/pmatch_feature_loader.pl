@@ -82,7 +82,7 @@ if($create) {
   &create_tables ;
 }
 
-#&process_cdnas;
+&process_cdnas;
 &process_proteins;
 
 # SUBROUTINES #
