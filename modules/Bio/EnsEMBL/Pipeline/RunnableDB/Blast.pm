@@ -53,6 +53,11 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 
 use vars qw(@ISA);
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+    require "Bio/EnsEMBL/Pipeline/Blast_conf.pl";
+}
+
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
@@ -120,11 +125,21 @@ sub runnable {
     my ($self) = @_;
     
     if (!defined($self->{'_runnable'})) {
+      my $ungapped;
+      if($::pipeConf{'ungapped'}){
+	$ungapped = 1;
+      }else{
+	$ungapped = undef;
+      }
+      print STDERR "ungapped = ".$ungapped."\n";
       my $run = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(-query     => $self->genseq,
 							     -database  => $self->analysis->db,
 							     -program   => $self->analysis->program,
+							     -options => $self->analysis->parameters,
 							     -threshold_type => 'PVALUE',
-							     -threshold => 1);
+							     -threshold => 1,
+							     -ungapped => $ungapped,
+							    );
 
       $self->{'_runnable'} = $run;
     }

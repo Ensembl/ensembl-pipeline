@@ -108,10 +108,11 @@ sub fetch_input {
 
     my $contigid  = $self->input_id;
     #print "contig id = ".$contigid."\n";
-    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $contig    = $self->dbobj->get_RawContigAdaptor->fetch_by_name($self->input_id);
     #print "contig id = ".$contig->id."\n";
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     #print "geneseq ".$genseq." \n geneseq\n";
+    $self->{'contig'} = $contig;
     $self->genseq($genseq);
 
 }
@@ -202,6 +203,7 @@ sub write_output {
 
      $ptrans->analysis( $self->analysis() );
      for my $exon ( @exons ) {
+       print STDERR "adding contig ".$self->{'contig'}." to exon\n";
        $exon->contig( $self->{'contig'} );
        $ptrans->add_Exon( $exon );
      }
