@@ -40,7 +40,8 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_GENEBUILDER_CHUNKSIZE
 					EST_FILE
 					EST_RUNNER
-				       );
+                                        EST_GENE_RUNNER
+					);
 
 my %chrhash;
 
@@ -142,6 +143,7 @@ sub get_chrlengths{
   
   while( my ($chr, $length) = $sth->fetchrow_array) {
     $chrhash{$chr} = $length;
+    print STDERR "$chr -> $length\n";
   }
   
 }
@@ -264,7 +266,7 @@ sub make_EST_GeneBuilder_bsubs{
   # genomic size for each job
   my $size   = $EST_GENEBUILDER_CHUNKSIZE;
   
-  my $runner = $EST_RUNNER;
+  my $runner = $EST_GENE_RUNNER;
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
