@@ -57,6 +57,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::ORF;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam;
+use Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm;
 
 # Object preamble - inherits from Bio::Root::RootI
 
@@ -132,6 +133,8 @@ sub fetch_input{
    push(@{$self->{'_blast'}},$rc->get_all_SimilarityFeatures);
    push(@{$self->{'_repeat'}},$rc->get_all_RepeatFeatures);
 
+
+
    return;
 
 }
@@ -172,8 +175,6 @@ sub run{
        substr($str,$rep->start,$rep->length) = '1' x $rep->length;
    }
 
-  #print STDERR "$str\n";
-
    # now loop over ORF hits - if any '1s' in the string, bug out
 
    my @finalorf;
@@ -198,8 +199,11 @@ sub run{
 
        print STDERR $orf->{'_peptide'}."\n";
        
-       my $seganalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_dbID(24);
+       my $seganalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_newest_logic_name('Seg');
 
+       print STDERR "TEMPSEQ: $seganalysis\n";
+
+       
        my $seg = Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new(-clone => $tempseq, -analysis => $seganalysis);
        
        print STDERR "Runing Seg\n";
@@ -208,6 +212,8 @@ sub run{
        
        my @out = $seg->output;
        
+       my $count;
+
        foreach my $o(@out) {
 	   
 	   my $low_length = $o->end - $o->start + 1;
@@ -220,58 +226,53 @@ sub run{
        my $tempseq2 = Bio::PrimarySeq->new( -id => $self->input_id."seg".$count , -seq => $orf->{'_peptide'});
        
        
-       my $hmmanalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_dbID(48);
+       my $hmmanalysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_newest_logic_name("Pfam");
        
        my $pfam = Bio::EnsEMBL::Pipeline::Runnable::Protein::Hmmpfam->new(-clone => $tempseq2, -analysis=> $hmmanalysis);
        
        $pfam->run;
        
        foreach my $domain ( $pfam->output ) {
-	   print STDERR "GOT HMM\n";
+	   
 	   if($domain->feature1->score > 25) {
 	       
 	       #Get the the genomic sequence corresponding to the orf + dowstream and upstream region (length to be defined)
-	       my $subseq_start = $orf->start - 100;
-	       if ($subseq_start < 1) {
-		   $subseq_start = 1;
-	       }
+	       #my $subseq_start = $orf->start - 100;
+	       #if ($subseq_start < 1) {
+	#	   $subseq_start = 1;
+	       #}
 	       
-	       my $subseq_end  = $orf->end + 100;
-	       if ($subseq_end > $self->seq->length) {
-		   $subseq_end = $self->seq->length;
-	       }
+	       #my $subseq_end  = $orf->end + 100;
+	       #if ($subseq_end > $self->seq->length) {
+		#   $subseq_end = $self->seq->length;
+	       #}
 	       
-	       my $subseq = $self->seq->subseq($subseq_start,$subseq_end);
-
-	       print STDERR "GOT BIT>25\n";
+	       #my $subseq = $self->seq->subseq($subseq_start,$subseq_end);
 	       #$hmmhash{$domain->hmmname} = 1;
 	       
 	       #Push each genomic sequence corresponding to a given Hmm
-	       push (@{$hmmhash{$domain->hmmname}},$subseq);
+	       #push (@{$hmmhash{$domain->feature2->seqname}},$subseq);
+	       
+	       my $hmmnames = $domain->feature2->seqname;
+
+	       my $hmmtemp = "/tmp/hmmtemp".$$;
+	       my $hmmfile = $hmmanalysis->db_file();
+	       system("hmmfetch $hmmfile $hmmnames > $hmmtemp ");
+
+	       my $gw = Bio::EnsEMBL::Pipeline::Runnable::GenewiseHmm->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
+	       $gw->run;
+
+	       #my @f = $gw->output;
+
+	       #foreach my $f (@f) {
+		#   print STDERR ("Aligned output is \t" . $f->start . "\t" . $f->end . "\t" . $f->score . "\n");
+		 #  print $f;
+	       #}
+	      
 	   }
        }
    }
-
-   foreach my $hmmnames ( keys %hmmhash ) {
-       my $hmmtemp = "/tmp/hmmtemp".$$;
-       system("hmmfetch $hmmnames PfamFrag > $hmmtemp ");
-       
-#Get all of the seqs corresponding for the given HMM
-       my @seqs = @{$hmmhash{$hmmnames}};
-       
-       foreach my $s(@seqs) {
-#NB: -hmmfile hasn't been implemented yet
-	   my $gw = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new( -hmmfile => $hmmtemp, -genomic => $s);
-	   $gw->run;
-	   
-	   #    my $gw = Bio::EnsEMBL::Pipeline::Runnable::Genewise->new( -hmmfile => $hmmtemp, -genomic => $self->seq);
-   #    $gw->run;
-	   #    my @exons = $gw->each_Exon();
-       }
-   }
-       
    return;
-       
 }
 
 =head2 write_output
