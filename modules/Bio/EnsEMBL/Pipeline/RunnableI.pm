@@ -406,6 +406,7 @@ sub find_executable {
     if ($@) {
       $self->throw("Can't find executable [$name]");
     }
+    return $name;
   }
 }
 
