@@ -50,10 +50,10 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 my $dbtype = 'rdb';
 my $port   = undef;
-my $dbname = $EST_E2G_DBNAME;
-my $dbuser = $EST_E2G_DBUSER;
-my $dbpass = $EST_E2G_DBPASS;
-my $host   = $EST_E2G_DBHOST;
+my $dbname = $EST_DBNAME;
+my $dbuser = $EST_DBUSER;
+my $dbpass = $EST_DBPASS;
+my $host   = $EST_DBHOST;
 
 
 my $runnable;
