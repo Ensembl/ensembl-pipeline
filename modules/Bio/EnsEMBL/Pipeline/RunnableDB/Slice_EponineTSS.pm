@@ -3,7 +3,7 @@
 # Author Thomas Down <td2@sanger.ac.uk>
 #
 # Based on CPG.pm by Val Curwen
-# Modified by SCP to run on Slice's
+# Modified by SCP to run on Slices
 #
 # You may distribute this module under the same terms as perl itself
 #
@@ -60,35 +60,6 @@ use Bio::EnsEMBL::Pipeline::Runnable::EponineTSS;
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-=head2 new
-
- Title   : new
- Usage   : $self->new(-DBOBJ       => $db,
-                      -INPUT_ID    => $id,
-                      -ANALYSIS    => $analysis
-	   );
-                           
- Function: creates a Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS object
- Returns : Bio::EnsEMBL::Pipeline::RunnableDB::Slice_EponineTSS
- Args    :      -db      :     A Bio::EnsEMBL::DBSQL::DBAdaptor, 
-                -input_id:  A virtual contig ('chr_name.start.end')
-                -analysis:  A Bio::EnsEMBL::Analysis
-
-=cut
-
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    $self->{'_fplist'}      = []; # ???   
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    
-    $self->throw("Analysis object required") unless ($self->analysis);
-    
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::EponineTSS');
-    return $self;
-}
 
 =head2 fetch_input
 
@@ -116,39 +87,20 @@ sub fetch_input {
 
     $self->throw("Unable to fetch virtual contig") unless $slice;
 
-    $self->slice($slice);
-    $self->genseq($slice);
-}
+    $self->query($slice);
 
-#get/set for runnable and args
-sub runnable {
-    my ($self, $runnable) = @_;
+    my %parameters = $self->parameter_hash;
 
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my ($parameter_string) = $self->parameters() ;
-        my %parameters;
-        if ($parameter_string)
-        {
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $parameters{$key} = $value;
-            }
-        }
-        $parameters{'-java'} = $self->analysis->program_file;
-        #creates empty Bio::EnsEMBL::Runnable::EponineTSS object
-        $self->{'_runnable'} = $runnable->new(
-	      '-threshold' => $parameters{'-threshold'},
-	      '-epojar'    => $parameters{'-epojar'},
-	      '-java'      => $parameters{'-java'}
-	);
-    }
-    return $self->{'_runnable'};
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::EponineTSS(
+              -query     => $self->query,
+              -java      => $self->analysis->program_file,
+	      -threshold => $parameters{'-threshold'},
+	      -epojar    => $parameters{'-epojar'},
+    );
+
+    $self->runnable($runnable);
+
+    return 1;
 }
 
 
@@ -159,7 +111,7 @@ sub write_output {
     my $db  = $self->db;
     my $sfa = $db->get_SimpleFeatureAdaptor;
 
-    my $slice = $self->slice;
+    my $slice = $self->query;
     my @mapped_features;
 
     foreach my $f ($self->output) {
