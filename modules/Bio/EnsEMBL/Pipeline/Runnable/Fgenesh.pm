@@ -390,11 +390,11 @@ sub each_Transcript {
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+    my ($self) = @_;
     #check query
     my $seq = $self->query() || $self->throw("Seq required for Fgenesh\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
     #print STDERR "have checked directory writing file next\n";

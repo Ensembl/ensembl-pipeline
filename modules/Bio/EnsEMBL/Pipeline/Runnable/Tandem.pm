@@ -233,11 +233,11 @@ sub arguments {
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+    my ($self) = @_;
     #check seq
     my $seq = $self->query() || $self->throw("Seq required for Tandem\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
     $self->writefile(); 

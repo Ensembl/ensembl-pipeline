@@ -193,11 +193,11 @@ sub new {
 =cut
 
 sub run {
-    my ($self, $dir) = @_;
+    my ($self) = @_;
 
     my $seq = $self->query || $self->throw("Query seq required for Blast\n");
 
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless ($self->workdir);
     $self->checkdir();
     #print STDERR "checked directories\n";
     #write sequence to file

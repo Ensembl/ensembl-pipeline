@@ -386,10 +386,10 @@ sub errorfile {
 
 sub run {
 
-    my ($self, $dir) = @_;
+    my ($self) = @_;
     
 
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
 
     #print STDERR "write sequence to file\n";

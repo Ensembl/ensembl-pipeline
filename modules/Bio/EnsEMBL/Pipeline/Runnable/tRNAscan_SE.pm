@@ -151,12 +151,12 @@ sub tRNAscan_SE {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
+    my ($self) = @_;
     #set arguments for tRNAscan_SE
     #check seq
     my $seq = $self->query() || $self->throw("Seq required for tRNAscan_SE\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
 
     # reset filename and results as necessary

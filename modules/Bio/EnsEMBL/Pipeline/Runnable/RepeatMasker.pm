@@ -231,13 +231,11 @@ sub arguments {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
-    #set arguments for repeatmasker
-    $self->arguments($args) if ($args);
+    my ($self) = @_;
     #check seq
     my $seq = $self->query() || $self->throw("Seq required for RepeatMasker\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
     #write sequence to file
     $self->writefile();        

@@ -240,12 +240,12 @@ sub threshold {
 =cut
 
 sub run {
-    my ($self, $dir, $args) = @_;
+    my ($self) = @_;
     #set arguments for epo
     #check query
     my $seq = $self->query() || $self->throw("Seq required for EponineTSS\n");
     #set directory if provided
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/tmp') unless $self->workdir();
     $self->checkdir();
 
     # reset filename and results as necessary
