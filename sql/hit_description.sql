@@ -8,12 +8,14 @@
 #
 
 CREATE TABLE hit_description (
-  hit_name varchar(20) DEFAULT '' NOT NULL,
+  hit_name varchar(40) DEFAULT '' NOT NULL,
   hit_length int(10) unsigned,
   hit_description text,
   hit_taxon int(10) unsigned,
-  hit_db enum('EMBL','Swissprot','TrEMBL') DEFAULT 'EMBL' NOT NULL,
+  hit_db enum('EMBL','Swissprot','TrEMBL','Pfam') DEFAULT 'EMBL' NOT NULL,
   PRIMARY KEY (hit_name),
   KEY hit_db (hit_db)
 );
 
+# To change from previous version [patch] does not affect column values.
+#ALTER TABLE hit_description MODIFY hit_db ENUM('EMBL','Swissprot','TrEMBL','Pfam') DEFAULT 'EMBL' NOT NULL;
