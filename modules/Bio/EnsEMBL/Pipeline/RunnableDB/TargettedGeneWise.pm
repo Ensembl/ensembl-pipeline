@@ -60,9 +60,6 @@ sub new {
   my ($class,@args) = @_;
   my $self = bless {}, $class;
 
-#    my ($self,@args) = @_;
-#    my $make = $self->SUPER::_initialize(@_);    
-           
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
     my( $dbobj, $input_id ) = $self->_rearrange(['DBOBJ',
@@ -77,7 +74,7 @@ sub new {
     $dbobj->static_golden_path_type('UCSC');
   
     $self->throw("No input id input") unless defined($input_id);
-    $self->throw("$input_id is not an array ref") unless ref($input_id) eq "ARRAY";
+#    $self->throw("$input_id is not an array ref") unless ref($input_id) eq "ARRAY";
     $self->input_id($input_id);
     
     return $self; # success - we hope!
@@ -100,7 +97,19 @@ sub new {
 sub fetch_input{
   my ($self,@args) = @_;
 
-  my $input = $self->input_id;
+  my $input_id = $self->input_id;
+  my $input;
+
+  # is it an array ref or just a string?
+  if (ref($input_id) eq "ARRAY") {
+    $input = $input_id;
+  }
+  else {
+    my @tmp;
+    push (@tmp,$input_id);
+    $input = \@tmp;
+  }
+
   my @fps;
   my $fpc;
   my $pid; 
@@ -148,15 +157,15 @@ sub fetch_input{
 
   print STDERR "$fpc $start $end\n";
 
-  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-500,$end+500);
-  # I *think* the chr start and end will be handled by sgpa->fetch_rawcontigs_by_chr_start_end
-  # can make sure $start > 0, but what to compare $end with?
-  #  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-250000,$end+250000);
+
+# 500bp flanking seems awfully short. Trouble is, upping it to, say, 250000 creates problems
+# with "extra" blast hits. These should be got by similarity genewises later on?
+#  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-500,$end+500);
+  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
   print STDERR "$chrname $chrstart $chrend\n";
   my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
   
   $self->vc($vc);
-  
   my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( -genomic => $vc->primary_seq,
 								    -ids => \@fps);
   
@@ -252,7 +261,7 @@ sub write_output {
     }
   }
   
-  #$self->throw("exiting before real write");
+#  $self->throw("exiting before real write");
   
   eval {
     foreach my $gene (@newgenes) {	    

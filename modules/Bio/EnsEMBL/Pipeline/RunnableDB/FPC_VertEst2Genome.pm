@@ -54,8 +54,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Gene;
-use Bio::SeqIO;
-
+use Bio::EnsEMBL::Pipeline::SeqFetcher;
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
 sub new {
@@ -85,6 +84,9 @@ sub new {
 =cut
 
 sub write_output {
+
+# alter this so it writes features, not genes!
+
 
   my($self) = @_;
   
@@ -310,6 +312,9 @@ sub _convert_output {
     }
     
     push(@{$self->{_output}},@remapped);
+
+    # somewhere in here, convert exons back to genomic coordinates so can write out as features
+
   }
 }
 
@@ -448,7 +453,7 @@ sub _process_features {
   
   foreach my $f (@features) {
     if (defined($f->analysis)      && defined($f->score) && 
-	defined($f->analysis->db)  && $f->analysis->db eq "vert") {
+	defined($f->analysis->db)  && $f->analysis->db eq "riken_prot") {
       
       if (!defined($idhash{$f->hseqname})) { 
 	push(@mrnafeatures,$f);
@@ -546,7 +551,8 @@ sub get_Sequences {
   
   foreach my $pair (@pairs) {
     my $id = $pair->hseqname;
-    if ($pair->analysis->db eq "vert") {
+#    if ($pair->analysis->db eq "vert") {
+    if ($pair->analysis->db eq "riken_prot") {
       
       eval {
 	my $seq = $self->get_Sequence($id);
@@ -560,36 +566,6 @@ sub get_Sequences {
   return @seq;
 }
 
-=head2 parse_Header
-
-    Title   : parse_Header
-    Usage   : my $newid = $self->parse_Header($id);
-    Function: Parses different sequence headers
-    Returns : string
-    Args    : ID string
-
-=cut
-
-sub parse_Header {
-  my ($self,$id) = @_;
-  
-  if (!defined($id)) {
-    $self->throw("No id input to parse_Header");
-  }
-  
-  my $newid = $id;
-  
-  if ($id =~ /^(.*)\|(.*)\|(.*)/) {
-    $newid = $2;
-    $newid =~ s/(.*)\..*/$1/;
-	
-  } elsif ($id =~ /^..\:(.*)/) {
-    $newid = $1;
-  }
-  $newid =~ s/ //g;
-  return $newid;
-}
-    
 =head2 get_Sequence
 
   Title   : get_Sequence
@@ -603,60 +579,24 @@ sub parse_Header {
 
 sub get_Sequence {
   my ($self,$id) = @_;
+  $self->throw("No id supplied to get_Sequence") unless defined $id;
+
   if (defined($self->{_seq_cache}{$id})) {
     return $self->{_seq_cache}{$id};
   } 
-  
-  my $newid = $self->parse_Header($id);
-  
-  return unless defined($newid);
+
+  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+  my $seq;
 
   # seq fetching choices: efetch, then getz
-  my $format = "";
-  my $seq = "";
- FETCH: while ($format eq ""){
-    $seq = "";
-    open(IN,"efetch $newid |") or $self->throw("Can't pipe to efetch for id [$newid]");
-    
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /Can/ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
-    # finally try getz
-    $seq = "";
-    open(IN,"getz -e '[libs=embl-ID:$newid]' |") 
-      or $self->throw("Can't pipe to getz for id [$newid]");
-    
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /getz: No match./ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
-    #   # if get here, there's a big problem
-    $self->throw("Couldn't find sequence for $newid [$id]");
-    
+  $seq = $seqfetcher->run_efetch($id);
+  if(!defined $seq){
+    $seq = $seqfetcher->run_getz($id,'embl emblnew');
   }
-  
-  # hopefully we now have a sequence string
-  $self->throw("Couldn't find sequence for $newid [$id]") unless defined ($seq);
-  my $seqfile = $self->get_tmp_file('/tmp/','getseq','seq');
-  
-  open (OUT, ">$seqfile") or $self->throw("Can't write to $seqfile");
-  print OUT $seq;
-  close (OUT) or $self->throw("Can't close $seqfile");
-  
-  my $seqin = Bio::SeqIO->new('-format' => $format,
-			      -file   => "$seqfile");
-  $seq = $seqin->next_seq();
-  
-  unlink $seqfile;
+
+  if(!defined $seq){
+    $self->throw("Problem fetching sequence for [$id]");
+  }
   
   $self->{_seq_cache}{$id} = $seq;
   

@@ -51,10 +51,10 @@ use strict;
 # Object preamble - inherits from Bio::Root::Object;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
+use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Analysis::MSPcrunch;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Gene;
-#use Bio::EnsEMBL::FeaturePair;
 use Bio::SeqIO;
 use Bio::Tools::Blast;
 
@@ -702,36 +702,6 @@ sub get_Sequences {
   return @seq;
 }
 
-=head2 parse_Header
-
-    Title   : parse_Header
-    Usage   : my $newid = $self->parse_Header($id);
-    Function: Parses different sequence headers
-    Returns : string
-    Args    : ID string
-
-=cut
-
-sub parse_Header {
-    my ($self,$id) = @_;
-
-    if (!defined($id)) {
-	$self->throw("No id input to parse_Header");
-    }
-
-    my $newid = $id;
-
-    if ($id =~ /^(.*)\|(.*)\|(.*)/) {
-	$newid = $2;
-	$newid =~ s/(.*)\..*/$1/;
-	
-    } elsif ($id =~ /^..\:(.*)/) {
-	$newid = $1;
-    }
-    $newid =~ s/ //g;
-    return $newid;
-}
-    
 =head2 get_Sequence
 
   Title   : get_Sequence
@@ -750,59 +720,17 @@ sub get_Sequence {
     return $self->{_seq_cache}{$id};
   } 
   
-  my $newid = $self->parse_Header($id);
+  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+  my $seq = $seqfetcher->run_efetch($id);
   
-  return unless defined($newid);
-  print(STDERR "New pog id :  is $newid [$id]\n");
-  
-  my $format = "";
-  my $seq = "";
- FETCH: while ($format eq ""){
-    $seq = "";
-    print STDERR "Trying efetch\n";
-    open(IN,"efetch $newid |") or $self->throw("Can't pipe to efetch for id [$newid]");
-
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /Can/ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
-    # finally try getz
-    $seq = "";
-    print STDERR "Trying getz\n";
-    open(IN,"getz -e '[libs=embl-ID:$newid]' |") 
-      or $self->throw("Can't pipe to getz for id [$newid]");
-
-    while (<IN>) { $seq .= $_; }
-    
-    if (defined($seq) && $seq !~ /getz: No match./ && length($seq) > 0)
-      {
-	$format = "EMBL";
-	last FETCH;
-      }  
-    
- #   # if get here, there's a big problem
-    $self->throw("Couldn't find sequence for $newid [$id]");
-   
+  if(!defined $seq) {
+    $seq = $seqfetcher->run_getz($id, 'embl');
   }
   
-  # hopefully we now have a sequence string
-  $self->throw("Couldn't find sequence for $newid [$id]") unless defined ($seq);
-  my $seqfile = $self->get_tmp_file('/tmp/','getseq','seq');
+  if(!defined $seq) {
+    $self->throw("Couldn't find sequence for [$id]");
+  }
 
-  open (OUT, ">$seqfile") or $self->throw("Can't write to $seqfile");
-  print OUT $seq;
-  close (OUT) or $self->throw("Can't close $seqfile");
-
-  my $seqin = Bio::SeqIO->new('-format' => $format,
-			      -file   => "$seqfile");
-  $seq = $seqin->next_seq();
-  
-  unlink $seqfile;
-  
   print (STDERR "Found sequence for $newid [" . $seq->length() . "]\n");
   $self->{_seq_cache}{$id} = $seq;
   
