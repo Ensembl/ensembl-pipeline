@@ -41,7 +41,7 @@ my $filter;
 	    'genetype:s'   => \$genetype,
 	   );
 
-unless ( $dbname && $dbhost && $dnadbname && $dnadbhost ){
+unless ( $dbname && $dbhost ){
   print STDERR "script to check whether CDSs starts with ATG and end with stop (TAA|TGA|TAG)\n";
  
   print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost\n";
@@ -60,12 +60,17 @@ if ( $filter ){
   }
 }
 
-my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					       '-host'   => $dnadbhost,
-					       '-user'   => $dnadbuser,
-					       '-dbname' => $dnadbname,
-					       '-pass'   => $dnadbpass,
-					      );
+my $dnadb;
+if($dnadbhost && $dnadbuser){
+  $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+					      '-host'   => $dnadbhost,
+					      '-user'   => $dbuser,
+					      '-dbname' => $dnadbname,
+					      '-pass'   => $dbpass,
+					     );
+}
+
+
 
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -73,11 +78,12 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    '-dnadb'  => $dnadb,
 					   );
 
-
+$db->dnadb($dnadb) if($dnadb);
 print STDERR "connected to $dbname : $dbhost\n";
+print STDERR "dnadb not defined are you sure your database contains dna\n";
+
 
 
 my  @ids = @{$db->get_GeneAdaptor->list_geneIds};
@@ -182,6 +188,13 @@ print "stop codons correct : $stop_correct\n";
 print "both correct        : $both_correct\n";
 
 
+
+close (OUT);
+
+
+
+=======
+>>>>>>> 1.2
 sub get_evidence{
   my ($trans) = @_;
   my %evi;
