@@ -1,0 +1,74 @@
+#!/usr/local/bin/perl
+
+$| = 1;
+
+use strict;
+use Getopt::Long;
+
+my $outdir = "/work2/michele/out/genebuild/";
+my $script = "/work1/michele/trunk/ensembl-pipeline/scripts/test_RunnableDB";
+my $module = "Bio::EnsEMBL::Pipeline::RunnableDB::Clone_Gene_Builder";
+my $queue = "acari";
+
+my $infile;
+my $
+
+&GetOptions('infile=s'   => \$infile,
+	    'queue:s'    => \$queue,
+	    'outdir:s'   => \$outdir,
+	    'script:s'   => \$script,
+	    );
+
+if (!defined($infile)) {
+  die "No input file containing clone ids (-infile clonefile)";
+}
+
+if (! -d $outdir ) {
+  die "Output directory [$outdir] doesn't exist";
+}
+
+if ($script !~ /^\//) {
+  my $pwd = `pwd`;
+  chomp($pwd);
+  $script = $pwd . "/" . $script;
+}
+
+if (! -e $script )
+  die "Script [$script] doesn't exist";
+}
+
+my @clones = read_ids($infile);
+
+foreach my $clone (@clones) {
+      my $input_id = "ctg.$clone";
+
+      my $outfile  = $outdir . $input_id . ".out";
+      my $errfile  = $outdir . $input_id . ".err";
+
+
+      my $command  = "bsub -q $queue -o $outfile -e $errfile -E \"$script -check \"";
+      $command .= "  $script ";
+      $command .= " -runnable $module ";
+      $command .= " -input_id $input_id -write";
+
+      print "$command\n";
+
+      print(STDERR "Creating job for clone $clone\n");
+    }
+
+
+sub read_ids {
+  my ($infile) = @_;
+
+  my @ids;
+
+  if (defined($infile)) {
+    open(IN,"<$infile");
+    while (<IN>) {
+      chomp;
+      push(@ids,$_);
+    }
+  }
+
+  return @ids;
+}
