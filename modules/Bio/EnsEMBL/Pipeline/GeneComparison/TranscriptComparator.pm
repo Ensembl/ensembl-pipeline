@@ -520,9 +520,9 @@ sub _compare_Transcripts {
 
 sub _test_for_merge{
   my ($self,$tran1,$tran2) = @_;
-
+  
   my $verbose   = $self->verbose;
-
+  
   if ($verbose){
       my $id1 = $tran1->dbID || "no-id";
       my $id2 = $tran2->dbID || "no-id";
