@@ -1009,7 +1009,7 @@ sub _lock_Phases{
   
   # keep the original est_tran translation
   my $original_translation = $est_tran->translation;
-  my $original_transcript  = $self->_clone_Transcript($est_tran);
+  my $original_transcript  = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($est_tran);
 
   # we go first for the easy-peasy case: when the est gene
   # overlaps the start exon and end exon of the ensembl translation
@@ -2120,7 +2120,7 @@ sub _add_5prime_exons{
       # add the extra exons
       my $count = 0;
       while ( $count < $est_exon_position ){
-	my $new_exon = $self->_clone_Exon( $est_exons[ $count ] );
+	my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $est_exons[ $count ] );
 	$new_exon->phase(-1);
 	$new_exon->end_phase(-1);
 	$ens_tran->add_Exon($new_exon);
@@ -2174,7 +2174,7 @@ sub _add_3prime_exons{
       # add the extra exons
       my $count = $#est_exons;
       while ( $count > $est_exon_position ){
-	my $new_exon = $self->_clone_Exon( $est_exons[ $count ] );
+	my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon( $est_exons[ $count ] );
 	$new_exon->phase(-1);
 	$new_exon->end_phase(-1);
 	$ens_tran->add_Exon($new_exon);
