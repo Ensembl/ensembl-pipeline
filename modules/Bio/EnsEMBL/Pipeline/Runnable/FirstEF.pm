@@ -59,8 +59,11 @@ sub new {
 					WORK_DIR)],
 				     @args);
 
+  $firstef_bin = 'firstef' unless ($firstef_bin);
+
+  $self->_firstef_bin($self->find_executable($firstef_bin));
+print STDERR "Executable was found at : " . $self->_firstef_bin . "\n";
   $self->_query_seq($query_seq)       if $query_seq;
-  $self->_firstef_bin($firstef_bin)   if $firstef_bin;
   $self->_param_dir($param_dir)       if $param_dir;
   $self->_parse_script($parse_script) if $parse_script;
   $self->workdir($workdir)            if $workdir;
@@ -133,10 +136,8 @@ sub _write_seqs_for_firstef {
      # NOTE, this little backwater is where the repeatmasked 
      # sequence is plonked in, or not.
   if ($self->_repeatmask) {
-print "USING REPEATMASKED SEQUENCE\n";
     $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
   } else {
-print "NOT USING REPEATMASKED SEQUENCE\n";
     $seqio_out->write_seq($self->_query_seq)
   }
 
@@ -228,7 +229,7 @@ sub _firstef_bin {
 		 $self->{_firstef_bin} . "]")
       unless (-x $self->{_firstef_bin});
   }
-print "Executable : " . $self->{_firstef_bin} . "\n";
+
   $self->throw("FirstEF executable has not been set.") 
     unless defined($self->{_firstef_bin});
 
@@ -351,7 +352,7 @@ sub run_firstef {
   my $command = $self->_firstef_bin . ' 1500 ' . $self->_listfile . ' ' . 
     $self->_param_dir . ' 0 0.4 0.4 0.5';
 
-  print $command . "\n";
+  print STDERR $command . "\n";
 
   $self->throw("A fatal error was encountered while running firstef.") 
     if system($command);
