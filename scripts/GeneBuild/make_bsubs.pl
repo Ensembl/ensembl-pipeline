@@ -47,12 +47,18 @@ my %chrhash;
 
 &get_chrlengths;
 
-foreach my $lr(@{$GB_LENGTH_RUNNABLES}) {
-  make_lbsubs($lr) unless $lr eq '';
+### read runnable and analysis logic names ###
+
+foreach my $length_runnable_list (@{$GB_LENGTH_RUNNABLES}) {
+  my $analysis = $length_runnable_list->{analysis};
+  my $runnable = $length_runnable_list->{runnable};
+  make_lbsubs($runnable, $analysis) unless $runnable eq '';
 }
 
-foreach my $tr(@{$GB_TARGETTED_RUNNABLES}) {
-  make_tbsubs($tr) unless $tr eq '';
+foreach my $other_runnable_list (@{$GB_TARGETTED_RUNNABLES}) {
+  my $analysis = $other_runnable_list->{analysis};
+  my $runnable = $other_runnable_list->{runnable};
+  make_tbsubs($runnable, $analysis) unless $runnable eq '';
 }
 
 make_genecombiner_bsubs( $RUNNABLE ) if ($RUNNABLE);
@@ -84,7 +90,7 @@ sub get_chrlengths{
 }
 
 sub make_tbsubs {
-  my ($runnable) = @_;
+  my ($runnable,$analysis_logic_name) = @_;
   
   my $runner      = $GB_RUNNER;
   my $dbname      = $GB_DBNAME;
@@ -146,7 +152,7 @@ sub make_tbsubs {
 
     my $outfile  = $resdir . "/$input_id.out";
     my $errfile  = $resdir . "/$input_id.err";
-    my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable\"";
+    my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name\"";
 
     $command .= "  $runner ";
     $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
@@ -162,7 +168,7 @@ sub make_tbsubs {
 
 
 sub make_lbsubs {
-  my ($runnable) = @_;
+  my ($runnable,$analysis_logic_name) = @_;
   
   my $runner      = $GB_RUNNER;
   my $dbname      = $GB_DBNAME;
@@ -216,7 +222,7 @@ sub make_lbsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable \"";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable  Bio::EnsEMBL::Pipeline::RunnableDB::$runnable -analysis $analysis_logic_name\"";
       $command .= "  $runner ";
       $command .= " -runnable Bio::EnsEMBL::Pipeline::RunnableDB::$runnable ";
       $command .= " -input_id $input_id ";
