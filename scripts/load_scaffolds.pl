@@ -78,7 +78,6 @@ my $seqio = new Bio::SeqIO(-format=>'Fasta',
 my $count = 0;
 while ( my $seq = $seqio->next_seq ) {
     my $cloneid= $seq->id;
-    $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
     my $clone     = new Bio::EnsEMBL::Clone;
     my $contig    = new Bio::EnsEMBL::RawContig;
     $clone->htg_phase(-1);
@@ -93,6 +92,7 @@ while ( my $seq = $seqio->next_seq ) {
     my $bp = $seq->length;   #
     $contig->length($bp);  
     my $contigid = $cloneid.".1.".$bp;
+    $verbose && print STDERR ("Parsed contig $contigid : contig length ".$seq->length."\n");
     $contig->name($contigid);
     $contig->embl_offset(1);
     $clone->add_Contig($contig);
