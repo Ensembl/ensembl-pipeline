@@ -57,6 +57,7 @@ print "ok 4\n"; # 4th test passed
 
 #get and store the output
 my @results = $blast->output();
+display (@results);
 
 unless (@results) 
 { print "not ok 5\n"; }
@@ -66,12 +67,19 @@ else
 my @methods = qw( seqname start end strand hseqname hstart hend hstrand
                   percent_id p_value hpercent_id hp_value score hscore);
 #Display output
-foreach my $obj (@results)
-{
-    print "\n";
-    foreach my $method_name (@methods) {
-        my $value = $obj->$method_name();
-        printf ("%10s = $value\n", $method_name);
+sub display {
+    my @results = @_;
+    #Display output
+    foreach my $obj (@results)
+    {
+       print STDERR ($obj->gffstring."\n");
+       if ($obj->sub_SeqFeature)
+       {
+            foreach my $exon ($obj->sub_SeqFeature)
+            {
+                print STDERR "Sub: ".$exon->gffstring."\n";
+            }
+       }
     }
 }
 
