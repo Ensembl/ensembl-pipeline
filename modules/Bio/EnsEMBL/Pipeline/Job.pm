@@ -38,9 +38,6 @@ package Bio::EnsEMBL::Pipeline::Job;
 
 use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
-
-# Object preamble - inherits from Bio::Root::Object;
-
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
 
@@ -265,7 +262,6 @@ sub flush_runs {
     $self->throw( "Cannot run remote without db connection" );
   }
 
-  local *SUB;
   local *FILE;
 
   my $db       = $adaptor->db;
@@ -643,7 +639,7 @@ sub get_last_status {
 }
 
 
-=head 2 make_filenames
+=head2 make_filenames
 
 =cut
 
