@@ -1192,6 +1192,9 @@ sub _check_Translation{
 sub linked_predictions {
   my ($self,@linked_predictions) = @_;
 
+  if(!$self->{_linked_predictions}){
+    $self->{_linked_predictions} = [];
+  }
   if ( @linked_predictions ) {
      push(@{$self->{_linked_predictions}},@linked_predictions);
   }
