@@ -41,6 +41,7 @@ use strict;
 use DBI;
 
 use Bio::EnsEMBL::DBSQL::Obj;
+use Bio::EnsEMBL::Pipeline::DB::ObjI;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
@@ -52,7 +53,7 @@ use Bio::Root::Object;
 
 # Inherits from the base bioperl object
 
-@ISA = qw(Bio::EnsEMBL::DBSQL::Obj Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::ObjI Bio::EnsEMBL::DBSQL::Obj);
 
 sub _initialize {
     my ($self,@args) = @_;
