@@ -312,8 +312,7 @@ sub parse_results {
   my $filehandle = \*BL2SEQ;
 
   my $bl2seq_parsing = Bl2seq::Parser->new(-fh => $filehandle,
-					   -alntype => 'blastp',
-#					   -alntype => $self->alntype,
+					   -alntype => 'blastn',
 					   -min_score => $self->min_score);
 
   while (my @blocks = $bl2seq_parsing->nextBlocks) {
