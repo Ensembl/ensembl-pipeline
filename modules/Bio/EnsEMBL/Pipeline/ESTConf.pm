@@ -58,37 +58,38 @@ use vars qw( %ESTConf );
 	    # path to run_ESTRunnableDB
 	    
 	    # for C.Briggsae:
-	    #EST_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
+	    EST_INPUTID_REGEX => '(^\S+\.\S+)\.(\d+)-(\d+)',
 	    
 	    # for human
-	    EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
-	    EST_RUNNER        => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_EST_RunnableDB', 	   
+	    #EST_INPUTID_REGEX => '(\S+)\.(\d+)-(\d+)',
+	    EST_RUNNER        => '/ecs2/work1/lec/code/main_trunk/ensembl-pipeline/scripts/run_EST_RunnableDB', 	   
  
 	    
 	    # path to run_EST_GeneBuilder.pl, script that launches EST_GeneBuilder.pm
 	    # we use a different on from EST_RUNNER to use different EST_DB's
-	    EST_GENE_RUNNER   => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
+	    EST_GENE_RUNNER   => '/ecs2/work1/lec/code/main_trunk/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
 	    
 	    # path to ensembl-pipeline/scripts/EST
-	    EST_SCRIPTDIR     => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/EST/',
+	    EST_SCRIPTDIR     => '/ecs2/work1/lec/code/main_trunk/ensembl-pipeline/scripts/EST/',
 	    
 	    # where the result-directories are going to go	
     
 	    #EST_TMPDIR                  => '/ecs2/scratch1/ensembl/eae/NCBI_30/cdnas',
-	    EST_TMPDIR        => '/ecs2/scratch1/ensembl/eae/NCBI_31/cdnas',
+	    EST_TMPDIR        => '/ecs2/scratch4/ensembl/lec/briggsae_out',
 	    
 	    # job-queue in the farm
 	    EST_QUEUE         => 'acari',
 	    
 	    # make_bsubs.pl options
-	    EST_EXONERATE_BSUBS   => '/ecs2/scratch1/ensembl/eae/new_exonerate_test/exonerate.jobs',
-	    EST_FILTER_BSUBS      => '/ecs2/scratch1/ensembl/eae/NCBI_31/cdnas/filter_and_e2g.jobs',
-	    EST_GENEBUILDER_BSUBS => '/ecs2/scratch1/ensembl/eae/NCBI_31/cdnas/EST_GeneBuilder.jobs',
-	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch1/ensembl/eae/NCBI_31/cdnas/genes2ests.jobs', 
+	   
+	    EST_EXONERATE_BSUBS         => '/ecs2/scratch4/ensembl/lec/briggsae_out/exonerates.jobs',
+	    EST_FILTER_BSUBS            => '/ecs2/scratch4/ensembl/lec/briggsae_out/filter_and_e2g.jobs',
+	    EST_GENEBUILDER_BSUBS       => '/ecs2/scratch4/ensembl/lec/briggsae_out/EST_GeneBuilder.jobs',	
+	    EST_EXPRESSION_BSUBS  => '/ecs2/scratch1/ensembl/eae/blat_test/genes2ests.jobs', 
 	    
 	    # make_blat_bsubs.pl options
-	    EST_BLAT_BSUBS   => '/ecs2/scratch1/ensembl/eae/NCBI_31/cdnas/blat.jobs',
-	    
+	    EST_BLAT_BSUBS   => '/ecs2/scratch1/ensembl/eae/blat_test/blat.jobs',
+	    EST_BLAT_OPTIONS     => " -mask=lower ",
 
 	    	    
 	    # for prepare_ests.pl
@@ -101,7 +102,7 @@ use vars qw( %ESTConf );
 	    
 	    # path to directory where EST chunks live
 	    #EST_CHUNKDIR                => '/acari/work6a/eae.tmp/Mouse/Mouse_5.3.1/riken_mRNAs/second_rechunks',
-	    
+	    EST_REPEAT_MASKING => ['RepeatMask'],
 	    EST_CHUNKDIR                => '/ecs2/work1/eae/NCBI_31/cdnas/chunks',
 	    #EST_CHUNKDIR                => '/acari/work4a/lec/briggsae_sequence/mRNA_chunks/',
 	    
