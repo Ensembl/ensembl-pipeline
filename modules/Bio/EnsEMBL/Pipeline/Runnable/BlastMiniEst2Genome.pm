@@ -18,7 +18,7 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'    => $genseq,
 									 '-seqfetcher' => $seqfetcher
-									 '-blastdb'    => $blastdb);
+									 '-queryseq'   => $queryseq);
 
     $obj->run
 
@@ -63,14 +63,14 @@ use Data::Dumper;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC       => $genomicseq,
-			   -BLASTDB       => $blastdbname,
+			   -QUERYSEQ      => $queryseq,
                            -SEQFETCHER    => $sf);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome object
     Returns :   A Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome object
     Args    :   -genomic:    Bio::PrimarySeqI object (genomic sequence)
-                -blastdb:    Path to Blastable DB
+  -queryseq:   Either path to file containing query seqs or reference to aray of Bio::Seq
                 -seqfetcher  Bio::DB::RandomAccessI object
 =cut
 
@@ -80,8 +80,8 @@ sub new {
 
     $self->{'_idlist'} = []; #create key to an array of feature pairs
     
-    my( $genomic, $blastdb, $seqfetcher, $id, $length) = $self->_rearrange([qw(GENOMIC
-									       BLASTDB
+    my( $genomic, $queryseq, $seqfetcher, $id, $length) = $self->_rearrange([qw(GENOMIC
+									       QUERYSEQ
 									       SEQFETCHER
 									       ID_THRESHOLD
 									       LENGTH_THRESHOLD)],
@@ -93,9 +93,9 @@ sub new {
       unless $genomic->isa("Bio::PrimarySeqI");
     $self->genomic_sequence($genomic) if defined($genomic);
 
-    $self->throw("No blastdb specified") 
-      unless defined($blastdb);
-    $self->blastdb($blastdb) if defined($blastdb);
+    $self->throw("No queryseq specified") 
+      unless defined($queryseq);
+    $self->queryseq($queryseq) if defined($queryseq);
 
     $self->throw("No seqfetcher provided")           
       unless defined($seqfetcher);
@@ -160,28 +160,60 @@ sub seqfetcher {
     return $self->{'_seqfetcher'};
 }
 
-=head2 blastdb
+=head2 queryseq
 
-    Title   :   blastdb
-    Usage   :   $self->blastdb($seq)
-    Function:   Get/set method for blastdb
+    Title   :   queryseq
+    Usage   :   $self->queryseq($seq)
+    Function:   Get/set method for queryseq
     Returns :   
-    Args    :   path to blastdb
+    Args    :   name of a file containing query seq(s), OR reference to an array of Bio::Seq
 
 =cut
 
-sub blastdb {
-    my( $self, $blastdb ) = @_;    
-    if ($blastdb) {
+sub queryseq {
+    my( $self, $queryseq ) = @_;   
+    if ($queryseq) { 
+      if (ref($queryseq) eq 'ARRAY') {
 
-      # check for presence of relevant files .csq, .nhd, .ntb
-      $self->throw("Can't find blastfile [$blastdb]\n") unless -e $blastdb;
+	# I'm not at all sure this is right
+	my $time = time; chomp($time);
+	my $estfile = "/tmp/estfile_.$$.$time.fn";
+	$self->queryfilename($estfile);
 
-      $self->{'_blastdb'} = $blastdb;
+	foreach my $est(@$queryseq) {
+	  $est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
+	}
+
+	$self->{'_query_sequences'} = $queryseq;
+      }
+      else {
+	# it's a filename - check the file exists
+	$self->throw("[$queryseq] : file does not exist\n") unless -e $queryseq;
+	$self->queryfilename($queryseq);
+	$self->{'_query_sequences'} = $queryseq;
     }
-    return $self->{'_blastdb'};
-}
+  }
+  
+  #NB ref to an array of Bio::Seq
+  return $self->{'_query_sequences'};
 
+  }
+
+=head2 queryfilename
+
+    Title   :   queryfilename
+    Usage   :   $self->queryfilename($filename)
+    Function:   Get/set method for queryfilename
+    Returns :   
+    Args    :   
+
+=cut
+
+sub queryfilename {
+  my ($self, $queryfilename) = @_;
+  $self->{'_queryfilename'} = $queryfilename if ($queryfilename);
+  return $self->{'_queryfilename'};
+}
 
 =head2 get_all_FeatureIds
 
@@ -253,97 +285,36 @@ sub run {
     print STDERR "**got " . scalar(@exonerate_res) . " hits\n";
     
     my %exonerate_ests;
+    my @feat;
     foreach my $res(@exonerate_res ) {
       my $seqname = $res->hseqname;       #gb|AA429061.1|AA429061
       $seqname =~ s/\S+\|(\S+)\|\S+/$1/;
+      $res->hseqname($seqname);
 
-      # score cutoff 500 for exonerate ...
-      if($res->score > 500) {
-	$exonerate_ests{$seqname} = 1;
+      # may move this out of here.
+
+      # score cutoff 500 for exonerate ... take all features for a sequence as long as one of them gets over this threshold
+      if($res->score > 500 || defined $exonerate_ests{$seqname}) {
+	push(@{$exonerate_ests{$seqname}}, $res);
+	push (@feat, $res);
       }
     }
 
-    # run blast on genomic seq vs dbEST
-    my @seq = $self->get_Sequences(keys %exonerate_ests);
-    my $blast_report = $self->run_blast(@seq);
+    # filter features
+    my %filtered_ests;
+    my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( '-coverage' => 10,
+								      '-minscore' => 500);
+    my @filteredfeats = $filter->run(@feat);
 
-    # store est seqs in a hash keyed by seqname
-    my %est_seqs;
-    foreach my $seq(@seq) {
-      $est_seqs{$seq->id} = $seq;
+    foreach my $f(@filteredfeats){
+      push(@{$filtered_ests{$f->hseqname}}, $f);
     }
 
-    my $id_threshold = $self->{'_id_threshold'};
-    my $length_threshold = $self->{'_length_threshold'};    
-
-    # get hits - 
-    my %esthash;
-
-    HIT:
-    while (my $hit = $blast_report->nextSbjct) {
-      # est length
-      my $estname;
-      my $covered_length = 0;
-      my @hsps; # we will need these later for building the MiniSeq
-
-      while (my $hsp = $hit->nextHSP) {
-	if(defined $estname && $estname ne $hsp->subject->seqname){
-	  print STDERR "trying to switch querynames halfway through a blast hit - big problem!\n";
-	  next HIT;
-	}
-	else{
-	  $estname = $hsp->subject->seqname;
-	}
-	# check against $id_threshold
-	next HIT unless $hsp->percent >= $id_threshold;
-
-	$covered_length += $hsp->length;
-
-	# need to make a Bio::EnsEMBL::FeaturePair of the hsp
-	# genomic
-	my $sf1 = new Bio::EnsEMBL::SeqFeature(-start  => $hsp->query->start,
-					      -end    => $hsp->query->end,
-					      -strand => $hsp->query->strand);
-	# est
-	my $sf2 = new Bio::EnsEMBL::SeqFeature(-start  => $hsp->subject->start,
-					      -end    => $hsp->subject->end,
-					      -strand => $hsp->subject->strand);
-	$sf1->score($hsp->score);
-	$sf2->score($hsp->score);
-	$sf1->seqname($self->genomic_sequence->id);
-	$sf2->seqname($hsp->subject->seqname);
-	$sf1->primary_tag('similarity');
-	$sf2->primary_tag('similarity');
-	$sf1->source_tag('e2g');
-	$sf2->source_tag('e2g');
-
-	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $sf1,
-					       -feature2 => $sf2,
-					      );
-#	my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $sf2,
-#					       -feature2 => $sf1,
-#					      );
-	push(@hsps, $fp);
-      } #end of while $hsp
-      
-      # check against $len_threshold
-      $estname =~ s/\s+//g;
-      my $tmp = $est_seqs{$estname};
-      my $estlength = $tmp->length;
-
-      my $cp = ($covered_length/$estlength) * 100;
-      next HIT unless $cp >= $length_threshold;
-#      print STDERR "keeping $estname\n";
-      push(@{$esthash{$estname}},@hsps);$esthash{$estname};
-    } # end of while $hit
-    
   ID:    
-    foreach my $id(keys %esthash) {
-      # get all the HSPs for this EST sequence
-      my @features = @{$esthash{$id}};
+    foreach my $id(keys %filtered_ests) {
+      my @features = @{$filtered_ests{$id}};
  
-      # only use ESTs that have >1 blast hit to cut down on how many e2gs we run.
-#      print STDERR "id: $id has "  . scalar(@features) . " blast hits\n";
+      # only use ESTs that have >1 exonerate hit to cut down on how many e2gs we run.
       next ID unless scalar(@features) > 1; # ??? too strict?
 
       # make MiniEst2Genome runnables
@@ -358,10 +329,6 @@ sub run {
       # sort out output
       my @f = $e2g->output;
       
-      foreach my $f (@f) {
-	#      print(STDERR "PogAligned output is $f " . $f->seqname . " " . $f->start . "\t" . $f->end . "\t" . $f->score .  "\n");
-      }
-      
       push(@{$self->{'_output'}},@f);
     }
 }
@@ -370,14 +337,41 @@ sub run_exonerate {
   my ($self) = @_;
   my @res;
 
+  my $estseq  = $self->queryseq;
+  my $estfile = $self->queryfilename;
+
+  # do we need to write out the est sequences?
+  if(ref($estseq) eq 'ARRAY'){
+    eval{
+      if (-e $estfile) { $self->throw("alreayd using $estfile\n"); }
+      my $estOutput = Bio::SeqIO->new(-file => ">$estfile" , '-format' => 'Fasta')
+	or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
+      
+      foreach my $eseq(@$estseq) {
+	$estOutput->write_seq($eseq);
+      }
+    };
+    
+    if($@){
+      $self->warn("couldn't run exonerate - problem writing estfile\n");
+      return;
+    }
+
+  }
+
   my $exr = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
 							    '-exonerate' => "/work2/gs2/gs2/bin/exonerate-0.3d",
 							    '-genomic'   => $self->genomic_sequence,
-							    '-est'      => $self->blastdb
+							    '-est'      => $self->queryfilename
 							   );
   
   $exr->run;
   my @res = $exr->output;
+
+  #clean up temp files
+  if(ref($estseq) eq 'ARRAY'){
+    unlink $estfile;
+  }
 
   return @res;
   
@@ -544,19 +538,21 @@ sub get_Sequence {
       $self->warn("No id input to get_Sequence");
     }  
     
-#    print(STDERR "Sequence id :  is [$id]\n");
-
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
-    if ($@){
-      $self->warn("Problem with seqfetcher [$id]: [$@]\n");
-    }
-	
-    if(!defined($seq)){
-      $self->warn("Could not find sequence for [$id]");
+
+    # if we didn't get it by accession, try by id
+    if(!defined $seq){
+      eval{
+	$seq = $seqfetcher->get_Seq_by_id($id) unless defined $seq;
+      };
     }
 
+    if (!defined $seq && $@){
+      $self->warn("Could not retrieve sequence for [$id]:\n [$@]\n");
+    }
+	
 #    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
 
     return $seq;
