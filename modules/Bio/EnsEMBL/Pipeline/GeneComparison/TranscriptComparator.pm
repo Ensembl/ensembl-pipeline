@@ -86,6 +86,7 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
+use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -338,15 +339,31 @@ sub _test_for_fuzzy_semiexact_Merge{
     $allowed_mismatch =  $self->splice_mismatch;
   }
 
-  my $verbose = 0;
+  my $verbose = 1;
   
-  #print STDERR "=========== comparing ================\n";
+  print STDERR "=========== comparing ================\n";
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $est_tran ) if $verbose;
   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $ens_tran ) if $verbose;
   
   my @exons1 = @{$est_tran->get_all_Exons};
   my @exons2 = @{$ens_tran->get_all_Exons};	
   
+  # the simplest check is to see whether they are in the same genomic region:
+  if ( $exons1[0]->start > $exons2[$#exons2]->end 
+       ||
+       $exons2[0]->start > $exons1[$#exons1]->end 
+     ){
+    print STDERR "transcript genomic regions do not overlap\n" if $verbose;
+    return (0,0);
+  }
+
+  # the simplest case is with two single-exon transcripts:
+  if ( scalar(@exons1) == 1 && scalar(@exons2) == 1 ){
+    if ( $exons1[0]->overlaps($exons2[0] )){
+      return (1,1);
+    }
+  }
+
   @exons1 = sort {$a->start <=> $b->start} @exons1;
   @exons2 = sort {$a->start <=> $b->start} @exons2;
 
@@ -384,8 +401,7 @@ sub _test_for_fuzzy_semiexact_Merge{
       # and $allowed_mismatch bases mismatch at the end
       elsif ( ($k == 0 || $j == 0) ){
 	
-	# if one of them is a single-exon transcript
-	# we allow any mismatch
+	# if one of them is a single-exon transcript...
 	if( ( $k == 0 && $k == $#exons2 ) || ( $j == 0 && $j == $#exons1 )    ){
 	  if ( $k == 0 && $k == $#exons2 
 	       && (
@@ -409,23 +425,49 @@ sub _test_for_fuzzy_semiexact_Merge{
 	    $merge = 0;
 	    last EXON1;
 	  }
-	  else{
+	  elsif( ( $j==0 && $j== $#exons1 
+		   && ( $exons2[$k]->start - $exons1[$j]->start <=  $allowed_mismatch )
+		   && ( $exons1[$j]->end   - $exons2[$k]->end   <=  $allowed_mismatch )
+		 )
+		 ||
+		 ( $k==0 && $k== $#exons2 
+		   && ( $exons1[$j]->start - $exons2[$k]->start <=  $allowed_mismatch )
+		   && ( $exons2[$k]->end   - $exons1[$j]->end   <=  $allowed_mismatch )
+		 ) ){
 	    $foundlink = 1;
 	    $overlaps++;
 	    $merge = 1;
 	    print STDERR "merged single exon transcript\n" if $verbose;
 	    last EXON1;
 	  }
+	  else{
+	    print STDERR "single exon transcript overlapping beyond the allowed splic-site mismatches\n" if $verbose;
+	    $merge = 0;
+	    last EXON1;
+	  }
 	}
+	
 	# if the first overlaps with the last, we allow any overlap
-	elsif ( ( $k==0 && $j == $#exons1 ) || ( $j==0 && $k == $#exons2 ) ){
+	if ( ( $k==0 && $j == $#exons1 ) || ( $j==0 && $k == $#exons2 ) ){
 	  $foundlink = 1;
 	  $overlaps++;
 	  $merge = 1;
 	  print STDERR "found link --> merged\n" if $verbose;
 	  last EXON1;
 	}
-	elsif ( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
+	
+	if ( ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] ) )
+	     ||
+	     ( $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] ) )
+	   ){
+	  print STDERR "Exon overlaps two exons, not merging\n";
+	  $merge = 0;
+	  last EXON1;
+	  
+	}
+	
+	if( abs($exons1[$j]->end - $exons2[$k]->end)<= $allowed_mismatch ){
+	  
 	  # else we force it to match the end (with a mismatch of $allowed_mismatch bases allowed)
 	  
 	  $foundlink = 1;
@@ -437,23 +479,33 @@ sub _test_for_fuzzy_semiexact_Merge{
       }
       # the last one can have any mismatch on the end
       # but must have a match at the start (with $allowed_mismatch mismatches allowed)
-      elsif ( ( $k == $#exons2 || $j == $#exons1 ) &&
-	      ( $foundlink == 1 )                  &&
-	      ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
-	    ){
-	print STDERR "link completed, merged transcripts\n" if $verbose;
-	$merge = 1;
-	$overlaps++;
-	last EXON1;
+      if ( ( $k == $#exons2 || $j == $#exons1 ) ){
+	if ( ( $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] ) )
+	     ||
+	     ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] ) )
+	   ){
+	  print STDERR "Exon overlaps two exons, not merging\n";
+	  $merge = 0;
+	  last EXON1;
+	}
+	elsif( $foundlink == 1 
+	       &&
+	       ( abs($exons1[$j]->start - $exons2[$k]->start)<= $allowed_mismatch ) 
+	     ){
+	  print STDERR "link completed, merged transcripts\n" if $verbose;
+	  $merge = 1;
+	  $overlaps++;
+	  last EXON1;
+	}
       }
       # the middle one must have exact matches
       # (up to an $allowed_mismatch mismatch)
-      elsif ( ($k != 0 && $k != $#exons2) && 
-	      ($j != 0 && $j != $#exons1) &&
-	      ( $foundlink == 1)          &&
-	      abs( $exons1[$j]->start - $exons2[$k]->start )<= $allowed_mismatch &&
-	      abs( $exons1[$j]->end   - $exons2[$k]->end   )<= $allowed_mismatch
-	    ){
+      if ( ($k != 0 && $k != $#exons2) && 
+	   ($j != 0 && $j != $#exons1) &&
+	   ( $foundlink == 1)          &&
+	   abs( $exons1[$j]->start - $exons2[$k]->start )<= $allowed_mismatch &&
+	   abs( $exons1[$j]->end   - $exons2[$k]->end   )<= $allowed_mismatch
+	 ){
 	$overlaps++;
 	$start = $k+1;
 	print STDERR "continue link\n" if $verbose;
@@ -617,8 +669,8 @@ sub _test_for_Simple_Merge{
 sub _test_for_Merge_allow_small_introns{
   my ($self,$tran1,$tran2) = @_;
   
-  my $newtran1 = $self->_difuse_small_introns( $tran1 );
-  my $newtran2 = $self->_difuse_small_introns( $tran2 );
+  $tran1 = $self->_difuse_small_introns( $tran1 );
+  $tran2 = $self->_difuse_small_introns( $tran2 );
   return $self->_test_for_fuzzy_semiexact_Merge( $tran1, $tran2 );
 }
 
@@ -1133,7 +1185,157 @@ sub _compare_Transcripts {
 
 #########################################################################
 
-	
+
+sub _test_for_Merge{
+  my ($self,$tran1,$tran2) = @_;
+  my (%exons1,%exons2);
+  my @exons1 = sort { $a->start <=> $b->start } @{$tran1->get_all_Exons};
+  my @exons2 = sort { $a->start <=> $b->start } @{$tran2->get_all_Exons};	
+  
+  # the simplest case is with two single-exon transcripts:
+  if ( scalar(@exons1) == 1 && scalar(@exons2) == 1 ){
+    if ( $exons1[0]->overlaps($exons2[0] )){
+      return (1,1);
+    }
+  }
+
+  my $object_map = Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap->new();
+
+  my $verbose   = 0;
+  my $foundlink = 0; # flag that gets set when starting to link exons
+  my $start     = 0; # start looking at this one
+  my $overlaps  = 0; # independently if they merge or not, we compute the number of exon overlaps
+  my $merge     = 0; # =1 if they merge
+  
+  # we follow a greedy aproach to try to match all the exons
+  # we jump out as soon as we find a problem with the matching
+  
+  my %is_first;
+  my %is_last;
+
+ EXON1:
+  for (my $j=0; $j<=$#exons1; $j++) {
+    
+    if ( $j==0 ){
+      $is_first{ $exons1[$j] } = 1;
+    }
+    else{
+      $is_first{ $exons1[$j] } = 0;
+    }
+    if ( $j == $#exons1 ){
+      $is_last{ $exons1[$j] } = 1;
+    }
+    else{
+      $is_last{ $exons1[$j] } = 0;
+    }
+    
+  EXON2:
+    for (my $k=$start; $k<=$#exons2; $k++){
+
+      if ( $k==0 ){
+	$is_first{ $exons2[$k] } = 1;
+      }
+      else{
+	$is_first{ $exons2[$k] } = 0;
+      }
+      if ( $k == $#exons2 ){
+	$is_last{ $exons2[$k] } = 1;
+      }
+      else{
+	$is_last{ $exons2[$k] } = 0;
+      }
+      
+      # if texons1[$j] and exons2[$k] overlap go to the next exon1 and  next $exon2
+      if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k])) ){
+	print STDERR "go to next exon2\n";
+	$foundlink = 0;
+	next EXON2;
+      }
+      elsif ( $foundlink == 1 && !($exons1[$j]->overlaps($exons2[$k])) ){
+	print STDERR "link is broken, not merging\n";
+	$foundlink = 0;
+	$merge = 0;
+	last EXON1;
+      }
+      elsif ( $exons1[$j]->overlaps($exons2[$k]) ){
+	if ( $j == $#exons1 || $k == $#exons2 ){
+	  if ( $j != $#exons1 && $exons2[$k]->overlaps( $exons1[$j+1] )
+	       ||
+	       $k != $#exons2 && $exons1[$j]->overlaps( $exons2[$k+1] )
+	     ){
+	    print STDERR "terminal exon overlaps two exons. Not merging\n" if $verbose;
+	    $merge = 0;
+	    last EXON1;
+	  }
+	  else{
+	    print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+	    $object_map->match( $exons1[$j], $exons2[$k] );
+	    print STDERR "End of transcripts. THere is merge|\n";
+	    $merge = 1;
+	    $overlaps++;
+	    $foundlink = 1;
+	    last EXON1;
+	  }
+	}
+	else{
+	  print STDERR ($j+1)." <--> ".($k+1)."\n" if $verbose;
+	  $object_map->match( $exons1[$j], $exons2[$k] );
+	  $overlaps++;
+	  $foundlink = 1;
+	  $start++;
+	  next EXON2;
+	}
+      }
+      
+    } # end of EXON2 
+    
+    # if you haven't found any match for this exon1, start again from the first exon2:
+    if ($foundlink == 0){
+      $start = 0;
+    }
+    
+  }   # end of EXON1      
+  
+  unless ( $merge ){
+    return ( 0, $overlaps );
+  }
+
+  my @list1 = $object_map->list1();
+  my @list2 = $object_map->list2();
+  
+  # the simplest case: when they match over one exon only:
+  if ( scalar(@list1)==1 && scalar(@list2)==1 ){
+    if ( ( $is_first{ $list1[0] } && $is_last{ $list2[0] } )
+	 ||
+	 ( $is_first{ $list2[0] } && $is_last{ $list1[0] } )
+       ){
+      print STDERR "--- merge ---\n" if $verbose;
+      return (1,1);
+    }
+    elsif( ( ( $is_first{ $list1[0] } && $is_last{ $list1[0] } )
+	     ||
+	     ( $is_first{ $list2[0] } && $is_last{ $list2[0] } )
+	   )
+	   && $self->compare_exon($list1[0], $list2[0]) 
+	 ){
+      print STDERR "--- merge ---\n" if $verbose;
+      return (1,1);
+    }
+    return (0,1);
+  }
+  
+  foreach my $exon_in_pair1 ( @list1 ){
+    my @partners = $object_map->partners( $exon_in_pair1 );
+    if ( scalar( @partners ) > 1 ){
+      $self->warn("One exon has been matched to two exons");
+    }
+    my $exon_in_pair2 = shift ( @partners );
+  }
+  
+
+
+}
+
 ########################################################################
 
 1;
