@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_DATABASES
 					 GB_SIMILARITY_COVERAGE
@@ -65,6 +66,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_SIMILARITY_MAX_LOW_COMPLEXITY
 					 GB_INPUTID_REGEX
 					 GB_TARGETTED_GW_GENETYPE
+					 GB_REPEAT_MASKING
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -103,7 +105,7 @@ sub write_output {
 
     my $gene_adaptor = $self->db->get_GeneAdaptor;
     my @genes = $self->output;
-    #print STDERR "have ".@genes."\n";
+    print STDERR "have ".@genes." genes\n";
   GENE: foreach my $gene (@genes) {	
       # do a per gene eval...
       eval {
@@ -144,7 +146,7 @@ sub write_output {
     
     my $sla       = $self->db->get_SliceAdaptor();
     my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-    my $genseq    = $slice->get_repeatmasked_seq;
+    my $genseq    = $slice->get_repeatmasked_seq($GB_REPEAT_MASKING);
 
     
     $slice->chr_name($chrid);
@@ -223,7 +225,7 @@ sub write_output {
 
       # at present, we'll only ever have one ...
 
-      $self->vcontig($slice);
+      $self->query($slice);
     }
   }     
   
@@ -319,13 +321,13 @@ sub make_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
   my @genes;
 
-  print STDERR "making FPC_BlastMiniGenewise genes\n";
+  #print STDERR "making FPC_BlastMiniGenewise genes\n";
 
   $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
   foreach my $tmpf (@{$results}) {
-    my $unchecked_transcript = $self->_make_transcript($tmpf, $self->vcontig, $genetype, $analysis_obj);
+    my $unchecked_transcript = $self->_make_transcript($tmpf, $self->query, $genetype, $analysis_obj);
     
     next unless defined ($unchecked_transcript);
 
@@ -383,7 +385,6 @@ sub _make_transcript{
     # make an exon
     my $exon = new Bio::EnsEMBL::Exon;
     
-    $exon->contig_id($contig->id);
     $exon->start($exon_pred->start);
     $exon->end  ($exon_pred->end);
     $exon->strand($exon_pred->strand);
@@ -555,7 +556,7 @@ sub validate_transcript {
     foreach my $exon(@{$transcript->get_all_Exons}){
       $newtranscript->add_Exon($exon);
       foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig_id);
+	  $sf->seqname($exon->contig->dbID);
       }
     }
 
@@ -678,7 +679,7 @@ EXON:   foreach my $exon(@{$transcript->get_all_Exons}){
       $curr_transcript->add_Exon($exon) unless $exon_added;
     }
     foreach my $sf(@{$exon->get_all_supporting_features}){
-	  $sf->seqname($exon->contig_id);
+	  $sf->seqname($exon->contig->dbID);
 
       }
     # this exon becomes $prev_exon for the next one
@@ -756,7 +757,7 @@ sub check_coverage{
 
  SEQFETCHER:
   foreach my $seqfetcher( $self->each_seqfetcher){
-    print STDERR "FPC_BlastMiniGenewise: getting sequence for $protname\n";
+    #print STDERR "FPC_BlastMiniGenewise: getting sequence for $protname\n";
     eval{
       $seq = $seqfetcher->get_Seq_by_acc($protname);
     };
@@ -782,7 +783,7 @@ sub check_coverage{
     return 0;
   }
 
-  print STDERR "looking at coverage of $protname\n";
+ # print STDERR "looking at coverage of $protname\n";
 
   my $coverage = $matches/$plength;
   $coverage *= 100;
@@ -872,7 +873,7 @@ sub check_low_complexity{
 
 sub remap_genes {
   my ($self, $genes) = @_;
-  my $contig = $self->vcontig;
+  my $contig = $self->query;
 
   my @newf;
   my $trancount=1;
