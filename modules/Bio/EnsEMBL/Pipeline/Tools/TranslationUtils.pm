@@ -164,15 +164,24 @@ sub compute_translation{
 sub run_translate{
     my ($self,$trans,$met) = @_;
     
-    my $verbose = 1;
+    my $verbose = 0;
 
     my $trans_id = $trans->stable_id || $trans->dbID;
+    unless ( $trans_id ){
+      if ( $trans->type ){
+	$trans_id = $trans->type;
+      }
+      else{
+	$trans_id = "transcript_".$$;
+      }
+    }
     my $seq = $trans->seq;
     unless ( $seq->display_id ){
 	$seq->display_id( $trans_id );
     }
     my $length = $seq->length;
     
+    print STDERR "display_id = ".$seq->display_id."\n";
     ############################################################
     # create file
     my $file = "/tmp/"."cdna_".$$.".fa";
