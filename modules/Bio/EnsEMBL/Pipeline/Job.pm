@@ -736,15 +736,17 @@ sub set_up_queues {
 	    $q{$ln}{'jobs'} = [];
 	    $q{$ln}{'last_flushed'} = undef;
 	    $q{$ln}{'batch_size'} ||= $DEFAULT_BATCH_SIZE;
-	    $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
+	    $q{$ln}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+            $q{$ln}{'retries'} ||= $DEFAULT_RETRIES;
 	}
 
 	# a default queue for everything else
 	unless (defined $q{'default'}) {
 	    $q{'default'}{'batch_size'} = $DEFAULT_BATCH_SIZE;
-	    $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
+            $q{'default'}{'retries'} ||= $DEFAULT_RETRIES;
 	    $q{'default'}{'last_flushed'} = undef;
-	    $q{'default'}{'jobs'} = [];
+	    $q{'default'}{'queue'} ||= $DEFAULT_BATCH_QUEUE;
+            $q{'default'}{'jobs'} = [];
 	}
     }
     return %q;
