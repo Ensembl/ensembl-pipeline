@@ -67,6 +67,7 @@ sub fetch_analysis_by_inputId_class {
   my $inputId = shift;
   my $class = shift;
   my @result;
+  my @row;
 
   my $anaAd = $self->db->get_AnalysisAdapter;
 
@@ -80,7 +81,7 @@ sub fetch_analysis_by_inputId_class {
   while( @row = $sth->fetchrow_array ) {
     my $analysis = $anaAd->fetch_by_dbID( $row[0] );
     if( defined $analysis ) {
-      push( @result, $analysis ):
+      push( @result, $analysis );
     }
   }
 
@@ -124,7 +125,7 @@ sub list_inputId_class_by_start_count {
   my @result;
   my @row;
 
-  my $query = qq{
+  my $query = qq({
     SELECT inputId, class 
       FROM InputIdAnalysis
      GROUP by inputId, class } );
