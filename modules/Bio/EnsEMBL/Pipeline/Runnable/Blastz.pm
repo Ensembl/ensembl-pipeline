@@ -92,15 +92,15 @@ sub new {
 
     my $self = $class->SUPER::new(@args);    
 
-    $self->{'_query'}     = undef;     # location of Bio::Seq object
-    $self->{'_filename'}  = undef;     # file to store Bio::Seq object
+    $self->{'_query'}     = undef;     # file location of query sequence
     $self->{'_program'}   = "blastz";     # location of Blast
     $self->{'_database'}  = undef;     # name of database filename
     $self->{'_options'}   = "";     # options for blastz
     $self->{'_fplist'}    = [];        # an array of feature pairs (the output)
     $self->{'_workdir'}   = "/tmp";     # location of temp directory
     $self->{'_results'}   = $self->{'_workdir'}."/results.".$$; # location of result file
-
+    $self->{'_results_to_tmp_file'} = 0;  # switch on whether to use pipe or /tmp file
+    
     # Now parse the input options and store them in the object
     my($program,$query,$database,$options) = $self->_rearrange([qw(PROGRAM
 								   QUERY 
@@ -145,41 +145,53 @@ sub run {
   
   $self->checkdir();
   
-  #write sequence to file
-  $self->writefile();
-
   $self->run_analysis();
   
   #parse output and create features
-  $self->parse_results;  
   $self->deletefiles();
 }
 
 
 sub run_analysis {
-  my ($self) = @_;
-  print STDERR ("Running blastz...\n" . $self->program . " " .
-		                        $self->filename . " " .
-		                        $self->database . " " .
-		                        $self->options . " > " .
-		                        $self->results . "\n");
+  my $self = shift;
 
-  $self->throw("Failed during blastz run, $!\n") unless (system ($self->program  . " " .
-								 $self->filename . " " .
-								 $self->database . " " .
-								 $self->options . " > " .
-								 $self->results) == 0);
-  $self->file($self->results);
-}  
-  
-sub parse_results { 
-  my ($self) = @_;
-  
-  my $BlastzParser = Bio::EnsEMBL::Pipeline::Tools::Blastz->new('-file' => $self->results);
-  
+  my $cmd = $self->program  ." ".
+            $self->query ." ".
+            $self->database ." ".
+            $self->options;
+
+  my $BlastzParser;
+  my $blastz_output_pipe = undef;
+              
+  if($self->{'_results_to_tmp_file'}) {
+    $cmd .=  " > ". $self->results;
+    print STDERR "Running blastz...\n$cmd\n";
+    $self->throw("Error runing blastz cmd\n$cmd\n." .
+                 " Returned error $? BLAST EXIT: '" .
+                 ($? >> 8) . "'," ." SIGNAL '" . ($? & 127) .
+                 "', There was " . ($? & 128 ? 'a' : 'no') .
+                 " core dump") unless(system($cmd) == 0);
+    #$self->throw("Failed during blastz run, $!\n") unless (system ($cmd));
+    $self->file($self->results);
+    $BlastzParser = Bio::EnsEMBL::Pipeline::Tools::Blastz->new('-file' => $self->results);
+  } else {
+    print STDERR "Running blastz to pipe...\n$cmd\n";
+    open($blastz_output_pipe, "$cmd |") ||
+      $self->throw("Error opening Blasts cmd <$cmd>." .
+                   " Returned error $? BLAST EXIT: '" .
+                   ($? >> 8) . "'," ." SIGNAL '" . ($? & 127) .
+                   "', There was " . ($? & 128 ? 'a' : 'no') .
+                   " core dump");
+    $BlastzParser = Bio::EnsEMBL::Pipeline::Tools::Blastz->new('-fh' => $blastz_output_pipe);
+  }
+
+  my $count=0;
   while (defined (my $alignment = $BlastzParser->nextAlignment)) { # nextHSP-like
     $self->_add_fp($alignment);
+    $count++;
   }
+
+  close($blastz_output_pipe) if(defined($blastz_output_pipe));
 }
 
 
@@ -187,16 +199,41 @@ sub parse_results {
 # get/set methods 
 #################
 
+=head2 query
+
+    Title   :   query
+    Usage   :   $self->query($seq)
+    Function:   Get/set method for query.  If set with a Bio::Seq object it
+                will get written to the local tmp directory
+    Returns :   filename
+    Args    :   Bio::PrimarySeqI, or filename
+
+=cut
+
 sub query {
-  my ($self, $seq) = @_;
-  if ($seq) {
-    unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::Seq")) {
-      $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+  my ($self, $value) = @_;
+
+  if (defined $value) {
+
+     if (! ref($value)) {
+      # assume it's a filename - check the file exists
+      $self->throw("[$value] : file does not exist\n") unless -e $value;
+      $self->{'_query'} = $value;
     }
-    
-    $self->{'_query'} = $seq ;
-    $self->filename($seq->id.".$$.seq");
+    elsif ($value->isa("Bio::PrimarySeqI") || $value->isa("Bio::Seq")) {
+      my $filename = "/tmp/genfile_$$.".rand(time()).".fn";
+      my $genOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => "Fasta")
+	or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
+
+      $self->throw ("problem writing genomic sequence to $filename\n" ) unless $genOutput->write_seq($value);
+      $self->{'_query'} = $filename;
+      $self->file($filename);
+    }
+    else {
+      $self->throw("$value is neither a Bio::Seq  nor a filename\n");
+    }
   }
+
   return $self->{'_query'};
 }
 
@@ -204,8 +241,9 @@ sub query {
   
     Title   :   database
     Usage   :   $self->database($seq)
-    Function:   Get/set method for database
-    Returns :   Bio::PrimarySeqI, or filename
+    Function:   Get/set method for database.  If set with a Bio::Seq object it
+                will get written to the local tmp directory
+    Returns :   filename
     Args    :   Bio::PrimarySeqI, or filename
 
 =cut
@@ -218,18 +256,16 @@ sub database {
      if (! ref($value)) {
       # assume it's a filename - check the file exists
       $self->throw("[$value] : file does not exist\n") unless -e $value;
-      $self->genfilename($value);
       $self->{'_database'} = $value;
     }
     elsif ($value->isa("Bio::PrimarySeqI")) {
-      my $filename = "/tmp/genfile_$$.fn";
-      $self->genfilename($filename);
+      my $filename = "/tmp/genfile_$$.".rand(time()).".fn";
       my $genOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => "Fasta")
 	or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
     
       $self->throw ("problem writing genomic sequence to $filename\n" ) unless $genOutput->write_seq($value);
-      $self->{'_database'} = $self->genfilename;
-      $self->file($self->genfilename);
+      $self->{'_database'} = $filename;
+      $self->file($filename);
     }
     else {
       $self->throw("$value is neither a Bio::Seq  nor a filename\n");
@@ -321,18 +357,3 @@ sub program {
   return $self->{'_program'};
 }
 
-=head2 genfilename
-
-    Title   :   genfilename
-    Usage   :   $self->genfilename($filename)
-    Function:   Get/set method for genfilename
-    Returns :   
-    Args    :   
-
-=cut
-
-sub genfilename {
-  my ($self, $genfilename) = @_;
-  $self->{'_genfilename'} = $genfilename if ($genfilename);
-  return $self->{'_genfilename'};
-}
