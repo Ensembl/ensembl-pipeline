@@ -82,7 +82,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
 							     GB_INPUTID_REGEX
-							     GB_REPEAT_MASKING
 							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
