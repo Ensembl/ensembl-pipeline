@@ -40,6 +40,7 @@ package Bio::EnsEMBL::Pipeline::RunnableI;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Analysis::Programs;
+use Bio::SeqIO;
 
 # Object preamble - inherits from Bio::Root::RootI;
 

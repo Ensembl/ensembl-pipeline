@@ -196,7 +196,7 @@ sub run {
 
    $runnable->run();
   
-    $self->align_hits_to_contig($runnable->output);
+    $self->align_hits_to_contig2($runnable->output);
     #$self->check_features($transcript->translate->seq,$self->featurepairs);
   }
 
@@ -301,6 +301,104 @@ sub output {
 
     return $self->featurepairs();  
 }
+
+sub align_hits_to_contig2 {
+  my ( $self, @features )  = @_;
+  
+  # for each feature
+  
+  for my $feature ( @features ) {
+    print ::LOG join
+      ( "\n", 
+	( "\n", "Blast result:",
+	  "Start ".$feature->start." End ".$feature->end,
+	  "hstart ".$feature->hstart." hend ".$feature->hend,
+	  "qury: ".$feature->{'qseq'},
+	  "subj: ".$feature->{'sseq'},
+	  "\n" ));
+
+
+    my %exon_hash = ();
+  # for each ungapped piece in it
+    for my $ugFeature ( $feature->ungapped_features() ) {
+      
+      my $f = $ugFeature;
+      print ::LOG "ugfeature: ",join( " ", ( $f->start(), $f->end(), $f->strand(), "-", $f->hstart(), $f->hend(), $f->hstrand() )),"\n";      # ask the $self->peptide to do cdna2genomic
+      #   for f->start*3-2 f->end*3
+      my @split = $self->peptide->cdna2genomic
+	(( $ugFeature->start() * 3 -2 ), 
+	 ( $ugFeature->end() * 3 ));
+      
+      for my $gcoord ( @split ) {
+	
+	my ( $gstart, $gend, $gstrand, $contig, $exon, $cdna_start, $cdna_end ) =
+	  @$gcoord;
+
+	# Take the pieces and make a list of features from it
+	# hash them by exon
+
+	# first, eat away non complete codons from start
+	while(( $cdna_start - 1 ) % 3 != 0 ) {
+	  $cdna_start++;
+	  if( $gstrand == 1 ) {
+	    $gstart++;
+	  } else {
+	    $gend--;
+	  }
+	}
+	  
+	# and from end
+	while( $cdna_end  % 3 != 0 ) {
+	  $cdna_end--;
+	  if( $gstrand == 1 ) {
+	    $gend--;
+	  } else {
+	    $gstart++;
+	  }
+	}
+
+	if( $cdna_end <= $cdna_start ) {
+	  next;
+	}
+
+	my $dna_feat1 = Bio::EnsEMBL::SeqFeature->new 
+	  ( -seqname    =>  $contig->name,
+	    -start      =>  $gstart, 
+	    -end        =>  $gend,
+	    -strand     =>  $gstrand,
+	    -score      =>  $feature->score,
+	    -p_value    =>  $feature->p_value,
+	    -percent_id =>  $feature->percent_id,
+	    -analysis   =>  $feature->analysis );
+
+	
+	my $dna_feat2 = Bio::EnsEMBL::SeqFeature->new 
+	  ( -seqname    =>  $feature->hseqname,
+	    -start      =>  $cdna_start - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
+	    -end        =>  $cdna_end - ($ugFeature->start()*3-2) + $ugFeature->hstart(),
+	    -score      =>  $feature->score,
+	    -p_value    =>  $feature->p_value,
+	    -percent_id =>  $feature->percent_id,
+	    -analysis   =>  $feature->analysis );
+
+      
+	my $featurepair = Bio::EnsEMBL::FeaturePair->new (-feature1   => $dna_feat1,
+							  -feature2   => $dna_feat2 );
+	
+	push( @{$exon_hash{$exon}}, $featurepair );
+      }
+    }
+
+    # Take the pieces for each exon and make gapped feature
+    foreach my $ex ( keys %exon_hash ) {
+      my $dna_align_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new
+	(-features => $exon_hash{$ex});
+      $self->featurepairs($dna_align_feature);
+    }
+  }
+}
+
+
 
 # This function creates a hash which is used to map between the exon genomic position
 # and a position within the genscan predicted peptide. The hash is then matched
