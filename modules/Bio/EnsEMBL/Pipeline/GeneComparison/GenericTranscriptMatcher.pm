@@ -11,7 +11,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::GenericTranscriptMatcher
+Bio::EnsEMBL::Pipeline::GeneComparison::GenericTranscriptMatcher
 
 =head1 SYNOPSIS
 
