@@ -155,16 +155,4 @@ sub write_output {
 }
 
 
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetches output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of repeats (with start and end)
-    Args    :   none
-
-=cut
-
-
 1;
