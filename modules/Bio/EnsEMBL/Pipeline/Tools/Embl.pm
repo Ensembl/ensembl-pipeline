@@ -3,8 +3,6 @@ package Bio::EnsEMBL::Pipeline::Tools::Embl;
 ### embl ###
 
 use strict;
-use warnings;
-use Time::HiRes qw( usleep ualarm gettimeofday tv_interval );
 #no warnings;
 
 sub new{
@@ -52,7 +50,6 @@ sub parse{
 }
 sub _parse_record{
     my ($self,$string) = @_;
-    my $t0 = [gettimeofday];
     $self->clean();
     $string =~ s/^SQ\s{3}(.+;)(.+)/$self->sequence($2,$1)/ems;
     $string =~ s/^([A-Z]{2})\s{3}(.+\n)/$self->{"_" . $1} .= $2/egm;
@@ -63,8 +60,8 @@ sub _parse_record{
         foreach(@keys){
             my @qualifiers = split(/\s+\//, $_);
             my ($key,$location) = split(/\s+/,shift(@qualifiers));
-            #	        my $hash = { map { ($a, $b) = split('=') } @qualifiers }; # unfortunately not, [non unique $a!] :(
-            #	        $self->{'_FT'}->{$key}->{$location} = $hash || {};
+#	        my $hash = { map { ($a, $b) = split('=') } @qualifiers }; # unfortunately not, [non unique $a!] :(
+#	        $self->{'_FT'}->{$key}->{$location} = $hash || {};
             my $hash;
             foreach(@qualifiers){
                 my ($qualifier, $value) = (split(/=/),'')[0,1];
@@ -77,12 +74,10 @@ sub _parse_record{
     else{
         $self->_non_EMBL(1);
     }
-    #   print "found accession: <" . $self->accession() .">";
+    #   print "found accession: <" . join(" ", @{$self->accession()}) .">\n";
     #   print ", sequence version: <". $self->sequence_version() . ">";
     #   print ", description: <" . $self->description() . ">\n";
     #   print " * fasta:\n" . $self->fasta() . "\n";
-    my $elapsed = tv_interval ( $t0, [gettimeofday]);
-    print "parsing took: " . $elapsed . "\n";
 }
 
 sub feature_table{
