@@ -29,12 +29,16 @@ use Bio::SeqIO;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passed.
-my ($seq) =  set_seq();
+
+my $seqio = new Bio::SeqIO(-file => '/nfs/croc/michele/trunk/ensembl-pipeline/scripts/AP000074.pep',
+			   -format => 'fasta');
+
+my $seq   = $seqio->next_seq->seq;
 
 my $clone =  Bio::PrimarySeq->new(  -seq         => $seq,
-                                    -id          => 'AI937824',
-                                    -accession   => 'AI937824',
-                                    -moltype     => 'dna');
+                                    -id          => 'AP000074',
+                                    -accession   => 'AP000074',
+                                    -moltype     => 'protein');
 unless ($clone) 
 { print "not ok 2\n"; }
 else
@@ -42,8 +46,8 @@ else
 
 #create blast object    
 my $blast = Bio::EnsEMBL::Pipeline::Runnable::Blast->new (   -query    => $clone,
-                                                             -program  => 'wublastn',
-                                                             -database => 'dbSTS-1',
+                                                             -program  => 'wutblastn',
+                                                             -database => '/nfs/croc/michele/trunk/ensembl-pipeline/scripts/AI053588.fa',
                                                              -threshold => 1,
                                                              );
  
@@ -84,18 +88,3 @@ sub display {
     }
 }
 
-sub set_seq {
-
-my $seq = 
-"ttttttttttttttttagtggcagaaagcaaaaagggcctttgctgctttaatttttaaa".
-"ttttcttacaaaaatttaggtgtttaccaatagtcttattttggcttatttttaatgctt".
-"tttctcagtgtttttcttctgtttctgagtcacgaacagcaggcactgaaagcagtcccc".
-"cagccactgccgaaggtcagtcccggaggtgctgcccaggcttggctggggcgaggcgct".
-"gccaacccctgccgccagggggctccaagctccacggcacgatctgctcagggtggccct".
-"tcttccacgatccaagccctaagaacaagaggctgggcctgggcccaggcatgcaagcta".
-"tacccaagaatcaacgggctgaggcttagcgtcccctaccgcgtccaccagcctgaccgc".
-"gggcctgctgggcccggggggaggggccttcctgctggggttcgagtttcaaggtgttcc".
-"ttctcagaggcctttcctgcagagcttgcgcctcgtggtctacgctccctctggtccacc".
-"gtgggatattccgtctgggcccagtgcatccttgttgatcacatctccgctgcc";
-return $seq;
-}
