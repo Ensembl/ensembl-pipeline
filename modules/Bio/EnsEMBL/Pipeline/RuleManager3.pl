@@ -21,6 +21,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::LSF;
 
 # defaults: command line options override pipeConf variables,
 # which override anything set in the environment variables.
@@ -36,6 +37,7 @@ my $flushsize = $::pipeConf{'batchsize'};
 my $jobname   = $::pipeConf{'jobname'};
 my $retry     = $::pipeConf{'retry'} || 3;
 my $sleep     = $::pipeConf{'sleep'} || 3600;
+my $maxjobs   = $::pipeConf{'maxjobs'} || 1000;
 
 $| = 1;
 
@@ -43,6 +45,7 @@ my $chunksize    = 500000;  # How many InputIds to fetch at one time
 my $currentStart = 0;       # Running total of job ids
 my $completeRead = 0;       # Have we got all the input ids yet?
 my $local        = 0;       # Run failed jobs locally
+my $alllocal     = 0;       # Run all jobs locally
 my $analysis;               # Only run this analysis ids
 my $submitted;
 my $jobname;                # Meaningful name displayed by bjobs
@@ -65,7 +68,9 @@ GetOptions(
     'usenodes=s'  => \$nodes,
     'once!'       => \$once,
     'retry=i'     => \$retry,
-    'analysis=s'  => \$analysis
+    'analysis=s'  => \$analysis,
+    'alllocal'    => \$alllocal,
+
 )
 or die ("Couldn't get options");
 
@@ -108,6 +113,8 @@ $LSF_params->{'jobname'}   = $jobname if defined $jobname;
 my @rules       = $ruleAdaptor->fetch_all;
 
 my @idList;     # All the input ids to check
+
+my $lsf = new Bio::EnsEMBL::Pipeline::LSF(-queue => $LSF_params->{'queue'});
 
 while (1) {
 
@@ -221,8 +228,27 @@ while (1) {
 
 		    if ($cj->analysis->dbID == $anal->dbID) {
 			if ($cj->current_status->status eq 'FAILED' && $cj->retry_count < $retry) {
+                           if ($local || $alllocal) {
+                                print "Running job locally\n";
+                                eval {
+                                   $cj->runLocally;
+                                };
+                                if ($@) {
+                                   print STDERR "ERROR running job " . $cj->dbID .  " "  . $cj->stderr_file . "[$@]\n";
+                                }
+                           } else {
+
+                             my @jobs = $lsf->get_all_jobs;
+
+                             while (scalar(@jobs) >= $maxjobs) {
+                                 sleep(10);
+                                 @jobs = $lsf->get_all_jobs;
+                             }
+
+
 			    $cj->batch_runRemote($LSF_params);
 			    print "Retrying job\n";
+                          }
 			}
 			else {
 			    print "\nJob already in pipeline with status : " . $cj->current_status->status . "\n";
@@ -244,7 +270,7 @@ while (1) {
             $submitted++;
 	    $jobAdaptor->store($job);
 
-            if ($local) {
+            if ($alllocal) {
                 print "Running job locally\n";
                 eval {
                   $job->runLocally;
@@ -255,6 +281,14 @@ while (1) {
             } else {
 	      eval {
 	        print "\tBatch running job\n";
+
+                my @jobs = $lsf->get_all_jobs;
+
+                while (scalar(@jobs) >= $maxjobs) {
+                     sleep(10);
+                     @jobs = $lsf->get_all_jobs;
+                }
+
 	        $job->batch_runRemote($LSF_params);
 	      };
 	      if ($@) {

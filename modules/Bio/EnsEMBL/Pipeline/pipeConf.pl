@@ -20,22 +20,24 @@ BEGIN {
 package main;
 
 %pipeConf = ( 
-    'nfstmp.dir' => '', # working directory for err/outfiles
+    'nfstmp.dir' => '/work1/michele/out', # working directory for err/outfiles
     'pep_file'   => '', #
     'DBI.driver' => 'mysql',
-    'dbhost'     => 'mysql',
-    'dbname'     => '', #Database name for pipeline db
-    'dbuser'     => '', #Database user for pipeline db
-    'queue'      => '', #farm queue
+    'dbhost'     => 'ecs1c',
+    'dbname'     => 'michele_anopheles', #Database name for pipeline db
+    'dbuser'     => 'ensadmin', #Database user for pipeline db
+    'dbpass'     => 'ensembl', #Database user for pipeline db
+    'queue'      => 'acari', #farm queue
     'batchsize'  => 1,         # no of jobs to send to LSF together
-    'bindir'     => '',
-    'datadir'    => '',
-    'usenodes'   => '',        # farm nodes to use (default all)
+    'bindir'     => '/usr/local/ensembl/bin/',
+    'datadir'    => '/usr/local/ensembl/data/',
+    'usenodes'   => 'ecsnodes',        # farm nodes to use (default all)
     'autoupdate' => 1,         # true->update InputIdAnalysis via Job
     'runner'     => '',        # path to runner.pl, needed by Job.pm
     'cpname'     => '', #this is for crosscomparer comparadb name
     'cpuser'     => '', #and comparadb user
-    'sleep'      => 3600 #sleep time in Rulemanager3
+    'sleep'      => 3600, #sleep time in Rulemanager3
+    'maxjobs'    => 5,
     );
 }
 

@@ -39,7 +39,6 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::Root::RootI;
-use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::LSFJob;
 
@@ -51,9 +50,6 @@ sub new {
     my $self = $class->SUPER::new(@args);
     my ($user,$queue) = $self->_rearrange([qw(USER
 					      QUEUE)],@args);
-
-    $user  = "humpub"     unless defined($user);
-    $queue = "blast_farm" unless defined($queue);
 
     $self->user ($user);
     $self->queue($queue);
@@ -88,17 +84,15 @@ sub get_all_jobs {
 
     open(IN,$cmd . " |");
 
-    
     while (<IN>) {
 	if ($_ !~ /^JOBID/) {
-
 	    my $job = $self->_parse_line($_);
 	    push(@jobs,$job);
 	    
 	}
     }
     close(IN);
-
+    print STDERR "Found " . scalar(@jobs) . " LSF jobs \n";
     return @jobs;
 }
 
