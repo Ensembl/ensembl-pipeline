@@ -24,6 +24,7 @@ use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
+use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
 use MitConf;
 use Getopt::Long;
@@ -134,7 +135,11 @@ from the genbank file?(Y/N) ";
 my $logic_name = 'ncRNA';
 my $ncRNA_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if(!defined $ncRNA_analysis){
-croak "analysis $logic_name not found\n";
+#croak "analysis $logic_name not found\n";
+  $ncRNA_analysis = Bio::EnsEMBL::Analysis->new(
+                                                -logic_name => 'ncRNA',
+                                               );
+  print "You have no ".$logic_name." defined creating new object\n";
 }
 
 if ($MIT_LOGIC_NAME){
@@ -145,7 +150,11 @@ if ($MIT_LOGIC_NAME){
 }
 my $ensembl_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if(!defined $ensembl_analysis){
-croak "analysis $logic_name not found\n";
+#croak "analysis $logic_name not found\n";
+  $ensembl_analysis = Bio::EnsEMBL::Analysis->new(
+                                                  -logic_name => 'ensembl',
+                                                 );
+  print "You have no ".$logic_name." defined creating new object\n";
 }
 
  #########################################################
