@@ -1,5 +1,48 @@
 #!/usr/local/ensembl/bin/perl -w
 
+
+=head1 NAME
+
+load_agp.pl
+
+=head1 SYNOPSIS
+
+  load_agp.pl 
+
+=head1 DESCRIPTION
+ 
+This is a file for loading a standard agp file into the assembly table
+The agp format is described here
+
+http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
+
+Before you can use this script you need to have both the component
+and assembled pieces loaded into the seq_region table. This can be
+done with the load_seq_region.pl script
+
+here is an example commandline
+
+./load_agp.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-assembled_name chromosome -assembled_version NCBI34 
+-component_name contig -agp_file genome.agp
+
+=head1 OPTIONS
+
+    -dbhost    host name for database (gets put as host= in locator)
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+    -assembled_name, the name of the coordinate system which represents
+                   the assembled pieces
+    -assembled_version, the version of the assembled coord system
+    -component_name, the name of the coordinate system which represents
+                     the component pieces
+    -component_version, the version of the component coord system
+    -agp_file path to the the agp file
+    
+    -help      displays this documentation with PERLDOC
+
+=cut
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;

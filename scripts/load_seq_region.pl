@@ -2,26 +2,43 @@
 
 =head1 NAME
 
-load_scaffolds.pl
+load_seq_region.pl
 
 =head1 SYNOPSIS
 
-  load_scaffolds.pl 
+  load_seq_region.pl 
 
 =head1 DESCRIPTION
 
-this script will load a fasta file into a new schema database. It parses
-the file using Bio::SeqIO and then turns each sequence into a Slice
-before storing it
+This script can do three things. Use the entries in a fasta file to load
+a set of seq_regions into the seq_region object. If desried the sequence
+can also be stored. It can also load seq_regions which represent the
+assembled pieces from an agp file. The assembled pieces are represented by 
+the first 3 columns of the agp for further definition of the format see here
 
-as standard this script takes what ever SeqIO parses as the id for the
-slice name, you may need to edit this so it works properly and uses the 
-names you actually want
+http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
 
-here is an example commandline
+here are example commandlines
 
-./load_scaffolds.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
--seqfile sequence.fa -coord_system_name contig 
+this would load the sequence in the given file into the database under
+a coord system called contig. 
+
+./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name contig  -sequence_level -fasta_file sequence.fa
+
+this would just load seq_regions to represent the entries in this file
+
+./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name clone -fasta_file clone.fa
+
+this will load the assembled pieces from the agp file into the seq_region
+table. T
+./load_seq_region -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name chromosome -top_level -agp_file genome.agp
+
+
+
+
 
 =head1 OPTIONS
 
@@ -30,17 +47,16 @@ here is an example commandline
     -dbuser    For RDBs, what username to connect as (dbuser= in locator)
     -dbpass    For RDBs, what password to use (dbpass= in locator)
 
-    -seqfile   the fasta file which contains the sequence
     -coord_system_name the name of the coordinate system being stored
     -coord_system_version the version of the coordinate system being stored
     -default_version shows this version is the default version of the 
                      coordinate system
     -top_level  reflects this is the top level of sequence in the database
-    -sequence_level reflects this is a sequence level coordinate system
-    -agp_file shows the file you are passing in is an agp file and will 
-                     be treated appropriately
-    -fasta_file, shows the file you are passing in is a fasta file
-                 the sequence will only be stored if the -sequence_level
+    -sequence_level reflects this is a sequence level coordinate system and
+    means sequence will be stored from the fasta file. This option isn't valid
+    if an agp_file is being passed in'
+    -agp_file the name of the agp file to be parsed
+    -fasta_file, name of the fasta file to be parsed  if the -sequence_level
                  option is also set the sequence will not be stored
     -help      displays this documentation with PERLDOC
 
@@ -58,15 +74,14 @@ my $port   = '';
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
-my $seqfile;
 my $help;
 my $cs_name;
 my $cs_version;
 my $default = 0;
 my $top_level = 0;
 my $sequence_level = 0;
-my $agp = 0;
-my $fasta = 0;
+my $agp;
+my $fasta;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -74,14 +89,13 @@ my $fasta = 0;
             'dbname:s'   => \$dbname,
             'dbuser:s'   => \$dbuser,
             'dbpass:s'   => \$dbpass,
-            'seqfile:s'  => \$seqfile,
             'coord_system_name:s' => \$cs_name,
             'coord_system_version:s' => \$cs_version,
             'top_level!' => \$top_level,
             'sequence_level!' => \$sequence_level,
             'default_version!' => \$default,
-            'agp_file!' => \$agp,
-            'fasta_file!' => \$fasta,
+            'agp_file:s' => \$agp,
+            'fasta_file:s' => \$fasta,
             'h|help'     => \$help,
            ) or ($help = 1);
 
@@ -91,7 +105,7 @@ if(!$host || !$dbuser || !$dbname || !$dbpass){
     " -dbpass $dbpass\n";
   $help = 1;
 }
-if(!$cs_name || !$seqfile){
+if(!$cs_name || (!$fasta  && !$agp){
   print STDERR "Need coord_system_name and seqfile to beable to run\n";
   print STDERR "-coord_system_name $cs_name -seqfile $seqfile\n";
   $help = 1;
@@ -122,7 +136,7 @@ my $csa = $db->get_CoordSystemAdaptor();
 
 my $cs;
 eval{
-  $cs = $csa->fetch_by_name($cs_name);
+  $cs = $csa->fetch_by_name($cs_name, $cs_version);
 };
 if(!$cs){
   $cs = Bio::EnsEMBL::CoordSystem->new
@@ -140,11 +154,11 @@ my $sa  = $db->get_SliceAdaptor();
 
 
 if($fasta){
-  &parse_fasta($seqfile, $cs, $sa, $sequence_level);
+  &parse_fasta($fasta, $cs, $sa, $sequence_level);
 }
 
 if($agp){
-  &parse_agp($seqfile, $cs, $sa);
+  &parse_agp($agp, $cs, $sa);
 }
 
 sub parse_fasta{
@@ -207,6 +221,8 @@ sub parse_agp{
     my $slice = &make_slice($name, 1, $end, $end, 1, $cs);
     $sa->store($slice);
   }
+  
+  close(FH) or throw("Can't close ".$agp_file);
 }
 
 sub make_slice{
