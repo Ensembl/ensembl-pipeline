@@ -14,7 +14,7 @@
 
 =head1 SYNOPSIS
 
-  my $tmhmm = Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm->new ( -dbobj      => $db,
+  my $tmhmm = Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm->new ( -db      => $db,
 	  	                                                        -input_id   => $input_id,
                                                                         -analysis   => $analysis,
                                                                       );
@@ -29,7 +29,7 @@
 
   This object wraps Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm
   to add functionality to read and write to databases.
-  A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (dbobj).
+  A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor is required for database access (db).
   The query sequence is provided through the input_id.
   The appropriate Bio::EnsEMBL::Analysis object
   must be passed for extraction of parameters.
@@ -60,14 +60,14 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm;
 =head2 new
 
  Title    : new
- Usage    : $self->new ( -dbobj       => $db
+ Usage    : $self->new ( -db       => $db
                          -input_id    => $id
                          -analysis    => $analysis,
                        );
  Function : creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm object
  Example  : 
  Returns  : a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm object
- Args     : -dbobj    :  a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+ Args     : -db    :  a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
             -input_id :  input id
             -analysis :  a Bio::EnsEMBL::Analysis
  Throws   :
@@ -78,10 +78,10 @@ sub new {
 my ($class, @args) = @_;
 
     # this new method also parses the @args arguments,
-    # and verifies that -dbobj and -input_id have been assigned
+    # and verifies that -db and -input_id have been assigned
     my $self = $class->SUPER::new(@args);
     $self->throw ("Analysis object required") unless ($self->analysis);
-    $self->{'_genseq'}      = undef;
+    $self->{'_query'}      = undef;
     $self->{'_runnable'}    = undef;
     
     return $self;
@@ -103,7 +103,7 @@ my ($class, @args) = @_;
 
 sub fetch_input {
  my ($self) = @_;
- my $proteinAdaptor = $self->dbobj->get_Protein_Adaptor;
+ my $proteinAdaptor = $self->db->get_ProteinAdaptor;
  
  my $prot;
     my $peptide;
@@ -131,7 +131,7 @@ sub fetch_input {
     }
 
     
-    $self->genseq($peptide);
+    $self->query($peptide);
 }
 
 
@@ -149,7 +149,7 @@ sub fetch_input {
 
 sub write_output {
     my ($self) = @_;
-    my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
+    my $proteinFeatureAdaptor = $self->db->get_ProteinFeatureAdaptor;
     my @features = $self->output;
 
     if (@features) {
@@ -172,7 +172,7 @@ sub write_output {
 sub run {
     my ($self,$dir) = @_;
     $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched")      unless ($self->genseq());
+    $self->throw("Input not fetched")      unless ($self->query());
 
     $self->runnable->run($dir);
 }
@@ -196,7 +196,7 @@ sub runnable {
     
     if (!defined($self->{'_runnable'})) {
 	
-	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-query     => $self->genseq,
+	my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Tmhmm->new(-query     => $self->query,
 									-analysis  => $self->analysis	);
 	
 	
