@@ -51,7 +51,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Combined qw (
-							     GB_COMBINED_GENETYPE
+                                                            GB_GENEWISE_COMBINED_GENETYPE
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
@@ -113,7 +113,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 					 },
 					 {
 					  runnable => 'Combine_Genewises_and_E2Gs',
-					  analysis => $GB_COMBINED_GENETYPE,
+					  analysis => $GB_GENEWISE_COMBINED_GENETYPE,
 					 },
 					 {
 					  runnable => 'Gene_Builder',
