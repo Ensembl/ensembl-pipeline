@@ -46,6 +46,12 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_EXPRESSION_RUNNER
 					EST_EXPRESSION_CHUNKSIZE
 					EST_EXPRESSION_BSUBS
+					EST_EXONERATE_RUNNABLE
+					EST_EXONERATE_ANALYSIS
+					EST_FILTER_RUNNABLE
+					EST_FILTER_ANALYSIS
+					EST_GENEBUILDER_RUNNABLE
+					EST_GENEBUILDER_ANALYSIS
 				       );
 
 my %chrhash;
@@ -56,13 +62,6 @@ my $ex_bsubdir          = "exonerate_est/bsub";
 my $filterdir           = "filter_and_e2g";
 my $est_genebuilder_dir = "est_genebuilder";
 my $gene2expression_dir = "gene2ests";
-
-# get analyses and runnables
-my @entries = @$EST_RUNNABLES;
-my %runnable_hash;
-foreach my $entry ( @entries ){
-  $runnable_hash{$entry->{analysis}} = $entry->{runnable};
-}
 
 # get chr info from the database where you have contig, clone and static_golden_path
 &get_chrlengths();
@@ -242,7 +241,8 @@ sub make_filter_bsubs {
   my $filter = $scratchdir . "/" . $filterdir . "/";
   my $size   = $EST_FILTERCHUNKSIZE;
   my $runner = $EST_RUNNER;
-
+  my $runnable = $EST_FILTER_RUNNABLE;
+  my $analysis = $EST_FILTER_ANALYSIS;
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
     
@@ -260,7 +260,7 @@ sub make_filter_bsubs {
       my $input_id = $chr . "." . $start . "-" .  $end;
       my $outfile  = $chrdir . "/$input_id.out";
       my $errfile  = $chrdir . "/$input_id.err";
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G\" $filter_e2g -input_id $input_id";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable $runnable -analysis $analysis\" $filter_e2g -input_id $input_id";
       print OUT "$command\n";
       
       $count = $count + $size;
@@ -291,7 +291,9 @@ sub make_EST_GeneBuilder_bsubs{
   # genomic size for each job
   my $size   = $EST_GENEBUILDER_CHUNKSIZE;
   
-  my $runner = $EST_RUNNER;
+  my $runner   = $EST_RUNNER;
+  my $runnable = $EST_GENEBUILDER_RUNNABLE;
+  my $analysis = $EST_GENEBUILDER_ANALYSIS;
 
   foreach my $chr(keys %chrhash) {
     my $length = $chrhash{$chr};
@@ -312,7 +314,7 @@ sub make_EST_GeneBuilder_bsubs{
       my $errfile  = $chrdir . "/$input_id.err";
 
       # if you don't want it to write to the database, eliminate the -write option
-      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder -analysis genomewise\" $runner -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder -analysis genomewise -input_id $input_id -write";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable $runnable -analysis $analysis\" $runner -runnable $runnable -analysis $analysis -input_id $input_id -write";
       print OUT "$command\n";
       
       $count = $count + $size;
