@@ -52,6 +52,7 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::tRNAscan_SE;
 use vars qw(@ISA);
+
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 new
@@ -76,8 +77,6 @@ sub new {
     $self->{'_fplist'}      = [];  
     $self->{'_genseq'}      = undef;
     $self->{'_runnable'}    = undef;
-    $self->{'_input_id'}    = undef;
-    $self->{'_analysis'}    = undef;
     
 
     $self->throw("Analysis object required") unless ($self->analysis);
