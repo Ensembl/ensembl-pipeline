@@ -24,7 +24,6 @@
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Getopt::Long;
 
 # ref db holds the exonerate_e2g gene/exon/supporting feature data

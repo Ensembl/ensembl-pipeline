@@ -52,7 +52,6 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 
 use Bio::DB::RandomAccessI;
 

@@ -36,7 +36,6 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_SOURCE
