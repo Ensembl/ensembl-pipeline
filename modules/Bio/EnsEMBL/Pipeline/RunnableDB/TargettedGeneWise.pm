@@ -74,10 +74,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
 							     GB_TARGETTED_SOFTMASK
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts   qw (
-							     GB_SIZE
-							    );
-
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
@@ -189,23 +185,9 @@ sub fetch_input{
  print STDERR "Parsed input id name ".$chr_name." start ".$start." end ".$end."\n";
   
   # we want to give genewise a bit more genomic than the one found by pmatch, 
-  # but we don't want to exceed the multiple of $GB_SIZE,
-  # if transcripts cross this boundary, they will get mangled afterwards when we
-  # read them in GeneBuilder and store them again using $GB_SIZE's
-  print "GB chunk size = ".$GB_SIZE."\n";
-  my $chunk_size = $GB_SIZE;
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
   
-  my $chunk_start = (int($start/$GB_SIZE)) * $GB_SIZE + 1;
-  my $chunk_end   = $chunk_start + $GB_SIZE - 1;
-  
-  # check that end passed in is not larger than end of chunk
-  if ( $end > $chunk_end ){
-    $self->throw("the end of the protein match passed in ($end) is larger than the genomic chunk we are in ($chunk_end)");
-  }
-  $new_start = (($start - 10000) < $chunk_start) ? $chunk_start : ($start - 10000);
-  $new_end   = (($end + 10000)   > $chunk_end)   ? $chunk_end   : ($end + 10000);
   print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
   my $slice = $sliceadp->fetch_by_chr_start_end($chr_name,$new_start,$new_end);
@@ -220,9 +202,6 @@ sub fetch_input{
   #print STDERR $protein_id."\n";
   print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
   # check slice seq
-#  print ">slice\n" . $slice->seq . "\n";
-  #print "trying to fetch $chr_name.$new_start-$new_end\n";
-
   # genewise runnable
   # repmasking?
 
@@ -336,7 +315,7 @@ sub write_output {
     # do a per gene eval...
     eval {
       $gene_adaptor->store($gene);
-      #print STDERR "wrote gene dbID " . $gene->dbID . "\n";
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
