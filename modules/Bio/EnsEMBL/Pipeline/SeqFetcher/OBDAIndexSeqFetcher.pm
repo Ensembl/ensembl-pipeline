@@ -86,6 +86,8 @@ $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARR
       $database = $1;
     }
 
+    $self->index_name( $database);
+
     # get the index name and the index directory out of $database
     my @path = split /\//, $database;
 
@@ -200,11 +202,56 @@ sub  get_Seq_by_acc {
       last;
     }
   }
+
   if(!defined $seq){
-    $self->warn("could not find sequence for $acc");
+    $self->warn("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name."\n");
+    
+  FETCHER:
+    foreach my $seqfetcher ( $self->_seqfetcher ){
+      
+      my @secondary_namespaces = $seqfetcher->secondary_namespaces;
+      foreach my $name ( @secondary_namespaces ){
+	$self->warn("seqfetcher $seqfetcher is looking in namespace $name for secondary key $acc\n");
+	
+	my @seqs;
+	eval{
+	  # this returns potentially an array of Bio::Seq
+	  @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
+	};
+	if ( $@ ){
+	  $self->warn("problem fetching sequence for secondary key $acc");
+	}
+	if ( @seqs > 1 ){
+	  $self->warn("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
+	  next;
+	}
+	
+	if ( defined $seqs[0] ){
+	  $seqs[0]->display_id( $acc );
+	  $seqs[0]->accession_number( $acc );
+	  $seqs[0]->desc("");
+	  $seq = $seqs[0];
+	  last FETCHER;
+	}
+      }
+    }
+    unless ($seq){
+      $self->warn("could not find sequence for secondary key $acc");
+    }
   }
-  
+
+  if ($seq){
+    print STDERR "found sequence!\n";
+    #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+    #print STDERR "display_id: ".$seq->display_id."\n";
+    #print STDERR $seq->seq."\n";
+  }
+  else{
+    print STDERR "Returning undef\n";
+  }
+
   return $seq;
+  
 }
 
 
@@ -261,10 +308,19 @@ sub  get_Seq_by_secondary {
     $self->warn("OBDAIndexSeqFetcher: could not find sequence for $acc");
   }
   
-  print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
-  print STDERR "display_id: ".$seqs[0]->display_id."\n";
-  print STDERR $seqs[0]->seq."\n";
+  #print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
+  #print STDERR "display_id: ".$seqs[0]->display_id."\n";
+  #print STDERR $seqs[0]->seq."\n";
   return $seqs[0];
 }
+
+sub index_name{
+  my ($self,$name) = @_;
+  if ($name){
+    $self->{index_name} = $name;
+  }
+  return $self->{index_name};
+}
+
 
 1;
