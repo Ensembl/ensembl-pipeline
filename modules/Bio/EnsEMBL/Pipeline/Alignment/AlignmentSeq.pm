@@ -40,7 +40,7 @@ sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
-  
+
   my ($name, 
       $seq, 
       $deletions,
@@ -106,24 +106,19 @@ sub seq_array {
 sub seq_with_newlines {
   my ($self, $line_length) = @_;
 
+  $line_length = 60 unless defined $line_length;
+
   my $seq = $self->seq_array;
 
-  my $concat = '';
-
-  my $column_pos = 0;
+  my $seq_string = '';
 
   foreach my $element (@$seq){
-
-   if (($column_pos%($line_length) == 0)&&($column_pos != 0)){
-     $concat .= "\n";
-     $column_pos = 0;
-   }
-
-   $concat .= $element;
-   $column_pos++;
+    $seq_string .= $element;
   }
 
-  return $concat;
+  $seq_string =~ s/(.{$line_length})/$1\n/g;
+
+  return $seq_string;
 }
 
 
@@ -168,6 +163,8 @@ sub fetch_base_at_position {
 sub insert_gap {
   my ($self, $insert_position, $gap_length) = @_;  
 
+  print STDERR "--------------------------Inserting gap-----------------------\n";
+
   unless ($insert_position && $gap_length){
     $self->throw("Need to specify gap insertion position [$insert_position] and length [$gap_length]");
   }
@@ -189,16 +186,30 @@ sub insert_gap {
     $self->increment_deletions_above($insert_position+$i)
   }
 
-print ">SEQUENCE\n" . $self->seq_with_newlines . "\n";
+#print STDERR ">SEQUENCE\n" . $self->seq_with_newlines . "\n";
 
   return 1;
 }
+
+sub all_gaps {
+  my $self = shift;
+
+  my $sequence_array = $self->seq_array;
+  my @gap_coordinates;
+
+  for (my $i = 0; $i < scalar @$sequence_array; $i++) {
+    push @gap_coordinates, $i+1 if $sequence_array->[$i] eq '*'
+  }
+
+  return \@gap_coordinates
+}
+
 
 sub deletions {
   my $self = shift;
 
   my @sorted_array_of_deletion_coords = 
-    sort {$a <=> $b} keys %{$self->{_deletion_hash}};
+    sort {$a <=> $b} keys %{$self->_deletion_hash};
 
   return \@sorted_array_of_deletion_coords
 }
@@ -213,9 +224,14 @@ sub add_deletion {
 		 ref($position) . "]") 
       if (ref($position) ne '');
 
-    $self->_deletion_hash->{$position}++
+    $self->_deletion_hash->{$position}++;
+#print STDERR "Adding deletion in sequence " . $self->name . " at position $position\n";
   }
-
+#print STDERR "Now have deletions at positions : ";
+#  foreach my $coord (keys %{$self->_deletion_hash}){
+#    print STDERR $coord . " ";
+#  }
+#print STDERR "\n";
   return 1
 }
 
@@ -234,15 +250,13 @@ sub is_a_deletion {
 sub increment_deletions_above {
   my ($self, $coord) = @_;
 
-print "Increment above this coord : " . $coord . "\n";
+print STDERR "Increment above this coord : " . $coord . "\n";
+  my @coords = keys %{$self->_deletion_hash};
 
-  my $coords = keys %{$self->_deletion_hash};
-
-
-  for (my $i = 0; $i < scalar @$coords; $i++) {
-    if ($self->_deletion_hash->{$coords->[$i]}){
-      delete $self->_deletion_hash->{$coords->[$i]};
-      $self->_deletion_hash->{$coords->[$i]+1} = 1;
+  for (my $i = 0; $i < scalar @coords; $i++) {
+    if ($self->_deletion_hash->{$coords[$i]}){
+      delete $self->_deletion_hash->{$coords[$i]};
+      $self->_deletion_hash->{$coords[$i]+1} = 1;
     }
   }
 
@@ -258,31 +272,6 @@ sub _deletion_hash {
 
   return $self->{'_deletions'}
 }
-
-
-sub deletion_array {
-  my $self = shift;
-
-  $self->throw("deletion_array method removed due to" .
-	       " the antisocial manner in which it hammers memory.");
-}
-
-sub store_deletion_array {
-  my ($self, $input_array) = @_;
-
-  $self->throw("store_deletion_array method removed due to" .
-	       " the antisocial manner in which it hammers memory.");
-
-}
-
-sub fetch_deletion_at_position {
-  my ($self, $base_position) = @_;
-
-  $self->throw("fetch_deletion_at_position method removed due to" .
-		 " the antisocial manner in which it hammers memory.");
-
-}
-
 
 # I'm not sure what this is used for...
 
@@ -349,6 +338,30 @@ sub fasta_string {
   return '>' . $self->name . "\n" . $self->seq_with_newlines($line_length) . "\n";
 }
 
+# Deprecated methods
+
+sub deletion_array {
+  my $self = shift;
+
+  $self->throw("deletion_array method removed due to" .
+	       " the antisocial manner in which it hammers memory.");
+}
+
+sub store_deletion_array {
+  my ($self, $input_array) = @_;
+
+  $self->throw("store_deletion_array method removed due to" .
+	       " the antisocial manner in which it hammers memory.");
+
+}
+
+sub fetch_deletion_at_position {
+  my ($self, $base_position) = @_;
+
+  $self->throw("fetch_deletion_at_position method removed due to" .
+		 " the antisocial manner in which it hammers memory.");
+
+}
 
 return 1;
 

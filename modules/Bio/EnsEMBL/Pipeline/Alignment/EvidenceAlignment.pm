@@ -194,7 +194,7 @@ sub new {
   my ($class, @args) = @_;
 
   my $self = bless {},$class;
-  
+
   my ($db, 
       $transcript, 
       $seqfetcher, 
@@ -313,10 +313,7 @@ sub retrieve_alignment {
 						MERGE_SEQUENCES
 					       )],@_);
 
-  unless ($type) {
-    $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
-		 "of \'all\', \'nucleotide\' or \'protein\'.");
-  }
+  $self->_type($type);
 
   unless ($self->_is_computed($type)){
     $self->_align($type, $show_missing_evidence, $remove_introns, 
@@ -445,7 +442,6 @@ sub _align {
   # sequence.  This will complete the alignment of the evidence
   # with the genomic sequence.  A bit of fiddling is needed to 
   # propagate gaps into the evidence sequences that need them.
-print STDERR "There are deletions in genomic sequence.\n" if $self->_there_are_deletions;
 
     # Make some handy data structures
 
@@ -456,7 +452,7 @@ print STDERR "There are deletions in genomic sequence.\n" if $self->_there_are_d
   foreach my $evidence_sequence (@$evidence_sequences) {
 
     # Note:  Purposely using the memory address for our evidence sequence objects
-    # as they have non-unique names.
+    # as they otherwise have non-unique names.
 
     $evidence_sequence_hash{$evidence_sequence} = $evidence_sequence;
 
@@ -473,6 +469,8 @@ print STDERR "There are deletions in genomic sequence.\n" if $self->_there_are_d
     # Add a gap to the genomic and exonic sequence
 
     $self->_genomic_sequence->insert_gap($deletion_coord, 1);
+my $genomic_deletions = $self->_genomic_sequence->deletions;
+print STDERR "Inserted genomic gap at coord $deletion_coord. Now have " . scalar @$genomic_deletions . " total gaps.\n"; 
     $self->_exon_nucleotide_sequence->insert_gap($deletion_coord, 1);
     $self->_exon_protein_translation->insert_gap($deletion_coord, 1);
 
@@ -497,11 +495,11 @@ print STDERR "There are deletions in genomic sequence.\n" if $self->_there_are_d
       # %deletion_sets
 
     foreach my $evidence_name (keys %evidence_sequence_hash) {
-      my $coords = keys %{$deletion_sets{$evidence_name}};
-      for (my $i = 0; $i < scalar @$coords; $i++) {
-	if ($deletion_sets{$evidence_name}->{$coords->[$i]}){
-	  delete $deletion_sets{$evidence_name}->{$coords->[$i]};
-	  $deletion_sets{$evidence_name}->{$coords->[$i]+1} = 1;
+      my @coords = keys %{$deletion_sets{$evidence_name}};
+      for (my $i = 0; $i < scalar @coords; $i++) {
+	if ($deletion_sets{$evidence_name}->{$coords[$i]}){
+	  delete $deletion_sets{$evidence_name}->{$coords[$i]};
+	  $deletion_sets{$evidence_name}->{$coords[$i]+1} = 1;
 	}
       }
     }
@@ -981,10 +979,10 @@ sub _truncate_introns {
 
   push (@sequences, $self->_working_alignment('genomic_sequence'));
   push (@sequences, $self->_working_alignment('exon_nucleotide'));
-
+print STDERR "Type is : " . $self->_type . "\n";
   if (($self->_type eq 'all')||($self->_type eq 'protein')){
     push (@sequences, $self->_working_alignment('exon_protein'));
-  }  
+  }
 
   foreach my $aligned_seq (@{$self->_working_alignment('evidence')}){
     push (@sequences, $aligned_seq);
@@ -1002,15 +1000,28 @@ sub _truncate_introns {
   foreach my $exon (@{$self->_transcript->get_all_Exons}){
 
     my $exon_start = $exon->start;
-    my $exon_end = $exon->end;
+    my $exon_end   = $exon->end;
 
     if ($self->_strand == -1) {
-      $exon_start = $self->_slice->length - $exon_start - ($exon_end - $exon_start);
-      $exon_end = $self->_slice->length - $exon_start;
+      $exon_start = $self->_slice->length - $exon_start + 1;
+      $exon_end   = $self->_slice->length - $exon_end + 1;
     }
-    
-    push(@coordinates, $exon->start);
-    push(@coordinates, $exon->end);
+    push(@coordinates, $exon_start, $exon_end);
+  }
+
+  # Get locations of gaps in genomic sequence.
+
+  my $genomic_gaps = $self->_genomic_sequence->all_gaps;
+print STDERR "Have " . scalar @$genomic_gaps . " genomic gaps.\n";
+
+  # Work through the list of genomic gaps and increment all
+  # coordinates that are greater than a gap position.
+
+  foreach my $gap_coord (@$genomic_gaps) {
+    for (my $i = 0; $i < scalar @coordinates; $i++) {
+print STDERR "Incrementing intron boundary coordinate [".$coordinates[$i]."] because it lies downstream of a gap at [$gap_coord].\n";
+      $coordinates[$i]++ if $coordinates[$i] >= $gap_coord;
+    }
   }
 
   # Sort in reverse, such that we splice out introns from the
@@ -1053,13 +1064,10 @@ sub _truncate_introns {
 		    "to be discarded.  Try again with a higher amount of padding\n".
 		    "around the exon sequences.\n");
       }
-      
     }
-    
-    
     $align_seq->store_seq_array($seq_array);
   }
-  
+
   return 1;
 }
 
@@ -1203,12 +1211,22 @@ sub _type {
   my ($self, $type) = @_;
 
   if (defined $type) {
+    unless ($type eq 'all' ||
+	    $type eq 'nucleotide' ||
+	    $type eq 'protein') {
+      $self->throw("Type of alignment to retrieve not recognised.  Please use one " . 
+		   "of \'all\', \'nucleotide\' or \'protein\'.");
+    }
+
     $self->{'_computed_type'} = $type;
   }
 
+  $self->throw("Type of alignment to retrieve not specified.  Please use one " . 
+	       "of \'all\', \'nucleotide\' or \'protein\'.") 
+    unless $self->{'_computed_type'};
+
   return $self->{'_computed_type'};
 }
-
 
 
 ##### Alignment information handling methods #####
@@ -1587,7 +1605,7 @@ sub _fiddly_bits {
     my $length = $last_aa - $first_aa + 1;
 
     @fetched_seq = splice(@full_seq, $first_aa, $length);
-  } 
+  }
 
   # If we have a dna align feature, extracting the correct portion
   # of the hit sequence is a bit easier than the method required
@@ -1648,7 +1666,7 @@ sub _fiddly_bits {
   foreach my $instruction (@cigar_instructions) {
 
     if ($instruction->{'type'} eq 'I') {
-      my $gap = '*' x $instruction->{'length'};
+      my $gap = '-' x $instruction->{'length'};
       my @gap = split //, $gap;
 
       if ($hit_position < scalar @fetched_seq){
@@ -1671,9 +1689,10 @@ sub _fiddly_bits {
       $deletions++;
 
       for (my $i = 1; $i <= $instruction->{'length'}; $i++){
+	next unless $slice_position + $i >= 0;
 	$partially_aligned->add_deletion($slice_position + $i);
-
-	print STDERR "Inserting deletion at position : $hit_position\n";
+	my $thing = $slice_position + $i;
+	print STDERR "Inserting deletion at position : $thing\n";
       }
 
       $hit_position   += $instruction->{'length'};
@@ -1686,16 +1705,48 @@ sub _fiddly_bits {
   }
 
   # This little section of code handles any sequence that
-  # overshoots the beginning of our slice.  Chop.
+  # overshoots the beginning or end of our slice.  Chop.
 
-  if ($base_align_feature->start < 0 && $base_align_feature->end > 0) {
+  if ($base_align_feature->start < 0 || 
+      $base_align_feature->start > $self->_slice->length ||
+      $base_align_feature->end > $self->_slice->length || 
+      $base_align_feature->end < 0) {
     $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
 		$base_align_feature->start . " end:" . $base_align_feature->end 
-		."] extends past the start of genomic slice.  Truncating it to fit.");
+		."] extends past the start or end of genomic slice.  Truncating " . 
+		"overhanging sequence");
 
-    my $overshoot = $base_align_feature->start * -1;
-
-    splice (@fetched_seq, 0, $overshoot + 1);
+    if (($base_align_feature->start < 0 && 
+	 $base_align_feature->end < 0)||
+	($base_align_feature->start > $self->_slice->length &&
+	 $base_align_feature->end > $self->_slice->length)) {
+      print STDERR "Feature lies completely outside the bounds of Slice.  Chuck.\n";
+      splice (@fetched_seq, 0, scalar @fetched_seq);
+    } elsif ($self->_strand == 1) {
+      my $start_overshoot = 0;
+      if ($base_align_feature->start < 0) {
+print STDERR "Case 1.\n";
+	$start_overshoot = $base_align_feature->start * -1;
+	splice (@fetched_seq, 0, $start_overshoot + 1);
+      }
+      if ($base_align_feature->end > $self->_slice->length) {
+print STDERR "Case 2.\n";
+	my $end_overshoot = $base_align_feature->end - $self->_slice->length - 1;
+	splice (@fetched_seq, $base_align_feature->end - $start_overshoot - 1, $end_overshoot);
+      }
+    } elsif ($self->_strand == -1) {
+      my $start_overshoot = 0;
+      if ($base_align_feature->end < 0) {
+print STDERR "Case 3.\n";
+	$start_overshoot = $base_align_feature->end * -1;
+	splice (@fetched_seq, 0, $start_overshoot + 1);
+      }
+      if ($base_align_feature->start > $self->_slice->length) {
+print STDERR "Case 4.\n";
+	my $end_overshoot = $base_align_feature->start - $self->_slice->length - 1;
+	splice (@fetched_seq, $base_align_feature->start - $start_overshoot - 1, $end_overshoot);
+      }
+    }
   }
 
   # Here we are actually building the sequence that will
@@ -1704,10 +1755,19 @@ sub _fiddly_bits {
   my $feature_sequence = '-' x $self->_slice->length;
   my @feature_sequence = split //, $feature_sequence;
 
-  my $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start -1 : 0;
+  my $genomic_start;
+
+  if ($self->_strand == 1){
+    $genomic_start = $base_align_feature->start > 0 ? $base_align_feature->start - 1 : 0;
+  } elsif ($self->_strand == -1) {
+    $genomic_start = $base_align_feature->end > 0 ? $base_align_feature->end - 1 : 0;
+  }
 
   if ($genomic_start <= scalar @feature_sequence){
-print STDERR $base_align_feature->hseqname . " " . $base_align_feature->start . " " . $genomic_start . "\n";
+    if ($self->_strand == -1){
+      $genomic_start = scalar @feature_sequence - $genomic_start - 1;
+    }
+print STDERR "Inserting sequence : " . $base_align_feature->hseqname . " (feat start) " . $base_align_feature->start . " (insert at) " . $genomic_start . "\n";
     splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
   } else {
     $self->warn("Feature [". $base_align_feature->hseqname . " start:" . 
@@ -1756,6 +1816,8 @@ sub _print_tabulated_coordinates {
 
   print STDERR 
     "Transcript : id         - " . $self->_transcript->stable_id . "\n" . 
+    "             coding     - (start) " . $self->_transcript->coding_start . " (end) " . 
+      $self->_transcript->coding_end . "\n" .
     "             exon count - " . scalar @$exons . "\n";
   foreach my $exon (@$exons) {
     print STDERR 
@@ -2131,6 +2193,8 @@ sub _build_sequence_cache {
   # Build cache.
 
   foreach my $fetched_seq (@$fetched_seqs){
+
+    next unless defined $fetched_seq;
 
     $self->{'_fetched_seq_cache'}->{$fetched_seq->accession_number} = $fetched_seq;
 
