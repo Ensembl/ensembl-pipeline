@@ -90,10 +90,10 @@ foreach my $job (@jobs) {
     my $stdout=$job->stdout_file();
     print STDERR "STDOUT file is $stdout\n";
     
-    open(STDOUT,"<$stdout");
+    open(STDOUT,'<$stdout') || die ("Could not open $stdout\n");
     my $failed = 1;
     while(<STDOUT>){
-	print $_;
+	print STDERR $_;
 	if(/Successfully/){
 	    $failed=0;
 	    #$job->set_status('SUCCESSFUL');
