@@ -248,11 +248,11 @@ sub pair_Transcripts {
   my (@ann_transcripts,@pred_transcripts);
   my (@ann_trans,@pred_trans);
   foreach my $gene ( @$pred_genes ){
-    print STDERR "gene ".$gene->type." put in pred_trans array\n";
+    #print STDERR "gene ".$gene->type." put in pred_trans array\n";
     push( @pred_trans, $gene->each_Transcript );
   }
   foreach my $gene ( @$ann_genes ){
-    print STDERR "gene ".$gene->type." put in ann_trans array\n";
+    #print STDERR "gene ".$gene->type." put in ann_trans array\n";
     push( @ann_trans, $gene->each_Transcript );
   }
   
@@ -301,6 +301,9 @@ sub pair_Transcripts {
       #.$$overlap_matrix{ $tran1 }{ $tran2 }."\n";
     }
   }
+  # @overlap_pairs contains an array of lists
+  # each list contains: ( number_of_exon_overlaps, prediction, annotation, length_of_overlap )
+  
   if ( @overlap_pairs ){
     # sort the list of @overlap_pairs on the overlap
     my @sorted_pairs = sort { my $result = ( $$b[0] <=> $$a[0] );
