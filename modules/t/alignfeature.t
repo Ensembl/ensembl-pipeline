@@ -1,26 +1,8 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use strict;
+use Test;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..7\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
-
+BEGIN { $| = 1; plan tests => 8;}
 
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
@@ -30,10 +12,8 @@ use Bio::SeqIO;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::SeqFeature;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
+ok(1);
 
-# make PrimarySeq objects for genomic and est sequences.
 my ($gseq, $estseq) =  set_seq();
 
 my $genomic_seq	   =  Bio::PrimarySeq->new(	-seq         => $gseq,
@@ -41,15 +21,14 @@ my $genomic_seq	   =  Bio::PrimarySeq->new(	-seq         => $gseq,
 						-accession   => 'Z84721',
 						-moltype     => 'dna');
 
+ok($genomic_seq);
+
 my $est_seq = Bio::PrimarySeq->new(		-seq         => $estseq,
 						-id          => 'u44e12',
 						-accession   => 'AI816040',
 						-moltype     => 'dna');
 
-unless (defined($genomic_seq) && defined($est_seq)) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
+ok($est_seq);
 
 # Manually making a *really* minimal FeaturePair to pass to new AlignFeature object- It seems only the 
 # sequence names are used from these.
@@ -57,64 +36,55 @@ else
 my $f1 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'Z84721',
 				       -start	=> 33739,
 				       -end	=> 34575);
+
 my $f2 = Bio::EnsEMBL::SeqFeature->new(-seqname => 'AI816040',
 				       -start	=> 1,
 				       -end	=> 578);
+
 my $feat_pair = Bio::EnsEMBL::FeaturePair->new(	-feature1 => $f1,
 						-feature2 => $f2,
 					      );
-
-unless (defined($feat_pair))
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+ok($feat_pair);
 
 # Gotta make a SeqFetcher object too.
-  # write est sequence to a file that will be subsequently indexed (great, a one sequence index...)
-  my $fasta_filename = '/tmp/estseq.fa';
-  my $index_filename = '/tmp/estseq.inx';
+# write est sequence to a file that will be subsequently indexed (great, a one sequence index...)
+my $fasta_filename = '/tmp/estseq.fa';
+my $index_filename = '/tmp/estseq.inx';
 
-  my $seq_stream = Bio::SeqIO->new('-format' => 'Fasta','-file' => ">$fasta_filename");
-  $seq_stream->write_seq($est_seq);
+my $seq_stream = Bio::SeqIO->new('-format' => 'Fasta','-file' => ">$fasta_filename");
 
-  #create a bioperl index to be used by SeqFetcher
-  my $inx = Bio::Index::Fasta->new(  '-filename'   => $index_filename,
-				     '-write_flag' => 1);
-  $inx->make_index($fasta_filename);
+$seq_stream->write_seq($est_seq);
 
-  #create SeqFetcher::Pfetch object    
-  my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
-								-executable  => '/usr/local/pubseq/bin/pfetch',
-								-bp_index => $index_filename);
+#create a bioperl index to be used by SeqFetcher
+my $inx = Bio::Index::Fasta->new('-filename'   => $index_filename,
+                                 '-write_flag' => 1);
 
-unless (defined($seqfetcher))
-{ print "not ok 4\n"; }
-else
-{ print "ok 4\n"; }
+$inx->make_index($fasta_filename);
+
+#create SeqFetcher::Pfetch object    
+my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new(
+                     -executable  => '/usr/local/pubseq/bin/pfetch',
+		     -bp_index    => $index_filename);
+
+ok($seqfetcher);
 
 # Make the actual AlignFeature object
-my @feat_pairs = ($feat_pair);
+
 my $alignfeature = Bio::EnsEMBL::Pipeline::Runnable::AlignFeature->new('-genomic'    => $genomic_seq,
-								       '-features'   => \@feat_pairs,
+								       '-features'   => [$feat_pair],
 								       '-seqfetcher' => $seqfetcher);
  
-unless ($alignfeature)
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
+ok($alignfeature);
 
 #run AlignFeature runnable                            
 $alignfeature->run();
-print "ok 6\n"; # 4th test passed
+
+ok(1);
 
 #get and store the output
-my @results = $alignfeature->output();
-display(@results);
+ok(my @results = $alignfeature->output);
 
-unless (@results) 
-{ print "not ok 7\n"; }
-else
-{ print "ok 7\n"; }
+display(@results);
 
 # clean up sequence and index files 
 unlink ($fasta_filename);
