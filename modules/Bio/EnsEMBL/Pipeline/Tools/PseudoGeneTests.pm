@@ -246,14 +246,17 @@ sub is_spliced{
 sub has_polyA_track{
   my ($self,$transcript,$db) = @_;
   my @exons     = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
-  my $chr_name  = $exons[0]->contig->chr_name;
-  my $end       = $exons[0]->contig->chr_start + $exons[$#exons]->start - 1;
+  my $seq_region_name  = $exons[0]->slice->seq_region_name;
+  my $coord_system_name = $exons[0]->slice->coord_system_name; 
+  my $end       = $exons[0]->slice->start + $exons[$#exons]->start - 1;
   
   if ( $exons[0]->strand == 1 ){
       print STDERR "Last Exon: ".$exons[$#exons]->start."-".$exons[$#exons]->end.":".$exons[$#exons]->strand."\n";
       my $start = $exons[$#exons]->end - 9;
       my $end   = $exons[$#exons]->end + 9;
-      my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $start, $end )->seq;
+      my $seq = $db->get_SliceAdaptor->fetch_by_region($coord_system_name,
+                                                    $seq_region_name, 
+                                                    $start, $end )->seq;
       
       #####################################################################
       print STDERR "$start-$end -> ".($end-$start+1)."bp downstream: $seq\n";
@@ -270,7 +273,9 @@ sub has_polyA_track{
       print STDERR "Last Exon: ".$exons[0]->start."-".$exons[0]->end.":".$exons[0]->strand."\n";
       my $start = $exons[0]->start - 9;
       my $end   = $exons[0]->start + 9;
-      my $seq = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $start, $end )->seq;
+      my $seq = $db->get_SliceAdaptor->fetch_by_region($coord_system_name,
+                                                       $seq_region_name, 
+                                                       $start, $end )->seq;
       
       ############################################################
       # get the revcomp sequence:
@@ -353,14 +358,16 @@ sub overlap_repeats{
 
   ############################################################
   # need to get a slice where pseudogene sits:
-  my $chr_name  = $exons[0]->contig->chr_name;
-  my $chr_start = $exons[0]->contig->chr_start;
-  my $chr_end   = $exons[0]->contig->chr_end;
+  my $seq_region_name  = $exons[0]->slice->seq_region_name;
+  my $coord_system_name = $exons[0]->slice->coord_system_name; 
+  my $chr_start = $exons[0]->slice->start;
+  my $chr_end   = $exons[0]->slice->end;
   
   ############################################################
   # get slice from the same db where our pseudogene is
-  my $slice = $db->get_SliceAdaptor
-    ->fetch_by_chr_start_end( $chr_name, $chr_start + $start - 1 - 1000, $chr_start + $end - 1 + 1000);
+  my $slice = $db->get_SliceAdaptor->fetch_by_region($coord_system_name,
+                                                     $seq_region_name, 
+                                                     $chr_start, $chr_end);
   
   #my $rpfa = $db->get_RepeatFeatureAdaptor();
   #my @features = @{$rpfa->fetch_all_by_Slice($slice, 'RepeatMask')};
@@ -374,8 +381,8 @@ sub overlap_repeats{
     next unless ( $strand == $feature->strand );
     my $overlap = 0;
     my $overlap_length = 0;
-    my $feature_start = $slice->chr_start + $feature->start - 1;
-    my $feature_end   = $slice->chr_start + $feature->end - 1;
+    my $feature_start = $slice->start + $feature->start - 1;
+    my $feature_end   = $slice->start + $feature->end - 1;
     
     if ( $feature_start <= $start && $feature_end >= $start ){
       $overlap = 1;
@@ -490,7 +497,7 @@ sub overlap{
   my ($self, $t1, $t2 ) = @_;
   my @e1 = sort { $a->start <=> $b->start } @{$t1->get_all_Exons};
   my @e2 = sort { $a->start <=> $b->start } @{$t2->get_all_Exons};
-  unless ( $e1[0]->contig->chr_name eq $e2[0]->contig->chr_name ){
+  unless ( $e1[0]->slice->seq_region_name eq $e2[0]->slice->seq_region_name ){
     return 0;
   }
   my $start1 = $e1[0]->start;
