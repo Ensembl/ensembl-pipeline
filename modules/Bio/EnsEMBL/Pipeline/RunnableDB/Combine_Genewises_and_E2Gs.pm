@@ -214,7 +214,7 @@ sub run {
 
 	# this is a very low threshold ... we were losing a lot of good matches this way
 #	if ($intron > 50000) {
-	if ($intron > 100000) {
+	if ($intron > $GB_COMBINED_MAX_INTRON) {
 	  $found = 1;
 	  
 	}
