@@ -186,7 +186,7 @@ sub run {
   }
   close( QUERY_SEQ );
   
-  my $command ="$blat -t=$target_type -q=$query_type $target $query ".$self->results; 
+  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query ".$self->results; 
   print STDERR "running blat: $command\n";
   
   # system calls return 0 (true in Unix) if they succeed
