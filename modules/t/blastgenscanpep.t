@@ -78,7 +78,7 @@ my $blastgenscan = Bio::EnsEMBL::Pipeline::Runnable::BlastGenscanPep->new (
                                                     -peptide    => $pred_transcript,
 						    -program    => 'wublastp',
                                             # Hardcoded path alert
-                                                    -database   => '/data/blastdb/Ensembl/swall-1',
+                                                    -database   => '/data/blastdb/Ensembl/swall',
                                                     -threshold  => 1e-6,
                                                     -options    => 'B=1000'
                                                     );
