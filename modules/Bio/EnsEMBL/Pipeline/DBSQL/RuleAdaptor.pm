@@ -284,33 +284,4 @@ sub deleteObj {
   }
 }
 
-sub create_tables{
-  my ($self) = @_;
-  my $sth;
-
-  $sth = $self->prepare("drop table if exists rule_goal");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE rule_goal (
-    rule_id           int unsigned default 0 not null auto_increment,
-    goal              int unsigned,
-
-    PRIMARY KEY (rule_id)
-    );
-  });
-  $sth->execute();
-
-  $sth = $self->prepare("drop table if exists rule_conditions");
-  $sth->execute();
-
-  $sth = $self->prepare(qq{
-    CREATE TABLE rule_conditions (
-    rule_id            int not null,
-    condition_literal  varchar(40)
-    );
-  });
-  $sth->execute();
-}
-
 1;
