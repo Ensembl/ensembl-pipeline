@@ -187,10 +187,11 @@ sub map{
 
    # deal with dead exons
 
-   foreach my $exon ( $self->{'_untransfered'} ) {
-       $self->archive->write_seq($exon->id,$exon->version,'exon',$exon->seq,$exon->id,$exon->version);
+   if ($self->{'untransfered'}) {
+       foreach my $exon ( $self->{'_untransfered'} ) {
+	   $self->archive->write_seq($exon->id,$exon->version,'exon',$exon->seq,$exon->id,$exon->version);
+       }
    }
-
    print $log "About to map genes";
    # map the genes
 
@@ -369,7 +370,7 @@ sub map_temp_Exons_to_real_Exons{
        } else {
 	   # ok - new Exon
 	   my $tempid = $tempexon->id();
-	   $tempexon->id($self->archive->get_new_stable_id('exon',1));
+	   $tempexon->id($self->archive->get_new_stable_ids('exon',1));
 	   $tempexon->created($time);
 	   $tempexon->modified($time);
 	   $tempexon->version(1);
@@ -658,7 +659,7 @@ sub map_temp_Genes_to_real_Genes{
 	   push(@oldtrans,$oldg{$oldgeneid}->each_Transcript);
        }
        
-       my ($should_increment,$additional_dead_transcript_ids) = Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Transcripts_to_real_Transcripts($vc,$logfile,\@newtrans,\@oldtrans);
+       my ($should_increment,$additional_dead_transcript_ids) = $self->map_temp_Transcripts_to_real_Transcripts($vc,$logfile,\@newtrans,\@oldtrans);
 
        push(@dead_transcript_ids,@$additional_dead_transcript_ids);
 
