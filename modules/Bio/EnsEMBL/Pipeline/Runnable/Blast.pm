@@ -486,7 +486,7 @@ sub parse_results {
  }
 
 
-# Alternate feature filter. If option not present in pipeConf, should default to FeatureFilter -prune
+# Alternate feature filter. If option not present in config, should default to FeatureFilter -prune
 
   if ($REFILTER{$self->database}){
     # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
