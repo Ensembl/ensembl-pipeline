@@ -25,18 +25,26 @@ use Getopt::Long;
 ## load all the parameters
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
 
-
+# annotation
 my $host1   = $DBHOST1;
 my $dbname1 = $DBNAME1;
 my $path1   = $PATH1;
 my $type1   = $GENETYPES1;
 my $user1   = $DBUSER1;
 
+# prediction
 my $host2   = $DBHOST2;
 my $dbname2 = $DBNAME2;
 my $path2   = $PATH2;
 my $type2   = $GENETYPES2;
 my $user2   = $DBUSER2;
+
+# reference db
+my $ref_host   = $REF_DBHOST;
+my $ref_dbname = $REF_DBNAME;
+my $ref_path   = $REF_PATH;
+my $ref_user   = $REF_DBUSER;
+
 
 my $runnable;
 my $input_id;
@@ -45,12 +53,14 @@ my $check  = 0;
 my $params;
 my $pepfile;
 
+my $gff_file;
+
 # can override db options on command line
 &GetOptions( 
-	     'input_id:s'  => \$input_id,
+	    'input_id:s'  => \$input_id,
+	    'gff_file:s'  => \$gff_file,
+	   );
 
-	     );
-	
 unless( $input_id){     
   print STDERR "Usage: run_GeneComparison.pl -input_id < chrname.chrstart-chrend >\n";
   exit(0);
@@ -67,6 +77,12 @@ unless ( $chr && $chrstart && $chrend ){
 }
 
 # connect to the databases 
+my $dna_db= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host,
+					       -user  => $ref_user,
+					       -dbname=> $ref_dbname);
+$dna_db->static_golden_path_type($ref_path); 
+
+
 my $db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host1,
 					    -user  => $user1,
 					    -dbname=> $dbname1);
@@ -75,7 +91,9 @@ print STDERR "Connected to database $dbname1 : $host1 : $user1 \n";
 
 my $db2= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $host2,
 					    -user  => $user2,
-					    -dbname=> $dbname2);
+					    -dbname=> $dbname2,
+					    -dnadb => $dna_db);
+
 print STDERR "Connected to database $dbname2 : $host2 : $user2 \n";
 
 
@@ -86,13 +104,15 @@ $db2->static_golden_path_type($path2);
 
 my $sgp1 = $db1->get_StaticGoldenPathAdaptor;
 my $sgp2 = $db2->get_StaticGoldenPathAdaptor;
+my $sgp3 = $dna_db->get_StaticGoldenPathAdaptor;
 
 # get a virtual contig with a piece-of chromosome #
 my ($vcontig1,$vcontig2);
 
 print STDERR "Fetching region $chr, $chrstart - $chrend\n";
-$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
+$vcontig1 = $sgp1->fetch_VirtualContig_by_chr_start_end("chr20",$chrstart,$chrend);
 $vcontig2 = $sgp2->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
+my $vcontig3 = $sgp3->fetch_VirtualContig_by_chr_start_end($chr,$chrstart,$chrend);
 
 # get the genes of type @type1 and @type2 from $vcontig1 and $vcontig2, respectively #
 my (@genes1,@genes2);
@@ -122,10 +142,26 @@ foreach my $type ( @{ $type2 } ){
   print STDERR "with ".scalar(@more_trans)." transcripts\n";
 }
 
+#my @extra_genes = $vcontig3->get_Genes_by_Type("ensembl");
+#my @extra_trans = ();
+#foreach my $gene ( @extra_genes ){
+#  push ( @extra_trans, $gene->each_Transcript );
+#}
+#print STDERR scalar(@extra_genes)." genes of type ensembl found\n";
+#print STDERR "with ".scalar(@extra_trans)." transcripts\n";
+#push( @genes2, @extra_genes );
+
+
 # get a GeneComparison object 
-my $gene_comparison = Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(\@genes1, \@genes2);
-# as convention, we put first the annotated (or benchmark) genes and second the predicted genes
-# and the comparison methods refer to the second list with respect to the first one
+my $gene_comparison = 
+  Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison->new(					     
+							      '-annotation_db'    => $db1,
+							      '-prediction_db'    => $db2,
+							      '-annotation_genes' => \@genes1,
+							      '-prediction_genes' => \@genes2,
+							      '-input_id'         => $input_id,
+							     );
+
 
 
 #########################################################
@@ -165,7 +201,11 @@ print STDERR scalar(@gene_clusters)." gene clusters formed\n";
 print STDERR scalar(@unclustered1)." genes of type @$type1 left unclustered\n";
 print STDERR scalar(@unclustered2)." genes of type @$type2 left unclustered\n";
 
+if ( $gff_file ){  
+  $gene_comparison->gff_file($gff_file);
+}
 
-$gene_comparison->compare_Exons(\@gene_clusters,'coding');
+# run the analysis
+$gene_comparison->compare_Exons(\@gene_clusters,0,'verbose');
 
 
