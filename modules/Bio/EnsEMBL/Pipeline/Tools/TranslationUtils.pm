@@ -37,6 +37,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Utils::PolyA;
+use Bio::EnsEMBL::Utils::Exception;
 use Bio::EnsEMBL::DBSQL::SliceAdaptor;
 
 
@@ -64,10 +65,9 @@ sub compute_translation{
   my ($self,$trans) = @_;
   
   my $verbose = 0;
-
   my @met_predictions   = $self->run_translate( $trans,1);
   my @nomet_predictions = $self->run_translate( $trans );
-  
+ 
   my $count = 0;
   while ( $count < 2 && $met_predictions[$count] ){
     my @entry = @{$met_predictions[$count]};
@@ -98,7 +98,13 @@ sub compute_translation{
     }
     elsif( @nomet_predictions ){
 	$best = $nomet_predictions[0];
-    }
+   }else{
+        # if there are no nomet_predictions and no met_predictions return to caller
+        verbose('DEPRECATE');
+        warning("No translation could be computed for transcript \n");
+	return $trans;
+   }
+ 
     my @entry = @{$best};
     my $orf_start = $entry[1];
   my $orf_end   = $entry[2];
