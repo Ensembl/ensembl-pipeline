@@ -222,7 +222,8 @@ sub run {
   if ($self->check_repeated){ 
     $mg_runnables = $self->build_runnables(@features);
   } else {
-    $mg_runnables = $self->make_mmgw($self->genomic_sequence, \@features);
+    my $runnable = $self->make_mmgw($self->genomic_sequence, \@features);
+    push (@$mg_runnables, $runnable); 
   }
 
   #print STDERR "Running the MultiMiniGenewise runnables.\n";
@@ -268,7 +269,7 @@ sub run_blast {
     }else {
       $::fasta_header_re{$dbname} = '^(\w+)\s+';
     }
-    
+
     my $run = new Bio::EnsEMBL::Pipeline::Runnable::Blast(-query    => $seq,
 							  -program  => 'wutblastn',
 							  -database => $blastdb->dbfile,
