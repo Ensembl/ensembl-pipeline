@@ -222,7 +222,7 @@ sub _derive_informative_site_alignment {
     # against the aligned exonic sequence.
     if ($lost) {
       my $gene_seed_string = substr($gene_string, $gene_coord, 10);
-print STDERR "  Gene seed : " . $gene_seed_string . "\n";
+#print STDERR "  Gene seed : " . $gene_seed_string . "\n";
     LOST:
       while (1){
 	my $exon_seed_string = substr($exon_string, $align_coord, 10);
@@ -241,7 +241,7 @@ print STDERR "  Gene seed : " . $gene_seed_string . "\n";
 
 	$exon_seed_string =~ s/-//g;
 
-print STDERR "    Align coord : " . $align_coord . "  Seed : $exon_seed_string\n";
+#print STDERR "    Align coord : " . $align_coord . "  Seed : $exon_seed_string\n";
 	my $increment = 0;
 
       EXTENTION:
@@ -259,11 +259,11 @@ print STDERR "    Align coord : " . $align_coord . "  Seed : $exon_seed_string\n
 
 	  throw("Have run off the end of the alignment without matching the gene seed.  Bugger.")
 	    if ($align_coord + 10 + $increment >= $align_length);
-print STDERR "      Extending exon seed : " . $exon_seed_string . "\n";
+#print STDERR "      Extending exon seed : " . $exon_seed_string . "\n";
 	}
 	
 	if ($gene_seed_string =~ /^$exon_seed_string/) {
-print STDERR "Sequence FOUND\n";
+#print STDERR "Sequence FOUND\n";
 	  $lost = 0;
 	  last LOST
 	}
@@ -304,16 +304,16 @@ else {
       $align_coord++;
       next
     } else {
-print STDERR "Next base is a gap.  Trying to hop.\n";
+#print STDERR "Next base is a gap.  Trying to hop.\n";
       while (substr($exon_string, $align_coord + $hop, 1) eq '-'){
 	$hop++;
-print STDERR "     Little hop.\n";
+#print STDERR "     Little hop.\n";
 	while (substr($exon_string, $align_coord + $hop, 10) eq '-' x 10) {
 	  $hop += 10;
-print STDERR "      Big hop.\n";
+#print STDERR "      Big hop.\n";
 	  while (substr($exon_string, $align_coord + $hop, 100) eq '-' x 100) {
 	    $hop += 100;
-print STDERR "      Really big hop.\n";
+#print STDERR "      Really big hop.\n";
 	  }
 	}
       }
