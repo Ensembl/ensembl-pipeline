@@ -135,10 +135,10 @@ sub store_input_id_analysis {
 
   my $sth = $self->prepare(qq{
     INSERT INTO input_id_analysis
-                (input_id, analysis_id, created)
-                values (?, ?, now())
+                (input_id, input_id_type, analysis_id, created)
+                values (?, ?, ?, now())
   });
-  $sth->execute($inputId, $analysis->dbID);
+  $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID);
 }
 
 
@@ -275,6 +275,49 @@ sub delete_input_id {
     WHERE  input_id = ? } );
   $sth->execute($inputId);
 }
+
+sub get_all_input_id_analysis_sets {
+  my $self = shift;
+  my %id_type_hash;
+  my @row;
+  my @types;
+
+  my $sth = $self->prepare( qq{
+    SELECT DISTINCT input_id_type FROM input_id_analysis } );
+  $sth->execute();
+
+  while( @row = $sth->fetchrow_array ) {
+    push @types,$row[0];
+  }
+
+  foreach my $type (@types) {
+    my $ids = $self->list_input_ids_by_type($type);
+    foreach my $id  (@$ids) {
+      $id_type_hash{$type}{$id} = 1;
+    }
+  }
+  return \%id_type_hash;
+}
+
+sub list_input_ids_by_type {
+  my $self = shift;
+  my $type = shift;
+  my @ids;
+  my @row;
+
+  my $sth = $self->prepare( qq{
+    SELECT distinct input_id FROM input_id_analysis where input_id_type=?
+    });
+
+  $sth->execute($type);
+
+  while( @row = $sth->fetchrow_array ) {
+    push @ids,$row[0];
+  }
+
+  return \@ids;
+}
+
 
 
 =head2 delete_input_id
