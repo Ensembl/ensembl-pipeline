@@ -57,8 +57,7 @@ my $translation_id;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
-my $insert_analysis;
-my $store_input_ids;
+
 GetOptions(
            'dbhost=s'      => \$dbhost,
            'dbname=s'      => \$dbname,
@@ -75,7 +74,7 @@ GetOptions(
            'config_sanity!' => \$config_sanity,
            'utils_verbosity=s' => \$utils_verbosity,
            'perldoc!' => \$perldoc,
-           'analysis=s' => \$logic_name,
+           'logic_name=s' => \$logic_name,
            'force!' => \$force,
            'input_id_file=s' => \$ids_to_run,
            'make_input_ids!' => \$make_input_ids,
@@ -85,7 +84,6 @@ GetOptions(
            'slice_size:s' => \$slice_size,
            'slice_overlap:s' => \$slice_overlap,
            'logic_name:s' => \$logic_name,
-           'input_id_type:s' => \$input_id_type,
            'file'         => \$file,
            'dir:s'        => \$dir,
            'file_regex:s' => \$regex,
@@ -94,8 +92,6 @@ GetOptions(
            'translation_ids' => \$translation_id,
            'seq_level' => \$seq_level,
            'top_level' => \$top_level,
-           'insert_analysis!' => \$insert_analysis,
-           'store_input_ids!' => \$store_input_ids,
            ) or useage(\@command_args);
 
 
@@ -172,8 +168,7 @@ my $input_ids = setup_input_ids($analysis, $rulemanager, $ids_to_run,
                                 $translation_id, $single, $slice_size, 
                                 $slice_overlap, $dir, $regex, $name, 
                                 $seq_level, $top_level, $verbose, 
-                                $logic_name, $input_id_type, 
-                                $insert_analysis, $store_input_ids);
+                                $logic_name);
 
 my @input_ids = keys(%{$input_ids->{$analysis->input_id_type}});
 
@@ -215,8 +210,7 @@ sub setup_input_ids{
   my ($analysis, $rulemanager, $ids_to_run, $make_input_ids,
       $slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
-      $verbose, $logic_name, $input_id_type, $insert_analysis,
-      $store_input_ids) = @_;
+      $verbose, $logic_name) = @_;
   
   my $id_hash;
   if($ids_to_run){
@@ -237,8 +231,7 @@ sub setup_input_ids{
     $id_hash = make_input_ids($slice, $file, $translation_id, $single, 
                           $slice_size, $slice_overlap, $dir, 
                           $regex, $name, $seq_level, $top_level, 
-                          $verbose, $logic_name, $input_id_type, 
-                          $insert_analysis, $store_input_ids);
+                          $verbose, $logic_name, $input_id_type);
   }else{
     $id_hash->{$analysis->input_id_type} = {};
     my @ids = @{$rulemanager->stateinfocontainer
@@ -260,8 +253,7 @@ sub termhandler {
 sub make_input_ids{
   my ($slice, $file, $translation_id, $single, $slice_size, 
       $slice_overlap, $dir, $regex, $name, $seq_level, $top_level, 
-      $verbose, $logic_name, $input_id_type, $insert_analysis,
-      $store_input_ids) = @_;
+      $verbose, $logic_name, $store_input_ids) = @_;
   my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
     (
      -db => $db,
@@ -276,8 +268,6 @@ sub make_input_ids{
      -single_name => $name,
      -verbose => $verbose,
      -logic_name => $logic_name,
-     -input_id_type => $input_id_type,
-     -insert_analysis => $insert_analysis,
      -coord_system => $coord_system,
      -coord_system_version => $coord_system_version,
      -slice_size => $slice_size,
@@ -287,8 +277,142 @@ sub make_input_ids{
 
 
   my $ids = $inputIDFactory->generate_input_ids;
-  if($store_input_ids){
-    $inputIDFactory->store_input_ids;
-  }
+
   return $inputIDFactory->get_id_hash;
 }
+
+=pod 
+
+=head1 NAME
+
+job_submission.pl
+
+=head1 SYNOPSIS
+
+job_submission.pl a script for submitting a single analysis' jobs
+to the pipeline.
+
+=head1 DESCRIPTION
+
+this script will run a single analyses jobs through the pipeline
+it will check rules and retry failed jobs but it doesn't have too.
+It can either read the input_ids from a file or create the
+input_ids using the InputIDFactory
+
+=head OPTIONS
+ 
+DB Connection Details
+
+
+   -dbhost     The host where the pipeline database is.
+   -dbport     The port.
+   -dbuser     The user to connect as.
+   -dbpass     The password to use.
+   -dbname     The database name.
+
+Analysis Details
+
+  -logic_name the logic_name of the analysis you want to run. You 
+  must have this analysis already in the analysis table and it
+  must has an input_id_type and module specified. This logic
+  name is also used to fetch the rule. This analysis should be
+  the goal of the rule you want executed
+  -force this forces the script to ignore the rule and just create
+  and submit the jobs with no regard to whether they should be run
+  or are already running. If this option is specifed jobs already 
+  in the pipeline running this analysis are ignored and failed
+  jobs of this type are not retried
+  
+
+RuleManager details
+
+  -utils_verbosity, this affects the amount of chatter you recieve from
+  the core module Bio::EnsEMBL::Utils::Exception. By default this is set
+  to WARNING which means you see the prints from warnings and throws but
+  not from deprecate and info calls. See the modules itself for more 
+  information
+  -verbose, toggles whether some print statements are printed in this
+  script and in the RuleManager
+  -config_sanity this is a test to check certain values are defined in
+  your General.pm and BatchQueue.pm config files
+
+  Some of the follow options can intially be set in either the General.pm
+  of BatchQueue.pm config files see docs of  rulemanager.pl for more 
+  details
+  
+  -queue_manager this specifies which 
+  Bio::EnsEMBL::Pipeline::BatchSubmission module is used by 
+  Bio::EnsEMBL::Pipeline::RuleManager
+  -output_dir the path to an output directory when the jobs stderr and
+  stdout will be redirected. This alwaysoverrides the values specified in
+  BatchQueue
+  -mark_awol toggle to specify whether to mark jobs as awol if lost from
+  the submission system this can apply strain to the job table. It is on
+  by default and can be switched off using the -nomark_awol flag
+  -runner path to a default runner script. This will override what is
+  set in General.pm but will be overidden by any analyses specific
+  settings found in BatchQueue.pm
+  -rename_on_retry a toggle to specify whether to rename stderr/stdout 
+  file when a job is retried as otherwise the submission system just
+  cats them all together
+
+
+Input id details
+
+  If you specify no options to do with input_ids it will just take 
+  all the input_ids from the input_id_analysis table with an appropriate
+  input_id_type as specified by the analysis object
+
+  -input_id_file this is a text file in the format input_id input_id_type
+  if used these are the only input_ids which are considered
+  -make_input_ids this indicates you want to use the InputIDFactory
+   to make the input_ids for you. If you specify this option it
+   makes you use force too so the rules are ignored as if the
+   analysis needs its input ids created it won't pass a rule check'
+ 
+  These are options needed for the manufacture of input ids
+
+  -slice  signals to insert slice type input ids using
+  the format 
+  coord_system:coord_system_version:seq_region_name:start:end:strand
+  -coord_system the coordinate system you want slices in
+  -coord_system_version the version of the coord system you want
+  -slice_size the size to make the slice ids
+  -slice_overlap the slice overlap (non-overlapping by default)
+  -file     if the input_ids are to be a list of filenames from a directory
+  -dir      the directory to read the filenames from
+  -file_regex a regex to impose on the filenames before using them
+  -single if you just want a single dummy input_id ie for genome wide 
+  analyses
+  -single_name , by default this is genome but you can specify something
+  different here, for example for protein annotation jobs which use the 
+  whole proteome this must be proteome
+  -translation_ids if you want your input ids to be translation ids
+  -verbose if you want more information about what the script is doing
+  -input_id_type if you want to specific an input_id_type not already
+  used by the analysis object
+  -insert_analysis if you want to insert an analysis object if it doesn't
+     already exist in the database'
+  -seq_level if you want the ids for the seq_level seq_regions, can
+  work with slice_size but the -slice options isn't required'
+  -top_level this will fetch all the non_redundant pieces in
+  the database this may produce ids which are a mixture of different
+  coordinate systems, if -coord_system_version is specified it will
+  be ignored
+ 
+
+
+Misc options
+
+ -help will print out the standard help
+ -perldoc will print out these perl docs
+
+=head1 CONTACT
+
+Post general queries to <ensembl-dev@ebi.ac.uk>
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+
+=cut
