@@ -27,13 +27,28 @@ Bio::EnsEMBL::Pipeline::Runnable::SearchFilter - Filters a search runnable
 
 =head1 DESCRIPTION
 
-Filters search results, such as Blast, on a number of criteria. The
-most important ones are minscore, maxevalue, coverage. Coverage means
-that only XX number of completely containing higher scores will be
-permitted for this feature. The option prune performs a clustering of 
-the features according to overlap with respect to the genomic sequence
-and take only a maximum number of features per cluster; this number being
-specified by coverage.
+Filters search results, such as Blast, on several criteria. The most
+important ones are minscore, maxevalue, coverage. Coverage is as
+follows:
+
+  sort hit-sequence-accessions in decreasing order of
+  maximum HSP score;
+
+  for each hit-sequence-accession in turn:
+
+    if all parts of all features for hit-sequence-accession
+    are covered by other features to a depth of <coverage>
+
+      remove all features for this hit-sequence-accession;
+
+An arbitrary but consistent sorting criterion is used to order
+hit-sequence-accessions of equal maximum HSP score.
+
+The option prune allows only a maximum number of features per
+strand per genomic base per hit sequence accession, this number also
+being specified by the coverage parameter. Prune removed features
+until the criterion is met. Prune filtering occurs after coverage
+filtering.
 
 =head1 CONTACT
 
@@ -184,8 +199,9 @@ sub run{
   my @list;
   $list[$maxend] = 0;
   
-  # sort the list by highest score
-  my @inputids = sort { $validhit{$b} <=> $validhit{$a} } keys %validhit; 
+  # sort the list by highest score, then alphabetically for ties
+   my @inputids = sort { $validhit{$b} <=> $validhit{$a} or $b cmp $a }
+                    keys %validhit;
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
@@ -311,7 +327,7 @@ sub prune_features {
 
  Title   : _prune_features_by_strand
  Usage   : @pruned_neg = $self->prune_features(-1, @f_array);
- Function: reduce coverage of each base to a maximum of
+ Function: reduce coverage of each genomic base to a maximum of
            $self->coverage features on the specified strand;
 	   all features not on the specified strand are discarded
  Returns : array of features
