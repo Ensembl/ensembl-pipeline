@@ -117,21 +117,20 @@ sub _initialize {
         $self->_rearrange(['CLONE', 'GENSCAN', 'PARAM', 'MATRIX'], @args);
 
     $self->clone($clonefile) if ($clonefile);
-    
+    print STDERR "GENSCAN $genscan\tMATRIX $matrix\n";
     if ($genscan)       
-    {$self->genscan($genscan) ;}
+    {
+        $self->genscan($genscan) ;
+    }
     else                
     { 
-        eval 
-        {  $self->genscan($self->locate_executable('genscan')); }; 
-        if ($@) 
-        {  $self->genscan('/nfs/disk100/humpub/OSFbin/genscan'); }
+        $self->genscan($self->locate_executable('genscan'));
     }
     
     if ($matrix)    
     { $self->matrix($matrix) ; }
     else                
-    {$self->matrix('/nfs/disk100/humpub/OSFbin/HumanIso.smat'); }
+    {$self->throw("Path to Matrix required ($matrix)\n"); }
          
     if ($parameters)    
     { $self->parameters($parameters) ; }
