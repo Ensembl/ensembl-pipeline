@@ -55,34 +55,45 @@ my $prefix='COB';
 
 # Hash containing config info
 %GeneCombinerConf = (
+		     ############################################################
+		     # EST GENES PROPERTIES
+		     ############################################################
+		     
 		     # db from where we get the est-genes
-		     ESTGENE_DBHOST              => 'ecs1f',
+		     ESTGENE_DBHOST              => 'ecs1d',
 		     ESTGENE_DBUSER              => 'ensro', 
-		     ESTGENE_DBNAME              => 'ens_NCBI_30_cdna_genes',
+		     ESTGENE_DBNAME              => 'briggsae_cdna_newschema',
 		     ESTGENE_DBPASS              => 'ensembl',
 		     
 		     # gene type for est-genes
-		     ESTGENE_TYPE                => 'genomewise',
+		     #ESTGENE_TYPE                => 'genomewise',
+		     ESTGENE_TYPE                => 'exonerate_e2g',
+		     
+		     # in case you want to restrict the length of the introns
+		     ESTGENE_MAX_INTRON_LENGTH    => 500000,
+
+
 		     
 		     # db from which we get ensembl genes
-		     ENSEMBL_DBHOST              => 'ecs1a',
+		     ENSEMBL_DBHOST              => 'ecs1c',
 		     ENSEMBL_DBUSER              => 'ensro',
-		     ENSEMBL_DBNAME              => 'ens_NCBI_30_final_build',
+		     ENSEMBL_DBNAME              => 'briggsae_test_intermediate',
 		     ENSEMBL_DBPASS              => 'ensembl',
 		     
 		     # gene type for the ensembl genes
-		     ENSEMBL_TYPE                => 'ensembl',
+		     #ENSEMBL_TYPE                => 'ensembl',
+		     ENSEMBL_TYPE                => 'combined_gw_e2g',
 		     
 		     # refdb where the dna is, so that we do not need to have it everywhere
-		     REF_DBHOST              => 'ecs1e',
+		     REF_DBHOST              => 'ecs1d',
 		     REF_DBUSER              => 'ensro',
-		     REF_DBNAME              => 'ens_NCBI_30',
-		     REF_DBPASS              => 'ensembl',
+		     REF_DBNAME              => 'briggsae_intermediate_newschema',
+		     REF_DBPASS              => '',
 		     
 		     # different db for writing final genes to - to get round table locks
 		     # this db needs to have clone & contig & static_golden_path tables populated
 		     FINAL_DBHOST             => 'ecs1c',
-		     FINAL_DBNAME             => 'genecombiner_test_NCBI_30',
+		     FINAL_DBNAME             => 'briggsae_test_intermediate',
 		     FINAL_DBUSER             => 'ensadmin',
 		     FINAL_DBPASS             => 'ensembl',
 		     
@@ -91,14 +102,19 @@ my $prefix='COB';
 		     
 		     # general variables
 		     # path to run_GeneBuild_RunnableDB
-		     RUNNER      => '/nfs/acari/eae/ensembl-branch-121/ensembl-pipeline/scripts/run_GeneCombiner.pl',
-		     RUNNABLE    => 'GeneCombiner',
+		     RUNNER      => '/nfs/acari/eae/ensembl/ensembl-pipeline/scripts/run_GeneCombiner.pl',
+		     GENECOMBINER_RUNNABLES    =>  [
+						    {
+						     runnable => 'GeneCombiner',
+						     analysis => 'final_ensembl',
+						    },
+						   ],
 		     
 		     # directory where the output files will go
-		     OUTPUT_DIR  => '/ecs2/scratch1/ensembl/eae/NCBI_30/test_genecombiner',
+		     OUTPUT_DIR  => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
 		     
 		     # directory where the jobs files will go
-		     JOBS_DIR    => '/ecs2/scratch1/ensembl/eae/NCBI_30/test_genecombiner',
+		     JOBS_DIR    => '/ecs2/scratch1/ensembl/eae/main_trunk_tests',
 		     
 		     # LSF queue plus any options you want to use
 		     QUEUE       => 'acari',
