@@ -261,7 +261,7 @@ sub parse_results {
         $feat1 {'start'}        = $start;
         $feat1 {'end'}          = $end;
         $feat2 {'start'}        = 1;     
-        $feat2 {'end'}          = $end - $start;
+        $feat2 {'end'}          = $end - $start + 1;
         $feat1 {'strand'}       = 0;
         $feat2 {'strand'}       = 0;
         #misc
