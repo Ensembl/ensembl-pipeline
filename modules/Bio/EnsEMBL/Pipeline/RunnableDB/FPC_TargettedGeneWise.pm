@@ -1,4 +1,4 @@
-#
+
 # Ensembl module for Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise.pm
 #
 # Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
@@ -42,7 +42,6 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::PmatchFeature;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBNAME
 							     GB_GW_DBHOST
@@ -181,7 +180,7 @@ sub make_targetted_runnables {
 
   #print STDERR "fetching features for $chr_name $start $end\n";
   my @features = $pmfa->get_PmatchFeatures_by_chr_start_end($chr_name, $start, $end);
-  #print STDERR "have ".@features." to run with\n";
+  #print STDERR "have ".@features." pmatch features to run with\n";
   my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						       '-host'   => $GB_GW_DBHOST,
 						       '-user'   => $GB_GW_DBUSER,
@@ -258,7 +257,7 @@ sub targetted_runnable{
 sub run {
   my ($self) = @_;
   my $count = 0;
-  #print STDERR "***Running targetted build***\n";
+  #print STDERR "***Running targetted build***\n\n";
  TGE:   
   foreach my $tge($self->targetted_runnable){
     
@@ -283,6 +282,7 @@ sub run {
     eval{
      my @genes = $tge->write_output;
      $count += @genes;
+     #print "\n\n";
     };
 
     if($@){
@@ -291,7 +291,7 @@ sub run {
     }
   }
   
-  print "there were ".$count." genes produce\n";
+  #print "there were ".$count." genes produce TargettedGenewise\n";
   $self->{'_targetted_runnables'} = [];
 
 }
