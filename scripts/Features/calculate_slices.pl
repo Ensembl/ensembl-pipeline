@@ -68,7 +68,7 @@ my $count = 0;
 		+ int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
 	}
 	
-	if ( ( $end - $start + 1 ) > $max_length || $feature_count > $max_feature_count ){
+	if ( ($end - $start + 1 ) > $max_length || $count > $max_feature_count ){
 	    print OUTPUT "$chr_name.$start-$end\tlength:".($end-$start+1)."\tfeature_count:$count\n";
 	    $start = $end + 1;
 	    $count = 0;
