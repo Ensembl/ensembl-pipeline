@@ -153,7 +153,8 @@ my $sl_adp = $db->get_SliceAdaptor;
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db,
                                                                        -slice => 1,
                                                                        -slice_size => $max_slice_size,
-                                                                       -coord_system => 'toplevel');
+                                                                       -coord_system => 'toplevel',
+								       -logic_name => $logic_name);
 my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
 
@@ -164,8 +165,7 @@ my @iids_to_write;
 $verbose and print STDERR "Generating Initial input ids...\n";
 
 # foreach my $chr (sort {$a->dbID <=> $b->dbID} @{$db->get_ChromosomeAdaptor->fetch_all}) {
-foreach my $slice_id ($inputIDFactory->generate_input_ids) {
-
+foreach my $slice_id (@{$inputIDFactory->generate_input_ids}) {
     my $chr_slice = $sl_adp->fetch_by_name( $slice_id );
     my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name( $slice_id );
 
