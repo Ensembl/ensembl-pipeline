@@ -19,8 +19,7 @@ Bio::EnsEMBL::Pipeline::Job
 
 =head1 DESCRIPTION
 
-stores a list of input_ids from a pipeline and will generate unions
-intersections and differences between the list it holds and a list it is passed
+object to hold information about and run a particular job
 
 =head1 CONTACT
 
@@ -263,11 +262,11 @@ sub adaptor{
 
 sub set_current_status{
   my ($self, $status) = @_;
-  my $time = time;
+ 
   if(!$self->adaptor){
     print STDERR ("Can't update the status of a Job if it doesn't have a jobadaptor and a database connection".$self->dbID.":".$self->taskname.":".$self->input_id." $!");
   }else{
-    $self->adaptor->update_job_status($self, $status, $time);
+    $self->adaptor->update_job_status($self, $status);
   }
   $self->status($status);
 }
