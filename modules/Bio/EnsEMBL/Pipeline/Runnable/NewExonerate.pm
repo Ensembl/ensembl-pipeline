@@ -102,6 +102,8 @@ sub new {
 												      )
 												   ], @args);
   
+
+  $self->{_output} = [];
   # must have a target and a query sequences
   unless( $query_seqs ){
     $self->throw("Exonerate needs a query_seqs: $query_seqs");
