@@ -43,7 +43,7 @@ sub new {
     $self->analysis($analysis);
     # this should make a OBDAIndexSeqFetcher, but will default to Pfetch
     my $indices = [ split(",", $self->analysis->db) ];
-    my $seqfetcher = $self->_make_seqfetcher($indices);
+    $seqfetcher = $self->_make_seqfetcher($indices);
     $self->seqfetcher($seqfetcher);
     
     return $self;
