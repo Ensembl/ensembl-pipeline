@@ -208,6 +208,9 @@ sub fetch_input{
   # we want to give genewise a bit more genomic than the one found by pmatch, 
   my $new_start  = $start - 10000;
   my $new_end    = $end   + 10000;
+
+  $new_start = $start if $new_start < $start;
+  $new_end = $end if $new_end > $end;
   
   #print STDERR "fetching slice ".$chr_name." ".$new_start." ".$new_end." \n";
   my $sliceadp = $self->db->get_SliceAdaptor();
