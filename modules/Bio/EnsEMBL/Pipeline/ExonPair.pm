@@ -179,11 +179,11 @@ sub verifyExons {
 
 	if ($self->exon1->strand == 1) {
 	    if ($self->exon1->end >  $self->exon2->start) {
-		$self->throw("Inconsistent coordinates for exons [" . $self->exon1->end . "][" . $self->exon2->start ."}");
+		$self->throw("Inconsistent coordinates for exons [" . $self->exon1->end . "][" . $self->exon2->start ."]");
 	    }
 	} else {
 	    if ($self->exon2->end >  $self->exon1->start) {
-		$self->throw("Inconsistent coordinates for exons (-1)[" . $self->exon2->end . "][" . $self->exon1->start ."}");
+		$self->throw("Inconsistent coordinates for exons (-1)[" . $self->exon2->end . "][" . $self->exon1->start ."]");
 	    }
 	}
     }
@@ -251,4 +251,58 @@ sub compare {
 
 
 
+=head2 add_Evidence
+
+ Title   : add_Evidence
+ Usage   : $pair->add_Evidence($f);
+ Function: Adds a sequence feature that was
+           used to create this pair
+ Example : 
+ Returns : nothing
+ Args    : Bio::EnsEMBL::FeaturePair
+
+=cut
+
+sub add_Evidence {
+    my ($self,$feature) = @_;
+
+
+    if (!defined($self->{_evidence})) {
+	$self->{_evidence} = [];
+    }
+
+    $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless defined($feature);
+    $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless $feature->isa("Bio::EnsEMBL::FeaturePair");
+
+    push(@{$self->{_evidence}},$feature);
+
+}
+
+
+
+=head2 get_all_Evidence
+
+ Title   : get_all_Evidence
+ Usage   : my @features = $pair->get_all_Evidence;
+ Function: Returns all the feature pairs that were
+           used to create this pair
+ Example : 
+ Returns : Array of Bio::EnsEMBL::FeaturePair
+ Args    : none
+
+=cut
+
+sub get_all_Evidence {
+    my ($self) = @_;
+
+
+    if (!defined($self->{_evidence})) {
+	$self->{_evidence} = [];
+    }
+
+    return @{$self->{_evidence}};
+}
+
+
+1;
 

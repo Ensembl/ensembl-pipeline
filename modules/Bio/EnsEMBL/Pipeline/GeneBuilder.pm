@@ -35,6 +35,10 @@ The rest of the documentation details each of the object methods. Internal metho
 
 package Bio::EnsEMBL::Pipeline::GeneBuilder;
 
+use Bio::EnsEMBL::Pipeline::ExonPair;
+use Bio::EnsEMBL::Transcript;
+use Bio::EnsEMBL::Exon;
+
 use vars qw(@ISA);
 use strict;
 
@@ -47,13 +51,13 @@ sub _initialize {
 
     my $make = $self->SUPER::_initialize(@args);
 
-    my (@contigs) = $self->_rearrange([qw(CONTIGS
+    my ($contigs) = $self->_rearrange([qw(CONTIGS
 					  )],@args);
 
 
-    $self->throw("Must input an array of contigs to GeneBuilder") unless defined(@contigs);
+    $self->throw("Must input an array ref of contigs to GeneBuilder") unless defined(@$contigs);
     
-    foreach my $contig (@contigs) {
+    foreach my $contig (@$contigs) {
 	$self->add_Contig($contig);
     }
 
@@ -82,9 +86,9 @@ sub add_Contig {
     }
     
     if (defined($contig) && $contig->isa("Bio::EnsEMBL::DB::RawContigI")) {
-	push(@{$self->{_contigs}},$contigs);
+	push(@{$self->{_contigs}},$contig);
     } else {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::DB::RawContigI");
+	$self->throw("[$contig] is not a Bio::EnsEMBL::DB::RawContigI");
     }
 }
 
@@ -137,17 +141,38 @@ sub build_Genes {
     my @exons               = $self->make_Exons    ($features,$genscan);
 
     foreach my $exon (@exons) {
-	print STDERR $exon->seqname . "\t" . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n";
+	$self->print_Exon($exon);
     }
 
-    return;
+
     my @pairs               = $self->make_ExonPairs(@exons);
-    my @transcripts         = $self->link_ExonPairs(@pairs);
+
+    foreach my $pair ($self->get_all_ExonPairs) {
+	print STDERR "\nMade pair\n";
+	$self->print_Exon($pair->exon1);
+	$self->print_Exon($pair->exon2);
+    }
+
+
+    my @transcripts         = $self->link_ExonPairs(@exons);
+
+    foreach my $tran (@transcripts) {
+	print STDERR "\nTranscript\n";
+	foreach my $exon ($tran->each_Exon) {
+	    $self->print_Exon($exon);
+	}
+    }
+
     my @contigs             = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
 
 }
 
+sub print_Exon {
+    my ($self,$exon) = @_;
+
+    print STDERR $exon->seqname . "\t" . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n";
+}
 
 sub get_Features {
     my ($self) = @_;
@@ -207,6 +232,7 @@ sub make_Exons {
 	foreach my $f ($gs->sub_SeqFeature) {
 	    my $exon  = new Bio::EnsEMBL::Exon;
 	    $exon->id       ($contigid . "$gscount.$excount");
+	    $exon->seqname  ($contigid);
 	    $exon->contig_id($contigid);
 	    $exon->start    ($f->start);
 	    $exon->end      ($f->end  );
@@ -284,12 +310,15 @@ sub  make_ExonPairs {
 
     my %pairhash;
 
-    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
+#    for (my $i = 0; $i < scalar(@exons)-1; $i++) {
+    for (my $i = 0; $i < 5; $i++) {
 
 	my %idhash;
 	my $exon1 = $exons[$i];
 
-	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
+
+#	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
+	J: for (my $j = 0 ; $j < 5; $j++) {
 	    next J if ($i == $j);
 
 	    my $exon2 = $exons[$j];
@@ -299,6 +328,8 @@ sub  make_ExonPairs {
 	  F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
 		    
 	    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
+		my @pairs = $self->get_all_ExonPairs;
+		return @pairs if $#pairs > 4;
 
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
 		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePair")));
@@ -324,8 +355,27 @@ sub  make_ExonPairs {
 			}
 		    }
 		    
+		    # This checks if the coordinates are consistent if the 
+		    # exons are on the same contig
+		    if ($ispair == 1) {
+			if ($exon1->contig_id eq $exon2->contig_id) {
+			    if ($f1->strand == 1) {
+				if ($f1->end >  $f2->start) {
+				    $ispair = 0;
+				}
+			    } else {
+				if ($f2->end >  $f1->start) {
+				    $ispair = 0;
+				}
+			    }
+			}
+		    }
+
+		    # We finally get to make a pair
 		    if ($ispair == 1) {
 			eval {
+
+			    
 			    print(STDERR "Making new pair " . $exon1->id . "\t" .  $exon2->id . "\n");
 			    
 			    my $pair = $self->makePair($exon1,$exon2);
@@ -342,12 +392,12 @@ sub  make_ExonPairs {
 			    warn("Error making ExonPair from [" . $exon1->id . "][" .$exon2->id ."] $@");
 			}
 		    }
-		    
 		}
 	    }
 	  }
 	}
     }
+    return $self->get_all_ExonPairs;
 }
 
 
@@ -457,9 +507,15 @@ sub add_ExonPair {
 sub link_ExonPairs {
     my ($self,@exons) = @_;
 
+    if (!defined(@exons)) {
+	$self->throw("No array of exons input to link_ExonPairs");
+    }
+    
     foreach my $exon (@exons) {
+	$self->throw("[$exon] is not a Bio::EnsEMBL::Exon") unless $exon->isa("Bio::EnsEMBL::Exon");
+
 	if ($self->isHead($exon)) {
-	    print STDERR "Found new transcript start [" . $exon->seqname . "]\n";
+	    print STDERR "Found new transcript start [" . $exon->id . "]\n";
 
 	    my $transcript = new Bio::EnsEMBL::Transcript;
 
@@ -469,7 +525,8 @@ sub link_ExonPairs {
 	    $self->_recurseTranscript($exon,$transcript);
 	}
     }
-    
+    return $self->get_all_Transcripts;
+
 }
 
 
@@ -555,7 +612,7 @@ sub add_Transcript {
     my ($self,$transcript) = @_;
 
     $self->throw("No transcript input") unless defined($transcript);
-    $self->throw("Input must be Bio::EnsEMBL::Transcript") unless $exon->isa("Bio::EnsEMBL::Transcript");
+    $self->throw("Input must be Bio::EnsEMBL::Transcript") unless $transcript->isa("Bio::EnsEMBL::Transcript");
 
     if (!defined($self->{_transcripts})) {
 	$self->{_transcripts} = [];
@@ -634,8 +691,14 @@ sub isHead {
 
     my $minimum_coverage = 2;
 
-    foreach my $pair ($self->get_all_Pairs) {
+    foreach my $pair ($self->get_all_ExonPairs) {
+	print("\nPair\n");
+	$self->print_Exon($pair->exon1);
+	$self->print_Exon($pair->exon2);
 	my $exon2 = $pair->exon2;
+
+	print("[$exon][$exon2] " . $exon->id . "\t" . $pair->exon2->id . "\n");
+	
 
 	if ($exon == $exon2 && $pair->coverage >= $minimum_coverage) {
 	    return 0;
@@ -663,7 +726,7 @@ sub isTail {
 
     my $minimum_coverage = 2;
 
-    foreach my $pair ($self->get_all_Pairs) {
+    foreach my $pair ($self->get_all_ExonPairs) {
 	my $exon1 = $pair->exon1;
 
 	if ($exon == $exon1 && $pair->coverage >= $minimum_coverage) {
