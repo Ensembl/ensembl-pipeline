@@ -239,7 +239,8 @@ foreach my $input_id(@$input_ids){
   $batch_job->construct_command_line($command);
   push(@batch_submission_objects, $batch_job);
 }
-
+print STDERR "YOU WILL NOT BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T ".
+  "SPECIFY -open \n" if(!$open);
 foreach my $batch_object(@batch_submission_objects){
   print $batch_object->bsub."\n" if($verbose);
   if($open){
@@ -249,9 +250,15 @@ foreach my $batch_object(@batch_submission_objects){
     if($@ || !$batch_object->id){
       throw("Failed to open ".$batch_object->bsub." $@");
     }
+    print $batch_object->bsub."\n" if($verbose);
     sleep($submission_interval);
+  }else{
+    print $batch_object->bsub."\n";
   }
 }
+print STDERR "YOU DIDN'T BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T SPECIFY ".
+  "-open \n" if(!$open);
+
 sub setup_input_ids{
   my ($analysis, $db, $ids_to_run, $make_input_ids,
       $slice, $file, $translation_id, $single, $slice_size, 
@@ -370,8 +377,214 @@ sub set_up_queues {
   
   return %q;
 }
+
+
+
 sub useage{
+  my ($command_args) = @_;
+  print "Your commandline was :\n".
+    "lsf_submission.pl ".join("\t", @$command_args), "\n\n";
+  print ("lsf_submission.pl is a script which will create and open ".
+         "commandlines for the appropriate batch submission system ".
+         "based on the test_RunnableDB script. It will only run ".
+         "RunnableDB's which fit the standard model\n\n".
+         "Everytime you run job_submission.pl you must pass in the ".
+         "database options\n\n-dbhost The host where the pipeline ".
+         "database is.\n-dbport     The port.\n-dbuser   The user to ".
+         "connect as.\n-dbpass     The password to use.\n".
+         "-dbname   The database name.\n\n".
+         "This script also requires a logic_name of an analysis ".
+         "specified with -logic_name.\n\n".
+         "Other useful options include:\n\n".
+         "-queue_manager allows you to change which ".
+         "Bio::EnsEMBL::Pipeline::BatchSubmission module to use\n".
+         "-output_dir the directory to put the stderr and stdout ".
+         "of your analysis runs \n".
+         "-script_dir the directory where the test_RunnableDB script ".
+         "you want to run lives otherwise it assumes the script is in ".
+         "the current working directory\n");
+  exit(0);
+}
+sub perldoc{
 	exec('perldoc', $0);
 	exit(0);
 }
+
+=pod 
+
+=head1 NAME
+
+lsf_submission.pl
+
+=head1 SYNOPSIS
+
+lsf_submission.pl is a script which create and opens commandlines
+appropriate to your batch submission system to run the test_RunnableDB
+script
+
+=head1 DESCRIPTION
+
+This script creates submission lines to run the test_RunnableDB script
+which will run RunnableDBs which fit the standard pipeline model which 
+means they must take three arguments, Input_id, database adaptor and
+analysis object and have the standard methods fetch_input, run, output
+and write_output. The script does allow for the insertion of analysis
+objects and creation of input_ids before commandline creation
+
+
+=head OPTIONS
+
+DB Connection Details
+
+
+   -dbhost     The host where the pipeline database is.
+   -dbport     The port.
+   -dbuser     The user to connect as.
+   -dbpass     The password to use.
+   -dbname     The database name.
+
+Analysis Details
+
+  -logic_name the logic_name of the analysis you want to run. You 
+  must have this analysis already in the analysis table and it
+  must has an input_id_type and module specified. This logic
+  name is also used to fetch the rule. This analysis should be
+  the goal of the rule you want executed
+  -insert_analysis this tells the script to insert the analysis object
+  and requires both the follow options are also used
+  -input_id_type this specified what type of input_id
+  -module this is the name of the RunnableDB to be used
+
+Submission system options
+
+  -queue_manager this specifies which 
+  Bio::EnsEMBL::Pipeline::BatchSubmission module is used
+  -output_dir which directory to put the stderr and stdout files in
+  This is the base directory the script creates 10 directorys from 0-9
+  below that where the files are actually placed to ensure that no
+  directory gets too many files in it
+  -queue the submission system queue the jobs will be submitted to
+  -pre_exec toggle if a pre exec command is to be used in the submission
+  command
+  -resource_requirements any resource requirements for the commandline
+  in the LSF system this string will placed after the -R flag
+  -sub_args any other arguments you want to pass to your submission system
+
+  All of these options are discretionary and if not specified the
+  settings will be taken from the BatchQueue config file
+
+  -open this tells the script to actually open the commandlines to the
+  submission system otherwise it will just print the commandlines
+  -submission_interval the length of time to sleep for between opening
+  submissions by default it is 5 seconds
+
+test_RunnableDB options
+
+  -script_dir the directory where you copy of test_RunnableDB lives
+  if not specified the current working directory is used
+  -runnabledb_path the perl path for the runnabledb to be used. Again
+  this is discretionary and can be taken from BatchQueue if needed
+  -write whether test_RunnableDB should write its output to the database
+  -update_input_id_analysis whether test_RunnableDB should update the 
+  input_id_analysis table on sucessful completion of a job
+  -script_verbosity whether test_RunnableDB should have its verbose flag 
+  set
+
+Input ID options
+
+
+  If you specify no options to do with input_ids it will just take 
+  all the input_ids from the input_id_analysis table with an appropriate
+  input_id_type as specified by the analysis object
+
+  -input_id_file this is a text file in the format input_id input_id_type
+  if used these are the only input_ids which are considered
+  -make_input_ids this indicates you want to use the InputIDFactory
+   to make the input_ids for you. If you specify this option it
+   makes you use force too so the rules are ignored as if the
+   analysis needs its input ids created it won't pass a rule check'
+ 
+  These are options needed for the manufacture of input ids
+
+  -slice  signals to insert slice type input ids using
+  the format 
+  coord_system:coord_system_version:seq_region_name:start:end:strand
+  -coord_system the coordinate system you want slices in
+  -coord_system_version the version of the coord system you want
+  -slice_size the size to make the slice ids
+  -slice_overlap the slice overlap (non-overlapping by default)
+  -file     if the input_ids are to be a list of filenames from a directory
+  -dir      the directory to read the filenames from
+  -file_regex a regex to impose on the filenames before using them
+  -single if you just want a single dummy input_id ie for genome wide 
+  analyses
+  -single_name , by default this is genome but you can specify something
+  different here, for example for protein annotation jobs which use the 
+  whole proteome this must be proteome
+  -translation_ids if you want your input ids to be translation ids
+  -verbose if you want more information about what the script is doing
+  -input_id_type if you want to specific an input_id_type not already
+  used by the analysis object
+  -insert_analysis if you want to insert an analysis object if it doesn't
+     already exist in the database'
+  -seq_level if you want the ids for the seq_level seq_regions, can
+  work with slice_size but the -slice options isn't required'
+  -top_level this will fetch all the non_redundant pieces in
+  the database this may produce ids which are a mixture of different
+  coordinate systems, if -coord_system_version is specified it will
+  be ignored
+
+
+Misc options
+
+  -help will print out the standard help
+  -perldoc will print out these perl docs
+  -utils_verbosity, this affects the amount of chatter you recieve from
+  the core module Bio::EnsEMBL::Utils::Exception. By default this is set
+  to WARNING which means you see the prints from warnings and throws but
+  not from deprecate and info calls. See the modules itself for more 
+  information
+  -verbose print out information about how the script is running
+
+=head1 CONTACT
+
+Post general queries to <ensembl-dev@ebi.ac.uk>
+
+=head1 EXAMPLES
+
+./lsf_submission.pl -dbhost myhost -dbuser user -dbpass password 
+-dbport 3306 -dbname my_pipeline_database -logic_name RepeatMask -open
+
+this will create and submit commandlines to your submission system to
+run test_RunnableDB with RepeatMask anallysis
+
+./lsf_submission.pl -dbhost myhost -dbuser user -dbpass password 
+-dbport 3306 -dbname my_pipeline_database -logic_name RepeatMask -open
+-insert_analysis -input_id_type CONTIG -module RepeatMasker  
+
+this will create and submit the commandlines and it will also insert the 
+analysis object called RepeatMask with the input_id_type CONTIG and module
+RepeatMasker
+
+./lsf_submission.pl -dbhost myhost -dbuser user -dbpass password 
+-dbport 3306 -dbname my_pipeline_database -logic_name RepeatMask -open
+-input_id_file input_ids
+
+this will create and submit the commandlines based on the input_ids in
+the file input_ids
+
+./lsf_submission.pl -dbhost myhost -dbuser user -dbpass password 
+-dbport 3306 -dbname my_pipeline_database -logic_name RepeatMask
+
+this will just print the commandlines constucted to STDOUT
+
+=head1 SEE ALSO
+
+  rulemanager.pl
+  job_submission.pl and
+  pipeline_sanity.pl all here in ensembl-pipeline/scripts
+
+and also using_the_ensembl_pipeline.txt in the ensembl-docs cvs module
+
+=cut
 

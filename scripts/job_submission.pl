@@ -472,11 +472,10 @@ will pass any rule checks
 
 =head1 SEE ALSO
 
-  Bio::EnsEMBL::Pipeline::Job
-  Bio::EnsEMBL::Pipeline::Config::General
-  Bio::EnsEMBL::Pipeline::Config::BatchQueue
-
-  pipeline_sanity.pl script here in ensembl-pipeline/scripts
+  rulemanager.pl
+  lsf_submission.pl and
+  pipeline_sanity.pl all here in ensembl-pipeline/scripts
+  awol_check.pl
 
 and also using_the_ensembl_pipeline.txt in the ensembl-docs cvs module
 
