@@ -203,6 +203,7 @@ sub useage{
 }
 
 
+
 # POD documentation - main docs before the code
 
 =pod
@@ -234,7 +235,7 @@ sub useage{
      The above are all compulsory options you must provide them 
      otherwise the script won't work'
  
-    -input_type the input id type
+    -input_id_type the input id type
     -module the module to be run, this should either be a module which is
                 present in Bio::Ensembl::Pipeline::RunnableDB or it 
                 should be the full path
