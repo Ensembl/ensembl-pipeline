@@ -203,9 +203,10 @@ sub fetch_input {
       push(@estseqs, $est);
       
     }
-    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'     => $genseq, 
-									       '-queryseq' => \@estseqs,
-									       '-seqfetcher'  => $seqfetcher);
+    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome->new('-genomic'        => $genseq, 
+									       '-queryseq'       => \@estseqs,
+									       '-seqfetcher'     => $seqfetcher,
+									       '-check_repeated' => 1);
     
     $self->runnable($runnable);
   

@@ -226,9 +226,10 @@ sub fetch_input{
   # genewise runnable
   # repmasking?
 
-  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'    => $seq,
-								    '-ids'        => [ $protein_id ] ,
-								    '-seqfetcher' => $self->seqfetcher);
+  my $r = Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise->new( '-genomic'        => $seq,
+								    '-ids'            => [ $protein_id ] ,
+								    '-seqfetcher'     => $self->seqfetcher,
+								    '-check_repeated' => 1);
  
   $self->runnable($r);
 
