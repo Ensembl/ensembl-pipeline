@@ -18,64 +18,84 @@
 
 
 ## We start with some black magic to print on failure.
-BEGIN { 
-        $| = 1; print "1..6\n"; 
-	    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-	    use vars qw($loaded); 
-      }
-
-END {   print "not ok 1\n" unless $loaded;  }
 
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G;
 use Bio::EnsEMBL::Analysis;
+use Test;
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passes.
+# Use the ESTConf here and then later reset vars to internal test dbs.  Unless 
+# this is done first, when a new FilterESTs_and_E2G runnable is made it will 
+# read/reread global variables from ESTconf.pm.  This would mean that the 
+# test then starts using whatever dbs are configured external to this test.
+# If this were to happen, innocently running this test will write junk into 
+# user dbs that may well be configured for a production run - erk.
+
+use Bio::EnsEMBL::Pipeline::ESTConf qw (
+					EST_REFDBHOST
+					EST_REFDBNAME
+					EST_REFDBUSER
+					EST_DBNAME
+					EST_DBHOST
+					EST_DBUSER 
+					EST_DBPASS
+					EST_SOURCE
+					EST_INDEX
+					EST_MIN_PERCENT_ID
+					EST_MIN_COVERAGE
+					EST_INPUTID_REGEX
+					EST_GENETYPE
+					EST_FEATFILT_COVERAGE
+					EST_FEATFILT_MINSCORE
+				       );
+
+BEGIN { $| = 1; plan test => 9;}
+
+ok(1);   #1
     
 my $ens_test = EnsTestDB->new(
    {schema_sql => [ '../sql/table.sql', '../../ensembl/sql/table.sql', '../sql/est.sql' ]}
    ); # Must remember to create the correst est tables - THIS OVERRIDES THE CONFIG FILE
 
 # Load some data into the db
-$ens_test->do_sql_file("t/FilterESTs_and_E2G_db.dump");
+$ens_test->do_sql_file("t/dumps/FilterESTs_and_E2G_db.dump");
     
 # Get an EnsEMBL db object for the test db
-my $db = $ens_test->get_DBSQL_Obj;
-print "ok 2\n";    
+ok(my $db = $ens_test->get_DBSQL_Obj); #2
 
-my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G';
-my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = $ana_adaptor->fetch_by_logic_name('exonerate_e2g');
+# Set global variable to our own potted database.
+$EST_REFDBHOST	       = $ens_test->{'host'};
+$EST_REFDBNAME	       = $db->{'_dbname'};
+$EST_REFDBUSER	       = $ens_test->{'readonly_user'};
+$EST_DBNAME	       = $db->{'_dbname'};
+$EST_DBHOST	       = $ens_test->{'host'};
+$EST_DBUSER	       = $ens_test->{'user'};
+$EST_DBPASS	       = $ens_test->{'pass'};
+$EST_SOURCE	       = 'worm_ests';
+$EST_INDEX	       = 't/data/ests';
+$EST_MIN_PERCENT_ID    = 70; 
+$EST_MIN_COVERAGE      = 90;
+$EST_INPUTID_REGEX     = '(^\S+\.\S+)\.(\d+)-(\d+)';
+$EST_GENETYPE	       = 'exonerate_e2g';
+$EST_FEATFILT_COVERAGE = 500;
+$EST_FEATFILT_MINSCORE = 10;
 
-unless ($ana)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+
+
+ok(my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G');  #3
+ok(my $ana_adaptor = $db->get_AnalysisAdaptor);                               #4
+ok(my $ana = $ana_adaptor->fetch_by_logic_name('exonerate_e2g'));             #5
 
 my $id ='cb25.fpc0829.1800001-1850000';
-$ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(-db      => $db,
-			      -input_id   => $id,
-			      -analysis   => $ana );
-unless ($runobj)
-{ print "not ok 4\n"; }
-else
-{ print "ok 4\n"; }
 
-$runobj->fetch_input;
-$runobj->run;
+ok($ana_adaptor->exists( $ana ));       #6
 
-my @out = $runobj->output;
-unless (@out)
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
+ok(my $runobj = "$runnable"->new(-db       => $db,
+	      		         -input_id => $id,
+			         -analysis => $ana ));       #7
 
+ok($runobj->fetch_input);    #8
+ok($runobj->run);            #9
 
-$runobj->write_output();
-
-print "ok 6\n";
-
-#Hmm, maybe should try retrieving things.
+$runobj->write_output;
