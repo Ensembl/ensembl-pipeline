@@ -823,7 +823,7 @@ sub _pair_Transcripts{
   # this hopefully will avoid generating too many alternative splicing artifacts
   ############################################################
   my $transcript_comparator 
-    = Bio::EnsEMBL::Pipeline::::GeneComparison::TranscriptComparator->new(	
+    = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->new(	
 									  -comparison_level         => 5,
 									 );
   
