@@ -89,6 +89,7 @@ sub fetch_input {
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::EPCR(
         -query => $self->query,
+        -epcr  => $self->analysis->program_file,
         -sts   => $self->analysis->db_file,
         -nmin  => $parameters{'-NMIN'},
         -nmax  => $parameters{'-NMAX'},
@@ -106,7 +107,7 @@ sub write_output {
     my($self) = @_;
 
     my $db  = $self->db;
-    my $sfa = $self->db->get_SimpleFeatureAdaptor;
+    my $mfa = $self->db->get_MarkerFeatureAdaptor;
     
     my @mapped_features;
   
@@ -135,7 +136,11 @@ sub write_output {
 	push @mapped_features, $mapped[0];
 
     }
-    $sfa->store(@mapped_features) if @mapped_features;
+
+    # need to change adaptor to store > 1 feature at once
+    foreach my $mf (@mapped_features) {
+        $mfa->store($mf);
+    }
 
     return 1;
 }
