@@ -306,7 +306,6 @@ sub run {
       last MAIN;
     }
 
-
     if(time() - $last_check >= $CHECK_INTERVAL) {	
       #
       # update task status by contacting job adaptor
@@ -342,29 +341,43 @@ sub run {
 
 
     #
-    # Check if tasks are finished
-    # and give each running task a bit of time to create jobs
+    # Check if any running tasks are finished 
+    #
+    my $any_finished = 0;
+    foreach my $taskname (keys %running_tasks) {
+      my $task = $running_tasks{$taskname};
+      if($task->is_finished()) {
+	delete $running_tasks{$taskname};
+	$finished_tasks{$taskname} = $task;
+	$task->get_TaskStatus->is_finished(1);
+	$any_finished = 1;
+      }
+
+      last MAIN if($self->stop);
+    }
+
+    # If any tasks were identified as finished then we want to recalculate
+    # which jobs are pending/finished (the finished state of one task can alter
+    # the state of other tasks). This speeds up the determination
+    # of which jobs for more equal time-sharing and faster restart of an
+    # already running pipeline
+    next MAIN if($any_finished);
+
+    #
+    # Give each running task a bit of time to create jobs
     #
     foreach my $taskname (keys %running_tasks) {
       my $task = $running_tasks{$taskname};
       my $subsystem = $self->_submission_systems->{$taskname};
-
-      if($task->is_finished()) {
-        delete $running_tasks{$taskname};
-        $finished_tasks{$taskname} = $task;
-	$task->get_TaskStatus->is_finished(1);
-      } else {
-        my $retcode = $task->run();
+      
+      my $retcode = $task->run();
 	
-        if($retcode eq 'TASK_FAILED') {
-          $self->warn("Task [$taskname] failure");
-        } elsif ($retcode eq 'TASK_DONE') {
-	  
-          $subsystem->flush($taskname);
-        } elsif ($retcode ne 'TASK_OK') {
-          $self->warn("Task [$taskname] returned unknown status $retcode");
-        }
-	
+      if($retcode eq 'TASK_FAILED') {
+	$self->warn("Task [$taskname] failure");
+      } elsif ($retcode eq 'TASK_DONE') {	  
+	$subsystem->flush($taskname);
+      } elsif ($retcode ne 'TASK_OK') {
+	$self->warn("Task [$taskname] returned unknown status $retcode");
       }
 
       last MAIN if($self->stop());
