@@ -2554,16 +2554,22 @@ sub prune_gene {
   my @transcripts;
   my %lengths;
   
-  
   my @newgenes;
   my $max_num_exons = 0;
   my @transcripts = $gene->each_Transcript;
 
   # sizehash holds transcript length - based on sum of exon lengths
   my %sizehash;
+
   # orfhash holds orf length - based on sum of translateable exon lengths
   my %orfhash;
 
+  my %tran2orf;
+  my %tran2length;
+  
+  # keeps track of to which transcript(s) this exon belong
+  my %exon2transcript;
+  
   foreach my $tran (@transcripts) {
     # keep track of number of exons in multiexon transcripts
     my @exons = $tran->get_all_Exons;
@@ -2571,17 +2577,21 @@ sub prune_gene {
 
     # total exon length
     my $length = 0;
-    foreach my $e($tran->get_all_Exons){
+    foreach my $e ($tran->get_all_Exons){
       $length += $e->end - $e->start + 1;
+
+      push ( @{ $exon2transcript{ $e } }, $tran );
+
     }
     $sizehash{$tran->{'temporary_id'}} = $length;
-    
+    $tran2length{ $tran } = $length;
+
     # now for ORF length
     $length = 0;
     foreach my $e($tran->translateable_exons){
       $length += $e->end - $e->start + 1;
     }
-
+    $tran2orf{ $tran } = $length;
     push(@{$orfhash{$length}}, $tran);
   }
 
@@ -2594,6 +2604,27 @@ sub prune_gene {
 # better way? hold both total exon length and length of translateable exons. Then sort:
 # long translation + UTR > long translation no UTR > short translation + UTR > short translation no UTR
 
+
+  # eae: let's try whether this sorting is equivalent:
+  my @sordid_transcripts =  sort { my $result = ( 
+						 $tran2orf{ $b }
+						 <=> 
+						 $tran2orf{ $a }
+						);
+				   if ($result){
+				     return $result;
+				   }
+				   else{
+				     return ( $tran2length{ $b } <=> $tran2length{ $a } )
+				   }
+				 } @transcripts;
+
+  #test
+  print STDERR "1.- sorted transcripts:\n";
+  foreach my $tran (@sordid_transcripts){
+    print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+  }
+  
   @transcripts = ();
   # sort first by orfhash{'length'}
   my @orflengths = sort {$b <=> $a} (keys %orfhash);
@@ -2630,6 +2661,12 @@ sub prune_gene {
     $currbin++;
   }
 
+  #test
+  print STDERR "2.- sorted transcripts:\n";
+  foreach my $tran (@transcripts){
+    print STDERR $tran." orf_length: $tran2orf{$tran}, total_length: $tran2length{$tran}\n";
+  }
+
 # old way - sort strictly on exon length
 #    @transcripts = sort {$sizehash{$b->{'temporary_id'}} <=> $sizehash{$a->{'temporary_id'}}} @transcripts;
 
@@ -2663,7 +2700,7 @@ sub prune_gene {
   # allows retrieval of exon objects by exon->id - convenience
   my %exonhash;
   my @newtran;
-
+  
   foreach my $tran (@transcripts) {
     my @exons = $tran->get_all_Exons;
     $tran->sort;
@@ -2671,6 +2708,9 @@ sub prune_gene {
     my $i     = 0;
     my $found = 1;
     
+    # if this transcript has already been seen, this
+    # will be used to transfer supporting evidence
+    my @evidence_pairs;
 
 # 10.1.2002 VAC we know there's a potential problem here - single exon transcripts which are in a 
 # cluster where the longest transcriopt has > 1 exon are not going to be considered in 
@@ -2685,27 +2725,29 @@ sub prune_gene {
 # get through the check for single exon genes above.
 
 
-
+  EXONS:
     for ($i = 0; $i < $#exons; $i++) {
       my $foundpair = 0;
       my $exon1 = $exons[$i];
       my $exon2 = $exons[$i+1];
-      
+ 
       # Only count introns > 50 bp as real introns
       my $intron;
       if ($exon1->strand == 1) {
-	$intron = abs($exon2->start - $exon1->end + 1);
+	$intron = abs($exon2->start - $exon1->end - 1);
       } else {
-	$intron = abs($exon1->start   - $exon2->end + 1);
+	$intron = abs($exon1->start - $exon2->end - 1);
       }
       
-      #		print STDERR "Intron size $intron\n";
+      #	print STDERR "Intron size $intron\n";
       if ($intron < 50) {
 	$foundpair = 1; # this pair will not be compared with other transcripts
       } 
       else {
 	
-	# go through the exon pairs already stored in %pairhash. If there is a pair whose exon1 overlaps this exon1, and whose exon2 overlaps this exon2, then these two transcripts are paired
+	# go through the exon pairs already stored in %pairhash. 
+	# If there is a pair whose exon1 overlaps this exon1, and 
+	# whose exon2 overlaps this exon2, then these two transcripts are paired
 	
 	foreach my $exon1id (keys %pairhash) {
 	  my $exon1a = $exonhash{$exon1id};
@@ -2713,18 +2755,24 @@ sub prune_gene {
 	  foreach my $exon2id (keys %{$pairhash{$exon1id}}) {
 	    my $exon2a = $exonhash{$exon2id};
 	    
-	    
-	    if (($exon1->overlaps($exon1a) && 
-		 $exon2->overlaps($exon2a))) {
-	      #			  	print STDERR "HOORAY! Found overlap\n";
+	    if (($exon1->overlaps($exon1a) && $exon2->overlaps($exon2a))) {
 	      $foundpair = 1;
+	      
+	      # eae: this method allows a transcript to be covered by exon pairs
+	      # from different transcripts, rejecting possible
+	      # splicing variants
 
+	      # we put first the exon from the transcript being tested:
+	      push( @evidence_pairs, [ $exon1 , $exon1a ] );
+	      push( @evidence_pairs, [ $exon2 , $exon2a ] );
+	      
 	      # transfer evidence between exons, assuming the suppfeat coordinates are OK.
-	      # currently not working as the supporting evidence is not there - can get it for genewsies, but why not there for genscans?
-#	      $self->transfer_supporting_evidence($exon1, $exon1a);
-#	      $self->transfer_supporting_evidence($exon1a, $exon1);
-#	      $self->transfer_supporting_evidence($exon2, $exon2a);
-#	      $self->transfer_supporting_evidence($exon2a, $exon2);
+	      # currently not working as the supporting evidence is not there - 
+	      # can get it for genewsies, but why not there for genscans?
+	      #	      $self->transfer_supporting_evidence($exon1, $exon1a);
+	      #	      $self->transfer_supporting_evidence($exon1a, $exon1);
+	      #	      $self->transfer_supporting_evidence($exon2, $exon2a);
+	      #	      $self->transfer_supporting_evidence($exon2a, $exon2);
 	    }
 	  }
 	}
@@ -2742,16 +2790,30 @@ sub prune_gene {
 	# store the pairing between these 2 exons
 	$pairhash{$exon1->{'temporary_id'}}{$exon2->{'temporary_id'}} = 1;
       }
-    } # end of for ($i = 0; $i < $#exons; $i++)
+    }   # end of EXONS
     
     # decide whether this is a new transcript or whether it has already been seen
     if ($found == 0) {
-#      print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
+      #print STDERR "found new transcript " . $tran->{'temporary_id'} . "\n";
       push(@newtran,$tran);
+      @evidence_pairs = ();
     } else {
-#      print STDERR "Transcript already seen " . $tran->{'temporary_id'} . "\n";
-      # transfer supporting feature data - but to which transcript?
+      print STDERR "\n\nTranscript already seen " . $tran->{'temporary_id'} . "\n";
       
+      ## transfer supporting feature data. We transfer it to exons
+      foreach my $pair ( @evidence_pairs ){
+	my @pair = @$pair;
+
+	# first in the pair is the 'already seen' exon
+	my $source_exon = $pair[0];
+	my $target_exon = $pair[1];
+
+	print STDERR "transferring evi from ".
+	  $source_exon->{'temporary_id'}." in transcript @{ $exon2transcript{ $source_exon } } ".
+	    "to ".$target_exon->{'temporary_id'}." in transcript @{ $exon2transcript{ $target_exon } }\n";
+	
+	$self->transfer_supporting_evidence($source_exon, $target_exon)
+      }
     }
   } # end of this transcript
   
@@ -2808,9 +2870,9 @@ sub split_transcript{
   $curr_transcript->translation($translation);
 
 
-EXON:   foreach my $exon($transcript->get_all_Exons){
-
-
+EXON:   
+  foreach my $exon($transcript->get_all_Exons){
+    
     $exon_added = 0;
       # is this the very first exon?
     if($exon == $transcript->start_exon){
@@ -2981,30 +3043,51 @@ sub transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
   
   my @target_sf = $target_exon->each_Supporting_Feature;
-#  print "target exon sf: \n";
-#  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
+  #  print "target exon sf: \n";
+  #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
+  
+  #  print "source exon: \n";
+ 
+  # keep track of features already transferred, so that we do not duplicate
+  my %unique_evidence;
+  my %hold_evidence;
 
-#  print "source exon: \n";
- SUPPFEAT:
-  foreach my $feat($source_exon->each_Supporting_Feature){
-    next SUPPFEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
-#    $self->print_FeaturePair($feat);
-    TSF:
-    foreach my $tsf(@target_sf){
-      next TSF unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
-      next SUPPFEAT if($feat->start    == $tsf->start &&
-		       $feat->end      == $tsf->end &&
-		       $feat->strand   == $tsf->strand &&
-		       $feat->hseqname eq $tsf->hseqname &&
-		       $feat->hstart   == $tsf->hstart &&
-		       $feat->hend     == $tsf->hend);
-
+ SOURCE_FEAT:
+  foreach my $feat ($source_exon->each_Supporting_Feature){
+    next SOURCE_FEAT unless $feat->isa("Bio::EnsEMBL::FeaturePair");
+    
+    # skip duplicated evidence objects
+    next SOURCE_FEAT if ( $unique_evidence{ $feat } );
+    
+    # skip duplicated evidence 
+    if ( $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } ){
+      print STDERR "Skipping duplicated evidence\n";
+      next SOURCE_FEAT;
     }
-#    print STDERR "Adding suppfeat\n";
-    $target_exon->add_Supporting_Feature($feat);
-  }
-		  
 
+    #$self->print_FeaturePair($feat);
+    
+  TARGET_FEAT:
+    foreach my $tsf (@target_sf){
+      next TARGET_FEAT unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
+      
+      if($feat->start    == $tsf->start &&
+	 $feat->end      == $tsf->end &&
+	 $feat->strand   == $tsf->strand &&
+	 $feat->hseqname eq $tsf->hseqname &&
+	 $feat->hstart   == $tsf->hstart &&
+	 $feat->hend     == $tsf->hend){
+	
+	print STDERR "feature already in target exon\n";
+	next SOURCE_FEAT;
+      }
+    }
+    print STDERR "from ".$source_exon->{'temporary_id'}." to ".$target_exon->{'temporary_id'}."\n";
+    $self->print_FeaturePair($feat);
+    $target_exon->add_Supporting_Feature($feat);
+    $unique_evidence{ $feat } = 1;
+    $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
+  }
 }
 
 sub print_FeaturePair{
