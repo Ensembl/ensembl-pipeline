@@ -901,7 +901,13 @@ sub job_existance{
        $status eq 'READING' ||$status eq 'WRITING' ||
        $status eq 'WAITING'){
       if(!$job->submission_id){
-        next JOB;
+        if($status eq 'SUBMITTED'){
+          next JOB;
+        }else{
+          print STDERR ("Job ".$job->dbID." doesn't have a submission id ".
+                        "We can't check if it still exists and the status ".
+                        " is aparently ".$status."\n");
+        }
       }
       if(!$job_submission_ids{$job->submission_id}){
         $job_submission_ids{$job->submission_id} = [];
