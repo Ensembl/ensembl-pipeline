@@ -21,8 +21,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
 my $db          = Bio::EnsEMBL::DBLoader->new($locator);
 my $genscan     = Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA->new ( 
                                                     -dbobj      => $db,
-			                                        -input_id   => $input_id
+			                            -input_id   => $input_id
                                                     -analysis   => $analysis );
+
 $genscan->fetch_input();
 $genscan->run();
 $genscan->output();
@@ -30,9 +31,9 @@ $genscan->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
-his object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed from 
-assembling genscan predicted features into contiguous DNA sequence. 
-The resulting blast hits are written back as FeaturePairs.
+This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed from 
+assembling genscan predicted features to peptide sequence. The resulting blast hits are
+written back as FeaturePairs.
 The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
@@ -53,14 +54,136 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
-use Data::Dumper;
+
+#use Data::Dumper;
 
 use vars qw(@ISA);
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
+=head2 new
+
+    Title   :   new
+    Usage   :   $self->new(-DBOBJ       => $db
+                           -INPUT_ID    => $id
+                           -ANALYSIS    => $analysis);
+                           
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
+    Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
+    Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
+                -input_id:  Contig input id , 
+                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+
+=cut
+
+sub new {
+    my ($class, @args) = @_;
+    my $self = bless {}, $class;
+    
+    $self->{'_featurepairs'}= [];
+    $self->{'_genseq'}      = undef;
+    $self->{'_transcripts'} = [];
+    $self->{'_runnable'}    = [];
+    $self->{'_input_id'}    = undef;
+    $self->{'_parameters'}  = undef;
+    
+    my ( $dbobj, $input_id, $analysis) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
+    
+    $self->throw('Need database handle') unless ($dbobj);
+    $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
+                unless ($dbobj->isa ('Bio::EnsEMBL::DB::ObjI'));
+    $self->dbobj($dbobj);
+    
+    $self->throw("No input id provided") unless ($input_id);
+    $self->input_id($input_id);
+    
+    $self->throw("Analysis object required") unless ($analysis);
+    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
+                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+
+    $self->analysis($analysis);
+    
+    return $self;
+}
+
+=head2 fetch_input
+
+    Title   :   fetch_input
+    Usage   :   $self->fetch_input
+    Function:   Fetches input data for repeatmasker from the database
+    Returns :   none
+    Args    :   none
+
+=cut
+
+sub fetch_input {
+    my($self) = @_;
+    
+    $self->throw("No input id") unless defined($self->input_id);
+
+    my $contigid  = $self->input_id;
+    print STDERR "Fetching contig $contigid\n";
+    my $contig    = $self->dbobj->get_Contig($contigid) 
+        or $self->throw("Unable to find contig ($contigid)\n");
+    my $genseq    = $contig->primary_seq() 
+        or $self->throw("Unable to fetch contig sequence");
+    $self->genseq($genseq);
+    #need to get features predicted by genscan
+    $self->transcripts($contig->get_genscan_peptides);
+}
+
+sub transcripts {
+    my ($self, @transcripts) = @_;
+    
+    if (@transcripts)
+    {
+        foreach (@transcripts)
+        {
+            $self->throw("Input $_ is not a Bio::EnsEMBL::Transcript\n")
+                unless $_->isa("Bio::EnsEMBL::Transcript");
+        }
+        push (@{$self->{'_transcripts'}}, @transcripts);
+    }
+    return @{$self->{'_transcripts'}};
+}
+
+#converts parameters from string to hash
+sub formatted_parameters {
+    my ($self) = @_;
+     
+        #extract parameters into a hash
+        my ($parameter_string) = $self->parameters;
+        my %parameters;
+        if ($parameter_string)
+        {
+            my @pairs = split (/,/, $parameter_string);
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $key =~ s/\s+//g;
+                $parameters{$key} = $value;
+            }
+        }
+        $parameters {'-blast'}  = $self->analysis->program_file;
+        $parameters {'-db'}     = $self->analysis->db_file;
+        
+    return %parameters;
+}
+
+sub runnable {
+    my ($self, @runnable) = @_;
+    if (@runnable)
+    {
+        foreach my $runnable (@runnable)
+        {
+            $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") or
+                $self->throw("Input to runnable is not Bio::EnsEMBL::Pipeline::RunnableI");
+        }
+        push (@{$self->{'_runnable'}}, @runnable);
+    }
+    return @{$self->{'_runnable'}};
+}
 
 =head2 run
 
@@ -73,180 +196,320 @@ use vars qw(@ISA);
 =cut
 
 sub run {
-    my ($self) = @_;
-    #need to pass one peptide at a time
-    $self->throw("Input must be fetched before run") unless ($self->genseq);
-    foreach my $transcript ($self->transcripts)
+  my ($self) = @_;
+  #need to pass one peptide at a time
+  $self->throw("Input must be fetched before run") unless ($self->genseq);
+  print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
+  foreach my $transcript ($self->transcripts)
     {
-        print STDERR "Creating BioPrimarySeq ".$transcript->id."\n";
-        my $gene_seq    = Bio::PrimarySeq->new(
-                        -id         => $transcript->id,
-                        -seq        => $transcript->dna_seq->seq,
-                        -moltype    => 'protein' );
-                                        
-        my %parameters = $self->formatted_parameters();
-        my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(%parameters);
-        $runnable->clone($gene_seq);
-        $runnable->run();
-        $self->runnable($runnable);                                        
+      print STDERR "Creating BioPrimarySeq ".$transcript->id."\n";
+      my $peptide = Bio::PrimarySeq->new(
+					 -id         => $transcript->id,
+					 -seq        => $transcript->translate->seq(),
+					 -moltype    => 'protein' );
+      
+      my %parameters = $self->formatted_parameters();
+      my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(%parameters);
+      
+      $runnable->clone($peptide);
+      $runnable->run();
+      $self->runnable($runnable);                                        
     }
-
-    my (@output);
-    my @runnable = $self->runnable();
-    #align the output to the contig
-    foreach my $run (@runnable)
+  
+  my (@output);
+  my @runnable = $self->runnable();
+  #align the output to the contig
+  foreach my $run (@runnable)
     {
-        foreach my $transcript ($self->transcripts)
+      foreach my $transcript ($self->transcripts)
         {
-            if ($run->clone->id eq $transcript->id)
+	  if ($run->clone->id eq $transcript->id)
             {
-                print STDERR "MATCHED: ".$run->clone->id." with ".$transcript->id."\n";
-                $self->align_hit_to_contig($run, $transcript);
-                last;
+	      print STDERR "MATCHED: ".$run->clone->id." with ".$transcript->id."\n";
+	      $self->align_hit_to_contig($run, $transcript);
+	      last;
             }
         }
     }
 }
 
-sub align_hit_to_contig {
-    my ($self, $run, $trans) = @_;
-    my @exon_aligns;
+=head2 output
+
+    Title   :   output
+    Usage   :   $self->output();
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->output()
+    Returns :   An array of Bio::EnsEMBL::Repeat objects (FeaturePairs)
+    Args    :   none
+
+=cut
+
+sub output {
+    my ($self) = @_;
+
+    return $self->featurepairs();  
+}
+
+
+=head2 write_output
+
+    Title   :   write_output
+    Usage   :   $self->write_output
+    Function:   Writes output data to db
+    Returns :   array of repeats (with start and end)
+    Args    :   none
+
+=cut
+
+sub write_output {
+    my($self) = @_;
+
+    my $db=$self->dbobj();
+    my @features = $self->output();
     
-    #map each exon onto a single dna sequence
+    my $contig;
+    eval 
+    {
+        $contig = $db->get_Contig($self->input_id);
+    };
+    
+    if ($@) 
+    {
+	    print STDERR "Contig not found, skipping writing output to db: $@\n";
+    }
+    elsif (@features) 
+    {
+        #should add conditional for evalue here
+	    print STDERR "Writing features to database\n";
+        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+	    $feat_Obj->write($contig, @features);
+    }
+    return 1;
+}
+
+# This function creates a hash which is used to map between the exon genomic position
+# and a position within the genscan predicted peptide. The hash is then matched
+# against blast peptide hits to return a set of featurepairs of exons and blast
+# peptides
+sub align_hit_to_contig {
+    my ($trans,@output) = @_;
+
+    my (%dna_align, @exon_aligns, @featurepairs); #structure for tracking alignment variables
+    
+    $dna_align {'exons'} = [];
+    #exons must be in order of peptide start position
+    $trans->sort;
+    #calculate boundaries and map exons to translated peptide
+    #Note: Exons have an extra 3 bases for the stop codon. Peptides lack this
     foreach my $exon ($trans->each_Exon)
     {
         my %ex_align;
-        my $mrna    = $trans->dna_seq->seq 
-            or $self->throw("Unable to read sequence from Transcript ".$trans->name."\n");
-        my $ex_seq  = $exon->seq->seq
-            or $self->throw("Unable to read sequence from Exon ".$exon->name."\n");
-        
+        my $pep = $trans->translate->seq;
+        my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
+        print("Exon translation not found in peptide") 
+                    unless ($pep =~ /$expep/);
+
         $ex_align {'name'}      = $exon->id;
-        $ex_align {'gen_start'} = $exon->start;
-        $ex_align {'gen_end'}   = $exon->end;
+        $ex_align {'gen_start'} = $exon->start + (3 - $exon->phase)%3;
+        $ex_align {'gen_end'}   = $exon->end   - $exon->end_phase;  
         $ex_align {'strand'}    = $exon->strand;
         $ex_align {'phase'}     = $exon->phase;
         $ex_align {'end_phase'} = $exon->end_phase;
-        $ex_align {'cdna_start'}= index($mrna, $ex_seq) +1;
-        $ex_align {'cdna_end'}  = ($ex_align {'cdna_start'} + length($ex_seq)) -1;   
+        $ex_align {'pep_start'} = index($pep, $expep)+1;
+        $ex_align {'pep_end'}   = ($ex_align {'pep_start'} + length($expep))-1;
+      
         push (@exon_aligns, \%ex_align);
+        
+        $dna_align {'exon_dna_limit'} += $exon->length;   
+        #print STDERR "Exon: ".$ex_align {'name'}
+        #        ." PEP ".$ex_align {'pep_start'}." - ".$ex_align {'pep_end'}
+        #        ." GEN ".$ex_align {'gen_start'}." - ".$ex_align {'gen_end'}
+        #        ." SPh ".$ex_align {'phase'}." EPh ".$ex_align {'end_phase'}."\n";
+        #print STDERR "Translated Seq: ".$exon->translate->seq."\n";
+	printf ("Exon: %20s PEP %10d - %10d GEN %10d - %10d Sph %5d Eph %5d %s\n",$ex_align{name},
+		$ex_align{pep_start},
+		$ex_align{pep_end},
+		$ex_align{gen_start},
+		$ex_align{gen_end},
+		$ex_align{phase},
+		$ex_align{end_phase});
+        
     }
     
-    #map each feature onto 1 or more exons
-    foreach my $fp ($run->output)
-    { 
-        if ($fp->strand != 1 && $fp->strand != -1)
+    $dna_align {'pep_limit'} = $dna_align {'exon_dna_limit'}/3;      
+    
+    #map each feature to 1 or more exons
+    foreach my $fp (@output)
+    {   
+        unless (($fp->end - $fp->start)+1 <= $dna_align{'pep_limit'})
         {
-            warn("Strand not set to 1 or -1 for Feature "
-                   .$fp->seqname."(".$fp->strand.")\n");
-            next;
+	  print("Feature length (".$fp->start."-".$fp->end. 
+               ") is larger than peptide (".$dna_align{'pep_limit'}.")\n");
         }
-        
-        my @aligned_exons;
-        foreach my $ex (@exon_aligns)
+        #find each matching exon
+        my (@aligned_exons);
+        foreach my $ex_align (@exon_aligns)
         {
-            if ($ex->{'strand'} != 1 && $ex->{'strand'} != -1)
+            if ($ex_align->{'pep_end'} >= $fp->start)
             {
-                warn("Strand not set to 1 or -1 for Exon "
-                       .$ex->{'name'}."(".$ex->{'strand'}.")\n");
-                next;
-            }            
-            
-            if ($ex->{'cdna_end'} >= $fp->start)
-            {
-                push (@aligned_exons, $ex);
-                last if ($ex->{'cdna_end'} >= $fp->end);
+                push (@aligned_exons, $ex_align);
+                last if ($ex_align->{'pep_end'} >= $fp->end);
             }
         }
-        $self->create_dna_featurepairs($fp, @aligned_exons);
-    }
+        #create sets of featurepairs mapping peptide features to exons
+        create_peptide_featurepairs($fp, @aligned_exons);
+    } 
 }
 
-sub create_dna_featurepairs {
-my  ($self, $fp, @aligned_exons) = @_;
-
-    #split features across exons if necessary
-    foreach my $ex (@aligned_exons)
-    {
-        #my ($start, $end, $hstart, $hend);
-        my ($start_phase, $end_phase, $start, $end, $hstart, $hend);
+# This function takes a blast peptide feature hit and a set of matching exons and
+# creates a set of featurepairs aligned to genomic coordinates. It will split
+# features if they cross exon boundaries
+sub create_peptide_featurepairs {
+    my ( $fp, @aligned_exons) = @_;
+    #create featurepairs
     
-        if ($$ex{'cdna_start'} < $fp->start)
-        {
-            $start  =   $ex->{'gen_start'} + ($fp->start - $ex->{'cdna_start'});
-            $hstart =   $fp->hstart; 
-            $start_phase = 0; 
+    print "\nConverting featurepair : PEP " . $fp->start . "\t" . $fp->end . " HIT " . $fp->hstart . "\t" . $fp->hend . "\t" . $fp->hstrand . "\n";
+
+    foreach my $ex_align (@aligned_exons) {
+      print "\nFound aligned exon " . $ex_align->{pep_start} . "\t" . $ex_align->{pep_end} . "\t" . $ex_align->{gen_start} . "\t" . $ex_align->{gen_end} . "\n";
+      my ($ex_start, $ex_end, $dna_start, $dna_end, $start_phase, $end_phase);
+      #This splits features across multiple exons and records phases
+      if ($ex_align->{'pep_start'}  < $fp->start) {
+
+#	print "\tFound start of feature\n";
+	#feature starts inside current exon
+	
+	if ($ex_align->{strand} == 1) {
+	  $ex_start   = $ex_align->{'gen_start'}
+	  + (($fp->start - $ex_align->{'pep_start'})*3);
+	} else {
+	  $ex_end     = $ex_align->{'gen_end'}
+	  - (($fp->start - $ex_align->{'pep_start'})*3);
+	}
+
+	$start_phase= 0;
+	
+	if ($fp->hstrand == 1) {
+	  $dna_start  = $fp->hstart;
+	} else {
+	  $dna_end    = $fp->hend;
+	}
+	
+      } else {
+#	print "\tStart of feature = exon start\n";
+	#feature starts in a previous exon or absolute start of current exon
+	if ($ex_align->{strand} == 1) {
+	  $ex_start   = $ex_align->{'gen_start'};
+	} else {
+	  $ex_end     = $ex_align->{'gen_end'};
+	}
+	$start_phase= $ex_align->{'phase'};
+	
+	# check for strand
+	if ($fp->hstrand == 1) {
+	  $dna_start  = $fp->hstart + ($ex_align->{'pep_start'} - $fp->start)*3;
+	} else {
+	  $dna_end    = $fp->hend   - ($ex_align->{pep_start}   - $fp->start)*3;
+	}
+      }
+        
+      if ($$ex_align{'pep_end'}    > $fp->end) {
+#	print "\tFeature ends in exon\n";
+	#feature ends in current exon
+	if ($ex_align->{strand} == 1) {
+	  $ex_end     = $ex_align->{'gen_start'}
+	  + (($fp->end -  $ex_align->{'pep_start'})*3)+2;
+	} else {
+	  $ex_start   = $ex_align->{'gen_end'}
+	  - (($fp->end -  $ex_align->{'pep_start'})*3)-2;
+	}
+	$end_phase  = 0;
+	
+	#Check for strand
+	if ($fp->hstrand == 1) {
+	  $dna_end    = $fp->hend;
+	} else {
+	  $dna_start  = $fp->hstart;
+	}
+      } else {
+#	print "\tFeature end is exon end\n";
+	#feature ends in a later exon or absolute end of current exon
+	if ($ex_align->{strand} == 1) {
+	  $ex_end     = $ex_align->{'gen_end'};
+	} else {
+	  $ex_start   = $ex_align->{'gen_start'};
+	}
+	$end_phase  = $ex_align->{'end_phase'};
+	
+	# Check for strand
+	if ($fp->hstrand == 1) {
+#	  print "Setting dna end\n";
+	  $dna_end    = $fp->hstart + ($ex_align->{'pep_end'} - $fp->start)*3 +2;
+	} else {
+	  $dna_start  = $fp->hend   - ($ex_align->{pep_end}   - $fp->start)*3 -2;
         }
-        else
-        {
-            $start  =   $ex->{'gen_start'};
-            $hstart =   ($ex->{'cdna_start'} - $fp->start) + $fp->hstart;
-            $start_phase = $ex->{'phase'};
-        }
+      }
+
+      # Need to sort out strand - do we need strand or hstrand here?
+      my $strand = 1;
+      if ($ex_align->{strand} == 1 ) {
+	$strand  = $fp->hstrand;
+      } else {
+	$strand  = $fp->hstrand * -1;
+      }
+
+      my $start_frac = $ex_align->{'phase'} + 1;
+      my $end_frac   = (( 3 - $$ex_align{'end_phase'})%3) + 1;
+      my $dna_feat = Bio::EnsEMBL::SeqFeature->new (
+						    -seqname    =>  $ex_align->{'name'},
+						    -start      =>  $ex_start, 
+						    -end        =>  $ex_end,
+						    -strand     =>  $strand,
+						    -score      =>  $fp->score,
+						    -p_value    =>  $fp->p_value,
+						    -percent_id =>  $fp->percent_id,
+						    -analysis   =>  $fp->analysis,
+						    -primary_tag=>  $fp->primary_tag,
+						    -source_tag =>  $fp->source_tag, 
+						    -phase      =>  $start_phase,  
+						    -end_phase  =>  $end_phase );
         
-        if ($$ex{'cdna_end'} > $fp->end)
-        {
-            $end    =   $ex->{'gen_start'} + ($fp->end - $ex->{'cdna_start'});
-            $hend   =   $fp->hend;
-            $end_phase = 0;
-        }
-        else
-        {
-            $end    =   $ex->{'gen_end'};
-            $hend   =   $fp->hstart + ($ex->{'cdna_end'} - $fp->start); 
-            $end_phase = $ex->{'end_phase'};
-        }
-        
-        #print STDERR "NAME: ".$fp->hseqname
-        #             ."\tEx: ".($ex->{'cdna_end'} - $ex->{'cdna_start'})
-        #             ."\tF1: ".($fp->end - $fp->start +1)
-        #             ."\tf2: ".($fp->hend - $fp->hstart +1)
-        #             ."\th1: ".($end - $start + 1)
-        #             ."\th2: ".($hend - $hstart +1)."\n";
-        #print STDERR "Ex ".$ex->{'cdna_start'}." - ".$ex->{'cdna_end'}
-        #             ." Feat ".$fp->start." - ".$fp->end
-        #             ." Feat2 ".$fp->hstart." - ".$fp->hend
-        #             ." H1 $start - $end H2 $hstart - $hend"
-        #             ." Ex ".$ex->{'gen_start'}." - ".$ex->{'gen_end'}
-        #             ."\tPh: ".$start_phase." - ".$end_phase ."\n";
-                     
-        my $contig_feat = Bio::EnsEMBL::SeqFeature->new (
-                                -seqname    =>  $ex->{'name'},
-                                -start      =>  $start, 
-                                -end        =>  $end,
-                                -strand     =>  $fp->strand,
-                                -score      =>  $fp->score,
-                                -p_value    =>  $fp->p_value,
-                                -percent_id =>  $fp->percent_id,
-                                -analysis   =>  $fp->analysis,
-                                -primary_tag=>  $fp->primary_tag,
-                                -source_tag =>  $fp->source_tag, 
-                                -phase      =>  $start_phase,  
-                                -end_phase  =>  $end_phase );
-                                
-        my $hit_feat = Bio::EnsEMBL::SeqFeature->new (
-                                -seqname    =>  $fp->hseqname,
-                                -start      =>  $hstart, 
-                                -end        =>  $hend,
-                                -strand     =>  $fp->hstrand,
-                                -score      =>  $fp->score,
-                                -p_value    =>  $fp->p_value,
-                                -percent_id =>  $fp->percent_id,
-                                -analysis   =>  $fp->analysis,
-                                -primary_tag=>  $fp->primary_tag,
-                                -source_tag =>  $fp->source_tag, 
-                                -phase      =>  $start_phase,  
-                                -end_phase  =>  $end_phase );
-        
-        #print STDERR "F1 ".$contig_feat->start." - ".$contig_feat->end
-        #            ." F2 ".$hit_feat->start." - ".$hit_feat->end
-        #            ."\tPh: ".$contig_feat->phase." - ".$contig_feat->end_phase ."\n";
-        
-        my $featurepair = Bio::EnsEMBL::FeaturePair->new (
-                                -feature1   => $contig_feat,
-                                -feature2   => $hit_feat );
-        
-        $self->featurepairs($featurepair);
-    }
+      my $pep_feat = Bio::EnsEMBL::Pep_SeqFeature->new (
+							-seqname    =>  $fp->hseqname,
+							-start      =>  $dna_start,
+							-end        =>  $dna_end,
+							-strand     =>  $strand,
+							-start_frac =>  $start_frac,
+							-end_frac   =>  $end_frac,
+							-score      =>  $fp->score,
+							-p_value    =>  $fp->p_value,
+							-percent_id =>  $fp->percent_id,
+							-analysis   =>  $fp->analysis,
+							-primary_tag=>  $fp->primary_tag,
+							-source_tag =>  $fp->source_tag );
+                                    
+      my $featurepair = Bio::EnsEMBL::FeaturePair->new (
+							-feature1   => $dna_feat,
+							-feature2   => $pep_feat );
+
+      
+      $self->featurepairs($featurepair);
+
+      print STDERR $featurepair->gffstring . "\n";
+
+    }   
 }
 
+
+
+
+sub featurepairs {
+    my ($self, $fp) = @_;
+    if ($fp)
+    {
+        $self->throw("Input isn't a Bio::EnsEMBL::FeaturePair") 
+                unless $fp->isa("Bio::EnsEMBL::FeaturePairI");
+        push (@{$self->{'_featurepairs'}}, $fp);
+    }
+    #print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
+    return @{$self->{'_featurepairs'}};
+}
