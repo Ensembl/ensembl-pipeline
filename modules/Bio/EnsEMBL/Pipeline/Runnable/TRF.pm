@@ -108,8 +108,8 @@ sub new {
     $self->{'_delta'}     = 7;
     $self->{'_pm'}        = 80;
     $self->{'_pi'}        = 10;
-    $self->{'_minscore'}  = 50;
-    $self->{'_maxperiod'} = 150; 
+    $self->{'_minscore'}  = 20;
+    $self->{'_maxperiod'} = 500; 
 
     my ($clone, $trf, $match, $mismatch, $delta, $pm, $pi, $minscore, $maxperiod) = $self->_rearrange([qw(
 	CLONE
@@ -122,8 +122,9 @@ sub new {
         MINSCORE
         MAXPERIOD
     )], @args);
+    
 
-    $trf = 'trf' unless defined($trf);
+    $trf = 'trf301' unless defined($trf);
     $trf = $self->find_executable($trf);
     $self->trf($trf);
 
