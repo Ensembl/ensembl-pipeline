@@ -24,6 +24,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
                                         EST_RUNNER
                                         EST_EXONERATE_RUNNABLE
+                                        EST_EXONERATE_ANALYSIS
                                         EST_EXONERATE
                                         EST_REFDBNAME
                                         EST_REFDBUSER
@@ -40,6 +41,7 @@ my $exonerate;
 my $dbname;
 my $dbuser;
 my $host;
+my $est_db;
 my $estfiledir;
 my $chunkname;
 my $input_id;
@@ -48,12 +50,13 @@ my $errfile;
 my $tmperrfile;
 my $outfile;
 my $tmpoutfile;
+my $analysis;
 
 &get_variables();
 
 my $estfile = $estfiledir . "/" . $chunkname;
 
-my $command = "$runner -runnable $runnable -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
+my $command = "$runner -runnable $runnable -input_id $input_id -analysis $analysis -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
 
 print STDERR "command is $command\n";
 
@@ -103,6 +106,7 @@ sub get_variables {
   $estfiledir = $EST_CHUNKDIR;
   $input_id   = $EST_GENOMIC;
   $outdir     = $EST_TMPDIR;
+  $analysis = $EST_EXONERATE_ANALYSIS;
 
   if(!(defined $host       && defined $dbname    && defined $dbuser &&
        defined $runner     && defined $runnable  && defined $exonerate &&
