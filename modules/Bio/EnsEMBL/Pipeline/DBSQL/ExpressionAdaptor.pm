@@ -54,11 +54,13 @@ sub fetch_ests_by_Term{
   
   # find the intersection
   if ( scalar( @terms ) == 1 ){
+    print STDERR "fetching ESTs\n";
     my @est_ids = $self->_get_ests_by_clone_id_array( @{ $lib_arrays{$terms[0]} });
     return @est_ids;
   }
   # this method rely on having no repeated ESTs within each array
   if ( scalar( @terms ) > 1 ){
+    print STDERR "finding intersectino of libraries\n";
     my @common_libs;
     my %counter;
     foreach my $term (@terms){
@@ -74,6 +76,7 @@ sub fetch_ests_by_Term{
       exit(0);
     }
     # get all the ests for these clone libraries
+    print STDERR "fetching ESTs\n";
     my @est_ids = $self->_get_ests_by_clone_id_array( @common_libs);
     return @est_ids;
   }
@@ -100,9 +103,9 @@ sub get_clonelib_by_Term{
 
   #first get the NodeId and the Ontology tree for this term
   my $q = qq ( SELECT Vocabulary.NodeId, Node.OntologyId 
-	       FROM Vocabulary, Node 
-	       WHERE Vocabulary.Term   = "$term" 
-	       AND Vocabulary.NodeId = Node.Id
+	       FROM   Vocabulary, Node 
+	       WHERE  Vocabulary.Term   = "$term" 
+	       AND    Vocabulary.NodeId = Node.Id
 	     );
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
@@ -125,9 +128,11 @@ sub get_clonelib_by_Term{
     print STDERR "reading a new tree: $ontology_id\n";
     %tree = $self->get_Tree_by_id($ontology_id);
   }
-
+  
   # get the leaves (clone libraries) of the subtree:
   my @leaves;
+  my $ref = \%tree;
+  print STDERR "getting libraries with this term\n";
   @leaves = $self->_get_leaves_from_node( $node_id , \@leaves, \%tree);
   
   return @leaves;
@@ -147,11 +152,11 @@ sub get_clonelib_by_Term{
 
 sub _get_leaves_from_node{
   my ( $self, $node_id, $leaves, $tree ) = @_;
-  my %tree = %{ $tree };
+  my %tree = %$tree;
   
   if ( $tree{children}{$node_id}  && @{ $tree{children}{$node_id} } ){
     foreach my $child ( @{ $tree{children}{$node_id} }){
-      push( @{ $leaves },  get_leaves_from_node( $child, $leaves, $tree ) );
+      push( @{ $leaves },  $self->_get_leaves_from_node( $child, $leaves, $tree ) );
     }
   }
   elsif( $tree{libraries}{$node_id} && @{ $tree{libraries}{$node_id} } ){
@@ -186,7 +191,6 @@ sub _get_ests_by_clone_id_array{
 	       WHERE  EST.ClonelibId in $string
 	     ); 
   
-  print STDERR $q;
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
   my $res = $sth->execute      || $self->throw("can't execute: $q");
   my @est_ids;
@@ -199,7 +203,7 @@ sub _get_ests_by_clone_id_array{
 
 ########################################################################################
 #
-# Method to suck the entire tree structure for a given ontology given its internal id
+# Method to load the entire tree structure for a given ontology given its internal id
 #
 ########################################################################################
 
@@ -217,7 +221,21 @@ sub _get_ests_by_clone_id_array{
 
 sub get_Tree_by_id{
   my ($self,$ontology_id) = @_;
+
+  my %tree;
   
+  # get the root of the tree
+  my $q = qq ( SELECT Ontology.Name
+	       FROM   Ontology
+	       WHERE  Ontology.Id = $ontology_id
+	     );
+  
+  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
+  my $res = $sth->execute      || $self->throw("can't execute: $q");
+
+  $tree{root} = $sth->fetchrow_array;
+  
+  print STDERR "getting tree structure\n";
   # store terms and parent ids
   my $q = qq ( SELECT Node.Id, Node.ParentId, Vocabulary.Term
 	       FROM   Vocabulary, Node
@@ -227,7 +245,6 @@ sub get_Tree_by_id{
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
   my $res = $sth->execute      || $self->throw("can't execute: $q");
-  my %tree;
   while( my ($node_id, $parent_id, $term) = $sth->fetchrow_array){
     $tree{term}{$node_id}   = $term;
     $tree{parent}{$node_id} = $parent_id;
@@ -235,6 +252,7 @@ sub get_Tree_by_id{
     push( @{ $tree{nodes} }, $node_id );
   }
   
+  print STDERR "getting libraries for this tree\n";
   # get all the leaves in this tree
   my $q = qq ( SELECT Node.Id, Mapping.ClonelibId
 	       FROM   Node, Mapping
@@ -244,12 +262,12 @@ sub get_Tree_by_id{
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
   my $res = $sth->execute      || $self->throw("can't execute: $q");
-  my %term;
-  my %parent;
-  my %tree;
+  my $count = 0;
   while( my ($node_id, $lib_id) = $sth->fetchrow_array){
+    $count++;
     push( @{ $tree{libraries}{$node_id} }, $lib_id);
   }
+  print STDERR "$count libraries found\n";
   # cache the tree
   $self->_tree($ontology_id,\%tree);
   return %tree;
@@ -268,14 +286,17 @@ sub _tree{
   unless ( $ontology_id ){
     $self->throw("Cannot retrived a cached tree without an ontology_id");
   }
-  if ( $tree ){
+  if ( $ontology_id && $tree ){
     $self->{_tree}{$ontology_id} = $tree;
   }
   return $self->{_tree}{$ontology_id};
 }
 
-
-############################################################
+########################################################################################
+#
+# Method to check which ests (from an array) are present in (at least) one of the Vocabulary trees
+#
+########################################################################################
 
 =head2 get_libraryId_by_estarray
   
@@ -323,91 +344,67 @@ sub get_libraryId_by_estarray{
 
 
 ############################################################
-
-sub get_class_ids{
-  my ($self, $clonelibrary_id) = @_;
-  my $q = qq ( SELECT SequenceClassLink.class_id
-	       FROM   SequenceClassLink, Sequence
-	       WHERE  SequenceClassLink.sequence_id = Sequence.id
-	       AND    Sequence.clonelibrary_id = "$clonelibrary_id"
-	     );
-  
-  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute || $self->throw("can't execute: $q");
-  my @class_ids;
-  while ( my ($class_id) = $sth->fetchrow_array ){
-    push ( @class_ids, $class_id );
-  }
-  return @class_ids;
-}
-
+#
+# Method to get all the vocabulary associated to an EST
+#
 ############################################################
 
-sub get_Clonelib_id_by_name{
-  my ($self, $name ) = @_;
-  my $q = qq ( SELECT Id 
-	       FROM   Clonelib
-	       WHERE  Name="$name"
-	     );
+=head2 get_Vocabulary_of_est
   
-  my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute || $self->throw("can't execute: $q");
-  my $count = 0;
-  my $clone_dbID;
-  while ( my ($id) = $sth->fetchrow_array ){
-    $clone_dbID = $id;
-    $count++;
-  }
-  if ( $count>1){
-    print STDERR "WARNING: 1-to-2 mapping\n";
-  }
-  return $clone_dbID;
-}
-
-############################################################
-
-=head2 get_vocabulary_of_est
-  
-  Arg        : an EST accession, it will check for version numbers and remove them
-  Description: given an EST accession, for each Ontology tree, it finds the full path leading to the 
-               node where the EST sits
-  Returntype : It returns an array with as many elements as paths the EST have been found in.
+  Arg        : an EST accession (a string), it will check for version numbers and remove them
+  Description: given an EST accession, for each Ontology tree where the library can be found, 
+               it finds the full path from the root to the node where the EST sits
+  Returntype : It returns an array with as many elements as paths the EST have been found in,
+               one per ontology tree where it was found in.
                Each element is an arrayref which contains all the terms in the vocabulary,
                starting from the ontology tree name. It does not contain the clone library name, which
                can be retrieved with $self->get_library_by_est($est_id)               
 =cut
 
-sub get_vocabulary_of_est{
+sub get_Vocabulary_of_est{
   my ($self,$est_id) = @_;
 
-  # we get first the clone library for this est:
-  my $clone_library = $self->get_library_by_est( $est_id);
+  # remove version numbers
+  if ( $est_id =~/(\S+)\.(\d+)/ ){
+    $est_id = $1;
+  }
 
-  # get the Node ids linking through the clone library id:
-  my $q = qq ( SELECT Mapping.NodeId
-	       FROM   Mapping, EST
-	       WHERE  EST.Accession = "$est_id"
+  # get the Node ids linking through the clone library id for this est:
+  my $q = qq ( SELECT Node.OntologyId, Mapping.NodeId
+	       FROM   Mapping, EST, Node
+	       WHERE  EST.Accession  = "$est_id"
 	       AND    EST.ClonelibId = Mapping.ClonelibId
+	       AND    Mapping.NodeId = Node.Id 
 	     );
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute || $self->throw("can't execute: $q");
+  my $res = $sth->execute      || $self->throw("can't execute: $q");
   
   my @nodes;
-  while ( my ($node_id) = $sth->fetchrow_array ){
+  my %ontology;
+  while ( my ($ontology_id, $node_id) = $sth->fetchrow_array ){
     push (@nodes, $node_id);
+    $ontology{$node_id} = $ontology_id;
+  }
+  unless( @nodes ){
+    print STDERR "est $est_id not found in the tree\n";
   }
 
   # now find the whole path to the root of the tree from each of these end nodes
-  my @ontologies;
+  my @vocabularies;
   foreach my $node_id (@nodes){
-    
     my @vocabulary;
-    my $string  = $self->_find_path($node_id);
-    @vocabulary = split '|||',$string;
-    push ( @ontologies, \@vocabulary );
+    my %tree;
+    if ( $self->_tree( $ontology{$node_id}) ){
+      %tree = %{ $self->_tree( $ontology{$node_id} ) };
+    }
+    else{
+      %tree = $self->get_Tree_by_id($ontology{$node_id}) ;
+    }
+    $self->_find_path($node_id, \@vocabulary, \%tree);
+    push ( @vocabularies, \@vocabulary );
   }
-  return @ontologies;
+  return @vocabularies;
 }
 
 ############################################################
@@ -424,21 +421,36 @@ sub get_vocabulary_of_est{
 =cut
 
 sub _find_path{
-  my ($self,$node_id) = @_;
-  
-  my $parent_node_id = $self->_get_parent_node_id($node_id);
-  if ( $parent_node_id == 0 ){
-    # we got to the root, get the name of the tree:
-    my $ontology = $self->_get_ontology_from_node_id( $node_id);
-    return $ontology;
-  }
-  my $parent_term = $self->find_path($parent_node_id);
+  my ($self,$node_id,$vocabulary, $tree) = @_;
 
-  my $term = $self->_get_term_by_node_id($node_id); 
+  my %tree = %$tree;
+
+  # recall that
+  # $tree{root} is the name of the Onotology tree (the root)
+  # $tree{term}{$node_id}   is the vocabulary term for that node
+  # $tree{parent}{$node_id} is the parent node id
+  # @{ $tree{nodes} }       holds all the node ids in the tree
+  # @{ $tree{libraries}{$node_id} } holds the leaves ( all the clone libraries hanging from a node )
+
+  my $parent_node_id = $tree{parent}{$node_id};
+
+  if ( $parent_node_id == 0 || !defined($parent_node_id)){
+
+    # we got to the root, get the name of the tree:
+    my $root = $tree{root};
+    push ( @{ $vocabulary }, $root );
+    
+    my $term = $tree{term}{$node_id};
+    push ( @{$vocabulary}, $term);
+    
+    return;
+  }
+  $self->_find_path($parent_node_id, $vocabulary, $tree);
   
-  my $string = $parent_term."|||".$term;
+  my $child_term = $tree{term}{$node_id};
+  push ( @{$vocabulary}, $child_term );
   
-  return $string;
+  return;
 }
 
 ############################################################
@@ -482,17 +494,17 @@ sub _get_ontology_from_node_id{
 
 ############################################################
 
-=head2 get_libraryId_by_est
+=head2 get_library_Name_by_est
   
   Arg        : an EST Accession ( a string)
   Description: it finds the clone library name in the Clonelib table from which
                this EST was derived. It checks for version numbers and prune them
                as this information is not stored in the expression database
-  Returntype : a string hlding the name of the clone library 
+  Returntype : a string holding the name of the clone library 
 
 =cut
 
-sub get_libraryId_by_est{
+sub get_library_Name_by_est{
   my ($self,$est_id) = @_;
   
   # get rid of version numbers
@@ -500,20 +512,19 @@ sub get_libraryId_by_est{
     $est_id = $1;
   }
 
-  my $q = qq ( SELECT EST.Accession, EST.ClonelibId
-	       FROM   EST
+  my $q = qq ( SELECT Clonelib.Name
+	       FROM   EST, Clonelib
 	       WHERE  EST.Accession  = "$est_id"
+	         AND  EST.ClonelibId = CLonelib.Id
 	     );
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute || $self->throw("can't execute: $q");
+  my $res = $sth->execute      || $self->throw("can't execute: $q");
   
-  my $clone_library;
-  while ( my ($id) = $sth->fetchrow_array ){
-    $clone_library = $id;
-  }
-  return $clone_library;
+  my $library_name = $sth->fetchrow_array;
+  return $library_name;
 }
+
 ############################################################
 
 =head2 _get_parent_node_id
@@ -534,14 +545,12 @@ sub _get_parent_node_id{
 	     );
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
-  my $res = $sth->execute || $self->throw("can't execute: $q");
-  my $count = 0;
-  my $clone_dbID;
+  my $res = $sth->execute      || $self->throw("can't execute: $q");
+  my $parent_id;
   while ( my ($id) = $sth->fetchrow_array ){
-    $clone_dbID = $id;
-    $count++;
+    $parent_id = $id;
   }
-  return $clone_dbID;
+  return $parent_id;
 }
 
 ############################################################
