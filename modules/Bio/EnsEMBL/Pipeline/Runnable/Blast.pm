@@ -351,7 +351,7 @@ sub parse_results {
             $feat1 {p}           = $hsp->P;
             $feat2 {p}           = $hsp->P;
             
-            unless ($hsp->queryBegin < $hsp->queryEnd)
+            if ($hsp->queryBegin < $hsp->queryEnd)
             {
                 $feat1 {start}   = $hsp->queryBegin;
                 $feat1 {end}     = $hsp->queryEnd;
@@ -367,7 +367,7 @@ sub parse_results {
             $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
             $feat2 {name}    = $1;
             
-            unless ($hsp->sbjctBegin < $hsp->sbjctEnd)
+            if ($hsp->sbjctBegin < $hsp->sbjctEnd)
             {
                 $feat2 {start}   = $hsp->sbjctBegin;
                 $feat2 {end}     = $hsp->sbjctEnd;
