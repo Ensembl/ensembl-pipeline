@@ -87,11 +87,11 @@ sub _check_Transcript{
     ############################################################
     if ( $slice ){
 	if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-	    print STDERR "transcript $id outside the slice\n";
+	    print STDERR "check: transcript $id outside the slice\n";
 	    $valid = 0;
 	}
 	elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-	    print STDERR "transcript $id falls off the slice by its lower end\n";
+	    print STDERR "check: transcript $id falls off the slice by its lower end\n";
 	    $valid = 0;
 	}
     }
@@ -109,7 +109,7 @@ sub _check_Transcript{
 	  ##############################
 	  my $length = $exons[$i]->end - $exons[$i]->start + 1;
 	  if ( $length > $MAX_EXON_LENGTH ){
-	    print STDERR "exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
+	    print STDERR "check: exon too long: length = $length >  MAX_EXON_ENGTH = $MAX_EXON_LENGTH\n";
 	    $valid = 0;
 	    last EXON;
 	  }
@@ -122,7 +122,7 @@ sub _check_Transcript{
 		# check strand consistency:
 		##############################
 	        if($exons[$i]->strand != $exons[$i-1]->strand){
-	            print STDERR "transcript $id has mixed strands\n";
+	            print STDERR "check: transcript $id has mixed strands\n";
 	            $valid = 0;
 		    last EXON;
 	        }
@@ -131,7 +131,7 @@ sub _check_Transcript{
 		# check phase consistency:
 		##############################
 		if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-		    print STDERR "transcript $id has phase inconsistency\n";
+		    print STDERR "check: transcript $id has phase inconsistency\n";
 		    $valid = 0;
 		    last EXON;
 		}
@@ -144,14 +144,14 @@ sub _check_Transcript{
 		##############################
 		if ($exons[0]->strand == 1) {
 		    if ($exons[$i]->start < $exons[$i-1]->end) {
-			print STDERR "transcript $id folds back on itself\n";
+			print STDERR "check: transcript $id folds back on itself\n";
 			$valid = 0;
 			last EXON;
 		    } 
 		} 
 		elsif ($exons[0]->strand == -1) {
 		    if ($exons[$i]->end > $exons[$i-1]->start) {
-			print STDERR "transcript $id folds back on itself\n";
+			print STDERR "check: transcript $id folds back on itself\n";
 			$valid = 0;
 			last EXON;
 		    } 
@@ -162,7 +162,7 @@ sub _check_Transcript{
 	    ############################################################
 	    foreach my $evidence (@{$exons[$i]->get_all_supporting_features}){
 		if ( $evidence->hseqname =~/$UNWANTED_EVIDENCE/ ){
-		    print STDERR "transcript with evil evidence: ".$evidence->hseqname." skippping\n";
+		    print STDERR "check: transcript with evil evidence: ".$evidence->hseqname." skippping\n";
 		    $valid = 0;
 		    last EXON;
 		}
@@ -173,12 +173,12 @@ sub _check_Transcript{
     elsif( scalar(@exons) == 1 ){
 	my $length =  $exons[0]->end - $exons[0]->start + 1;
 	if ( $length >  $MAX_EXON_LENGTH ){
-	    print STDERR "single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
+	    print STDERR "check: single exon transcript is too long: length = $length >  MAX_EXON_LENGTH = $MAX_EXON_LENGTH\n";
 	    $valid = 0;
 	}
     }
     else{
-	print STDERR "transcript with no exons\n";
+	print STDERR "check: transcript with no exons\n";
 	$valid = 0;
     }
     if ($valid == 0 ){
@@ -209,8 +209,8 @@ sub _check_introns{
     my $strand;
     
     eval {
-    $strand =  $exons[0]->strand;
-};
+	$strand =  $exons[0]->strand;
+    };
     if ($@) {
 	$self->throw("Can't get strand\n");
     }
@@ -361,12 +361,12 @@ sub _check_Translation{
 
   # double check sane translation start & end
   if( $translation->start < 1){
-      print STDERR "dodgy translation start: ".$translation->start."\n";
+      print STDERR "check: dodgy translation start: ".$translation->start."\n";
       $valid = 0;
   }
   
   if( $translation->end < 1 || $translation->end > $translation->end_Exon->length ){
-     print STDERR "dodgy translation end: " . $translation->end . " end-exon length: ".
+     print STDERR "check: dodgy translation end: " . $translation->end . " end-exon length: ".
 	 $translation->end_Exon->length."\n";
      $valid = 0;
   }
@@ -376,7 +376,7 @@ sub _check_Translation{
     $sequence = $transcript->translate;
   };
   unless ( $sequence ){
-    print STDERR "transcript $id has no translation\n";
+    print STDERR "check: transcript $id has no translation\n";
     return 0;
   }
   if ( $sequence ){
@@ -384,12 +384,12 @@ sub _check_Translation{
     #print STDERR "peptide: $peptide\n";
     # check only terminal stops
     if ( $peptide =~ /\*./ ){
-      print STDERR "translation of transcript $id has STOP codons\n";
+      print STDERR "check: translation of transcript $id has STOP codons\n";
       $valid = 0;
     }
   }
   if ($valid == 0 ){
-    $self->_print_Transcript($transcript);
+    # $self->_print_Transcript($transcript);
   }
   return $valid;
 }
@@ -437,19 +437,17 @@ sub _check_low_complexity{
 								 );
     
     $seg->run;
+    $low_complexity = $seg->get_low_complexity_length;
     
-    
-    if($seg->get_low_complexity_length > $complexity_threshold){
-      warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
+    if($low_complexity > $complexity_threshold){
+      printf STDERR "check: discarding transcript - translation has %.2f %% low complexity sequence\n", $low_complexity;
       $valid = 0;
     }
-    $valid = 1;
-    
     
   };
   
   if($@){
-    print STDERR "problem running seg: \n[$@]\n";
+    print STDERR "check: problem running seg (assuming transcript okay): \n[$@]\n";
     $valid = 1;		# let transcript through
   }
   
@@ -1197,245 +1195,252 @@ print STDERR "check_splice_sites: upstream ".
 # we leav it un-touched.
 
 sub set_stop_codon{
-  my ( $self, $transcript ) = @_;
-
-  my  $verbose = 0;
-  unless ( $transcript->translation ){
-    print STDERR "transcript has no translation - cannot put the stops" if $verbose;
-    return $transcript;
-  }
-
-  if ( $transcript->translation ){
-
-    my $end      = $transcript->translation->end;
-    my $end_exon = $transcript->translation->end_Exon;
-
-    ############################################################
-    # first see whether the transcript already include the stop:  taa/tag/tga 
-    # this gives you the sequence 5' to 3'
-    my $bioseq = $end_exon->seq;
-    print STDERR "sequence length: ".$bioseq->length."\n";
-    print STDERR "last codon position: ".($end - 2)."..".$end."\n";
-    my $last_codon;
-    if ( $end > 2 ){
-      $last_codon = $bioseq->subseq( $end - 2, $end );
-    }
-    else{
-      my $donor    = 3 - $end;
-      my $acceptor = $end;
-	
-      my $previous_exon = $self->get_previous_Exon( $transcript, $end_exon );
-      if ($previous_exon ){
-	my $donor_seq =  
-	  $previous_exon->seq->subseq( $previous_exon->end - $previous_exon->start + 1 - $donor + 1, $previous_exon->end - $previous_exon->start + 1 );
-	my $acceptor_seq = 
-	  $end_exon->seq->subseq( 1, $end );
-	
-	$last_codon = $donor_seq.$acceptor_seq;
-      }
-    }
-    if ( uc($last_codon) eq 'TAA' || uc($last_codon) eq 'TAG' || uc($last_codon) eq 'TGA' ){ 
-      print STDERR "transcript already has a stop at the end - no need to modify\n" if $verbose;
-      return $transcript;
-    }
-
-    ############################################################
-    # now look at the next codon
-    ############################################################
-    # first the simplest case
-    print STDERR "next codon position: ".($end  + 1 )."..".($end + 3 )."\n";
-    if ( $end + 3 <= ($end_exon->end - $end_exon->start + 1) ){
-      print STDERR "end+3 = ".($end  + 3 )." <= ? exon-length = ". ($end_exon->end - $end_exon->start + 1)."\n";
-      print STDERR "looking at the next codon in end exon:\n";
-      my $next_codon = $bioseq->subseq( $end+1, $end+3 );      
-      if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
-	print STDERR "simple-case: next codon is a stop - extending translation\n" if $verbose;
-	#print STDERR "Before:\n";
-	#$self->_print_Translation( $transcript );
-	$transcript->translation->end( $end + 3 );
-	#print STDERR "After:\n";
-	#$self->_print_Translation( $transcript );
+    my ( $self, $transcript ) = @_;
+    
+    my  $verbose = 0;
+    
+    print STDERR "Setting stop codon\n" if $verbose;
+    
+    unless ( $transcript->translation ){
+	print STDERR "transcript has no translation - cannot put the stops" if $verbose;
 	return $transcript;
-      }
-      else{
-	print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
-	return $transcript;
-      }
     }
-
-    ############################################################
-    # more complex cases we need to know if there is a next exon:
-    my $next_exon = $self->get_next_Exon( $transcript, $end_exon );
-
-    if ( $next_exon ){
-
-      ############################################################
-      # homany bases of the next codon sit in $end_exon?
-      my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
-      my $acceptor_bases_count = 3 - $donor_bases_count;
-
-      ############################################################
-      # get the next codon
-      my $next_bioseq = $next_exon->seq;
-      my $donor;
-      if ( $donor_bases_count == 0 ){
-	$donor = '';
-      }
-      else{
-	$donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
-      }
-      my $acceptor = $next_bioseq->subseq( 1, $acceptor_bases_count );
-
-      my $next_codon = $donor.$acceptor;
-      if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
-	print STDERR "shared-codon: next codon is a stop - extending translation\n" if $verbose;
+    
+    if ( $transcript->translation ){
 	
-	$transcript->translation->end_Exon( $next_exon );
-	$transcript->translation->end( $acceptor_bases_count );
+	my $end      = $transcript->translation->end;
+	my $end_exon = $transcript->translation->end_Exon;
 	
 	############################################################
-	# re-set the phases:
-	$end_exon->end_phase($donor_bases_count%3);
-	$next_exon->phase( $donor_bases_count%3 );
+	# first see whether the transcript already include the stop:  taa/tag/tga 
+	# this gives you the sequence 5' to 3'
+	my $bioseq = $end_exon->seq;
 	
-	return $transcript;
-      }
-      else{
-	print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
-	return $transcript;
-      }
-    }
-    elsif( $end + 3 > ($end_exon->end - $end_exon->start + 1) ){
-      # there is no next exon and the next codon would fall off the end of the exon 
+	print STDERR "sequence length: ".$bioseq->length."\n" if $verbose;
+	print STDERR "last codon position: ".($end - 2)."..".$end."\n" if $verbose;
 	
-      # need to get the slice sequence
-      my $adaptor =  $end_exon->contig->adaptor;
-      if ( $adaptor ){
-	my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
-	my $acceptor_bases_count = 3 - $donor_bases_count;
-
-	# the sequence from the current end exon is:
-	my $donor;
-	if ( $donor_bases_count == 0 ){
-	  $donor = '';
+	my $last_codon;
+	if ( $end > 2 ){
+	    $last_codon = $bioseq->subseq( $end - 2, $end );
 	}
 	else{
-	  $donor = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+	    my $donor    = 3 - $end;
+	    my $acceptor = $end;
+	    
+	    my $previous_exon = $self->get_previous_Exon( $transcript, $end_exon );
+	    if ($previous_exon ){
+		my $donor_seq =  
+		    $previous_exon->seq->subseq( $previous_exon->end - $previous_exon->start + 1 - $donor + 1, $previous_exon->end - $previous_exon->start + 1 );
+		my $acceptor_seq = 
+		    $end_exon->seq->subseq( 1, $end );
+		
+		$last_codon = $donor_seq.$acceptor_seq;
+	    }
+	}
+	if ( uc($last_codon) eq 'TAA' || uc($last_codon) eq 'TAG' || uc($last_codon) eq 'TGA' ){ 
+	    print STDERR "transcript already has a stop at the end - no need to modify\n" if $verbose;
+	    return $transcript;
 	}
 	
+	############################################################
+	# now look at the next codon
+	############################################################
+	# first the simplest case
+	print STDERR "next codon position: ".($end  + 1 )."..".($end + 3 )."\n" if $verbose;
+	if ( $end + 3 <= ($end_exon->end - $end_exon->start + 1) ){
+	    if ($verbose) {
+		print STDERR "end+3 = ".($end  + 3 )." <= ? exon-length = ". ($end_exon->end - $end_exon->start + 1)."\n";
+		print STDERR "looking at the next codon in end exon:\n";
+	    }
+	    my $next_codon = $bioseq->subseq( $end+1, $end+3 );      
+	    if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
+		print STDERR "simple-case: next codon is a stop - extending translation\n" if $verbose;
+		#print STDERR "Before:\n";
+		#$self->_print_Translation( $transcript );
+		$transcript->translation->end( $end + 3 );
+		#print STDERR "After:\n";
+		#$self->_print_Translation( $transcript );
+		return $transcript;
+	    }
+	    else{
+		print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
+		return $transcript;
+	    }
+	}
 	
 	############################################################
-	# here we distinguish the strands
-	if ( $end_exon->strand == 1 ){
-	  my $slice_start = $end_exon->contig->chr_start;
+	# more complex cases we need to know if there is a next exon:
+	my $next_exon = $self->get_next_Exon( $transcript, $end_exon );
 	
-	  ############################################################
-	  # calculate the next codon start/end in chr coordinates 
-	
-	  #print STDERR "exon_end: ".$end_exon->end."\n";
-	  my $codon_start = $slice_start + ( $end_exon->start + $end - 1 );
-	  my $codon_end   = $codon_start + 2;
-	
-	  #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
-	  my $codon_slice = $adaptor
-	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
-	  my $codon = $codon_slice->seq;
-	
-	  ############################################################
-	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
-	    print STDERR "forward-strand:next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
-	
-	    #print STDERR "Before:\n";
-	    #$self->_print_Transcript( $transcript );
-	    #$self->_print_Translation( $transcript );
-	
-	    $end_exon->end( $end_exon->end + $acceptor_bases_count );
-	    $transcript->translation->end( $end + 3 );
-		
+	if ( $next_exon ){
+	    
 	    ############################################################
-	    # update the exon sequence:	    	    
-	    my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
-	    #my $exon_seq = Bio::Seq->new(
-	    #			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
-	    #			     -MOLTYPE    => 'dna',
-	    #			     -SEQ        => $seq_string,
-	    #			     );
+	    # homany bases of the next codon sit in $end_exon?
+	    my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
+	    my $acceptor_bases_count = 3 - $donor_bases_count;
+
+	    ############################################################
+	    # get the next codon
+	    my $next_bioseq = $next_exon->seq;
+	    my $donor;
+	    if ( $donor_bases_count == 0 ){
+		$donor = '';
+	    }
+	    else{
+		$donor    = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+	    }
+	    my $acceptor = $next_bioseq->subseq( 1, $acceptor_bases_count );
+	    
+	    my $next_codon = $donor.$acceptor;
+	    if ( uc($next_codon) eq 'TAA' || uc($next_codon) eq 'TAG' || uc($next_codon) eq 'TGA'){ 
+		print STDERR "shared-codon: next codon is a stop - extending translation\n" if $verbose;
+	  
+		$transcript->translation->end_Exon( $next_exon );
+		$transcript->translation->end( $acceptor_bases_count );
+	  
+		############################################################
+		# re-set the phases:
+		$end_exon->end_phase($donor_bases_count%3);
+		$next_exon->phase( $donor_bases_count%3 );
 		
-	    #$end_exon->seq($exon_seq);
-	    $transcript->translation->end_Exon($end_exon);
-	    #print STDERR "After:\n";
-	    #$self->_print_Transcript( $transcript );
-	    #$self->_print_Translation( $transcript );
-	    return $transcript;
-	  }
-	  else{
-	    print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
-	    return $transcript;
-	  }
+		return $transcript;
+	    }
+	    else{
+		print STDERR "next codon is not a stop - not modifying translation\n" if $verbose;
+		return $transcript;
+	    }
 	}
-	else{
-	  my $slice_start = $end_exon->contig->chr_start;
+	elsif( $end + 3 > ($end_exon->end - $end_exon->start + 1) ){
+	    # there is no next exon and the next codon would fall off the end of the exon 
 	
-	  ############################################################
-	  # calculate the next codon start/end in chr coordinates 
-	  print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n";
+	    # need to get the slice sequence
+	    my $adaptor =  $end_exon->contig->adaptor;
+	    if ( $adaptor ){
+		my $donor_bases_count    = ( $end_exon->end - $end_exon->start + 1 ) - $end;
+		my $acceptor_bases_count = 3 - $donor_bases_count;
+		
+		# the sequence from the current end exon is:
+		my $donor;
+		if ( $donor_bases_count == 0 ){
+		    $donor = '';
+		}
+		else{
+		    $donor = $bioseq->subseq( $end+1, ( $end_exon->end - $end_exon->start + 1 ));
+		}
+		
+		
+		############################################################
+		# here we distinguish the strands
+		if ( $end_exon->strand == 1 ){
+		    my $slice_start = $end_exon->contig->chr_start;
+		    
+		    ############################################################
+		    # calculate the next codon start/end in chr coordinates 
+		    
+		    #print STDERR "exon_end: ".$end_exon->end."\n";
+		    my $codon_start = $slice_start + ( $end_exon->start + $end - 1 );
+		    my $codon_end   = $codon_start + 2;
 	
-	  my $codon_end   = $slice_start + $end_exon->end - $end - 1;
-	  my $codon_start = $codon_end - 2;
-	  print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
-	
-	  my $codon_slice = $adaptor
-	    ->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
-	  my $pre_codon = $codon_slice->seq;
-	
-	  #print STDERR "sequence: $pre_codon\n";
-	
-	  # need to reverse and complement:
-	  my $codon;
-	  ( $codon = reverse $pre_codon ) =~tr/gatcGATC/ctagCTAG/; 
-	  #print STDERR "revcomp sequence: $codon\n";
-	  if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
-	    print STDERR "reverse-strand: next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
-	    print STDERR "extending end_exon from start = ".$end_exon->start." to ".
-	      (  $end_exon->start - $acceptor_bases_count )."\n";
-	    $end_exon->start( $end_exon->start - $acceptor_bases_count);
+		    #print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
+		    my $codon_slice = $adaptor
+			->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
+		    my $codon = $codon_slice->seq;
+		    
+		    ############################################################
+		    if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
+			print STDERR "forward-strand:next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
+			
+			#print STDERR "Before:\n";
+			#$self->_print_Transcript( $transcript );
+			#$self->_print_Translation( $transcript );
+			
+			$end_exon->end( $end_exon->end + $acceptor_bases_count );
+			$transcript->translation->end( $end + 3 );
+		
+			############################################################
+			# update the exon sequence:	    	    
+			my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
+			#my $exon_seq = Bio::Seq->new(
+			#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
+			#			     -MOLTYPE    => 'dna',
+			#			     -SEQ        => $seq_string,
+			#			     );
+			
+			#$end_exon->seq($exon_seq);
+			$transcript->translation->end_Exon($end_exon);
+			#print STDERR "After:\n";
+			#$self->_print_Transcript( $transcript );
+			#$self->_print_Translation( $transcript );
+			return $transcript;
+		    }
+		    else{
+			print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
+			return $transcript;
+		    }
+		}
+		else{
+		    my $slice_start = $end_exon->contig->chr_start;
+		    
+		    ############################################################
+		    # calculate the next codon start/end in chr coordinates 
+		    print STDERR "end_exon: ".$end_exon->start."-".$end_exon->end."\n";
+		    
+		    my $codon_end   = $slice_start + $end_exon->end - $end - 1;
+		    my $codon_start = $codon_end - 2;
+		    print STDERR "codon_start: $codon_start\tcodon_end: $codon_end\n";
+		    
+		    my $codon_slice = $adaptor
+			->fetch_by_chr_start_end( $end_exon->contig->chr_name, $codon_start, $codon_end );
+		    my $pre_codon = $codon_slice->seq;
+		    
+		    #print STDERR "sequence: $pre_codon\n";
+		    
+		    # need to reverse and complement:
+		    my $codon;
+		    ( $codon = reverse $pre_codon ) =~tr/gatcGATC/ctagCTAG/; 
+		    #print STDERR "revcomp sequence: $codon\n";
+		    if ( uc($codon) eq 'TAA' || uc($codon) eq 'TAG' || uc($codon) eq 'TGA'){ 
+			print STDERR "reverse-strand: next codon (falling off the exon) is a stop - extending translation\n" if $verbose;
+			print STDERR "extending end_exon from start = ".$end_exon->start." to ".
+			    (  $end_exon->start - $acceptor_bases_count )."\n";
+			$end_exon->start( $end_exon->start - $acceptor_bases_count);
 	    $transcript->translation->end( $end + 3 );
-	
+			
 	    print STDERR "end_exon length: ".($end_exon->end - $end_exon->start + 1 ).
-	      " translation end".$transcript->translation->end."\n";
-	    ############################################################
-	    # update the exon sequence:	    	    
-	    my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
-	    #my $exon_seq = Bio::Seq->new(
-	    #			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
-	    #			     -MOLTYPE    => 'dna',
-	    #			     -SEQ        => $seq_string,
-	    #			     );
+		" translation end".$transcript->translation->end."\n";
+			############################################################
+			# update the exon sequence:	    	    
+			my $seq_string = $end_exon->contig->subseq( $end_exon->start, $end_exon->end, $end_exon->strand );
+			#my $exon_seq = Bio::Seq->new(
+			#			     -DISPLAY_ID => $end_exon->stable_id || $end_exon->dbID,
+			#			     -MOLTYPE    => 'dna',
+			#			     -SEQ        => $seq_string,
+			#			     );
 		
-	    #$end_exon->seq($exon_seq);
-	    $transcript->translation->end_Exon( $end_exon );
-	    return $transcript;
-	  }
-	  else{
-	    print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
-	    return $transcript;
-	  }
+			#$end_exon->seq($exon_seq);
+			$transcript->translation->end_Exon( $end_exon );
+			return $transcript;
+		    }
+		    else{
+			print STDERR "next codon (falling off the exon) is not a stop - not modifying\n" if $verbose;
+			return $transcript;
+		    }
+		}
+	    }
+	    else{
+		print STDERR "cannot get an adaptor to get the sequence - not modifying the translation\n" if $verbose;
+		return $transcript;
+	    }
 	}
-      }
-      else{
-	print STDERR "cannot get an adaptor to get the sequence - not modifying the translation\n" if $verbose;
-	return $transcript;
-      }
+	else{
+	    print STDERR "There is no downstream exon - and no stop codon beyond the last exon - not modifying\n" if $verbose;
+	    return $transcript;
+	}
     }
     else{
-      print STDERR "There is no downstream exon - and no stop codon beyond the last exon - not modifying\n" if $verbose;
-      return $transcript;
+	print STDERR "transcript has no translation - not modifying anything\n" if $verbose;
+	return $transcript;
     }
-  }
-  else{
-    print STDERR "transcript has no translation - not modifying anything\n" if $verbose;
-    return $transcript;
-  }
 }
 
 ############################################################
@@ -1447,17 +1452,17 @@ sub set_stop_codon{
 sub set_start_codon{
   my ( $self, $transcript ) = @_;
 
-  my  $verbose = 1;
+  my  $verbose = 0;
 
   # check transcript has a translation
   if((!defined $transcript->translation) || (!defined $transcript->translation->start_Exon)){
-    print STDERR "Transcript has no translation, or no start exon - maybe a pseudogene?\n";
+    print STDERR "Transcript has no translation, or no start exon - maybe a pseudogene?\n" if $verbose;
     return $transcript;
   }
 
   # check not in RawContig coords
   if ($transcript->translation->start_Exon->contig->adaptor->isa("Bio::EnsEMBL::DBSQL::RawContigAdaptor")){
-    print STDERR "transcript must be in genomic coordinates, not RawContig coordinates - skipping\n";
+    print STDERR "transcript must be in genomic coordinates, not RawContig coordinates - skipping\n" if $verbose;
     return $transcript;
   }
 
@@ -1478,8 +1483,8 @@ sub set_start_codon{
   my $cdna_seq          = uc($transcript->spliced_seq);
   my @pepgencoords      = $transcript->pep2genomic(1,1);
   if(scalar(@pepgencoords) > 2) {
-    print STDERR "peptide start does not map cleanly - not modifying transcript\n";
-    return $transcript;
+      print STDERR "peptide start does not map cleanly - not modifying transcript\n" if $verbose;
+      return $transcript;
   }
   
   my $pepgenstart = $pepgencoords[0]->start;
@@ -1487,17 +1492,17 @@ sub set_start_codon{
 
   unless($pepgencoords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate') && 
 	 $pepgencoords[$#pepgencoords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
-          print STDERR "peptide coordinate(s)  maps to gap - not modifying transcript\n";
-	  return $transcript;
-        }
+      print STDERR "peptide coordinate(s)  maps to gap - not modifying transcript\n" if $verbose;
+      return $transcript;
+  }
 
-  print "Peptide genomic location = " . $pepgenstart . " " . $pepgenend . "\n";
+  print STDERR "Peptide genomic location = " . $pepgenstart . " " . $pepgenend . "\n" if $verbose;
 
   ############################################################
   # first see whether the transcript already begins with ATG
   my $first_codon = substr($cdna_seq, $cdna_coding_start-1, 3);
 
-  print STDERR "first codon: $first_codon\n";
+  print STDERR "first codon: $first_codon\n" if $verbose;
 
   if ( uc($first_codon) eq 'ATG' ){
     print STDERR "transcript already starts with ATG - no need to modify\n" if $verbose;
@@ -1512,7 +1517,7 @@ sub set_start_codon{
     # the previous codon is in the cdna
     $first_codon = substr($cdna_seq, $cdna_coding_start-4, 3);
     if ($first_codon ne 'ATG'){
-      print STDERR "Upstream codon is not an ATG - not modifying transcript\n";
+      print STDERR "Upstream codon is not an ATG - not modifying transcript\n" if $verbose;;
       return $transcript;
     }
     else{
@@ -1538,19 +1543,19 @@ sub set_start_codon{
       # check not mapping to gaps
       unless($coords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate') &&
 	     $coords[$#coords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
-	print STDERR "new coordinate(s) maps to gap - not modifying transcript\n";
+	print STDERR "new coordinate(s) maps to gap - not modifying transcript\n" if $verbose;;
 	return $transcript;
       }
 
       if (scalar(@coords) > 2){
-	print STDERR "coordinate mapping not done cleanly - not modifying transcript!\n";
+	print STDERR "coordinate mapping not done cleanly - not modifying transcript!\n" if $verbose;;
 	return $transcript;
       }
       elsif(scalar(@coords) == 2){
-	print STDERR "new start codon split across intron\n";
 	if ($verbose){
-	  print "coord[0] = " . $coords[0]->start . " " . $coords[0]->end ."\n";
-	  print "coord[1] = " . $coords[1]->start . " " . $coords[1]->end ."\n";
+	    print STDERR "new start codon split across intron\n";
+	    print "coord[0] = " . $coords[0]->start . " " . $coords[0]->end ."\n";
+	    print "coord[1] = " . $coords[1]->start . " " . $coords[1]->end ."\n";
 	}
 	
 	if($strand == 1){
@@ -1565,7 +1570,7 @@ sub set_start_codon{
 	my $newstartexon = $self->get_previous_Exon($transcript, $start_exon);
 
 	if (!defined($newstartexon)) {
-	  print STDERR "Failed finding new start exon - not modifying transcript\n";
+	  print STDERR "Failed finding new start exon - not modifying transcript\n" if $verbose;;
 	  return $transcript;
 	}
 
@@ -1579,7 +1584,7 @@ sub set_start_codon{
 	  $newphase = $new_start - $newstartexon->start + 1;
 	}
 	
-	print "New Phase = $newphase\n";
+	print STDERR "New Phase = $newphase\n" if $verbose;;
 	
 	$start_exon->phase($newphase);
 	$newstartexon->end_phase($newphase);
@@ -1604,31 +1609,31 @@ sub set_start_codon{
 	}	
 	
 	if($verbose){
-	  print "Translation seq AFTER:\n";
+	  print STDERR "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
 	}
 	
 	return $transcript;
       }
       else{
-	print STDERR "New start codon doesn't split across introns - but which exon is it in?\n";
+	print STDERR "New start codon doesn't split across introns - but which exon is it in?\n" if $verbose;;
 	$new_start = $coords[0]->start;
 	$new_end   = $coords[0]->end;
 
 	if (($strand == 1  && $new_end == $pepgenstart-1) ||
 	    ($strand == -1 && $new_start == $pepgenend+1)) {
-	  print "In current start exon\n";
+	  print STDERR "In current start exon\n" if $verbose;;
 	  
 	  $translation->start($translation->start-3);
 	  
 	} 
 	else{
-	  print STDERR "In previous exon\n";
+	  print STDERR "In previous exon\n" if $verbose;;
 
 	  # find exon
 	  my $newstartexon = $self->get_previous_Exon($transcript, $start_exon);
 	  if (!defined($newstartexon)) {
-	    print STDERR "Failed finding new start exon - how can this be?\n";
+	    print STDERR "Failed finding new start exon - how can this be?\n" if $verbose;;
 	    return $transcript;
 	  }
 
@@ -1660,7 +1665,7 @@ sub set_start_codon{
 	}
 
 	if($verbose){
-	  print "Translation seq AFTER:\n";
+	  print STDERR "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
 	}
 	return $transcript;
@@ -1686,9 +1691,9 @@ sub set_start_codon{
     my $seq_adaptor = $start_exon->contig->adaptor->db->get_SequenceAdaptor;
     my $codonseq      = uc($seq_adaptor->fetch_by_assembly_location($codon_start,$codon_end,$strand,$start_exon->contig->chr_name,$start_exon->contig->adaptor->db->assembly_type));
     
-    print "Got codon seq " . $codonseq . "\n";
+    print STDERR "Got codon seq " . $codonseq . "\n" if $verbose;;
     if ($codonseq ne "ATG") {
-      print STDERR "upstream codon (faling off the slice) is not ATG - not modifying transcript\n";
+      print STDERR "upstream codon (faling off the slice) is not ATG - not modifying transcript\n" if $verbose;;
       return $transcript;
     }
     else{
@@ -1734,11 +1739,11 @@ sub set_start_codon{
 	$transcript->start_Exon->end_phase($current_start_exon_endphase);
       }
 
-	if($verbose){
-	  print "Translation seq AFTER:\n";
+      if($verbose){
+	  print STDERR "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
-	}
-	return $transcript;
+      }
+      return $transcript;
     }
   }
 }
