@@ -196,7 +196,7 @@ sub get_all_features_by_id {
     
     my @sorted_ids = keys %idhash;
     
-    @sorted_ids = sort {$scorehash{$a} <=> $scorehash{$b}} @sorted_ids;
+    @sorted_ids = sort {$scorehash{$b} <=> $scorehash{$a}} @sorted_ids;
     
     return (\%idhash,\@sorted_ids);
   }
@@ -262,7 +262,7 @@ sub run {
   my @forward;
   my @reverse;
   foreach my $id (@$ids) {
-    #print STDERR "Processing $id\n";
+    print STDERR "$id\n";
     
     my @features = @{$fhash->{$id}};
     my @extras   = $self->_find_extras (@features);
