@@ -91,13 +91,9 @@ sub new {
 							-pass             => $EST_E2G_DBPASS,
 							);
     
-    
     $est_e2g_db->dnadb($refdb);
     $self->est_e2g_db($est_e2g_db);
 	
-
-
-
     # only if we want to read also cdnas in this analysis
     if ( $USE_cDNA_DB ){
       my $cdna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -2505,6 +2501,16 @@ sub make_genes {
       print STDERR "Rejected a single-exon transcript\n";
       next TRANSCRIPT;
     }
+
+    
+    # check the consistency of the phases:
+    for (my $i = 1; $i <= $#exons; $i++) {
+      if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+	print STDERR "EST_GeneBuilder: transcript has phase inconsistency, skipping it...\n";
+	next TRANSCRIPT;
+      }
+    }
+
     
     #print STDERR "In _make_genes() before translate():\n\n";
     my $excount = 1;

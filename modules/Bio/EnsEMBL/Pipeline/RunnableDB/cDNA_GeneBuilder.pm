@@ -2542,6 +2542,15 @@ sub make_genes {
       next TRANSCRIPT;
     }
     
+    # check the consistency of the phases:
+    for (my $i = 1; $i <= $#exons; $i++) {
+      if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+	print STDERR "cDNA_GeneBuilder: transcript has phase inconsistency, skipping it...\n";
+	next TRANSCRIPT;
+      }
+    }
+
+
     #print STDERR "In _make_genes() before translate():\n\n";
     my $excount = 1;
   EXON:
