@@ -267,10 +267,7 @@ sub fetch_input {
 
  
     my $slice_adaptor = $self->db->get_SliceAdaptor();
-    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-
-   
-    
+    my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);    
     $slice->chr_name($chrid);
     $self->slice($slice);
     print STDERR "got slice\n";
@@ -1472,13 +1469,6 @@ sub _produce_Transcript{
 
     # sort them in genomic order
     @exons    = sort { $a->start <=> $b->start } @exons;
- 
-###foreach my $exon (@exons){
-#print STDERR $exon . "\n";
-#while (my ($k, $v) = each %$exon){
-#print STDERR "     $k => $v\n";
-#}
-#}
 
     push ( @allexons, @exons );
     
@@ -1515,7 +1505,6 @@ sub _produce_Transcript{
     my $new_exon = Bio::EnsEMBL::Exon->new();
     $new_exon->start ($exon_cluster->start );
     $new_exon->end   ($exon_cluster->end   );
-#    $new_exon->contig($exon_cluster->contig);
     
     ###  dont't set strand yet, genomewise cannot handle that ###
     # we put it to 1 anyway, so that minigenomewise does not complain?
@@ -1525,28 +1514,12 @@ sub _produce_Transcript{
     my %evidence_hash;
     my %evidence_obj;
     foreach my $exon ( $exon_cluster->sub_SeqFeature ){
-      #print STDERR "\ntransferring evidence from $exon to $new_exon\n";
       $self->_transfer_Supporting_Evidence($exon,$new_exon);
     }
 
-$new_exon->end_phase(5);
     $transcript->add_Exon($new_exon);
   }
  			
-#  print STDERR "producing from:\n";
-#  foreach my $tran ( @$merged ){
-#    print STDERR "$tran: ";
-#    foreach my $exon ($tran->get_all_Exons){
-#      print STDERR $exon->start.":".$exon->end."  ";
-#    }
-#    print STDERR "\n";
-#  }
-#  print STDERR "a new transcript: $transcript\n";
-#  foreach my $exon ($transcript->get_all_Exons){
-#    print STDERR $exon->start.":".$exon->end."  ";
-#  }
-#  print STDERR "\n\n";
-			
   return $transcript;
 }
 
@@ -1609,7 +1582,7 @@ sub _transfer_Supporting_Evidence{
       }
      }
     }
-    #print STDERR "transferring evidence\n";
+    #print STDERR "transfering evidence\n";
     #$self->print_FeaturePair($feat);
     #$feat->analysis($self->analysis);
     $target_exon->add_supporting_features($feat);
