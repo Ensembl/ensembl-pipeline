@@ -299,8 +299,8 @@ sub flush_runs {
     $cmd .= " @job_ids";
 
     $batch_job->construct_command_line($cmd);
-    $batch_job->open_command_line();
-
+    #$batch_job->open_command_line();
+    print STDERR "RUNNING :".$batch_job->bsub."\n";
     if( ! defined $batch_job->id ) {
       print STDERR ( "Couldnt batch submit @job_ids" );
       foreach my $job_id (@job_ids) {
@@ -363,12 +363,12 @@ sub batch_runRemote {
 
 =head2 runLocally
 =head2 runRemote( boolean withDB, queue )
-=head2 runInLSF
+=head2 run_module
 
   Title   : running
   Usage   : $self->run...;
   Function: runLocally doesnt submit to LSF
-            runInLSF is like runLocally, but doesnt redirect STDOUT and 
+            run_module is like runLocally, but doesnt redirect STDOUT and 
             STDERR. 
             runRemote submits to LSF via the runner.pl script.
   Returns : 
@@ -394,13 +394,13 @@ sub runLocally {
     return;
   }
        print STDERR "Running inLSF\n"; 
-  $self->runInLSF();
+  $self->run_module();
 }
 
 
 # question, when to submit the success report to the db?
 # we have to parse the output of LSF anyway....
-sub runInLSF {
+sub run_module {
   my $self = shift;
   my $module = $self->analysis->module;
   my $rdb;
