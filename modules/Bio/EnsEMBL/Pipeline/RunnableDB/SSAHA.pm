@@ -57,90 +57,26 @@ use vars qw(@ISA);
 @ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB);
 
 
-sub new {
-    my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    $self->{'_fplist'}      = [];
-    $self->{'_genseq'}      = undef;
-    $self->{'_runnable'}    = undef;
-    return $self;
-}
-
-
 sub fetch_input {
     my( $self) = @_;
 
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->db->get_Contig($contigid);
-    my $genseq    = $contig->primary_seq() or
-     $self->throw("Unable to fetch contig");
-    $self->genseq($genseq);
+    my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
+    $self->query($contig);
+
+    my %parameters = $self->parameter_hash;
+
+    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::SSAHA(
+            -query  => $self->query,
+            -ssaha  => $self->analysis->program_file,
+            -db     => $self->analysis->db_file,
+            -length => $parameters{'-length'}
+    );
+
+    $self->runnable($runnable);
 }
 
-
-sub runnable {
-    my ($self, $runnable) = @_;
-
-    #need to pass one peptide at a time
-    $self->throw("Input must be fetched before run") unless ($self->genseq);
-
-    if ($runnable) {
-
-        #extract parameters into a hash
-        my ($parameter_string) = $self->analysis->parameters();
-        my %parameters;
-        my ($thresh, $thresh_type, $arguments);
-
-        if ($parameter_string) {
-
-            $parameter_string =~ s/\s+//g;
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                if ($key eq '-threshold_type' && $value) {
-                    $thresh_type = $value;
-                }
-                elsif ($key eq '-threshold' && $value) {
-                    $thresh = $value;
-                }
-                else
-	        # remaining arguments not of '=>' form
-	        # are simple flags (like -p1)
-                {
-                    $arguments .= " $key ";
-                }
-            }
-        }
-
-        $parameters{'-query'} = $self->genseq;
-        $parameters{'-database'} = $self->analysis->db_file;
-        $parameters{'-ssaha'} = $self->analysis->program;
-
-        my $runnable = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(
-	    %parameters
-        );
-    }
-
-    return $self->runnable();
-
-}
-
-
-sub output {
-    my ($self) = @_;
-
-    my @runnable = $self->runnable;
-    my @results;
-
-    foreach my $runnable(@runnable){
-      print STDERR "runnable = ".$runnable[0]."\n";
-      push(@results, $runnable->output);
-    }
-    return @results;
-}
 
 1;

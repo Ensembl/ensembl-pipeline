@@ -24,7 +24,7 @@ $seq = $seqstream->next_seq();
 #create Bio::EnsEMBL::Pipeline::Runnable::SSAHA object
 
 my $ssaha = Bio::EnsEMBL::Pipeline::Runnable::SSAHA->new(
-    -CLONE => $seq,
+    -QUERY => $seq,
     -DB    => 'mydb.fa'
 );
 
@@ -78,7 +78,7 @@ sub new {
                                  # predicted match to be reported
 
   my ($seq, $len, $ssaha, $db) = $self->_rearrange([
-    qw(CLONE LENGTH SSAHA DB)
+    qw(QUERY LENGTH SSAHA DB)
   ], @args);
 
   $ssaha = 'ssaha' unless ($ssaha);
@@ -194,7 +194,6 @@ sub run_ssaha {
 
     push @args, "-mp " . $self->min_length if $self->min_length;
     my $cmd = join " ", $self->ssaha, $self->filename, $self->database, @args;
-#    print STDERR "Running ssaha: $cmd\n";
 
     $self->throw("Error running ssaha on ".$self->filename."\n")
         if (system ($cmd . " > " . $self->results));
@@ -213,6 +212,7 @@ sub run_ssaha {
 sub parse_results {
     my ($self, $filehandle) = @_;
     my $resfile = $self->results();
+    my $min_len = $self->min_length;
 
     if (-e $resfile) {
         if (-z $self->results) {
