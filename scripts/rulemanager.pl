@@ -226,14 +226,15 @@ while(1){
        }
        
        if ($rst_sig) {
-         $done = 0;
          $reset = 1;
-         print "Got reset signal\n" if($verbose);
-         setup_pipeline(\@analyses_to_run, \@analyses_to_skip, $all_rules, 
+         print "Got reset signal\n";
+         setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules, 
                         \%accumulator_analyses, 
                         \%always_incomplete_accumulators, 
                         $ids_to_run, $ids_to_skip, \@types_to_run, \@types_to_skip,
                         \@starts_from);
+         print STDERR "have reread input_id_analysis table\n";
+         $rst_sig = 0;
          last INPUT_ID_TYPE;
        }
        my %analHash;
@@ -333,7 +334,5 @@ sub termhandler {
 
 # handler for SIGUSR1
 sub sighandler {
-
     $rst_sig = 1;
-    $SIG{SIG1} = \&sighandler;
 };
