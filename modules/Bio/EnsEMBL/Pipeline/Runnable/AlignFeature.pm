@@ -248,7 +248,11 @@ sub parse_Header {
     my $newid = $id;
 
     if ($id =~ /^(.*)\|(.*)\|(.*)/) {
-	$newid = $2;
+        if ($2 eq "UG") {
+          $newid = $3;
+        } else {
+	  $newid = $2;
+        }
 	$newid =~ s/(.*)\..*/$1/;
 	
     } elsif ($id =~ /^..\:(.*)/) {

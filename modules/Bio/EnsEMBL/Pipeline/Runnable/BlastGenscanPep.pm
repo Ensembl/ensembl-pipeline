@@ -54,6 +54,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pep_SeqFeature;
+use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 #use Data::Dumper;
 
 use vars qw(@ISA);
@@ -165,13 +166,10 @@ sub run {
 							       -program   => $self->program,
 							       -database  => $self->database,
 							       -threshold => $self->threshold,
-							       -options   => $self->options,);
-   my $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new(
-                                               -runnable => $runnable
-    );
+							       -options   => $self->options,
+                                                               -filter    => 1);
 
-  $search->run;
-  #$runnable->run();
+  $runnable->run();
   
   $self->align_hits_to_contig($runnable->output);
 #  $self->check_features($transcript->translate->seq,$self->featurepairs);

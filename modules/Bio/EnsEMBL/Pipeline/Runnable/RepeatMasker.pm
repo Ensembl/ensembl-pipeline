@@ -114,12 +114,12 @@ sub _initialize {
 	$self->repeatmasker($self->locate_executable('RepeatMaskerHum'));
     };
     if ($@) {
-	$self->repeatmasker('/nfs/disk100/humpub/scripts/RepeatMaskerHum');
+	$self->repeatmasker('/usr/local/ensembl/bin/RepeatMaskerHum');
     }
     if ($arguments) 
     {   $self->arguments($arguments) ;}
     else
-    { $self->arguments('-low') ;      }
+    { $self->arguments('-low') ;     }
     return $self; # success - we hope!
 }
 

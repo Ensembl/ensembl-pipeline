@@ -477,7 +477,7 @@ sub split_HSP {
     #print STDERR "Alignment q : " . $hsp->queryBegin . "\t" . $hsp->queryEnd . "\t" . $hsp->queryAlignment . "\n";
     #print STDERR "Alignment s : " . $hsp->sbjctBegin . "\t" . $hsp->sbjctEnd . "\t" . $hsp->sbjctAlignment . "\n";
 
-#    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
+    #print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc)\n";
 
     # We split the alignment strings into arrays of one char each.  
     # We then loop over this array and when we come to a gap

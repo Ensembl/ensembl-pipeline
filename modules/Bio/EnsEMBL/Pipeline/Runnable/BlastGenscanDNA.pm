@@ -53,7 +53,6 @@ use strict;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::Runnable::SearchFilter;
 
 use vars qw(@ISA);
 
@@ -172,9 +171,9 @@ sub run {
 								 -database  => $self->database,
 								 -threshold => $self->threshold,
 								 -options   => $self->options,
-                                                                 -filter    => 0);
+                                                                 -filter    => 1);
 
-    $runnable->run();
+   $runnable->run();
   
     $self->align_hits_to_contig($runnable->output);
     #$self->check_features($transcript->translate->seq,$self->featurepairs);
