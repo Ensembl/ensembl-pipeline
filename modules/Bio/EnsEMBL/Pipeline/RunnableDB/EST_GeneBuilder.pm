@@ -469,7 +469,7 @@ sub _process_Transcripts {
   else{
     $label = $$."_".$label;
   }
-  print STDERR "############## passing label: $label\n";
+  #print STDERR "############## passing label: $label\n";
   
   my $merge_object 
     = Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge
