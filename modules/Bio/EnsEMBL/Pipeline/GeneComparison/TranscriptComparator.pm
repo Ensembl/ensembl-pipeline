@@ -67,8 +67,8 @@ sub new{
 sub _test_for_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
   
-  my @exons1 = $est_tran->get_all_Exons;
-  my @exons2 = $ens_tran->get_all_Exons;	
+  my @exons1 = @{$est_tran->get_all_Exons};
+  my @exons2 = @{$ens_tran->get_all_Exons};	
   
   @exons1 = sort {$a->start <=> $b->start} @exons1;
   @exons2 = sort {$a->start <=> $b->start} @exons2;
@@ -82,8 +82,7 @@ sub _test_for_semiexact_Merge{
       
     EXON2:
       for (my $k=$start; $k<=$#exons2; $k++){
-	  #print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end.
-	  #    " and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
+	#print STDERR "comparing j = $j : ".$exons1[$j]->start."-".$exons1[$j]->end." and k = $k : ".$exons2[$k]->start."-".$exons2[$k]->end."\n";
 	  
 	  # we allow some mismatches at the extremities
 	  #                        ____     ____     ___   
@@ -92,7 +91,7 @@ sub _test_for_semiexact_Merge{
 	  #              exons2    |___|---|____|---|____|  $k
 	  
 	  # if there is no overlap, go to the next EXON2
-	  if ( $foundlink == 0 && !($exons1[$j]->overlaps($exons2[$k]) ) ){
+	  if ( $foundlink == 0 && !( $exons1[$j]->overlaps($exons2[$k]) ) ){
 	      #print STDERR "foundlink = 0 and no overlap --> go to next EXON2\n";
 	      next EXON2;
 	  }
@@ -178,8 +177,8 @@ sub _test_for_semiexact_Merge{
 sub _test_for_fuzzy_semiexact_Merge{
   my ($self,$est_tran,$ens_tran) = @_;
   
-  my @exons1 = $est_tran->get_all_Exons;
-  my @exons2 = $ens_tran->get_all_Exons;	
+  my @exons1 = @{$est_tran->get_all_Exons};
+  my @exons2 = @{$ens_tran->get_all_Exons};	
   
   @exons1 = sort {$a->start <=> $b->start} @exons1;
   @exons2 = sort {$a->start <=> $b->start} @exons2;
@@ -292,8 +291,8 @@ sub _test_for_fuzzy_semiexact_Merge{
 
 sub _test_for_Merge{
   my ($self,$tran1,$tran2) = @_;
-  my @exons1 = $tran1->get_all_Exons;
-  my @exons2 = $tran2->get_all_Exons;	
+  my @exons1 = @{$tran1->get_all_Exons};
+  my @exons2 = @{$tran2->get_all_Exons};	
  
   my $foundlink = 0; # flag that gets set when starting to link exons
   my $start     = 0; # start looking at the first one
@@ -405,8 +404,8 @@ sub _test_for_Merge{
 
 sub _test_for_Merge_with_gaps{
   my ($self,$tran1,$tran2) = @_;
-  my @exons1 = $tran1->get_all_Exons;
-  my @exons2 = $tran2->get_all_Exons;	
+  my @exons1 = @{$tran1->get_all_Exons};
+  my @exons2 = @{$tran2->get_all_Exons};	
  
   my $foundlink = 0; # flag that gets set when starting to link exons
   my $start     = 0; # start looking at the first one
@@ -513,8 +512,8 @@ sub _test_for_Merge_with_gaps{
 
 sub _compare_Transcripts {         
   my ($tran1, $tran2) = @_;
-  my @exons1   = $tran1->get_all_Exons;
-  my @exons2   = $tran2->get_all_Exons;
+  my @exons1   = @{$tran1->get_all_Exons};
+  my @exons2   = @{$tran2->get_all_Exons};
   my $overlaps = 0;
   my $overlap_length = 0;
   foreach my $exon1 (@exons1){
