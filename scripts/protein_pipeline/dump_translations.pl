@@ -47,6 +47,7 @@ GetOptions(
 	   'dnadbname=s'    => \$dnadbname,
 	   'dnadbuser=s'    => \$dnadbuser,
 	   'dnadbpass=s'    => \$dnadbpass,
+	   'dnadbport=s'    => \$dnadbport,
 	   'stable_id!' => \$stable_id,
 	   'db_id!' => \$db_id,
 	   'file=s' => \$file,
