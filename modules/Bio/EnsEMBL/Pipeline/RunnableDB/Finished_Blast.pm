@@ -3,10 +3,10 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Finished_Blast;
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
+use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
 use vars qw(@ISA);
-
-@ISA = qw (Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
 
 =head2 run
 
@@ -68,7 +68,7 @@ sub run {
     }
 
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast->new( %parameters );
-    $runnable->split_gapped_alignements($split_gapped);
+    $runnable->split_gapped_alignments($split_gapped);
 
     $runnable->run();
     $self->runnable($runnable);
