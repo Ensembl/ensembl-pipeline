@@ -169,10 +169,9 @@ sub build_Genes{
   print STDERR "Number of genewise and combined transcripts " . scalar($self->genewise_combined_Transcripts) . "\n";
   
   #test
-  foreach my $t ( $self->genewise_combined_Transcripts ){
-    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
-  }
-
+  #foreach my $t ( $self->genewise_combined_Transcripts ){
+  #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($t);
+  #}
 
   # get all Genscan predictions on this slice
   $self->get_Predictions;
@@ -205,15 +204,16 @@ sub build_Genes{
   print STDERR "clustering transcripts...\n";
   my @transcript_clusters = $self->cluster_Transcripts(@all_transcripts);
   print STDERR scalar(@transcript_clusters)." clusters formed\n";
-  my $ccount =0;
-  foreach my $cluster (@transcript_clusters){
-    $ccount++;
-    print STDERR "* cluster $ccount:\n";
-    foreach my $tran ( @{$cluster->get_Transcripts} ){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-    }
-  }
-
+  
+  ## test
+  #my $ccount =0;
+  #foreach my $cluster (@transcript_clusters){
+  #  $ccount++;
+  #  print STDERR "* cluster $ccount:\n";
+  #  foreach my $tran ( @{$cluster->get_Transcripts} ){
+  #    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+  #  }
+  #}
 
   # prune the redundant transcripts for each cluster
   print STDERR "pruning transcripts...\n";
@@ -231,7 +231,7 @@ sub build_Genes{
       $count++;
       print STDERR "Gene $count:\n";
       foreach my $tran ( @{$gene->get_all_Transcripts} ){
-	  $self->_print_Transcript($tran);
+	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       }
   }
 
@@ -275,6 +275,7 @@ sub get_Genes {
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
 	
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $tran ); 
 	# my @valid_transcripts = $self->validate_transcript($t);
 	# next TRANSCRIPT unless scalar(@valid_transcripts);
 	
@@ -459,8 +460,8 @@ sub prune_Transcripts {
       @transcripts = map { $_->[1] } sort { $b->[0]->length <=> $a->[0]->length } map{ [ $_->start_Exon, $_ ] } @transcripts;
       my $tran = shift( @transcripts );
       push (@newtran, $tran);
-      print STDERR "found single_exon_transcript\n";
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+      #print STDERR "found single_exon_transcript\n";
+      #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
       my @es = @{$tran->get_all_Exons};
       my $e  = $es[0];
       foreach my $transcript (@transcripts){
@@ -519,8 +520,7 @@ sub prune_Transcripts {
 	my $foundpair = 0;
 	my $exon1 = $exons[$i];
 	my $exon2 = $exons[$i+1];
-	print STDERR "exon1 is a $exon1 and exon2 is a $exon2\n";
-	
+		
 	# Only count introns > 50 bp as real introns
 	my $intron;
 	if ($exon1->strand == 1) {
@@ -583,18 +583,18 @@ sub prune_Transcripts {
       
       # decide whether this is a new transcript or whether it has already been seen
       if ($found == 0) {
-	print STDERR "found new transcript:\n";
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
+	#print STDERR "found new transcript:\n";
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 
 	push(@newtran,$tran);
 	@evidence_pairs = ();
       } 
       else {
-	print STDERR "transcript already seen:\n";
+	#print STDERR "transcript already seen:\n";
 	if ( $tran == $transcripts[0] ){
 	  print STDERR "Strange, this is the first transcript in the cluster!\n";
 	}
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
+	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
 	
 	## transfer supporting feature data. We transfer it to exons
 	foreach my $pair ( @evidence_pairs ){
@@ -834,9 +834,8 @@ sub cluster_into_Genes{
     foreach my $transcript( @sorted_transcripts ){
 	if ($count < $GB_MAX_TRANSCRIPTS_PER_GENE) {
 	    $gene->add_Transcript($transcript);
-	    print STDERR "accepting:\n";
-	    print STDERR "check this, prune_Transcripts may not be working properly!\n";
-	    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
+	    #print STDERR "accepting:\n";
+	    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	}
 	$count++;
     }
@@ -1009,10 +1008,11 @@ sub get_Predictions {
   my ($self) = @_;
   my @checked_predictions;
   foreach my $prediction ( @{ $self->query->get_all_PredictionTranscripts } ){
-    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
-      next;
-    }
     $prediction->type("ab-initio");
+    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Peptide( $prediction );
+    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $prediction, $self->query ) ){
+      $self->warn("We let in a prediction with wrong phases!");
+    }
     push ( @checked_predictions, $prediction );
   }
   $self->predictions(@checked_predictions);
