@@ -541,7 +541,7 @@ sub split_Transcript{
 ############################################################
 
 sub _print_SimpleTranscript{
-    my ($self,$transcript) = @_;
+    my ($self,$transcript,$chr_coord) = @_;
     my @exons = @{$transcript->get_all_Exons};
     my $id;
     if ($transcript->stable_id){
@@ -557,8 +557,13 @@ sub _print_SimpleTranscript{
       $id .= " ".$transcript->type;
     }
     print STDERR "transcript ".$id.": ";
+    
+    my $shift = 0;
+    if ( $chr_coord ){
+      $shift = $exons[0]->contig->chr_start - 1;
+    }
     foreach my $exon ( @exons){
-      print STDERR $exon->start."-".$exon->end." ";
+      print STDERR ($exon->start + $shift)."-".( $exon->end + $shift )." ";
     }
     print STDERR "\n";
   }
