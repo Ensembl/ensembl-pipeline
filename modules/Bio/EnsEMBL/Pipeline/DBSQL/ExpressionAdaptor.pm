@@ -72,7 +72,7 @@ sub fetch_ests_by_Term{
   }
   # this method rely on having no repeated ESTs within each array
   if ( scalar( @terms ) > 1 ){
-    print STDERR "finding intersectino of libraries\n";
+    print STDERR "finding intersection of libraries\n";
     my @common_libs;
     my %counter;
     foreach my $term (@terms){
@@ -113,6 +113,9 @@ sub fetch_ests_by_Term{
 sub get_clonelib_by_Term{
   my ($self,$term) = @_;
 
+  # the leaves are the libraries hanging from the ontology tree
+  my @leaves;
+
   #first get the NodeId and the Ontology tree for this term
   my $q = qq ( SELECT Vocabulary.NodeId, Node.OntologyId 
 	       FROM   Vocabulary, Node 
@@ -126,6 +129,7 @@ sub get_clonelib_by_Term{
   
   unless ( $ontology_id ){
     print STDERR "term $term is not present in any Tree\n";
+    return @leaves; #return undef
   }
   
   # load this ontology tree in memory
@@ -142,7 +146,6 @@ sub get_clonelib_by_Term{
   }
   
   # get the leaves (clone libraries) of the subtree:
-  my @leaves;
   my $ref = \%tree;
   print STDERR "getting libraries with this term\n";
   @leaves = $self->_get_leaves_from_node( $node_id , \@leaves, \%tree);
@@ -166,11 +169,13 @@ sub _get_leaves_from_node{
   my ( $self, $node_id, $leaves, $tree ) = @_;
   my %tree = %$tree;
   
+  # if node_id has children, recurse to the children
   if ( $tree{children}{$node_id}  && @{ $tree{children}{$node_id} } ){
     foreach my $child ( @{ $tree{children}{$node_id} }){
       push( @{ $leaves },  $self->_get_leaves_from_node( $child, $leaves, $tree ) );
     }
   }
+  # else, this node must have libraries attached
   elsif( $tree{libraries}{$node_id} && @{ $tree{libraries}{$node_id} } ){
     push( @{ $leaves }, @{ $tree{libraries}{$node_id} } );
     return @{ $leaves };
@@ -266,6 +271,7 @@ sub get_Tree_by_id{
   
   print STDERR "getting libraries for this tree\n";
   # get all the leaves in this tree
+  # this selects all the libraries that are linked to nodes from this tree $ontology_id
   my $q3 = qq ( SELECT Node.Id, Mapping.ClonelibId
 		FROM   Node, Mapping
 		WHERE  Mapping.NodeId  = Node.Id
@@ -370,7 +376,7 @@ sub get_libraryId_by_estarray{
                one per ontology tree where it was found in.
                Each element is an arrayref which contains all the terms in the vocabulary,
                starting from the ontology tree name. It does not contain the clone library name, which
-               can be retrieved with $self->get_library_by_est($est_id)               
+               can be retrieved with $self->get_library_Name_by_est($est_id)               
 =cut
 
 sub get_Vocabulary_of_est{
@@ -446,7 +452,7 @@ sub _find_path{
 
   my $parent_node_id = $tree{parent}{$node_id};
 
-  if ( $parent_node_id == 0 || !defined($parent_node_id)){
+  if ( !defined($parent_node_id) || $parent_node_id == 0 ){
 
     # we got to the root, get the name of the tree:
     my $root = $tree{root};
@@ -527,7 +533,7 @@ sub get_library_Name_by_est{
   my $q = qq ( SELECT Clonelib.Name
 	       FROM   EST, Clonelib
 	       WHERE  EST.Accession  = "$est_id"
-	         AND  EST.ClonelibId = CLonelib.Id
+	         AND  EST.ClonelibId = Clonelib.Id
 	     );
   
   my $sth = $self->prepare($q) || $self->throw("can't prepare: $q");
