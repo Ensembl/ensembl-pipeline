@@ -237,7 +237,7 @@ sub run{
 	  if( /End/ ) {
 	    if( $seen_utr3 == 0 ) {
 	      #  print STDERR "Seen utr - setting end to prev\n";
-	      # ended on a cds 
+	      #  ended on a cds 
 	      $trans->end_Exon($prev);
 	      $trans->end($prev->length);
 	    }
@@ -246,123 +246,117 @@ sub run{
 	
 	if( /utr5\s+(\d+)\s+(\d+)/) {
 	  my $start = $1;
-	    my $end   = $2;
-	    my $strand = 1;
-	    
-	    my $exon = Bio::EnsEMBL::Exon->new();
+	  my $end   = $2;
+	  my $strand = 1;
+	  
+	  my $exon = Bio::EnsEMBL::Exon->new();
+	  $exon->start($start);
+	  $exon->end  ($end);
+	  $exon->strand($strand);
+	  # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
+	  $exon->phase(-1);
+	  $exon->end_phase(-1);
+	  $t->add_Exon($exon);
+	  $prev = $exon;
+	  next;
+	}
+	if( /cds\s+(\d+)\s+(\d+)\s+phase\s+(\d+)/ ) {
+	  my $start = $1;
+	  my $end   = $2;
+	  my $strand = 1;
+	  my $phase = $3;
+	  
+	  my $this_start  = $1;
+	  my $this_end    = $2;
+	  my $this_length = $this_end - $this_start + 1;
+	  
+	  my $cds_start = $start;
+	  my $exon;
+	  
+	  if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
+	    # we have an abutting utr5
+	    $start = $prev->start();
+	    $exon  = $prev;
+	    # end_phase is number of bases at the end of the exon which do not fall in a codon
+	    my $end_phase = $this_length%3;
 	    $exon->start($start);
 	    $exon->end  ($end);
 	    $exon->strand($strand);
-	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
-	    $exon->phase(-1);
- 	    $exon->end_phase(-1);
+	    $exon->phase($prev->phase);
+	    #print STDERR "Genomewise: setting end_phase to $end_phase\n";
+	    $exon->end_phase($end_phase);
+	  } 
+	  else {
+	    # make a new Exon
+	    $exon  = Bio::EnsEMBL::Exon->new();
 	    $t->add_Exon($exon);
-	    $prev = $exon;
-	    next;
+	    $exon->phase($phase);
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->end_phase( ( $end - $start + 1 + $phase ) %3 );
+	    $exon->strand($strand);
 	  }
-	  if( /cds\s+(\d+)\s+(\d+)\s+phase\s+(\d+)/ ) {
-	    my $start = $1;
-	    my $end   = $2;
-	    my $strand = 1;
-	    my $phase = $3;
+	  if( $seen_cds == 0 ) {
+	    $trans->start_Exon($exon);
+	    $trans->start($cds_start-$start+1);
+	  }
+	  $seen_cds = 1;
+	  $prev = $exon;
+	  next;
+	}
+	
+	if( /utr3\s+(\d+)\s+(\d+)/ ) {
+	  #	print "Found utr3\n";
+	  my $start = $1;
+	  my $end   = $2;
+	  my $strand = 1;
+	  
+	  my $orig_end;
+	  my $exon;
+	  if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
 	    
-	    my $this_start  = $1;
-	    my $this_end    = $2;
-	    my $this_length = $this_end - $this_start + 1;
-
-	    my $cds_start = $start;
-	    my $exon;
-	    if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
-	      # we have an abutting utr5
-	      $start = $prev->start();
-	      $exon  = $prev;
-	      # end_phase is number of bases at the end of the exon which do not fall in a codon
-	      my $end_phase = $this_length%3;
-	      $exon->start($start);
-	      $exon->end  ($end);
-	      $exon->strand($strand);
-	      $exon->phase($prev->phase);
-	      #print STDERR "Genomewise: setting end_phase to $end_phase\n";
-	      $exon->end_phase($end_phase);
+	    #   abutting 3utr
+	    #      _____________
+	    #...--|______|______|--...
+	    #   cds($prev) utr3
+	    
+	    $orig_end = $prev->end;
+	    $exon     = $prev;
+	    $start    = $prev->start;
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->strand($strand);
+	    $exon->phase($prev->phase);
+	    $exon->end_phase(-1);
+	    
+	  } 
+	  else {
+	    
+	    #   not abutting; should be fine.
+	    $exon =  Bio::EnsEMBL::Exon->new();
+	    $t->add_Exon($exon);
+	    $exon->start($start);
+	    $exon->end  ($end);
+	    $exon->strand($strand);	    
+	    $exon->phase(-1);
+	    $exon->end_phase(-1);
+	  }
+	    
+	  # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
+	  if( $seen_utr3 == 0 ) {
+	    if( !defined $orig_end ) {
+	      $self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
 	    } 
 	    else {
-	      # make a new Exon
-	      $exon  = Bio::EnsEMBL::Exon->new();
-	      $t->add_Exon($exon);
-	      $exon->phase($phase);
-	      $exon->start($start);
-	      $exon->end  ($end);
-	      $exon->end_phase( ( $end - $start + 1 + $phase ) %3 );
+	      $trans->end_Exon($exon);
+	      
+	      # position of the end of translation in exon-local coordinates
+	      $trans->end($orig_end - $start + 1);
 	    }
-#	    $exon->start($start);
-#	    $exon->end  ($end);
-#	    $exon->strand($strand);
-#	    $exon->phase($phase);
-	    
-	    if( $seen_cds == 0 ) {
-	      $trans->start_Exon($exon);
-	      $trans->start($cds_start-$start+1);
-	    }
-	    $seen_cds = 1;
-	    $prev = $exon;
-	    next;
 	  }
-	  
-	  if( /utr3\s+(\d+)\s+(\d+)/ ) {
-	    #	print "Found utr3\n";
-	    my $start = $1;
-	    my $end   = $2;
-	    my $strand = 1;
-	    
-	    my $orig_end;
-	    my $exon;
-	    if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
-	      
-	      #   abutting 3utr
-	      #      _____________
-	      #...--|______|______|--...
-	      #   cds($prev) utr3
-	      
-	      $orig_end = $prev->end;
-	      $exon     = $prev;
-	      $start    = $prev->start;
-	      $exon->start($start);
-	      $exon->end  ($end);
-	      $exon->strand($strand);
-	      $exon->phase($prev->phase);
-	      $exon->end_phase(-1);
-	      
-	    } else {
-	      
-	      #   not abutting; should be fine.
-	      $exon =  Bio::EnsEMBL::Exon->new();
-	      $t->add_Exon($exon);
-	      $exon->start($start);
-	      $exon->end  ($end);
-	      $exon->strand($strand);	    
-	      $exon->phase(-1);
-	      $exon->end_phase(-1);
-	    }
-	    
-	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
-	    
-#	    $exon->start($start);
-#	    $exon->end  ($end);
-#	    $exon->strand($strand);
-	    
-	    if( $seen_utr3 == 0 ) {
-	      if( !defined $orig_end ) {
-		$self->throw("This should not be possible. Got a switch from cds to utr3 in a non-abutting exon");
-	      } else {
-		$trans->end_Exon($exon);
-		
-		# position of the end of translation in exon-local coordinates
-		$trans->end($orig_end - $start + 1);
-	      }
-	    }
-	    $seen_utr3 = 1;
-	    next;
-	  }
+	  $seen_utr3 = 1;
+	  next;
+	}
 	
 	# else - worrying 
 	
