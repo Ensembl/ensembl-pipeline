@@ -30,15 +30,25 @@ require "Bio/EnsEMBL/Pipeline/EST_conf.pl";
 my %chrhash;
 
 # declare these here so we can refer to them later
-my $ex_resultsdir = "exonerate_est/results";
-my $ex_bsubdir    = "exonerate_est/bsub";
-my $filterdir     = "filter_and_e2g";
+my $ex_resultsdir       = "exonerate_est/results";
+my $ex_bsubdir          = "exonerate_est/bsub";
+my $filterdir           = "filter_and_e2g";
+my $est_genebuilder_dir = "est_genebuilder";
 
+# get chr info from the database where you have contig, clone and static_golden_path
 &get_chrlengths();
+
+# make output directories
 &make_directories();
+
+# create jobs file for Exonerate
 &make_exonerate_bsubs();
+
+# create jobs file for FilterESTs_and_E2G
 &make_filter_bsubs();
 
+# create jobs file for EST_GeneBuilder
+&make_EST_GeneBuilder_bsubs();
 
 =head2 make_directories
 
@@ -206,6 +216,57 @@ sub make_filter_bsubs {
   close (OUT) or die (" Error closing $jobfile: $!");
 }
 
+
+
+=head2 make_EST_GeneBuilder_bsubs
+
+  Title   : make_EST_GeneBuilder_bsubs
+  Function: makes bsubs to run EST_GeneBuilder
+
+=cut
+
+sub make_ESTbuilder_bsubs{
+  my $jobfile    = $::scripts_conf{'EST_GeneBuilder_bsubsfile'};
+  my $scratchdir = $::scripts_conf{'tmpdir'};
+  my $queue      = $::scripts_conf{'queue'};
+  my $scriptdir  = $::scripts_conf{'scriptdir'};
+
+  open (OUT, ">$jobfile") or die ("Can't open $jobfile for writing: $!");
+
+  # where out and err files go
+  my $filter = $scratchdir . "/" . $est_genebuilder_dir . "/";
+
+  # genomic size for each job
+  my $size   = $::scripts_conf{'est_genebuilder_chunksize'};
+  
+  my $runner = $::scripts_conf{'runner'};
+
+  foreach my $chr(keys %chrhash) {
+    my $length = $chrhash{$chr};
+    
+    my $chrdir = $filter . "/$chr";
+    my $count = 1;
+
+    while($count < $length) {
+      my $start = $count;
+      my $end   = $count + $size -1;
+      
+      if ($end > $length) {
+	$end = $length;
+      }
+      
+      my $input_id = $chr . "." . $start . "-" .  $end;
+      my $outfile  = $chrdir . "/$input_id.out";
+      my $errfile  = $chrdir . "/$input_id.err";
+      my $command = "bsub -q $queue -C0 -o $outfile -e $errfile -E \"$runner -check -runnable Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder\" $runner -input_id $input_id";
+      print OUT "$command\n";
+      
+      $count = $count + $size;
+    }
+  }
+
+  close (OUT) or die (" Error closing $jobfile: $!");
+}
 
 =head2 makedir
 
