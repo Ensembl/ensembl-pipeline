@@ -41,12 +41,17 @@ ok(my $blastn = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
      '-threshold' => 1e-6,
      ));
 
+if(!defined $blastn->get_regex("$pwd/t/data/AI053588.fa")){
+  print STDERR "No regex defined for $pwd/t/data/AI053588.fa - adding one\n";
+  #>AI053588 AI053588 qi68h04.x1 NCI_CGAP_Ov26 ...
+  $blastn->add_regex("$pwd/t/data/AI053588.fa", '^(\w+)\s+');
+}
+
 ok($blastn->run);
 
 foreach my $out ($blastn->output) {
     print $out->gffstring . "\n";
 }
-
 
 # Now the dna-pep blast
 ok(my $blastx = Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
@@ -56,6 +61,11 @@ ok(my $blastx = Bio::EnsEMBL::Pipeline::Runnable::Blast->new
      '-threshold' => 1e-6,
      ));
 
+if(!defined $blastn->get_regex("$pwd/t/data/AP000074.pep")){
+  print STDERR "No regex defined for $pwd/t/data/AP000074.pep - adding one\n";
+  # >AP000074|GENSCAN_predicted_peptide_1|956_aa
+  $blastn->add_regex("$pwd/t/data/AP000074.pep", '^(\w+)\s*');
+}
 
 ok($blastx->run);
 
