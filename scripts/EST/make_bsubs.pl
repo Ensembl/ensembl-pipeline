@@ -52,6 +52,8 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_FILTER_ANALYSIS
 					EST_GENEBUILDER_RUNNABLE
 					EST_GENEBUILDER_ANALYSIS
+					EST_EXPRESSION_RUNNABLE
+					EST_EXPRESSION_ANALYSIS    
 				       );
 
 my %chrhash;
