@@ -20,9 +20,9 @@ Bio::EnsEMBL::Pipeline::Runnable::Snap
   my $Snap = Bio::EnsEMBL::Pipeline::Runnable::Snap->new (-CLONE => $seq);
   $Snap->workdir($workdir);
   $Snap->run();
-  my @genes = $Snap->output();
-  my @exons = $Snap->output_exons();
-  my $seqfeature = $Snap->output_singlefeature();
+  my @genes = $snap->output();
+  my @exons = $snap->output_exons();
+  my $seqfeature = $snap->output_singlefeature();
 
 =head1 DESCRIPTION
 
@@ -122,12 +122,19 @@ sub new {
     $self->query($query);
 #    $snap = 'snap'       unless ($snap);
 
-#    $self->snap($self->find_executable($snap)) unless ($snap);
-#    $self->hmmfile ($self->find_file($matrix));
-    $self->snap($snap);
+    if ($snap) {
+	$self->snap($snap);
+    }
+    else {
+	$self->snap($self->find_executable($snap)) unless ($snap);
+    }
+
+    print STDERR "HMMFILE1: $matrix\n";
+    
     $self->hmmfile($matrix);
-    print STDERR "SNAP0: $snap\n";
-    print STDERR "SNAP: ".$self->snap."\n";
+
+
+    print STDERR "HMMFILE2: ".$self->hmmfile."\n";
 
     if ($parameters)    
     { $self->parameters($parameters) ; }
@@ -150,6 +157,13 @@ sub query {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
+#Snap takes all of the fasta header, want to make sure that the fasta header contains only one field
+
+#	my $id = $seq->id;
+#	my $s = $seq->seq;
+
+#	my $new_seq = Bio::Seq->new(-seq=>$s,-id=>$id);
+
         $self->{'_query'} = $seq ;
         $self->filename($seq->id.".$$.seq");
         $self->results($self->filename.".snap");
@@ -192,13 +206,10 @@ sub snap {
 
 sub hmmfile {
     my ($self, $location) = @_;
-    print STDERR "LOCATION: $location\n";
-    #if ($location)
-    #{
-     #   $self->throw("Genscan hmmfile not found at $location: $!\n") 
-     #                                               unless (-e $location);
-        $self->{'_hmmfile'} = $location ;
-    #}
+    if ($location) {
+	$self->{'_hmmfile'} = $location ;
+    }
+
     return $self->{'_hmmfile'};
 }
 
@@ -307,15 +318,16 @@ sub run {
     $self->run_snap();
     #parse output and create features
     $self->parse_results();
-#    $self->deletefile();
+    $self->deletefiles();
+    unlink ($self->protfile) or $self->throw ("Couldn't delete ".$self->protfile.":$!");
     return 1;
 }
 
 sub run_snap {
     my ($self) = @_;
-    print STDERR "Running snap on ".$self->snap.' fly  '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results."\n";
+#    print STDERR "Running snap on ".$self->snap.' '.$self->hmmfile.' '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results."\n";
     
-    system ($self->snap.' fly '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results);
+    system ($self->snap.' '.$self->hmmfile.' '.$self->filename.' -gff -aa '.$self->protfile.'> '.$self->results);
    
    $self->throw($self->results." (GFF output) not created by Snap\n") unless (-e $self->results);
     $self->throw($self->protfile." (protein file) not created by Snap\n") unless (-e $self->results);
@@ -364,16 +376,16 @@ sub parse_results {
 
     my @element;
     
-    my $excount = 0;
-    my $transcount = 1;
+    my $excount;
+    my $transcount = 0;
+
+    my $current_trans;
 
     #The big parsing loop - parses exons and predicted peptides
     while (<$filehandle>) 
     {
-	$excount++;
 
-	my $name = $transcount.".".$excount;
-
+	
 	print STDERR "$_";
 	my %feature; 
 	
@@ -382,6 +394,17 @@ sub parse_results {
 	$self->throw("Unable to parse Snap ouput (".scalar(@element).") Line: $_\n") unless (scalar(@element) == 9); 
 	
 	
+	if ($current_trans ne $element[8]) {
+	    $excount = 0;
+	    $transcount++;
+	    $current_trans = $element[8];
+	}
+	
+	$excount++;
+
+	my $name = $transcount.".".$excount;
+
+
 	if ($element[6] eq '+')
 	{
 	    $feature {'start'} = $element[3];
@@ -408,10 +431,10 @@ sub parse_results {
 	
 	$self->create_feature(\%feature);
 	
-	if (($element[2] eq "Eterm")||( $element[2] eq "Esngl")) {
-	    $transcount++;
-	    $excount = 0;
-	}
+#	if (($element[2] eq "Eterm")||( $element[2] eq "Esngl")) {
+	#    $transcount++;
+	#    $excount = 0;
+	#}
     }
 
     $self->create_genes();    
@@ -425,7 +448,7 @@ sub parse_results {
 
 sub calculate_and_set_phases_new {
     my ($self) = @_;
-    my $min_gene_length = 10;
+    my $min_gene_length = 25;
 
     my @genes       = $self->snap_genes();
     my @peptides    = $self->snap_peptides();
@@ -446,6 +469,12 @@ sub calculate_and_set_phases_new {
           print STDERR "peptide $i too short (", length($peptide), "bp)\n";
           $i++;
           next GENE;
+      }
+      
+      if ($peptide =~ /X{5,}?/) {
+	  print STDERR "peptide $i ($peptide) has too much low complexity\n";
+	  $i++;
+	  next GENE;
       }
 
       my @exons   = $genes[$i]->sub_SeqFeature();
@@ -518,7 +547,7 @@ sub calculate_and_set_phases_new {
           #print "translation = ".$temp_tran."\n";
           if($temp_tran =~/\*/){
             print "translation ".$tran->temporary_id." = ".$temp_tran."\n";
-            print "transcript contains stop codons!";
+            print "transcript contains stop codons!\n";
           } else {
            #print "adding translation ".$tran->temporary_id." \n";
             $self->add_Transcript($tran);
@@ -605,9 +634,9 @@ sub create_genes {
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
     my @ordered_exons = sort { $a->seqname <=> $b->seqname } $self->exons();
-    foreach my $exon(@ordered_exons){
-      print STDERR " seqname ".$exon->seqname."\n";
-    }
+#    foreach my $exon(@ordered_exons){
+#      print STDERR " EXON ".$exon."\n";
+#    }
     #sort exons into hash by initial numbers of seqname (genes)
     foreach my $exon (@ordered_exons)
       {
@@ -690,8 +719,11 @@ sub output {
 
     foreach my $transcript (@{$self->get_all_Transcripts}) {
 
+	
         my $exons = $transcript->get_all_Exons();
-        my @exons;
+        
+
+	my @exons;
 
         if ($exons->[0]->strand == 1) {
             @exons = sort {$a->start <=> $b->start } @{$exons};
