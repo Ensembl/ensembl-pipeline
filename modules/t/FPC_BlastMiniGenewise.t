@@ -51,11 +51,8 @@ my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise';
 
-my $fbmg = "$runnable"->new(-dbobj      => $db,
-			    -input_id   => $id,
-			    -seqfetcher => $fetcher,
-			    -type       => 'sptr',
-                            -threshold  => 100);	
+my $fbmg = "$runnable"->new(-db     => $db,
+			    -input_id   => $id);	
 
 
 unless ($fbmg)
@@ -75,14 +72,14 @@ foreach my $gene(@genes){
    $count++;
    my $ecount = 0;
    print STDERR "gene $count\n";
-     foreach my $exon ( $gene->get_all_Exons() ) {
+     foreach my $exon ( @{$gene->get_all_Exons()} ) {
        $ecount++;
        print STDERR 	"exon $ecount\t" .
 			$exon->contig_id . "\t" . 
 			$exon->start     . "\t" . 
 			$exon->end       . "\t" . 
 			$exon->strand    . "\n";
-       foreach my $sf($exon->each_Supporting_Feature) {
+       foreach my $sf(@{$exon->get_all_supporting_features}) {
 	  print STDERR "\tsupporting_features: " . 
                        $sf->seqname     . "\t" .
 		       $sf->start       . "\t" .
