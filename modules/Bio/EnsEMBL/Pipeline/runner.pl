@@ -34,8 +34,8 @@ GetOptions(
     'dbname=s'     => \$dbname,
     'dbuser=s'     => \$dbuser,
     'pass=s'       => \$pass,
-    'index'        => \$index,
-    'jobname'      => \$jobname,
+    'index=n'        => \$index,
+    'jobname=s'      => \$jobname,
     'check!'       => \$check,
     'output_dir=s' => \$output_dir
 )
@@ -51,7 +51,7 @@ if( $check ) {
 
 }
 
-
+print STDERR "have jobname ".$jobname."\n";
 $jobname or die("jobname not defined");
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(

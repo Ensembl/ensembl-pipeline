@@ -98,18 +98,19 @@ sub new{
 sub _check{
     my ($self, $arg) = @_;
     
-    if(ref($arg) eq 'ARRAY'){
-      
-       my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
+    if($arg){
+      if(ref($arg) eq 'ARRAY'){
+	
+	my $idset = Bio::EnsEMBL::Pipeline::IDSet->new(
                                                        -ID_LIST => $arg,
-                                                     );
-       return $idset;
+						      );
+	return $idset;
+      }
+      
+      if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
+	return $arg;
+      }
     }
-    
-    if($arg->isa("Bio::EnsEMBL::Pipeline::IDSet")){
-       return $arg;
-    }
-     
     $self->throw("Must pass either Bio::EnsEMBL::Pipeline::IDSet or array refs to TaskStatus add methods not $arg : $!");
     
 
