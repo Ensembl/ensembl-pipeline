@@ -434,9 +434,23 @@ sub calculate_and_set_phases_new {
 
       foreach my $tran (@newtran) {
 
-#	print STDERR "Translation is " . $tran->translate->seq . "\n";
+	my $temp_tran = $tran->translate->seq;
 
-	if (index($peptides[$i],$tran->translate->seq) >= 0) {
+#	print STDERR "Translation is " . $temp->tran . "\n";
+
+	# clean the translated sequence
+
+        #genscan translated partial genes correctly whilst exon translation begin with M
+        $temp_tran =~ s/^M//i; #remove initial M from exon
+
+	# remove any initial X's from the translation
+	$temp_tran =~ s/^x//i;
+	
+	# remove any terminal X's from the translation
+	$temp_tran =~ s/x$//i;
+
+
+	if (index($peptides[$i],$temp_tran) >= 0) {
 #	  print STDERR $tran->temporary_id . " " . $tran->translate->seq . "\n";
 
 	  foreach my $exon ($tran->get_all_Exons) {
