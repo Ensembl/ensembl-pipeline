@@ -133,7 +133,7 @@ sub write_output {
   GENE: foreach my $gene ($self->output) {      
       # do a per gene eval..
       my @transcripts = $gene->each_Transcript;
-      if(!$transcripts[1]){
+      if(!$transcripts[0]){
 	print STDERR "Gene doesn't have any transcript\n";
 	next GENE;
       }else{ 
@@ -175,7 +175,7 @@ sub fetch_input {
     my @features;
     
    
-    @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold,0);
+    @features  = $contig->get_all_SimilarityFeatures_above_score($self->type, $self->threshold);
     
     
     
