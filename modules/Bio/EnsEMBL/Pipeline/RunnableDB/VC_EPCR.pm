@@ -112,6 +112,7 @@ sub fetch_input {
 
     my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
+    $self->vc($vc);
 }
 
 #get/set for runnable and args
@@ -144,7 +145,7 @@ sub runnable {
 		}
             }
         }
-        $parameters {'-sts'}     = $self->analysis->db_file();  
+        $parameters {'-db'}      = $self->analysis->db_file();  
         $parameters {'-options'} = $arguments;
         $parameters {'-pcr'}     = $self->analysis->program_file();  
         #creates empty Bio::EnsEMBL::Runnable::EPCR object
@@ -152,6 +153,61 @@ sub runnable {
     }
     return $self->{'_runnable'};
 }
+
+
+sub write_output {
+    my($self) = @_;
+    my $start;
+    my $contig;
+    my ($raw_start, $raw_end);
+
+    my $db=$self->dbobj();
+    my @features = $self->output();
+    my %feat_by_contig;
+  
+    my $vc = $self->vc;
+
+    foreach my $f (@features) {
+	$f->analysis($self->analysis);
+	$start  = $f->start;
+	my ($raw, $raw_pos) = $vc->raw_contig_position($start);
+	if ($raw && $raw_pos) {
+	    if ($raw->static_golden_ori == 1) {
+		$raw_start = $raw_pos;
+		$raw_end = $f->end + $raw_start - $start;
+	    }
+	    else {
+		$raw_end = $raw_pos;
+		$raw_start = $start - $f->end + $raw_end;
+	    }
+	    my $raw_end = $f->end + $raw_start - $start;
+	    $feat_by_contig{$raw->id} = [] unless defined $feat_by_contig{$raw->id};
+	    $f->start($raw_start);
+	    $f->end($raw_end);
+	    push @{$feat_by_contig{$raw->id}}, $f;
+	}
+    }
+
+    foreach my $contig_id (keys %feat_by_contig) {
+	eval {
+	    $contig = $db->get_Contig($contig_id);
+	};
+	print $contig, "\n";
+	print length($@), "\n";
+
+	if ($@) {
+	    print STDERR "Contig not found, skipping writing output to db: $@\n";
+	}
+	elsif (@features = @{$feat_by_contig{$contig_id}}) {
+	    print STDERR "Writing features to database\n";
+	    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	    $feat_adp->store($contig, @features);
+	}
+
+    }
+    return 1;
+}
+
 
 =head2 fetch_output
 
