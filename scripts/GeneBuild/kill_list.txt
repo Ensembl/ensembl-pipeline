@@ -302,4 +302,4 @@ Q80YX9 Homologous to integrase domain (dta).
 Q8VDY3 Member of integrase C superfamily (dta).
 NP_112232 Tiny protein that has been removed from RefSeq.  Formed the basis 51 human genes (dta).
 Q91VY0 56 Q91VY0_MOUSE Q91VY0 Similar to L1 repeat, Tf subfamily, member 30. 
-
+Q06666 T2_MOUSE Q06666 Octapeptide-repeat protein T2.
