@@ -61,7 +61,7 @@ use Bio::SeqIO;
  Usage    : my $signalp =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Signalp->new
                            ( -program    => '/usr/local/pubseq/bin/signalp',
                              -clone      => $clone,
-                             -analysisid => 4,
+                             -analysis   => $analysis,
                            );
  Function : initialises Signalp object
  Returns  : a Signalp object
@@ -84,23 +84,24 @@ sub new {
     $self->{'_protected'} = [];           # a list of files protected from deletion
     $self->{'_analysis'} = undef;
 
-    my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
-						   ANALYSIS)], 
-							 @args);
+    my ($clone, $analysis, $program) = $self->_rearrange([qw(CLONE 
+						             ANALYSIS
+                                                             PROGRAM)], 
+							  @args);
 
-    print STDERR "PROGREEE: ".$analysis->program."\n";
+    $self->clone ($clone) if ($clone);
+
+    if ($analysis) {
+        $self->analysis ($analysis);
+    }
+    else {
+        $self->throw("Signalp needs an analysis");
+    }
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
   
-    $self->clone ($clone) if ($clone);       
-    $self->analysis ($analysis) if ($analysis);
-
-    #if (!defined $program) {
-	#$self->program ($self->find_executable ($program));
-    #}
-    #else {
-	#$self->program($program);
-    #}
-
     return $self;
+
 }
 
 ###################
@@ -171,6 +172,28 @@ sub analysis {
 } 
 
 
+=head2 program
+
+ Title    : program
+ Usage    : $self->program ('/usr/local/pubseq/bin/hmmpfam');
+ Function : get/set method for the path to the program binaries
+ Example  :
+ Returns  : File path
+ Args     : File path (optional)
+ Throws   :
+
+=cut
+
+sub program {
+    my ($self, $location) = @_;
+    if ($location) {
+        unless (-e $location) {
+            $self->throw ($self->program." not found at $location");
+        }
+        $self->{'_program'} = $location ;
+    }
+    return $self->{'_program'};
+}
 
 ###################
 # analysis methods
@@ -285,7 +308,7 @@ sub run {
 sub run_program {
     my ($self) = @_;
     
-    print STDERR "RUNNING: ".$self->analysis->program." -t euk ".$self->filename." > ".$self->results."\n";
+    print STDERR "RUNNING: ".$self->program." -t euk ".$self->filename." > ".$self->results."\n";
     
     my $filename = $self->filename;
 
@@ -293,10 +316,10 @@ sub run_program {
     
 
     # run program
-    print STDERR "running ".$self->analysis->program."\n";
+    print STDERR "running ".$self->program."\n";
     
-    $self->throw ("Error running ".$self->analysis->program." on ".$self->filename) 
-        unless ((system ($self->analysis->program." -t euk ".$self->filename. " > ".$self->results)) == 0); 
+    $self->throw ("Error running ".$self->program." on ".$self->filename) 
+        unless ((system ($self->program." -t euk ".$self->filename. " > ".$self->results)) == 0); 
 }
 
 
@@ -357,9 +380,9 @@ sub parse_results {
 	        $feature{name} = $id;
        	        $feature{start} = 1;
 	        $feature{end} = $end;
-                ($feature{source}) = $self->analysis->program =~ /([^\/]+)$/;
+                ($feature{source}) = $self->program =~ /([^\/]+)$/;
 	        $feature{primary}= 'signal_peptide';
-	        ($feature{program}) = $self->analysis->program =~ /([^\/]+)$/;
+	        ($feature{program}) = $self->program =~ /([^\/]+)$/;
                 $feature{logic_name} = 'signal_peptide';
   	        $self->create_feature (\%feature);
 	    }

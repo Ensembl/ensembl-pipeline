@@ -60,7 +60,7 @@ use Bio::EnsEMBL::Analysis;
  Usage    : my $ncoils =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Coil->new
                           ( -program    => '/usr/local/pubseq/bin/ncoils',
                             -clone      => $clone,
-                            -analysisid => 4,
+                            -analysi    => $analysis,
                           );
  Function : initialises Coil object
  Returns  : a Coil object
@@ -82,18 +82,26 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of program run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
-						   ANALYSIS)], 
-					       @args);
+    my ($clone, $analysis, $program) = $self->_rearrange([qw(CLONE 
+						             ANALYSIS
+                                                             PROGRAM)], 
+					                 @args);
   
     
-    
     $self->clone ($clone) if ($clone);
-    
-    $self->analysis ($analysis) if ($analysis);
-    
+
+    if ($analysis) {
+        $self->analysis ($analysis);
+    }
+    else {
+        $self->throw("Coil needs an analysis");
+    }
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
+  
     return $self;
 }
+
 
 ###################
 # get/set methods 
@@ -161,7 +169,7 @@ sub analysis {
 =head2 program
 
  Title    : program
- Usage    : $self->analysis->program ('/usr/local/pubseq/bin/ncoils');
+ Usage    : $self->program ('/usr/local/pubseq/bin/ncoils');
  Function : get/set method for the path to the executable
  Example  :
  Returns  : File path
@@ -252,7 +260,7 @@ sub run {
 =head2 run_program
 
  Title    : run_program
- Usage    : $self->analysis->program
+ Usage    : $self->program
  Function : makes the system call to program
  Example  :
  Returns  : 
@@ -268,9 +276,9 @@ sub run_program {
     $ENV{'COILSDIR'}=$coilsdir;
     
     # run program
-    print STDERR "running ".$self->analysis->program."\n";
-    $self->throw ("Error running ".$self->analysis->program." on ".$self->filename) 
-        unless ((system ($self->analysis->program." -f < ".$self->filename." > ".$self->results)) == 0); 
+    print STDERR "running ".$self->program."\n";
+    $self->throw ("Error running ".$self->program." on ".$self->filename) 
+        unless ((system ($self->program." -f < ".$self->filename." > ".$self->results)) == 0); 
 }
 
 
@@ -294,7 +302,7 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print STDERR $self->analysis->program." didn't find anything\n";
+	    print STDERR $self->program." didn't find anything\n";
 	    return;
         }       
         else {
@@ -328,9 +336,9 @@ sub parse_results {
 	        $feature{name} = $id;
        	        $feature{start} = $start;
 	        $feature{end} = $end;
-    	        ($feature{source}) = $self->analysis->program =~ /([^\/]+)$/;
+    	        ($feature{source}) = $self->program =~ /([^\/]+)$/;
 	        $feature{primary}= 'coiled_coil';
-	        ($feature{program}) = $self->analysis->program =~ /([^\/]+)$/;
+	        ($feature{program}) = $self->program =~ /([^\/]+)$/;
                 $feature{logic_name} = 'coiled_coil';
   	        $self->create_feature (\%feature);
                 $switch = 0;

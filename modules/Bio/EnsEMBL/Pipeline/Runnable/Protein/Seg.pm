@@ -15,7 +15,7 @@
 =head1 SYNOPSIS
 
   my $seqstream = Bio::SeqIO->new ( -file => $clonefile,
-                                   -fmt => 'Fasta',
+                                    -fmt => 'Fasta',
                                   );
   $seq = $seqstream->next_seq;
 
@@ -60,7 +60,7 @@ use Bio::EnsEMBL::Analysis;
  Usage    : my $seg =  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg->new
                        ( -program    => '/usr/local/pubseq/bin/seg',
                          -clone      => $clone,
-                         -analysisid => 4,
+                         -analysis   => $analysis,
                        );
  Function : initialises Seg object
  Returns  : a Seg object
@@ -82,14 +82,23 @@ sub new {
     $self->{'_results'}   = undef;        # file to store results of program run
     $self->{'_protected'} = [];           # a list of files protected from deletion
   
-    my ($clone, $analysis) = $self->_rearrange([qw(CLONE 
-						   ANALYSIS)], 
-					       @args);
+    my ($clone, $analysis, $program) = $self->_rearrange([qw(CLONE 
+						             ANALYSIS
+                                                             PROGRAM)], 
+					                 @args);
+    $self->clone ($clone) if ($clone);
+
+    if ($analysis) {
+        $self->analysis ($analysis);
+    }
+    else {
+        $self->throw("Seg needs an analysis");
+    }
+
+    $self->program ($self->find_executable ($self->analysis->program_file));
   
-    $self->clone ($clone) if ($clone);       
-    $self->analysis ($analysis) if ($analysis);
-      
     return $self;
+
 }
 
 ###################
@@ -154,6 +163,29 @@ sub analysis {
     return $self->{'_analysis'};
 } 
 
+
+=head2 program
+
+ Title    : program
+ Usage    : $self->program ('/usr/local/pubseq/bin/hmmpfam');
+ Function : get/set method for the path to the program binaries
+ Example  :
+ Returns  : File path
+ Args     : File path (optional)
+ Throws   :
+
+=cut
+
+sub program {
+    my ($self, $location) = @_;
+    if ($location) {
+        unless (-e $location) {
+            $self->throw ($self->program." not found at $location");
+        }
+        $self->{'_program'} = $location ;
+    }
+    return $self->{'_program'};
+}
 
 ####################
 # analysis methods
@@ -239,9 +271,9 @@ sub run {
 sub run_program {
     my ($self) = @_;
     # run program
-    print STDERR "Running ".$self->analysis->program." ".$self->filename." -l > ".$self->results."\n";
-    $self->throw ("Error running ".$self->analysis->program." on ".$self->filename) 
-        unless ((system ($self->analysis->program." ".$self->filename." -l > ".$self->results)) == 0); 
+    print STDERR "Running ".$self->program." ".$self->filename." -l > ".$self->results."\n";
+    $self->throw ("Error running ".$self->program." on ".$self->filename) 
+        unless ((system ($self->program." ".$self->filename." -l > ".$self->results)) == 0); 
 }
 
 
@@ -265,7 +297,7 @@ sub parse_results {
     if (-e $resfile) {
         # it's a filename
         if (-z $self->results) {  
-	    print STDERR $self->analysis->program." didn't find anything\n";
+	    print STDERR $self->program." didn't find anything\n";
 	    return;
         }       
         else {
@@ -293,9 +325,9 @@ sub parse_results {
      	    $feature{score} = $score;
 	    $feature{start} = $start;
 	    $feature{end} = $end;
-	    ($feature{source}) = $self->analysis->program =~ /([^\/]+)$/;
+	    ($feature{source}) = $self->program =~ /([^\/]+)$/;
 	    $feature{primary} = 'low_complexity';
-	    ($feature{program}) = $self->analysis->program =~ /([^\/]+)$/;
+	    ($feature{program}) = $self->program =~ /([^\/]+)$/;
             $feature{logic_name} = 'low_complexity';
   	    $self->create_feature (\%feature);
 	}
