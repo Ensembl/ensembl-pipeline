@@ -469,7 +469,7 @@ sub pair_Genes {
 
 sub _get_start_of_Gene {
   my $gene = shift @_;
-  my @exons = $gene->get_all_Exons;
+  my @exons = @{$gene->get_all_Exons};
   my $st;
   if ($exons[0]->strand == 1) {
     @exons = sort {$a->start <=> $b->start} @exons;
@@ -489,7 +489,7 @@ sub _get_start_of_Gene {
 
 sub _get_strand_of_Gene {
   my $gene = shift @_;
-  my @exons = $gene->get_all_Exons;
+  my @exons = @{$gene->get_all_Exons};
   
   if ($exons[0]->strand == 1) {
     return 1;
@@ -528,7 +528,7 @@ sub cluster_Transcripts_by_Gene {
     
     my @transcripts;   
     foreach my $gene ( $cluster->get_Genes ){
-      push ( @transcripts, $gene->each_Transcript );
+      push ( @transcripts, @{$gene->get_all_Transcripts} );
     }
     push ( @transcript_clusters, $self->cluster_Transcripts(@transcripts) );
     # we pass the array of transcripts to be clustered to the method cluster_Transcripts
@@ -553,7 +553,7 @@ sub cluster_Transcripts {
   unless ( @transcripts ){                        
     my @genes = ( $self->annotation_Genes, $self->prediction_Genes );
     foreach my $gene (@genes){
-      my @more_transcripts = $gene->each_Transcript;
+      my @more_transcripts = @{$gene->get_all_Transcripts};
       push ( @transcripts, @more_transcripts );
     }
   }
@@ -565,7 +565,7 @@ sub cluster_Transcripts {
   foreach my $transcript (@transcripts){
     my $start;
     my $seqname;
-    my @exons = $transcript->get_all_Exons;
+    my @exons = @{$transcript->get_all_Exons};
     @exons = sort { $a->start <=> $b->start } @exons;
     if ( $exons[0]->start > $exons[0]->end){
       $start = $exons[0]->end;
@@ -607,7 +607,7 @@ sub cluster_Transcripts {
 #  # test
 #  foreach my $tran (@transcripts){
 #    print STDERR "\ntranscript: ".$tran->stable_id."internal_id: ".$tran->dbID."\n";
-#    foreach my $exon ($tran->get_all_Exons){
+#    foreach my $exon ( @{$tran->get_all_Exons}){
 #      print STDERR $exon->seqname." ".$exon->start.":".$exon->end."\n";
 #    }
 #    print STDERR "\n";
@@ -1043,12 +1043,12 @@ sub compare_Exons{
     }
     if ( $only_ann ){
       foreach my $gene ( $gene_cluster->get_Genes ){
-	$total_transcripts_in_clusters_with_only_ann += scalar($gene->each_Transcript);
+	$total_transcripts_in_clusters_with_only_ann += scalar(@{$gene->get_all_Transcripts});
       }
     }
     elsif ( $only_pred ){
       foreach my $gene ( $gene_cluster->get_Genes ){
-	$total_transcripts_in_clusters_with_only_pred += scalar($gene->each_Transcript);
+	$total_transcripts_in_clusters_with_only_pred += scalar(@{$gene->get_all_Transcripts});
       }
     }
 
@@ -1157,7 +1157,7 @@ sub compare_Exons{
     if ( scalar(@genes)>1 ){
       $self->throw("something went wrong, a cluster with 2 genes is classified as unclustered!");
     }
-    my @transcripts = $genes[0]->each_Transcript;
+    my @transcripts = @{$genes[0]->get_all_Transcripts};
     my $type = $genes[0]->type;
     my @annotation;
     my @prediction;
@@ -1376,8 +1376,8 @@ sub _match_Exons{
     }
   }
   else{
-    @ann_exons  = $annotation->get_all_Exons;
-    @pred_exons = $prediction->get_all_Exons;
+    @ann_exons  = @{$annotation->get_all_Exons};
+    @pred_exons = @{$prediction->get_all_Exons};
   }
   
   # compute TruePositive + FalseNegative
@@ -1609,7 +1609,7 @@ sub _get_length_of_Transcripts {
    }
    my $total_exon_length;
    foreach my $transcript ( @transcripts){
-     foreach my $exon ( $transcript->get_all_Exons ){
+     foreach my $exon ( @{$transcript->get_all_Exons} ){
        $total_exon_length += $exon->length;
      }
    }
@@ -1734,10 +1734,10 @@ sub exon_Density{
   my $sum_density;
   foreach my $tran (@transcripts){
     my $exon_span;
-    my @exons = $tran->get_all_Exons;
+    my @exons = @{$tran->get_all_Exons};
     @exons = sort { $a->start <=> $b->start } @exons;
     my $transcript_length = $exons[$#exons]->end - $exons[0]->start;
-    foreach my $exon ( $tran->get_all_Exons ){
+    foreach my $exon ( @{$tran->get_all_Exons} ){
       $exon_span += $exon->length;
     }
     $sum_density += $exon_span/$transcript_length;
@@ -1804,12 +1804,12 @@ sub get_Exon_Statistics{
   else{                            # or else read the transcripts from the data fields
     my @genes1 = $self->annotation_Genes;
     foreach my $gene (@genes1){
-      my @more_transcripts = $gene->each_Transcript;
+      my @more_transcripts = @{$gene->get_all_Transcripts};
       push ( @transcripts1, @more_transcripts );
     }
     my @genes2 = $self->prediction_Genes;
     foreach my $gene (@genes2){
-      my @more_transcripts = $gene->each_Transcript;
+      my @more_transcripts = @{$gene->get_all_Transcripts};
       push ( @transcripts2, @more_transcripts );
     }
   }
@@ -1839,8 +1839,8 @@ between their exons = (INTERSECT($exon1,$exon2))/MAX($exon1,$exon2)
 
 sub _exon_Statistics {
   my ($transcript1,$transcript2) = @_;
-  my @exons1 = $transcript1->get_all_Exons; # transcripts get their exons in order
-  my @exons2 = $transcript2->get_all_Exons;
+  my @exons1 = @{$transcript1->get_all_Exons}; # transcripts get their exons in order
+  my @exons2 = @{$transcript2->get_all_Exons};
 
   my %stats;
 
@@ -1907,12 +1907,12 @@ sub get_Coding_Exon_Statistics{
   else{                          # or else read the transcripts from the gene_array data fields
     my @genes1 = $self->annotation_Genes;
     foreach my $gene (@genes1){
-      my @more_transcripts = $gene->each_Transcript;
+      my @more_transcripts = @{$gene->get_all_Transcripts};
       push ( @transcripts1, @more_transcripts );
     }
     my @genes2 = $self->prediction_Genes;
     foreach my $gene (@genes2){
-      my @more_transcripts = $gene->each_Transcript;
+      my @more_transcripts = @{$gene->get_all_Transcripts};
       push ( @transcripts2, @more_transcripts );
     }
   }
@@ -1958,8 +1958,8 @@ sub _coding_Exon_Statistics {
   # and may end in any one as well
   my ($transcript1,$transcript2) = @_;
 
-  my @exons1 = $transcript1->get_all_Exons;
-  my @exons2 = $transcript2->get_all_Exons;
+  my @exons1 = @{$transcript1->get_all_Exons};
+  my @exons2 = @{$transcript2->get_all_Exons};
 
   my $translation1 = $transcript1->translation;
   my $translation2 = $transcript2->translation;
@@ -2285,8 +2285,8 @@ sub get_fragmented_Genes {
 
 sub _compare_Genes {         
   my ($gene1,$gene2) = @_;
-  my @exons1 = $gene1->get_all_Exons;
-  my @exons2 = $gene2->get_all_Exons;
+  my @exons1 = @{$gene1->get_all_Exons};
+  my @exons2 = @{$gene2->get_all_Exons};
   
   foreach my $exon1 (@exons1){
   
@@ -2312,8 +2312,8 @@ sub _compare_Genes {
 
 sub _compare_Transcripts {         
   my ($transcript1,$transcript2) = @_;
-  my @exons1   = $transcript1->get_all_Exons;
-  my @exons2   = $transcript2->get_all_Exons;
+  my @exons1   = @{$transcript1->get_all_Exons};
+  my @exons2   = @{$transcript2->get_all_Exons};
   my $overlaps = 0;
   
   foreach my $exon1 (@exons1){
@@ -2431,10 +2431,10 @@ sub exon_Coverage{
   my @ann_exons;
   my @pred_exons;
   foreach my $tran ( @$ann_genes ){
-    push ( @ann_exons, $tran->get_all_Exons );
+    push ( @ann_exons, @{$tran->get_all_Exons} );
   }
   foreach my $tran ( @$pred_genes ){
-    push ( @pred_exons, $tran->get_all_Exons );
+    push ( @pred_exons, @{$tran->get_all_Exons} );
   }
 
   if (defined($lower_bound)){
@@ -2499,10 +2499,10 @@ sub exon_Coverage_by_Length{
   my @ann_exons;
   my @pred_exons;
   foreach my $tran ( @$ann_genes ){
-    push ( @ann_exons, $tran->get_all_Exons );
+    push ( @ann_exons, @{$tran->get_all_Exons} );
   }
   foreach my $tran ( @$pred_genes ){
-    push ( @pred_exons, $tran->get_all_Exons );
+    push ( @pred_exons, @{$tran->get_all_Exons} );
   }
 
   # now cluster the exons for each side
@@ -2746,7 +2746,7 @@ sub toGFF{
   #print STDERR "gene: $gene_type, type: $genetype, transcript_id: $id\n";
   
  EXON:
-  foreach my $exon ( $transcript->get_all_Exons ){
+  foreach my $exon ( @{$transcript->get_all_Exons} ){
     my $strand_label;
     if ( $exon->strand == 1 ){
       $strand_label = "+";
