@@ -34,6 +34,14 @@ sub add_parent {
 
   $self->throw("No parent argument to add_parent call\n") if (!defined($parent));
 
+  foreach my $p (@{$self->{_parents}}) {
+    #if ($p->anal->logic_name eq $parent->anal->logic_name) {
+    if ($p == $parent) {
+      print "Already added parent\n";
+      return;
+    }
+  }
+
   push @{$self->{_parents}}, $parent;
 }
 
@@ -41,6 +49,14 @@ sub add_child {
   my ($self, $child) = @_;
 
   $self->throw("No child argument to add_child call\n") if (!defined($child));
+
+  foreach my $c (@{$self->{_children}}) {
+    #if ($c->anal->logic_name eq $child->anal->logic_name) {
+    if ($c == $child) {
+      print "Already added child\n";
+      return;
+    }
+  }
 
   push @{$self->{_children}}, $child;
 }
