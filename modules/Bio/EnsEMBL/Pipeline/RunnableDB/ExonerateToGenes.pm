@@ -247,15 +247,28 @@ sub filter_output{
   
   my %matches_sorted_by_coverage;
   my %selected_matches;
+ 
  RNA:
   foreach my $rna_id ( keys( %matches ) ){
-    @{$matches_sorted_by_coverage{$rna_id}} = sort { $self->_coverage($b) <=> $self->_coverage($a) } @{$matches{$rna_id}};
     
+    @{$matches_sorted_by_coverage{$rna_id}} = 
+      sort { my $result = ( $self->_coverage($b) <=> $self->_coverage($a) );
+	     if ( $result){
+	       return $result;
+	     }
+	     else{
+	       return ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
+	     }
+	   }    @{$matches{$rna_id}} ;
+    
+    my $count = 0;
+    my $is_spliced = 0;
     my $max_score;
     print STDERR "####################\n";
     print STDERR "Matches for $rna_id:\n";
   TRANSCRIPT:
     foreach my $transcript ( @{$matches_sorted_by_coverage{$rna_id}} ){
+      $count++;
       unless ($max_score){
 	$max_score = $self->_coverage($transcript);
       }
@@ -269,22 +282,61 @@ sub filter_output{
       my $seqname= $exons[0]->seqname;
       $seqname   =~ s/\.\d+-\d+$//;
       my $extent = $seqname."-".$start."-".$end;
-      print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand\n";
+      
+      my $label;
+      if ( $count == 1 ){
+	$label = 'best_match';
+      }
+      elsif ( $count > 1 
+	   && $is_spliced 
+	   && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
+	 ){
+	$label = 'processed_pseudogene';
+      }
+      else{
+	$label = $count;
+      }
+
+      ############################################################
+      # put flag is the first one is spliced
+      if ( $count == 1 && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript ) ){
+	$is_spliced = 1;
+      }
       
       ############################################################
       # we keep anything which is 
       # within the 2% of the best score
       # with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
-      if ( $score >= (0.98*$max_score) && 
-	   $score >= $EST_MIN_COVERAGE && 
-	   $perc_id >= $EST_MIN_PERCENT_ID ){
+      my $accept;
+      if ( ( $score >= (0.98*$max_score) && 
+	     $score >= $EST_MIN_COVERAGE && 
+	     $perc_id >= $EST_MIN_PERCENT_ID )
+	   ||
+	   ( $score >= (0.98*$max_score) &&
+	     $score >= (1 + 5/100)*$EST_MIN_COVERAGE &&
+	     $perc_id >= ( 1 - 3/100)*$EST_MIN_PERCENT_ID
+	   )
+	 ){
 	
-	print STDERR "Accepted!\n";
-	push( @good_matches, $transcript);
+	############################################################
+	# non-best matches are kept only if they are not unspliced with the
+	# best match being spliced - otherwise they could be processed pseudogenes
+	if ( $count > 1 
+	     && $is_spliced 
+	     && !Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->is_spliced( $transcript )
+	   ){
+	  $accept = 'NO';	  
+	}
+	else{
+	  $accept = 'YES';
+	  push( @good_matches, $transcript);
+	}
       }
       else{
-	print STDERR "Rejected!\n";
+	$accept = 'NO';
       }
+      print STDERR "match:$rna_id coverage:$score perc_id:$perc_id extent:$extent strand:$strand comment:$label accept:$accept\n";
+      
       print STDERR "--------------------\n";
       
     }
