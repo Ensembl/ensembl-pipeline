@@ -229,6 +229,7 @@ sub database {
     
       $self->throw ("problem writing genomic sequence to $filename\n" ) unless $genOutput->write_seq($value);
       $self->{'_database'} = $self->genfilename;
+      $self->file($self->genfilename);
     }
     else {
       $self->throw("$value is neither a Bio::Seq  nor a filename\n");
