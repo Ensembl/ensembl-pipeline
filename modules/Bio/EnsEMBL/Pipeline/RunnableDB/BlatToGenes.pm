@@ -132,6 +132,7 @@ sub new {
   if ($options){
     $self->options($options);
   }
+
   return $self;
 }
 
@@ -188,19 +189,21 @@ sub run{
     $runnable->run;  
     
     # store the results
-    print STDERR scalar(@results)." matches found\n";
     push ( @results, $runnable->output );
+    print STDERR scalar(@results)." matches found\n";
     
   }
   
-    
+  
   #filter the output
   my @filtered_results = $self->filter_output(@results);
   
   if ( @filtered_results ){
-
+    
     # make genes out of the features
+    print STDERR scalar(@filtered_results)." filtered results to be made into genes\n";
     my @genes = $self->make_genes(@filtered_results);
+    print STDERR scalar(@genes)." genes created\n";
     
     # print out the results:
     foreach my $gene (@genes){
@@ -217,27 +220,24 @@ sub run{
       }
     }
     
-    #print STDERR "=== Before converting coordinates ===\n";
-    #foreach my $gene (@genes ){
-    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-#      }
-#    }
-
+    print STDERR "=== Before converting coordinates ===\n";
+    foreach my $gene (@genes ){
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+    	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+     } 
+    }    
     # need to convert coordinates?
     my @mapped_genes = $self->convert_coordinates( @genes );
     
-    #print STDERR "=== After converting coordinates ===\n";
-    #foreach my $gene (@genes ){
-    #  foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-#	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
-#      }
-#    }
-
-
-
+    print STDERR "=== After converting coordinates ===\n";
+    foreach my $gene (@mapped_genes ){
+      foreach my $transcript ( @{$gene->get_all_Transcripts} ){
+    	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($transcript);
+    }  
+    }    
+    #print STDERR "passing ".scalar(@mapped_genes)." genes to output()\n";
     $self->output(@mapped_genes);
-
+    
   }
   else{
     # exit gracefully
@@ -267,18 +267,18 @@ sub filter_output{
     @{$matches_sorted_by_coverage{$rna_id}} = sort { $b->score <=> $a->score  } @{$matches{$rna_id}};
     
     my $max_score;
-    #print STDERR "matches for $rna_id:\n";
+    print STDERR "matches for $rna_id:\n";
     foreach my $match ( @{$matches_sorted_by_coverage{$rna_id}} ){
       unless ($max_score){
 	$max_score = $match->score;
       }
-      #foreach my $sub_feat ( $match->sub_SeqFeature ){
-      #	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
-      #}
+      foreach my $sub_feat ( $match->sub_SeqFeature ){
+      	print STDERR $sub_feat->gffstring." ".$sub_feat->percent_id."\n";
+      }
       my $score = $match->score;
       
-      my $only_best_score = 1;
-      my $hits_within_2percent = 0;
+      my $only_best_score      = 0;
+      my $hits_within_2percent = 1;
 
       # we can select: best in genome matches
       if ( $only_best_score ){
@@ -292,7 +292,7 @@ sub filter_output{
 	  #print STDERR "Reject!\n";
 	}
       }
-      elsif(hits_within_2percent ) {
+      elsif( $hits_within_2percent ) {
 	# or we we keep anything within the 2% fo the best score
 	# with score >= $EST_MIN_COVERAGE and percent_id >= $EST_MIN_PERCENT_ID
 	if ( $score >= (0.98*$max_score) && 
@@ -315,16 +315,18 @@ sub filter_output{
 ############################################################
 
 sub write_output{
-  my ($self,@output) = @_;
+  my ($self) = @_;
   
-  my $gene_adaptor = $self->db->get_GeneAdaptor;
 
-  unless (@output){
-    @output = $self->output;
-  }
+  my $gene_adaptor = $self->db->get_GeneAdaptor;
+  my @output = $self->output;
+  
+  
   foreach my $gene (@output){
-    print STDERR "gene is a $gene\n";
-    print STDERR "about to store gene ".$gene->type." $gene\n";
+    #print STDERR "gene is a $gene\n";
+    
+      print STDERR "about to store gene ".$gene->type." $gene\n";
+   
     foreach my $tran (@{$gene->get_all_Transcripts}){
       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
     }
@@ -350,10 +352,18 @@ sub write_output{
 
 ############################################################
 
+# we create one transcript per gene
+
+# each feature represents a set of exons in a transcript
+
+# each exon is in fact a feature pair. The genomic feature is the exon and the sequence feature is the 
+# supporting evidence
+
 sub make_genes{
   my ($self,@features) = @_;
   
   my @genes;
+ TRANSCRIPT:
   foreach my $feature ( @features ){
     my $transcript = Bio::EnsEMBL::Transcript->new();
     my $gene       = Bio::EnsEMBL::Gene->new();
@@ -368,9 +378,12 @@ sub make_genes{
     my $prev_feature;
     my $prev_exon;
     
+    # sort the features according to the genomic coordinate
     my @sub_features = sort{ $a->feature1->start <=> $b->feature1->start } $feature->sub_SeqFeature;
     
-    foreach my $sub_feature ($feature->sub_SeqFeature){
+
+  EXON:
+    foreach my $sub_feature (@sub_features){
       # each sub_feature is a feature pair
       
       # make the exon out of the feature1 (the genomic feature)
@@ -391,7 +404,14 @@ sub make_genes{
       
       # what about the supporting evidence?
       my @supp_features = ($sub_feature);
-      my $supp_feature  = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
+      my $supp_feature;
+      eval{
+	$supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
+      };
+      if ( $@ || !defined $supp_feature ){
+	$self->warn("could not create supporting feature:\n$@");
+	next TRANSCRIPT;
+      }
       $supp_feature->contig     ($exon->contig);
       $supp_feature->seqname    ($sub_feature->feature1->seqname);
       $supp_feature->hseqname   ($sub_feature->feature2->seqname);
@@ -410,8 +430,8 @@ sub make_genes{
       }
       
     }
-    #print STDERR "transcript produced:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
+    print STDERR "transcript produced:\n";
+    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $transcript );
     push( @genes, $gene);
   }
   return @genes;
@@ -454,14 +474,14 @@ sub convert_coordinates{
 	}
       }
     }
-    
-    
+      
     my $transformed_gene;
     # some exons may fall on gaps!!!
     eval{
+      print STDERR "about to transform gene $gene\n";
       $transformed_gene = $gene->transform;
     };
-    if ($@){
+    if ($@ || !defined $transformed_gene){
       $self->warn("could not transform coordinates of gene");
       foreach my $tran (@{$gene->get_all_Transcripts}){
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript( $tran );
@@ -504,18 +524,18 @@ sub get_chr_names{
 
 ############################################################
 
-# must override RunnableDB::output() which is an eveil thing reading out from the Runnable objects
+# must override RunnableDB::output() which is an evil thing reading out from the Runnable objects
 
 sub output {
   my ($self, @output) = @_;
-  unless ( $self->{_output} ){
-    $self->{_output};
+  unless ( $self->{_gene_output} ){
+    $self->{_gene_output} = [];
   }
 
   if (@output){
-    push( @{$self->{_output} }, @output);
+    push( @{$self->{_gene_output} }, @output);
   }
-  return @{$self->{_output}};
+  return @{$self->{_gene_output}};
 }
 
 ############################################################
