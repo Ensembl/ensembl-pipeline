@@ -19,7 +19,6 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
 					     -dbobj     => $db,
 					     -input_id  => $id,
-					     -golden_path => $gp,
 					     -type      => $type,
                                              -threshold => $threshold		    
 								    
@@ -59,13 +58,13 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_PROTEIN_INDEX
 					 GB_SIMILARITY_TYPE
 					 GB_SIMILARITY_THRESHOLD
 					 GB_SIMILARITY_COVERAGE
 					 GB_SIMILARITY_MAX_INTRON
 					 GB_SIMILARITY_MIN_SPLIT_COVERAGE
+					 GB_SIMILARITY_GENETYPE
 					);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
@@ -79,11 +78,7 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-    my ($path, $type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
-
-    if(!defined $path || $path eq ''){
-      $path = $GB_GOLDEN_PATH;
-    }
+    my ($type, $threshold) = $self->_rearrange([qw(TYPE THRESHOLD)], @args);
 
     if(!defined $type || $type eq ''){
       $type = $GB_SIMILARITY_TYPE;
@@ -93,11 +88,9 @@ sub new {
       $threshold = $GB_SIMILARITY_THRESHOLD
     }
 
-    $path = 'UCSC' unless (defined $path && $path ne '');
     $type = 'sptr' unless (defined $type && $type ne '');
     $threshold = 200 unless (defined($threshold));
 
-    $self->dbobj->static_golden_path_type($path);
     $self->type($type);
     $self->threshold($threshold);
 
@@ -292,13 +285,13 @@ sub convert_output {
   my ($self) =@_;
   
   my $trancount = 1;
-  my $genetype;
+  my $genetype = $GB_SIMILARITY_GENETYPE;
   foreach my $runnable ($self->runnable) {
-    if ($runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise")){
-      $genetype = "similarity_genewise";
-    }
-    else{
-      $self->throw("I don't know what to do with $runnable");
+    $self->throw("I don't know what to do with $runnable") unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
+										 
+    if(!defined($genetype) || $genetype eq ''){
+      $genetype = 'similarity_genewise';
+      $self->warn("Setting genetype to $genetype\n");
     }
 
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
@@ -391,7 +384,7 @@ sub make_genes {
 
 sub _make_transcript{
   my ($self, $gene, $contig, $genetype, $analysis_obj) = @_;
-  $genetype = 'unspecified' unless defined ($genetype);
+  $genetype = 'similarity_genewise' unless defined ($genetype);
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
     {print "$gene must be Bio::EnsEMBL::SeqFeatureI\n";}
@@ -511,8 +504,6 @@ sub validate_transcript {
 	$intron = abs($previous_exon->start - $exon->end - 1);
       }
       
-      print STDERR "intron: $intron\n";
-
       if ($intron > $GB_SIMILARITY_MAX_INTRON && $coverage < $GB_SIMILARITY_MIN_SPLIT_COVERAGE) {
 	print STDERR "Intron too long $intron  for transcript " . $transcript->{'temporary_id'} . " with coverage $coverage\n";
 	$split = 1;

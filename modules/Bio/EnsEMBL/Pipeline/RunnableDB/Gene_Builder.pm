@@ -56,11 +56,11 @@ use Bio::EnsEMBL::DBLoader;
 use Bio::EnsEMBL::Utils::GTF_handler;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
 					 GB_VCONTIG
-					 GB_GOLDEN_PATH
 					 GB_FINALDBNAME
 					 GB_FINALDBHOST
 					 GB_DBUSER
 					 GB_DBPASS
+					 GB_FINAL_GENETYPE
 					 );
 use Data::Dumper;
 
@@ -72,7 +72,6 @@ use Data::Dumper;
     Usage   :   $self->new(-DBOBJ       => $db,
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
-			   -GOLDEN_PATH => $path,
                            -ANALYSIS    => $analysis,
 			   -VCONTIG     => 1,
 			   -EXTEND      => 400);
@@ -97,7 +96,7 @@ sub new {
            
     $self->{'_fplist'} = []; #create key to an array of feature pairs
     
-    my( $use_vcontig,$extend, $path ) = $self->_rearrange([qw(VCONTIG EXTEND GOLDEN_PATH)], @args);
+    my( $use_vcontig,$extend ) = $self->_rearrange([qw(VCONTIG EXTEND)], @args);
        
     if (! defined $use_vcontig) {
        $use_vcontig = $GB_VCONTIG;
@@ -106,15 +105,6 @@ sub new {
     $self->use_vcontig($use_vcontig);
     
     $self->extend($extend);
-
-    # golden path
-    if(!defined $path){
-
-    $path = $GB_GOLDEN_PATH;
-    }
-
-    $path = 'UCSC' unless (defined $path && $path ne '');
-    $self->dbobj->static_golden_path_type($path);
 
     return $self;
 }
@@ -195,7 +185,11 @@ sub write_output {
 						'-dnadb'  => $self->dbobj,
 					       );
     # sort out analysis
-    my $genetype = 'ensembl';
+    my $genetype = $GB_FINAL_GENETYPE;
+    if(!defined $genetype || $genetype eq ''){
+      $genetype = 'ensembl';
+      $self->warn("setting genetype to $genetype\n");
+    }
     my $anaAdaptor = $db->get_AnalysisAdaptor;
 
     my $anal_logic_name = $genetype;

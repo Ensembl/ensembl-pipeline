@@ -55,12 +55,12 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_TARGETTED_PROTEIN_INDEX
 					 GB_TARGETTED_SINGLE_EXON_COVERAGE
 					 GB_TARGETTED_MULTI_EXON_COVERAGE
 					 GB_TARGETTED_MAX_INTRON
 					 GB_TARGETTED_MIN_SPLIT_COVERAGE
+					 GB_TARGETTED_GW_GENETYPE
 					 );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -69,17 +69,6 @@ sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
 
-  my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
-
-  # golden path
-  if(!defined $path){
-    $path = $GB_GOLDEN_PATH;
-  }
-
-  $path = 'UCSC' unless (defined $path && $path ne '');
-  $self->dbobj->static_golden_path_type($path);
-
-  # broken by test_runnableDB 
   # protein sequence fetcher
   if(!defined $self->seqfetcher) {
     my $seqfetcher = $self->make_seqfetcher($GB_TARGETTED_PROTEIN_INDEX);
@@ -336,7 +325,11 @@ sub gw_genes {
 sub convert_gw_output {
   my ($self) = @_;
   my $count = 1;
-  my $genetype = 'TGE_gw';
+  my $genetype = $GB_TARGETTED_GW_GENETYPE;
+  if(!defined $genetype || $genetype eq ''){
+    $genetype = 'TGE_gw';
+    $self->warn("Setting genetype to $genetype\n");
+  }
   my @results  = $self->runnable->output;
 
   # get the appropriate analysis from the AnalysisAdaptor
@@ -712,7 +705,7 @@ sub check_coverage{
 
 sub make_transcript{
   my ($self, $gene, $contig, $genetype, $count, $analysis_obj)=@_;
-  $genetype = 'unspecified' unless defined ($genetype);
+  $genetype = 'TGE_gw' unless defined ($genetype);
   $count = 1 unless defined ($count);
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))

@@ -57,11 +57,11 @@ use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Gene;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_GOLDEN_PATH
 					 GB_DBHOST
 					 GB_DBNAME
 					 GB_DBUSER
 					 GB_DBPASS
+					 GB_COMBINED_GENETYPE
 					);
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					 EST_DBHOST
@@ -76,13 +76,6 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-  
-  my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
-  
-  # golden path
-  if(!defined $path){
-    $path = $GB_GOLDEN_PATH;
-  }
   
   # need 2 dbs, one for getting genewises, one for getting e2gs
   my $genedb =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -102,10 +95,6 @@ sub new {
   $self->dbobj($genedb);
   $self->cdnadb($cdnadb);
 
-  $path = 'NCBI_28' unless (defined $path && $path ne '');
-
-  $self->dbobj->static_golden_path_type($path);
-  $self->cdnadb->static_golden_path_type($path);
   return $self;
 }
 
@@ -426,8 +415,11 @@ sub combined_genes {
 sub combine_genes{
   my ($self, $gw, $e2g) = @_;
   
-  my $genetype = 'combined_gw_e2g';
-  
+  my $genetype = $GB_COMBINED_GENETYPE;
+  if(!defined ($genetype) || $genetype eq ''){
+    $genetype = 'combined_gw_e2g';
+    $self->warn("Setting genetype to $genetype\n");
+  }
   # get the appropriate analysis from the AnalysisAdaptor
   my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
   my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
@@ -1466,7 +1458,7 @@ sub check_translation {
 
 sub _make_transcript{
   my ($self, $gene, $contig, $genetype, $count, $analysis_obj)=@_;
-  $genetype = 'unspecified' unless defined ($genetype);
+  $genetype = 'combined_gw_e2g' unless defined ($genetype);
   $count = 1 unless defined ($count);
 
   unless ($gene->isa ("Bio::EnsEMBL::SeqFeatureI"))
