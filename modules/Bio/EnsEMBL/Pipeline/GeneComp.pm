@@ -138,7 +138,7 @@ sub new {
   }
 
   if( !defined $archive || !ref $archive || !$archive->isa('Bio::EnsEMBL::DBArchive::Obj') ) {
-      $self->throw("must have a archive, got a [$archive]");
+      $self->throw("must have an archive database, got a [$archive]");
   }
 
   #if( !defined $finaldb || !ref $finaldb || !$finaldb->isa('Bio::EnsEMBL::DBSQL::Obj') ) {
@@ -183,10 +183,7 @@ sub map{
     
     #Map exons
     print $log "Mapping exons:\n";
-    my ($before_e,$after_e)=$self->map_temp_Exons_to_real_Exons();
-    if ($before_e != $after_e) {
-	print $log "EXON MAPPING BUG: Size of temp exons and final exons not equal, bad bug! Temp exons: $before_e, final: $after_e";
-    }
+    $self->map_temp_Exons_to_real_Exons();
     #Map genes
     print $log "Mapping genes:\n";
     my ($before_g,$finalgenes) = $self->map_temp_Genes_to_real_Genes();
@@ -250,6 +247,7 @@ sub map_temp_Exons_to_real_Exons{
    my $log = $self->log;
    print $log "Getting all new exons...";
    my @tempexons=$vc->get_all_Exons();
+
    my $t_size=scalar(@tempexons);
    print $log " got $t_size new exons\n";
    
@@ -262,12 +260,9 @@ sub map_temp_Exons_to_real_Exons{
 
    # we need some internal data structures during the mapping process.
 
-   my %contig;   # hash of contig objects
-   my %oldexons; # a hash of arrays of old exon objects
    my %moved;    # shows which old exons we have moved (or not).
-   my %oldexonhash; # direct hash of old exons for final dead call
    my %ismapped; # tells us whether temporary exons have been mapped or not
-   my %temp_old;
+   my %temp_old; # Hash of temp to old mapping to be used later in the gene code
    my @new;      # new exons
    my @mapped;   #mapped exons
   
@@ -279,25 +274,32 @@ sub map_temp_Exons_to_real_Exons{
        if( exists $ismapped{$tempexon->id} ) {
 	   $self->throw("you have given me temp exons with identical ids. bad...");
        }
-
+       print STDERR $tempexon->id." ";
        $ismapped{$tempexon->id} = 0;
    }
-   print $log "Getting all old exons...\n";
+   print "\n";
+   print $log "Getting all old exons...";
    my @oldexons=$vc->get_old_Exons($log);
+
    my $size=scalar(@oldexons);
-   print $log "got $size old exons mapped\n";
+   print $log " got $size old exons\n";
    # get out one date for this mapping....
 
    my $time = time();
 
    @tempexons  = sort { $a->start <=> $b->start } @tempexons;
-   @oldexons   = sort { $a->end   <=> $b->end } @oldexons;
-   # go over each exon and map old->new...
-   my $s1=scalar(@tempexons);
-   my $s2=scalar(@oldexons);
-   TEMPEXON :
 
-   foreach my $tempexon ( @tempexons ) {
+   @oldexons   = sort { $a->end   <=> $b->end } @oldexons;
+
+   my @tempexons2;
+
+   # go over each exon and map old->new...
+
+   #First sort out identical exons...
+   
+   print $log "Checking for identical exons...\n";
+   IDENTICAL:foreach my $tempexon ( @tempexons ) {
+       print $log "Trying to find identical exon to ".$tempexon->id." (".$tempexon->start."-".$tempexon->end.")\n";
        foreach my $oldexon ( @oldexons ) {
 	   if ($tempexon->start > $oldexon->end) {
 	       #Skip this old exon, it ends before temp starts
@@ -306,9 +308,10 @@ sub map_temp_Exons_to_real_Exons{
 	   if( $oldexon->start > $tempexon->end ) {
 	       #Exiting comparison loop because this old exon 
 	       #starts after end of temp
+	       push (@tempexons2,$tempexon);
 	       last;
 	   }
-
+	   print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
 	   # if start/end/strand is identical, it is definitely up for moving.
 	   
 	   if( $tempexon->start == $oldexon->start &&
@@ -316,33 +319,32 @@ sub map_temp_Exons_to_real_Exons{
 	       $tempexon->strand == $oldexon->strand ) {
 
 	       # ok - if we have already moved this - ERROR
-
 	       if( $moved{$oldexon->id} == 1 ) {
-		   print $log "attempting to move old exon twice ".$oldexon->id." with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand." Not clever!\n";
-		   next;
+		   print $log "attempting to move old exon twice ".$oldexon->id." (for ".$tempexon->id.") with identical start/end/strand. ".$tempexon->start.":".$tempexon->end.":".$tempexon->strand." Not clever!\n";
+		   next IDENTICAL;
 	       }
 
 	       # set ismapped to 1 for this tempexon
 
 	       $ismapped{$tempexon->id} = 1;
 	       $temp_old{$tempexon->id}=$oldexon->id;
+	       
 	       print $log "EXON MAP IDENTICAL: ",$tempexon->id," ",$oldexon->id," "; # will add version
 	       # we move the id. Do we move the version?
 	       $tempexon->id($oldexon->id);
-	       push (@mapped,$tempexon);
-	       
+	       	       
 	       if( $oldexon->seq eq $tempexon->seq) {
 		   # version and id
 		   $tempexon->version($oldexon->version);
-		   print $log "Identical\n";
 		   # don't update modified
 	       } else {
 		   my $v=$oldexon->version()+1;
 		   $tempexon->version($oldexon->version()+1);
-		   print $log $v."\n";
 		   $tempexon->modified($time);
 	       }
-	       
+	       push (@mapped,$tempexon);
+	       print $log $tempexon->version."\n";
+	       print $log "Assigning moved to ".$oldexon->id."\n";
 	       $moved{$oldexon->id} = 1;
 
 	       # remove old exons we never need to look at again
@@ -354,104 +356,106 @@ sub map_temp_Exons_to_real_Exons{
 		       last;
 		   }
 	       }
-
-	       next TEMPEXON;
+	       
+	       next IDENTICAL;
 	   }
-	   
+	   else {
+	       push (@tempexons2,$tempexon);
+	   }	   
        }
-   
-
-
-
-      # we can't map this exon directly. Second scan over oldexons to see whether
-      # there is a significant overlap
-
-      my $biggestoverlap = undef;
-      my $overlapsize = 0;
-      foreach my $oldexon ( @oldexons ) {
-	  if ($tempexon->start > $oldexon->end) {
-	      #Skip this old exon, it ends before temp starts
-	      next;
-	  }
-	  if( $oldexon->start > $tempexon->end ) {
-	      #Go out of loop, reached old exon after temp
-	      last;
-	  }
-
-	  
-	  if( $oldexon->overlaps($tempexon) && $moved{$oldexon->id} == 0 ) {
-	      my ($tstart,$tend,$tstrand) = $oldexon->intersection($tempexon);
-	      if( !defined $biggestoverlap ) {
-		  $biggestoverlap = $oldexon;
-		  $overlapsize = ($tend - $tstart +1); 
-              } else {
-		  if( ($tend - $tstart +1) > $overlapsize ) {
-		      $biggestoverlap = $oldexon;
-		      $overlapsize = ($tend - $tstart +1);
-		  }
-	      }
-	  }
-      }
-
-
-       # remove old exons we never need to look at again
-       # because they will never overlap with tempexons
-       
-       #while( my $tempoldexon = shift @oldexons ) {
-#	   print STDERR "Shifting out ".$tempoldexon->id."\n";
-	#   if( $tempoldexon->end >= $tempexon->start ) {
-	#       print STDERR "Putting back in ".$tempoldexon->id."\n";
-	#       unshift(@oldexons,$tempoldexon);
-	#       last;
-	#   }
-       #}
-       
-
-       # if I have got a biggest overlap - map across...
-       if( defined $biggestoverlap ) {
-	   # set ismapped to 1 for this tempexon
-	   
-	   $ismapped{$tempexon->id} = 1;
-	   
-	   # we move the id. Do we move the version?
-	   print $log "EXON MAP BEST FIT: ",$tempexon->id," ",$biggestoverlap->id," ",$biggestoverlap->version()+1,"\n";
-
-	   $temp_old{$tempexon->id}=$biggestoverlap->id;
-	   $tempexon->id($biggestoverlap->id);
-	   $tempexon->version($biggestoverlap->version()+1);
-	   $tempexon->modified($time);
-	   push(@mapped,$tempexon);
-	   $moved{$biggestoverlap->id} = 1;
-	   my $size=scalar (@oldexons);
-	   while( my $tempoldexon = shift @oldexons ) {
-	       if( $tempoldexon->end >= $tempexon->start ) {
-		   unshift(@oldexons,$tempoldexon);
-		   last;
-	       }
-	   }
-
-	   next TEMPEXON;
-       } else {
-	   # ok - new Exon
-	   my $tempid = $tempexon->id();
-	   $tempexon->id($self->archive->get_new_stable_ids('exon',1));
-	   $tempexon->created($time);
-	   $tempexon->modified($time);
-	   $tempexon->version(1);
-	   $temp_old{$tempid}=$tempexon->id;
-	   print $log "EXON MAP NEW: ",$tempid," ",$tempexon->id," 1\n"; 
-	   push(@new,$tempexon);
-	   next TEMPEXON;
-       }
-    
-       $self->throw("Error - should never reach here!");
    }
+
+   print $log "Looking for BEST fits for remaining exons...\n";
+   
+   # we can't map some exons directly. Second scan over all exons to see whether
+   # there is significant overlaps
+ BESTFIT:foreach my $tempexon (@tempexons2) {
+     my $biggestoverlap = undef;
+     my $overlapsize = 0;
+     print $log "BESTFIT Trying to find identical exon to ".$tempexon->id." (".$tempexon->start."-".$tempexon->end.")\n";
+     if ($ismapped{$tempexon->id} == 1) {
+	 next;
+     }
+     foreach my $oldexon ( @oldexons ) {
+	 if ($tempexon->start > $oldexon->end) {
+	     #Skip this old exon, it ends before temp starts
+	     next;
+	 }
+	 if( $oldexon->start > $tempexon->end ) {
+	     #Go out of loop, reached old exon after temp
+	     last;
+	 }
+	 
+	 print $log "Checking it against ".$oldexon->id." (".$oldexon->start."-".$oldexon->end.")\n";
+	 
+	 if( $oldexon->overlaps($tempexon) && $moved{$oldexon->id} == 0 ) {
+	     my ($tstart,$tend,$tstrand) = $oldexon->intersection($tempexon);
+	     if( !defined $biggestoverlap ) {
+		 $biggestoverlap = $oldexon;
+		 $overlapsize = ($tend - $tstart +1); 
+	     } else {
+		 if( ($tend - $tstart +1) > $overlapsize ) {
+		     $biggestoverlap = $oldexon;
+		     $overlapsize = ($tend - $tstart +1);
+		 }
+	     }
+	 }
+     }
+     # if I have got a biggest overlap - map across...
+     if( defined $biggestoverlap ) {
+	 # set ismapped to 1 for this tempexon
+	 
+	 $ismapped{$tempexon->id} = 1;
+	 
+	 # we move the id. Do we move the version?
+	 print $log "EXON MAP BEST FIT: ",$tempexon->id," ",$biggestoverlap->id." ";
+	 
+	 $temp_old{$tempexon->id}=$biggestoverlap->id;
+	 $tempexon->id($biggestoverlap->id);
+	 $tempexon->version($biggestoverlap->version()+1);
+	 print $log $tempexon->version."\n";
+	 $tempexon->modified($time);
+	 push(@mapped,$tempexon);
+	 print $log "Second assigning of moved for ".$biggestoverlap->id." to 1\n";
+	 $moved{$biggestoverlap->id} = 1;
+	 my $size=scalar (@oldexons);
+	 while( my $tempoldexon = shift @oldexons ) {
+	     if( $tempoldexon->end >= $tempexon->start ) {
+		 unshift(@oldexons,$tempoldexon);
+		 last;
+	     }
+	 }
+	 
+	 next BESTFIT;
+     } else {
+	 # ok - new Exon
+	 my $tempid = $tempexon->id();
+	 $tempexon->id($self->archive->get_new_stable_ids('exon',1));
+	 $tempexon->created($time);
+	 $tempexon->modified($time);
+	 $tempexon->version(1);
+	 $temp_old{$tempid}=$tempexon->id;
+	 print $log "EXON MAP NEW: ",$tempid," ",$tempexon->id," 1\n"; 
+	 push(@new,$tempexon);
+	 next BESTFIT;
+     }
+     
+     $self->throw("Error - should never reach here!");
+ }
 	      
    $self->{'_exon_map_hash'} = \%temp_old;
    $self->{'_mapped_exons'} = \@mapped;
    $self->{'_new_exons'} = \@new;
-   my $final_size= scalar (@mapped)+scalar(@new);
-   return ($t_size,$final_size);
+
+   my $ns = scalar @new;
+   my $nm = scalar @mapped;
+   
+   my $f_size= $ns+$nm;
+   print STDERR "Temp size: $t_size, final size: $f_size (new:$ns mapped:$nm)\n";
+   if ($t_size != $f_size) {
+       print $log "EXON MAPPING BUG: Size of temp exons and final exons not equal, bad bug! Temp exons: $t_size, final: $f_size";
+   }
+   return 1;
 }
 
 
@@ -501,7 +505,6 @@ sub map_temp_Genes_to_real_Genes{
     
     my %has_done_new;  # 1 or 0 depending on whether this gene has be moved or not
     my %has_moved_old; # 1 or 0 depending on whether this gene has mapped forward or not
-    my @dead_gene_ids; #Array of dead genes
     my %newe2g; # hash of new exon to new gene objects
     
     # map old exons to gene and transcripts
@@ -627,87 +630,91 @@ sub map_temp_Genes_to_real_Genes{
    # simple is easy ;).
     my $now = time();
     foreach my $oldgeneid ( keys %simple ) {
-       my $newgeneid = $simple{$oldgeneid};
-
-       # flag that we have done this move before the ids change ;)
-
-       $has_done_new{$newgeneid} = 1;
-       $has_moved_old{$oldgeneid} = 1;
-
-
-       my @newtrans = $newg{$newgeneid}->each_Transcript;
-       my @oldtrans = $oldg{$oldgeneid}->each_Transcript;
-       my %old_tg;
-       foreach my $trans ($oldg{$oldgeneid}->each_Transcript) {
-	   $old_tg{$trans->id}=$oldg{$oldgeneid};
-       }
-       
-       my $should_increment = $self->map_temp_Transcripts_to_real_Transcripts($oldg{$oldgeneid},\@newtrans,\@oldtrans,%old_tg);
-
-
-       # deal with the mapping of ids
-       print $log "GENE MAP: MOVED ",$newgeneid," ",$oldgeneid,"\n";
-       $self->{_done_gene_hash}->{$newgeneid}=1;
-       $self->{_done_gene_hash}->{$oldgeneid}=1;
-       $newg{$newgeneid}->id($oldgeneid);
-       
-       if( $should_increment ) {
-	   $newg{$newgeneid}->version($oldg{$oldgeneid}->version+1);
-	   $newg{$newgeneid}->modified($now);
-       }
-       #print $log "About to dump after move!\n";
-       #$newg{$newgeneid}->_dump(\*STDERR);
-       push (@final_genes,$newg{$newgeneid});
+	my $newgeneid = $simple{$oldgeneid};
+	
+	# flag that we have done this move before the ids change ;)
+	
+	$has_done_new{$newgeneid} = 1;
+	$has_moved_old{$oldgeneid} = 1;
+	
+	
+	my @newtrans = $newg{$newgeneid}->each_Transcript;
+	my @oldtrans = $oldg{$oldgeneid}->each_Transcript;
+	my %old_tg;
+	foreach my $trans ($oldg{$oldgeneid}->each_Transcript) {
+	    $old_tg{$trans->id}=$oldg{$oldgeneid};
+	}
+	
+	my $should_increment = $self->map_temp_Transcripts_to_real_Transcripts($oldg{$oldgeneid},\@newtrans,\@oldtrans,%old_tg);
+	
+	
+	# deal with the mapping of ids
+	print $log "GENE MAP: MOVED ",$newgeneid," ",$oldgeneid;
+	$self->{_done_gene_hash}->{$newgeneid}=1;
+	$self->{_done_gene_hash}->{$oldgeneid}=1;
+	$newg{$newgeneid}->id($oldgeneid);
+	
+	if( $should_increment ) {
+	    $newg{$newgeneid}->version($oldg{$oldgeneid}->version+1);
+	    $newg{$newgeneid}->modified($now);
+	}
+	print $log $newg{$newgeneid}->version."\n";
+	#print $log "About to dump after move!\n";
+	#$newg{$newgeneid}->_dump(\*STDERR);
+	push (@final_genes,$newg{$newgeneid});
    }
 
    # merges are also quite easy.
 
-   foreach my $newgeneid ( keys %merge ) {
-       my @newtrans = $newg{$newgeneid}->each_Transcript;
-       my @oldtrans;
-       my $largest;
-       my $size = 0;
-
-
-       foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
-	   $has_moved_old{$oldgeneid} = 1;
-	   if( $oldgeneid ne $largest ) {
-	       push (@dead_gene_ids,$oldgeneid);
-	   }
-       }
-
-       #Into merge code....
-       my %old_tg;
-       foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
-	   if ($self->{_done_gene_hash}->{$oldgeneid}) {
-	       next;
-	   }
-	   my $tsize = scalar ( $oldg{$oldgeneid}->each_unique_Exon );
-
-	   if( $tsize > $size ) {
-	       $largest = $oldgeneid;
-	   }
-	   foreach my $trans ($oldg{$oldgeneid}->each_Transcript) {
-	       $old_tg{$trans->id}=$oldg{$oldgeneid};
-	   }
-	   push(@oldtrans,$oldg{$oldgeneid}->each_Transcript);
-       }
-       my $should_increment = $self->map_temp_Transcripts_to_real_Transcripts($newg{$newgeneid},\@newtrans,\@oldtrans,%old_tg);
-       
-       if ($oldg{$largest}) {
-	   $has_done_new{$newgeneid} = 1;
-	   # deal with the mapping of ids
-	   print $log "GENE MAP: MERGED ",$newgeneid," ",$oldg{$largest}->id,"\n";
-	   $self->{_done_gene_hash}->{$newgeneid}=1;
-	   $self->{_done_gene_hash}->{$oldg{$largest}->id}=1;
-	   $newg{$newgeneid}->id($oldg{$largest}->id);
-	   
-	   # we increment irregardless of anything else
-	   $newg{$newgeneid}->version($oldg{$largest}->version+1);
-	   $newg{$newgeneid}->modified($now);
-	   push (@final_genes,$newg{$newgeneid});
-       }
-   }
+    foreach my $newgeneid ( keys %merge ) {
+	my @newtrans = $newg{$newgeneid}->each_Transcript;
+	my @oldtrans;
+	my $largest;
+	my $size = 0;
+	
+	
+	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
+	    $has_moved_old{$oldgeneid} = 1;
+	    if( $oldgeneid ne $largest ) {
+		#Double check this is right...
+		#Killing all genes in merge that are not largest
+		print $log  "GENE MAP KILLED: $oldgeneid merged into $largest\n";
+		$self->archive->write_deleted_id('gene',$oldgeneid,$largest);
+	    }
+	}
+	
+	#Into merge code....
+	my %old_tg;
+	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
+	    if ($self->{_done_gene_hash}->{$oldgeneid}) {
+		next;
+	    }
+	    my $tsize = scalar ( $oldg{$oldgeneid}->each_unique_Exon );
+	    
+	    if( $tsize > $size ) {
+		$largest = $oldgeneid;
+	    }
+	    foreach my $trans ($oldg{$oldgeneid}->each_Transcript) {
+		$old_tg{$trans->id}=$oldg{$oldgeneid};
+	    }
+	    push(@oldtrans,$oldg{$oldgeneid}->each_Transcript);
+	}
+	
+	if ($oldg{$largest}) {
+	    $has_done_new{$newgeneid} = 1;
+	    # deal with the mapping of ids
+	    print $log "GENE MAP: MERGED ",$newgeneid," ",$oldg{$largest}->id;
+	    $self->{_done_gene_hash}->{$newgeneid}=1;
+	    $self->{_done_gene_hash}->{$oldg{$largest}->id}=1;
+	    $newg{$newgeneid}->id($oldg{$largest}->id);
+	    
+	    # we increment irregardless of anything else
+	    $newg{$newgeneid}->version($oldg{$largest}->version+1);
+	    print $log $newg{$newgeneid}->version()."\n";
+	    $newg{$newgeneid}->modified($now);
+	    push (@final_genes,$newg{$newgeneid});
+	}
+    }
 
    # splits **suck** big time
     foreach my $oldgeneid ( keys %split ) {
@@ -720,7 +727,6 @@ sub map_temp_Genes_to_real_Genes{
 	my $assigned = 0;
 	
 	foreach my $trans ( $oldg{$oldgeneid}->each_Transcript ) {
-	    print $log "Checking if ".$trans->id." has been used\n";
 	    if (exists $self->{_fitted_trans_hash}->{$trans->id}) {
 		print $log "Skipping ".$trans->id."\n";
 		next;
@@ -730,199 +736,168 @@ sub map_temp_Genes_to_real_Genes{
 	    
 	    # needs to up here so we can assign it later on.
 	    
-
-	   # flag that we have moved these
-	   $has_moved_old{$oldgeneid} =1;
-	   
-	   
-	   foreach my $newgeneid ( @newgeneid ) {
-	       $has_done_new{$newgeneid} = 1;
-	   }
-
-	   my $lastgeneid;
-	   GENE: foreach my $newgeneid ( @newgeneid ) {
-	       foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
-		   if( exists $self->{_fitted_trans_hash}->{$newtrans->id} ) {
-		       next;
-		   }
-
-		   my ($tscore,$perfect) = Bio::EnsEMBL::Pipeline::GeneComp::overlap_Transcript($trans,$newtrans);
-		   if( $tscore > $score || $perfect == 1) {
-		       $current_fit = $newtrans;
-		       $lastgeneid = $newgeneid;
-		   }
-
-		   if( $perfect == 1 ) {
-		       $lastgeneid=$newgeneid;
-		       # just in case
-		       $current_fit = $newtrans;
-		       last GENE;
-		   }
-	       }
-	   }
-	   if( !defined $current_fit ) {
-	       #Dead, archive!
-	       #my $fe = $trans->start_exon;
-	       #my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
-	       #my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($trans->id);
-	       #$self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$oldgeneid, $oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
-	       #$self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$oldgeneid,$oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
-	       print $log "TRANSCRIPT MAP: KILLED ",$trans->id,"\n";
-	       print $log "TRANSLATION MAP: KILLED ".$trans->translation->id."\n";
-	       next;
-	   }
-
-	   my $tempid=$current_fit->id;
-	   # current_fit is the best fit of this old transcript
-	   $current_fit->id($trans->id);
-	   if( Bio::EnsEMBL::Pipeline::GeneComp::increment_Transcript($trans,$current_fit) == 1 ) {
-	       $current_fit->version($trans->version()+1);
-	   } else {
-	       $current_fit->version($trans->version());
-	   }
-	   print $log "TRANSCRIPT MAP: SPLIT $tempid ".$current_fit->id."\n";
-	   $self->{_fitted_trans_hash}->{$current_fit->id} = 1;
-	   $self->{_fitted_trans_hash}->{$tempid} = 1;
-	   #Deal with translation
-	   my $tempid=$current_fit->translation->id;
-	   my $id=$current_fit->id;
-	   $id =~ s/ENST/ENSP/;
-	   $current_fit->translation->id($id);
-	   my $oldid = $current_fit->translation->start_exon_id();
-	   if ($exon_map->{$oldid}) {
-	       $current_fit->translation->start_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	       print $log "START EXON BUG: Could not map start exon ".$oldid." for translation $tempid\n";
-	   } 
-	   $oldid = $current_fit->translation->end_exon_id();
-	   if ($exon_map->{$oldid}){
-	       $current_fit->translation->end_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	       print $log "END EXON BUG: Could not map end exon ".$oldid." for translation $tempid\n";
-	   }  
-	   print $log "TRANSLATION MAP: ".$tempid." ".$current_fit->translation->id."\n";
-	   
-	   if($assigned == 0) {
-	       # this gene id wins. Hurray!
-	       print $log "GENE MAP: SPLIT ",$lastgeneid," ",$oldgeneid,"\n";
-	       $self->{_done_gene_hash}->{$lastgeneid}=1;
-	       $newg{$lastgeneid}->id($oldgeneid);
-	       $newg{$lastgeneid}->version($oldg{$oldgeneid}->version+1);
-	       $newg{$lastgeneid}->modified($now);
-	       $assigned=1;
-	       push (@final_genes,$newg{$lastgeneid});
-	   }
-
+	    
+	    # flag that we have moved these
+	    $has_moved_old{$oldgeneid} =1;
+	    foreach my $newgeneid ( @newgeneid ) {
+		$has_done_new{$newgeneid} = 1;
+	    }
+	    
+	    my $lastgeneid;
+	GENE: foreach my $newgeneid ( @newgeneid ) {
+	    foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
+		if( exists $self->{_fitted_trans_hash}->{$newtrans->id} ) {
+		    next;
+		}
+		
+		my ($tscore,$perfect) = Bio::EnsEMBL::Pipeline::GeneComp::overlap_Transcript($trans,$newtrans);
+		if( $tscore > $score || $perfect == 1) {
+		    $current_fit = $newtrans;
+		    $lastgeneid = $newgeneid;
+		}
+		
+		if( $perfect == 1 ) {
+		    $lastgeneid=$newgeneid;
+		    # just in case
+		    $current_fit = $newtrans;
+		    last GENE;
+		}
+	    }
+	}
+	    if( !defined $current_fit ) {
+		#Dead, archive!
+		my $fe = $trans->start_exon;
+		eval {
+		    my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
+		    my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($trans->id);
+		    $self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$oldgeneid, $oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
+		    $self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$oldgeneid,$oldg{$oldgeneid}->version,$clone->id,$clone->embl_version);
+		};
+		$self->warn("Could not archive ".$trans->id." because of $@\n");
+		print $log "TRANSCRIPT MAP: KILLED ",$trans->id,"\n";
+		print $log "TRANSLATION MAP: KILLED ".$trans->translation->id."\n";
+		$self->archive->write_deleted_id('transcript',$trans->id);
+		$self->archive->write_deleted_id('translation',$trans->id);
+		next;
+	    }
+	    
+	    my $tempid=$current_fit->id;
+	    # current_fit is the best fit of this old transcript
+	    $current_fit->id($trans->id);
+	    my $should_increment = $self->increment_Transcript($trans,$current_fit);
+	    my $v;
+	    if( $should_increment == 1 ) {
+		$v=$trans->version()+1;
+	    } else {
+		$v=$trans->version();
+	    }
+	    $current_fit->version($v);
+	    print $log "TRANSCRIPT MAP: SPLIT $tempid ".$current_fit->id." ".$current_fit->version()."\n";
+	    $self->{_fitted_trans_hash}->{$current_fit->id} = 1;
+	    $self->{_fitted_trans_hash}->{$tempid} = 1;
+	    #Deal with translation
+	    my $tempid=$current_fit->translation->id;
+	    my $id=$current_fit->id;
+	    $id =~ s/ENST/ENSP/;
+	    $current_fit->translation->id($id);
+	    $current_fit->translation->version($v);
+	    print $log "TRANSLATION MAP: ".$tempid." ".$current_fit->translation->id." $v\n";
+	    
+	    if($assigned == 0) {
+		# this gene id wins. Hurray!
+		print $log "GENE MAP: SPLIT ",$lastgeneid," ",$oldgeneid;
+		$self->{_done_gene_hash}->{$lastgeneid}=1;
+		$newg{$lastgeneid}->id($oldgeneid);
+		$newg{$lastgeneid}->version($oldg{$oldgeneid}->version+1);
+		$newg{$lastgeneid}->modified($now);
+		$assigned=1;
+		print $log $newg{$lastgeneid}->version."\n";
+		push (@final_genes,$newg{$lastgeneid});
+	    }
+	    
+	}
+	
+	# we need to create new transcripts for the remainder of the 
+	# new transcripts not fitted
+	foreach my $newgeneid ( @newgeneid ) {
+	    foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
+		if(exists $self->{_fitted_trans_hash}->{$newtrans->id}) {
+		    next;
+		}
+		my $tempid = $newtrans->id; 
+		$newtrans->id($self->archive->get_new_stable_ids('transcript',1));
+		$self->{_fitted_trans_hash}->{$newtrans->id}=1;
+		print $log "TRANSCRIPT MAP: SPLIT NEW ",$tempid," ",$newtrans->id," 1\n";
+		
+		$newtrans->version(1);
+		$newtrans->created($now);
+		$newtrans->modified($now);
+		
+		#Deal with the translation mapping
+		my $tempid=$newtrans->translation->id();
+		$newtrans->translation->id($self->archive->get_new_stable_ids('translation',1));
+		$newtrans->translation->version(1);
+		
+		print $log "TRANSLATION MAP: SPLIT ".$newtrans->translation->id()." ".$tempid." 1\n";
+	    }
+	    if(($newg{$newgeneid}->id ne $oldgeneid) && ($newgeneid !~ /ENSG/)) {
+		if ($self->{_done_gene_hash}->{$newgeneid}) {
+		    next;
+		}
+		my $newgene = $newg{$newgeneid};
+		my $tempid = $newgene->id();
+		# it is an unassigned gene...
+		$newgene->id($self->archive->get_new_stable_ids('gene',1));
+		print $log "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id," 1\n";
+		$self->{_done_gene_hash}->{$tempid}=1;
+		$newgene->created($now);
+		$newgene->modified($now);
+		$newgene->version(1);
+		$self->{_done_gene_hash}->{$newgeneid}=1;
+		push (@final_genes,$newgene);
+	    }
+	}
+	
+	
+    }
+    
+    
+    # Now - handle all the cases which have not been handled already, 
+    # and assign new everything to them!
+    
+    foreach my $newgene_id ( keys %newg ) {
+	if( $has_done_new{$newgene_id} ) {
+	    next;
+	}
+	
+	my $newgene = $newg{$newgene_id};
+	
+	$newgene->id($self->archive->get_new_stable_ids('gene',1));
+	$newgene->created($now);
+	$newgene->modified($now);
+	$newgene->version(1);
+	
+	foreach my $t ( $newgene->each_Transcript ) {
+	    if ($self->{_fitted_trans_hash}->{$t->id}) {
+		next;
+	    }
+	    my $tempid=$t->id;
+	    $t->id($self->archive->get_new_stable_ids('transcript',1));
+	    $t->created($now);
+	    $t->modified($now);
+	    $t->version(1);
+	    $self->{_fitted_trans_hash}->{$t->id}=1;
+	    print $log "TRANSCRIPT MAP: NEW ".$tempid." ".$t->id."\n";
+	    my $tempid=$t->translation->id;
+	    $t->translation->id($self->archive->get_new_stable_ids('translation',1));
+	    print $log "TRANSLATION MAP: NEW ".$tempid." ".$t->translation->id." 1\n";
        }
-   
-       # we need to create new transcripts for the remainder of the new transcripts not
-       # fitted
-       foreach my $newgeneid ( @newgeneid ) {
-	   foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
-	       if(exists $self->{_fitted_trans_hash}->{$newtrans->id}) {
-		   next;
-	       }
-	       my $tempid = $newtrans->id; 
-	       $newtrans->id($self->archive->get_new_stable_ids('transcript',1));
-	       $self->{_fitted_trans_hash}->{$newtrans->id}=1;
-	       print $log "TRANSCRIPT MAP: SPLIT ",$tempid," ",$newtrans->id,"\n";
-	       
-	       $newtrans->version(1);
-	       $newtrans->created($now);
-	       $newtrans->modified($now);
-	       
-	       #Deal with the translation mapping
-	       my $tempid=$newtrans->translation->id();
-	       $newtrans->translation->id($self->archive->get_new_stable_ids('translation',1));
-	       my $oldid = $newtrans->translation->start_exon_id();
-	       if ($exon_map->{$oldid}) {
-	          $newtrans->translation->start_exon_id($exon_map->{$oldid});
-	       }
-	       else {
-		   print $log "START EXON BUG: Could not map start exon ".$oldid." for translation $tempid-".$newtrans->translation->id." on transcript ".$newtrans->id."\n";
-	       }
-	       $oldid = $newtrans->translation->end_exon_id();
-	       if ($exon_map->{$oldid}) {
-		   $newtrans->translation->end_exon_id($exon_map->{$oldid});
-	       }
-	       else {
-		   print $log "END EXON BUG: Could not map end exon ".$oldid." for translation $tempid-".$newtrans->translation->id." on transcript ".$newtrans->id."\n";
-	       } 
-		   print $log "TRANSLATION MAP: SPLIT ".$newtrans->translation->id()." ".$tempid."\n";
-	   }
-	   if(($newg{$newgeneid}->id ne $oldgeneid) && ($newgeneid !~ /ENSG/)) {
-	       if ($self->{_done_gene_hash}->{$newgeneid}) {
-		   next;
-	       }
-	       my $newgene = $newg{$newgeneid};
-	       my $tempid = $newgene->id();
-	       # it is an unassigned gene...
-	       $newgene->id($self->archive->get_new_stable_ids('gene',1));
-	       print $log "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id,"\n";
-	       $self->{_done_gene_hash}->{$tempid}=1;
-	       $newgene->created($now);
-	       $newgene->modified($now);
-	       $newgene->version(1);
-	       $self->{_done_gene_hash}->{$newgeneid}=1;
-	       push (@final_genes,$newgene);
-	   }
-       }
-
-
-   }
-
-
-   # Now - handle all the cases which have not been handled already, and assign
-   # new everything to them!
-
-   foreach my $newgene_id ( keys %newg ) {
-       if( $has_done_new{$newgene_id} ) {
-	   next;
-       }
-
-       my $newgene = $newg{$newgene_id};
-
-       $newgene->id($self->archive->get_new_stable_ids('gene',1));
-       $newgene->created($now);
-       $newgene->modified($now);
-       $newgene->version(1);
-
-       foreach my $t ( $newgene->each_Transcript ) {
-	   if ($self->{_fitted_trans_hash}->{$t->id}) {
-	       next;
-	   }
-	   my $tempid=$t->id;
-	   $t->id($self->archive->get_new_stable_ids('transcript',1));
-	   $t->created($now);
-	   $t->modified($now);
-	   $t->version(1);
-	   $self->{_fitted_trans_hash}->{$t->id}=1;
-	   print $log "TRANSCRIPT MAP: LEFT NEW ".$tempid." ".$t->id."\n";
-	   my $tempid=$t->translation->id;
-	   $t->translation->id($self->archive->get_new_stable_ids('translation',1));
-	   my $oldid = $t->translation->start_exon_id();
-	   if ($exon_map->{$oldid}) {
-	       $t->translation->start_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	       print $log "START EXON BUG: Could not map start exon ".$oldid." for translation $tempid\n";
-	   } 
-	   $oldid = $t->translation->end_exon_id();
-	   if ($exon_map->{$oldid}) {
-	       $t->translation->end_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	       print $log "END EXON BUG: Could not map end exon ".$oldid." for translation $tempid\n";
-	   }  
-	   print $log "TRANSLATION MAP: NEW ".$tempid." ".$t->translation->id."\n";
-       }
-       print $log "GENE MAP: NEW ".$newgene_id." ".$newgene->id."\n";
+       print $log "GENE MAP: NEW ".$newgene_id." ".$newgene->id." 1\n";
        $self->{_done_gene_hash}->{$newgene_id}=1;
        push (@final_genes,$newgene);
    }
-    
+
+    my @dead_gene_ids;
     foreach my $gene ( @oldgenes ) {
 	if( $has_moved_old{$gene->id} ) {
 	    next;
@@ -934,9 +909,10 @@ sub map_temp_Genes_to_real_Genes{
     my @unique = grep { ! $seen{$_} ++ } @dead_gene_ids;
 
     #Archiving dead genes
-    #foreach my $gene (@unique) {
-	#$self->archive->write_dead_geneid($gene);
-    #}
+    foreach my $gene (@unique) {
+	print $log "GENE MAP KILLED: $gene\n";
+	$self->archive->write_deleted_id('gene',$gene);
+    }
     my $final_size=scalar(@final_genes);
     return ($temp_size,\@final_genes);
 }
@@ -998,49 +974,48 @@ sub map_temp_Transcripts_to_real_Transcripts{
        }
 
        if ( defined $fitted_trans ) {
-	   print $log "TRANSCRIPT MAP: ",$fitted_trans->id," ",$oldt->id,"\n";
-
+	   print $log "TRANSCRIPT MAP: ",$fitted_trans->id," ",$oldt->id;
+	   
 	   $fitted_trans->id($oldt->id);
 	   $self->{_fitted_trans_hash}->{$fitted_trans->id}=1;
 	   #print $log "Setting ".$oldt->id." to 1\n";
 	   $self->{_fitted_trans_hash}->{$oldt->id}=1;
-	   if( Bio::EnsEMBL::Pipeline::GeneComp::increment_Transcript($oldt,$fitted_trans) == 1 ) {
-	       $fitted_trans->version($oldt->version()+1);
+	   my $should_increment = $self->increment_Transcript($oldt,$fitted_trans);
+	   my $v;
+	   if( $should_increment == 1 ) {
+	       $v=$oldt->version()+1;
 	       $fitted_trans->modified($now);
 	       $should_change = 1;
 	   } else {
-	       $fitted_trans->version($oldt->version());
+	       $v=$oldt->version();
 	   }
-
+	   $fitted_trans->version($v);
+	   print $log " $v\n";
 	   #Deal with translation
 	   my $tempid=$fitted_trans->translation->id;
 	   my $id=$fitted_trans->id;
 	   $id =~ s/ENST/ENSP/;
 	   $fitted_trans->translation->id($id);
-	   my $oldid = $fitted_trans->translation->start_exon_id();
-	   if ($exon_map->{$oldid}) {
-	       $fitted_trans->translation->start_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	       print $log "START EXON BUG: Could not map start exon ".$oldid." for translation $tempid\n";
-	   } 
-	   $oldid = $fitted_trans->translation->end_exon_id();
-	   if ($exon_map->{$oldid}){
-	       $fitted_trans->translation->end_exon_id($exon_map->{$oldid});
-	   }
-	   else {
-	        print $log "END EXON BUG: Could not map end exon ".$oldid." for translation $tempid\n";
-	   }  
-	   print $log "TRANSLATION MAP: ".$tempid." ".$fitted_trans->translation->id."\n";
+	   $fitted_trans->translation->version($v);
+	   print $log "TRANSLATION MAP: ".$tempid." ".$fitted_trans->translation->id." $v\n";
        } else {
 	   # it is dead ;)
 	   $should_change = 1;
-	   #my $gene=$old_tg{$oldt->id};
-	   #my $fe = $oldt->start_exon;
-	   #my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
-	   #my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($oldt->id);
-	   #$self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$gene->id,$gene->version,$clone->id,$clone->version);
-	   #$self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$gene->id,$gene->version,$clone->id,$clone->version);
+	   my $gene=$old_tg{$oldt->id};
+	   my $fe = $oldt->start_exon;
+
+	   eval {
+	       my $clone = $vc->dbobj->_crossdb->old_dbobj->get_Clone($fe->clone_id);
+	       my $old_trans = $vc->dbobj->_crossdb->old_dbobj->gene_Obj->get_Transcript($oldt->id);
+	       $self->archive->write_seq($old_trans->dna_seq,$old_trans->version,'transcript',$gene->id,$gene->version,$clone->id,$clone->version);
+	       $self->archive->write_seq($old_trans->translate,$old_trans->translation->version,'protein',$gene->id,$gene->version,$clone->id,$clone->version);
+	       $self->write_deleted_id('transcript',$old_trans->id);
+	       $self->write_deleted_id('translation',$old_trans->translation->id);
+	   };
+	   if ($@) {
+	       $self->warn("Could not archive ".$oldt->id." because of $@");
+	   }
+	   
 	   print $log "TRANSCRIPT MAP: KILLED ",$oldt->id,"\n";
 	   print $log "TRANSLATION MAP: KILLED ".$oldt->translation->id."\n";
        }
@@ -1056,25 +1031,11 @@ sub map_temp_Transcripts_to_real_Transcripts{
        $newt->version(1);
        $newt->created($now);
        $newt->modified($now);
-       print $log "TRANSCRIPT MAP: NEW ",$tempid," ",$newt->id,"\n";
+       print $log "TRANSCRIPT MAP: NEW ",$tempid," ",$newt->id," 1\n";
        $self->{_fitted_trans_hash}->{$newt->id}=1;
        $tempid = $newt->translation->id;
        $newt->translation->id($self->archive->get_new_stable_ids('translation',1));
-       my $oldid = $newt->translation->start_exon_id();
-       if ($exon_map->{$oldid}) {
-	   $newt->translation->start_exon_id($exon_map->{$oldid});
-       }
-       else {
-	    print $log "START EXON BUG: Could not map start exon ".$oldid." for translation $tempid\n";
-       }
-       $oldid = $newt->translation->end_exon_id();
-       if ($exon_map->{$oldid}) {
-	   $newt->translation->end_exon_id($exon_map->{$oldid});
-       }
-       else {
-	    print $log "END EXON BUG: Could not map end exon ".$oldid." for translation $tempid\n";
-       }
-       print $log "TRANSLATION MAP: NEW ".$tempid." ".$newt->translation->id."\n";
+       print $log "TRANSLATION MAP: NEW ".$tempid." ".$newt->translation->id." 1\n";
    }
    return $should_change;
 }
@@ -1147,10 +1108,10 @@ sub overlap_Transcript{
 =cut
 
 sub increment_Transcript{
-   my ($old,$new) = @_;
+   my ($self,$old,$new) = @_;
 
    if( !defined $old || !defined $new || ! ref $old || !$old->isa('Bio::EnsEMBL::Transcript') || !$new->isa('Bio::EnsEMBL::Transcript')) {
-       croak ('Did not give me both old and new transcripts in increment Transcript');
+       $self->throw("Did not give me both old and new transcripts in increment Transcript, got: $old,$new");
    }
 
    my ($i,$j);
