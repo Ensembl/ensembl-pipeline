@@ -22,7 +22,7 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
   my $blast =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
     ('-clone'          => $query,
      '-program'        => 'wublastp' or '/usr/local/pubseq/bin/wublastp',
-     'analysisid'      => $analysisId,
+     '-analysisid'     => $analysisId,
      '-database'       => 'swissprot',
      '-threshold'      => 1e-3,
      '-threshold_type' => 'PVALUE'
@@ -56,7 +56,6 @@ Bio::EnsEMBL::Pipeline::Runnable::BlastWorm
 =cut
 
 package Bio::EnsEMBL::Pipeline::Runnable::BlastWorm;
-
 
 use vars qw(@ISA);
 use strict;
@@ -558,7 +557,8 @@ sub parse_results {
         }
 	  
         # loop over all hsp's
-        # (hsp's are Bio::SeqFeatureI's)
+        # (hsp's are Featurepairs (pairs of Bio::SeqFeatureI's), and
+        # $hsp->query, $hsp->subject is equal to $hsp->feature1, $hsp->feature2)
         HSP: while (my $hsp = $sbjct->nextHSP) {
             if ($self->threshold_type eq "PID") {
 	        next HSP if ($hsp->percent < $self->threshold);
@@ -584,11 +584,11 @@ sub parse_results {
             $feature {hstart} = $hsp->subject->start;
             $feature {hend} = $hsp->subject->end;
             $feature {hstrand} = $hstrand;
-            ($feature {source}) = $self->program =~ /\/?(\w+)$/;
+            ($feature {source}) = $self->program =~ /\/?([^\/]+)$/;
             $feature {primary} = 'similarity';
-            ($feature {program}) = $self->program =~ /\/?(\w+)$/;
+            ($feature {program}) = $self->program =~ /\/?([^\/]+)$/;
             $feature {program_version} = 1;
-            $feature {db} = $self->database;
+            ($feature {db}) = $self->database =~ /\/?([^\/]+)$/;
             $feature {db_version} = 1;
 
             $feature {program} = $self->program;
@@ -667,7 +667,7 @@ sub filter_hits {
     # don't give the e/p-value to the FeatureFilter for the moment and
     # set the score threshold very low => filter only for coverage
     my $search = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new ( -coverage  => 10,
-                                                                        -minscore  => 1,
+                                                                        -minscore  => -1000,
                                                                         -maxevalue => 0.1,
                                                                       );
     my @newfeatures = $search->run(@features);
@@ -746,11 +746,11 @@ sub split_HSP {
     my @qchars = split(//,$hsp->querySeq);        # split query alignment into array of chars
     my @hchars = split(//,$hsp->sbjctSeq);        # ditto for hit
     
-    my $qstart = $hsp->query->start();            # set the query start
-    my $hstart = $hsp->subject->start();          # ditto for hit
+    my $qstart = ($qstrand == 1 ) ? $hsp->query->start : $hsp->query->end;             # set the query start
+    my $hstart = ($hstrand == 1 ) ? $hsp->subject->start : $hsp->subject->end;         # ditto for hit
     
-    my $qend   = $hsp->query->start();            # set the query end
-    my $hend   = $hsp->subject->start();          # ditto for hit
+    my $qend   = $qstart;                         # set the ungapped subalignment end
+    my $hend   = $hstart;                         # ditto for hit
     
     my $count = 0;                                # counter for the bases in the alignment
     my $found = 0;                                # flag saying whether we have an ungapped subalignment
