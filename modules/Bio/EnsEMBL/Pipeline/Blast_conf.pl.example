@@ -13,6 +13,9 @@
 # Example RE's are below. If you don't understand
 # regexes, e-mail ensembl-dev@ebi.ac.uk for help!
 
+# added blastconf, contains some blast options and parameters
+# for Blast.pm.
+
 
 BEGIN {
 package main;
@@ -26,21 +29,16 @@ package main;
     'embl_vertrna'   => '',
 );
 
+%blastconf = (
+    'filter_blast'   => 0 , #filter blast results (1) or prune them (0)? Blast.po
+    'B_factor'       => '10', # factor that determines the number of HSP alignments reported when running blast
+    'blast_type'     => 'wu' # wu or ncbi blast.
+);
+
 }
 
 1;
 
 
 __END__
-
-
-^\w+\s+(\w+)'
->143B_HUMAN P31946 CAA40621.1 CAA15497.1 AAH01359.1 Desc: 14-3-3
-PROTEIN BETA/ALPHA (PROTEIN KINASE C INHIBITOR PROTEIN-1) (KCIP-1)
-(PROTEIN 1054).
-
-'\/ug=(\w+)'
->gnl|UG|At#S146917 Arabidopsis thaliana AT3g12580/T2E22_110 mRNA,
-complete cds /cds=(102,2054) /gb=AY054183 /gi=15809831 /ug=At.1
-/len=2284
 
