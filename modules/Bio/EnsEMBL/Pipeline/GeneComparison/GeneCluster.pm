@@ -125,6 +125,29 @@ sub get_Genes {
   return @genes;
 }
 
+############################################################
+
+sub strand{
+  my $self = shift;
+  my @genes = $self->get_Genes;
+  unless (@genes){
+    $self->warn("cannot retrieve the strand in a cluster with no genes");
+  }
+  my $strand;
+  foreach my $gene (@genes){
+    foreach my $transcript (@{$gene->get_all_Transcript}){
+      unless (defined($strand)){
+	$strand = $transcript->start_Exon->strand;
+	next;
+      }
+      if ( $transcript->start_Exon->strand != $strand ){
+	$self->throw("You have a cluster with genes on opposite strands");
+      }
+    }
+  }
+  return $strand;
+}
+
 #########################################################################
 
 =head2 get_separated_Genes()
