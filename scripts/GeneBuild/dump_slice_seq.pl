@@ -90,14 +90,14 @@ my $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					     -dnadb  =>$dnadb
 					    );
 
-$db->static_golden_path_type($path);
+$db->assembly_type($path);
 
-my $sgpa = $db->get_StaticGoldenPathAdaptor;
+my $sgpa = $db->get_SliceAdaptor;
 
 print STDERR "about to fetch $chr_name $start $end\n";
 
 print "fetching virtual contig for ".$chr_name." ".$start." ".$end."\n";
-my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chr_name,$start,$end);
+my $vc = $sgpa->fetch_by_chr_start_end($chr_name,$start,$end);
 
 
 my $seqout = Bio::SeqIO->new( '-format' => 'fasta',
