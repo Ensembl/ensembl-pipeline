@@ -73,6 +73,11 @@ my $params;
 	     );
 
 $| = 1;
+
+die "No runnable entered" unless defined ($runnable);
+(my $file = $runnable) =~ s/::/\//g;
+require "$file.pm";
+
 if ($check) {
    exit(0);
 }
@@ -84,7 +89,6 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
 );
 
 
-die "No runnable entered" unless defined ($runnable);
 die "No input id entered" unless defined ($input_id);
 
 (my $file = $runnable) =~ s/::/\//g;
