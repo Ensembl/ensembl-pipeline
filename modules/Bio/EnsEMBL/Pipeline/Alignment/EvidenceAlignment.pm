@@ -442,7 +442,6 @@ sub _align {
   my %evidence_sequence_hash;
 
   foreach my $evidence_sequence (@$evidence_sequences) {
-
     # Note:  Purposely using the memory address for our evidence sequence objects
     # as they otherwise have non-unique names.
 
@@ -1094,6 +1093,11 @@ sub _truncate_introns {
 			   ($intron_end - 2*$self->_padding - $intron_start), 
 			   '---intron-truncated---');
 
+      if ($self->_padding == 0) {
+	@offcut = splice (@$seq_array, $intron_start + $self->_padding, 
+			  ($intron_end - 2*$self->_padding - $intron_start), 
+			  '');
+      }
 
       my $offcut;
       foreach my $discarded_element (@offcut) {
@@ -1527,6 +1531,7 @@ sub _corroborating_sequences {
 
  FEATURE:
   foreach my $base_align_feature (@{$self->_all_supporting_features}){
+
     if ((($type eq 'nucleotide')
 	 &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	||(($type eq 'protein')
@@ -1638,9 +1643,16 @@ sub _build_evidence_seq {
   my $fetched_seq = $self->_fetch_sequence($base_align_feature->hseqname);
 
   if ( ! $fetched_seq) {
-    warning("Error fetching sequence " . 
+    warning("Error fetching sequence [" . 
 	    $base_align_feature->hseqname . 
-	    ".  Ignoring.");
+	    "].  Ignoring.");
+
+    return 0;
+  } elsif (($fetched_seq->seq eq '')||
+	   ($fetched_seq->seq eq '-' x length($fetched_seq->seq))) {
+    warning("Error fetching sequence [" . 
+	    $base_align_feature->hseqname . 
+	    "].  Sequence is an empty string.");
 
     return 0;
   }
@@ -1788,8 +1800,8 @@ sub _build_evidence_seq {
 	($base_align_feature->start > $self->_slice->length &&
 	 $base_align_feature->end > $self->_slice->length)) {
       info("Feature [" . $base_align_feature->hseqname . 
-	      "] lies completely outside the bounds of Slice.  Chuck.");
-      splice (@fetched_seq, 0, scalar @fetched_seq);
+	   "] lies completely outside the bounds of Slice.  Chuck.");
+      return 0
     } elsif ($self->_strand == 1) {
       my $start_overshoot = 0;
       if ($base_align_feature->start < 0) {
@@ -1835,12 +1847,15 @@ sub _build_evidence_seq {
     if ($self->_strand == -1){
       $genomic_start = scalar @feature_sequence - $genomic_start - 1;
     }
+
     splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq)
   } else {
     info("Feature [". $base_align_feature->hseqname . " start:" . 
-	    $base_align_feature->start . " end:" . $base_align_feature->end . 
-	    " strand:" . $base_align_feature->strand 
-	    ."] starts beyond end of genomic slice.");
+	 $base_align_feature->start . " end:" . $base_align_feature->end .
+	 " strand:" . $base_align_feature->strand 
+	 ."] starts beyond end of genomic slice.  This feature most probably " .
+	 "aligns to an exon that is not part of this transcript.");
+    return 0
   }
 
   $feature_sequence = join '', @feature_sequence;
@@ -1853,7 +1868,7 @@ sub _build_evidence_seq {
 =head2 _print_tabulated_coordinates
 
   Arg [1]    :
-  Example    : 
+  Example    :
   Description: A debugging subroutine for printing the coordinate locations 
                of our gene, exons, feature and evidence.
   Returntype : 
