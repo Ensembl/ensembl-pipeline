@@ -420,6 +420,8 @@ sub create_genewisehmm{
  #print "getting hmms\n";
  $self->workdir('/tmp') unless ($self->workdir($dir)); 
  $self->checkdir();
+ print "running HalfwiseHMM\n";
+ system("pwd");
  my @ids = keys(%$pfam_ids);
  my $genewisehmm;
  my @features;
@@ -434,7 +436,7 @@ sub create_genewisehmm{
     $self->warn("hmm file not created :$!");
     next;
   }
-   print "got hmm \n";
+   #print "got hmm \n";
    if($strand == 1){
     
     $genewisehmm = $self->run_genewisehmm($strand, $memory);
@@ -455,7 +457,6 @@ sub create_genewisehmm{
     $genewisehmm->run();
     @features = $genewisehmm->output(); 
     #print "adding ".scalar(@features)." to output\n";
-    unlink $self->hmmfilename();
     $self->add_output_features(\@features);
     $genewisehmm = $self->run_genewisehmm(-1, $memory);
     $genewisehmm->run();
@@ -513,12 +514,12 @@ sub run_genewisehmm{
 sub get_hmm{
   
   my ($self, $id) = @_;
-  print "getting hmms\n";
+  #print "getting hmms\n";
   $self->hmmfilename($id.".".$$.".hmm");
   #print "getting hmm for id ".$id."\n";
   my $command =  $self->hmmfetch." ".$self->hmmdb." ".$id." > ".$self->hmmfilename;
 
-  print "command = ".$command."\n";
+  #print "command = ".$command."\n";
   system ('pwd');
   eval{
     system($command);
