@@ -196,7 +196,7 @@ sub get_PmatchFeatures_by_chr_start_end {
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
               "AND pmf.chr_name = '$chr_name' " .
 	      "AND pmf.start >= $chrstart " .
-	      "AND pmf.end <= $chrend ";
+	      "AND pmf.start <= $chrend ";
   if($analysis){
     $query .= " and analysis_id = ".$analysis->dbID;
   }
@@ -252,6 +252,8 @@ sub get_PmatchFeatures_by_chr_start_end {
 
   return @pmatch;
 }
+
+
 
 sub fetch_by_logic_name {
   my ($self, $logic_name) = @_;
