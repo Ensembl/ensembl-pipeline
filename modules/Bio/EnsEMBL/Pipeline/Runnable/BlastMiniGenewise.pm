@@ -378,6 +378,9 @@ sub make_blast_db {
     my ($self,@seq) = @_;
 
     my $tmpdir = $::pipeConf{'nfstmp.dir'};
+    if(!defined $tmpdir || $tmpdir eq ''){
+      $tmpdir = '/tmp';
+    }
     my $blastfile = $self->get_tmp_file($tmpdir,'blast','fa');
     my $seqio = Bio::SeqIO->new('-format' => 'Fasta',
 			       -file   => ">$blastfile");
