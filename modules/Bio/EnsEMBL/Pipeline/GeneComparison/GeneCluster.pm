@@ -249,11 +249,11 @@ sub pair_Transcripts {
   my (@ann_trans,@pred_trans);
   foreach my $gene ( @$pred_genes ){
     #print STDERR "gene ".$gene->type." put in pred_trans array\n";
-    push( @pred_trans, $gene->each_Transcript );
+    push( @pred_trans, @{$gene->get_all_Transcripts} );
   }
   foreach my $gene ( @$ann_genes ){
     #print STDERR "gene ".$gene->type." put in ann_trans array\n";
-    push( @ann_trans, $gene->each_Transcript );
+    push( @ann_trans, @{$gene->get_all_Transcripts} );
   }
   
   # tran1 are predicted genes
@@ -456,8 +456,8 @@ sub pair_Transcripts {
 
 sub _compare_Transcripts {         
   my ($tran1, $tran2) = @_;
-  my @exons1   = $tran1->get_all_Exons;
-  my @exons2   = $tran2->get_all_Exons;
+  my @exons1   = @{ $tran1->get_all_Exons };
+  my @exons2   = @{ $tran2->get_all_Exons };
   my $overlaps = 0;
   my $overlap_length = 0;
   foreach my $exon1 (@exons1){
@@ -518,7 +518,7 @@ sub to_String {
   my $self = shift @_;
   my $data='';
   foreach my $gene ( $self->get_Genes ){
-    my @exons = $gene->get_all_Exons;
+    my @exons = @{ $gene->get_all_Exons };
      
     $data .= sprintf "Id: %-16s"      , $gene->stable_id;
     $data .= sprintf "Contig: %-20s"  , $exons[0]->contig->id;
@@ -541,7 +541,7 @@ sub to_String {
 
 sub _get_start {
   my ($self,$gene) = @_;
-  my @exons = $gene->get_all_Exons;
+  my @exons = @{ $gene->get_all_Exons };
   my $st;
   
   if ($exons[0]->strand == 1) {
@@ -565,7 +565,7 @@ sub _get_start {
 
 sub _get_end {
   my ($self,$gene) = @_;
-  my @exons = $gene->get_all_Exons;
+  my @exons = @{ $gene->get_all_Exons };
   my $end;
   
   if ($exons[0]->strand == 1) {
@@ -577,47 +577,6 @@ sub _get_end {
   }                                                 # which is here the last of the list @exons
   return $end;
 }
-
-#########################################################################
-#Adding new methods to calculate the prediction accuracies of the genes in this cluster
-#########################################################################
-
-=head2 nucleotide_level_accuracy()
-
- function that calculates the difference between the annotated and predicted genes at a nucleotide level
- returns the average sensitivity and specificity of the predictions
-
-=cut
-
-sub nucleotide_level_accuracy {
-    my ($self) = @_;	
-	my @genes = $self->get_Genes;
-    my %statistics;	
-	shift @genes; # the first gene in the array should be the yardstick gene
-
-	GENE: foreach my $gene (@genes){
-	    my $count =0;	
-		my ($sum_sn,$sum_sp) = (0,0);
-		my ($gene_sn,$gene_sp) ;
- 		TRANS: foreach my $trans ($gene->each_Transcript) {
-			
-	    	my @results=$self->evaluate_Transcripts($trans);
-	   		next TRANS unless @results; 
-			$count ++;	#provides a running counter of transcripts which overlap.
-			my ($trans_sn, $trans_sp) = @results;
-			$sum_sn += $trans_sn;
-			$sum_sp += $trans_sp;
-			
-	       
-	    }
-		$gene_sn = $sum_sn/$count;	
-		$gene_sp = $sum_sp/$count;	
-		my @gene_stats = ($gene_sn, $gene_sp);	
-		$statistics{$gene->stable_id} = [@gene_stats];
-	}
-	$self->statistics(%statistics);
-}
-
 
 #########################################################################
 
@@ -635,74 +594,6 @@ sub statistics {
   return  %{$self->{'_statistics'}};
 }
 
-
-#########################################################################
-
-=head2 evaluate_Transcripts()
-
- function that compares a transcript with each transcript of the annotated gene in this cluster
-
-=cut
-
-sub evaluate_Transcripts {
-
-    my ($self,$trans) = @_;
-
-    my $yardstick = $self->get_first_Gene();
-
-	my $count=0;
-	my ($sum_sn, $sum_sp,$sn,$sp) = (0,0);	# The sums and average sensitivity and specificity of this particular transcript WRT 
-				 	 						# all transcripts in the yardstick gene in this cluster.
-
-    TRANS: foreach my $ys_trans($yardstick->each_Transcript) {
-      my $trans_tp = 0;
-	  my @ys_exons = $ys_trans->translateable_exons;
-	
-	  foreach my $ys_exon (@ys_exons){
-	    
-	  my @exons = $trans->translateable_exons;
-	    EXON: while (@exons){
-	    
-	        my $exon = shift @exons;
-		
-			next EXON unless ($exon->overlaps($ys_exon) && ($exon->strand eq $ys_exon->strand));
-       		my $overlap;
-			my ($exon_start,$exon_end) =  ($exon->start,$exon->end);
-			my ($ys_start,$ys_end) =  ($ys_exon->start,$ys_exon->end);
-			my ($start,$end);
-
-			if ($exon_start > $ys_start) { $start = $exon_start;} 
-				else {$start = $ys_start;}
-			if ($exon_end  < $ys_end) { $end = $exon_end;} 
-				else {$end = $ys_end;}
-
-			$overlap = $end - $start;
-
-			$trans_tp += $overlap;
-	    }	
-		
-	  }
-    next TRANS unless ($trans_tp ne 0);
-
-	$count ++;	#provides a running counter of transcripts which overlap.
-    my $trans_ap = _translateable_exon_length($ys_trans);
-    my $trans_pp = _translateable_exon_length($trans);
-	
-	$sum_sn += sprintf("%.2f",($trans_tp)/($trans_ap)*100);
-	$sum_sp += sprintf("%.2f",($trans_tp)/($trans_pp)*100);
-    #$sum_sn += $trans_tp/$trans_ap; # sensitivity
-	#$sum_sp += $trans_tp/$trans_pp; #specificity 
-    }     	
-	if ($count eq 0){
-	print STDERR "Count eq 0. is there an error?\n";
-	return 0 ; 
-	}
-    $sn = $sum_sn/$count;    
-    $sp = $sum_sp/$count;    
-
-	my 	@statistics = (	$sn,$sp);
-	return @statistics; 
-}
 
 #########################################################################
 
@@ -731,7 +622,7 @@ sub start{
   my @genes = $self->get_Genes;
   my $start;
   foreach my $gene ( @genes ) {
-    my @exons = $gene->get_all_Exons;
+    my @exons = @{ $gene->get_all_Exons};
     @exons = sort { $a->start <=> $b->start } @exons;
     my $this_start = $exons[0]->start;
     unless ( $start ){
@@ -752,7 +643,7 @@ sub end{
   my @genes = $self->get_Genes;
   my $end;
   foreach my $gene ( @genes ) {
-    my @exons = $gene->get_all_Exons;
+    my @exons = @{$gene->get_all_Exons};
     @exons = sort { $b->end <=> $a->end } @exons;
     
     # this is the largest end of all exons
