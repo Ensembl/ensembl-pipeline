@@ -179,7 +179,7 @@ sub get_all_FeaturesById {
     my  %idhash;
 
     FEAT: foreach my $f ($self->get_all_Features) {
-	print STDERR ("Feature is $f " . $f->seqname . "\t" . $f->hseqname ."\n");
+#	print STDERR ("Feature is $f " . $f->seqname . "\t" . $f->hseqname ."\n");
     if (!(defined($f->hseqname))) {
 	$self->warn("No hit name for " . $f->seqname . "\n");
 	    next FEAT;
@@ -256,13 +256,13 @@ sub make_miniseq {
 
     my $seqname = $features[0]->seqname;
 
-    print STDERR "seqname $seqname\n";
+#    print STDERR "seqname $seqname\n";
 
     @features = sort {$a->start <=> $b->start} @features;
     my $count  = 0;
     my $mingap = $self->minimum_intron;
-    
-    my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
+
+    my $pairaln = new Bio::EnsEMBL::Analysis::PairAlign;
 
     my @genomic_features;
 
@@ -270,7 +270,7 @@ sub make_miniseq {
     my $prevcdnaend = 0;
     
   FEAT: foreach my $f (@features) {
-      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
+#      print STDERR "Found feature - " . $f->hseqname . "\t" . $f->start . "\t" . $f->end . "\t" . $f->strand . "\n"; 
 
       my $start = $f->start;
       my $end   = $f->end;
@@ -283,20 +283,20 @@ sub make_miniseq {
 
       my $gap     =    ($start - $prevend);
 
-      print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
-      print STDERR "Padding feature - new start end are $start $end\n";
+#      print STDERR "Feature hstart is " . $f->hstart . "\t" . $prevcdnaend . "\n";
+#      print STDERR "Padding feature - new start end are $start $end\n";
 
-      print STDERR "Count is $count : $mingap " . $gap  . "\n";
+#      print STDERR "Count is $count : $mingap " . $gap  . "\n";
 
       if ($count > 0 && ($gap < $mingap)) {
 	# STRANDS!!!!!
 	  if ($end < $prevend) { $end = $prevend;}
-	  print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
+#	  print(STDERR "Merging exons in " . $f->hseqname . " - resetting end to $end\n");
 	    
 	  $genomic_features[$#genomic_features]->end($end);
 	  $prevend     = $end;
 	  $prevcdnaend = $f->hend;
-	  print STDERR "Merged start end are " . $genomic_features[$#genomic_features]->start . "\t" .  $genomic_features[$#genomic_features]->end . "\n";
+#	  print STDERR "Merged start end are " . $genomic_features[$#genomic_features]->start . "\t" .  $genomic_features[$#genomic_features]->end . "\n";
       } else {
 	
 	    my $newfeature = new Bio::EnsEMBL::SeqFeature;
@@ -310,13 +310,13 @@ sub make_miniseq {
 
 	    push(@genomic_features,$newfeature);
 	    
-	    print(STDERR "Added feature $count: " . $newfeature->start  . "\t"  . 
-		  $newfeature->end    . "\t " . 
-		  $newfeature->strand . "\n");
+#	    print(STDERR "Added feature $count: " . $newfeature->start  . "\t"  . 
+#		  $newfeature->end    . "\t " . 
+#		  $newfeature->strand . "\n");
 
 	    $prevend = $end;
 	    $prevcdnaend = $f->hend; 
-	    print STDERR "New end is " . $f->hend . "\n";
+#	    print STDERR "New end is " . $f->hend . "\n";
 
 	}
 	$count++;
@@ -461,7 +461,7 @@ sub get_Sequence {
       $self->throw("Couldn't find sequence for [$id]");
     }
     
-    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
+#    print (STDERR "Found sequence for $id [" . $seq->length() . "]\n");
     
     return $seq;
 
@@ -520,10 +520,10 @@ sub run {
     my $features = $esthash->{$est};
     my @exons;
     
-    print(STDERR "Processing $est\n");
+#    print(STDERR "Processing $est\n");
     next ID unless (ref($features) eq "ARRAY");
     
-    print(STDERR "Features = " . scalar(@$features) . "\n");
+#    print(STDERR "Features = " . scalar(@$features) . "\n");
 
     # why > not >= 1?
     next ID unless (scalar(@$features) >= 1);
@@ -555,7 +555,7 @@ sub run_blaste2g {
   
   #?? never did fully understand this.
   my @extras  = $self->find_extras (@$features);
-  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
+#  print STDERR "Number of extra features = " . scalar(@extras) . "\n";
   return unless (scalar(@extras) >= 1);
   
   my $miniseq = $self->make_miniseq(@$features);
@@ -575,7 +575,7 @@ sub run_blaste2g {
   # subseqfeatures of exons.
   my @genes = $eg->output;
   
-  print STDERR "number of genes: " . scalar(@genes)  . "\n";
+#  print STDERR "number of genes: " . scalar(@genes)  . "\n";
   
   my @newf;
   
@@ -613,8 +613,8 @@ sub run_blaste2g {
       }
       
       # now sort out sub seqfeatures - details of sub segments making up an exon.
-      print STDERR "minie2g: " . $ex->feature1->sub_SeqFeature .  "\n";
-      print STDERR "minie2g num subf: " . scalar($ex->feature1->sub_SeqFeature) . "\n";
+#      print STDERR "minie2g: " . $ex->feature1->sub_SeqFeature .  "\n";
+#      print STDERR "minie2g num subf: " . scalar($ex->feature1->sub_SeqFeature) . "\n";
 
       foreach my $aln($ex->feature1->sub_SeqFeature){
 	# strands 
