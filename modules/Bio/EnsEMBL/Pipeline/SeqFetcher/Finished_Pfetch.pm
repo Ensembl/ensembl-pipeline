@@ -214,7 +214,7 @@ sub get_Seq_by_acc {
     }
 }
 sub write_descriptions {
-    my ( $self, $dbobj, @ids, ) = @_;
+    my ( $self, $dbobj, @ids ) = @_;
     my $sth = $dbobj->prepare( qq{ 
                                 REPLACE DELAYED INTO 
                                 hit_description (hit_name, hit_description, hit_length, hit_taxon, hit_db)
@@ -225,21 +225,22 @@ sub write_descriptions {
 	print  $server "-F " . join(" ", @ids) . "\n";
 	local $/ = "//\n";
 	while(<$server>){
-#		print "**************************************\n";
+		#print "**************************************\n";
 		next unless $_ !~ /no match/;
 		$embl_parser->parse($_);
-		my @hit_row = (shift(@{$embl_parser->accession}), 
-									$embl_parser->description,
-									$embl_parser->seq_length,
-									$embl_parser->taxon,
-									$embl_parser->which_database
-									);
-#		print "Name                 :" . $hit_row[0] . "\n";
-#		print "TaxonomyID      : " . $hit_row[1] . "\n";
-#		print "Sequence length: " . $hit_row[2] . "\n";
-#		print "Description         : " .$hit_row[3] . "\n";
-#		print "Database           : " . $hit_row[4] . "\n";
-#		print "**************************************\n";
+		my @hit_row = (
+		               $embl_parser->sequence_version || shift(@{$embl_parser->accession}),
+		               $embl_parser->description,
+		               $embl_parser->seq_length,
+		               $embl_parser->taxon,
+		               $embl_parser->which_database
+		);
+		#print "Name                 :" . $hit_row[0] . "\n";
+		#print "Description      : " . $hit_row[1] . "\n";
+		#print "Sequence length: " . $hit_row[2] . "\n";
+		#print "TaxonomyID         : " .$hit_row[3] . "\n";
+		#print "Database           : " . $hit_row[4] . "\n";
+		#print "**************************************\n";
 		$sth->execute(@hit_row);
 	}
 	
