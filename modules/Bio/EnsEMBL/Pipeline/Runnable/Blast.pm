@@ -445,8 +445,8 @@ sub split_gapped_feature {
     
     my (@masked_f1, @masked_f2);
     #replace bases and gaps with positions and mask number
-    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'alignment'});
-    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'alignment'});
+    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'});
+    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'});
     
     $self->throw("Can't split feature where alignment lengths don't match: F1 ("
                  .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
@@ -463,14 +463,38 @@ sub split_gapped_feature {
             #One of the alignments contains an insertion.
             if ($building_feature)
             {            
-                $feat1->{'start'}   = $f1_start; 
-                $feat2->{'start'}   = $f2_start;
-                #feature ended at previous position
-                $feat1->{'end'}     = ($index == $mask_len -1) 
+                #feature ended at previous position unless alignment end
+                my $f1_end     = ($index == $mask_len -1) 
                                         ? $masked_f1[$index] : $masked_f1[$index-1];
-                $feat2->{'end'}     = ($index == $mask_len -1) 
+                my $f2_end     = ($index == $mask_len -1) 
                                         ? $masked_f2[$index] :$masked_f2[$index-1];
                 
+                if ($feat1->{'strand'} == 1)
+                {
+                    $feat1->{'start'}   = $f1_start;
+                    $feat1->{'end'}     = $f1_end;
+                }
+                else
+                {
+                    $feat1->{'start'}   = $f1_end;
+                    $feat1->{'end'}     = $f1_start;
+                }
+                if ($feat2->{'strand'} == 1)
+                {
+                    $feat2->{'start'}   = $f2_start;
+                    $feat2->{'end'}     = $f2_end;
+                }
+                else
+                {
+                    $feat2->{'start'}   = $f2_end;
+                    $feat2->{'end'}     = $f2_start;
+                }
+                
+                my $f1_len = $feat1->{'end'} - $feat1->{'start'} +1;
+                my $f2_len = $feat2->{'end'} - $feat2->{'start'} +1; 
+                $self->throw("FeaturePair lengths don't match! F1 ($f1_len) F2 ($f2_len)\n") 
+                        if ( $f1_len != $f2_len ); 
+                        
                 $self->createfeaturepair($feat1, $feat2);
                 $building_feature = 0;
             }
@@ -491,24 +515,27 @@ sub split_gapped_feature {
 
 #Fills gapped alignment with base position number or -1 for insertions. 
 sub mask_alignment {
-    my ($self, $start, $alignment) =@_;
-    
-    my @array = split (//,$alignment);
+    my ($self, $start, $strand, $alignment) =@_;
     my @masked_array;
+    my @array = split (//,$alignment);
+    $_ = $alignment;
+    my $valid_bases = tr/A-Za-z//;
     
-    my $base_count = $start;
+    my $base_count = ($strand == 1) ? $start : $start + ($valid_bases -1);
+    
     foreach my $base (@array)
     {
         if ($base ne '-')
         {
             push (@masked_array, $base_count);
-            $base_count++; 
+            $base_count = ($strand == 1) ? $base_count + 1  : $base_count - 1; 
         }
         else
         {
             push (@masked_array, -1);
         }   
     }
+    
     return @masked_array;
 }
 
