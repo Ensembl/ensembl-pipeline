@@ -53,7 +53,7 @@ use vars qw( %Targetted );
 	      GB_TARGETTED_SINGLE_EXON_COVERAGE     => '80',
 
 	      # maximum allowed size of intron in Targetted gene
-	      GB_TARGETTED_MAX_INTRON               => '20000',
+	      GB_TARGETTED_MAX_INTRON               => '200000',
 
 	      # minimum coverage required to prevent splitting on long introns - keep it high!
 	      GB_TARGETTED_MIN_SPLIT_COVERAGE       => '95',
