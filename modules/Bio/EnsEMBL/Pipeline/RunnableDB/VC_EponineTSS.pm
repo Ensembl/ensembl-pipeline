@@ -1,13 +1,14 @@
 #
 #
-# Author Thomas Down <td2@sanger.ac.uk>
+# Cared for by Thomas Down <td2@sanger.ac.uk>
 #
 # Based on CPG.pm by Val Curwen
-# Modified by SCP to run on VC's
 #
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
+#
+# Modified 1.2002 by SCP to run on VC's
 
 =pod 
 
@@ -70,7 +71,7 @@ use vars qw(@ISA);
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::VC_EponineTSS object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
-                -input_id:  A virtual contig ('chr_name.start.end')
+                -input_id:  A virtual contig (e.g. 'chr_name.start.end')
                 -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
 
 =cut
@@ -100,7 +101,7 @@ sub new {
 =cut
 
 sub fetch_input {
-    my ($self) = @_;
+    my($self) = @_;
     
     $self->throw("No input id") unless defined($self->input_id);
 
@@ -112,11 +113,11 @@ sub fetch_input {
     my $vc = $self->dbobj->get_StaticGoldenPathAdaptor->
      fetch_VirtualContig_by_chr_start_end($chr, $start, $end);
 
-    my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch virtual contig");
-
-    $self->vcontig($vc);
+    my $genseq = $vc->primary_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
+    $self->vc($vc);
 }
+
 
 #get/set for runnable and args
 sub runnable {
@@ -201,5 +202,6 @@ sub write_output {
     }
     return 1;
 }
+
 
 1;
