@@ -49,7 +49,8 @@ sub new {
 
 =cut
 
-sub submit{
+sub submit {
+
   my $self = shift;
   my $job  = shift;
   print STDERR "have ".$self." and job ".$job."\n";
@@ -58,46 +59,20 @@ sub submit{
     $self->throw('expected Bio::EnsEMBL::Pipeline::Job argument');
   }
 
-  #place the job on the end of the queue
-  unshift @_queue, $job;
+  my $config = $self->get_Config();
+  my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
+  print "submit: max_jobs = $max_jobs\n";
+  # if there aren't too many jobs executing take one off the start of the queue and run it
+  if ($children < $max_jobs) {
 
-  #if there aren't too many jobs executing take one off the start of the queue
-  if ($children < 1) {
-    my $job = shift @_queue;
+    $self->_start_job($job);
 
-    if (my $pid = fork) {       # fork returns PID of child to parent, 0 to child
-      # PARENT
-      $children++;
-      print "Size of children is now " . $children . "; " . 
-        scalar(@_queue) . " jobs left in queue\n";
-	
-    } else {
-      #CHILD
+  } else { # put it on the end of the queue
 
-      my $file_prefix = $self->_generate_filename_prefix($job);
-
-      # redirect stdout/stderr to files
-      # read stdin from /dev/null
-      $job->stdout_file("${file_prefix}.out");
-      $job->stderr_file("${file_prefix}.err");
-      POSIX::setsid();          #make session leader, and effectively a daemon
-      close(STDERR);
-      close(STDOUT);
-      close(STDIN);
-      open(STDERR, "+>" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
-      open(STDOUT, "+>" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
-      open(STDIN,  "+>/dev/null");
-
-      #print "Executing $job with PID $$\n";
-      $job->submission_id($$);
-      $job->adaptor->update($job);
-      $job->set_current_status('SUBMITTED');
-
-      $job->run();
-      exit(0);                  # child process is finished now!
-    }
+    unshift @_queue, $job;
 
   }
+
 }
 
 
@@ -173,8 +148,8 @@ sub kill {
 
   Arg [1]    : 
   Example    : 
-  Description: Present so this is polymorphic with all submission systems
-               flush() does nothing for the local submission system.
+  Description: If there are jobs on the queue and < max number of jobs 
+               are currently running, start a new one.
   Returntype : 
   Exceptions : 
   Caller     : 
@@ -184,6 +159,17 @@ sub kill {
 sub flush {
 
   my $self = shift;
+  my $config = $self->get_Config();
+  my $max_jobs = $config->get_parameter("LOCAL", "maxjobs"); # default???
+
+  if (scalar(@_queue) > 0) {
+
+    if ($children < $max_jobs) {
+      my $job = shift @_queue;
+      $self->_start_job($job);
+    }
+
+  }
 
   return;
 
@@ -221,9 +207,53 @@ sub _generate_filename_prefix {
   my $time = localtime(time());
   $time =~ tr/ :/_./;
 
- print STDERR "$temp_dir/" . "_job_" . $job->dbID() . "$time";
-  return "$temp_dir/" . "_job_" . $job->dbID() . "$time";
+  return "$temp_dir/" . "job_" . $job->dbID() . "$time";
  
+}
+
+
+# Actually start running a job
+sub _start_job {
+
+  my $self = shift;
+  my $job = shift;
+
+  print "in _start_job\n";
+
+  if (my $pid = fork) {		# fork returns PID of child to parent, 0 to child
+    # PARENT
+    $children++;
+    print "Size of children is now " . $children . "; " . 
+      scalar(@_queue) . " jobs left in queue\n";
+	
+  } else {
+    #CHILD
+
+    my $file_prefix = $self->_generate_filename_prefix($job);
+
+    # redirect stdout/stderr to files
+    # read stdin from /dev/null
+    $job->stdout_file("${file_prefix}.out");
+    $job->stderr_file("${file_prefix}.err");
+    POSIX::setsid();		# make session leader, and effectively a daemon
+    close(STDERR);
+    close(STDOUT);
+    close(STDIN);
+    open(STDERR, "+>" . $job->stderr_file()) || warn "Error redirecting STDERR to " .  $job->stderr_file();
+    open(STDOUT, "+>" . $job->stdout_file()) || warn "Error redirecting STDOUT to " .  $job->stdout_file();
+    open(STDIN,  "+>/dev/null");
+
+    #print "Executing $job with PID $$\n";
+    $job->submission_id($$);
+    $job->adaptor->update($job);
+    $job->set_current_status('SUBMITTED');
+
+    $job->run();
+    exit(0);			# child process is finished now!
+  }
+
+  return;
+
 }
 
 1;
