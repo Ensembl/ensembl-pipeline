@@ -87,7 +87,8 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 									 CHECK_SPLICE_SITES
 									 RAISE_SINGLETON_COVERAGE
 									 FILTER_ON_SINGLETON_SIZE
-									 );
+									 MAX_TRANSCRIPTS_PER_GENE
+									);
 
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -1168,9 +1169,20 @@ sub run {
 
   my @checked_forward_transcripts   = $self->_check_Translations(\@forward_transcripts,$strand);
   
+  # cluster them into genes
   my @forward_genes                 = $self->_cluster_into_Genes(@checked_forward_transcripts);
   
-  my @forward_remapped              = $self->remap_genes(\@forward_genes, $strand);
+  # take the best ten transcripts from each gene
+  my @selected_forward_transcripts  = $self->_select_best_transcripts(@forward_genes);
+
+  # cluster again into genes
+  my @selected_forward_genes        = $self->_cluster_into_Genes( @selected_forward_transcripts );
+
+  # important: make shared exons unique
+  my @ready_forward_genes           = $self->_make_shared_exons_unique( @selected_forward_genes );
+
+  # map them to raw contig coordinates
+  my @forward_remapped              = $self->remap_genes(\@ready_forward_genes, $strand);
 
   $self->output(@forward_remapped);
 
@@ -1202,12 +1214,71 @@ sub run {
   
   my @checked_reverse_transcripts = $self->_check_Translations(\@reverse_transcripts,$strand);
   
+  # cluster them into genes
   my @reverse_genes               = $self->_cluster_into_Genes(@checked_reverse_transcripts);
   
-  my @reverse_remapped            = $self->remap_genes(\@reverse_genes, $strand);
+  # take the best ten transcripts from each gene
+  my @selected_reverse_transcripts = $self->_select_best_transcripts(@reverse_genes);
+
+  # cluster them again into genes
+  my @selected_reverse_genes       = $self->_cluster_into_Genes( @selected_reverse_transcripts );
+
+   # important: make shared exons unique
+  my @ready_reverse_genes          = $self->_make_shared_exons_unique( @selected_reverse_genes );
+  
+  # map them to raw contig coordinates
+  my @reverse_remapped             = $self->remap_genes(\@reverse_genes, $strand);
 
   $self->output(@reverse_remapped);
 
+}
+
+############################################################
+
+sub _select_best_transcripts{
+  my ( $self, @genes ) = @_;
+  my @selected_transcripts;
+ GENE:
+  foreach my $gene ( @genes ){
+    my $count = 0;
+    my @trans = sort { my $result = ( $self->_mean_coverage($b) <=> $self->_mean_coverage($a) );
+		       if ( $result){
+			 return $result;
+		       }
+		       else{
+			 return ( scalar(@{$b->get_all_Exons}) <=> scalar(@{$a->get_all_Exons}) );
+		       }
+		     }  @{$gene->get_all_Transcripts};
+    
+  TRAN:
+    foreach my $tran ( @trans ){
+      $count++;
+      next GENE if $count > $MAX_TRANSCRIPTS_PER_GENE;
+      push ( @selected_transcripts, $tran );
+    }
+  }
+  return @selected_transcripts;
+}
+
+############################################################
+
+sub _mean_coverage{
+  my ($self,$tran) = @_;
+  my %score;
+ EXON:
+  foreach my $exon (@{$tran->get_all_Exons} ){
+  EVI:
+    foreach my $evi ( @{$exon->get_all_supporting_features} ){
+      $score{ $evi->hseqname} = $evi->score;
+    }
+  }
+  my $mean_coverage;
+  my @ids =  keys %score;
+  foreach my $id ( @ids  ){
+    $mean_coverage += $score{$id};
+  }
+  print STDERR "Mean coverage = ".($mean_coverage/scalar(@ids))."\n";
+  return $mean_coverage/scalar(@ids);
 }
 
 ###################################################################
@@ -1379,16 +1450,16 @@ sub remap_genes {
 ############################################################
 
 sub output{
-   my ($self,@genes) = @_;
-   
-   if (!defined($self->{_output})) {
-     $self->{_output} = [];
-   }
-    
-   if(@genes){
-     push(@{$self->{_output}},@genes);
-   }
-
+  my ($self,@genes) = @_;
+  
+  if (!defined($self->{_output})) {
+    $self->{_output} = [];
+  }
+  
+  if(@genes){
+    push(@{$self->{_output}},@genes);
+  }
+  
    return @{$self->{_output}};
 }
 
@@ -1524,21 +1595,17 @@ sub _cluster_into_Genes{
   print STDERR scalar(@clusters)." clusters created, making genes...\n";
   my @genes;
   foreach my $cluster(@clusters){
-      my $count = 0;
-      my $gene = new Bio::EnsEMBL::Gene;
-      my $genetype = $self->genetype;
-      my $analysis = $self->analysis;
-      $gene->type($genetype);
-      $gene->analysis($analysis);
-      
-      # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
-      foreach my $transcript( @{$cluster} ){
-	  $gene->add_Transcript($transcript);
-      }
-      
-      # prune out duplicate exons
-      my $new_gene = $self->prune_Exons($gene);
-      push( @genes, $new_gene );
+    my $count = 0;
+    my $gene = new Bio::EnsEMBL::Gene;
+    my $genetype = $self->genetype;
+    my $analysis = $self->analysis;
+    $gene->type($genetype);
+    $gene->analysis($analysis);
+    
+    # sort them, get the longest CDS + UTR first (like in prune_Transcripts() )
+    foreach my $transcript( @{$cluster} ){
+      $gene->add_Transcript($transcript);
+    }
   }
   
   # test
@@ -1556,6 +1623,23 @@ sub _cluster_into_Genes{
 }
 
 ############################################################
+
+sub _make_shared_exons_unique{
+  my ( $self, @genes ) = @_;
+  my @pruned_genes;
+  foreach my $gene ( @genes ){
+ 
+    # make different exon objects that are shared between transcripts 
+    # ( regarding attributes: start, end, etc )
+    # into unique exon objects 
+    my $new_gene = $self->prune_Exons($gene);
+    push( @pruned_genes, $new_gene );
+  }
+  return @pruned_genes;
+}
+
+############################################################
+
 
 sub check_Clusters{
   my ($self, $num_transcripts, $clusters) = @_;
@@ -1665,8 +1749,10 @@ sub prune_Exons {
     my @newexons;
     foreach my $exon (@{$tran->get_all_Exons}) {
       my $found;
+      
       #always empty
-    UNI:foreach my $uni (@unique_Exons) {
+    UNI:
+      foreach my $uni (@unique_Exons) {
 	if ($uni->start  == $exon->start  &&
 	    $uni->end    == $exon->end    &&
 	    $uni->strand == $exon->strand &&
@@ -1685,7 +1771,8 @@ sub prune_Exons {
 	if ($exon == $tran->translation->end_Exon){
 	  $tran->translation->end_Exon($found);
 	}
-      } else {
+      } 
+      else {
 	push(@newexons,$exon);
 	push(@unique_Exons, $exon);
       }
@@ -1693,8 +1780,9 @@ sub prune_Exons {
     $tran->flush_Exons;
     foreach my $exon (@newexons) {
       $tran->add_Exon($exon);
+    }
   }
-}
+  # we return the same gene object, but with modified exons in the transcripts
   return $gene;
 }
 
