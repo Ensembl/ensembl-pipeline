@@ -385,9 +385,7 @@ sub _make_genes {
 #   print "genetype = ".$genetype."\n";
     # fetch lookup multi-valued hash { pfam_id => [pfam_acc, pfam_desc], ... }
     my $pfam_lookup = $self->pfam_lookup();
-
     foreach my $tmp_gene (@$results) {
-        #print Dumper($tmp_gene);
         my $pfam_id = $tmp_gene->seqname();
         my $dbentry=Bio::EnsEMBL::DBEntry->new(-primary_id  => $pfam_lookup->{$pfam_id}->[0],
                                                -display_id  => $pfam_id,
@@ -403,6 +401,7 @@ sub _make_genes {
         $gene->analysis($analysis_obj);
         $gene->add_Transcript($transcript);
         $gene->add_DBEntry($dbentry);
+	$gene->display_xref($dbentry);
         push (@genes, $gene);
     }
     
