@@ -44,6 +44,7 @@ if(!defined $estfile    ||
   exit(1);
 }
 
+# append in fasta format
 my $seqout = new Bio::SeqIO(-file => ">>$seqoutfile", "-format" => "Fasta");
 
 open(EST, "<$estfile") or die "Can't open estfile [$estfile]\n";
