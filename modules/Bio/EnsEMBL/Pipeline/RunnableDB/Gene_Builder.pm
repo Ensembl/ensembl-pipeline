@@ -54,6 +54,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 							       GB_FINALDBHOST
 							       GB_FINALDBUSER
 							       GB_FINALDBPASS
+							       GB_FINALDBPORT
 							       GB_COMB_DBHOST
 							       GB_COMB_DBNAME
 							       GB_COMB_DBUSER
@@ -144,12 +145,14 @@ sub write_output {
     my $dbhost = $GB_FINALDBHOST;
     my $dbuser = $GB_FINALDBUSER;
     my $dbpass = $GB_FINALDBPASS;
-    
+    my $dbport = $GB_FINALDBPORT;
+
     my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
 						'-user'   => $dbuser,
 						'-dbname' => $dbname,
 						'-pass'   => $dbpass,
+						'-port'   => $dbport,
 						'-dnadb'  => $self->db,
 					       );
     # sort out analysis

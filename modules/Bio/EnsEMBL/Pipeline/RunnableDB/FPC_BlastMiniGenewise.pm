@@ -57,7 +57,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Analysis;
-
+use Bio::EnsEMBL::Utils::Exception qw(throw  warning);
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBNAME
@@ -101,7 +101,7 @@ sub new {
       
     # make sure at least one protein source database has been defined
     
-    $self->throw("no protein source databases defined in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
+    &throw("no protein source databases defined in Config::GeneBuild::Similarity::GB_SIMILARITY_DATABASES\n") 
       unless scalar(@{$GB_SIMILARITY_DATABASES});
     # make all seqfetchers
     foreach my $db(@{$GB_SIMILARITY_DATABASES}){
@@ -179,31 +179,14 @@ sub write_output {
 
 =cut
 
-  sub fetch_input {
+sub fetch_input {
     my( $self) = @_;
     
     print STDERR "Fetching input id : " . $self->input_id. " \n";
 
-    $self->throw("No input id") unless defined($self->input_id);
-    my $input_id = $self->input_id;
-   
-    $input_id =~ /$GB_INPUTID_REGEX/;
-
-    my $chrid    = $1;
-    my $chrstart = $2;
-    my $chrend   = $3;
-
+    &throw("No input id") unless defined($self->input_id);
+    $self->fetch_sequence($GB_SIMILARITY_MASKING);
     
-    my $sla       = $self->genewise_db->get_SliceAdaptor();
-    my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-    my $seq;
-    $self->query($slice);
-    $slice->chr_name($chrid);
-    if(@$GB_SIMILARITY_MASKING){
-      $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
-    }else{
-      $seq = $slice;
-    }
     
     # No similarity genes will be build overlapping the gene type put in 
     # the list 'GB_SIMILARITY_GENETYPEMASKED'. If nothing is put, the default 
@@ -212,104 +195,108 @@ sub write_output {
     my @genes;
 
     if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-	foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-	    print STDERR "FETCHING GENE TYPE : $type\n";
-	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
-		push (@genes,$mask_genes);
-	    }
-	}
+      foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+        print STDERR "FETCHING GENE TYPE : $type\n";
+        foreach my $mask_genes (@{$self->query->get_all_Genes_by_type($type)}) {
+          push (@genes,$mask_genes);
+        }
+      }
     }
     else {
-	print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
-	@genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
+      print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
+      @genes = @{$self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
     }
-            
-    DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+    
+  DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       
-	printf(STDERR "Fetching features for %s with score above %d from %s\@%s...", 
-	       $database->{'type'}, 
-	       $database->{'threshold'}, 
-	       $self->db->dbname, 
-	       $self->db->host);
-	
-	my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-	my @features  = @{$pafa->fetch_all_by_Slice_and_score($slice, 
-							      $database->{'threshold'}, 
-							      $database->{'type'})};
-	print STDERR "got " . @features." \n";
-	next DATABASE if not @features;
+      printf(STDERR "Fetching features for %s with score above %d from ".
+             "%s\@%s...", $database->{'type'}, 
+             $database->{'threshold'}, 
+             $self->db->dbname, 
+             $self->db->host);
+      
+      my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
+      my @features  = @{$pafa->fetch_all_by_Slice_and_score
+                          ($self->query, 
+                           $database->{'threshold'}, 
+                           $database->{'type'}
+                          )};
+      print STDERR "got " . @features." \n";
+      next DATABASE if not @features;
+      
+      foreach my $f(@features) {
+        my $name = $f->hseqname;
+        if ($name =~ /(\S+)\.\d+/) { 
+          $f->hseqname($1);
+        }
+      }
+      
+      # check which TargettedGenewise exons overlap similarity features
+      
+      my @all_exons;
+      foreach my $gene (@genes) {
+        foreach my $tran (@{$gene->get_all_Transcripts}) {
+          foreach my $exon (@{$tran->get_all_Exons}) {
+            if ($exon->seqname eq $self->query->id) {
+              push @all_exons, $exon;
+            }
+          }
+        }
+      }
+      @all_exons = sort {$a->start <=> $b->start} @all_exons;
+      
+      my %redids;
+      my $ex_idx = 0;
+      
+    FEAT: foreach my $f (sort {$a->start <=> $b->start} @features) {
+        for( ; $ex_idx < @all_exons; ) {
+          my $exon = $all_exons[$ex_idx];
+          
+          if ($exon->overlaps($f)) {
+            $redids{$f->hseqname} = 1;
+            next FEAT;
+          }
+          elsif ($exon->start > $f->end) {
+            # no exons will overlap this feature
+            next FEAT;
+          }
+          else {
+            $ex_idx++;
+          }
+        }
+      }
 
-	foreach my $f(@features) {
-	    my $name = $f->hseqname;
-	    if ($name =~ /(\S+)\.\d+/) { 
-		$f->hseqname($1);
-	    }
-	}
-
-	# check which TargettedGenewise exons overlap similarity features
-
-	my @all_exons;
-	foreach my $gene (@genes) {
-	    foreach my $tran (@{$gene->get_all_Transcripts}) {
-		foreach my $exon (@{$tran->get_all_Exons}) {
-		    if ($exon->seqname eq $slice->id) {
-			push @all_exons, $exon;
-		    }
-		}
-	    }
-	}
-	@all_exons = sort {$a->start <=> $b->start} @all_exons;
-
-	my %redids;
-	my $ex_idx = 0;
-	
-        FEAT: foreach my $f (sort {$a->start <=> $b->start} @features) {
-	    for( ; $ex_idx < @all_exons; ) {
-		my $exon = $all_exons[$ex_idx];
-		
-		if ($exon->overlaps($f)) {
-		    $redids{$f->hseqname} = 1;
-		    next FEAT;
-		}
-		elsif ($exon->start > $f->end) {
-		    # no exons will overlap this feature
-		    next FEAT;
-		}
-		else {
-		    $ex_idx++;
-		}
-	    }
-	}
-
-	# collect those features which haven't been used by Targetted Genewise
-	my (%idhash);
-	# reject them if they appear in the kill list
-	my %kill_list = %{$self->fill_kill_list};
-	
-	foreach my $f (@features) {
-	    # print "Feature : " . $f->gffstring . "\n";
-
-	    if (defined $kill_list{$f->hseqname}){
-		print STDERR "skipping over " . $f->hseqname . " : in kill list\n";
-		next;
-	    }	
-
-	    if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-		defined($f->hseqname) &&
-		$redids{$f->hseqname} != 1) {
-		
-		push(@{$idhash{$f->hseqname}},$f);
-	    }
-	}
-            
-	my @ids = keys %idhash;
-	
-	if ($GB_SIMILARITY_BLAST_FILTER) {
-	    print STDERR "Performing Anopheles-stle filtering...\n";
-	    print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
-	    
-	    my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
-	    my @newids = $self->prune_features($seq,\@sortedids,\%idhash);
+      # collect those features which haven't been used by 
+      #Targetted Genewise
+      my (%idhash);
+      # reject them if they appear in the kill list
+      my %kill_list = %{$self->fill_kill_list};
+      
+      foreach my $f (@features) {
+        # print "Feature : " . $f->gffstring . "\n";
+        
+        if (defined $kill_list{$f->hseqname}){
+          print STDERR "skipping over " . $f->hseqname . 
+            " : in kill list\n";
+          next;
+        }	
+        
+        if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
+            defined($f->hseqname) &&
+            $redids{$f->hseqname} != 1) {
+          
+          push(@{$idhash{$f->hseqname}},$f);
+        }
+      }
+      
+      my @ids = keys %idhash;
+      
+      if ($GB_SIMILARITY_BLAST_FILTER) {
+        print STDERR "Performing Anopheles-stle filtering...\n";
+        print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
+        
+        my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
+        my @newids = $self->prune_features($self->query,\@sortedids,\%idhash);
 	    
 	    print "  No. IDS AFTER FILTER: ".scalar(@newids)."\n"; 
 	    
@@ -319,11 +306,12 @@ sub write_output {
 	my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
 	#print STDERR "Feature ids are @ids\n";
 	print STDERR "have ".@ids." ids to pass to BMG\n"; 
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
-									       '-ids'      => \@ids,
-									       '-seqfetcher' => $seqfetcher,
-									       '-trim'     => 1);
-	
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
+    ('-genomic'  => $self->query,
+     '-ids'      => \@ids,
+     '-seqfetcher' => $seqfetcher,
+     '-trim'     => 1);
+      
 	$self->runnable($runnable);	
 	# at present, we'll only ever have one ...       	
     }
@@ -345,7 +333,7 @@ sub run {
 
     # is there ever going to be more than one?
     foreach my $runnable ($self->runnable) {
-	$runnable->run;
+      $runnable->run;
     }
     
     $self->convert_output;
@@ -368,11 +356,11 @@ sub convert_output {
   my $genetype = $GB_SIMILARITY_GENETYPE;
   #print STDERR "in CONVERT OUTPUT\n";
   foreach my $runnable ($self->runnable) {
-    $self->throw("I don't know what to do with $runnable") unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
+    &throw("I don't know what to do with $runnable") unless $runnable->isa("Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise");
 										 
     if(!defined($genetype) || $genetype eq ''){
       $genetype = 'similarity_genewise';
-      $self->warn("Setting genetype to $genetype\n");
+      &warning("Setting genetype to $genetype\n");
     }
 
     my $anaAdaptor = $self->db->get_AnalysisAdaptor;
@@ -383,17 +371,17 @@ sub convert_output {
     if ( !defined $analysis_obj ){
       # make a new analysis object
       $analysis_obj = new Bio::EnsEMBL::Analysis
-	(-db              => 'NULL',
-	 -db_version      => 1,
-	 -program         => $genetype,
-	 -program_version => 1,
-	 -gff_source      => $genetype,
-	 -gff_feature     => 'gene',
-	 -logic_name      => $genetype,
-	 -module          => 'FPC_BlastMiniGenewise',
-      );
+        (-db              => 'NULL',
+         -db_version      => 1,
+         -program         => $genetype,
+         -program_version => 1,
+         -gff_source      => $genetype,
+         -gff_feature     => 'gene',
+         -logic_name      => $genetype,
+         -module          => 'FPC_BlastMiniGenewise',
+        );
     }
-
+    
     my @results = $runnable->output;
     my $genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
@@ -421,7 +409,7 @@ sub make_genes {
   my ($self, $genetype, $analysis_obj, $results) = @_;
   my @genes;
 
-  $self->throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
+  &throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n") 
     unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
 
   my $count = 0;
@@ -443,38 +431,41 @@ sub make_genes {
       
       # validate transcript
       my @seqfetchers = $self->each_seqfetcher;
-
+      
       my $valid_transcripts = 
-	  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($unchecked_transcript, 
-									$self->query, 
-									$GB_SIMILARITY_COVERAGE, 
-									$GB_SIMILARITY_MAX_INTRON, 
-									$GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
-									\@seqfetchers, 
-									$GB_SIMILARITY_MAX_LOW_COMPLEXITY);
+        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript
+            ($unchecked_transcript, 
+             $self->query, 
+             $GB_SIMILARITY_COVERAGE, 
+             $GB_SIMILARITY_MAX_INTRON, 
+             $GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
+             \@seqfetchers, 
+             $GB_SIMILARITY_MAX_LOW_COMPLEXITY);
       if (not defined $valid_transcripts) {
-	  print STDERR "   Transcript $count : REJECTED because validation failed\n";
-	  next;
+        print STDERR "   Transcript $count : REJECTED because validation failed\n";
+        next;
       }
       
       # make genes from valid transcripts
       foreach my $checked_transcript(@$valid_transcripts){
-	  #print "have ".$checked_transcript." as a transcript\n";
-	  
-	  # add terminal stop codon if appropriate
-	  $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
-
-	  my $gene = new Bio::EnsEMBL::Gene;
-	  $gene->type($genetype);
-	  $gene->analysis($analysis_obj);
-	  $gene->add_Transcript($checked_transcript);
-	  
-	  push (@genes, $gene);
+        #print "have ".$checked_transcript." as a transcript\n";
+        
+        # add start codon if appropriate
+        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
+        # add terminal stop codon if appropriate
+        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+        
+        my $gene = new Bio::EnsEMBL::Gene;
+        $gene->type($genetype);
+        $gene->analysis($analysis_obj);
+        $gene->add_Transcript($checked_transcript);
+        
+        push (@genes, $gene);
       }
-  }
+    }
   
   return \@genes;
-
+  
 }
 
 =head2 remap_genes
@@ -498,7 +489,7 @@ sub remap_genes {
   my $trancount=1;
   foreach my $gene (@$genes) {
     eval {
-      $gene->transform;
+      #$gene->transform;
       # need to explicitly add back genetype and analysis.
       #$newgene->type($gene->type);
       #$gene->analysis($gene->analysis);
@@ -582,7 +573,7 @@ sub make_seqfetcher {
     
   }
   else{
-    $self->throw("Can't make seqfetcher\n");
+    &throw("Can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -646,8 +637,8 @@ sub each_seqfetcher_by_type {
 
 sub add_seqfetcher_by_type{
   my ($self, $type, $seqfetcher) = @_;
-  $self->throw("no type specified\n") unless defined ($type); 
-  $self->throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
+  &throw("no type specified\n") unless defined ($type); 
+  &throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
     unless defined ($seqfetcher) && $seqfetcher->isa("Bio::DB::RandomAccessI"); 
   $self->{'_seqfetchers'}{$type} = $seqfetcher;
 }
@@ -808,7 +799,7 @@ sub sort_hids_by_coverage{
 	     };
 	 
 	     if ($@) {
-		 $self->warn("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+		 &warning("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
 	     }
 	 
 	     if (defined $seq) {
@@ -818,7 +809,7 @@ sub sort_hids_by_coverage{
 	 }
      
 	 if(!defined $seq){
-	     $self->warn("FPC_BMG:No sequence fetched for [$protname] - can't check coverage - set coverage to 1 (entry will be considered as having low coverage...sorry\n");
+	     &warning("FPC_BMG:No sequence fetched for [$protname] - can't check coverage - set coverage to 1 (entry will be considered as having low coverage...sorry\n");
 	 }
      
 	 eval {
@@ -1032,8 +1023,8 @@ sub prune_features{
 
 sub add_length_by_id{
    my ($self,$id,$length) = @_;
-   $self->throw("no id specified\n") unless defined ($id); 
-   $self->throw("no length specified\n") unless defined ($length);
+   &throw("no id specified\n") unless defined ($id); 
+   &throw("no length specified\n") unless defined ($length);
    
    if (!defined $self->{'_idlength'}{$id}) {
        $self->{'_idlength'}{$id} = $length;
@@ -1078,7 +1069,8 @@ sub genewise_db {
     if ($genewise_db)
     {
         $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-            || $self->throw("Input [$genewise_db] isn't a Bio::EnsEMBL::DBSQL::DBAdaptor");
+            || &throw("Input [$genewise_db] isn't a ".
+                      "Bio::EnsEMBL::DBSQL::DBAdaptor");
         $self->{_genewise_db} = $genewise_db;
     }
     return $self->{_genewise_db};

@@ -20,10 +20,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes;
 
 my $exonerate2genes = Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateToGenes->new(
                               -db         => $refdb,
-			      -input_id   => \@sequences,
-			      -rna_seqs   => \@sequences,
 			      -analysis   => $analysis_obj,
 			      -database   => $EST_GENOMIC,
+			      -rna_seqs   => \@sequences,
 			      -query_type => 'dna',
 			      -target_type=> 'dna',
                               -exonerate  => $exonerate,
@@ -47,9 +46,6 @@ for splice-site checking and the conversion of
 coordinates. When the gene is going to be written 
 we then create a dbadaptor for the target database. These parameters are
 read from the config file use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate
-This hopefully avoids some database contention
-
-
 
 =head1 CONTACT
 
@@ -157,13 +153,25 @@ sub fetch_input {
   else{
     $self->throw("sorry, it can only run with a database");
   }
-  
-  my @chr_names = $self->get_chr_names;
 
-  foreach my $chr_name ( @chr_names ){
-    my $database = $target."/".$chr_name.".fa";
-    
-    # check that the file exists:
+  my @databases;
+
+  if ($EST_ONE_FILE_PER_CHROMOSOME) {
+      @databases = map { "$target/$_.fa" } $self->get_chr_names;
+  }
+  else {
+      if (-d $target) {
+	  opendir(DB_DIR, $target) or $self->throw("Could not open database directory $target for reading\n");
+	  @databases = map { "$target/$_" } grep { $_ !~ /^\.\.?$/ } readdir DB_DIR;
+	  closedir(DB_DIR);
+      } elsif (-e $target) {
+	  @databases = ($target);
+      }
+  }
+  
+  # map {print STDERR "DATABASE:$_\n" } @databases;
+  
+  foreach my $database ( @databases ){
     if ( -s $database){
       
       #print STDERR "creating runnable for target: $database\n";
@@ -204,7 +212,7 @@ sub run{
     print STDERR scalar(@results_here)." matches found in ".$runnable->database."\n";
     
   }
-  
+
   ############################################################
   #filter the output
   my @filtered_results = $self->filter_output(@results);
@@ -215,16 +223,15 @@ sub run{
   
   ############################################################
   # print out the results:
-  foreach my $gene (@genes){
-    foreach my $trans (@{$gene->get_all_Transcripts}){
-      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
-    }
-  }
+  #foreach my $gene (@genes){
+  #  foreach my $trans (@{$gene->get_all_Transcripts}){
+  #    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($trans);
+  #  }
+  #}
   
   ############################################################
-#  # need to convert coordinates?
-#  my @mapped_genes = $self->convert_coordinates( @genes );
-
+  #  # need to convert coordinates?
+  #  my @mapped_genes = $self->convert_coordinates( @genes );
 
   # need to convert coordinates?
   my @mapped_genes;
@@ -234,8 +241,6 @@ sub run{
     @mapped_genes = $self->convert_coordinates( @genes );
   }
   
- 
-
   $self->output(@mapped_genes);
 }
 
@@ -250,7 +255,17 @@ sub filter_output{
 
   my %matches;
 
+TRAN:
   foreach my $transcript (@results ){
+    my $score    = $self->_coverage($transcript);
+    my $perc_id  = $self->_percent_id($transcript);
+
+    ##########################################
+    # lower bound: 40% identity, 40% coverage
+    # to avoid unnecessary processing
+    ##########################################
+    next TRAN unless ( $score >= 40 && $perc_id >= 40 );
+
     my $id = $self->_evidence_id($transcript);
     push ( @{$matches{$id}}, $transcript );
   }
@@ -446,6 +461,7 @@ sub write_output{
 					      -user             => $EST_DBUSER,
 					      -dbname           => $EST_DBNAME,
 					      -pass             => $EST_DBPASS,
+					      -port             => $EST_DBPORT,
 					      );
 
   # Get our gene adaptor, depending on the type of gene tables
@@ -459,21 +475,21 @@ sub write_output{
   } 
 
 
-
   unless (@output){
       @output = $self->output;
   }
-  foreach my $gene (@output){
-      print STDERR "gene is a $gene\n";
-      print STDERR "about to store gene ".$gene->type." $gene\n";
-      foreach my $tran (@{$gene->get_all_Transcripts}){
-	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
-      }
-      
-      eval{
-	$gene_adaptor->store($gene);
-      };
 
+  print STDERR "Writing output\n";
+  foreach my $gene (@output){
+      eval {
+	  foreach my $tran (@{$gene->get_all_Transcripts}){
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+	  }
+	  
+	  $gene_adaptor->store($gene);
+	  print STDERR "wrote gene " . $gene->dbID . "\n";
+      };
+            
       if ($@){
 	  $self->warn("Unable to store gene!!\n$@");
       }
@@ -483,47 +499,47 @@ sub write_output{
 ############################################################
 
 sub make_genes{
-  my ($self,@transcripts) = @_;
-  
-  my @genes;
-  my $slice_adaptor = $self->db->get_SliceAdaptor;
-  my $gene;
-  my $checked_transcript;
-  foreach my $tran ( @transcripts ){
-    $gene = Bio::EnsEMBL::Gene->new();
-    $gene->analysis($self->analysis);
-    $gene->type($self->analysis->logic_name);
+    my ($self,@transcripts) = @_;
     
-    ############################################################
-    # put a slice on the transcript
-    my $slice_id      = $tran->start_Exon->seqname;
-    my $chr_name;
-    my $chr_start;
-    my $chr_end;
-    #print STDERR " slice_id = $slice_id\n";
-    if ($slice_id =~/$EST_INPUTID_REGEX/){
-      $chr_name  = $1;
-      $chr_start = $2;
-      $chr_end   = $3;
-      #print STDERR "chr: $chr_name start: $chr_start end: $chr_end\n";
+    my @genes;
+    my $slice_adaptor = $self->db->get_SliceAdaptor;
+    my $gene;
+    my $checked_transcript;
+
+    my $dna_at_splices = $self->get_splice_sites(@transcripts);
+    @transcripts = map {$self->check_splice_sites( $_, $dna_at_splices ) } @transcripts;
+
+    foreach my $tran ( @transcripts ){
+	$gene = Bio::EnsEMBL::Gene->new();
+	$gene->analysis($self->analysis);
+	$gene->type($self->analysis->logic_name);
+	
+	############################################################
+	# put a slice on the transcript
+	my ($chr_name, $chr_start, $chr_end);
+
+	my $slice_id      = $tran->start_Exon->seqname;
+
+	if ($slice_id =~/$EST_INPUTID_REGEX/){
+	    ($chr_name, $chr_start, $chr_end)  = ($1, $2, $3);
+	}
+	else{
+	    $self->warn("It cannot read a slice id from exon->seqname. Please check.");
+	}
+	my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
+	$slice->name($slice_id);
+	foreach my $exon (@{$tran->get_all_Exons}){
+	    $exon->contig($slice);
+	    foreach my $evi (@{$exon->get_all_supporting_features}){
+		$evi->contig($slice);
+		$evi->analysis($self->analysis);
+	    }
+	}
+
+	$gene->add_Transcript($tran);
+	push( @genes, $gene);
     }
-    else{
-      $self->warn("It cannot read a slice id from exon->seqname. Please check.");
-    }
-    my $slice = $slice_adaptor->fetch_by_chr_start_end($chr_name,$chr_start,$chr_end);
-    foreach my $exon (@{$tran->get_all_Exons}){
-      $exon->contig($slice);
-      foreach my $evi (@{$exon->get_all_supporting_features}){
-	$evi->contig($slice);
-	$evi->analysis($self->analysis);
-      }
-    }
-    
-    $checked_transcript = $self->check_splice_sites( $tran );
-    $gene->add_Transcript($checked_transcript);
-    push( @genes, $gene);
-  }
-  return @genes;
+    return @genes;
 }
 
 ############################################################
@@ -535,6 +551,7 @@ sub convert_coordinates{
   my $slice_adaptor     = $self->db->get_SliceAdaptor;
   
   my @transformed_genes;
+
  GENE:
   foreach my $gene (@genes){
   TRANSCRIPT:
@@ -555,17 +572,14 @@ sub convert_coordinates{
 	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($transcript);
 	next TRANSCRIPT;
       }
+
+      my ($chr_name, $chr_start, $chr_end); 
       my $slice_id      = $transcript->start_Exon->seqname;
-      my $chr_name;
-      my $chr_start;
-      my $chr_end;
       if ($slice_id =~/$EST_INPUTID_REGEX/){
-	$chr_name  = $1;
-	$chr_start = $2;
-	$chr_end   = $3;
+	($chr_name, $chr_start, $chr_end) = ($1, $2, $3);
       }
       else{
-	$self->warn("It looks that you haven't run on slices. Please check.");
+	$self->warn("It looks that you haven't run on slices [$slice_id]. Please check.");
 	next TRANSCRIPT;
       }
       
@@ -613,6 +627,94 @@ sub get_chr_names{
 }
 ############################################################
 
+
+=head2 get_splice_sites
+
+We need to get the splice-sites for each transcript in order to 
+determine the correct strand for the gene (where possible). The
+natural way to do this is too database intensive, so we have
+to try to minimise database lookups.
+
+=cut
+
+sub get_splice_sites {
+    my ($self, @transcripts) = @_;
+
+    my %dna_at_splice_positions;
+
+    # sort the transcripts by underlying slice
+    my %trans_by_seqid;
+    foreach my $t (@transcripts) {
+	if (scalar(@{$t->get_all_Exons}) > 1) {
+	    push @{$trans_by_seqid{$t->start_Exon->seqname}}, $t;
+	}
+    }
+
+    foreach my $slice_id (keys %trans_by_seqid) {
+	my ($chr_name, $chr_start, $chr_end);
+	if ($slice_id =~/$EST_INPUTID_REGEX/){
+	    ($chr_name, $chr_start, $chr_end) = ($1, $2, $3);
+	}
+	else {
+	    print STDERR "Cannot get chr_name/start-end from $slice_id; check regexp\n";
+	    next;
+	}
+
+	my %splice_positions;
+
+	my @sorted = sort { $a->start_Exon->start <=> $b->start_Exon->start } @{$trans_by_seqid{$slice_id}};
+	foreach my $tran (@sorted) {
+	    my @exons = sort {$a->start <=> $b->start} @{$tran->get_all_Exons};
+
+	    next unless @exons > 1;
+		
+	    for(my $ex_idx = 0; $ex_idx < @exons - 1; $ex_idx++) {
+		# exon co-ords relative to start of slice. 
+
+		my $up1 = $exons[$ex_idx]->end + 1;
+		my $up2 = $exons[$ex_idx]->end + 2;
+		my $down1 = $exons[$ex_idx + 1]->start - 2;
+		my $down2 = $exons[$ex_idx + 1]->start - 1;
+
+		map { $splice_positions{$_} = 1 } ($up1, $up2, $down1, $down2);
+	    }
+	}
+
+	# Sites are put into groups of ~200kb extent, the idea being that the
+	# majority of work done in fetching sequence from the database is
+	# done in assembly mapping, and once this is done, fetching 2bp or
+	# 2000000bp takes approx. the same time
+
+	my @site_list_list = ([]);
+	foreach my $site (sort {$a <=> $b} keys %splice_positions)  {
+	    if (@{$site_list_list[-1]} and
+		$site - $site_list_list[-1]->[-1] > 10 and
+		$site - $site_list_list[-1]->[0] > 200000) {
+		push @site_list_list, [];	  
+	    } 
+	    push @{$site_list_list[-1]}, $site;
+	}
+
+	foreach my $site_list (@site_list_list) {
+	    my ($this_start, $this_end) = ($site_list->[0], $site_list->[-1]);
+
+	    # positions are relative to start of slice, so we need to offset them
+	    # to get chromosome/start-end
+	    my $seq = $self->get_chr_subseq($chr_name, 
+					    $this_start + $chr_start - 1, 
+					    $this_end + $chr_start  - 1);
+	    foreach my $pos (@{$site_list}) {
+		my $dna_base = substr($seq, $pos - $this_start, 1);
+		$dna_at_splice_positions{"$slice_id:$pos"} = $dna_base;
+	    }
+	}
+    }
+
+    return \%dna_at_splice_positions;
+}
+
+
+
 =head2 check_splice_sites
 
 We want introns of the form:
@@ -633,7 +735,7 @@ we need to do it ourselves. Exonerate will do this work for you.
 =cut
 
 sub check_splice_sites{
-  my ($self,$transcript) = @_;
+  my ($self,$transcript, $dna_lookup_hash) = @_;
 
   my $verbose = 0;
     
@@ -642,13 +744,8 @@ sub check_splice_sites{
   #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_TranscriptEvidence($transcript);
   
   my $strand = $transcript->start_Exon->strand;
-  my @exons;
-  if ( $strand == 1 ){
-    @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
-  }
-  else{
-    @exons = sort { $b->start <=> $a->start } @{$transcript->get_all_Exons};
-  }
+  my @exons = sort { $a->start <=> $b->start } @{$transcript->get_all_Exons};
+
   my $introns  = scalar(@exons) - 1 ; 
   if ( $introns <= 0 ){
     return $transcript;
@@ -659,141 +756,52 @@ sub check_splice_sites{
   my $other    = 0;
   
   # all exons in the transcripts are in the same seqname coordinate system:
-  my $slice = $transcript->start_Exon->contig;
-  
-  if ($strand == 1 ){
-    
+  my $slice_id = $transcript->start_Exon->seqname;
+
   INTRON:
     for (my $i=0; $i<$#exons; $i++ ){
       my $upstream_exon   = $exons[$i];
       my $downstream_exon = $exons[$i+1];
-      
-      my $upstream_start = ($upstream_exon->end     + 1);
-      my $upstream_end   = ($upstream_exon->end     + 2);      
-      my $downstream_start = $downstream_exon->start - 2;
-      my $downstream_end   = $downstream_exon->start - 1;
 
-      #eval{
-#	$upstream_site = 
-#	  $slice->subseq( ($upstream_exon->end     + 1), ($upstream_exon->end     + 2 ) );
-#	$downstream_site = 
-#	  $slice->subseq( ($downstream_exon->start - 2), ($downstream_exon->start - 1 ) );
-#      };
-            
-      #print STDERR "upstream $upstream_site, downstream: $downstream_site\n";
-      ## good pairs of upstream-downstream intron sites:
-      ## ..###GT...AG###...   ...###AT...AC###...   ...###GC...AG###.
-      
-      ## bad  pairs of upstream-downstream intron sites (they imply wrong strand)
-      ##...###CT...AC###...   ...###GT...AT###...   ...###CT...GC###...
-      
-      # print STDERR "From database:\n";
-#      print STDERR "strand: + upstream (".
-#	($upstream_exon->end + 1)."-".($upstream_exon->end + 2 ).") = $upstream_site, downstream ".
-#	  ($downstream_exon->start - 2)."-".($downstream_exon->start - 1).") = $downstream_site\n";
-      
-      ############################################################
-      # use chr_subseq from Tim Cutts
-      
-      my $upstream_site   = 
-	$self->get_chr_subseq($slice->chr_name, $upstream_start, $upstream_end, $strand );
-      my $downstream_site = 
-	$self->get_chr_subseq($slice->chr_name, $downstream_start, $downstream_end, $strand );
-      
-      unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites\n";
+      my $up_start = ($upstream_exon->end     + 1);
+      my $up_end   = ($upstream_exon->end     + 2);      
+      my $down_start = $downstream_exon->start - 2;
+      my $down_end   = $downstream_exon->start - 1;	  
+
+      my $donor = $dna_lookup_hash->{"$slice_id:$up_start"} . $dna_lookup_hash->{"$slice_id:$up_end"};
+      my $acceptor = $dna_lookup_hash->{"$slice_id:$down_start"} . $dna_lookup_hash->{"$slice_id:$down_end"};
+
+      unless ( $donor && $acceptor ){
+	print STDERR "problems retrieving sequence for splice sites $slice_id $up_start $up_end $down_start $down_end\n";
 	next INTRON;
       }
 
-      print STDERR "Tim's script:\n" if $verbose;
-      print STDERR "strand: + upstream (".
-      	($upstream_start)."-".($upstream_end).") = $upstream_site, downstream ".
-        ($downstream_start)."-".($downstream_end).") = $downstream_site\n" if $verbose;
+      if ($strand == -1) {
+	  my $tmp = $donor; $donor = $acceptor; $acceptor = $tmp;
 
-      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
-	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
-	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
-	$correct++;
+	  ($donor = reverse($donor)) =~ tr/ACGT/TGCA/;
+	  ($acceptor = reverse($acceptor)) =~ tr/ACGT/TGCA/;
       }
-      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
-	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
-	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
-	$wrong++;
+
+      print STDERR "strand: + upstream (".
+      	($up_start)."-".($up_end).") = $donor, downstream ".
+        ($down_start)."-".($down_end).") = $acceptor\n" if $verbose;
+
+      if (  ($donor eq 'GT' && $acceptor eq 'AG') ||
+	    ($donor eq 'AT' && $acceptor eq 'AC') ||
+	    ($donor eq 'GC' && $acceptor eq 'AG') ){
+	  $correct++;
+      }
+      elsif (  ($donor eq 'CT' && $acceptor eq 'AC') ||
+	       ($donor eq 'GT' && $acceptor eq 'AT') ||
+	       ($donor eq 'CT' && $acceptor eq 'GC') ){
+	  $wrong++;
       }
       else{
-	$other++;
+	  $other++;
       }
-	} # end of INTRON
-  }
-  elsif ( $strand == -1 ){
-    
-    #  example:
-    #                                  ------CT...AC---... 
-    #  transcript in reverse strand -> ######GA...TG###... 
-    # we calculate AC in the slice and the revcomp to get GT == good site
-    
-  INTRON:
-    for (my $i=0; $i<$#exons; $i++ ){
-      my $upstream_exon   = $exons[$i];
-      my $downstream_exon = $exons[$i+1];
-      my $up_site;
-      my $down_site;
-      
-      my $up_start   = $upstream_exon->start - 2;
-      my $up_end     = $upstream_exon->start - 1;
-      my $down_start = $downstream_exon->end + 1;
-      my $down_end   = $downstream_exon->end + 2;
+  } # end of INTRON
 
-      #eval{
-#	$up_site = 
-#	  $slice->subseq( ($upstream_exon->start - 2), ($upstream_exon->start - 1) );
-#	$down_site = 
-#	  $slice->subseq( ($downstream_exon->end + 1), ($downstream_exon->end + 2 ) );
-#      };
-       
-#      ( $upstream_site   = reverse(  $up_site  ) ) =~ tr/ACGTacgt/TGCAtgca/;
-#      ( $downstream_site = reverse( $down_site ) ) =~ tr/ACGTacgt/TGCAtgca/;
-      	  
-#      print STDERR "From database:\n";
-#      print STDERR "strand: + ".
-#	"upstream ($up_start-$up_end) = $upstream_site,".
-#	  "downstream ($down_start-$down_end) = $downstream_site\n";
-      
-      ############################################################
-      # use chr_subseq from Tim Cutts
-      my $upstream_site   = 
-	$self->get_chr_subseq($slice->chr_name, $up_start, $up_end, $strand );
-      my $downstream_site = 
-	$self->get_chr_subseq($slice->chr_name, $down_start, $down_end, $strand );
- 
-      unless ( $upstream_site && $downstream_site ){
-	print STDERR "problems retrieving sequence for splice sites\n";
-	next INTRON;
-      }
-      
-      print STDERR "Tim's script:\n" if $verbose;
-      print STDERR "strand: + upstream (".
-	($up_start)."-".($up_end).") = $upstream_site, downstream ".
-	  ($down_start)."-".($down_end).") = $downstream_site\n" if $verbose;
-
-      
-      #print STDERR "strand: - upstream $upstream_site, downstream: $downstream_site\n";
-      if (  ($upstream_site eq 'GT' && $downstream_site eq 'AG') ||
-	    ($upstream_site eq 'AT' && $downstream_site eq 'AC') ||
-	    ($upstream_site eq 'GC' && $downstream_site eq 'AG') ){
-	$correct++;
-      }
-      elsif (  ($upstream_site eq 'CT' && $downstream_site eq 'AC') ||
-	       ($upstream_site eq 'GT' && $downstream_site eq 'AT') ||
-	       ($upstream_site eq 'CT' && $downstream_site eq 'GC') ){
-	$wrong++;
-      }
-      else{
-	$other++;
-      }
-      
-    } # end of INTRON
-  }
   unless ( $introns == $other + $correct + $wrong ){
     print STDERR "STRANGE: introns:  $introns, correct: $correct, wrong: $wrong, other: $other\n";
   }
@@ -809,27 +817,31 @@ sub check_splice_sites{
 ############################################################
 
 sub get_chr_subseq{
-  my ( $self, $chr_name, $start, $end, $strand ) = @_;
-
-  my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
-  my $command = "chr_subseq $chr_file $start $end |";
- 
-  #print STDERR "command: $command\n";
-  open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
-  my $seq = uc <SEQ>;
-  chomp $seq;
-  close( SEQ );
+  my ( $self, $chr_name, $start, $end ) = @_;
   
-  if ( length($seq) != 2 ){
-    print STDERR "WRONG: asking for chr_subseq $chr_file $start $end and got = $seq\n";
+  my $seq;
+
+  if ($EST_ONE_FILE_PER_CHROMOSOME) {
+      my $chr_file = $EST_GENOMIC."/".$chr_name.".fa";
+
+      unless (-e $chr_file) {
+	  $self->throw("Could not fine chromosome file $chr_file; unable to fetch sequence so dying\n");
+      }
+
+      my $command = "chr_subseq $chr_file $start $end |";
+      
+      #print STDERR "command: $command\n";
+      open( SEQ, $command ) || $self->throw("Error running chr_subseq within ExonerateToGenes");
+      $seq = uc <SEQ>;
+      chomp $seq;
+      close( SEQ );
   }
-  if ( $strand == 1 ){
-    return $seq;
+  else {
+      my $slice_seq = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name, $start, $end);
+      $seq = uc($slice_seq->seq);
   }
-  else{
-    ( my $revcomp_seq = reverse( $seq ) ) =~ tr/ACGTacgt/TGCAtgca/;
-    return $revcomp_seq;
-  }
+  
+  return $seq;
 }
 
 
@@ -898,12 +910,12 @@ sub output {
     push( @{$self->{_output} }, @output);
   }
   
-  my @output;
+  my @ret_output;
   if($self->{_output}){
-    @output = @{$self->{_output}};
+    @ret_output = @{$self->{_output}};
   }
 
-  return @output;
+  return @ret_output;
 }
 
 ############################################################

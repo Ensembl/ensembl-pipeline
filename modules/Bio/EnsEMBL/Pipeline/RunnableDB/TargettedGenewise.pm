@@ -186,15 +186,10 @@ sub fetch_input{
   my $entry = $self->input_id;
   my $name;
   my $protein_id; 
-  #print STDERR "Input id = ".$entry."\n";
+  print STDERR "\n\nInput id = ".$entry."\n";
   # chr12:10602496,10603128:Q9UGV6:
   #  print STDERR $entry."\n";
   ($name, $protein_id) = split /\|/, $self->input_id;
-  if($protein_id eq 'CE00592'){
-    $self->verbose(1);
-  }else{
-    $self->verbose(0);
-  }
   my @array = split(/:/,$name);
 
   if(@array != 6) {
@@ -231,7 +226,7 @@ sub fetch_input{
   }
 
 
-  
+  #print STDERR "Have ".$slice->name." sequence to run\n";
   $self->query($slice);
   my $seq;
   if(@$GB_TARGETTED_MASKING){
@@ -420,7 +415,8 @@ sub convert_gw_output {
   # never fail to fetch sequences ina a targetted run!
   #$self->throw("Did not expect zero BMG results! for ".$self->input_id." ".$self->protein_id." \n") unless scalar(@results);
   if(!@results){
-    $self->warn("BMG didn't produce any results");
+    $self->warn("BMG didn't produce any results for ".$self->input_id." ".
+               $self->protein_id);
     return;
   }
   # get the appropriate analysis from the AnalysisAdaptor
@@ -451,6 +447,17 @@ sub convert_gw_output {
   # check for stops?
   #print STDERR "have made ".@genes." genes\n";
   #print STDERR "RUNNABLEDB code produced ".@genes." genes\n\n";
+  my $exon_count;
+  foreach my $g(@genes){
+    foreach my $t(@{$g->get_all_Transcripts}){
+      $exon_count += @{$t->get_all_Exons};
+      # foreach my $e(@{$t->get_all_Exons}){
+      # print STDERR "exon ".$e->start." ".$e->end." ".$e->strand."\n";
+      # }
+    }
+  }
+  print STDERR "Have ".$exon_count." exons from ".$self->input_id.
+    "'s analysis\n";
   $self->gw_genes(@genes);
   
 }
@@ -489,6 +496,9 @@ sub make_genes {
     my $gene;
     # make one gene per valid transcript
     foreach my $valid (@$valid_transcripts){
+
+      # add a start codon if appropriate
+      $valid = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($valid);
 
       # add a stop codon if appropriate
       $valid = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($valid);
@@ -651,6 +661,11 @@ GENE:  foreach my $gene (@genes) {
 
     my @t = @{$gene->get_all_Transcripts};
     my $tran = $t[0];
+    #print STDERR "Have transcript ".$tran."\n";
+    #foreach my $exon(@{$tran->get_all_Exons}){
+      #print STDERR "Exon ".$exon->start." ".$exon->end." ".
+    #    $exon->strand."\n";
+    #}
     #print STDERR "gene has ".@t." transcripts\n";
     # check that it translates
     if($gene->type eq $GB_TARGETTED_GW_GENETYPE){
@@ -844,9 +859,6 @@ sub make_transcript{
   my @exons;
   #print "have ".scalar($gene->sub_SeqFeature)." exons\n";
   foreach my $exon_pred ($gene->sub_SeqFeature) {
-    #print STDERR "Exon ".$exon_pred->start." ".$exon_pred->end." ".
-    #  $exon_pred->strand."\n" if($self->verbose);
-    # make an exon
     my $exon = Bio::EnsEMBL::Exon->new;
    
     $exon->start($exon_pred->start);
@@ -1124,14 +1136,6 @@ sub output_db {
     return $self->{_output_db};
 }
 
-
-sub verbose{
-  my ($self, $verbose) = @_;
-  if(defined $verbose){
-    $self->{'verbose'} = $verbose;
-  }
-  return $self->{'verbose'};
-}
 
 
 1;

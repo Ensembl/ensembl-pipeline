@@ -1713,8 +1713,9 @@ sub _check_Translations {
       }
       
       ############################################################
-      # put possible stop at the end:
+      # put possible start and stop:
       eval{
+	$transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon( $transcript );
 	$transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon( $transcript );
       };
       if($@){
