@@ -1402,6 +1402,7 @@ sub set_stop_codon{
 	    $transcript->translation->end( $end + 3 );
 	    #print STDERR "After:\n";
 	    #$self->_print_Translation( $transcript );
+	    $transcript->recalculate_coordinates;
 	    return $transcript;
       }
 	else{
@@ -1443,7 +1444,7 @@ sub set_stop_codon{
 	# re-set the phases:
 	$end_exon->end_phase($donor_bases_count%3);
 	$next_exon->phase( $donor_bases_count%3 );
-	
+	$transcript->recalculate_coordinates;
 	return $transcript;
       }
       else{
@@ -1513,6 +1514,7 @@ sub set_stop_codon{
 		#print STDERR "After:\n";
 		#$self->_print_Transcript( $transcript );
 		#$self->_print_Translation( $transcript );
+		$transcript->recalculate_coordinates;
 		return $transcript;
 	    }
 	    else{
@@ -1568,6 +1570,7 @@ sub set_stop_codon{
 		
 		#$end_exon->seq($exon_seq);
 		$transcript->translation->end_Exon( $end_exon );
+		$transcript->recalculate_coordinates;
 		return $transcript;
 	  }
 	  else{
@@ -1763,7 +1766,7 @@ sub set_start_codon{
 	  print "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
 	}
-	
+	$transcript->recalculate_coordinates;
 	return $transcript;
       }
       else{
@@ -1819,6 +1822,7 @@ sub set_start_codon{
 	  print "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
 	}
+	$transcript->recalculate_coordinates;
 	return $transcript;
       } 
       
@@ -1896,6 +1900,7 @@ sub set_start_codon{
 	  print "Translation seq AFTER:\n";
 	  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($transcript);
 	}
+      $transcript->recalculate_coordinates;
 	return $transcript;
     }
   }
