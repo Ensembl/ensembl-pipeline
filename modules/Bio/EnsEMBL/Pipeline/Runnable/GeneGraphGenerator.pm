@@ -53,7 +53,7 @@ use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
-use Bio::EnsEMBL::Pipeline::GeneCombinerConf;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
