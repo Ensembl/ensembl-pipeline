@@ -16,10 +16,13 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
+my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::MiniGenewise->new(
 					     -dbobj     => $db,
 					     -input_id  => $id,
-					     -golden_path => $gp
+					     -golden_path => $gp,
+					     -type      => $type,
+                                             -threshold => $threshold		    
+								    
                                              );
     $obj->fetch_input
     $obj->run
@@ -71,58 +74,30 @@ sub new {
       $self->seqfetcher($seqfetcher);
     }
        
-    my ($path) = $self->_rearrange([qw(GOLDEN_PATH)], @args);
+    my ($path,$type, $threshold) = $self->_rearrange([qw(GOLDEN_PATH TYPE THRESHOLD)], @args);
+
     $path = 'UCSC' unless (defined $path && $path ne '');
+    $type = 'sptr' unless (defined $type && $type ne '');
+
+    $threshold = 200 unless (defined($threshold));
+
     $self->dbobj->static_golden_path_type($path);
+    $self->type($type);
+    $self->threshold($threshold);
+
     return $self; 
+  }
+
+
+sub type {
+  my ($self,$type) = @_;
+
+  if (defined($type)) {
+    $self->{_type} = $type;
+  }
+  return $self->{_type};
 }
 
-=head1 RunnableDB implemented methods
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=cut
-
-=head2 input_id
-
-    Title   :   input_id
-    Usage   :   $self->input_id($input_id);
-    Function:   Gets or sets the value of input_id
-    Returns :   valid input id for this analysis (if set) 
-    Args    :   input id for this analysis 
-
-=head2 vc
-
- Title   : vc
- Usage   : $obj->vc($newval)
- Function: 
- Returns : value of vc
- Args    : newvalue (optional)
-
-=head1 FPC_BlastMiniGenewise implemented methods
-
-=head2 fetch_output
-
-    Title   :   fetch_output
-    Usage   :   $self->fetch_output($file_name);
-    Function:   Fetchs output data from a frozen perl object
-                stored in file $file_name
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
-
-sub fetch_output {
-    my($self,$output) = @_;
-    
-}
 
 =head2 write_output
 
@@ -190,8 +165,7 @@ sub write_output {
     print STDERR "Fetching features \n\n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
-#    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200, 0);
-    my @features  = $contig->get_all_SimilarityFeatures_above_score('swall',200, 0);
+    my @features  = $contig->get_all_SimilarityFeatures_above_score($self->type,$self->threshold, 0);
     
     # lose version numbers - probably temporary till pfetch indices catch up
 
