@@ -830,7 +830,10 @@ sub blast_Exons{
   system("pressdb $database > /dev/null 2>&1");
   
   ############################################################
-  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
+  my $options = 'V=200 B=200 altscore="* any na" altscore="any * na"  S2=13 -nogap';
+  $options .= " W=$word ";
+  #print STDERR "options: $options\n";
+  #my $options = 'V=200 B=200 altscore="* any na" altscore="any * na" W=4 E=0.01 E2=0.01 -nogap';
   #my $options = 'V=200 B=200 W=9 E=0.01 E2=0.01';
   my $blast =  
     Bio::EnsEMBL::Pipeline::Runnable::Blast->new ('-query'          => $seq1,
