@@ -528,7 +528,7 @@ sub run {
   
   $self->output( @transcripts );
 
-  close(EXO);  
+  close(EXO) or $self->throw("couldn't close pipe ");  
     
   ############################################################
   # remove interim files (but do not remove the database if you are using one)
