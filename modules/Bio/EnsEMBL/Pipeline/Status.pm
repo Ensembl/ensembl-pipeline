@@ -17,10 +17,11 @@ Bio::EnsEMBL::Pipeline::Status - small object storing job status tags
 
 =head1 SYNOPSIS
 
-    my $obj    = new Bio::EnsEMBL::Pipeline::Status(-jobid              => $jobid,
-						    -status             => $status,
-						    -created            => $created,
-						      )
+    my $obj    = new Bio::EnsEMBL::Pipeline::Status
+    ('-jobid'              => $jobid,
+     '-status'             => $status,
+     '-created'            => $created,
+     );
 
 =head1 DESCRIPTION
 
@@ -28,11 +29,12 @@ Stores the status of a job at a certain time
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -48,10 +50,10 @@ use Bio::Root::RootI;
 @ISA = qw(Bio::Root::RootI);
 
 
-sub _initialize {
-  my($self,@args) = @_;
+sub new {
+  my($class,@args) = @_;
   
-  my $make = $self->SUPER::_initialize;
+  my $self = $class->SUPER::new(@args);
 
   my ($jobid,$status,$created)  =
       $self->_rearrange([qw(JOBID
@@ -65,9 +67,9 @@ sub _initialize {
 
   $self->jobid             ($jobid);
   $self->status            ($status);
-  $self->created        ($created);
+  $self->created           ($created);
 
-  return $self; # success - we hope!
+  return $self;
 }
 
 
@@ -131,4 +133,4 @@ sub created {
     return $self->{_created};
 }
 
-
+1;

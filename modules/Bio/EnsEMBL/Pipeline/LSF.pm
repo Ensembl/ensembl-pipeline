@@ -38,18 +38,17 @@ package Bio::EnsEMBL::Pipeline::LSF;
 use vars qw(@ISA);
 use strict;
 
+use Bio::Root::RootI;
 use FreezeThaw qw(freeze thaw);
-
-# Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::LSFJob;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize(@args);
+    my $self = $class->SUPER::new(@args);
     my ($user,$queue) = $self->_rearrange([qw(USER
 					      QUEUE)],@args);
 
@@ -59,7 +58,7 @@ sub _initialize {
     $self->user ($user);
     $self->queue($queue);
 
-    return $make; # success - we hope!
+    return $self;
 }
 
 =head2 get_all_jobs
@@ -146,14 +145,15 @@ sub _parse_line {
     }
     chomp($job_name);
     
-    my $job = new Bio::EnsEMBL::Pipeline::LSFJob(-id              => $id,
-						 -user            => $user,
-						 -status          => $stat,
-						 -queue           => $queue,
-						 -from_host       => $from_host,
-						 -exec_host       => $exec_host,
-						 -job_name        => $job_name,
-						 -submission_time => $submit_time);
+    my $job = new Bio::EnsEMBL::Pipeline::LSFJob
+	('-id'              => $id,
+	 '-user'            => $user,
+	 '-status'          => $stat,
+	 '-queue'           => $queue,
+	 '-from_host'       => $from_host,
+	 '-exec_host'       => $exec_host,
+	 '-job_name'        => $job_name,
+	 '-submission_time' => $submit_time);
     
     return $job;
 }
@@ -181,6 +181,3 @@ sub queue {
 }
 
 1;
-
-
-

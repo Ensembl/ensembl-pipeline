@@ -15,21 +15,23 @@ Bio::EnsEMBL::Pipeline::GeneComp - Comparison of old and new Gene/Transcript/Exo
 
 =head1 SYNOPSIS
 
-    $vc is a Bio::EnsEMBL::Virtual::Contig (it has to be attached to a crossmatch
-    database, in order to support the get_old_Exons and get_old_Genes calls)
-    
-    $arcdb is the archive database to which all dead genes, transcripts and
-    translations will be written
+    $vc is a Bio::EnsEMBL::Virtual::Contig (it has to be attached to a
+    crossmatch database, in order to support the get_old_Exons and
+    get_old_Genes calls).
+
+ 
+    $arcdb is the archive database to which all dead genes,
+    transcripts and translations will be written.
 
     $finaldb is a new database object to which all new, mapped genes will be
     written (with all their transcripts, exons, etc.)
     
     $log is the logfile filehandle to which all mappings are logged
 
-    my $gc =  Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc,
-						    -archive => $arcdb,
-						    -finaldb => $finaldb,
-						    -log => \*LOG);
+    my $gc =  Bio::EnsEMBL::Pipeline::GeneComp->new('-vc' => $vc,
+						    '-archive' => $arcdb,
+						    '-finaldb' => $finaldb,
+						    '-log' => \*LOG);
 
     $gc->map();
 
@@ -99,18 +101,19 @@ Ensembl - ensembl-dev@ebi.ac.uk
 
 
 package Bio::EnsEMBL::Pipeline::GeneComp;
-use vars ('@ISA');
-use Bio::Root::RootI;
 use strict;
+use vars qw(@ISA);
+use Bio::Root::RootI;
 use Carp;
 
-@ISA = ('Bio::Root::RootI');
+@ISA = qw(Bio::Root::RootI);
 
 
 =head2 new
 
  Title   : new
- Usage   : $genecomp = Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc, -archive => $archive,-finaldb => $db,-log => $log);
+ Usage   : $genecomp = Bio::EnsEMBL::Pipeline::GeneComp->new(-vc => $vc,
+                      -archive => $archive,-finaldb => $db,-log => $log);
  Function: Builds a new genecomp object, based around a virtual contig, 
  Example :
  Returns : a new genecomp object
@@ -121,8 +124,7 @@ use Carp;
 
 sub new {
   my($class,@args) = @_;
-  my $self = {};
-  bless ($self,$class);
+  my $self = $class->SUPER::new(@args);
   my ($vc,$archive,$log,$map) = 
       $self->_rearrange([qw(VC
 			    ARCHIVE
@@ -132,11 +134,13 @@ sub new {
 
   #REmoved finaldb, now writing....
 
-  if( !defined $vc || !ref $vc || !$vc->isa('Bio::EnsEMBL::Virtual::Contig') ) {
+  if( !defined $vc || !ref $vc || 
+      !$vc->isa('Bio::EnsEMBL::Virtual::Contig') ) {
       $self->throw("must have a virtual contig, got a [$vc]");
   }
 
-  if( !defined $archive || !ref $archive || !$archive->isa('Bio::EnsEMBL::DBArchive::Obj') ) {
+  if( !defined $archive || !ref $archive || 
+      !$archive->isa('Bio::EnsEMBL::DBArchive::Obj') ) {
       $self->throw("must have an archive database, got a [$archive]");
   }
 
@@ -153,7 +157,7 @@ sub new {
   #$self->finaldb($finaldb);
   $self->log($log);
   $self->mapfile($map);
-  $self->{_fitted_trans_hash}=();
+  $self->{'_fitted_trans_hash'} = ();
 
   # this usually dies if we can't write
   print $log "Built GeneComp object\n";
@@ -671,8 +675,8 @@ sub map_temp_Genes_to_real_Genes{
 	# deal with the mapping of ids
 	print $log "GENE MAP: MOVED $newgeneid $oldgeneid ";
 	print $map $newgeneid,"\t",$oldgeneid."\n";
-	$self->{_done_gene_hash}->{$newgeneid}=1;
-	$self->{_done_gene_hash}->{$oldgeneid}=1;
+	$self->{'_done_gene_hash'}->{$newgeneid}=1;
+	$self->{'_done_gene_hash'}->{$oldgeneid}=1;
 	$newg{$newgeneid}->id($oldgeneid);
 	
 	if( $should_increment ) {
@@ -708,7 +712,7 @@ sub map_temp_Genes_to_real_Genes{
 	#Into merge code....
 	my %old_tg;
 	foreach my $oldgeneid ( @{$merge{$newgeneid}} ) {
-	    if ($self->{_done_gene_hash}->{$oldgeneid}) {
+	    if ($self->{'_done_gene_hash'}->{$oldgeneid}) {
 		next;
 	    }
 	    my $tsize = scalar ( $oldg{$oldgeneid}->each_unique_Exon );
@@ -727,8 +731,8 @@ sub map_temp_Genes_to_real_Genes{
 	    # deal with the mapping of ids
 	    print $log "GENE MAP: MERGED $newgeneid ",$oldg{$largest}->id." ";
 	    print $map $newgeneid,"\t",$oldg{$largest}->id."\n";
-	    $self->{_done_gene_hash}->{$newgeneid}=1;
-	    $self->{_done_gene_hash}->{$oldg{$largest}->id}=1;
+	    $self->{'_done_gene_hash'}->{$newgeneid}=1;
+	    $self->{'_done_gene_hash'}->{$oldg{$largest}->id}=1;
 	    $newg{$newgeneid}->id($oldg{$largest}->id);
 	    
 	    # we increment irregardless of anything else
@@ -750,7 +754,7 @@ sub map_temp_Genes_to_real_Genes{
 	my $assigned = 0;
 	
 	foreach my $trans ( $oldg{$oldgeneid}->each_Transcript ) {
-	    if (exists $self->{_fitted_trans_hash}->{$trans->id}) {
+	    if (exists $self->{'_fitted_trans_hash'}->{$trans->id}) {
 		print $log "Skipping ".$trans->id."\n";
 		next;
 	    }
@@ -769,7 +773,7 @@ sub map_temp_Genes_to_real_Genes{
 	    my $lastgeneid;
 	GENE: foreach my $newgeneid ( @newgeneid ) {
 	    foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
-		if( exists $self->{_fitted_trans_hash}->{$newtrans->id} ) {
+		if( exists $self->{'_fitted_trans_hash'}->{$newtrans->id} ) {
 		    next;
 		}
 		
@@ -817,8 +821,8 @@ sub map_temp_Genes_to_real_Genes{
 	    $current_fit->version($v);
 	    print $log "TRANSCRIPT MAP: SPLIT $tempid ".$current_fit->id." ".$current_fit->version()."\n";
 	    print $map "$tempid\t".$current_fit->id."\n";
-	    $self->{_fitted_trans_hash}->{$current_fit->id} = 1;
-	    $self->{_fitted_trans_hash}->{$tempid} = 1;
+	    $self->{'_fitted_trans_hash'}->{$current_fit->id} = 1;
+	    $self->{'_fitted_trans_hash'}->{$tempid} = 1;
 	    #Deal with translation
 	    my $tempid=$current_fit->translation->id;
 	    my $id=$current_fit->id;
@@ -832,7 +836,7 @@ sub map_temp_Genes_to_real_Genes{
 		# this gene id wins. Hurray!
 		print $log "GENE MAP: SPLIT $lastgeneid $oldgeneid ";
 		print $map $lastgeneid,"\t",$oldgeneid."\n";
-		$self->{_done_gene_hash}->{$lastgeneid}=1;
+		$self->{'_done_gene_hash'}->{$lastgeneid}=1;
 		$newg{$lastgeneid}->id($oldgeneid);
 		$newg{$lastgeneid}->version($oldg{$oldgeneid}->version+1);
 		$newg{$lastgeneid}->modified($now);
@@ -847,12 +851,12 @@ sub map_temp_Genes_to_real_Genes{
 	# new transcripts not fitted
 	foreach my $newgeneid ( @newgeneid ) {
 	    foreach my $newtrans ( $newg{$newgeneid}->each_Transcript ) { 
-		if(exists $self->{_fitted_trans_hash}->{$newtrans->id}) {
+		if(exists $self->{'_fitted_trans_hash'}->{$newtrans->id}) {
 		    next;
 		}
 		my $tempid = $newtrans->id; 
 		$newtrans->id($self->archive->get_new_stable_ids('transcript',1));
-		$self->{_fitted_trans_hash}->{$newtrans->id}=1;
+		$self->{'_fitted_trans_hash'}->{$newtrans->id}=1;
 		print $log "TRANSCRIPT MAP: SPLIT NEW ",$tempid," ",$newtrans->id," 1\n";
 		print $map $tempid,"\t",$newtrans->id,"\n";
 		$newtrans->version(1);
@@ -870,7 +874,7 @@ sub map_temp_Genes_to_real_Genes{
 		print $map "$tempid\t".$newtrans->translation->id()."\n";
 	    }
 	    if(($newg{$newgeneid}->id ne $oldgeneid) && ($newgeneid !~ /ENSG/)) {
-		if ($self->{_done_gene_hash}->{$newgeneid}) {
+		if ($self->{'_done_gene_hash'}->{$newgeneid}) {
 		    next;
 		}
 		my $newgene = $newg{$newgeneid};
@@ -879,11 +883,11 @@ sub map_temp_Genes_to_real_Genes{
 		$newgene->id($self->archive->get_new_stable_ids('gene',1));
 		print $log "GENE MAP: SPLIT NEW ",$tempid," ",$newgene->id," 1\n";
 		print $map $tempid,"\t",$newgene->id,"\n";
-		$self->{_done_gene_hash}->{$tempid}=1;
+		$self->{'_done_gene_hash'}->{$tempid}=1;
 		$newgene->created($now);
 		$newgene->modified($now);
 		$newgene->version(1);
-		$self->{_done_gene_hash}->{$newgeneid}=1;
+		$self->{'_done_gene_hash'}->{$newgeneid}=1;
 		push (@final_genes,$newgene);
 	    }
 	}
@@ -908,7 +912,7 @@ sub map_temp_Genes_to_real_Genes{
 	$newgene->version(1);
 	
 	foreach my $t ( $newgene->each_Transcript ) {
-	    if ($self->{_fitted_trans_hash}->{$t->id}) {
+	    if ($self->{'_fitted_trans_hash'}->{$t->id}) {
 		next;
 	    }
 	    my $tempid=$t->id;
@@ -916,7 +920,7 @@ sub map_temp_Genes_to_real_Genes{
 	    $t->created($now);
 	    $t->modified($now);
 	    $t->version(1);
-	    $self->{_fitted_trans_hash}->{$t->id}=1;
+	    $self->{'_fitted_trans_hash'}->{$t->id}=1;
 	    print $log "TRANSCRIPT MAP: NEW ".$tempid." ".$t->id."\n";
 	    print $map "$tempid\t".$t->id."\n";
 	    my $tempid=$t->translation->id;
@@ -928,7 +932,7 @@ sub map_temp_Genes_to_real_Genes{
 	}
 	print $log "GENE MAP: NEW ".$newgene_id." ".$newgene->id." 1\n";
 	print $map $newgene_id."\t".$newgene->id."\n";
-	$self->{_done_gene_hash}->{$newgene_id}=1;
+	$self->{'_done_gene_hash'}->{$newgene_id}=1;
 	push (@final_genes,$newgene);
     }
 
@@ -991,14 +995,14 @@ sub map_temp_Transcripts_to_real_Transcripts{
 
    # best fit to new transcripts...
    foreach my $oldt ( @oldt ) {
-       if ($self->{_fitted_trans_hash}->{$oldt->id}) {
+       if ($self->{'_fitted_trans_hash'}->{$oldt->id}) {
 	   next;
        }
        my $score = 0;
        my $fitted_trans = undef;
 
        foreach my $newt ( @newt ) {
-	   if( exists $self->{_fitted_trans_hash}->{$newt->id} ) {
+	   if( exists $self->{'_fitted_trans_hash'}->{$newt->id} ) {
 	       next;
 	   }
 	   my ($tscore,$perfect) = Bio::EnsEMBL::Pipeline::GeneComp::overlap_Transcript($oldt,$newt);
@@ -1016,9 +1020,9 @@ sub map_temp_Transcripts_to_real_Transcripts{
 	   print $map $fitted_trans->id,"\t",$oldt->id."\n";
 	   
 	   $fitted_trans->id($oldt->id);
-	   $self->{_fitted_trans_hash}->{$fitted_trans->id}=1;
+	   $self->{'_fitted_trans_hash'}->{$fitted_trans->id}=1;
 	   #print $log "Setting ".$oldt->id." to 1\n";
-	   $self->{_fitted_trans_hash}->{$oldt->id}=1;
+	   $self->{'_fitted_trans_hash'}->{$oldt->id}=1;
 	   my $should_increment = $self->increment_Transcript($oldt,$fitted_trans);
 	   my $v;
 	   if( $should_increment == 1 ) {
@@ -1062,7 +1066,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
    }
 
    foreach my $newt ( @newt ) {
-       if( exists $self->{_fitted_trans_hash}->{$newt->id} ) {
+       if( exists $self->{'_fitted_trans_hash'}->{$newt->id} ) {
 	   next;
        }
        my $tempid = $newt->id;
@@ -1073,7 +1077,7 @@ sub map_temp_Transcripts_to_real_Transcripts{
        $newt->modified($now);
        print $log "TRANSCRIPT MAP: NEW ",$tempid," ",$newt->id," 1\n";
        print $map $tempid,"\t",$newt->id,"\n";
-       $self->{_fitted_trans_hash}->{$newt->id}=1;
+       $self->{'_fitted_trans_hash'}->{$newt->id}=1;
        $tempid = $newt->translation->id;
        my $id=$newt->id;
        $id =~ s/ENST/ENSP/;
@@ -1102,7 +1106,9 @@ sub overlap_Transcript{
    my ($old,$new) = @_;
    my ($score,$perfect);
 
-   if( !defined $old || !defined $new || ! ref $old || !$old->isa('Bio::EnsEMBL::Transcript') || !$new->isa('Bio::EnsEMBL::Transcript')) {
+   if( !defined $old || !defined $new || ! ref $old || 
+       !$old->isa('Bio::EnsEMBL::Transcript') || 
+       !$new->isa('Bio::EnsEMBL::Transcript')) {
        croak ('Did not give me both old and new transcripts in overlap Transcript');
    }
 

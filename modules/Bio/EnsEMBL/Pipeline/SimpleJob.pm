@@ -19,19 +19,20 @@ Bio::EnsEMBL::Pipeline::SimpleJob
     my $db       = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(...);
     my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (...);
 
-    my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job(-dbobj    => $db,
-							  -input_id => 1,
-							  -analysis => $analysis,
-							  -queue    => 'fast_blast_farm',
-							  -create   => 1,
-							  );
+    my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job
+    ('-dbobj'    => $db,
+     '-input_id' => 1,
+     '-analysis' => $analysis,
+     '-queue'    => 'fast_blast_farm',
+     '-create'   => 1,
+     );
 
     #### This is the module you change for different analysis types.
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::ProcessList();
 
-    my $runjob   = new Bio::EnsEMBL::Pipeline::SimpleJob(-jobobj   => $job,
-							 -runnable => $runjob);
+    my $runjob   = new Bio::EnsEMBL::Pipeline::SimpleJob('-jobobj'   => $job,
+							 '-runnable' => $runjob);
 
     my $stat   = $runjob->run;
     my $output = $runjob->output;
@@ -40,25 +41,26 @@ Bio::EnsEMBL::Pipeline::SimpleJob
 
 =head1 DESCRIPTION
 
-Stores run and status details of a simple analysis job.  This module is a 
-container bringing together the two parts of the pipeline - the database access 
-part (job ids,status etc) and the doing part which actually runs the analysis and 
-parses the results.
+Stores run and status details of a simple analysis job.  This module
+is a container bringing together the two parts of the pipeline - the
+database access part (job ids,status etc) and the doing part which
+actually runs the analysis and parses the results.
 
 SimpleJob -> JobI       - stores job status and frozen objects in the database
           -> RunnableI  - runs programs and parses output.
 
-In this way we can use our Runnable objects as standalone modules for 
-one off analysis and can also change our job tracking code without interfering
-with the analysis part.
+In this way we can use our Runnable objects as standalone modules for
+one off analysis and can also change our job tracking code without
+interfering with the analysis part.
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -71,19 +73,20 @@ use strict;
 
 use FreezeThaw qw(freeze thaw);
 
-# Object preamble - inherits from Bio::Root::Object;
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Est2Genome;
+use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::Object);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI 
+	  Bio::EnsEMBL::Pipeline::DB::JobI 
+	  );
 
+sub new {
+    my ($class,@args) = @_;
 
-sub _initialize {
-    my ($self,@args) = @_;
-
-    my $make = $self->SUPER::_initialize;
+    my $self = $self->SUPER::new(@args);
     my ($jobobj,$runnable) = $self->_rearrange([qw(JOBOBJ
 						   RUNNABLE
 						   )],@args);
@@ -94,7 +97,7 @@ sub _initialize {
     $self->jobobj  ($jobobj);
     $self->runnable($runnable);
 
-    return $make; # success - we hope!
+    return $self;
 }
 
 
@@ -538,12 +541,14 @@ sub status_file {
 
     return $self->jobobj->status_file($arg);
 }
+
 sub disconnect {
    my ($self) = @_;
 
    $self->jobobj->disconnect;
 
 }
+
 1;
 
 

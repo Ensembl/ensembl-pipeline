@@ -1,6 +1,3 @@
-#!/usr/local/bin/perl
-
-
 # Cared for by Simon Potter <scp@sanger.ac.uk>
 #
 # Copyright GRL/EBI
@@ -42,7 +39,7 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
-
+#' # keep emacs happy
 
 package Bio::EnsEMBL::Pipeline::ExceptionHandler;
 
@@ -70,8 +67,8 @@ use vars qw(@ISA);
 # would also fit nicely with that point-and-click pipeline GUI. TODO...
 
 sub new {                   
-    my ($class) = @_;
-    my $self = bless {}, $class;
+    my ($class, @args) = @_;
+    my $self = $class->SUPER::new(@args);
     $self->{'_exceptions'} = undef; 
 
     $self->add_exception('FAILED_Blast_Short_peptide',

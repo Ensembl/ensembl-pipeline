@@ -3,6 +3,29 @@
 # Creation: 11.07.2000
 
 
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::ControlDB - object_state table entries and convience functions
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+Handle object_state table entries and convience functions
+
+=head1 CONTACT
+
+Arne Stabenau
+ensembl-dev@ebi.ac.uk
+
+=head1 APPENDIX
+
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
+
+=cut
+
 # module to handle object_state table entries
 # contains convenience functions
 # not yet objects for handeling the states.
@@ -11,6 +34,8 @@ package Bio::EnsEMBL::Pipeline::ControlDB;
 
 use strict;
 use DBI;
+use Bio::Root::RootI;
+
 use vars qw( @ISA );
 
 # maybe import the configuration
@@ -20,30 +45,51 @@ BEGIN {
 
 @ISA = qw( Bio::Root::RootI );
 
+=head2 new
+
+ Title   : new
+ Usage   : my $controldb = new Bio::EnsEMBL::Pipeline::ControlDB
+ Function:
+ Example :
+ Returns : 
+ Args    :
+
+=cut
+
 sub new {
-  # without the pipeConf file nothing goes, so all parameters are there
-  # may chage soonish
+    # without the pipeConf file nothing goes, so all parameters are there
+    # may chage soonish
+    my ($class, @args) = @_;
+    my $self = $class->SUPER::new(@args);
 
-  my $self = bless {};
-
-  my $dsn = "DBI:".$::pipeConf{'DBI.driver'}.":database=".$::pipeConf{'ControlDB.name'}.";host=".$::pipeConf{'ControlDB.host'};
-  my $dbh =  DBI->connect( $dsn, $::pipeConf{'ControlDB.user'}, $::pipeConf{'ControlDB.pass'}, {RaiseError => 1});
-  $self->db( $dbh );
-  return $self;
+    my $dsn = "DBI:".$::pipeConf{'DBI.driver'}.":database=".$::pipeConf{'ControlDB.name'}.";host=".$::pipeConf{'ControlDB.host'};
+    my $dbh =  DBI->connect( $dsn, $::pipeConf{'ControlDB.user'}, $::pipeConf{'ControlDB.pass'}, {RaiseError => 1});
+    $self->db( $dbh );
+    return $self;
 }
 
 
 # make transition from one state to the other
 # for a given object_state_id
 # line must be in transit for that
+
+=head2 changeState
+
+ Title   : changeState
+ Usage   : 
+ Function: Transition object from one state to another
+ Returns : 
+ Args    : object state id, 
+           nickname to transition to
+
+=cut
+
 sub changeState {
-  my $self = shift;
-  my $obj_state_id = shift;
-  my $to_nick = shift;
+  my ($self,$obj_state_id, $to_nick) = @_;
+
   my @result;
 
   my $sth = $self->db->prepare( q{
-
    	SELECT o.inTransition, t.state_description_id, o.state_description_id
 	FROM object_state o, state_description s, state_description t
 	WHERE o.object_state_id = ?
@@ -92,8 +138,19 @@ sub changeState {
 
 # return all object_status which are in transit
 # and have to be monitored. Used from TransitionManager.
+
+=head2 get_inTransit_toMonitor
+
+ Title   : get_inTransit_toMonitor
+ Usage   : my @ids = $controldb->get_inTransit_toMonitor();
+ Function: Transition object from one state to another
+ Returns : all object states which are in transition
+ Args    : none
+
+=cut
+
 sub get_inTransit_toMonitor {
-  my $self = shift;
+  my ($self) = @_;
   my @result;
   my $queryResult;
 
@@ -114,8 +171,20 @@ sub get_inTransit_toMonitor {
 }
 
 # return where the transit_module has to be started
+
+=head2 get_noFinal_nonTransit
+
+ Title   : get_noFinal_nonTransit
+ Usage   : my @ids = $controldb->get_noFinal_nonTransit();
+ Function: Get where the transit_module has to be started
+ Returns : ids where the transit_module has to be started
+ Args    : none
+
+
+=cut
+
 sub get_nonFinal_nonTransit {
-  my $self = shift;
+  my ($self) = @_;
   my @result;
   my $queryResult;
 
@@ -137,11 +206,21 @@ sub get_nonFinal_nonTransit {
 
 # used by transition monitors and aware transition modules
 # to get what they want from the ControlDB
+=head2 get_byIds_age
+
+ Title   : get_byIds_age
+ Usage   : my @cols = $controldb->get_byIds_age($minutes,\@ids, \@cols); 
+ Function: used by transition monitors and aware transition modules
+           to get what they want from the ControlDB
+ Returns : list of cols that match criteria
+ Args    : minutes        - minutes old
+           idListRef      - array ref of ids
+           columnsListRef - array ref of columns to obtain
+
+=cut
+
 sub get_byIds_age {
-  my $self = shift;
-  my $minutes = shift;
-  my $idListRef = shift;
-  my $columnsListRef = shift;
+  my ($self,$minutes,$idListRef,$columnsListRef) = @_;
   my @result;
   my $queryString;
 
@@ -175,10 +254,20 @@ sub get_byIds_age {
 
 # put an object from object_state table into transit mode
 # log the time if requested.
+
+=head2 object_toTransit
+
+ Title   : object_toTransit
+ Usage   : $controldb->object_toTransit(\@objectidlist, 1);
+ Function: Set Objects transition state 
+ Returns : none
+ Args    : object stateid list - array ref of object state ids
+           resetTransit        - boolean state to set transition
+
+=cut
+
 sub object_toTransit {
-  my $self = shift;
-  my $obj_state_id_list = shift;
-  my $resetTransit = shift;
+  my ($self,$obj_state_id_list,$resetTransit) = @_;
 
   my $whereClause;
   if( ! defined $resetTransit ) {
@@ -217,9 +306,23 @@ sub object_toTransit {
 
 # here you can reset transits you have set before. Do so, when executing
 # the TransitionModule start fails. If it starts, then dont!
+
+=head2 object_reset_transit
+
+ Title   : object_reset_transit
+ Usage   :
+ Function: very dirty, should seperate out the transit handling function
+           here you can reset transits you have set before. Do so, 
+           when executing the TransitionModule start fails. 
+           If it starts, then dont!
+ Returns : none
+ Args    : object stateid list - array ref of objects to reset to 
+           transition to false
+
+=cut
+
 sub object_reset_transit {
-  my $self = shift;
-  my $obj_state_id_list = shift;
+  my ($self,$obj_state_id_list) = @_;
   $self->object_toTransit( $obj_state_id_list, 'false' );
 }
 
@@ -227,11 +330,20 @@ sub object_reset_transit {
 # put an object into the pipeline
 # missing, a check so that the same object goes not in again.
 
+=head2 submit
+
+ Title   : submit
+ Usage   : $controldb->submit($objectid, $class,$state);
+ Function: inserts an object in the pipeline - checks for duplicates
+ Returns : none
+ Args    : objectid,
+           object class id,
+           state nickname
+
+=cut
+
 sub submit {
-  my $self = shift;
-  my $object_id = shift;
-  my $class = shift;
-  my $state = shift;
+  my ($self,$object_id,$class,$state) = @_;
   my @queryResult;
 
   # get the state_description_id
@@ -251,28 +363,59 @@ sub submit {
   }
 }
 
-sub db {
-  my $self = shift;
-  my $db = shift;
-  $db &&
-    ( $self->{_db} = $db );
-  $self->{_db};
-}
+=head2 db
 
+ Title   : db
+ Usage   : $obj->db($newval)
+ Function: 
+ Example : 
+ Returns : value of db
+ Args    : newvalue (optional)
+
+
+=cut
+
+sub db {
+   my ($obj,$value) = @_;
+   if( defined $value) {
+      $obj->{'_db'} = $value;
+    }
+    return $obj->{'_db'};
+}
 
 # convenience function to get rid of %pipeConf once
 # maybe have params in the database?
+=head2 get_param
+
+ Title   : get_param
+ Usage   :
+ Function: convenience function to get rid of %pipeConf once
+           maybe have params in the database?
+ Returns : config options
+ Args    : paramname
+
+
+=cut
+
 sub get_param {
-  my $self = shift;
-  my $paramname = shift;
+  my ($self,$paramname) = @_;
 
   return $::pipeConf{$paramname};
 }
 
+=head2 log_error
+
+ Title   : log_error
+ Usage   : $controldb->log_error($objectstateid, $msg);
+ Function: logs a message in the database
+ Returns : none
+ Args    : object state id, 
+           message
+
+=cut
+
 sub log_error {
-  my $self = shift;
-  my $obj_state_id = shift;
-  my $msg = shift;
+  my ($self,$obj_state_id,$msg) = @_;
 
   my $sth = $self->db->prepare( q{
     INSERT into object_error( object_state_id, error_mesg )
@@ -280,7 +423,5 @@ sub log_error {
   } );
   $sth->execute( $obj_state_id, $msg );
 }
-
-
 
 1;

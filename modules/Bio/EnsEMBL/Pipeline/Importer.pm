@@ -16,9 +16,9 @@ Importer
 
 =head1 SYNOPSIS
 
-  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(-host => $host,
-                                                     -dbname => $dbname,
-                                                     -user   => 'ensadmin');
+  my $dbobj = new Bio::EnsEMBL::Pipeline::DBSQL::Obj('-host' => $host,
+                                                     '-dbname' => $dbname,
+                                                     '-user'   => 'ensadmin');
 
   my $mirror_dir = '/nfs/disk100/humpub/th/unfinished_ana/';
 
@@ -30,11 +30,12 @@ Importer
 
 =head1 DESCRIPTION
 
-Reads sequences from files in a directory, makes them into clone objects
-and writes them into the database.  Before writing it detects whether the database 
-already has the sequence and deletes it if it is a previous version.  If the
-sequence being written is the same or a previous version to that in the database 
-a warning is printed and the sequence isn't written.
+Reads sequences from files in a directory, makes them into clone
+objects and writes them into the database.  Before writing it detects
+whether the database already has the sequence and deletes it if it is
+a previous version.  If the sequence being written is the same or a
+previous version to that in the database a warning is printed and the
+sequence isn't written.
 
 Previous versions of clones my be retained with retain_old_versions()
 
@@ -48,6 +49,7 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
+#' # make emacs happy
 
 package Bio::EnsEMBL::Pipeline::Importer;
 
@@ -69,46 +71,48 @@ use Bio::EnsEMBL::Pipeline::DBSQL::Obj;
 =head2 new
 
     Title   :   new
-    Usage   :   my $importer   = new Importer(-dbobj      => $dbobj,
-                                              -mirror_dir => $mirror_dir,
-                                              -species    => $species);
+    Usage   :   my $importer   = new Importer('-dbobj'      => $dbobj,
+                                              '-mirror_dir' => $mirror_dir,
+                                              '-species'    => $species);
     Function:   Initializes module
     Returns :   
-    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,directory name,species
+    Args    :   Bio::EnsEMBL::Pipeline::DBSQL::Obj,
+                directory name,
+                species
 
 =cut
 
-sub _initialize {
-  my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-  my $make = $self->SUPER::_initialize(@_);    
+    my $self = $class->SUPER::new(@args);    
 
-  $self->{_dbobj}        = undef;     
-  $self->{_mirror_dir}   = undef;
-  $self->{_clones}       = [];
-  $self->{_chromosome}   = undef;
-  $self->{_retain_old_versions} = undef;
+    $self->{'_dbobj'}        = undef;     
+    $self->{'_mirror_dir'}   = undef;
+    $self->{'_clones'}       = [];
+    $self->{'_chromosome'}   = undef;
+    $self->{'_retain_old_versions'} = undef;
 
-  my( $dbobj,$mirror_dir,$species) = 
-    $self->_rearrange(['DBOBJ','MIRROR_DIR','SPECIES'], @args);
+    my( $dbobj,$mirror_dir,$species) = 
+	$self->_rearrange([qw(DBOBJ MIRROR_DIR SPECIES)], @args);
 
-  if ($dbobj) {
-    $self->dbobj($dbobj);
-  } else {
-    $self->throw("No database object input");
-  }
-  if ($mirror_dir) {
-    $self->mirror_dir($mirror_dir);
-  } else {
-    $self->throw("No mirror directory input");
-  }
-  if ($species) {
-    $self->species($species);
-  } else {
-    $self->throw("No species input");
-  }
+    if ($dbobj) {
+	$self->dbobj($dbobj);
+    } else {
+	$self->throw("No database object input");
+    }
+    if ($mirror_dir) {
+	$self->mirror_dir($mirror_dir);
+    } else {
+	$self->throw("No mirror directory input");
+    }
+    if ($species) {
+	$self->species($species);
+    } else {
+	$self->throw("No species input");
+    }
 
-    return $self; # success - we hope!
+    return $self;
 }
 
 
@@ -126,7 +130,8 @@ sub importClones {
         print STDERR "Can't find file $file\n";
       }
     }
-    $self->throw("Couldn't find any of the specified files") unless scalar @files > 0;
+    $self->throw("Couldn't find any of the specified files") 
+	unless scalar @files > 0;
   }
   else {
     @files = $self->getNewFiles;
@@ -140,8 +145,8 @@ sub importClones {
  FILE: foreach my $file (@files) {
       next FILE if ($file =~ /_cc/); 
 
-      $self->{_clones} = [];
-      $self->{_clonehash} = {};
+      $self->{'_clones'} = [];
+      $self->{'_clonehash'} = {};
 
       eval {
 	my $clones = $self->readFile($file);
@@ -184,7 +189,7 @@ sub checkClones {
 	$ok = 0;
       }
 
-      my $file = $self->{_clonehash}{$clone->id}{file};
+      my $file = $self->{'_clonehash'}{$clone->id}{file};
       
       if (!defined($clone->htg_phase)) {
 	$self->warn("ERROR: Clone " . $clone->id . " in file $file has no htg_phase");
@@ -258,7 +263,7 @@ sub checkClones {
 	  if ($oldversion > $clone->embl_version) {
 	    $self->warn("ERROR : Inconsistent clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version);
 	  }elsif ($oldversion == $clone->embl_version) {
-	    $self->warn("ERROR : Identical clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version. " in file " . $self->{_clonehash}{$clone->id}{file} . "\n");
+	    $self->warn("ERROR : Identical clone versions for " . $clone->id . " : old - $oldversion new - " . $clone->embl_version. " in file " . $self->{'_clonehash'}{$clone->id}{file} . "\n");
 	  } else {
             if ($self->retain_old_versions) {
 	      print STDERR "Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "; keeping old version\n";
@@ -283,7 +288,7 @@ sub checkClones {
     }
   }
 
-  $self->{_clones} = [];
+  $self->{'_clones'} = [];
 
   foreach my $clone (@newclones) {
     $self->clones($clone);
@@ -388,7 +393,7 @@ sub getNewFiles {
 sub readFile {
   my ($self,$file) = @_;
 
-  my $clonehash = $self->{_clonehash};
+  my $clonehash = $self->{'_clonehash'};
 
   my $dir = $self->mirror_dir;
   my $count = 1;
@@ -467,23 +472,15 @@ sub readFile {
 	$clonehash->{$1}{version} = $2;
 	$clonehash->{$1}{contigs} = [];
       } elsif ($_ =~ /(\d+)\s+(\d+):? contig of/) {
-    # disclaimer: this re (^^) should work, but not guaranteed, e.g.
-    # needed ? after : because of file format "inconsistencies"... arrgh!
-        my %contighash;
+	  # disclaimer: this re (^^) should work, but not guaranteed, e.g.
+	  # needed ? after : because of file format "inconsistencies"... arrgh!      
       
-	$contighash{start} = $1;
-	$contighash{end}   = $2;
-      
-        push(@{$clonehash->{$accession}{contigs}},\%contighash);
+        push(@{$clonehash->{$accession}{'contigs'}},{ 'start' => $1, 
+						      'end'   => $2});
       
       } elsif ($_ =~ /Contig (\d+):\s+(\d+)\-(\d+)/) {
-        my %contighash;
-      
-	$contighash{start} = $2;
-	$contighash{end}   = $3;
-      
-        push(@{$clonehash->{$accession}{contigs}},\%contighash);
-      
+        push(@{$clonehash->{$accession}{'contigs'}},{ 'start' => $2,
+						      'end'   => $3} );
       }
     }
     close(CC);
@@ -523,7 +520,7 @@ sub readChromosomes {
     
     my ($acc,$ver,$id,$chr,@dum) = split(' ',$_);
     my $accver = "$acc.$ver";
-    $self->{_chromosome}{$accver} = $chr;
+    $self->{'_chromosome'}{$accver} = $chr;
     
   }
   close(CHR);
@@ -652,10 +649,10 @@ sub dbobj {
     if (!($arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj"))) {
       $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj");
     }
-    $self->{_dbobj} = $arg;
+    $self->{'_dbobj'} = $arg;
   }
 
-  return $self->{_dbobj};
+  return $self->{'_dbobj'};
 }
 
 
@@ -676,10 +673,10 @@ sub species {
     if ($arg ne 'hs' && $arg ne 'mm') {
       $self->throw("Only mm [mouse] and hs [human] options supported");
     }
-    $self->{_species} = $arg;
+    $self->{'_species'} = $arg;
   }
 
-  return $self->{_species};
+  return $self->{'_species'};
 }
 
 =head2 mirror_dir
@@ -700,10 +697,10 @@ sub mirror_dir {
       $self->throw("Directory [$arg] doesn't exist");
     }
     $arg .= "/" if ($arg !~ /\/$/);
-    $self->{_mirror_dir} = $arg;
+    $self->{'_mirror_dir'} = $arg;
   }
 
-  return $self->{_mirror_dir};
+  return $self->{'_mirror_dir'};
 }
 
 =head2 clones
@@ -723,10 +720,10 @@ sub clones {
     if (!($arg->isa("Bio::EnsEMBL::DB::CloneI"))) {
       $self->throw("[$arg] is not a Bio::EnsEMBL::DB::CloneI");
     }
-    push(@{$self->{_clones}},$arg);
+    push(@{$self->{'_clones'}},$arg);
   }
 
-  return @{$self->{_clones}};
+  return @{$self->{'_clones'}};
 }
 
 
@@ -755,14 +752,15 @@ sub retain_old_versions {
 
   if (defined $arg) {
     if ($arg) {
-      $self->{_retain_old_versions} = 1;
+      $self->{'_retain_old_versions'} = 1;
     }
     else {
-      $self->{_retain_old_versions} = 0;
+      $self->{'_retain_old_versions'} = 0;
     }
   }
-  return $self->{_retain_old_versions};
+  return $self->{'_retain_old_versions'};
 }
+
 
 =head2 scanClone
 
@@ -774,6 +772,7 @@ sub retain_old_versions {
     Args    :   seq: string
 
 =cut
+#'
 
 sub scanClone {
   my($self, $seq) = @_;

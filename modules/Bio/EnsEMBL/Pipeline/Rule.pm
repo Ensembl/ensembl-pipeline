@@ -37,6 +37,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 package Bio::EnsEMBL::Pipeline::Rule;
 use vars qw(@ISA);
+use Bio::Root::RootI;
 use strict;
 
 
@@ -55,14 +56,14 @@ use strict;
 
 
 sub new {
-  my $class = shift;
-  my $self = bless {},$class;
+  my ($class,@args) = @_;
+  my $self = $class->SUPER::new(@args);
 
   my ( $goal, $adaptor, $dbID ) =
     $self->_rearrange( [ qw ( GOAL
 			      ADAPTOR
 			      DBID
-			     ) ], @_ );
+			     ) ], @args );
   $self->throw( "Wrong parameter" ) unless
     $goal->isa( "Bio::EnsEMBL::Pipeline::Analysis" );
   $self->dbID( $dbID );
@@ -88,7 +89,7 @@ sub add_condition {
   my $self = shift;
   my $condition = shift;
 
-  push( @{$self->{_conditions}}, $condition );
+  push( @{$self->{'_conditions'}}, $condition );
 }
 
 =head2 list_conditions
@@ -106,7 +107,7 @@ sub add_condition {
 sub list_conditions {
   my $self = shift;
 
-  my @conditions = @{$self->{_conditions}};
+  my @conditions = @{$self->{'_conditions'}};
   if (! scalar (@conditions) ) {
       $self->throw("No conditions found for this Rule");
   }
@@ -127,8 +128,8 @@ sub goalAnalysis {
   my ($self,$arg) = @_;
 
   ( defined $arg ) &&
-    ( $self->{_goal} = $arg );
-  $self->{_goal};
+    ( $self->{'_goal'} = $arg );
+  $self->{'_goal'};
 }
 
 
@@ -169,14 +170,15 @@ sub check_for_analysis {
 sub dbID {
   my ( $self, $dbID ) = @_;
   ( defined $dbID ) &&
-    ( $self->{_dbID} = $dbID );
-  $self->{_dbID};
+    ( $self->{'_dbID'} = $dbID );
+  $self->{'_dbID'};
 }
 
 sub adaptor {
   my ( $self, $adaptor ) = @_;
   ( defined $adaptor ) &&
-    ( $self->{_adaptor} = $adaptor );
-  $self->{_adaptor};
+    ( $self->{'_adaptor'} = $adaptor );
+  $self->{'_adaptor'};
 }
 
+1;

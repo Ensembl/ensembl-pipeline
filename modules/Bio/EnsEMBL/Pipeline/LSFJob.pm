@@ -23,11 +23,12 @@ Stores details of a job on the LSF queue
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -38,26 +39,26 @@ package Bio::EnsEMBL::Pipeline::LSFJob;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::Root::RootI;
 
 @ISA = qw(Bio::Root::RootI);
 
-sub _initialize {
-    my ($self,@args) = @_;
+sub new {
+    my ($class,@args) = @_;
 
-    my $make = $self->SUPER::_initialize;
+    my $self = $class->SUPER::new(@args);
 
-    my ($id,$user,$status,$queue,$from_host,$exec_host,$job_name,$submission_time) = 
-	$self->_rearrange([qw(ID
-			      USER
-			      STATUS
-			      QUEUE
-			      FROM_HOST
-			      EXEC_HOST
-			      JOB_NAME
-			      SUBMISSION_TIME
-			      )],@args);
+    my ($id,$user,$status,$queue,$from_host,
+	$exec_host,$job_name,$submission_time) = 
+	    $self->_rearrange([qw(ID
+				  USER
+				  STATUS
+				  QUEUE
+				  FROM_HOST
+				  EXEC_HOST
+				  JOB_NAME
+				  SUBMISSION_TIME
+				  )],@args);
     $self->id             ($id);
     $self->user           ($user);
     $self->status         ($status);
@@ -67,7 +68,7 @@ sub _initialize {
     $self->job_name       ($job_name);
     $self->submission_time($submission_time);
     
-    return $make; # success - we hope!
+    return $self;
 }
 
 =head2 id
@@ -87,9 +88,9 @@ sub id {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_id} = $arg;
+	$self->{'_id'} = $arg;
     }
-    return $self->{_id};
+    return $self->{'_id'};
 
 }
 
@@ -109,10 +110,9 @@ sub user {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_user} = $arg;
+	$self->{'_user'} = $arg;
     }
-    return $self->{_user};
-
+    return $self->{'_user'};
 }
 
 
@@ -131,10 +131,9 @@ sub status {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_status} = $arg;
+	$self->{'_status'} = $arg;
     }
-    return $self->{_status};
-
+    return $self->{'_status'};
 }
 
 =head2 queue
@@ -152,10 +151,9 @@ sub queue {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_queue} = $arg;
+	$self->{'_queue'} = $arg;
     }
-    return $self->{_queue};
-
+    return $self->{'_queue'};
 }
 
 =head2 from_host
@@ -174,10 +172,9 @@ sub from_host {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_from_host} = $arg;
+	$self->{'_from_host'} = $arg;
     }
-    return $self->{_from_host};
-
+    return $self->{'_from_host'};
 }
 
 =head2 exec_host
@@ -196,10 +193,9 @@ sub exec_host {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_exec_host} = $arg;
+	$self->{'_exec_host'} = $arg;
     }
-    return $self->{_exec_host};
-
+    return $self->{'_exec_host'};
 }
 
 
@@ -218,10 +214,9 @@ sub job_name {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_job_name} = $arg;
+	$self->{'_job_name'} = $arg;
     }
-    return $self->{_job_name};
-
+    return $self->{'_job_name'};
 }
 
 =head2 submission_time
@@ -240,10 +235,9 @@ sub submission_time {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_submission_time} = $arg;
+	$self->{'_submission_time'} = $arg;
     }
-    return $self->{_submission_time};
-
+    return $self->{'_submission_time'};
 }
 
 
@@ -261,9 +255,7 @@ sub submit {
 	    print (STDERR $_);
 	}
     }
-		   
     close(SUB);
-
 }
 
 

@@ -45,13 +45,11 @@ use strict;
 
 # use FreezeThaw qw(freeze thaw);
 
-# Object preamble - inherits from Bio::Root::Object;
-
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DB::JobI;
-
+use Bio::Root::RootI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::DB::JobI Bio::Root::RootI);
 
@@ -62,11 +60,33 @@ use Bio::EnsEMBL::Pipeline::DB::JobI;
 my %batched_jobs;
 my %batched_jobs_runtime;
 
+=head2 new
+
+ Title   : new
+ Usage   : my $job = new Bio::EnsEMBL::Pipeline::Job(%params);
+ Function: object for representing jobs in pipeline ids are stored in 
+           pipeline db
+ Example :
+ Returns : 
+ Args    : -adaptor:   Bio::EnsEMBL::DBAdaptor object
+           -id:        DB Job id
+           -lsf_id:    LSF id for job
+           -input_id:  input id (mandatory)
+           -class:     Class of job (default 'contig')
+           -analysis:  Analysis object (mandatory)
+           -stdout:    file where program STDOUT is written
+           -stderr:    file where program STDERR is written
+           -input_object_file: File where object can be serialized
+           -retry_count: Number retries on this job
+
+=cut
+
 sub new {
     my ($class, @args) = @_;
-    my $self = bless {},$class;
+    my $self = $class->SUPER::new(@args);
 
-    my ($adaptor,$dbID,$lsfid,$input_id,$cls,$analysis,$stdout,$stderr,$input, $retry_count ) 
+    my ($adaptor,$dbID,$lsfid,$input_id,$cls,
+	$analysis,$stdout,$stderr,$input, $retry_count ) 
 	= $self->_rearrange([qw(ADAPTOR
 				ID
 				LSF_ID
@@ -148,9 +168,9 @@ sub dbID {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_dbID} = $arg;
+	$self->{'_dbID'} = $arg;
     }
-    return $self->{_dbID};
+    return $self->{'_dbID'};
 
 }
 
@@ -169,9 +189,9 @@ sub adaptor {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_adaptor} = $arg;
+	$self->{'_adaptor'} = $arg;
     }
-    return $self->{_adaptor};
+    return $self->{'_adaptor'};
 
 }
 
@@ -192,9 +212,9 @@ sub input_id {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_input_id} = $arg;
+	$self->{'_input_id'} = $arg;
     }
-    return $self->{_input_id};
+    return $self->{'_input_id'};
 }
 
 =head2 class
@@ -213,9 +233,9 @@ sub class {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_class} = $arg;
+	$self->{'_class'} = $arg;
     }
-    return $self->{_class};
+    return $self->{'_class'};
 }
 
 =head2 analysis
@@ -234,9 +254,9 @@ sub analysis {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-	$self->{_analysis} = $arg;
+	$self->{'_analysis'} = $arg;
     }
-    return $self->{_analysis};
+    return $self->{'_analysis'};
 
 }
 
@@ -498,15 +518,15 @@ sub runInLSF {
 	  $module =~ s/::/\//g;
 	  require "${module}.pm";
 	  $rdb = "${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+	      ( '-analysis' => $self->analysis,
+		'-input_id' => $self->input_id,
+		'-dbobj' => $self->adaptor->db );
       } else {
 	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
 	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-dbobj => $self->adaptor->db );
+	      ( '-analysis' => $self->analysis,
+		'-input_id' => $self->input_id,
+		'-dbobj' => $self->adaptor->db );
       }
   };
   if ($err = $@) {
@@ -796,9 +816,9 @@ sub stdout_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_stdout_file} = $arg;
+	$self->{'_stdout_file'} = $arg;
     }
-    return $self->{_stdout_file};
+    return $self->{'_stdout_file'};
 }
 
 =head2 stderr_file
@@ -815,9 +835,9 @@ sub stderr_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_stderr_file} = $arg;
+	$self->{'_stderr_file'} = $arg;
     }
-    return $self->{_stderr_file};
+    return $self->{'_stderr_file'};
 }
 
 =head2 input_object_file
@@ -834,9 +854,9 @@ sub input_object_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_input_object_file} = $arg;
+	$self->{'_input_object_file'} = $arg;
     }
-    return $self->{_input_object_file};
+    return $self->{'_input_object_file'};
 }
 
 =head2 LSF_id
@@ -852,22 +872,22 @@ sub input_object_file {
 sub LSF_id {
   my ($self, $arg) = @_;
   (defined $arg) &&
-    ( $self->{_lsfid} = $arg );
-  $self->{_lsfid};
+    ( $self->{'_lsfid'} = $arg );
+  $self->{'_lsfid'};
 }
 
 sub LSF_out {
   my ($self, $arg) = @_;
   (defined $arg) &&
-    ( $self->{_lsfout} = $arg );
-  $self->{_lsfout};
+    ( $self->{'_lsfout'} = $arg );
+  $self->{'_lsfout'};
 }
 
 sub LSF_err {
   my ($self, $arg) = @_;
   (defined $arg) &&
-    ( $self->{_lsferr} = $arg );
-  $self->{_lsferr};
+    ( $self->{'_lsferr'} = $arg );
+  $self->{'_lsferr'};
 }
 
 =head2 retry_count
@@ -883,8 +903,8 @@ sub LSF_err {
 sub retry_count {
   my ($self, $arg) = @_;
   (defined $arg) &&
-    ( $self->{_retry_count} = $arg );
-  $self->{_retry_count};
+    ( $self->{'_retry_count'} = $arg );
+  $self->{'_retry_count'};
 }
 
 sub remove {
@@ -900,8 +920,3 @@ sub remove {
 }
 
 1;
-
-
-
-
-

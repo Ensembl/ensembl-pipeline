@@ -13,37 +13,39 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Analysis.pm - Stores details of an analysis run
+Bio::EnsEMBL::Pipeline::Analysis - Stores details of an analysis run
 
 =head1 SYNOPSIS
 
-    my $obj    = new Bio::EnsEMBL::Analysis::Analysis(-id              => $id,
-						      -logical_name    => 'SWIRBlast',
-						      -db              => $db,
-						      -db_version      => $db_version,
-						      -db_file         => $db_file,
-						      -program         => $program,
-						      -program_version => $program_version,
-						      -program_file    => $program_file,
-						      -gff_source      => $gff_source,
-						      -gff_feature     => $gff_feature,
-						      -module          => $module,
-						      -module_version  => $module_version,
-						      -parameters      => $parameters,
-						      -created         => $created
-						      )
+ my $obj    = new Bio::EnsEMBL::Analysis::Analysis
+    ('-id'              => $id,
+     '-logical_name'    => 'SWIRBlast',
+     '-db'              => $db,
+     '-db_version'      => $db_version,
+     '-db_file'         => $db_file,
+     '-program'         => $program,
+     '-program_version' => $program_version,
+     '-program_file'    => $program_file,
+     '-gff_source'      => $gff_source,
+     '-gff_feature'     => $gff_feature,
+     '-module'          => $module,
+     '-module_version'  => $module_version,
+     '-parameters'      => $parameters,
+     '-created'         => $created
+     );
 
 =head1 DESCRIPTION
 
-Object to store details of an analysis run
+Object to store details of an analysis run.
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -54,26 +56,42 @@ package Bio::EnsEMBL::Pipeline::Analysis;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
-
 use Bio::Root::RootI;
 
 # Inherits from the base bioperl object
 @ISA = qw(Bio::Root::RootI);
 
-# new() is inherited from Bio::Root::RootI
+=head2 new
 
-# _initialize is where the heavy stuff will happen when new is called
+ Title   : new
+ Usage   : my $analysis = new Bio::EnsEMBL::Pipeline::Analysis(%params);
+ Function: Creates a new Bio::EnsEMBL::Pipeline::Analysis object
+ Returns : Bio::EnsEMBL::Pipeline::Analysis
+ Args    : -id:              Analysis ID
+           -db:              DB Name
+           -db_version:      DB Version
+           -db_file:         DB File
+           -program:         Program name
+           -program_version: Program version
+           -program_file:    Program file
+           -gff_source:      GFF source
+           -gff_feature:     GFF feature
+           -module:          Module 
+           -module_version:  Module version
+           -parameters:      Parameters used
+           -created:         Date created
+           -logic_name:      Logical name
 
-sub _initialize {
-  my($self,@args) = @_;
+=cut
 
-  my $make = $self->SUPER::_initialize;
+sub new {
+  my($class,@args) = @_;
+
+  my $self = $class->SUPER::new(@args);
 
   my ($id,$db,$db_version,$db_file,$program,$program_version,$program_file,
       $gff_source,$gff_feature,$module,$module_version,$parameters,$created,
       $logic_name ) =
-
 	  $self->_rearrange([qw(ID
 				DB
 				DB_VERSION
@@ -90,7 +108,7 @@ sub _initialize {
 				LOGIC_NAME
 				)],@args);
 
-  $self->dbID             ($id);
+  $self->dbID           ($id);
   $self->db             ($db);
   $self->db_version     ($db_version);
   $self->db_file        ($db_file);
@@ -103,9 +121,9 @@ sub _initialize {
   $self->gff_feature    ($gff_feature);
   $self->parameters     ($parameters);
   $self->created        ($created);
-  $self->logic_name ( $logic_name );
+  $self->logic_name     ( $logic_name );
 
-  return $self; # success - we hope!
+  return $self; 
 }
 
 
@@ -123,9 +141,9 @@ sub dbID {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_dbid} = $arg;
+	$self->{'_dbid'} = $arg;
     }
-    return $self->{_dbid};
+    return $self->{'_dbid'};
 }
 
 
@@ -143,10 +161,10 @@ sub db {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_db} = $arg;
+	$self->{'_db'} = $arg;
     }
 
-    return $self->{_db};
+    return $self->{'_db'};
 }
 
 
@@ -164,10 +182,10 @@ sub db_version {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_db_version} = $arg;
+	$self->{'_db_version'} = $arg;
     }
 
-    return $self->{_db_version};
+    return $self->{'_db_version'};
 }
 
 
@@ -185,10 +203,10 @@ sub db_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_db_file} = $arg;
+	$self->{'_db_file'} = $arg;
     }
 
-    return $self->{_db_file};
+    return $self->{'_db_file'};
 }
 
 
@@ -206,10 +224,10 @@ sub program {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_program} = $arg;
+	$self->{'_program'} = $arg;
     }
 
-    return $self->{_program};
+    return $self->{'_program'};
 }
 
 
@@ -227,10 +245,10 @@ sub program_version {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_program_version} = $arg;
+	$self->{'_program_version'} = $arg;
     }
 
-    return $self->{_program_version};
+    return $self->{'_program_version'};
 }
 
 =head2 program_file
@@ -247,10 +265,10 @@ sub program_file {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_program_file} = $arg;
+	$self->{'_program_file'} = $arg;
     }
 
-    return $self->{_program_file};
+    return $self->{'_program_file'};
 }
 
 
@@ -268,10 +286,10 @@ sub module {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_module} = $arg;
+	$self->{'_module'} = $arg;
     }
 
-    return $self->{_module};
+    return $self->{'_module'};
 }
 
 
@@ -289,10 +307,10 @@ sub module_version {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_module_version} = $arg;
+	$self->{'_module_version'} = $arg;
     }
 
-    return $self->{_module_version};
+    return $self->{'_module_version'};
 }
 
 =head2 gff_source
@@ -309,10 +327,10 @@ sub gff_source {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_gff_source} = $arg;
+	$self->{'_gff_source'} = $arg;
     }
 
-    return $self->{_gff_source};
+    return $self->{'_gff_source'};
 }
 
 =head2 gff_feature
@@ -329,10 +347,10 @@ sub gff_feature {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_gff_feature} = $arg;
+	$self->{'_gff_feature'} = $arg;
     }
 
-    return $self->{_gff_feature};
+    return $self->{'_gff_feature'};
 }
 
 =head2 parameters
@@ -349,10 +367,10 @@ sub parameters {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_parameters} = $arg;
+	$self->{'_parameters'} = $arg;
     }
 
-    return $self->{_parameters};
+    return $self->{'_parameters'};
 }
 
 =head2 created
@@ -369,10 +387,10 @@ sub created {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_created} = $arg;
+	$self->{'_created'} = $arg;
     }
 
-    return $self->{_created};
+    return $self->{'_created'};
 }
 
 =head2 logic_name
@@ -390,10 +408,9 @@ sub created {
 sub logic_name {
   my ($self, $arg ) = @_;
   ( defined $arg ) &&
-    ($self->{_logic_name} = $arg);
-  $self->{_logic_name};
+    ($self->{'_logic_name'} = $arg);
+  $self->{'_logic_name'};
 }
-
 
 1;
 

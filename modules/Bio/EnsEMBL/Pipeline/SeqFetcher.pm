@@ -1,5 +1,3 @@
-#!/usr/local/bin/perl
-
 #
 #
 # Cared for by Val Curwen  <vac@sanger.ac.uk>
@@ -51,17 +49,14 @@ use Bio::Index::Fasta;
 use Bio::Index::EMBL;
 use Bio::Index::SwissPfam;
 
-
-
 use vars qw(@ISA);
 
 @ISA = qw(Bio::Root::RootI);
 
 sub new {
   my ($class, @args) = @_;
-  my $self = bless {}, $class;
-  
-  return $self; # success - we hope!
+  my $self = $class->SUPER::new(@args);
+  return $self;
 }
 
 =head2 pfetch
@@ -75,14 +70,12 @@ sub new {
 =cut
 
 sub pfetch {
-  
-  my ($self, $pfetch) = @_;
-  if ($pfetch)
-    {
-      $self->{'_pfetch'} = $pfetch;
+    my ($self, $pfetch) = @_;
+
+    if ($pfetch) {
+	$self->{'_pfetch'} = $pfetch;
     }
-  return $self->{'_pfetch'};  
-  
+    return $self->{'_pfetch'};
 }
 
 =head2 efetch
@@ -96,11 +89,9 @@ sub pfetch {
 =cut
 
 sub efetch {
-  
-  my ($self, $efetch) = @_;
-  if ($efetch)
-    {
-      $self->{'_efetch'} = $efetch;
+    my ($self, $efetch) = @_;
+    if ($efetch) {
+	$self->{'_efetch'} = $efetch;
     }
   return $self->{'_efetch'};  
   
@@ -118,14 +109,11 @@ sub efetch {
 =cut
 
 sub getz {
-  
-  my ($self, $getz) = @_;
-  if ($getz)
-    {
-      $self->{'_getz'} = $getz;
+    my ($self, $getz) = @_;
+    if ($getz) {
+	$self->{'_getz'} = $getz;
     }
-  return $self->{'_getz'};  
-  
+    return $self->{'_getz'};    
 }
 
 =head2 bp_index
@@ -139,14 +127,11 @@ sub getz {
 =cut
 
 sub bp_index {
-  
-  my ($self, $inx) = @_;
-  if ($inx)
-    {
-      $self->{'_inx'} = $inx;
+    my ($self, $inx) = @_;
+    if ($inx) {
+	$self->{'_inx'} = $inx;
     }
-  return $self->{'_inx'};  
-  
+    return $self->{'_inx'};
 }
 
 =head2 bp_format
@@ -160,14 +145,11 @@ sub bp_index {
 =cut
 
 sub bp_format {
-  
-  my ($self, $format) = @_;
-  if ($format)
-    {
-      $self->{'_format'} = $format;
+    my ($self, $format) = @_;
+    if ($format) {
+	$self->{'_format'} = $format;
     }
-  return $self->{'_format'};  
-  
+    return $self->{'_format'};  
 }
 
 =head2 run_pfetch
@@ -181,9 +163,7 @@ sub bp_format {
 =cut
 
 sub run_pfetch {
-
-  my ($self,$id) = @_;
-
+  my ($self,$id) = @_;  
   if (!defined($id)) {
     $self->throw("No id input to run_pfetch");
   }  
@@ -202,12 +182,11 @@ sub run_pfetch {
 
   chomp($seqstr);
   if(defined $seqstr && $seqstr ne "no match") {
-    $seq = new Bio::Seq(-seq => $seqstr,
-			-id  => $newid);
+    $seq = new Bio::Seq('-seq' => $seqstr,
+			'-id'  => $newid);
   }
   
   return $seq;
-
 }
 
 =head2 run_efetch
@@ -221,7 +200,6 @@ sub run_pfetch {
 =cut
 
 sub run_efetch {
-
   my ($self,$id) = @_;
 
   if (!defined($id)) {
@@ -241,11 +219,10 @@ sub run_efetch {
   close IN;
 
 #  chomp($seqstr);
-  $seq = new Bio::Seq(-seq => $seqstr, -id  => $newid)
-    unless (!defined $seqstr || $seqstr =~ "not found");
+  $seq = new Bio::Seq('-seq' => $seqstr, '-id'  => $newid)
+      unless (!defined $seqstr || $seqstr =~ "not found");
   
   return $seq;
-
 }
 
 
@@ -260,7 +237,6 @@ sub run_efetch {
 =cut
 
 sub run_getz {
-
   my ($self,$id,$libs) = @_;
 
   if (!defined($id)) {
@@ -286,7 +262,7 @@ sub run_getz {
   # hack just for rikens
   my $format = 'EMBL';
   if($libs eq 'mouseprot') { $format = 'Fasta'; }
-  my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>$format);
+  my $fh = Bio::SeqIO->new('-fh'   => \*IN, "-format"=>$format);
 
   $seq = $fh->next_seq();
   close IN;
@@ -348,13 +324,13 @@ sub parse_header {
     Usage   :   $self->run_bp_search($id,$inx,$format)
     Function:   Retrieves a sequence from the specified Bioperl index
     Returns :   Bio::Seq, or undef
-    Args    :   id of sequence to be retrieved, string representing path to bioperl index,
+    Args    :   id of sequence to be retrieved, 
+                string representing path to bioperl index, 
                 string representing index format
 
 =cut
 
 sub run_bp_search {
-
   my ($self,$id,$inx,$format) = @_;
   my $seq;
   my $index;
@@ -371,10 +347,12 @@ sub run_bp_search {
   }
 
   if (!defined($format)){
-    $format = $self->bp_format;
-    if (!defined($format) || ($format ne 'Fasta' && $format ne 'EMBL' && $format ne 'SwissPfam')) {
-      $self->throw("Cannot run_bp_search without a valid format: Fasta, EMBL or SwissPfam");
-    }
+      $format = $self->bp_format;
+      if (!defined($format) || ($format ne 'Fasta' && 
+				$format ne 'EMBL' && 
+				$format ne 'SwissPfam')) {
+	  $self->throw("Cannot run_bp_search without a valid format: Fasta, EMBL or SwissPfam");
+      }
   }
   
   my $type = 'Bio::Index::' . $format;
@@ -398,3 +376,4 @@ sub run_bp_search {
   return $seq;
 }
 
+1;

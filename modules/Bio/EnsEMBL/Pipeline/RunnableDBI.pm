@@ -36,16 +36,14 @@ package Bio::EnsEMBL::Pipeline::RunnableDBI;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::Root::RootI;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
 =head1 CONCRETE METHODS
 
-These methods are actually implemented by this
-"I" module.
+These methods are actually implemented by this "I" module.
 
 =head2 dbobj
 
@@ -112,3 +110,5 @@ sub write_output {
     my( $self ) = @_;
     $self->throw("write_input not implemented");
 }
+
+1;

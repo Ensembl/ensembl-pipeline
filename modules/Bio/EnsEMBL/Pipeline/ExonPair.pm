@@ -13,60 +13,55 @@ Bio::EnsEMBL::Analysis::ExonPair - stores 2 exons surrounding a confirmed intron
 =head1 SYNOPSIS
 
     
-    $pair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon1,
-						 -exon2 => $exon2,
-						 -type  => $type);
+    $pair = new Bio::EnsEMBL::Pipeline::ExonPair('-exon1' => $exon1,
+						 '-exon2' => $exon2,
+						 '-type'  => $type);
     
     $exon1 and $exon2 are Bio::EnsEMBL::Exon;
 
 
 =head1 DESCRIPTION
 
-This object stores 2 exon objects which surround a confirmed intron.  A set of these pair
-objects are generated from similarity matches and gene structures are then generated.
+This object stores 2 exon objects which surround a confirmed intron.
+A set of these pair objects are generated from similarity matches and
+gene structures are then generated.
 
     my $exon1 = $pair->exon1;
     my $exon2 = $pair->exon2; 
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
 
 # Let the code begin...
 
-
 package Bio::EnsEMBL::Pipeline::ExonPair;
 
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inheriets from Bio::Root::RootI
-
 use Bio::Root::RootI;
-
 use Bio::EnsEMBL::Exon;
 
 @ISA = qw(Bio::Root::RootI);
-# new() is inherited from Bio::Root::RootI
 
-# _initialize is where the heavy stuff will happen when new is called
+sub new {
+  my($class,@args) = @_;
 
-sub _initialize {
-  my($self,@args) = @_;
+  my $self = $class->SUPER::new(@args);
 
-  my $make = $self->SUPER::_initialize;
-
-  my ($exon1,$exon2,$type) =     $self->_rearrange([qw(EXON1
-						       EXON2
-						       TYPE
-						 )],@args);
+  my ($exon1,$exon2,$type) = $self->_rearrange([qw(EXON1
+						   EXON2
+						   TYPE
+						   )],@args);
 
   
   $exon1 || $self->throw("First exon not defined in ExonPair constructor");
@@ -83,8 +78,7 @@ sub _initialize {
   $self->verifyExons();
   $self->add_coverage();
 
-  return $make; # success - we hope!
-
+  return $self;
 }
 
 
@@ -104,10 +98,10 @@ sub exon1 {
 
     if (defined($arg)) {
 	$self->throw("Argument must be Bio::EnsEMBL::Exon") unless $arg->isa("Bio::EnsEMBL::Exon");
-	$self->{_exon1} = $arg;
+	$self->{'_exon1'} = $arg;
     }
 
-    return $self->{_exon1};
+    return $self->{'_exon1'};
 }
 
 
@@ -127,9 +121,9 @@ sub exon2 {
 
     if (defined($arg)) {
 	$self->throw("Argument must be Bio::EnsEMBL::Exon") unless $arg->isa("Bio::EnsEMBL::Exon");
-	$self->{_exon2} = $arg;
+	$self->{'_exon2'} = $arg;
     }
-    return $self->{_exon2};
+    return $self->{'_exon2'};
 }
 
 
@@ -148,9 +142,9 @@ sub type {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_type} = $arg;
+	$self->{'_type'} = $arg;
     }
-    return $self->{_type};
+    return $self->{'_type'};
 }
 
 
@@ -203,8 +197,7 @@ sub verifyExons {
 
 sub add_coverage {
     my ($self) = @_;
-
-    $self->{_coverage}++;
+    $self->{'_coverage'}++;
 }
 
 
@@ -221,8 +214,7 @@ sub add_coverage {
 
 sub coverage {
     my ($self) = @_;
-
-    return $self->{_coverage};
+    return $self->{'_coverage'};
 }
 
 =head2 is_Covered
@@ -295,19 +287,16 @@ sub compare {
 sub add_Evidence {
     my ($self,$feature) = @_;
 
-
-    if (!defined($self->{_evidence})) {
-	$self->{_evidence} = [];
+    if (!defined($self->{'_evidence'})) {
+	$self->{'_evidence'} = [];
     }
 
     $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless defined($feature);
     $self->throw("Argument to add_Evidence must be Bio::EnsEMBL::FeaturePair") unless $feature->isa("Bio::EnsEMBL::FeaturePair");
 
-    push(@{$self->{_evidence}},$feature);
+    push(@{$self->{'_evidence'}},$feature);
 
 }
-
-
 
 =head2 get_all_Evidence
 
@@ -325,22 +314,32 @@ sub get_all_Evidence {
     my ($self) = @_;
 
 
-    if (!defined($self->{_evidence})) {
-	$self->{_evidence} = [];
+    if (!defined($self->{'_evidence'})) {
+	$self->{'_evidence'} = [];
     }
 
-    return @{$self->{_evidence}};
+    return @{$self->{'_evidence'}};
 }
 
+
+=head2 splice_seq
+
+ Title   : splice_seq
+ Usage   : my $spliceseq = $self->splice_seq(); or
+           $self->splice_seq($spliceseq); or
+ Function: Get/Set splice_seq 
+ Returns : Seq 
+ Args    : Seq
+
+=cut
 
 sub splice_seq {
     my ($self,$seq) = @_;
 
     if (defined($seq)) {
-	$self->{_spliceseq} = $seq;
+	$self->{'_spliceseq'} = $seq;
     }
-
-    return $self->{_spliceseq};
+    return $self->{'_spliceseq'};
 }
 
 1;

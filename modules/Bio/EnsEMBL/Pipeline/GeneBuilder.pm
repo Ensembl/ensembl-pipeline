@@ -28,39 +28,46 @@ my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'obi-wan',
 my $clone       = $db   ->get_Clone($clone);
 my @contigs     = $clone->get_all_Contigs;
 
-# The genebuilder object will fetch all the features from the contigs and use them
-# to first construct exons, then join those exons into exon pairs.  These exon apris are
-# then made into transcripts and finally all overlapping transcripts are put together into one gene.
+# The genebuilder object will fetch all the features from the contigs
+# and use them to first construct exons, then join those exons into
+# exon pairs.  These exon apris are then made into transcripts and
+# finally all overlapping transcripts are put together into one gene.
 
 
-my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contigs => \@contigs);
+my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder
+    (-contigs => \@contigs);
 
 my @genes       = $genebuilder->build_Genes;
 
-# After the genes are built they can be used to order the contigs they are on.
+# After the genes are built they can be used to order the contigs they
+# are on.
 
 my @contigs     = $genebuilder->order_Contigs;
 
 
 =head1 DESCRIPTION
 
-Takes in contigs and returns genes.  The procedure is currently reimplementing the TimDB method of
-building genes where genscan exons are confirmed by similarity features which are then joined together
+Takes in contigs and returns genes.  The procedure is currently
+reimplementing the TimDB method of building genes where genscan exons
+are confirmed by similarity features which are then joined together
 into exon pairs.  An exon pair is constructed as follows :
 
   ---------          --------    genscan exons
     -------          ----->      blast hit which spans an intron
     1     10        11    22        
 
-For an exon pair to make it into a gene there must be at least 2 blast hits (features) that span across 
-an intron.  This is called the coverage of the exon pair.
+For an exon pair to make it into a gene there must be at least 2 blast
+hits (features) that span across an intron.  This is called the
+coverage of the exon pair.
 
-After all exon pairs have been generated for all the genscan exons there is a recursive routine 
-(_recurseTranscripts) that looks for all exons that are the start of an exon pair with no 
-preceding exons.  The exon pairs are followed recursively (including alternative splices) to build up 
-full set of transcripts.
+After all exon pairs have been generated for all the genscan exons
+there is a recursive routine (_recurseTranscripts) that looks for all
+exons that are the start of an exon pair with no preceding exons.  The
+exon pairs are followed recursively (including alternative splices) to
+build up full set of transcripts.
 
-To generate the genes the transcripts are grouped together into sets with overlapping exons.
+To generate the genes the transcripts are grouped together into sets
+with overlapping exons.
 
 =head1 CONTACT
 
@@ -68,7 +75,8 @@ Describe contact details here
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+The rest of the documentation details each of the object
+methods. Internal methods are usually preceded with a _
 
 =cut
 
@@ -82,6 +90,8 @@ use Bio::EnsEMBL::MappedExon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Utils::GTF_handler;
+use Bio::EnsEMBL::SeqFeature;
+use Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
@@ -93,46 +103,42 @@ use FreezeThaw;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+@ISA = qw(Bio::Root::RootI);
 
-@ISA = qw(Bio::Root::Object);
+sub new {
+    my ($class,@args) = @_;
 
-sub _initialize {
-    my ($self,@args) = @_;
+    my $self = $class->SUPER::new(@args);
 
-    my $make = $self->SUPER::_initialize(@args);
-
-    my ($contig,$genewiseonly) = $self->_rearrange([qw(CONTIG GENEWISE
-					 )],@args);
+    my ($contig,$genewiseonly) = $self->_rearrange([qw(CONTIG 
+						       GENEWISE)],
+						   @args);
 
     $self->throw("Must input a contig to GeneBuilder") unless defined($contig);
     
     $self->contig($contig);
     $self->genewise_only($genewiseonly);
-    $self->{_genes} = [];
+    $self->{'_genes'} = [];
 
-    return $make; # success - we hope!
+    return $self;
 }
 
 sub genewise_only {
-	my ($self,$arg) = @_;
-
-  if (defined($arg)) {
-        $self->{_genewiseonly} = $arg;
-  }
-  return $self->{_genewiseonly};
+    my ($self,$arg) = @_;
+    
+    if (defined($arg)) {
+        $self->{'_genewiseonly'} = $arg;
+    }
+    return $self->{'_genewiseonly'};
 }
 
 =head2 build_Genes
 
- Title   : 
+ Title   : buildGenes 
  Usage   : my @genes = $self->build_Genes
- Function: 
- Example : 
- Returns : 
- Args    : 
-           
-
+ Function: builds genes
+ Returns : none
+ Args    : none
 
 =cut
 
@@ -169,7 +175,8 @@ sub build_Genes {
  Function: Gets all the features from all the contigs and sorts them into
            similarity features and genscan exons.
  Example : 
- Returns : Array ref of Bio::EnsEMBL::SeqFeature,array ref of Bio::EnsEMBL::SeqFeature
+ Returns : Array ref of Bio::EnsEMBL::SeqFeature,array ref of 
+           Bio::EnsEMBL::SeqFeature
  Args    : none
 
 =cut
@@ -177,7 +184,7 @@ sub build_Genes {
 sub get_Features {
     my ($self) = @_;
 
-    if (defined($self->{_got_features})) {
+    if (defined($self->{'_got_features'})) {
       return;
     }
     
@@ -205,14 +212,16 @@ sub get_Features {
 
 	my @fset = $self->set_phases($f,$contig);
 
-	if (defined(@fset) && $f->source_tag eq "genewise") {
+	if (scalar @fset > 0 && $f->source_tag eq "genewise") {
 	  push(@genewise,@fset);
-	} elsif (defined(@fset) && $f->source_tag eq "pruned_TGW") {
+	} elsif ( scalar @fset > 0 && $f->source_tag eq "pruned_TGW") {
 	  push(@genewise,@fset);
-	} elsif (defined(@fset) && $f->source_tag eq "genscan" && $self->genewise_only != 1) {
+	} elsif (scalar @fset > 0 && $f->source_tag eq "genscan" && 
+		 $self->genewise_only != 1) {
 	  push(@genscan,@fset);
 	  
-	} elsif ($f->primary_tag eq "similarity" && $self->genewise_only != 1) {
+	} elsif ($f->primary_tag eq "similarity" && 
+		 $self->genewise_only != 1) {
 	  
 	  $f->seqname  ($contig->id);
 	  
@@ -231,8 +240,7 @@ sub get_Features {
 	} elsif ($f->score >= 100) {
 	  push(@features,$f);
 	}
-      }
-      
+      }      
     }
 
     $self->genscan (@genscan);
@@ -278,6 +286,15 @@ sub make_Exons {
     }
     
 }
+=head2 make_genscanExons
+
+ Title   : make_genscanExons
+ Usage   : $self->make_genscanExons
+ Function: builds Genscan exons
+ Returns : exon list
+ Args    : none
+
+=cut
 
 sub make_genscanExons {
     my ($self) = @_;
@@ -333,11 +350,20 @@ sub make_genscanExons {
     $self->genscan_exons(@exons);
 }
 
+=head2 make_genewiseExons
+
+ Title   : make_genewiseExons
+ Usage   : $self->make_genewiseExons();
+ Function: Builds genewise Exons
+ Returns : list of exons
+ Args    : none
+
+=cut
+
 sub make_genewiseExons {
     my ($self) = @_;
 
     my @newexons;
-
 
     my $gwcount = 1;
 
@@ -412,6 +438,17 @@ sub make_genewiseExons {
     $self->genewise_exons(@newexons);
 }
 
+=head2 make_genewise_ExonPairs
+
+ Title   : make_genewise_ExonPairs
+ Usage   : $self->make_genewise_ExonPairs();
+ Function: builds Genewise Exon Pairs
+ Returns : none
+ Args    : none
+
+=cut
+
+
 sub make_genewise_ExonPairs {
     my ($self) = @_;
 
@@ -442,7 +479,7 @@ sub make_genewise_ExonPairs {
 
 
 		  print "found\n";
-		  my $spliceseq = $f1->{_3splice} . $f2->{_5splice};
+		  my $spliceseq = $f1->{'_3splice'} . $f2->{'_5splice'};
 		  print "splice " . $spliceseq;
 		  if ($spliceseq eq "GTAG") {
 		      $makepair = 1;
@@ -472,10 +509,11 @@ sub make_genewise_ExonPairs {
 		  if ($makepair == 1) {
 		      print "Making pair\n";
 		      
-		      my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $f1,
-									 -exon2 => $f2,
-									 -type  => 'ABUTTING',
-									 );
+		      my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair
+			  ('-exon1' => $f1,
+			   '-exon2' => $f2,
+			   '-type'  => 'ABUTTING',
+			   );
 		      my $found = 0;
 		      
 		      foreach my $p ($self->get_all_ExonPairs) {
@@ -492,8 +530,10 @@ sub make_genewise_ExonPairs {
 			#      $tmppair->add_Evidence($f1->each_Supporting_Feature);
 			#      $tmppair->add_Evidence($f2->each_Supporting_Feature);
 			#  }
-			  $tmppair->splice_seq(new Bio::Seq(-id => "splice", 
-							    -seq => $f1->{_3splice} . $f2->{_5splice}));
+			  $tmppair->splice_seq(new Bio::Seq
+					       ('-id' => "splice", 
+						'-seq' => $f1->{'_3splice'} . 
+						          $f2->{'_5splice'}));
 			  $self->add_ExonPair($tmppair);
 		      }
 		  }
@@ -508,9 +548,8 @@ sub make_genewise_ExonPairs {
   }
 
     # Now try and merge exons but only if we haven't already made a pair with it
-    
-    
-    my $count = 0;
+        
+    $count = 0;
 
     foreach my $exon (@exons) {
 	eval {
@@ -521,7 +560,7 @@ sub make_genewise_ExonPairs {
 	    my $exon2  = $exons[$count+1];
 	    
 	    if ($self->isTail($exon) && ($self->isHead($exon2))) {
-		my $spliceseq = $exon->{_3splice} . $exon2->{_5splice};
+		my $spliceseq = $exon->{'_3splice'} . $exon2->{'_5splice'};
 
 		if ($exon->strand == $exon2->strand) {
 		    # join together if they splice
@@ -549,10 +588,11 @@ sub make_genewise_ExonPairs {
 		       
 	    if ($makepair == 1 && defined($foundexon)) {
 		
-		my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair(-exon1 => $exon,
-								   -exon2 => $foundexon,
-								   -type  => 'ABUTTING',
-								   );
+		my $tmppair = new Bio::EnsEMBL::Pipeline::ExonPair
+		    ('-exon1' => $exon,
+		     '-exon2' => $foundexon,
+		     '-type'  => 'ABUTTING',
+		     );
 		my $found = 0;
 		
 		foreach my $p ($self->get_all_ExonPairs) {
@@ -565,12 +605,13 @@ sub make_genewise_ExonPairs {
 		    $self->add_ExonPair($tmppair);
 		    $tmppair->add_Evidence($exon->each_Supporting_Feature);
 		    $tmppair->add_Evidence($foundexon->each_Supporting_Feature);
-		    $tmppair->splice_seq(new Bio::Seq(-id => "splice", 
-						      -seq => $exon->{_3splice} . $foundexon->{_5splice}));
+		    $tmppair->splice_seq(new Bio::Seq
+					 ('-id' => "splice", 
+					  '-seq' => $exon->{'_3splice'} . 
+					            $foundexon->{'_5splice'}));
 		}
 	    }
 	}
-
     };
 	if ($@) {
 	    print STDERR "Error making inter genewise exon pairs [$@]\n";
@@ -758,7 +799,8 @@ sub  make_ExonPairs {
 
   Title   : merge
   Usage   : $homolset->merge
-  Function: Merges two or more homol features into one if they are close enough together
+  Function: Merges two or more homol features into one if they are 
+            close enough together
   Returns : nothing
   Args    : none
 
@@ -1079,11 +1121,11 @@ sub _recurseTranscript {
 
 	# Only use multiple pairs once
 	#if ($#pairs > 0) {
-	#    next PAIR if ($self->{_usedPairs}{$pair} == 1);
+	#    next PAIR if ($self->{'_usedPairs'}{$pair} == 1);
 	#    print ("Already used pair = skipping\n");
 	#}
 
-	$self->{_usedPairs}{$pair} = 1;
+	$self->{'_usedPairs'}{$pair} = 1;
 
 	if ($count > 0) {
 	    my $newtran = new Bio::EnsEMBL::Transcript;
@@ -1121,11 +1163,11 @@ sub add_Transcript {
     $self->throw("No transcript input") unless defined($transcript);
     $self->throw("Input must be Bio::EnsEMBL::Transcript") unless $transcript->isa("Bio::EnsEMBL::Transcript");
 
-    if (!defined($self->{_transcripts})) {
-	$self->{_transcripts} = [];
+    if (!defined($self->{'_transcripts'})) {
+	$self->{'_transcripts'} = [];
     }
 
-    push(@{$self->{_transcripts}},$transcript);
+    push(@{$self->{'_transcripts'}},$transcript);
 }
 
 
@@ -1143,11 +1185,11 @@ sub add_Transcript {
 sub get_all_Transcripts {
     my ($self) = @_;
 
-    if (!defined($self->{_transcripts})) {
-	$self->{_transcripts} = [];
+    if (!defined($self->{'_transcripts'})) {
+	$self->{'_transcripts'} = [];
     }
 
-    return (@{$self->{_transcripts}});
+    return (@{$self->{'_transcripts'}});
 }
 
 =head2 _getPairs
@@ -1319,20 +1361,20 @@ sub make_Genes {
 sub add_Gene {
     my ($self,$gene) = @_;
 
-    if (!defined($self->{_genes})) {
-	$self->{_genes} = [];
+    if (!defined($self->{'_genes'})) {
+	$self->{'_genes'} = [];
     }
-    push(@{$self->{_genes}},$gene);
+    push(@{$self->{'_genes'}},$gene);
 }
 
 sub each_Gene {
     my ($self) = @_;
 
-    if (!defined($self->{_genes})) {
-	$self->{_genes} = [];
+    if (!defined($self->{'_genes'})) {
+	$self->{'_genes'} = [];
     }
 
-    return (@{$self->{_genes}});
+    return (@{$self->{'_genes'}});
 }
 sub prune_Exons {
     my ($self,$gene) = @_;
@@ -1365,6 +1407,17 @@ sub prune_Exons {
       }
    }
 }
+
+=head2 make_id_hash
+
+ Title   : make_id_hash
+ Usage   : $self->make_id_hash(@feats);
+ Function: creates an hash of features hashed on hseqname 
+ Returns : hash
+ Args    : array of Bio::EnsEMBL::FeaturePair objects
+
+=cut
+
 sub make_id_hash {
     my ($self,@features) = @_;
 
@@ -1381,7 +1434,15 @@ sub make_id_hash {
     return \%id;
 }
 
+=head2 translate_Exon
 
+ Title   : translate_Exon
+ Usage   : $self->tramslate_Exon
+ Function: print the exon sequence translated in 3 frames
+ Returns : none
+ Args    : Bio::EnsEMBL::Exon object
+
+=cut
 
 
 sub translate_Exon {
@@ -1393,6 +1454,17 @@ sub translate_Exon {
     print ("Tran 1 " . $dna->translate('*','X',1)->seq . "\n");
     print ("Tran 2 " . $dna->translate('*','X',2)->seq . "\n");
 }
+
+=head2 make_Translation
+
+ Title   : make_Translation
+ Usage   : $self->make_Translation($transcript,$count)
+ Function: builds a translation for a Transcript object
+ Returns : Bio::EnsEMBL::Translation
+ Args    : $transcript - Bio::EnsEMBL::Transcript object
+           $count - translation count?
+
+=cut
 
 sub make_Translation{
     my ($self,$transcript,$count) = @_;
@@ -1457,17 +1529,17 @@ sub threshold {
     my ($self,$arg) = @_;
 
     if (defined($arg)) {
-	$self->{_threshold} = $arg;
+	$self->{'_threshold'} = $arg;
     }
 
-    return $self->{_threshold} || 100;
+    return $self->{'_threshold'} || 100;
 }
 
 
 sub set_ExonEnds {
     my ($self,$exon) = @_;
 
-    my @genscan = @{$self->{_pred}};
+    my @genscan = @{$self->{'_pred'}};
     my $contig  = $self->contig;
 
     # find genscan ends if poss
@@ -1612,13 +1684,17 @@ sub check_ExonPair {
     my $spliceseq;
 
     if ($pair->exon1->strand == 1) {
-	$splice1 = $exon1->{_gsf_seq}->subseq($exon1->end+1,$exon1->end+2);
-	$splice2 = $exon2->{_gsf_seq}->subseq($exon2->start-2,$exon2->start-1);
-	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice1$splice2");
+	$splice1 = $exon1->{'_gsf_seq'}->subseq($exon1->end+1,$exon1->end+2);
+	$splice2 = $exon2->{'_gsf_seq'}->subseq($exon2->start-2,$exon2->start-1);
+	$spliceseq = new Bio::Seq('-id' => "splice",
+				  '-seq' => "$splice1$splice2");
     } else {
-	$splice1 = $exon1->{_gsf_seq}->subseq($exon1->start-2,$exon1->start-1);
-	$splice2 = $exon2->{_gsf_seq}->subseq($exon2->end+1,$exon2->end+2);
-	$spliceseq = new Bio::Seq(-id => "splice",-seq => "$splice2$splice1");
+	$splice1 = $exon1->{'_gsf_seq'}->subseq($exon1->start-2,
+						$exon1->start-1);
+	$splice2 = $exon2->{'_gsf_seq'}->subseq($exon2->end+1,
+						$exon2->end+2);
+	$spliceseq = new Bio::Seq('-id' => "splice",
+				  '-seq' => "$splice2$splice1");
 	$spliceseq = $spliceseq->revcom;
     }
 
@@ -1662,10 +1738,6 @@ sub check_ExonPair {
 	    $exon1->phase($oldphase1);
 	}
     }
-
-
-
-
     return $match;
 }
 
@@ -1686,26 +1758,26 @@ sub find_FrameSplices {
 sub add_ExonFrame {
     my ($self,$exon,$frame) = @_;
 
-    $self->{_framehash}{$exon}{$frame} = 1;
+    $self->{'_framehash'}{$exon}{$frame} = 1;
 }
 
 sub each_ExonFrame {
     my ($self,$exon) = @_;
 
-    return $self->{_framehash}{$exon};
+    return $self->{'_framehash'}{$exon};
 }
 
 
 sub add_ExonPhase {
     my ($self,$exon) = @_;
 
-    if (defined($self->{_exonphase}{$exon})) {
-	print STDERR "Already defined phase : old phase " . $self->{_exonphase}{$exon} . " new " . $exon->phase . "\n";
-	if ($self->{_exonphase}{$exon} != $exon->phase) {
+    if (defined($self->{'_exonphase'}{$exon})) {
+	print STDERR "Already defined phase : old phase " . $self->{'_exonphase'}{$exon} . " new " . $exon->phase . "\n";
+	if ($self->{'_exonphase'}{$exon} != $exon->phase) {
 	    return 0;
 	}
     } else {
-	$self->{_exonphase}{$exon} = $exon->phase;
+	$self->{'_exonphase'}{$exon} = $exon->phase;
 	return 1;
     }
 
@@ -1752,8 +1824,8 @@ sub set_phases {
 		my $splice3 = $self->contig->primary_seq->subseq($ex->end+1,$ex->end+2);
 		my $splice5 = $self->contig->primary_seq->subseq($ex->start-2,$ex->start-1);
 
-		$ex->{_3splice} = $splice3;
-		$ex->{_5splice} = $splice5;
+		$ex->{'_3splice'} = $splice3;
+		$ex->{'_5splice'} = $splice5;
 
 	    } else {
 		my $splice3 = $self->contig->primary_seq->subseq($ex->start-2,$ex->start-1);
@@ -1762,8 +1834,8 @@ sub set_phases {
 		$splice3 = new Bio::Seq(-id => "splice",-seq => "$splice3");
 		$splice5 = new Bio::Seq(-id => "splice",-seq => "$splice5");
 
-		$ex->{_3splice} = $splice3->revcom->seq;
-		$ex->{_5splice} = $splice5->revcom->seq;
+		$ex->{'_3splice'} = $splice3->revcom->seq;
+		$ex->{'_5splice'} = $splice5->revcom->seq;
 
 	    }
 
@@ -1778,7 +1850,7 @@ sub set_phases {
 
     foreach my $f (@nrf) {
 	if ($count > 0) {
-	    my $spliceseq = $nrf[$count-1]{_3splice} . $nrf[$count]{_5splice};
+	    my $spliceseq = $nrf[$count-1]{'_3splice'} . $nrf[$count]{'_5splice'};
 	    if ($spliceseq ne "GTAG") {
 		push(@fset,$sf);
 		$sf = new Bio::EnsEMBL::SeqFeature;
@@ -1825,8 +1897,8 @@ sub set_phases {
 		$ex->strand      . "\t" . 
 		$ex->{phase}     . "\t" . 
 		$ex->{end_phase} . "\t" . 
-		$ex->{_5splice}   . "\t" . 
-		$ex->{_3splice}   . "\n";	
+		$ex->{'_5splice'}   . "\t" . 
+		$ex->{'_3splice'}   . "\n";	
 	}
     }
     print STDERR "@newfset\n";	
@@ -1981,9 +2053,9 @@ sub filter_Transcripts {
 	}
     }
 
-    $self->{_transcripts} = [];
+    $self->{'_transcripts'} = [];
 
-    push(@{$self->{_transcripts}},@new2);
+    push(@{$self->{'_transcripts'}},@new2);
 
 }
 
@@ -1991,73 +2063,73 @@ sub filter_Transcripts {
 sub  genscan {
     my ($self,@genscan) = @_;
 
-    if (!defined($self->{_genscan})) {
-        $self->{_genscan} = [];
+    if (!defined($self->{'_genscan'})) {
+        $self->{'_genscan'} = [];
     }
 
-    if (defined(@genscan)) {
-	push(@{$self->{_genscan}},@genscan);
+    if ( scalar @genscan > 0) {
+	push(@{$self->{'_genscan'}},@genscan);
     }
 
-    return @{$self->{_genscan}};
+    return @{$self->{'_genscan'}};
 }
 
 sub  feature {
     my ($self,@features) = @_;
 
-    if (!defined($self->{_feature})) {
-        $self->{_feature} = [];
+    if (!defined($self->{'_feature'})) {
+        $self->{'_feature'} = [];
     }
 
-    if (defined(@features)) {
-	push(@{$self->{_feature}},@features);
+    if ( scalar @features > 0) {
+	push(@{$self->{'_feature'}},@features);
     }
 
-    return @{$self->{_feature}};
+    return @{$self->{'_feature'}};
 }
 
 sub  genewise {
     my ($self,@genewise) = @_;
 
-    if (!defined($self->{_genewise})) {
-        $self->{_genewise} = [];
+    if (!defined($self->{'_genewise'})) {
+        $self->{'_genewise'} = [];
     }
 
-    if (defined(@genewise)) {
-	push(@{$self->{_genewise}},@genewise);
+    if (scalar @genewise > 0) {
+	push(@{$self->{'_genewise'}},@genewise);
     }
 
-    return @{$self->{_genewise}};
+    return @{$self->{'_genewise'}};
 }
 
 sub genewise_exons {
     my ($self,@exons) = @_;
 
-    if (!defined($self->{_genewise_exons})) {
-	$self->{_genewise_exons} = [];
+    if (!defined($self->{'_genewise_exons'})) {
+	$self->{'_genewise_exons'} = [];
     }
-    if (defined(@exons)) {
-	push(@{$self->{_genewise_exons}},@exons);
+    if (scalar @exons > 0) {
+	push(@{$self->{'_genewise_exons'}},@exons);
     }
-    return @{$self->{_genewise_exons}};
+    return @{$self->{'_genewise_exons'}};
 }
 
 sub genscan_exons {
     my ($self,@exons) = @_;
 
-    if (!defined($self->{_genscan_exons})) {
-	$self->{_genscan_exons} = [];
+    if (!defined($self->{'_genscan_exons'})) {
+	$self->{'_genscan_exons'} = [];
     }
-    if (defined(@exons)) {
-	push(@{$self->{_genscan_exons}},@exons);
+    if (scalar @exons > 0) {
+	push(@{$self->{'_genscan_exons'}},@exons);
     }
-    return @{$self->{_genscan_exons}};
+    return @{$self->{'_genscan_exons'}};
 }
 
 sub get_all_Features {
     my ($self) = @_;
 
-    if (!defined($self->{_all_Features})) {
+    if (!defined($self->{'_all_Features'})) {
       my @gw  =	 $self->contig->get_Genes_by_Type('genewise',0);
       my @tgw =  $self->contig->get_Genes_by_Type('pruned_TGW',0);
       
@@ -2144,11 +2216,11 @@ sub get_all_Features {
 	    push(@tmp,@sf);
         }
 		
-	$self->{_all_Features} = [];
-	push(@{$self->{_all_Features}},@tmp);
+	$self->{'_all_Features'} = [];
+	push(@{$self->{'_all_Features'}},@tmp);
     }
 
-    return @{$self->{_all_Features}};
+    return @{$self->{'_all_Features'}};
 }
 
 =head2 contig
@@ -2169,13 +2241,13 @@ sub contig {
     
     if (defined($contig)) {
 	if ($contig->isa("Bio::EnsEMBL::DB::ContigI")) {
-	    $self->{_contig} = $contig;
+	    $self->{'_contig'} = $contig;
 	} else {
 	    $self->throw("[$contig] is not a Bio::EnsEMBL::DB::ContigI");
 
 	}
     }
-    return $self->{_contig};
+    return $self->{'_contig'};
 }
 
 sub _make_Exon { 
@@ -2198,8 +2270,8 @@ sub _make_Exon {
     $exon->attach_seq($self->contig->primary_seq);
     $exon->add_Supporting_Feature($subf);
     
-    $exon->{_5splice} = $subf->{_5splice};
-    $exon->{_3splice} = $subf->{_3splice};
+    $exon->{'_5splice'} = $subf->{'_5splice'};
+    $exon->{'_3splice'} = $subf->{'_3splice'};
 
     return $exon;
 }
@@ -2308,10 +2380,10 @@ sub makePair {
 sub get_all_ExonPairs {
     my ($self) = @_;
 
-    if (!defined($self->{_exon_pairs})) {
-	$self->{_exon_pairs} = [];
+    if (!defined($self->{'_exon_pairs'})) {
+	$self->{'_exon_pairs'} = [];
     }
-    return @{$self->{_exon_pairs}};
+    return @{$self->{'_exon_pairs'}};
 }
 
 
@@ -2330,12 +2402,12 @@ sub add_ExonPair {
     my ($self,$arg) = @_;
 
 
-    if (!defined($self->{_exon_pairs})) {
-	$self->{_exon_pairs} = [];
+    if (!defined($self->{'_exon_pairs'})) {
+	$self->{'_exon_pairs'} = [];
     }
 
     if (defined($arg) && $arg->isa("Bio::EnsEMBL::Pipeline::ExonPair")) {
-	push(@{$self->{_exon_pairs}},$arg);
+	push(@{$self->{'_exon_pairs'}},$arg);
         print STDERR "Adding exon pair $arg\n";
     } else {
 	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::ExonPair");
@@ -2742,35 +2814,7 @@ sub prune {
 	}
     }
     
-    return @newgenes;
-
-    
+    return @newgenes;  
 }     
     
 1;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-

@@ -58,27 +58,21 @@ package Bio::EnsEMBL::Pipeline::MiniSeq;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::RootI
-
 use Bio::Root::RootI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis::PairAlign;
 
-
 @ISA = qw(Bio::Root::RootI);
-# new() is inherited from Bio::Root::RootI
 
-# _initialize is where the heavy stuff will happen when new is called
+sub new {
+  my($class,@args) = @_;
 
-sub _initialize {
-  my($self,@args) = @_;
+  my $self = $class->SUPER::new(@args);
 
-  my $make = $self->SUPER::_initialize;
-
-  my ($id,$pairalign) = $self->_rearrange([qw(ID
-					      PAIRALIGN)],@args);
-
+  my ($id,$pairalign) = $self->_rearrange([qw(ID 
+					      PAIRALIGN)],
+					  @args);
 
   $self->throw("No input id for MiniSeq")        unless defined($id);
   $self->throw("No input pairalign for MiniSeq") unless defined($pairalign);
@@ -89,7 +83,7 @@ sub _initialize {
   $self->id($id);
   $self->pairAlign($pairalign);
 
-  return $self; # success - we hope!
+  return $self;
 }
 
 =head2 id
@@ -107,10 +101,10 @@ sub id {
     my ($self,$arg) = @_;
 
     if(defined($arg)) {
-	$self->{'id'} = $arg;
+	$self->{'_id'} = $arg;
     }
 
-    return $self->{'id'};
+    return $self->{'_id'};
 }
 
 =head2 pairAlign
@@ -140,10 +134,10 @@ sub pairAlign {
        }
 
 
-       $self->{_pair} = $pair;
+       $self->{'_pair'} = $pair;
    }
    
-   return $self->{_pair};
+   return $self->{'_pair'};
    
 }
 
@@ -168,7 +162,7 @@ sub get_cDNA_sequence {
 
    my @exons = $self->pairAlign->eachFeaturePair;
    
-   return unless defined(@exons);
+   return unless (scalar @exons > 0);
 
    foreach my $exon (@exons) {
        $seqstr .= $exon->feature1->seq->seq;
@@ -239,31 +233,4 @@ sub convert_PepFeaturePair {
     return @newfeatures;
 }
 
-
-
 1;
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
