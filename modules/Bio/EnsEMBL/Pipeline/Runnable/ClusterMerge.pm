@@ -165,7 +165,7 @@ sub new {
   # $exon_match       = 0,
 
   # to get some blah,blah
-  $self->verbose(1);
+  $self->verbose(0);
 
 
   if ( $comparison_level ){
@@ -227,7 +227,7 @@ sub solutions{
 
   print STDERR "solution at node: ".$node->transcript->dbID."\n" if $verbose;
   if ( $node->is_candidate ){
-      print STDERR "node: ".$node->transcript->dbID." is a candidate\n" if $verbose;
+    print STDERR "node: ".$node->transcript->dbID." is a candidate\n" if $verbose;
   }
   
   ############################################################
@@ -427,26 +427,26 @@ sub link_Transcripts{
 	# wN is a potential missing link because it is not leaf but
 	# it could generate a new solution
 	if ( $result eq 'placed' ){
-	    if ( $newnode->is_included && @{$newnode->extension_parents} ){
-	
-		############################################################
-		# every extension parent must for a triangle, otherwise we have a candidate
-		unless( $self->check_triangle( $newnode ) ){
-		    
-		    ############################################################
-		    # check that $newnode is not already in the leaves
-		    my $is_leaf = 0;
-		    foreach my $leaf (@{$all_the_leaves}){
-			if ( $leaf == $newnode ){
-			    $is_leaf++;
-			    last;
-			}
-		    }
-		    unless( $is_leaf ){
-			push( @candidates, $newnode );
-		    }
+	  if ( $newnode->is_included && @{$newnode->extension_parents} ){
+	    
+	    ############################################################
+	    # every extension parent must account for a triangle, otherwise we have a candidate
+	    unless( $self->check_triangle( $newnode ) ){
+	      
+	      ############################################################
+	      # check that $newnode is not already in the leaves
+	      my $is_leaf = 0;
+	      foreach my $leaf (@{$all_the_leaves}){
+		if ( $leaf == $newnode ){
+		  $is_leaf++;
+		  last;
 		}
-	    }	    
+	      }
+	      unless( $is_leaf ){
+		push( @candidates, $newnode );
+	      }
+	    }
+	  }	    
 	}
 	############################################################
 	# check the leaves - this is a bit redundant but it is a sanity-check
@@ -469,9 +469,9 @@ sub link_Transcripts{
     # get rid of the candidates which have been extended:
     my @final_candidates;
     foreach my $candidate ( @candidates ){
-	unless ( $candidate->is_extended ){
-	    push( @final_candidates, $candidate );
-	}
+      unless ( $candidate->is_extended ){
+	push( @final_candidates, $candidate );
+      }
     }
 
     ############################################################
@@ -538,34 +538,51 @@ sub _check_leaves{
 # every extension parent must account for a triangle, otherwise we have a candidate
 sub check_triangle{
     my ($self, $node ) = @_;
+
+    my $verbose = $self->verbose();
+    print STDERR "checking for triangle for node ".$node->transcript->dbID."\n";
     unless ( @{$node->extension_parents} ){
 	return 1;
     }
+    
+    my $can_extension_parent;
+    my $found_triangle = 0;
     my $is_candidate = 0;
   EXT_PARENT:
     foreach my $extension_parent ( @{$node->extension_parents} ){
-	my $found_triangle = 0;
-      INCL_PARENT:
-	foreach my $inclusion_parent ( @{$node->inclusion_parents} ){
-	  OTHER_EXT_PARENT:
-	    foreach my $other_parent ( @{$inclusion_parent->extension_parents} ){
-		if ( $other_parent == $extension_parent ){
-		    $found_triangle = 1;
-		    last INCL_PARENT;
-		}
+    INCL_PARENT:
+      foreach my $inclusion_parent ( @{$node->inclusion_parents} ){
+    
+
+      OTHER_EXT_PARENT:
+	foreach my $other_parent ( @{$inclusion_parent->extension_parents} ){
+	  if ( $other_parent == $extension_parent ){
+	    $found_triangle = 1;
+	    last INCL_PARENT;
+	  }
+	}
+      
+	unless ( $found_triangle ){
+	OTHER_EXT_PARENT2:
+	  foreach my $other_parent ( @{$extension_parent->inclusion_parents} ){
+	    if ( $other_parent == $inclusion_parent ){
+	      $found_triangle = 1;
+	      last INCL_PARENT;
 	    }
+	  }
 	}
-	if ( $found_triangle == 0 ){
-	    $is_candidate = 1;
-	    $node->is_candidate(1);
-	    $node->add_candidate_extension_parent($extension_parent);
-	}
+      }
+      if ( $found_triangle == 0 ){
+	$is_candidate = 1;
+	$node->is_candidate(1);
+	$node->add_candidate_extension_parent($extension_parent);
+      }
     }
     if ( $is_candidate ){
-	return 0;
+      return 0;
     }
     else{
-	return 1;
+      return 1;
     }
 }
 
@@ -1245,13 +1262,13 @@ sub _cluster_Transcripts_by_genomic_range{
   my @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @mytranscripts;
   
   # take only the longest 50;
-  @mytranscripts = ();
-  my $c = 0;
-  foreach my $t ( @transcripts ){
-    $c++;
-    push( @mytranscripts, $t);
-    last if $c == 50;
-  }
+  #@mytranscripts = ();
+  #my $c = 0;
+  #foreach my $t ( @transcripts ){
+  #  $c++;
+  #  push( @mytranscripts, $t);
+  #  last if $c == 50;
+  #}
   
   # first sort the transcripts
   @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
