@@ -142,23 +142,18 @@ sub run {
   eval {
     # This is a bit stupid, but we dont know until here
     # whether our run has been successful.
-    push (@results, $parser->next_result());
+    while (my $result = $parser->next_result()) {
+      push (@results, $result)
+    }
   };
 
-  if ($@){
-    $self->warn("PAML run was unsuccessful.\n$@");
-    return 1;
-  }
-
-  while (my $result = $parser->next_result()) {
-    push (@results, $result); # More stupidity.
-  }
+  $self->throw("PAML run was unsuccessful.\n$@") 
+    if $@;
 
   unless (@results) {
     print "Duplications not found for this gene.\n";
     return 0
   }
-
 
   $self->throw("There are more than two sets of results returned from\n" .
 	       "the PAML parser.  This was not expected.") 
@@ -203,23 +198,13 @@ sub _extract_results {
 		       -id              => $query_id,
 		       -distance_method => $self->_distance_method);
 
+  $result_obj->matrix($matrix);
+  $result_obj->otus(\@otus);
 
   for(my $i = 0; $i < scalar @otus; $i++){
-
-    my $match_id;
-
-    $match_id = $otus[$i]->display_id
-      if ($otus[$i]->display_id ne $query_id);
-
     for (my $j = $i+1; $j < scalar @otus; $j++){
-
-      next unless (($otus[$i]->display_id eq $query_id)||
-		   ($otus[$j]->display_id eq $query_id));
-
-      $match_id = $otus[$j]->display_id unless $match_id;
-
-      $result_obj->add_match($query_id,
-			     $match_id,
+      $result_obj->add_match($otus[$i]->display_id,
+			     $otus[$j]->display_id,
 			     $matrix->[$i]->[$j]->{'dN'},
 			     $matrix->[$i]->[$j]->{'dS'});
     }
