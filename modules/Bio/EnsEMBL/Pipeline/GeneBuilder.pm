@@ -17,9 +17,50 @@ Bio::EnsEMBL::Pipeline::GeneBuilder
 
 =head1 SYNOPSIS
 
+# This is the main analysis database
+
+my $db = new Bio::EnsEMBL::DBSQL::Obj(-host   => 'obi-wan',
+				      -user   => 'ensro',
+				      -dbname => 'ens500',
+				      );
+
+# Fetch a clone and its contigs from the database
+my $clone       = $db   ->get_Clone($clone);
+my @contigs     = $clone->get_all_Contigs;
+
+# The genebuilder object will fetch all the features from the contigs and use them
+# to first construct exons, then join those exons into exon pairs.  These exon apris are
+# then made into transcripts and finally all overlapping transcripts are put together into one gene.
+
+
+my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contigs => \@contigs);
+
+my @genes       = $genebuilder->build_Genes;
+
+# After the genes are built they can be used to order the contigs they are on.
+
+my @contigs     = $genebuilder->order_Contigs;
+
+
 =head1 DESCRIPTION
 
-Takes in features and contigs and returns genes.
+Takes in contigs and returns genes.  The procedure is currently reimplementing the TimDB method of
+building genes where genscan exons are confirmed by similarity features which are then joined together
+into exon pairs.  An exon pair is constructed as follows :
+
+  ---------          --------    genscan exons
+    -------          ----->      blast hit which spans an intron
+    1     10        11    22        
+
+For an exon pair to make it into a gene there must be at least 2 blast hits (features) that span across 
+an intron.  This is called the coverage of the exon pair.
+
+After all exon pairs have been generated for all the genscan exons there is a recursive routine 
+(_recurseTranscripts) that looks for all exons that are the start of an exon pair with no 
+preceding exons.  The exon pairs are followed recursively (including alternative splices) to build up 
+full set of transcripts.
+
+To generate the genes the transcripts are grouped together into sets with overlapping exons.
 
 =head1 CONTACT
 
@@ -63,6 +104,36 @@ sub _initialize {
     }
 
     return $make; # success - we hope!
+}
+
+=head2 build_Genes
+
+ Title   : 
+ Usage   : my @genes = $self->build_Genes
+ Function: 
+ Example : 
+ Returns : 
+ Args    : 
+           
+
+
+=cut
+
+sub build_Genes {
+    my ($self) = @_;
+
+    my ($features,$genscan) = $self->get_Features;
+    my @exons               = $self->make_Exons    ($features,$genscan);
+    my @pairs               = $self->make_ExonPairs(@exons);
+    
+    $self->print_ExonPairs;
+
+    my @transcripts         = $self->link_ExonPairs(@exons);
+    my @contigs             = $self->order_Contigs (@transcripts);
+    my @genes               = $self->make_Genes    (@transcripts);
+
+
+    $self->print_Genes
 }
 
 
@@ -138,25 +209,13 @@ sub build_Genes {
     my ($self) = @_;
 
     my ($features,$genscan) = $self->get_Features;
-
     my @exons               = $self->make_Exons    ($features,$genscan);
-
-    foreach my $exon (@exons) {
-	$self->print_Exon($exon);
-    }
-
-
     my @pairs               = $self->make_ExonPairs(@exons);
-
-    foreach my $pair ($self->get_all_ExonPairs) {
-	$self->print_Exon($pair->exon1);
-	$self->print_Exon($pair->exon2);
-    }
-
+    
+    $self->print_ExonPairs;
+    
 
     my @transcripts         = $self->link_ExonPairs(@exons);
-
-
     my @contigs             = $self->order_Contigs (@transcripts);
     my @genes               = $self->make_Genes    (@transcripts);
 
@@ -176,11 +235,18 @@ sub build_Genes {
 
 }
 
-sub print_Exon {
-    my ($self,$exon) = @_;
+=head2 get_Features
 
-    print STDERR $exon->seqname . "\t" . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n";
-}
+ Title   : get_Features
+ Usage   : my ($features,$genscan) = $self->get_Features;
+ Function: Gets all the features from all the contigs and sorts them into
+           similarity features and genscan exons.
+ Example : 
+ Returns : Array ref of Bio::EnsEMBL::SeqFeature,array ref of Bio::EnsEMBL::SeqFeature
+ Args    : none
+
+=cut
+
 
 sub get_Features {
     my ($self) = @_;
@@ -244,7 +310,6 @@ sub make_Exons {
 	    $exon->start    ($f->start);
 	    $exon->end      ($f->end  );
 	    $exon->strand   ($f->strand);
-	    print("Exon id " . $exon->id . "\n"); 
 	    push(@exons,$exon);
 	    $excount++;
 	    
@@ -324,6 +389,7 @@ sub  make_ExonPairs {
 	my $exon1 = $exons[$i];
 
 
+	
 	J: for (my $j = 0 ; $j < scalar(@exons); $j++) {
 	    next J if ($i == $j);
             next J if ($exons[$i]->strand != $exons[$j]->strand);
@@ -333,6 +399,10 @@ sub  make_ExonPairs {
 
 	    my %doneidhash;
 
+
+	    # For the two exons we compare all of their supporting features.
+	    # If any of the supporting features of the two exons
+            # span across an intron a pair is made.
 	  F1: foreach my $f1 ($exon1->each_Supporting_Feature) {
 		    
 	    F2: foreach my $f2 ($exon2->each_Supporting_Feature) {
@@ -341,8 +411,16 @@ sub  make_ExonPairs {
 		next F1 if (!($f1->isa("Bio::EnsEMBL::FeaturePair")));
 		next F2 if (!($f2->isa("Bio::EnsEMBL::FeaturePair")));
 
+		# Do we have hits from the same sequence
+		# n.b. We only allow each database hit to span once
+		# across the intron (%idhash) and once the pair coverage between
+		# the two exons reaches $minimum_coverage we 
+		# stop finding evidence. (%pairhash)
+
 		if ($f1->hseqname eq $f2->hseqname &&
 		    $f1->strand   == $f2->strand   &&
+
+		    
 		    !(defined($idhash{$f1->hseqname})) &&
 		    !(defined($pairhash{$exon1}{$exon2}))) {
 		    
@@ -381,9 +459,6 @@ sub  make_ExonPairs {
 		    # We finally get to make a pair
 		    if ($ispair == 1) {
 			eval {
-
-			    
-			    print(STDERR "Making new pair " . $exon1->id . "\t" .  $exon2->id . "\n");
 			    
 			    my $pair = $self->makePair($exon1,$exon2,"ABUTTING");
 			    
@@ -824,5 +899,42 @@ sub make_Genes {
     return @genes;
 }
 
+
+
+sub print_Exon {
+    my ($self,$exon) = @_;
+
+    print STDERR $exon->seqname . "\t" . $exon->id . "\t" . $exon->start . "\t" . $exon->end . "\t" . $exon->strand . "\n";
+}
+
+sub print_ExonPairs {
+    my ($self) = @_;
+
+    foreach my $pair ($self->get_all_ExonPairs) {
+	print(STDERR "\nExon Pair\n");
+	$self->print_Exon($pair->exon1);
+	$self->print_Exon($pair->exon2);
+	foreach my $ev ($pair->get_all_Evidence) {
+	    print(STDERR "   -  " . $ev->hseqname . "\t" . $ev->hstart . "\t" . $ev->hend . "\n");
+	}
+	
+    }
+}
+
+sub print_Genes {
+    my ($self,@genes) = @_;
+
+    foreach my $gene (@genes) {
+	print(STDERR "\nNew gene - " . $gene->id . "\n");
+
+	foreach my $tran ($gene->each_Transcript) {
+	    print STDERR "\nTranscript - " . $tran->id . "\n";
+	    foreach my $exon ($tran->each_Exon) {
+		$self->print_Exon($exon);
+	    }
+	}
+    }
+}
 1;
+
 
