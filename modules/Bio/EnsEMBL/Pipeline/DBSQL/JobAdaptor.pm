@@ -336,7 +336,7 @@ sub remove {
   my $self = shift;
   my $job = shift;
 
-  if( ! defined $job->dbID ) {
+  if( ! $job->dbID ) {
     $self->throw( "Cant remove job without dbID" );
   }
   my $dbID = $job->dbID;
