@@ -475,7 +475,10 @@ sub link_Transcripts{
 	############################################################
 	# check the leaves - this is a bit redundant but it is a sanity-check
 	$self->_check_leaves( $all_the_leaves );
-      }
+      
+      } # end of TRANSCRIPT
+    # clean up some memory
+    @transcripts = ();
     
     # check #   
     #if ($verbose){
@@ -508,6 +511,10 @@ sub link_Transcripts{
     
     my @final_leaves = ( @$all_the_leaves, @final_candidates );
     
+    # clean up some memory;
+    @$all_the_leaves = ();
+    @final_candidates = ();
+
     foreach my $leaf ( @final_leaves ){
 	print STDERR "finding solutions from leaf ".$leaf->transcript->dbID."\n" if $verbose;
 	my @sol = @{$self->solutions($leaf)};
@@ -521,7 +528,9 @@ sub link_Transcripts{
     @solutions = ();
     
   } # end of CLUSTER  
-  
+
+  # clean up some memory
+  @{ $transcript_clusters} = ();
   
   ############################################################
   # convert the Bio::EnsEMBL::Pipeline::Node objects
@@ -532,6 +541,8 @@ sub link_Transcripts{
       my @tmp = map { $_->transcript } @$solution;
       push (@lists, \@tmp );
   }  
+  # clean up some memory
+  @all_solutions = ();
   return @lists;
 }
 
