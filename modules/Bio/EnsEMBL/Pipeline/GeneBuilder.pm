@@ -190,7 +190,9 @@ sub get_Genewises {
     my @gw;
 
     foreach my $type ($self->genewise_types) {
-      push(@gw,$self->contig->get_Genes_by_Type($type,'evidence'));
+#      push(@gw,$self->contig->get_Genes_by_Type($type,'evidence'));
+      # we'll explicitly call fetch_evidence_by_Exon later on
+      push(@gw,$self->contig->get_Genes_by_Type($type));
     }
 
     $self->print_Genes(@gw);
@@ -207,6 +209,10 @@ sub get_Genewises {
 	my $prev;
 
         foreach my $exon ($t->get_all_Exons) {
+#VAC remapping genes will later fail if $exon->contig_id is undefined; doesn't actually use the contig_id - why shoudl ti? this is all on a VC.
+	  $self->warn("no contig id\n") unless defined $exon->contig_id;
+	  if(!defined $exon->contig_id){ $exon->contig_id("sticky"); }
+
 	  # set temporary_id to be dbID
 	  $exon->{'temporary_id'} = ($exon->dbID) unless (defined $exon->{'temporary_id'} && $exon->{'temporary_id'} ne '');
 	  if (defined($prev)) {
@@ -1141,13 +1147,12 @@ sub make_Genes {
 
 
 	GENE: foreach my $gene (@genes) {
-
 #	  EXON: foreach my $gene_exon ($gene->each_unique_Exon) {
 	  EXON: foreach my $gene_exon ($gene->get_all_Exons) {
 
 	      foreach my $exon ($tran->get_all_Exons) {
 		  next EXON if ($exon->contig_id ne $gene_exon->contig_id);
-		
+
 		  if ($exon->overlaps($gene_exon)) {
 		    if ($exon->strand == $gene_exon->strand) {
 #		      $self->print_Exon($exon);
@@ -1173,6 +1178,7 @@ sub make_Genes {
 	    $genecount++;
 	    $gene->add_Transcript($tran);
 	    push(@genes,$gene);
+print STDERR "making new gene from " . $tran->{'temporary_id'} . "\n";
 	}
     }
 
@@ -2156,9 +2162,8 @@ sub print_Genes {
 
 sub print_gff {
     my ($self) = @_;
-    #VAC
-#    open (POG,">/scratch3/ensembl/michele/genebuild.apr/gff/".$self->input_id . ".gff");
-#    open (POG,">/scratch3/ensembl/vac/GeneBuildAugust/CombinedGeneBuild/gff/".$self->input_id . ".gff");
+# Manu - change this line!!!
+    open (POG,">/scratch3/ensembl/vac/GBtest/gff/".$self->input_id . ".gff");
     
     foreach my $gene ($self->each_Gene) {
 	foreach my $tran ($gene->each_Transcript) {
@@ -2453,7 +2458,7 @@ sub prune {
 			
 			if (($exon1->overlaps($exon1a) && 
 			     $exon2->overlaps($exon2a))) {
-			  	print STDERR "HOORAY! Found overlap\n";
+#			  	print STDERR "HOORAY! Found overlap\n";
 			  $foundpair = 1;
 			}
 		    }
@@ -2463,7 +2468,6 @@ sub prune {
 		if ($foundpair == 0) {
 		    	    print STDERR "Found new pair\n";
 		    $found = 0;
-print STDERR "tempids: " .$exon1->{'temporary_id'} . " and " .$exon2->{'temporary_id'} . "\n";
 
 		    $exonhash{$exon1->{'temporary_id'}} = $exon1;
 		    $exonhash{$exon2->{'temporary_id'}} = $exon2;
