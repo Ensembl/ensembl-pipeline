@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Clone_EPCR;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -45,7 +45,7 @@ my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Clone_EPCR';
 my $sts_db   = '/nfs/disk100/humpub/data/sanger_sts.epcr';
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file        => $sts_db,
+my $ana = Bio::EnsEMBL::Analysis->new (   -db_file        => $sts_db,
                                                     -db_version     => '1',
                                                     -program        => 'e-PCR',
                                                     -program_version=> 1,
@@ -54,6 +54,7 @@ my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file        => $sts_db,
                                                     -gff_source     => 'e-PCR',
                                                     -gff_feature    => 'similarity', 
                                                     -parameters     => '',
+						    -logic_name     => 'clone_epcr',
                                                      );
 
 unless ($ana)

@@ -74,40 +74,22 @@ sub new {
   my $self = $class->SUPER::new(@_);    
   
   $self->{'_flist'} = [];           #an array of Bio::SeqFeatures
-  $self->{'_sequence'}  = undef;        #location of Bio::Seq object
+  $self->{'_sequence'}  = undef;    #location of Bio::Seq object
   $self->{'_tRNAscan_SE'} = undef;  #location of tRNAscan_SE executable
-  $self->{'_workdir'}   = undef;     #location of temp directory
-  $self->{'_filename'}  = undef;      #file to store Bio::Seq object
-  $self->{'_results'}   = undef;      #file to store results of tRNAscan_SE
-  $self->{'_protected'} = [];         #a list of files protected from deletion
+  $self->{'_workdir'}   = undef;    #location of temp directory
+  $self->{'_filename'}  = undef;    #file to store Bio::Seq object
+  $self->{'_results'}   = undef;    #file to store results of tRNAscan_SE
+  $self->{'_protected'} = [];       #a list of files protected from deletion
   
   my( $sequence, $tRNAscan_SE) = $self->_rearrange([qw(CLONE 
 						       TRNASCAN_SE)], 
 						   @args);
-  
-  $self->clone($sequence) if ($sequence);       
-  
-  my $bindir = $::pipeConf{'bindir'} || undef;
 
-  if (-x $tRNAscan_SE) {
-    # passed from RunnableDB (full path assumed)
-    $self->tRNAscan_SE($tRNAscan_SE);
-  }
-  elsif ($::pipeConf{'bin_tRNAscan_SE'} && -x ($tRNAscan_SE = "$::pipeConf{'bin_tRNAscan_SE'}")) {
-    $self->tRNAscan_SE($tRNAscan_SE);
-  }
-  elsif ($bindir && -x ($tRNAscan_SE = "$bindir/tRNAscan-SE")) {
-    $self->tRNAscan_SE($tRNAscan_SE);
-  }
-  else {
-    # search shell $PATH
-    eval {
-      $self->tRNAscan_SE($self->locate_executable('tRNAscan-SE'));
-    };
-    if ($@) {
-      $self->throw("Can't find executable tRNAscan-SE");
-    }
-  }
+
+  $tRNAscan_SE = 'tRNAscan-SE' unless defined($tRNAscan_SE);
+
+  $self->clone($sequence) if ($sequence);       
+  $self->tRNAscan_SE($self->find_executable($tRNAscan_SE));
 
   return $self;
 }

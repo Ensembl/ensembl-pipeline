@@ -50,10 +50,14 @@ sub new {
   my($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   
-  my ($genomic, $protein, $memory,$reverse,$endbias) = 
-      $self->_rearrange([qw(GENOMIC PROTEIN MEMORY REVERSE ENDBIAS)], @args);
+  my ($genomic, $protein, $memory,$reverse,$endbias,$genewise) = 
+      $self->_rearrange([qw(GENOMIC PROTEIN MEMORY REVERSE ENDBIAS GENEWISE)], @args);
   
   print $genomic . "\n";
+
+  $genewise = 'genewise' unless defined($genewise);
+
+  $self->genewise($self->find_executable($genewise));
 
   $self->genomic($genomic) || $self->throw("No genomic sequence entered for blastwise");
   $self->protein($protein) || $self->throw("No protein sequence entered for blastwise");
@@ -63,6 +67,15 @@ sub new {
   $self->memory ($memory)    if (defined($memory));
 
   return $self;
+}
+
+sub genewise {
+  my ($self,$arg) = @_;
+
+  if (defined($arg)) {
+    $self->{_genewise} = $arg;
+  }
+  return $self->{_genewise};
 }
 
 # RunnableI methods
@@ -84,13 +97,11 @@ sub output {
 # Now the blastwise stuff
 
 sub set_environment {
-    my ($self) = @_;
-
-    $ENV{WISECONFIGDIR} = '/usr/local/ensembl/data/wisecfg/';
-
-    if (! -d '/usr/local/ensembl/data/wisecfg/') {
-	$self->throw("No WISECONFIGDIR /usr/local/ensembl/data/wisecfg/");
-    }
+  my ($self) = @_;
+  
+  if (! -d $ENV{WISECONFIGDIR}) {
+    $self->throw("No WISECONFIGDIR ["  . $ENV{WISECONFIGDIR} . "]");
+  }
 }
 
 sub _wise_init {
@@ -136,9 +147,8 @@ sub _align_protein {
   $proio->write_seq($self->protein);
   $proio = undef;
 
-# my $command = "genewise $protfile $genfile -gff -alb -kbyte $memory -ext 1 -gap 8 -subs 0.0000001 -quiet";
-#  my $command = "genewise $protfile $genfile -gff -alb -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet -init endbias -splice flat";
-  my $command = "genewise $protfile $genfile -gff -alb -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
+  my $genewise = $self->genewise;
+  my $command = "$genewise $protfile $genfile -gff -alb -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";

@@ -67,10 +67,6 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::Runnable::EPCR;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
-
 use vars qw(@ISA);
 use strict;
 # Object preamble - inherits from Bio::Root::RootI;
@@ -112,41 +108,18 @@ sub new {
     my( $clone, $epcr, $db, $options) = $self->_rearrange([qw(
 	CLONE PCR DB OPTIONS
     )], @args);
-    
-    $self->clone($clone) if ($clone);       
+
+    $epcr = 'e-PCR' unless defined ($epcr);
+
+    $self->clone  ($clone)   if ($clone);       
     $self->options($options) if ($options);       
 
-    my $bindir = $::pipeConf{'bindir'} || undef;
-    my $datadir = $::pipeConf{'datadir'} || undef;
+    $self->epcr   ($self->find_executable($epcr));
 
-    if (-x $epcr) {
-	# passed from RunnableDB (full path assumed)
-	$self->epcr($epcr);
-    }
-    elsif ($::pipeConf{'bin_EPCR'} && -x ($epcr = "$::pipeConf{'bin_EPCR'}")) {
-	$self->epcr($epcr);
-    }
-    elsif ($bindir && -x ($epcr = "$bindir/e-PCR")) {
-	$self->epcr($epcr);
-    }
-    else {   
-	# search shell $PATH
-        eval {
-            $self->epcr($self->locate_executable('e-PCR'));
-	};
-        if ($@) {
-            $self->throw("Can't find executable e-PCR");
-	}
-    }
-    
-    if (-e $db) {
-	$self->db($db);
-    }
-    elsif ($db && -e "$datadir/$db") {
-	$self->db("$datadir/$db");
-    }
-    else {
-        $self->throw("sts or primer database required");
+    if (defined($db)) {
+      $self->db     ($self->find_file($db));
+    } else {
+      $self->throw("No primer database entered\n");
     }
     
     return $self; 

@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CPG;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -45,7 +45,7 @@ print "ok 2\n";
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::CPG';
 my $ana_adaptor = $db->get_AnalysisAdaptor();
 
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
                                                     -db_version     => '__NONE__',
                                                     -program        => 'cpg',
                                                     -program_file   => '/usr/local/pubseq/bin/cpg',
@@ -55,6 +55,7 @@ my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__
                                                     -gff_feature    => 'cpg_island', 
 #                                                    -parameters     => '-LENGTH => 50, -GC => 75',
                                                     -parameters     => '',
+                                                    -logic_name     => 'cpg',
                                                      );
 
 unless ($ana)

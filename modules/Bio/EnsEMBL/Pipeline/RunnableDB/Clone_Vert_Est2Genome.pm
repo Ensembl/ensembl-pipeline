@@ -193,12 +193,12 @@ sub write_output {
         }
     }
 
-    my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
+    my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
 
     foreach my $con (keys %contighash) {
         if (scalar(@{$contighash{$con}{features}}) > 0) {
           print(STDERR "Number of features for $con is " . scalar({$contighash{$con}{features}}) . "\n");
-          $feat_Obj->write($contighash{$con},@{$contighash{$con}{features}});
+          $feat_adp->write($contighash{$con},@{$contighash{$con}{features}});
         }
     }
     return 1;

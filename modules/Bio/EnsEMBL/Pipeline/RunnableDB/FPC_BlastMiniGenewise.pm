@@ -56,6 +56,7 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Data::Dumper;
+
 # config file; parameters searched for here if not passed in as @args
 require "Bio/EnsEMBL/Pipeline/GB_conf.pl";
 
@@ -162,66 +163,62 @@ sub write_output {
 
 =cut
 
-sub fetch_input {
+  sub fetch_input {
     my( $self) = @_;
     
-    print STDERR "Fetching input: " . $self->input_id. " \n";
-    $self->throw("No input id") unless defined($self->input_id);
+    print STDERR "Fetching input id : " . $self->input_id. " \n\n";
 
+    $self->throw("No input id") unless defined($self->input_id);
+    
     my $chrid  = $self->input_id;
        $chrid =~ s/\.(.*)-(.*)//;
 
     my $chrstart = $1;
     my $chrend   = $2;
 
-    print STDERR "Chromosome id = $chrid , range $chrstart $chrend\n";
-
-#    $self->dbobj->static_golden_path_type('UCSC');
-
     my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
     my $contig    = $stadaptor->fetch_VirtualContig_by_chr_start_end($chrid,$chrstart,$chrend);
+    my $genseq    = $contig->get_repeatmasked_seq;
 
     $contig->_chr_name($chrid);
 
-    foreach my $rc ($contig->_vmap->each_MapContig) {
-	my $strand = "+";
-	if ($rc->orientation == -1) {
-	    $strand = "-";
-	}
-	
-    }
+    print STDERR "Chromosome id : $chrid\n";
+    print STDERR "Range         : $chrstart - $chrend\n";
+    print STDERR "Contig        : " . $contig->id . " \n";
+    print STDERR "Length is     : " . $genseq->length . "\n\n";
 
-    my $genseq    = $contig->get_repeatmasked_seq;
-
-    print STDERR "Length is " . $genseq->length . "\n";
-    print STDERR "Fetching features \n";
-
-    print STDERR "contig: " . $contig . " \n";
+    print STDERR "Fetching features \n\n";
 
     # need to pass in bp value of zero to prevent globbing on StaticContig.
 #    my @features  = $contig->get_all_SimilarityFeatures_above_score('sptr',200, 0);
     my @features  = $contig->get_all_SimilarityFeatures_above_score('swall',200, 0);
     
     # lose version numbers - probably temporary till pfetch indices catch up
+
     foreach my $f(@features) {
       my $name = $f->hseqname;
-      $name =~ /(\S+)\.\d+/;
-      $f->hseqname($1);
+      if ($name =~ /(\S+)\.\d+/) { 
+	$f->hseqname($1);
+      }
     }
 
-    print STDERR "Number of features = " . scalar(@features) . "\n";
+    print STDERR "Number of features = " . scalar(@features) . "\n\n";
 
     my @genes     = $contig->get_Genes_by_Type('TGE_gw');
 
-    print STDERR "Found " . scalar(@genes) . " genewise genes\n";
+    print STDERR "Found " . scalar(@genes) . " genewise genes\n\n";
 
     my %redids;
     my $trancount = 1;
 
     foreach my $gene (@genes) {
+
       print STDERR "Found genewise gene " . $gene->dbID . "\n";
+
       foreach my $tran ($gene->each_Transcript) {
+
 	foreach my $exon ($tran->get_all_Exons) {
+	  
 	  print STDERR "Exon " . $exon->dbID . " " . $exon->strand . "\n";
 
 	  if ($exon->seqname eq $contig->id) {
@@ -241,14 +238,15 @@ sub fetch_input {
     my %idhash;
     
     foreach my $f (@features) {
-        print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
+      print "Feature : " . $f->gffstring . "\n";
+      
       if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
 	  defined($f->hseqname) &&
-	    $redids{$f->hseqname} != 1) {
-      $idhash{$f->hseqname} = 1;
-      
+	  $redids{$f->hseqname} != 1) {
+	$idhash{$f->hseqname} = 1;
+	
+      }
     }
-  }
     
     my @ids = keys %idhash;
 
@@ -556,14 +554,13 @@ sub output{
 
 sub make_seqfetcher {
   my ( $self ) = @_;
-  my $index = $::seqfetch_conf{'protein_index'};
+  my $index   = $::seqfetch_conf{'protein_index'};
+
   my $seqfetcher;
 
   if(defined $index && $index ne ''){
     my @db = ( $index );
-    $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs(
-								  '-db' => \@db,
-								 );
+    $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs('-db' => \@db,);
   }
   else{
     # default to Pfetch

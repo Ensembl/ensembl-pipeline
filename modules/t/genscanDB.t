@@ -29,7 +29,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Genscan;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -44,17 +44,19 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'HumanIso',
-                                                    -db_file        => $::pipeConf{'datadir'} . '/HumanIso.smat',
- 
-                                                    -program        => 'Genscan',
-						    -program_file   => $::pipeConf{'bindir'} . '/genscan',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'genscan',
-                                                    -gff_feature    => 'exon', 
-                                                    #-parameters     => '',
-                                                     );
+
+
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'HumanIso',
+					  -db_version     => '__NONE__',
+					  -db_file        => '/usr/local/ensembl/data/HumanIso.smat',
+					  -program        => 'Genscan',
+					  -program_file   => '/usr/local/ensembl/bin/genscan',
+					  -module         => $runnable,
+					  -module_version => 1,
+					  -gff_source     => 'genscan',
+					  -gff_feature    => 'exon', 
+					  -logic_name     => 'genscan',
+				      );
 
 unless ($ana)
 { print "not ok 3\n"; }
@@ -62,10 +64,9 @@ else
 { print "ok 3\n"; }
 my $id ='AB015752.00001';
 $ana_adaptor->exists( $ana );
-my $runobj = "$runnable"->new(  
-                                -dbobj      => $db,
-			                    -input_id   => $id,
-                                -analysis   => $ana );
+my $runobj = "$runnable"->new(-dbobj      => $db,
+			      -input_id   => $id,
+			      -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
 else
@@ -82,8 +83,21 @@ else
 display(@out);
 
 $runobj->write_output();
-my @features = $db->get_Contig($id)->get_all_PredictionFeatures();
+
+print STDERR "Written output\n";
+my $contig = $db->get_Contig($id);
+my @features = $contig->get_all_PredictionFeatures();
+
+print STDERR "Got features\n";
 display(@features);
+
+foreach my $f (@features) {
+  my $transcript = Bio::EnsEMBL::DBSQL::Utils::fset2transcript($f,$contig);
+  print "Transcrip " . $transcript->translate->seq . "\n";
+}    
+
+
+
 
 unless (@features)
 { print "not ok 6\n"; }
@@ -91,17 +105,16 @@ else
 { print "ok 6\n"; }
 
 sub display {
-    my @results = @_;
-    #Display output
-    foreach my $obj (@results)
-    {
-       print STDERR ($obj->gffstring."\n");
-       if ($obj->sub_SeqFeature)
-       {
-            foreach my $exon ($obj->sub_SeqFeature)
-            {
-                print STDERR "Sub: ".$exon->gffstring."\n";
-            }
-       }
+  my @results = @_;
+
+  foreach my $obj (@results) {
+
+    print STDERR ($obj->gffstring."\n");
+
+    if ($obj->sub_SeqFeature) {
+      foreach my $exon ($obj->sub_SeqFeature) {
+	print STDERR "Sub: ".$exon->gffstring."\n";
+      }
     }
+  }
 }

@@ -31,7 +31,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep
 This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides
 constructed from assembling genscan predicted features to peptide
 sequence. The resulting blast hits are written back as FeaturePairs.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed
+The appropriate Bio::EnsEMBL::Analysis object must be passed
 for extraction of appropriate parameters. A
 Bio::EnsEMBL::Pipeline::DBSQL::Obj is required for databse access.
 
@@ -123,7 +123,7 @@ sub new {
   }
   
   if (defined($program)) {
-    $self->program($program);
+    $self->program($self->find_executable($program));
   } else {
     $self->throw ("No program input");
   }
@@ -172,9 +172,9 @@ sub run {
       $self->throw("No peptide input");
     }
 
-    print STDERR "Creating BioPrimarySeq ".$transcript->id."\n";
+    print STDERR "Creating BioPrimarySeq ".$transcript->temporary_id. " " . $transcript->translate->seq . "\n";
 
-    my $peptide = Bio::PrimarySeq->new(-id         => $transcript->id,
+    my $peptide = Bio::PrimarySeq->new(-id         => $transcript->temporary_id,
 				       -seq        => $transcript->translate->seq(),
 				       -moltype    => 'protein' );
 
@@ -318,7 +318,7 @@ sub align_hits_to_contig {
 
     #calculate boundaries and map exons to translated peptide
     #Note: Exons have an extra 3 bases for the stop codon. Peptides lack this
-    foreach my $exon ($trans->each_Exon) {
+    foreach my $exon ($trans->get_all_Exons) {
 
         my %ex_align;
 
@@ -329,13 +329,13 @@ sub align_hits_to_contig {
 
         my ($expep) = ($exon->translate->seq =~ /[^\*]+/g);
 	if ($expep =~ s/x$//i) {
-	    print STDERR "Removed terminal 'X' from exon @{[$exon->id]}\n";
+	    print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
 	}
 
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
 
-        $ex_align {'name'}      = $exon->id;
+        $ex_align {'name'}      = $self->genomic->id;
 
 	if ($exon->strand == 1) {
 	  $ex_align {'gen_start'} = $exon->start + (3 - $exon->phase)%3;
@@ -484,6 +484,7 @@ sub create_peptide_featurepairs2 {
                                 -feature1   => $dna_feat,
                                 -feature2   => $pep_feat );
 
+      print STDERR "seqname is " . $featurepair->seqname . "\n";
       $featurepair->attach_seq($self->genomic);
       $self->featurepairs($featurepair);    
 
@@ -624,7 +625,7 @@ sub create_peptide_featurepairs {
 
       $featurepair->attach_seq($self->genomic);
       $self->featurepairs($featurepair);    
-
+      
       print "\n" . $featurepair->gffstring .  " " . ($featurepair->feature1->end-$featurepair->feature1->start) . " " .( $featurepair->feature2->end-$featurepair->feature2->start) ."\n";
 
     }   
@@ -779,7 +780,7 @@ sub featurepairs {
                 unless $fp->isa("Bio::EnsEMBL::FeaturePairI");
         push (@{$self->{'_featurepairs'}}, $fp);
     }
-    #print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
+    print STDERR   "FEATURES: ".(@{$self->{'_featurepairs'}})."\n";
     return @{$self->{'_featurepairs'}};
 }
 

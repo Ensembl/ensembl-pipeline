@@ -110,7 +110,7 @@ sub get_JobsByAge {
   Title   : get_all_Analysis
   Usage   : my @analyses = $db->get_all_Analysis()
   Function: Retrieves all analysis objects
-  Returns : a list of Bio::EnsEMBL::Pipeline::Analysis
+  Returns : a list of Bio::EnsEMBL::Analysis
   Args    : none
 
 =cut
@@ -178,7 +178,7 @@ sub write_Analysis {
   Usage   : my $analyis = $db->get_Analysis($id)
   Function: Retrieves an analysis object with
             id $id
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
   Args    : int
 
 =cut

@@ -48,8 +48,8 @@ else
 
 my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
     -CLONE => $clone,
-    -GENSCAN => $::pipeConf{'bindir'}  . '/genscan',
-    -MATRIX  => $::pipeConf{'datadir'} . '/HumanIso.smat'
+    -GENSCAN => 'genscan',
+    -MATRIX  => 'HumanIso.smat'
 );
  
 unless ($genscan)
@@ -71,48 +71,46 @@ unless (@results)
 else
 { print "ok 5\n"; }
 
-my @exons = $genscan->output_exons();
-#print STDERR "Exons\n";
-#display(@exons);
-
-unless (@exons) 
-{ print "not ok 6\n"; }
-else
-{ print "ok 6\n"; }
-
 #check re-translation of features can be matched within peptides
 my $all_exons_found = 1;
 my @peptides = $genscan->genscan_peptides;
-foreach my $feature (@exons) {
 
+foreach my $feature (@results) {
+  print STDERR "Gene $gene\n";
     if ($all_exons_found == 1) {
 
-        $all_exons_found = 0;
-        my $exon = Bio::EnsEMBL::Exon->new();
-        $exon->id           ($feature->seqname);
-        $exon->start        ($feature->start);
-        $exon->end          ($feature->end);
-        $exon->strand       ($feature->strand);
-        $exon->phase        ($feature->phase);
-        $exon->contig_id    ($clone->id);
-        $exon->attach_seq   ($clone);
+      print STDERR "Phase " . $feature->phase . "\n";
+      $all_exons_found = 0;
+      my $exon = Bio::EnsEMBL::Exon->new();
+      $exon->temporary_id ($feature->seqname);
+      $exon->start        ($feature->start);
+      $exon->end          ($feature->end);
+      $exon->strand       ($feature->strand);
+      $exon->phase        ($feature->phase);
+      $exon->contig_id    ($clone->id);
+      $exon->attach_seq   ($clone);
+      
+      print STDERR "\n";
+      foreach my $full_pep (@peptides) {
+	
+	print STDERR "$full_pep\n";
+	my $exon_pep = $exon->translate->seq;
+	
 
-        foreach my $full_pep (@peptides) {
+	
+	$exon_pep =~ s/^M//i; # remove leading M's
+	$exon_pep =~ s/\*$//; # remove strailing tops
+	$exon_pep =~ s/X$//;  # remove trailing Xs - should track these
 
-            my $exon_pep = $exon->translate->seq;
-
-            $exon_pep =~ s/^M//i; #remove leading M's
-	    $exon_pep =~ s/\*$//; # remove strailing tops
-	    $exon_pep =~ s/X$//;  # remove trailing Xs - should track these
-
-            if (index ($full_pep, $exon_pep) > -1) {
-		print STDERR "Found exon\n";
-                $all_exons_found = 1;
-                last;
-            }
-        }
+	print STDERR $exon->phase . " " . "$exon_pep\n";		
+	if (index ($full_pep, $exon_pep) > -1) {
+	  print STDERR "Found exon\n";
+	  $all_exons_found = 1;
+	  last;
+	}
+      }
     }
-}
+  }
 
 unless ($all_exons_found)
 { print "not ok 7\n"; }
@@ -194,7 +192,7 @@ my $seq =
 'gctcaggagcaggttgcaattcaaaatcaagggctgctttgaggaggcctctccaccgggctgctgtagtcaccaag'.
 'tccagcccatgcccaaaggaagaggaatgagttcccccttaaaaaaaaaaaaaaaaagaaaaagacagagtcttgct'.
 'ctgtgcccaggctggagtgcagtgatgacatcatagctcactgtagcctcaaactcctgagctccagtgatcctccc'.
-'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
+  'acctcagcctcctgagtagctaggactaaaggcatgcaccactacacctggctaatttaaaaattttttgtagaaat'.
 'ggggtctccctatgttgcccagactggtctcaaactcctggcctcaagcgatcctcttgcctcaacctcccaaagtg'.
 'ctgggagtacaggtgtgtgcttggtctgaggctccaactttttgttgttgtttctcgagacagtctctcgctctgtt'.
 'gcccaggctggagtgcagtggcgcgatcttggctccctgcaacctctgtgaggctccaactcttgaagggaggagag'.

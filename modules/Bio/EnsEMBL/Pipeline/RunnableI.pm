@@ -47,6 +47,10 @@ use Bio::Root::RootI;
 
 @ISA = qw(Bio::Root::RootI);
 
+BEGIN {
+    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+}
+
 =head1 ABSTRACT METHODS
 
 These methods need to be implemented in any
@@ -279,7 +283,8 @@ sub createfeaturepair {
                             -program         => $feat2->{program},
                             -program_version => $feat2->{p_version},
                             -gff_source      => $feat2->{source},
-                            -gff_feature     => $feat2->{primary});
+                            -gff_feature     => $feat2->{primary},
+                            -logic_name      => $feat2->{logic_name} );
     
     #create and fill Bio::EnsEMBL::Seqfeature objects
     my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
@@ -324,7 +329,8 @@ sub create_repeat {
                             -program         => $feat2->{program},
                             -program_version => $feat2->{p_version},
                             -gff_source      => $feat2->{source},
-                            -gff_feature     => $feat2->{primary});
+                            -gff_feature     => $feat2->{primary},
+                            -logic_name      => $feat2->{logic_name});
     
     #create and fill Bio::EnsEMBL::Seqfeature objects
     my $seqfeature1 = new Bio::EnsEMBL::SeqFeature
@@ -369,3 +375,40 @@ sub shrinkfplist {
     #load fp onto array using command _grow_fplist
     return pop(@{$self->{'_fplist'}});
 }
+
+sub find_executable {
+  my ($self,$name) = @_;
+
+  my $bindir = $::pipeConf{'bindir'}   || undef;
+  my $datadir = $::pipeConf{'datadir'} || undef;
+
+  if (-x $name) {
+    return $name;
+  } elsif ($bindir && -x ($name = "$bindir/$name")) {
+    return $name;
+  } else {
+    eval {
+      $name = $self->locate_executable($name);
+    };
+    if ($@) {
+      $self->throw("Can't find executable [$name]");
+    }
+  }
+}
+
+sub find_file {
+  my ($self,$name) = @_;
+
+  my $datadir = $::pipeConf{'datadir'} || undef;
+
+  if (-e $name) {
+    return $name;
+    
+  } elsif ($datadir && -e ($name = "$datadir/$name")) {
+    return $name;
+  } else {
+    $self->throw("Can't find file [$name]");
+  }
+}
+
+1;

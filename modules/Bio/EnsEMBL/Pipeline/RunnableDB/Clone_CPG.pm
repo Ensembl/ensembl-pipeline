@@ -40,7 +40,7 @@ This object takes clone ids, while Bio::EnsEMBL::Pipeline::RunnabdleDB::CPG
 acts on contigs. This allows us to submit one Job per clone rather than one 
 per contig and should speed things up ...
 
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
+The appropriate Bio::EnsEMBL::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
 
@@ -75,7 +75,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Clone_CPG object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Clone input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
+                -analysis:  A Bio::EnsEMBL::Analysis
 
 =cut
 

@@ -79,8 +79,8 @@ sub new {
     Title   :   analysis
     Usage   :   $self->analysis($analysis);
     Function:   Gets or sets the stored Analusis object
-    Returns :   Bio::EnsEMBL::Pipeline::Analysis object
-    Args    :   Bio::EnsEMBL::Pipeline::Analysis object
+    Returns :   Bio::EnsEMBLAnalysis object
+    Args    :   Bio::EnsEMBL::Analysis object
 
 =head2 dbobj
 

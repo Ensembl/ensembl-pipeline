@@ -255,8 +255,8 @@ sub write_output {
                 $f->seqname($contig->internal_id);
             }
 	    print STDERR "Writing features to database\n";
-#	    my $feat_Obj = Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-#	    $feat_Obj->write($contig, @features);
+	    my $feat_adp = Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	    $feat_adp->store($contig, @features);
 	}
     }
     return 1;

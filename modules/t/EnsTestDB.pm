@@ -38,6 +38,7 @@ B<EnsTestDB.conf.example> for an example.
 
 package EnsTestDB;
 
+use vars qw(@ISA);
 use strict;
 use Sys::Hostname 'hostname';
 use Bio::EnsEMBL::DBLoader;
@@ -49,7 +50,7 @@ my $counter=0;
 
 {
     # This is a list of possible entries in the config
-    # file "EnsTestDB.conf"
+    # file "EnsTestDB.conf" or in the hash being used.
     my %known_field = map {$_, 1} qw(
         driver
         host
@@ -59,21 +60,40 @@ my $counter=0;
         schema_sql
         module
         );
-    
+
+    ### now takes an optional argument; when given, it can be a filename
+    ### or a hash, and will be used to get arguments from. If not, the
+    ### file 'EnsTestDB.conf' will be tried; it it exist; that is taken;
+    ### otherwise, some hopefully defaults will be used.
     sub new {
-        my( $pkg ) = @_;
+        my( $pkg, $arg ) = @_;
 
         $counter++;
-        # Get config from file, or use default values
-        my $self = do 'EnsTestDB.conf' || {
-            'driver'        => 'mysql',
-            'host'          => 'localhost',
-            'user'          => 'root',
-            'port'          => '3306',
-            'pass'      => undef,
-            'schema_sql'    => ['../sql/table.sql'],
-            'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor'
-            };
+
+        my $self =undef;
+	$self = do 'EnsTestDB.conf'
+	    || {
+		'driver'        => 'mysql',
+		'host'          => 'localhost',
+		'user'          => 'root',
+		'port'          => '3306',
+		'pass'      => undef,
+		'schema_sql'    => ['../sql/table.sql'],
+		'module'        => 'Bio::EnsEMBL::DBSQL::DBAdaptor'
+		};
+	if ($arg) {
+	    if  (ref $arg eq 'HASH' ) {  # a hash ref
+                foreach my $key (keys %$arg) {
+		    $self->{$key} = $arg->{$key};
+		}
+	    }
+	    elsif (-f $arg )  { # a file name
+		$self = do $arg;
+	    } else {
+		confess "expected a hash ref or existing file";
+	    }
+	}
+        
         foreach my $f (keys %$self) {
             confess "Unknown config field: '$f'" unless $known_field{$f};
         }
@@ -145,6 +165,17 @@ sub dbname {
     return $self->{'_dbname'};
 }
 
+# convenience method: by calling it, you get the name of the database,
+# which  you can cut-n-paste into another window for doing some mysql
+# stuff interactively
+sub pause {
+    my ($self) = @_;
+    my $db = $self->{'_dbname'};
+    print STDERR "pausing to inspect database; name of database is:  $db\n";
+    print STDERR "press ^D to continue\n";
+    `cat `;
+}
+
 sub module {
     my ($self, $value) = @_;
     $self->{'module'} = $value if ($value);
@@ -164,20 +195,19 @@ sub create_db {
     my( $self ) = @_;
     
     ### FIXME: not portable between different drivers
-    my $locator = 'dbi:'. $self->driver .':host='. $self->host;
+
+    my $locator = 'DBI:'. $self->driver .':host='.$self->host;
+
     my $db = DBI->connect(
         $locator, $self->user, $self->pass, {RaiseError => 1}
         ) or confess "Can't connect to server";
+
     my $db_name = $self->dbname;
-
-    print STDERR "Database name is $db_name\n";
-
     $db->do("CREATE DATABASE $db_name");
     $db->disconnect;
-    print STDERR "Created database\n";
-    print STDERR "Reading SQL file\n";
+    
+    
     $self->do_sql_file(@{$self->schema_sql});
-    print STDERR "done\n";
 }
 
 sub db_handle {
@@ -206,52 +236,75 @@ sub test_locator {
 sub ensembl_locator {
     my( $self) = @_;
     
-    my $module = ($self->module() || 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor');
+    my $module = ($self->module() || 'Bio::EnsEMBL::DBSQL::DBAdaptor');
     my $locator = '';
+
     foreach my $meth (qw{ host port dbname user pass}) {
+
         my $value = $self->$meth();
-	if( !defined $value ) { next; }
+	next unless defined $value;
         $locator .= ';' if $locator;
         $locator .= "$meth=$value";
     }
+    $locator .= ";perlonlyfeatures=1";
+   
     return "$module/$locator";
 }
 
+# return the database handle:
 sub get_DBSQL_Obj {
     my( $self ) = @_;
     
     my $locator = $self->ensembl_locator();
-    return Bio::EnsEMBL::DBLoader->new($locator);
+    my $db =  Bio::EnsEMBL::DBLoader->new($locator);
+    $db->dnadb($self->dnadb);
 }
-
 
 sub do_sql_file {
     my( $self, @files ) = @_;
     local *SQL;
     my $i = 0;
     my $dbh = $self->db_handle;
-    
+
+    my $comment_strip_warned=0;
+
     foreach my $file (@files)
     {
         my $sql = '';
         open SQL, $file or die "Can't read SQL file '$file' : $!";
         while (<SQL>) {
-            s/(#|--).*//;       # Remove comments
-	       next unless /\S/;   # Skip lines which are all space
-	       $sql .= $_;
-	       $sql .= ' ';
-	}
-	close SQL;
+            # careful with stripping out comments; quoted text
+            # (e.g. aligments) may contain them. Just warn (once) and ignore
+            if (    /'[^']*#[^']*'/ 
+                 || /'[^']*--[^']*'/ ) {
+                     if ( $comment_strip_warned++ ) { 
+                         # already warned
+                     } else {
+                         warn "#################################\n".
+                           warn "# found comment strings inside quoted string; not stripping, too complicated: $_\n";
+                         warn "# (continuing, assuming all these they are simply valid quoted strings)\n";
+                         warn "#################################\n";
+                     }
+                 } else {
+                s/(#|--).*//;       # Remove comments
+            }
+            next unless /\S/;   # Skip lines which are all space
+            $sql .= $_;
+            $sql .= ' ';
+        }
+        close SQL;
+        
 	#Modified split statement, only semicolumns before end of line,
-        #so we can have them inside a string in the statement
-	foreach my $s (grep /\S/, split /;\n/, $sql) {
+	#so we can have them inside a string in the statement
+	#\s*\n, takes in account the case when there is space before the new line
+        foreach my $s (grep /\S/, split /;[ \t]*\n/, $sql) {
             $self->validate_sql($s);
             $dbh->do($s);
             $i++
         }
     }
     return $i;
-}
+}                                       # do_sql_file
 
 sub validate_sql {
     my ($self, $statement) = @_;
@@ -263,9 +316,19 @@ sub validate_sql {
     }
 }
 
+sub dnadb {
+  my ($self,$dnadb) = @_;
+
+  if (defined($dnadb)) {
+     $self->{_dnadb} = $dnadb;
+  }
+  return $self->{_dnadb};
+}
+
+
 sub DESTROY {
-    my( $self, $file ) = @_;
-    
+    my( $self ) = @_;
+
     if (my $dbh = $self->db_handle) {
         my $db_name = $self->dbname;
         $dbh->do("DROP DATABASE $db_name");

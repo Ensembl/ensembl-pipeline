@@ -87,8 +87,8 @@ sub input_id {
   Title   : analysis
   Usage   : $self->analysis($anal);
   Function: Get/set method for the analysis object of the job
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
+  Args    : bio::EnsEMBL::Analysis
 
 =cut
 

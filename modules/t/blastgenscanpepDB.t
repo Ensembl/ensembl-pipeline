@@ -27,9 +27,9 @@ END {   print "not ok 1\n" unless $loaded;  }
 
 use lib 't';
 use EnsTestDB;
-use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
-use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep;
+use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::DBSQL::Utils;
 use Bio::EnsEMBL::Exon;
 use Data::Dumper;
@@ -39,38 +39,41 @@ print "ok 1\n";    # 1st test passes.
     
 my $ens_test = EnsTestDB->new();
 # Load some data into the db
-#$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
+$ens_test->do_sql_file("t/blastgenscanpepDB.dump");
     
 # Get an EnsEMBL db object for the test db
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ensrv4',
-                                      -dbname => 'ensembl_freeze17_michele',
-                                      -user => 'ensadmin');
+
+my $db = $ens_test->get_DBSQL_Obj;
+
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep';
 my $parameters = '-THRESHOLD => 1, -ARGS => -hspmax 1000 nogap';
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'swir',
-                                                    -db_file        => 'swir',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'wublastp',
-                                                    -program_file   => 'wublastp',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'blastp',
-                                                    -gff_feature    => 'similarity',
-                                                    -parameters     => $parameters );
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'swall',
+					  -db_file        => 'swall',
+					  -db_version     => '__NONE__',
+					  -program        => 'wublastp',
+					  -program_file   => 'wublastp',
+					  -module         => $runnable,
+					  -module_version => 1,
+					  -gff_source     => 'blastp',
+					  -gff_feature    => 'similarity',
+					  -parameters     => $parameters,
+					  -logic_name     => 'blastgenscanPEP' );
 
 unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-my $id = 'AP000074.1.1.100000';
+
+my $id = 'AB015752.00001';
 
 my $contig = $db->get_Contig($id);
 my @genscan_peptides = $contig->get_genscan_peptides;
 
+
 my $runobj = "$runnable"->new(  -dbobj      => $db,
-			                    -input_id   => $id,
+				-input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
@@ -85,12 +88,12 @@ unless (@out)
 { print "not ok 5\n"; }
 else
 { print "ok 5\n"; }
-#display(@out);
+display(@out);
 
 $runobj->write_output();
 my $contig = $db->get_Contig($id);
 my @features = $contig->get_all_SimilarityFeatures();
-#display(@features);
+display(@features);
 
 unless (@features)
 { print "not ok 6\n"; }
@@ -119,7 +122,6 @@ foreach my $feature (@features)
         $exon->strand       ($feature->strand);
         $exon->phase        ($feature->phase);
         $exon->contig_id    ($id);
-        #$exon->end_phase($feat->end_phase);
         $exon->attach_seq   ($contig->primary_seq);
         my $count = 1;
         foreach my $pep (@genscan_peptides)

@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
     
@@ -42,15 +42,16 @@ print "ok 2\n";
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::RepeatMasker';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
                                                     -db_version     => '__NONE__',
                                                     -program        => 'RepeatMasker',
                                                     -program_version=> 1,
-						    -program_file   => $::pipeConf{'bindir'} . 'RepeatMasker',
+                                                    -program_file   => 'RepeatMasker',
                                                     -module         => $runnable,
                                                     -module_version => 1,
                                                     -gff_source     => 'RepeatMasker',
                                                     -gff_feature    => 'repeat', 
+						    -logic_name     => 'RepeatMasker',
                                                     -parameters     => '',
                                                      );
 

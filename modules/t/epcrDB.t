@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::EPCR;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -49,7 +49,7 @@ my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::EPCR';
 my $sts_db   = $::pipeConf{'datadir'} . "/mapprimer";
   
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file             => $sts_db,
+my $ana = Bio::EnsEMBL::Analysis->new (   -db_file             => $sts_db,
                                                     -db_version     => '1',
                                                     -program        => 'e-PCR',
                                                     -program_version=> 1,
@@ -58,6 +58,7 @@ my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db_file             => $sts
                                                     -gff_source     => 'e-PCR',
                                                     -gff_feature    => 'similarity', 
                                                     -parameters     => '',
+                                                    -logic_name     => 'e-PCR'
                                                      );
 
 unless ($ana)
@@ -67,7 +68,7 @@ else
 my $id ='AB012723.00001';
 $ana_adaptor->exists( $ana );
 my $runobj = "$runnable"->new(  -dbobj      => $db,
-			                    -input_id   => $id,
+                                -input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }

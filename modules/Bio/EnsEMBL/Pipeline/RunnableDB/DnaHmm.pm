@@ -73,7 +73,7 @@ use Bio::Root::RootI;
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::EPCR object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 
@@ -96,8 +96,8 @@ sub new {
     $self->input_id($input_id);
     
     $self->throw("Analysis object required") unless ($analysis);
-    $self->throw("Analysis object is not Bio::EnsEMBL::Pipeline::Analysis")
-                unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+    $self->throw("Analysis object is not Bio::EnsEMBL::Analysis")
+                unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
     $self->analysis($analysis);
     
 
@@ -281,8 +281,8 @@ sub analysis {
     
     if ($analysis)
     {
-        $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
-            unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+        $self->throw("Not a Bio::EnsEMBL::Analysis object")
+            unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
         $self->{'_analysis'} = $analysis;
         $self->parameters($analysis->parameters);
     }

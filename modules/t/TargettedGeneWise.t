@@ -45,9 +45,13 @@ print "ok 2\n";
 
 my @id=('ctg22fin4:17398358,17400418:O60755:1,368');
 
+my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher;
+
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGeneWise';
+
 my $tgw = "$runnable"->new(-dbobj    => $db,
-                           -input_id => \@id);	
+                           -input_id => \@id,
+			   -seqfetcher => $fetcher);	
 
 unless ($tgw)
 { print "not ok 3\n"; }

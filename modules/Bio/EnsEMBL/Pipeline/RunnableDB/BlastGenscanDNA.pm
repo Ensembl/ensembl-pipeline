@@ -33,7 +33,7 @@ This object runs Bio::EnsEMBL::Pipeline::Runnable::Blast on peptides constructed
 assembling genscan predicted features to peptide sequence. The resulting blast hits are
 written back as FeaturePairs.
 
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
+The appropriate Bio::EnsEMBL::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for database access.
 
@@ -72,7 +72,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanPep object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:  Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 
@@ -80,7 +80,6 @@ sub new {
     my ($class, @args) = @_;
     my $self = $class->SUPER::new(@args);
     $self->{'_runnable'}    = [];
-
     $self->{'_genseq'}      = undef;
     $self->{'_transcripts'} = [];
     $self->{'_parameters'}  = undef;
@@ -115,8 +114,10 @@ sub fetch_input {
         or $self->throw("Unable to fetch contig sequence");
 
     $self->genseq($genseq);
+    
     #need to get features predicted by genscan
     $self->transcripts($contig->get_genscan_peptides);
+    print STDERR "Got genscan peptides\n";
 }
 
 sub transcripts {
@@ -197,7 +198,11 @@ sub output {
 
     my @output;
     foreach my $run ($self->runnable) {
-      push(@output,$run->output);
+      my @tmp = $run->output;
+      foreach my $f (@tmp) {
+	$f->analysis($self->analysis);
+      }
+      push(@output,@tmp);
     }
     return @output;
 }
@@ -233,8 +238,8 @@ sub write_output {
     }
     elsif (@features) 
     {
-        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	    $feat_Obj->write($contig, @features);
+        my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	    $feat_adp->store($contig, @features);
     }
     return 1;
 }

@@ -58,11 +58,14 @@ use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+use Bio::EnsEMBL::DBSQL::FeatureAdaptor;
 use Bio::DB::RandomAccessI;
 
 use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI);
+
+
 
 =head2 new
 
@@ -222,13 +225,12 @@ sub genseq {
 sub output {
     my ($self) = @_;
    
-    if (!defined($self->{'_output'})) {
-      $self->{'_output'} = [];
-    } 
-
+    $self->{'_output'} = [];
+    
     my @r = $self->runnable;
-    if(@r && scalar(@r)){
-      foreach my $r($self->runnable){
+
+    if(defined (@r) && scalar(@r)){
+      foreach my $r ($self->runnable){
 	push(@{$self->{'_output'}}, $r->output);
       }
     }
@@ -247,10 +249,13 @@ sub output {
 
 sub run {
     my ($self) = @_;
-    $self->throw("Runnable module not set") unless ($self->runnable());
-    $self->throw("Input not fetched") unless ($self->genseq());
-    $self->runnable->clone($self->genseq());
-    $self->runnable->run();
+
+    foreach my $runnable ($self->runnable) {
+      $self->throw("Runnable module not set") unless ($runnable);
+      $self->throw("Input not fetched") unless ($self->genseq());
+      $runnable->clone($self->genseq());
+      $runnable->run();
+    }
 }
 
 =head2 runnable
@@ -271,6 +276,7 @@ sub runnable {
   }
   
   if (defined($arg)) {
+
       if ($arg->isa("Bio::EnsEMBL::Pipeline::RunnableI")) {
 	  push(@{$self->{'_runnables'}},$arg);
       } else {
@@ -317,11 +323,15 @@ sub write_output {
 
     my $db=$self->dbobj();
     my @features = $self->output();
+  
+    foreach my $f (@features) {
+	$f->analysis($self->analysis);
+    }
 
     my $contig;
     eval 
     {
-        $contig = $db->get_Contig($self->input_id);
+      $contig = $db->get_Contig($self->input_id);
     };
 
     if ($@) 
@@ -331,8 +341,9 @@ sub write_output {
     elsif (@features) 
     {
 	print STDERR "Writing features to database\n";
-        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	$feat_Obj->write($contig, @features);
+
+        my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	$feat_adp->store($contig, @features);
     }
     return 1;
 }
@@ -348,14 +359,16 @@ sub write_output {
 =cut
 
 sub seqfetcher {
-    my( $self, $value ) = @_;    
-    if ($value) {
-        #need to check if passed sequence is Bio::DB::RandomAccessI object
-        $value->isa("Bio::DB::RandomAccessI") || 
-	    $self->throw("Input isn't a Bio::DB::RandomAccessI");
-        $self->{'_seqfetcher'} = $value;
-    }
+  my( $self, $value ) = @_;    
+  if (defined($value)) {
+    #need to check if passed sequence is Bio::DB::RandomAccessI object
+    #$value->isa("Bio::DB::RandomAccessI") || 
+    #  $self->throw("Input isn't a Bio::DB::RandomAccessI");
+    $self->{'_seqfetcher'} = $value;
+  }
     return $self->{'_seqfetcher'};
 }
+
+
 
 1;

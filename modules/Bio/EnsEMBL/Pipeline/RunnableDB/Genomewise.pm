@@ -74,42 +74,6 @@ sub new {
     return $self; 
 }
 
-=head2 RunnableDB methods
-
-=head2 analysis
-
-    Title   :   analysis
-    Usage   :   $self->analysis($analysis);
-    Function:   Gets or sets the stored Analusis object
-    Returns :   Bio::EnsEMBL::Pipeline::Analysis object
-    Args    :   Bio::EnsEMBL::Pipeline::Analysis object
-
-=head2 dbobj
-
-    Title   :   dbobj
-    Usage   :   $self->dbobj($obj);
-    Function:   Gets or sets the value of dbobj
-    Returns :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-                (which extends Bio::EnsEMBL::DB::ObjI)
-    Args    :   A Bio::EnsEMBL::Pipeline::DB::ObjI compliant object
-
-=head2 input_id
-
-    Title   :   input_id
-    Usage   :   $self->input_id($input_id);
-    Function:   Gets or sets the value of input_id
-    Returns :   valid input id for this analysis (if set) 
-    Args    :   input id for this analysis 
-
-=head2 write_output
-
-    Title   :   write_output
-    Usage   :   $self->write_output
-    Function:   Writes output data to db
-    Returns :   array of exons (with start and end)
-    Args    :   none
-
-=cut
 
 sub write_output {
     my($self,@features) = @_;

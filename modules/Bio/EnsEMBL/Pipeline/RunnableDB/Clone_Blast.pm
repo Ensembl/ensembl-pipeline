@@ -31,7 +31,7 @@ $repmask->write_output(); #writes to DB
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::Blast to add functionality 
 for reading and writing to databases. This objects requires clone ids, 
 Bio::EnsEMBL::Pipeline::RunnableDB::Blast acts on contigs.
-The appropriate Bio::EnsEMBL::Pipeline::Analysis object must be passed for
+The appropriate Bio::EnsEMBL::Analysis object must be passed for
 extraction of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
 
@@ -65,7 +65,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Args    :    -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis
+                -analysis:  A Bio::EnsEMBL::Analysis
 
 =cut
 
@@ -248,8 +248,8 @@ sub write_output {
             {
                 print STDERR ($feature->hseqname()."\t");
             }
-            my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	        $feat_Obj->write($contig, @features);
+            my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	        $feat_Obj->store($contig, @features);
         }
         return 1;
     } 

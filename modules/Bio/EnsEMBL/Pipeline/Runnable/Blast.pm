@@ -140,20 +140,7 @@ sub new {
       $self->throw("No query sequence input.");
     }
 
-    my $bindir  = $::pipeConf{'bindir'}  || undef;
-    my $datadir = $::pipeConf{'datadir'} || undef;
-    
-    if (-x $program) {
-      # passed from RunnableDB (full path assumed)
-      $self->program($program);
-    } elsif ($bindir && -x ($program = "$bindir/$program")) {
-      $self->program($program);
-    } elsif ($program =~ /blastn|blastx|blastp|tblastn|tblastx/) {
-      $self->program($self->locate_executable($program));  
-    } else {
-      $self->throw("Path to blast executable required [$program]\n");
-    }
-    
+    $self->program($self->find_executable($program));
     if ($database) {
       $self->database($database);
     } else {
@@ -569,7 +556,8 @@ sub split_HSP {
 					      -program         => $source,
 					      -program_version => 1,
 					      -gff_source      => $source,
-					      -gff_feature     => 'similarity');
+					      -gff_feature     => 'similarity',
+					      -logic_name      => 'blast');
     
     # Here goes...
 

@@ -164,8 +164,8 @@ sub write_output {
 	print STDERR "Contig not found, skipping writing output to db\n";
     }
     else {
-	my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	$feat_Obj->write($contig,@features);
+	my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	$feat_adp->store($contig,@features);
     }
     return 1;
 }

@@ -71,10 +71,6 @@ use Bio::SeqIO;
 use Bio::Root::RootI;
 use FileHandle;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
-
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::Root::RootI );
 
 sub new {
@@ -85,35 +81,12 @@ sub new {
     $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS PRINT)], @args);
 
   $self->throw("no genomic sequence given\n") unless defined $genomic;
-  $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
+  $self->throw("no est sequence given\n")     unless defined $est;
 
-  # allow it to take a filename or an array ref
-  $self->throw("no est sequence given\n") unless defined $est;
+  $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
   $self->est_sequence($est) if defined $est; 
 
-  my $bindir = $::pipeConf{'bindir'} || undef;
-  my $datadir = $::pipeConf{'datadir'} || undef;
-
-  if (-x $exonerate) {
-    # passed from RunnableDB (full path assumed)
-    $self->exonerate($exonerate);
-  }
-  elsif ($::pipeConf{'bin_Exonerate'} && -x ($exonerate = "$::pipeConf{'bin_Exonerate'}")) {
-    $self->exonerate($exonerate);
-  }
-  elsif ($bindir && -x ($exonerate = "$bindir/" . $exonerate)) {
-    $self->exonerate($exonerate);
-  }
-  else {   
-    eval 
-      { 
-	$self->exonerate($self->locate_executable('exonerate')); 
-      };
-    if ($@) {
-      # need a central installation ...
-      $self->throw("Can't find exonerate!"); 
-    }
-  }
+  $self->exonerate($self->find_executable('exonerate')); 
 
   if (defined $arguments) {   
     $self->arguments($arguments);
@@ -489,10 +462,8 @@ sub run_ungapped {
   my ($self) = @_;
 
   #check inputs
-  my $genomicseq = $self->genomic_sequence ||
-    $self->throw("Genomic sequences not provided");
-  my $estseq = $self->est_sequence ||
-    $self->throw("EST sequences not provided");
+  my $genomicseq = $self->genomic_sequence ||    $self->throw("Genomic sequences not provided");
+  my $estseq     = $self->est_sequence     ||    $self->throw("EST sequences not provided");
   
   #extract filenames from args and check/create files and directory
   my $genfile = $self->genfilename;
@@ -501,47 +472,60 @@ sub run_ungapped {
   # output parsing requires that we have both gff and cigar outputs. We don't want to do intron
   # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
   # are got from $self->arguments.
+
   my $command = $self->exonerate() . " " .  $self->arguments . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
-print STDERR "command is $command\n";
+
+  print STDERR "command is $command\n";
+
   # disable buffering of STDOUT
   STDOUT->autoflush(1);
 
   eval {
     open(EXONERATE, "$command |") or $self->throw("Error forking exonerate pipe on ".$self->genfilename."\n"); 
+
     my $source_tag  = "exonerate";
-    my $estname   = undef;
-    my $genname   = "";
+    my $prevstate   = "cigar";
+    my $estname     = undef;
+    my $genname     = "";
+
     my %gff;
-    my $prevstate = "cigar";
+
 
     # exonerate output is split up by est.
     # gff comes first, then all the cigar lines, so we can process all the gff, then all the cigar lines.
     # if we keep track of when we flip from cigar to gff, we know we're moving on to the next est.
+
     while(<EXONERATE>){
       # gff
       if(/\S+\s+exonerate\s+exon\s+\d+/){
 
 	# is this the first gff? ie have we moved onto a new est?
 	if($prevstate eq 'cigar') {
+
 	  $prevstate = 'gff';
-	  $estname = undef;
+	  $estname   = undef;
+
 	  foreach my $entry( keys %gff) {
 	    delete $gff{$entry};
 	  }
 	}
 
 	my @cols = split /;/;
-	my $pid = $cols[$#cols];
+	my $pid  = $cols[$#cols];
+
 	$pid =~ /(\d+)\./;
 	$pid = $1;
 	
 	my @coords = split /\s+/, $cols[0];
+	
 	$estname = $coords[0] unless defined $estname;
+
 	$self->throw("$coords[0] does not match $estname") unless $coords[0] eq $estname;
 
 	# key by start-end-strand
 	my $start = $coords[3]; 
 	$start--;# presently off by one wrt cigar
+
 	my $idstring = $start . "-" . $coords[4] . "-" . $coords[6];
 	$gff{$idstring} = $pid;
       }
@@ -592,13 +576,13 @@ print STDERR "command is $command\n";
 	}
 
 	my $genomic_primary = $primary_tag;
-	my $est_primary = $primary_tag;
+	my $est_primary     = $primary_tag;
 
 	my $pair = $self->_create_featurepair ($genomic_score, $pid, $genomic_start, $genomic_end, $genomic_id, 
-					 $est_start, $est_end, $est_id, 
-					 $genomic_source, $est_source, 
-					 $genomic_strand, $est_strand, 
-					 $genomic_primary, $est_primary);
+					       $est_start, $est_end, $est_id, 
+					       $genomic_source, $est_source, 
+					       $genomic_strand, $est_strand, 
+					       $genomic_primary, $est_primary);
 
 	$self->output($pair);
 

@@ -41,7 +41,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 use Bio::Root::RootI;
 
 use vars qw(@ISA);
@@ -282,7 +282,7 @@ sub store {
  Function: Tests whether this Analysis already exists in the database
  Example :
  Returns : newest Analysis object which has all what given analysis have.
- Args    : Bio::EnsEMBL::Pipeline::Analysis
+ Args    : Bio::EnsEMBL::Analysis
 
 =cut
 
@@ -290,7 +290,7 @@ sub exists {
     my ($self,$anal) = @_;
     my $resultAnalysis;
 
-    $self->throw("Object is not a Bio::EnsEMBL::Pipeline::Analysis") unless $anal->isa("Bio::EnsEMBL::Pipeline::Analysis");
+    $self->throw("Object is not a Bio::EnsEMBL::Analysis") unless $anal->isa("Bio::EnsEMBL::Analysis");
 
     my $query;
     my @conditions;
@@ -332,7 +332,7 @@ sub exists {
 sub _objFromHashref {
   my ($self,$rowHash) = @_;
 
-  my $analysis = Bio::EnsEMBL::Pipeline::Analysis->new
+  my $analysis = Bio::EnsEMBL::Analysis->new
     ( -id => $rowHash->{analysisId},
       -db => $rowHash->{db},
       -db_file => $rowHash->{db_file},

@@ -88,11 +88,11 @@ sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);    
            
-    $self->{'_fplist'} = [];          # an array of feature pairs
-    $self->{'_clone'}  = undef;       # location of Bio::Seq object
-    $self->{'_blastn'} = undef;       # location of Blastn script
+    $self->{'_fplist'}    = [];       # an array of feature pairs
+    $self->{'_clone'}     = undef;    # location of Bio::Seq object
+    $self->{'_blastn'}    = undef;    # location of Blastn script
     $self->{'_mspcrunch'} = undef;    # location of MSPcrunch
-    $self->{'_vector'} = undef;       # location of vector sequences
+    $self->{'_vector'}    = undef;    # location of vector sequences
     $self->{'_workdir'}   = undef;    # location of temp directory
     $self->{'_filename'}  = undef;    # file to store Bio::Seq object
     $self->{'_results'}   = undef;    # file to store results of analysis
@@ -100,32 +100,24 @@ sub new {
     $self->{'_arguments'} =undef;     # arguments for MSPcrunch    
     
     my( $clonefile, $arguments, $blastn, $msp, $vector) = 
-            $self->_rearrange([qw(CLONE ARGS BLAST 
-				  MSP VECT)], @args);
+            $self->_rearrange([qw(CLONE ARGS BLAST MSPCRUNCH VECTOR)], @args);
+
     $self->clone($clonefile) if ($clonefile);       
-    if ($blastn) {   $self->blastn($blastn) ;}
-    else {   
-        eval 
-        { $self->blastn($self->locate_executable('blastn'));  }; 
-        if ($@) 
-        { $self->blastn('/usr/local/pubseq/bin/blastn'); }  
-    }
-    
-    if ($msp) {   $self->mspcrunch($msp) ;}
-    else {   
-        eval 
-        { $self->mspcrunch($self->locate_executable('MSPcrunch')); }; 
-        if ($@)
-        { $self->mspcrunch('/usr/local/pubseq/bin/MSPcrunch'); }  
+
+    $blastn    = 'blastn'      unless defined($blastn);
+    $mspcrunch = 'MSPcrunch'   unless defined($mspcrunch);
+    $vector    = 'vectors_etc' unless defined($vector);
+
+    $self->blastn   ($self->find_executable($blastn));
+    $self->mspcrunch($self->find_executable($mspcrunch));
+    $self->vector   ($vector);
+      
+    if ($arguments) {
+      $self->arguments($arguments) ;
+    } else {
+      $self->arguments(' -I 95 -d -') ;      
     }
 
-    if ($vector) {   $self->vector($vector) ;}
-    else
-    {   $self->vector('/tmp_mnt/nfs/disk100/humpub/blast/vectors_etc');   }
-
-    if ($arguments) {   $self->arguments($arguments) ;}
-    else
-    { $self->arguments(' -I 95 -d -') ;      }
     return $self;
 }
 

@@ -111,7 +111,7 @@ sub new {
   }
   
   if (defined($program)) {
-    $self->program($program);
+    $self->program($self->find_executable($program));
   } else {
     $self->throw ("No program input");
   }
@@ -161,9 +161,9 @@ sub run {
     $self->throw("No peptide input");
   }
   
-  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->id."\n";
+  print STDERR "Creating BioPrimarySeq for peptide ".$transcript->temporary_id."\n";
 
-  my $peptide = Bio::PrimarySeq->new(-id         => $transcript->id,
+  my $peptide = Bio::PrimarySeq->new(-id         => $transcript->temporary_id,
 				     -seq        => $transcript->translate->seq(),
 				     -moltype    => 'protein' );
 
@@ -227,7 +227,7 @@ sub align_hits_to_contig {
 
     my $pep = $trans->translate->seq;
 
-    foreach my $exon ($trans->each_Exon) {
+    foreach my $exon ($trans->get_all_Exons) {
 
         my %ex_align;
 
@@ -240,13 +240,13 @@ sub align_hits_to_contig {
 
         my ($expep) = $exon->translate->seq =~ /[^\*]+/g;
 	if ($expep =~ s/x$//i) {
-	    print STDERR "Removed terminal 'X' from exon @{[$exon->id]}\n";
+	    print STDERR "Removed terminal 'X' from exon @{[$exon->temporary_id]}\n";
 	}
 
         $self->throw("Exon translation not found in peptide") 
                     unless ($pep =~ /$expep/);
 
-        $ex_align {'name'}      = $exon->id;
+        $ex_align {'name'}      = $self->genomic->id;
 
 	# Trim the start and end of the exon
 	if ($exon->strand == 1) {

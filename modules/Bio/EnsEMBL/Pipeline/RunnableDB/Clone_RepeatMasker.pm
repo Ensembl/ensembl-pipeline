@@ -228,8 +228,8 @@ sub write_output {
             {
                 print STDERR ($repeat->hseqname()."\t");
             }
-            my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	        $feat_Obj->write($contig, @repeats);
+            my $feat_adp=Bio::EnsEMBL::DBSQL::FeatureAdaptor->new($db);
+	        $feat_adp->write($contig, @repeats);
         }
         return 1;
     } 

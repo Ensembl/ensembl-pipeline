@@ -74,14 +74,17 @@ sub new {
 								FORDER)],
 							    @args);
     
-    $self->throw("No genomic sequence input")         unless defined($genomic);
-    $self->throw("[$genomic] is not a Bio::PrimarySeqI") unless $genomic->isa("Bio::PrimarySeqI");
-    $self->genomic_sequence($genomic) if defined($genomic);
-    $self->{'_forder'} = $forder      if defined($forder);
-    $self->throw("No seqfetcher provided") unless defined($seqfetcher);
+    $self->throw("No genomic sequence input")                     unless defined($genomic);
+    $self->throw("No seqfetcher provided")                        unless defined($seqfetcher);
+
+    $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+
+    $self->genomic_sequence($genomic) if defined($genomic);
     $self->seqfetcher($seqfetcher)    if defined($seqfetcher);
     $self->endbias($endbias)          if defined($endbias);
+
+    $self->{'_forder'} = $forder      if defined($forder);
 
     if (defined($features)) {
 	if (ref($features) eq "ARRAY") {
@@ -474,7 +477,8 @@ sub run {
 	 -program         => "genewise",
 	 -program_version => 1,
 	 -gff_source      => 'genewise',
-	 -gff_feature     => 'exon',);
+	 -gff_feature     => 'exon',
+	 -logic_name      => 'minigenewise');
 
     foreach my $id (@ids) {
 	my $hseq = $self->get_Sequence(($id));

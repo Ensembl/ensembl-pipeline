@@ -84,16 +84,18 @@ sub new {
   
   $self->throw("No seqfetcher provided")           
     unless defined($seqfetcher);
-  $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
-    unless $seqfetcher->isa("Bio::DB::RandomAccessI");
+
+#  $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
+#    unless $seqfetcher->isa("Bio::DB::RandomAccessI");
   $self->seqfetcher($seqfetcher) if defined($seqfetcher);
   
   if (defined($ids)) {
     if (ref($ids) eq "ARRAY") {
+      print "Ids @$ids\n";
       push(@{$self->{'_idlist'}},@$ids);
     } else {
       $self->throw("[$ids] is not an array ref.");
-	}
+    }
   }
   
   if (defined($trim)) {
@@ -161,7 +163,7 @@ sub seqfetcher {
   my( $self, $value ) = @_;    
   if ($value) {
     #need to check if passed sequence is Bio::DB::RandomAccessI object
-    $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+#    $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
     $self->{'_seqfetcher'} = $value;
   }
   return $self->{'_seqfetcher'};

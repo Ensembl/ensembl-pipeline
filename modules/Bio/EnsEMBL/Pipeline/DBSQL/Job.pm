@@ -45,7 +45,8 @@ use FreezeThaw qw(freeze thaw);
 
 use Bio::EnsEMBL::Pipeline::DB::JobI;
 use Bio::EnsEMBL::Pipeline::LSFJob;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::Root::RootI;
 
@@ -82,8 +83,8 @@ sub new {
 
     $dbobj->isa("Bio::EnsEMBL::Pipeline::DBSQL::Obj") || 
 	$self->throw("Database object [$dbobj] is not a Bio::EnsEMBL::Pipeline::DBSQL::Obj");
-    $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis") ||
-	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis");
+    $analysis->isa("Bio::EnsEMBLAnalysis") ||
+	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
 
     $self->id         ($id);
     $self->_dbobj     ($dbobj);
@@ -146,16 +147,15 @@ sub id {
 sub get_id {
     my ($self) = @_;
 
-    my $analysis = $self->_dbobj->write_Analysis($self->analysis);
-
-    $self->analysis($analysis);
+    my $ana_adp  = new Bio::EnsEMBL::DBSQL::AnalysisAdaptor($self->_dbobj);
+    my $analysis = $ana_adp->write($self->analysis);
 
     $self->throw("No analysis object defined") unless $self->analysis;
-    $self->throw("No analysis id input")       unless defined($self->analysis->id);
+    $self->throw("No analysis id input")       unless defined($self->analysis->dbID);
 
     my $query =   "insert into job (id,input_id,analysis,queue) values (NULL,\"" .
 				     $self->input_id     . "\",".
-				     $self->analysis->id . ",\"" .
+				     $self->analysis->dbID . ",\"" .
 				     $self->queue        ."\")";
 
     my $sth = $self->_dbobj->prepare($query);
@@ -200,16 +200,16 @@ sub input_id {
   Title   : analysis
   Usage   : $self->analysis($anal);
   Function: Get/set method for the analysis object of the job
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
+  Args    : bio::EnsEMBL::Analysis
 
 =cut
 
 sub analysis {
     my ($self,$arg) = @_;
     if (defined($arg)) {
-	$self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Analysis object" ) 
-            unless $arg->isa("Bio::EnsEMBL::Pipeline::Analysis");
+	$self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
+            unless $arg->isa("Bio::EnsEMBL::Analysis");
 
 	$self->{'_analysis'} = $arg;
     }
@@ -751,7 +751,7 @@ sub print {
     $self->print_var("Object"           , $self->input_object_file      ); 
     $self->print_var("Output"           , $self->output_file            ); 
     $self->print_var("Status"           , $self->status_file            ); 
-    $self->print_var("Analysis_id"      , $self->analysis->id           );
+    $self->print_var("Analysis_id"      , $self->analysis->dbID         );
     $self->print_var("Created"          , $self->analysis->created      );
     $self->print_var("Program"          , $self->analysis->program      );
     $self->print_var("Program_version"  , $self->analysis->program_version );

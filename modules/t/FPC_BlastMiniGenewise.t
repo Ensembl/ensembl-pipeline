@@ -27,6 +27,8 @@ END { print "not ok 1\n" unless $loaded; }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
@@ -45,9 +47,13 @@ print "ok 2\n";
 
 my $id='chr1.75000-100000';
 
+my $fetcher  = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise';
-my $fbmg = "$runnable"->new(-dbobj    => $db,
-			    -input_id => $id);	
+my $fbmg = "$runnable"->new(-dbobj      => $db,
+			    -input_id   => $id,
+			    -seqfetcher => $fetcher);	
+
 
 unless ($fbmg)
 { print "not ok 3\n"; }

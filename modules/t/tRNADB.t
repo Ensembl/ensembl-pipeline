@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -45,16 +45,17 @@ print "ok 2\n";
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::tRNAscan_SE';
 my $ana_adaptor = $db->get_AnalysisAdaptor();
 
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'tRNAscan_SE',
-                                                    -program_file   => '/usr/local/pubseq/bin/tRNAscan-SE',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'tRNAscan_SE',
-                                                    -gff_feature    => 'tRNA', 
-                                                    -parameters     => '',
-                                                     );
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => '__NONE__',
+					  -db_version     => '__NONE__',
+					  -program        => 'tRNAscan_SE',
+					  -program_file   => '/usr/local/pubseq/bin/tRNAscan-SE',
+					  -module         => $runnable,
+					  -module_version => 1,
+					  -gff_source     => 'tRNAscan_SE',
+					  -gff_feature    => 'tRNA', 
+					  -parameters     => '',
+					  -logic_name     => 'tRNA',
+				      );
 
 unless ($ana)
 { print "not ok 3\n"; }

@@ -30,7 +30,7 @@ $epcr->write_output(); #writes to DB
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::EPCR to add
 functionality for reading and writing to databases. The appropriate
-Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+Bio::EnsEMBL::Analysis object must be passed for extraction
 of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 is required for databse access.
 
@@ -65,7 +65,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::EPCR object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 
@@ -156,76 +156,5 @@ sub runnable {
 
 =cut
 
-#cut & pasted from Vert_Est2genome
-sub fetch_output {
-    my($self,$output) = @_;
-    
-    $output || $self->throw("No frozen object passed for the output");
-    
-    my $object;
-    open (IN,"<$output") || do {print STDERR ("Could not open output data file... skipping job\n"); next;};
-    
-    while (<IN>) 
-    {
-        $_ =~ s/\[//;
-	    $_ =~ s/\]//;
-	    $object .= $_;
-    }
-    close(IN);
-    my @out;
-   
-    if (defined($object)) 
-    {
-        my (@obj) = FreezeThaw::thaw($object);
-        foreach my $array (@obj) 
-        {
-	        foreach my $object (@$array) 
-            {
-	            push @out, $object;
-	        }
-        }
-    }
-    return @out;
-}
-
-=head2 write_output
-
-    Title   :   write_output
-    Usage   :   $self->write_output
-    Function:   Writes output data to db
-    Returns :   nothing
-    Args    :   none
-
-=cut
-
-sub write_output {
-    my($self) = @_;
-
-    my $db=$self->dbobj();
-    my @features = $self->output();
-    
-    my $contig;
-    eval 
-    {
-        $contig = $db->get_Contig($self->input_id);
-    };
-    
-    if ($@) 
-    {
-	    print STDERR "Contig not found, skipping writing output to db: $@\n";
-    }
-    elsif (@features) 
-    {
-        #should add conditional for evalue here
-	    print STDERR "Writing features to database\n";
-        foreach my $feature (@features)
-        {
-            print STDERR ($feature->hseqname()."\t");
-        }
-        my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
-	    $feat_Obj->write($contig, @features);
-    }
-    return 1;
-}
 
 1;

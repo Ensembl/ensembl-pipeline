@@ -28,7 +28,7 @@ END {   print "not ok 1\n" unless $loaded;  }
 use lib 't';
 use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
-use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Analysis;
 
 $loaded = 1;
 print "ok 1\n";    # 1st test passes.
@@ -40,10 +40,10 @@ $ens_test->do_sql_file("t/runnabledb.dump");
 # Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
-my $parameters = '-THRESHOLD => 1e-3, -ARGS => -hspmax  1000 -nogap';
+my $parameters = '-THRESHOLD => 1e-10, -ARGS => -hspmax  1000 -nogap';
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Blast';
 my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'embl_vertrna',
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
                                                     -db_file        => 'embl_vertrna',
                                                     -db_version     => '1',                  
                                                     -program        => 'wublastn',
@@ -54,6 +54,7 @@ my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'embl_ver
                                                     -gff_source     => 'wublastn',
                                                     -gff_feature    => 'similarity', 
                                                     -parameters     => $parameters,
+						    -logic_name     => 'blast',
                                                      );
 
 unless ($ana)

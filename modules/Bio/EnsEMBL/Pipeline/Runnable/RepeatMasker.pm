@@ -114,27 +114,9 @@ sub new {
     
     $self->clone($clone) if ($clone);       
 
-    my $bindir = $::pipeConf{'bindir'} || undef;
+    my $repmask = $self->find_executable($repmask);
 
-    if (-x $repmask) {
-        # passed from RunnableDB (full path assumed)
-        $self->repeatmasker($repmask);
-    }
-    elsif ($::pipeConf{'bin_RepeatMasker'} && -x ($repmask = "$::pipeConf{'bin_RepeatMasker'}")) {
-        $self->repeatmasker($repmask);
-    }
-    elsif ($bindir && -x ($repmask = "$bindir/RepeatMasker")) {
-        $self->repeatmasker($repmask);
-    }
-    else {
-        # search shell $PATH
-        eval {
-            $self->repmask($self->locate_executable('RepeatMasker'));
-        };
-        if ($@) {
-            $self->throw("Can't find executable RepeatMasker");
-        }
-    }
+    $self->repeatmasker($repmask);
 
     if ($arguments) {
 	$self->arguments($arguments);

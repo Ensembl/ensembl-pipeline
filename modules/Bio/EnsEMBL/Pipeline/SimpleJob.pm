@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::SimpleJob
 
 =head1 SYNOPSIS
     my $db       = new Bio::EnsEMBL::Pipeline::DBSQL::Obj(...);
-    my $analysis = new Bio::EnsEMBL::Pipeline::Analysis  (...);
+    my $analysis = new Bio::EnsEMBL::Analysis  (...);
 
     my $job      = new Bio::EnsEMBL::Pipeline::DBSQL::Job
     ('-dbobj'    => $db,
@@ -281,8 +281,8 @@ sub input_id {
   Title   : analysis
   Usage   : $self->analysis($anal);
   Function: Get/set method for the analysis object of the job
-  Returns : Bio::EnsEMBL::Pipeline::Analysis
-  Args    : bio::EnsEMBL::Pipeline::Analysis
+  Returns : Bio::EnsEMBL::Analysis
+  Args    : bio::EnsEMBL::Analysis
 
 =cut
 

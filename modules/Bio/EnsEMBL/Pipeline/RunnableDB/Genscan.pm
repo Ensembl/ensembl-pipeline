@@ -30,7 +30,7 @@ $genscan->write_output(); #writes to DB
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable::Genscan to add
 functionality for reading and writing to databases. The appropriate
-Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+Bio::EnsEMBL::Analysis object must be passed for extraction
 of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 is required for database access.
 
@@ -66,7 +66,7 @@ use vars qw(@ISA);
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Genscan object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 input_id:   Contig input id , 
-                -analysis:  A Bio::EnsEMBL::Pipeline::Analysis 
+                -analysis:  A Bio::EnsEMBL::Analysis 
 
 =cut
 
@@ -83,8 +83,7 @@ sub new {
 
     # anlaysis not mandatory for BlastableDB, so we check here 
     $self->throw("Analysis object required") unless ($self->analysis);
-
-    $self->runnable('Bio::EnsEMBL::Pipeline::Runnable::Genscan');
+    $self->init('Bio::EnsEMBL::Pipeline::Runnable::Genscan');
     
     return $self;
 }
@@ -109,34 +108,33 @@ sub fetch_input {
     my $contig    = $self->dbobj->get_Contig($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
+
 }
 
 #get/set for runnable and args
-sub runnable {
+sub init {
     my ($self, $runnable) = @_;
     
-    if ($runnable)
-    {
-        #extract parameters into a hash
-        my %parameters;
-        my ($parameter_string) = $self->parameters();
-        if ($parameter_string)
-        {
-            my @pairs = split (/,/, $parameter_string);
-            foreach my $pair (@pairs)
-            {
-                my ($key, $value) = split (/=>/, $pair);
-                $key =~ s/\s+//g;
-                $parameters{$key} = $value;
-            }
-            
-        }
-        $parameters {'-genscan'}  = $self->analysis->program_file;
-        $parameters {'-matrix'}   = $self->analysis->db_file;
-        #creates empty Bio::EnsEMBL::Runnable::Genscan object
-        $self->{'_runnable'} = $runnable->new(%parameters);
+    if ($runnable) {
+      #extract parameters into a hash
+      my %parameters;
+      my ($parameter_string) = $self->parameters();
+      if ($parameter_string) {
+	my @pairs = split (/,/, $parameter_string);
+	foreach my $pair (@pairs) {
+	  
+	  my ($key, $value) = split (/=>/, $pair);
+	  $key =~ s/\s+//g;
+	  $parameters{$key} = $value;
+	}
+	
+      }
+      $parameters {'-genscan'}  = $self->analysis->program_file;
+      $parameters {'-matrix'}   = $self->analysis->db_file;
+      #creates empty Bio::EnsEMBL::Runnable::Genscan object
+      my $runnable = $runnable->new(%parameters);
+      $self->runnable($runnable);
     }
-    return $self->{'_runnable'};
 }
 
 

@@ -30,64 +30,98 @@ use EnsTestDB;
 use Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA
 
 $loaded = 1;
+
 print "ok 1\n";    # 1st test passes.
     
 my $ens_test = EnsTestDB->new();
-# Load some data into the db
+
 $ens_test->do_sql_file("t/blastgenscanpepDB.dump");
     
-# Get an EnsEMBL db object for the test db
 my $db = $ens_test->get_DBSQL_Obj;
+
 print "ok 2\n";    
 
-my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA';
-my $parameters = '-THRESHOLD 1e-3'; 
-my $ana_adaptor = $db->get_AnalysisAdaptor;
-my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => 'embl_vertrna',
-                                                    -db_file        => 'embl_vertrna',
-                                                    -db_version     => '__NONE__',
-                                                    -program        => 'wublastn',
-                                                    -program_file   => 'wublastn',
-                                                    -module         => $runnable,
-                                                    -module_version => 1,
-                                                    -gff_source     => 'wublastn',
-                                                    -gff_feature    => 'similarity',
-                                                    -parameters     => $parameters );
+###########################
+# Build the analysis object
+###########################
 
-unless ($ana)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
+my $runnable    = 'Bio::EnsEMBL::Pipeline::RunnableDB::BlastGenscanDNA';
+my $parameters  = '-THRESHOLD 1e-10'; 
+my $ana_adaptor = $db->get_AnalysisAdaptor;
+
+my $ana = Bio::EnsEMBL::Analysis->new (   -db             => 'embl_vertrna',
+					  -db_file        => 'embl_vertrna',
+					  -db_version     => '__NONE__',
+					  -program        => 'wutblastn',
+					  -program_file   => 'wutblastn',
+					  -module         => $runnable,
+					  -module_version => 1,
+					  -gff_source     => 'wutblastn',
+					  -gff_feature    => 'similarity',
+					  -parameters     => $parameters,	
+					  -logic_name     => 'blastgenscanDNA' );
+
+unless ($ana) {
+  print "not ok 3\n"; 
+} else {
+  print "ok 3\n"; 
+}
+
+
 $ana_adaptor->exists( $ana );
+
+#####################
+# Create the runnable
+#####################
+
 my $id = 'AB015752.00001';
-my $runobj = "$runnable"->new(  
-                                -dbobj      => $db,
-			                    -input_id   => $id,
-                                -analysis   => $ana );
-unless ($runobj)
-{ print "not ok 4\n"; }
-else
-{ print "ok 4\n"; }
+
+my $runobj = "$runnable"->new(-dbobj      => $db,
+			      -input_id   => $id,	
+			      -analysis   => $ana );
+unless ($runobj) {
+ print "not ok 4\n"; 
+} else { 
+  print "ok 4\n"; 
+}
+
+##################
+# Run the runnable
+##################
 
 $runobj->fetch_input;;
 $runobj->run;
 
 my @out = $runobj->output;
-unless (@out)
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
-#display(@out);
+
+unless (@out) {
+  print "not ok 5\n"; 
+} else {
+  print "ok 5\n"; 
+}
+
+display(@out);
+
+##################
+# Write the output
+##################
 
 $runobj->write_output();
-my $contig = $db->get_Contig($id);
-my @features = $contig->get_all_SimilarityFeatures();
-#display(@features);
 
-unless (@features)
-{ print "not ok 6\n"; }
-else
-{ print "ok 6\n"; }
+#########################################
+# Retrieve the features from the database
+#########################################
+
+my $contig   = $db->get_Contig($id);
+my @features = $contig->get_all_SimilarityFeatures();
+
+display(@features);
+
+unless (@features) {
+  print "not ok 6\n"; 
+} else {
+  print "ok 6\n"; 
+}
 
 
 ##############################################################################

@@ -81,7 +81,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
     Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Sequence Fetcher Object (required),
-                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+                -analysis:   A Bio::EnsEMBL::Analysis (optional) 
 =cut
 
 sub new {

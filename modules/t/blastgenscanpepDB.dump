@@ -23,7 +23,7 @@
 # Dumping data for table 'analysis'
 #
 
-INSERT INTO analysis (id, db, db_version, program, program_version, gff_source, gff_feature) VALUES (1,NULL,NULL,'Genscan','1.0','genscan','prediction');
+INSERT INTO analysisprocess (analysisId, created,logic_name,db, db_version, program, program_version, gff_source, gff_feature) VALUES (1,now(),'genscan',NULL,NULL,'Genscan','1.0','genscan','prediction');
 
 #
 # Dumping data for table 'analysisprocess'
@@ -92,22 +92,12 @@ INSERT INTO dna (id, sequence, created) VALUES (4,'TCAAGCTTTCAAGCTATTAGATAATATCA
 # Dumping data for table 'feature'
 #
 
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (1,4,18168,18226,-0.7600,-1,1,'genscan',-1,-1,'Initial Exon',0.2140,NULL,0,2);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (2,4,16923,17076,2.6500,-1,1,'genscan',-1,-1,'Internal Exon',0.2610,NULL,2,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (3,4,7821,8150,2.2700,-1,1,'genscan',-1,-1,'Terminal Exon',0.2350,NULL,0,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (4,4,43368,43472,9.1700,-1,1,'genscan',-1,-1,'Initial Exon',0.8840,NULL,0,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (5,4,24953,25013,1.4900,-1,1,'genscan',-1,-1,'Internal Exon',0.3110,NULL,0,1);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (6,4,22738,22853,5.1500,-1,1,'genscan',-1,-1,'Terminal Exon',0.6590,NULL,1,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (7,4,46361,46437,3.6100,1,1,'genscan',-1,-1,'Initial Exon',0.4090,NULL,0,2);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (8,4,62493,62650,2.4300,1,1,'genscan',-1,-1,'Internal Exon',0.0690,NULL,2,1);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (9,4,63136,63281,4.8900,1,1,'genscan',-1,-1,'Terminal Exon',0.6120,NULL,1,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (10,4,71302,71619,15.8200,-1,1,'genscan',-1,-1,'Single Exon',0.8870,NULL,0,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (11,4,94871,95218,13.2500,1,1,'genscan',-1,-1,'Initial Exon',0.6930,NULL,0,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (12,4,99023,99152,1.0500,1,1,'genscan',-1,-1,'Internal Exon',0.3890,NULL,0,1);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (13,4,102482,102597,-3.4500,1,1,'genscan',-1,-1,'Terminal Exon',0.0940,NULL,1,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (14,4,104855,104990,12.2500,1,1,'genscan',-1,-1,'Initial Exon',0.5090,NULL,0,1);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (15,4,105501,105985,8.3200,1,1,'genscan',-1,-1,'Terminal Exon',0.2600,NULL,1,0);
-INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (16,4,114688,114879,9.2400,-1,1,'genscan',-1,-1,'Terminal Exon',0.9290,NULL,0,0);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (1,4,18168,18226,-0.7600,-1,1,'genscan',-1,-1,'1',0.2140,NULL,0,2);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (2,4,16923,17076,2.6500,-1,1,'genscan',-1,-1,'1',0.2610,NULL,2,0);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (3,4,7821,8150,2.2700,-1,1,'genscan',-1,-1,'1',0.2350,NULL,0,0);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (4,4,43368,43472,9.1700,-1,1,'genscan',-1,-1,'2',0.8840,NULL,0,0);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (5,4,24953,25013,1.4900,-1,1,'genscan',-1,-1,'2',0.3110,NULL,0,1);
+INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, name, hstart, hend, hid, evalue, perc_id, phase, end_phase) VALUES (6,4,22738,22853,5.1500,-1,1,'genscan',-1,-1,'2',0.6590,NULL,1,0);
 
 #
 # Dumping data for table 'fset'
@@ -115,11 +105,6 @@ INSERT INTO feature (id, contig, seq_start, seq_end, score, strand, analysis, na
 
 INSERT INTO fset (id, score) VALUES (1,1.3867);
 INSERT INTO fset (id, score) VALUES (2,5.2700);
-INSERT INTO fset (id, score) VALUES (3,3.6433);
-INSERT INTO fset (id, score) VALUES (4,15.8200);
-INSERT INTO fset (id, score) VALUES (5,3.6167);
-INSERT INTO fset (id, score) VALUES (6,10.2850);
-INSERT INTO fset (id, score) VALUES (7,9.2400);
 
 #
 # Dumping data for table 'fset_feature'
@@ -131,16 +116,7 @@ INSERT INTO fset_feature (feature, fset, rank) VALUES (3,1,3);
 INSERT INTO fset_feature (feature, fset, rank) VALUES (4,2,1);
 INSERT INTO fset_feature (feature, fset, rank) VALUES (5,2,2);
 INSERT INTO fset_feature (feature, fset, rank) VALUES (6,2,3);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (7,3,1);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (8,3,2);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (9,3,3);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (10,4,1);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (11,5,1);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (12,5,2);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (13,5,3);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (14,6,1);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (15,6,2);
-INSERT INTO fset_feature (feature, fset, rank) VALUES (16,7,1);
+
 
 #
 # Dumping data for table 'gene'
