@@ -3,7 +3,7 @@
 require 5.003;
 use ExtUtils::MakeMaker;
 
-$NAME     = 'Bio::EnsEMBL::Pipeline';
+$NAME     = 'Bio';
 $DISTNAME = "ensembl-pipeline";
 
 # make mini test targets for playing around with
