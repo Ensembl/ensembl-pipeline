@@ -11,10 +11,32 @@ use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Getopt::Long;
 
 
+## human_db
+#my $human_dbname = 'homo_sapiens_core_13_31';
+#my $human_dbhost = 'ecs2f';
+#my $human = 'Homo sapiens';
+
+## human_dnadb
+#my $human_dnadbname = 'homo_sapiens_core_13_31';
+#my $human_dnadbhost = 'ecs2f';
+
+## mouse_db
+#my $mouse_dbname = 'mus_musculus_core_13_30';
+#my $mouse_dbhost = 'ecs2f';
+#my $mouse = 'Mus musculus';
+
+## mouse_dnadb
+#my $mouse_dnadbname = 'mus_musculus_core_13_30';
+#my $mouse_dnadbhost = 'ecs2f';
+
+## compara_db
+#my $compara_dbname = 'ensembl_compara_13_1';
+#my $compara_dbhost = 'ecs2f';
+
 # human_db
 my $human_dbname = 'homo_sapiens_core_13_31';
 my $human_dbhost = 'ecs2f';
-my $human = 'Homo sapiens';
+my $human        = 'Homo sapiens';
 
 # human_dnadb
 my $human_dnadbname = 'homo_sapiens_core_13_31';
@@ -23,28 +45,38 @@ my $human_dnadbhost = 'ecs2f';
 # mouse_db
 my $mouse_dbname = 'mus_musculus_core_13_30';
 my $mouse_dbhost = 'ecs2f';
-my $mouse = 'Mus musculus';
+my $mouse        = 'Mus musculus';
 
 # mouse_dnadb
 my $mouse_dnadbname = 'mus_musculus_core_13_30';
 my $mouse_dnadbhost = 'ecs2f';
 
+# rat_db
+my $rat_dbname = 'rattus_norvegicus_core_13_2';
+my $rat_dbhost = 'ecs2f';
+my $rat        = 'Rattus norvegicus';
+
+# rat_dnadb
+my $rat_dnadbname = 'rattus_norvegicus_core_13_2';
+my $rat_dnadbhost = 'ecs2f';
+
 # compara_db
 my $compara_dbname = 'ensembl_compara_13_1';
 my $compara_dbhost = 'ecs2f';
-
 
 my $human_gene_id;
 my $mouse_gene_id;
 my $gap_penalty;
 my $check;
+my $coding_exons;
 
 # options
 &GetOptions( 
-	     'human_gene:s'       => \$human_gene_id,
-	     'mouse_gene:s'       => \$mouse_gene_id,
-	     'gap_penalty:n'      => \$gap_penalty,
-	     'check'              => \$check,
+	    'human_gene:s'       => \$human_gene_id,
+	    'mouse_gene:s'       => \$mouse_gene_id,
+	    'gap_penalty:n'      => \$gap_penalty,
+	    'check'              => \$check,
+	    'coding_exons'       => \$coding_exons,
 	   );
 
 unless( $gap_penalty ){
@@ -88,6 +120,18 @@ $mouse_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $mouse_dbhost,
 					       -dnadb => $mouse_dnadb,
 					      );
 
+
+#$rat_dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $mouse_dnadbhost,
+#						  -user  => 'ensro',
+#						  -dbname=> $mouse_dnadbname,
+#						 );
+
+#$rat_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $rat_dbhost,
+#					       -user  => 'ensro',
+#					       -dbname=> $rat_dbname,
+#					       -dnadb => $rat_dnadb,
+#					      );
+
 ############################################################
 # get the genes
 
@@ -101,7 +145,7 @@ my $mouse_gene = $mouse_adaptor->fetch_by_stable_id( $mouse_gene_id,1);
 # call the comparison method
 
 my $gene_pair = Bio::EnsEMBL::Pipeline::GeneComparison::GenePair->new();
-$gene_pair->compare( $human_gene, $mouse_gene);
+$gene_pair->compare( $human_gene, $mouse_gene, $coding_exons);
 
 ############################################################
 
