@@ -535,7 +535,6 @@ sub _check_Transcripts {
   my @alltranscripts; # here we'll put all the transcripts that pass the check
   my %hid_trans;
   my $exon_adaptor    = $self->db->get_ExonAdaptor;
-  my $feature_adaptor = $self->db->get_FeatureAdaptor;
   my $total_rejected        = 0;
   
  TRANSCRIPT: 
