@@ -253,7 +253,10 @@ sub add_CoordPair {
   my ($self,$pair) = @_;
   $self->throw('No coord pair') unless defined $pair;
   $self->throw('$pair is not a CoordPair') unless $pair->isa("CoordPair");
+
+
   push(@{$self->{_coord_pairs}},$pair);
+  
   # need to do some sorting?
   if ($self->strand == 1) {
     @{$self->{_coord_pairs}} = sort {$a->qstart <=> $b->qstart} @{$self->{_coord_pairs}};
@@ -261,6 +264,47 @@ sub add_CoordPair {
   else {
     @{$self->{_coord_pairs}} = sort {$b->qstart <=> $a->qstart} @{$self->{_coord_pairs}};
   }
+  
+  $self->tstart(@{$self->{_coord_pairs}}[0]->tstart);
+  $self->qstart(@{$self->{_coord_pairs}}[0]->qstart);
+
+  $self->tend(@{$self->{_coord_pairs}}[scalar(@{$self->{_coord_pairs}})-1]->tend);
+  $self->qend(@{$self->{_coord_pairs}}[scalar(@{$self->{_coord_pairs}})-1]->qend);
+  
+}
+
+=head2 subsume_MergedHit
+
+ Title   : subsume_MergedHit
+ Usage   :
+ Function: Incorporate all the pairs from another MergedHit into this one
+ Example :
+ Returns : 
+ Args    : 
+
+
+=cut
+sub subsume_MergedHit {
+  my ($self,$hit) = @_;
+  $self->throw('No hit') unless defined $hit;
+  $self->throw('$hit is not a MergedHit') unless $hit->isa("MergedHit");
+
+  push(@{$self->{_coord_pairs}},$hit->each_CoordPair);
+  
+  # need to do some sorting?
+  if ($self->strand == 1) {
+    @{$self->{_coord_pairs}} = sort {$a->qstart <=> $b->qstart} @{$self->{_coord_pairs}};
+  }
+  else {
+    @{$self->{_coord_pairs}} = sort {$b->qstart <=> $a->qstart} @{$self->{_coord_pairs}};
+  }
+  
+  $self->tstart(@{$self->{_coord_pairs}}[0]->tstart);
+  $self->qstart(@{$self->{_coord_pairs}}[0]->qstart);
+
+  $self->tend(@{$self->{_coord_pairs}}[scalar(@{$self->{_coord_pairs}})-1]->tend);
+  $self->qend(@{$self->{_coord_pairs}}[scalar(@{$self->{_coord_pairs}})-1]->qend);
+  
 }
 
 =head2 each_CoordPair
@@ -278,6 +322,7 @@ sub add_CoordPair {
 sub each_CoordPair {
   my ($self) = @_;
   # sorted by qstart, based on strand
+
   return @{$self->{_coord_pairs}};
 }
 
@@ -294,9 +339,11 @@ sub each_CoordPair {
 =cut
 
 sub tstart {
-  my ($self) = @_;
-  my @cps = $self->each_CoordPair;
-  return $cps[0]->tstart;
+  my ($self,$arg) = @_;
+  if ($arg) {
+    $self->{'tstart'} = $arg;
+  }
+  return $self->{'tstart'};
 }
 
 =head2 tend
@@ -312,9 +359,11 @@ sub tstart {
 =cut
 
 sub tend {
-  my ($self) = @_;
-  my @cps = $self->each_CoordPair;
-  return $cps[$#cps]->tend;
+  my ($self,$arg) = @_;
+  if ($arg) {
+    $self->{'tend'} = $arg;
+  }
+  return $self->{'tend'};
 }
 
 =head2 qstart
@@ -330,12 +379,14 @@ sub tend {
 =cut
 
 sub qstart {
-  my ($self) = @_;
-  my @cps = $self->each_CoordPair;
-  return $cps[0]->qstart;
+  my ($self,$arg) = @_;
+  if ($arg) {
+    $self->{'qstart'} = $arg;
+  }
+  return $self->{'qstart'};
 }
 
-=head2 quend
+=head2 qend
 
  Title   : qend
  Usage   :
@@ -348,11 +399,12 @@ sub qstart {
 =cut
 
 sub qend {
-  my ($self) = @_;
-  my @cps = $self->each_CoordPair;
-  return $cps[$#cps]->qend;
+  my ($self,$arg) = @_;
+  if ($arg) {
+    $self->{'qend'} = $arg;
+  }
+  return $self->{'qend'};
 }
-
 
 1;
 
@@ -635,7 +687,8 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my ($plengths, $protfile, $fpcfile, $pmatch, $tmpdir) = $self->_rearrange(['PLENGTHS','PROTFILE','FPCFILE','PMATCH','TMPDIR'], @args);
+  my ($plengths, $protfile, $fpcfile, $pmatch, $tmpdir, $maxintronlen) = 
+                 $self->_rearrange(['PLENGTHS','PROTFILE','FPCFILE','PMATCH','TMPDIR','MAXINTRONLEN'], @args);
   $self->throw("No protlengths data") unless defined $plengths;
   $self->plengths($plengths);
 
@@ -650,6 +703,9 @@ sub new {
 
   $self->throw("No tmpdir") unless defined $tmpdir;
   $self->tmpdir($tmpdir);
+
+  $self->throw("No maximum intron length") unless defined $maxintronlen;
+  $self->maxintronlen($maxintronlen);
 
   my %proteins = ();
   $self->{_proteins} = \%proteins; 
@@ -680,7 +736,7 @@ sub make_coord_pair {
     $protid = $1;
   }
   
-  # sort out strand
+  # sort out strand hmmm if strand = -1 then shouldn't we switch qstart & qend? Currently don't ...
   my $strand = 1;
   if ( $cols[3] < $cols[2]  ) { $strand=-1; }
   
@@ -783,12 +839,13 @@ sub make_mergelist {
     
     push(@hits,$mh);
 
+    my $prev = $hits[$#hits];
+    my $prev_cp = $first;
+
     CP: 
     foreach my $cp(@cps) {
 
       # need to compare with the last entry in @merged
-      my $prev = $hits[$#hits];
-      my @prev_cps = $prev->each_CoordPair();
 
       # first the strand
       my $strand = 1;
@@ -797,15 +854,20 @@ sub make_mergelist {
       # does this CoordPair extend the current hit?
       # need a fudge factor - pmatch could overlap them by 1 or 2 ... or 3
       if( $strand == $prev->strand &&
-	 ( ($cp->tstart >=  $prev_cps[$#prev_cps]->tend) ||
-	 (($prev_cps[$#prev_cps]->tend -  $cp->tstart) <= 3)))
+	 ( ($cp->tstart >=  $prev_cp->tend) ||
+	 (($prev_cp->tend -  $cp->tstart) <= 3)) &&
+	  # Steve's fix - Added qstart/qend condition (*strand should allow it to work on
+	  #     either strand)
+	  # no overlap currently allowed
+          $cp->qstart*$strand >= $prev_cp->qend*$strand 
+	)
 	{
 	  #extend existing MergedHit
 	  my $coverage = $cp->tend - $cp->tstart + 1;
 	  $coverage += $prev->coverage();
 
 	  # compensate for any overlap 
-	  my $diff = $prev_cps[$#prev_cps]->tend -  $cp->tstart;
+	  my $diff = $prev_cp->tend -  $cp->tstart;
 	  if($diff >=0) {
 	    $diff++;
 	    $coverage -= $diff;
@@ -813,17 +875,30 @@ sub make_mergelist {
 
 	  $prev->coverage($coverage);
 	  $prev->add_CoordPair($cp);
+          $prev_cp = $cp;
 	}
       else {
 	# make a new MergedHit
 	my $mh = $self->new_merged_hit($cp);
 	push(@hits,$mh);	
+
+        $prev = $hits[$#hits];
+        $prev_cp = $cp;
       }
     }
   }
 
+  # my $times = join " ", times;
+  # print "Before extend " . $times . "\n";
   # extend those merged hits
+
+  # print "Number of hits = " . scalar(@hits) . "\n";
+
   @hits = $self->extend_hits(@hits);
+
+  # $times = join " ", times;
+  # print "After extend " . $times . "\n";
+  # print "Number of hits = " . scalar(@hits) . "\n";
 
   # sort out coverage
   my $plengths = $self->plengths;
@@ -907,6 +982,21 @@ sub protfile {
     }
   }
   return $self->{_protfile};
+  
+}
+
+sub maxintronlen {
+  my ($self, $maxintronlen) = @_;
+  
+  if(defined($maxintronlen)){
+    if ($maxintronlen =~ /\d+/) {
+      $self->{_maxintronlen} = $maxintronlen;
+    } 
+    else {
+      $self->throw("[$maxintronlen] is not numeric.");
+    }
+  }
+  return $self->{_maxintronlen};
   
 }
 
@@ -999,39 +1089,49 @@ sub extend_hits {
   @fhits = sort {$a->qstart <=> $b->qstart} @fhits;
   @rhits = sort {$b->qstart <=> $a->qstart} @rhits;
 
+
   while(scalar(@fhits)){
     my $hit = shift(@fhits);
     push (@newhits, $hit);
-    
+
     # can we link it up to a subsequent hit?
     foreach my $sh(@fhits){
       die ("Argh!") unless $hit->strand == $sh->strand;
+      last if ($hit->qend+$self->{_maxintronlen} < $sh->qstart);
       if ($sh->tstart > $hit->tend &&
 	  $sh->tend   > $hit->tend &&
-	  abs($sh->tstart - $hit->tend <= 3)) {
+	  abs($sh->tstart - $hit->tend) <= 3 &&
+	  # qstart/qend condition - no overlap currently allowed
+	  $sh->qstart >= $hit->qend
+	 ) {
 	# add the coord pairs from $sh into $hit
-	foreach my $cp($sh->each_CoordPair) {
-	  $hit->add_CoordPair($cp);
-	}
+        $hit->subsume_MergedHit($sh);
       }
     }
   }
 
+  
 # same for rhits
   while(scalar(@rhits)){
     my $hit = shift(@rhits);
     push (@newhits, $hit);
     
+
     # can we link it up to a subsequent hit?
     foreach my $sh(@rhits){
       die ("Argh!") unless $hit->strand == $sh->strand;
+# hmmmm On minus strand qstart is currently > qend
+# ie $sh->qend <= $sh->qstart <= $hit->qend <= $hit->qstart
+#      last if ($hit->qstart-$self->{_maxintronlen} > $sh->qend);
+      last if ($hit->qend-$self->{_maxintronlen} > $sh->qstart);
       if ($sh->tstart > $hit->tend &&
 	  $sh->tend   > $hit->tend &&
-	  abs($sh->tstart - $hit->tend <= 3)) {
+	  abs($sh->tstart - $hit->tend) <= 3 &&
+	  # qstart/qend condition - no overlap currently allowed
+	  $hit->qend >= $sh->qstart
+	 ) {
 	# add the coord pairs from $sh into $hit
-	foreach my $cp($sh->each_CoordPair) {
-	  $hit->add_CoordPair($cp);
-	}
+        $hit->subsume_MergedHit($sh);
       }
     }
   }
@@ -1185,7 +1285,5 @@ sub output {
   } 
   return @{$self->{_output}};
 }
-
-
 
 1;
