@@ -43,7 +43,7 @@ my %db_conf =  %::db_conf;
 
 my %scripts_conf = %::scripts_conf;
 
-#Get DBs variables
+#Get DBs variablesl
 
 
 
