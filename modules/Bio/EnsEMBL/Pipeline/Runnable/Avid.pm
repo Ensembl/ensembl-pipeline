@@ -1,5 +1,6 @@
 #
 # Written by Jan-Hinnerk Vogel
+#
 # jhv [at] sanger.ac.uk
 #
 # Copyright GRL/EBI 2004
@@ -106,6 +107,8 @@ sub new {
                                          ], @args);
   $self->{_verbose} = 1 ;
 
+  ########### STORE NAME OF WRITTEN FASTA'S #############
+  $self->{_fasta_filenames}=[];
 
 
   ########### TESTING TYPES OF PASSED OBJECTS ###########
@@ -126,7 +129,7 @@ sub new {
 
   ########## WRITING SLAM OUTPUT ########################
   defined $slam_output ? $self->slam_output_opt($slam_output) : $self->slam_output_opt("False");
-
+  print "slam putput ooption is set to:".$self->slam_output_opt."\n";
 
   ########## SETTING WORKDIR ############################
   $self->workdir($workdir);
@@ -162,8 +165,8 @@ sub run {
 
   # names of fasta files on which avid runs on (there must also be a .masked-file)
 
-  my $fa_first = @{$self->file_basename}[0];
-  my $fa_secnd = @{$self->file_basename}[1];
+  my $fa_first = $self->workdir.@{$self->file_basename}[0];
+  my $fa_secnd = $self->workdir.@{$self->file_basename}[1];
 
   $fa_first .="fasta";
   $fa_secnd .="fasta";
@@ -182,6 +185,8 @@ sub run {
 
   # pass written minfo mout.. files for deletion to $self->file
   $self->files_to_delete($fa_first,$fa_secnd);
+
+  $self->printvars;
 
   return 1
 }
@@ -282,15 +287,18 @@ sub write_sequences {
   my $count = 0;
   foreach my $slice ( @{$self->query_sequences} ) {
 
-    # getting first filename for unmasked seq
-    my $file = $self->get_tmp_file($self->workdir , @{$self->file_prefix}[$count] , "");
+    my $tmp_filename=$self->get_tmp_file("",@{$self->file_prefix}[$count],"");
 
-    #push basefilename in an array of basenames
-    $self->file_basename($file);
+    # push basefilename in an array of basenames
+    $self->file_basename($tmp_filename);
+
+    my $file = $self->workdir.$tmp_filename;
+
+    # store names of fasta-files
+    $self->fasta_filenames($file);
 
     # add .fasta
     $file .= "fasta";
-
 
     # writing unmasked sequence
     my  $seqobj = Bio::SeqIO->new(-file => ">$file" , '-format' => 'Fasta');
@@ -327,17 +335,17 @@ sub write_slam_output {
 
   #getting name of binary slam outputfile
   my $ff = @{$self->file_basename}[0];
-  $ff =~s/\.$//;                #snipping away last dot
+  $ff =~s/^\/(.+)\.$/$1/;                #snipping away first slash and last dot
 
   my $sf = @{$self->file_basename}[1];
-  $sf =~s/\.$//;                #snipping away last dot
+  $sf =~s/^\/(.+)\.$/$1/;                #snipping away last dot
 
+  my $binfile = $self->workdir."/".$ff."_".$sf.".mout";
+  my $outfile = $self->workdir."/".$ff."_".$sf."_slam_input.txt";
 
-  my $binfile = $ff."_".$sf.".mout";
-  my $outfile = $ff."_".$sf."_slam_input.txt";
+  $self->slam_txt_filename($outfile);
 
   ####### START PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
-  if (-e $binfile) {
 
     my $lInd = -1;
     my $rInd = -1;
@@ -377,10 +385,9 @@ sub write_slam_output {
 
     print OUT join("\t",$i,$min,$max) . "\n";
     close(OUT);
-  }
+
   ####### STOP PARSING BINARY OUTPUT OF AVID-ALIGNEMENT #######
-  # unlink txt-slam_outputfile
-##  $self->file($outfile);   #uncomment to delete txt outfiles for slam !!! 
+# $self->file($outfile);   #uncomment to delete txt outfiles for slam !!!
   return $outfile;
 }
 
@@ -402,7 +409,11 @@ sub file_prefix{
   return $self->{_file_prefix};
 }
 
-
+sub slam_txt_filename{
+  my ($self,$fn) = @_;
+  $self->{_slam_txt_filename}=$fn if (defined $fn && !defined $self->{_slam_txt_filename});
+  return $self->{_slam_txt_filename};
+}
 
 sub file_basename {
   my ($self,$base) = @_;
@@ -412,6 +423,27 @@ sub file_basename {
   return $self->{_file_basename}; # /tmp/seq1.88796.
 }
 
+sub fasta_filenames {
+  my ($self,$name) = @_;
+
+#  $self->{_fasta_filenames} = [$name] if (defined $name && !defined $self->{_fasta_filenames});
+
+  # add to array of existing name if exists $self->
+  push @{$self->{_fasta_filenames}},$name if ( defined $name);
+
+  return $self->{fasta_filenames};
+}
+
+sub printvars {
+  my $self = shift;
+  my %tmp = %{$self};
+
+  print "Key:\t\t\tValue:\n";
+  print "------------------------------\n";
+  foreach (keys %tmp ) {
+    print "-$_-\t\t\t-$tmp{$_}-\n";
+  }
+}
 
 1;
 
