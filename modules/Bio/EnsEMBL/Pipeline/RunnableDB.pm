@@ -32,11 +32,11 @@ basic main methods of a RunnableDB which a subclass may override.
 parameters to new
 -dbobj:     A Bio::EnsEMBL::DB::Obj (required), 
 -input_id:   Contig input id (required), 
--analysis:  A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+-analysis:  A Bio::EnsEMBL::Analysis (optional) 
 
 This object wraps Bio::EnsEMBL::Pipeline::Runnable to add
 functionality for reading and writing to databases.  The appropriate
-Bio::EnsEMBL::Pipeline::Analysis object must be passed for extraction
+Bio::EnsEMBL::Analysis object must be passed for extraction
 of appropriate parameters. A Bio::EnsEMBL::Pipeline::DBSQL::Obj is
 required for databse access.
 
@@ -77,7 +77,7 @@ use vars qw(@ISA);
     Args    :   -dbobj:      A Bio::EnsEMBL::DB::Obj (required), 
                 -input_id:   Contig input id (required), 
                 -seqfetcher: A Bio::DB::RandomAccessI Object (required),
-                -analysis:   A Bio::EnsEMBL::Pipeline::Analysis (optional) 
+                -analysis:   A Bio::EnsEMBL::Analysis (optional) 
 =cut
 
 sub new {
@@ -113,8 +113,8 @@ sub new {
     Title   :   analysis
     Usage   :   $self->analysis($analysis);
     Function:   Gets or sets the stored Analusis object
-    Returns :   Bio::EnsEMBL::Pipeline::Analysis object
-    Args    :   Bio::EnsEMBL::Pipeline::Analysis object
+    Returns :   Bio::EnsEMBL::Analysis object
+    Args    :   Bio::EnsEMBL::Analysis object
 
 =cut
 
@@ -123,8 +123,8 @@ sub analysis {
     
     if ($analysis)
     {
-        $self->throw("Not a Bio::EnsEMBL::Pipeline::Analysis object")
-            unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
+        $self->throw("Not a Bio::EnsEMBL::Analysis object")
+            unless ($analysis->isa("Bio::EnsEMBL::Analysis"));
         $self->{'_analysis'} = $analysis;
         $self->parameters($analysis->parameters);
     }
@@ -227,7 +227,7 @@ sub output {
     } 
 
     my @r = $self->runnable;
-    if(defined (@r) && scalar(@r)){
+    if(@r && scalar(@r)){
       foreach my $r($self->runnable){
 	push(@{$self->{'_output'}}, $r->output);
       }
