@@ -535,7 +535,7 @@ sub _check_leaves{
 
 
 ############################################################
-# every extension parent must for a triangle, otherwise we have a candidate
+# every extension parent must account for a triangle, otherwise we have a candidate
 sub check_triangle{
     my ($self, $node ) = @_;
     unless ( @{$node->extension_parents} ){
@@ -630,7 +630,8 @@ sub check_tree{
 	    next NODE;
 	}
 	############################################################
-	# if no-overlap, we jump to the next leaf
+	# if 'continue' that means that we did not manage to place it
+	# we might be in a worst case scenario - we jump to the next leaf
 	############################################################
 	elsif ( $result eq 'continue' ){
 	    # recover the leaf if it hasn't been added before
@@ -971,8 +972,9 @@ sub _recurse_extension_branch{
 			  $self->tag_extension_ancestors($parent_node);
 		      }
 		      $placed++;}
-		  elsif( $result3 eq 'continue' ){
-		      next PARENT;
+		  elsif( $result3 eq 'placed' ){
+		    $placed++;
+		    next PARENT;
 		  }
 	      }
 	      ############################################################
@@ -996,7 +998,7 @@ sub _recurse_extension_branch{
 	  elsif( $result2 eq 'placed'){
 	      $placed++;
 	  }
-      }
+	} # end of PARENT
       
       ############################################################
       # continue if we didn't place it
