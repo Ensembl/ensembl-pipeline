@@ -52,6 +52,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::GeneBuilder;
 use Bio::EnsEMBL::DB::ConvertibleVirtualContig;
+use Bio::EnsEMBL::DBSQL::StaticGoldenPathAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 TRANSCRIPT_ID_SUBSCRIPT
 					 GENE_ID_SUBSCRIPT
@@ -266,36 +267,40 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_Contig($contigid);
+    #my $contig    = $self->dbobj->get_Contig($contigid);
+    $self->dbobj->static_golden_path_type('UCSC');
 
-    if ($self->vcontig) {
-	my $focus = int(($contig->golden_start + $contig->golden_end)/2);
+    my $stadaptor = $self->dbobj->get_StaticGoldenPathAdaptor();
+    my $contig    = $stadaptor->fetch_VirtualContig_by_fpc_name($self->input_id);
 
-	$self->focuscontig($contig);
+    #if ($self->vcontig) {
+#	my $focus = int(($contig->golden_start + $contig->golden_end)/2);
 
-	$contig = new Bio::EnsEMBL::DB::ConvertibleVirtualContig(-focuscontig   => $contig,
-						      -focusposition => $focus,
-						      -ori           => 1,
-						      -left          => $self->extend,
-						      -right         => $self->extend);
+#	$self->focuscontig($contig);
 
-#	$contig = $contig->extend_maximally;
+#	$contig = new Bio::EnsEMBL::DB::ConvertibleVirtualContig(-focuscontig   => $contig,
+#						      -focusposition => $focus,
+#						      -ori           => 1,
+#						      -left          => 1,
+#						      -right         => 60000);
 
-	print(STDERR "Contig length is " . $contig->length . "\n");
+	#$contig = $contig->extend_maximally;
 
-	if ($contig->length > 50000000) {
-	    $self->throw("Aborting - virtual contig loo tong");
-	}
+#	print(STDERR "Contig length is " . $contig->length . "\n");
 
-    }
+#	if ($contig->length > 50000000) {
+#	    $self->throw("Aborting - virtual contig loo tong");
+#	}
 
-    $contig->_dump_map(\*STDOUT);
+#    }
+
+
+    my $analysis = $self->dbobj->get_OldAnalysis(8);
+
     $contig->primary_seq;
 
     print STDERR "Length of primary seq is ",$contig->primary_seq->length,"\n";
 
-    my $analysis = $self->dbobj->get_OldAnalysis(8);
-           
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder(-contig => $contig,
 							      -analysis => $analysis,
 							      );
@@ -303,7 +308,7 @@ sub fetch_input {
 
 
     $self->addgenebuilder($genebuilder,$contig);
-    
+
 }
 sub focuscontig {
     my ($self,$arg) = @_;
