@@ -418,13 +418,32 @@ sub run {
 	  
 	  #print STDERR "rev_query{end}   = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
 	  #print STDERR "rev_query{start} = ".($length{$q_id})." - ".$query{start}." + 1\n" if $verbose;
-	  my $feature_pair = $self->create_FeaturePair(\%rev_target, \%rev_query);	
-	  
+	  my $feature_pair = $self->create_FeaturePair($rev_target{start}, 
+                                                 $rev_target{end}, 
+                                                 $rev_target{strand},
+                                                 $rev_query{start},
+                                                 $rev_query{end},
+                                                 $rev_query{strand},
+                                                 $rev_query{name},
+                                                 $rev_query{score},
+                                                 $rev_query{percent},
+                                                 0,
+                                                 $rev_target{name});
 	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
 	}
 	else{	      	    
-	  my $feature_pair = $self->create_FeaturePair(\%target, \%query);
+	  my $feature_pair = $self->create_FeaturePair($target{start}, 
+                                                 $target{end}, 
+                                                 $target{strand},
+                                                 $query{start},
+                                                 $query{end},
+                                                 $query{strand},
+                                                 $query{name},
+                                                 $query{score},
+                                                 $query{percent},
+                                                 0,
+                                                 $target{name});
 	  #print STDERR "adding feature: ".$feature_pair->gffstring."\n" if $verbose;
 	  push( @features, $feature_pair);
 	}

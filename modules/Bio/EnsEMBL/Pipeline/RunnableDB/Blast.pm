@@ -115,10 +115,10 @@ sub fetch_input {
       (-query          => $self->query,
        -database       => $self->analysis->db_file,
        -program        => $self->analysis->program,
-       $self->parameter_hash 
        -threshold_type => 'PVALUE',
        -threshold      => 1,
        -ungapped       => $ungapped,
+       $self->parameter_hash, 
       );
     
     $self->runnable($run);

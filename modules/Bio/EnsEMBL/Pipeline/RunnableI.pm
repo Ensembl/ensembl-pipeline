@@ -309,9 +309,9 @@ sub diskspace {
 
 sub create_FeaturePair {
     my ($self, $start, $end, $strand, $hstart, $hend, 
-        $hstrand, $hseqname, $score, $percent_id, $p_value, $seq,
+        $hstrand, $hseqname, $score, $percent_id, $p_value, $seqname,
         $analysis) = @_;
-   
+    
     my $fp = Bio::EnsEMBL::FeaturePair->new(
                                             -start    => $start,
                                             -end      => $end,
@@ -326,13 +326,8 @@ sub create_FeaturePair {
                                             -analysis => $analysis,
                                            );
 
-    if($seq &&($seq->isa('Bio::EnsEMBL::Slice'))){
-      $fp->slice($seq);
-    }else{
-      #print STDERR "Have seq ".$seq." ".$seq->display_id."\n"; 
-      $fp->seqname($seq->display_id);
-    }
-    #print STDERR "Have fp ".$fp->seqname." ".$fp->hseqname."\n";
+    $fp->seqname($seqname);
+    
     return $fp;
 }
 
@@ -428,6 +423,8 @@ sub writefile {
 
 
   } else {
+    #print STDERR "Writing file ".$self->filename."\n";
+    #print STDERR "Writing sequence length ".length($self->query->seq)."\n";
     #print "Writing sequence to ".$self->filename."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')

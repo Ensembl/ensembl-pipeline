@@ -111,7 +111,7 @@ foreach my $db (@$DB_CONFIG) {
 
 =head2 new
 
-    Title   :   new
+Title   :   new
     Usage   :   my obj =  Bio::EnsEMBL::Pipeline::Runnable::Blast->new 
     (-query    => $seq,
      -program  => 'blastp',
@@ -286,7 +286,7 @@ sub run_analysis {
     foreach my $database (@databases) {
         my $db = $database;
         $db =~ s/.*\///;
-        print STDERR "\nDatabase: '".$database."'\n";
+        #print STDERR "\nDatabase: '".$database."'\n";
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.       
         
         #my $command = "ulimit -d 2000; " . $self->program ;
@@ -304,7 +304,7 @@ sub run_analysis {
         # Add the result file to our clean-up list.
         $self->file($self->results . ".$db");
 
-        print STDERR "Running cmd: $command\n";
+        #print STDERR "Running cmd: $command\n";
 
         open(my $fh, "$command |") || 
           $self->throw("Error opening Blast cmd <$command>." .
@@ -368,7 +368,7 @@ sub run_analysis {
                       "error $? BLAST EXIT: '" . ($? >> 8) . 
                       "', SIGNAL '" . ($? & 127) . "', There was " . 
                       ($? & 128 ? 'a' : 'no') . " core dump");
-          die qq{"UNKNOWN_ERROR"\n}; # hang around until someone works 
+          die ($UNKNOWN_ERROR_STRING."\n"); # hang around until someone works 
           #out what went wrong.
         }
       }
@@ -549,10 +549,10 @@ sub parse_results {
     }
   }
  }
-
+  #print STDERR "have ".$count." hsps\n";
 
 # Alternate feature filter. If option not present in config, should default to FeatureFilter -prune
-
+  
   if ($REFILTER{$self->database}){
     # re-filter, with pruning - rewrotee to use a local select_feature 
     #function instead of FeatureFilter 
@@ -561,6 +561,7 @@ sub parse_results {
   } else {
     # re-filter, with pruning
     my @allfeatures = $self->output;
+    #print STDERR "Have ".@allfeatures." fetures to filter\n";
     if($self->threshold_type){
       if ($self->threshold_type eq "PID") {
         @allfeatures = sort {$b->percent_id 
@@ -582,6 +583,7 @@ sub parse_results {
     }
   }
   #print "have parsed resultz\n";
+  #print STDERR "Have ".$self->output." results to output\n";
   return $self->output;
 
 }
@@ -626,7 +628,7 @@ sub filter_hits {
        HSP:while (my $hsp = $sbjct->nextHSP) {
       
            my $name = $hsp->subject->seqname ;
-           if($self->threshold){
+           if($self->threshold_type){
              if ($self->threshold_type eq "PID") {
                next HSP if ($hsp->percent < $self->threshold);
              } elsif ($self->threshold_type eq "SCORE") {
@@ -654,7 +656,8 @@ sub filter_hits {
            my $fp = $self->create_FeaturePair($qstart, $qend, $qstrand, 
                                               $hstart, $hend, $hstrand, 
                                               $name, $score, $percent, 
-                                              $p_value, $self->query);
+                                              $p_value, 
+                                              $self->query->name);
            
            push(@features,$fp);
          }
@@ -936,7 +939,8 @@ sub _convert2FeaturePair {
     my $fp = $self->create_FeaturePair($tmpqstart,$tmpqend,$qstrand,
                                        $tmphstart,$tmphend,$hstrand,
                                        $name, $hsp->score, $hsp->percent,
-                                       $hsp->P, $self->query, $analysis);
+                                       $hsp->P, $self->query->name, 
+                                       $analysis);
 
     return $fp;
 }

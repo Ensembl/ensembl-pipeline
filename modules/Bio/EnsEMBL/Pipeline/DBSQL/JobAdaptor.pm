@@ -395,10 +395,8 @@ sub store {
                 $job->execution_host,
                );
 
-  $sth = $self->prepare("SELECT LAST_INSERT_ID()");
-  $sth->execute;
-
-  my $dbId = ($sth->fetchrow_arrayref)->[0];
+ 
+  my $dbId = $sth->{'mysql_insertid'};
   $job->dbID( $dbId );
   $job->adaptor( $self );
 
