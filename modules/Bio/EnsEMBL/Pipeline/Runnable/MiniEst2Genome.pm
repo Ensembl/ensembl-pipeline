@@ -619,12 +619,6 @@ sub run_blaste2g {
       # now sort out sub seqfeatures - details of sub segments making up an exon.
 
       foreach my $aln($ex->feature1->sub_SeqFeature){
-	# strands 
-	if($aln->strand != $aln->hstrand){
-	  $aln->strand(-1);
-	  $aln->hstrand(1);
-	  $ex->strand(-1);
-	}
 	
 	# convert to genomic coords
 	my @alns = $miniseq->convert_FeaturePair($aln);
@@ -635,8 +629,9 @@ sub run_blaste2g {
 	
 	foreach my $a(@alns) {
 	  my $added = 0;
-	  $a->strand($aln->strand); # genomic
-	  $a->hstrand(1);      # protein
+ 	  $a->strand($aln->strand); # genomic 
+ 	  $a->hstrand($aln->hstrand); # est
+
 	  
 	  $a->seqname($aln->seqname);
 	  $a->hseqname($aln->hseqname);
