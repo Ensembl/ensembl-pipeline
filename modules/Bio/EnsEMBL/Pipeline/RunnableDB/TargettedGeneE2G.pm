@@ -71,7 +71,9 @@ sub new {
 
   if(!defined $self->seqfetcher) {
     # will look for pfetch in $PATH - change this once PipeConf up to date
-    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
+    my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch(
+								    '-executable' => '/work2/vac/UberBuild/scripts/pfetch'
+								   ); 
     $self->seqfetcher($seqfetcher);
   }
 
@@ -96,21 +98,21 @@ sub fetch_input{
   my ($self,@args) = @_;
 
   my $entry = $self->input_id;
-  my $chrname;
+  my $fpc;
   my $start;
   my $end;
   my $protein_id; 
   my $cdna_id;
 
-  # input format: chr22:10602496,10603128:Q9UGV6:AC00012
-  # or chr22:10602496,10603128:Q9UGV6 if no cDNA
+  # input format: ctg1234:10602496,10603128:Q9UGV6:AC00012
+  # or ctg1234:10602496,10603128:Q9UGV6 if no cDNA
   if( !(($entry =~ /(\S+):(\d+),(\d+):(\S+):(\S+)/) || ($entry =~ /(\S+):(\d+),(\d+):(\S+):/))) {
       $self->throw("Not a valid input id... $entry");
   }
   
   print STDERR "input: ".$entry . "\n";
   
-  $chrname = $1;
+  $fpc = $1;
   $protein_id = $4;
   $cdna_id = $5;
 
@@ -124,9 +126,12 @@ sub fetch_input{
   
   my $sgpa = $self->dbobj->get_StaticGoldenPathAdaptor();
 
-  print STDERR "$chrname $start $end\n";
+  print STDERR "$fpc $start $end\n";
+  my ($chrname,$chrstart,$chrend) = $sgpa->convert_fpc_to_chromosome($fpc,$start-10000,$end+10000);
+  print STDERR "$chrname $chrstart $chrend\n";
+  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$chrstart,$chrend);
 
-  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
+#  my $vc = $sgpa->fetch_VirtualContig_by_chr_start_end($chrname,$start-10000,$end+10000);
   
   $self->vc($vc);
   
