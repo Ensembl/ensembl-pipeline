@@ -324,7 +324,9 @@ sub get_killed{
 
 sub get_existing{
     my ($self) = @_;
-   
+    if(!$self->{'_existing'}){
+      $self->create_existing;
+    }
     return $self->{'_existing'};
 }
 
