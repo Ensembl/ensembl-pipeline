@@ -766,7 +766,7 @@ sub add_seqfetcher_by_type{
 
   &throw("no type specified\n") unless defined ($type); 
   &throw("no suitable seqfetcher specified: [$seqfetcher]\n") 
-    unless defined ($seqfetcher) && $seqfetcher->isa("Bio::EnsEMBL::Pipeline::SeqFetcher"); 
+    unless ($seqfetcher || !($seqfetcher->can('get_Seq_by_acc'))); ; 
   $self->{'_seqfetchers'}{$type} = $seqfetcher;
 }
 
