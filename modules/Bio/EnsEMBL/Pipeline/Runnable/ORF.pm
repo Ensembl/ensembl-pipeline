@@ -103,7 +103,8 @@ sub run{
    my $start1 = 0;
    my $start2 = 0;
 
-   while ($seq0 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+   
+   while ($seq0 =~ /([^\*]{1,})\*?/g) {
        
        my $match = $1;
        
@@ -119,13 +120,12 @@ sub run{
        $self->add_output($sf);
        $start0 = $start0 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
+   
        $seq0 =~ s/$prestring\*//g;
        
    }
 	  
-   while ($seq1 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+   while ($seq1 =~ /([^\*]{1,})\*?/g) {
        
        my $match = $1;
        
@@ -141,13 +141,11 @@ sub run{
        $self->add_output($sf);
        $start1 = $start1 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
        $seq1 =~ s/$prestring\*//g;
        
    }
 	  
-   while ($seq2 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
+   while ($seq2 =~ /([^\*]{1,})\*?/g) {
        
        my $match = $1;
        
@@ -163,8 +161,6 @@ sub run{
        $self->add_output($sf);
        $start2 = $start2 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
        $seq2 =~ s/$prestring\*//g;
        
    } 
@@ -179,8 +175,6 @@ sub run{
    $start1 = 0;
    $start2 = 0;
    
-   #print STDERR "SEQS: $seq0\t$seq1\t$seq2\n"; 
-
    my $len = $seq->length();
  while ($seq0 =~ /([^\*]{1,})[\*\w{$olen}]/g) {
        
@@ -198,8 +192,6 @@ sub run{
        $self->add_output($sf);
        $start0 = $start0 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
        $seq0 =~ s/$prestring\*//g;
        
    }
@@ -220,8 +212,6 @@ sub run{
        $self->add_output($sf);
        $start1 = $start1 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
        $seq1 =~ s/$prestring\*//g;
        
    }
@@ -242,8 +232,6 @@ sub run{
        $self->add_output($sf);
        $start2 = $start2 + length($prestring);
 
-       #print STDERR $sf->start."\n";
-       #print STDERR $sf->end."\n";
        $seq2 =~ s/$prestring\*//g;
        
    } 
