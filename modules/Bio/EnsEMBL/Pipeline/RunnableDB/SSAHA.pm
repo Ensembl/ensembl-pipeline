@@ -116,7 +116,7 @@ sub runnable {
             }
         }
 
-        $parameters{'-query'} = $self->genseq;
+        $parameters{'-clone'} = $self->genseq;
         $parameters{'-database'} = $self->analysis->db;
         $parameters{'-ssaha'} = $self->analysis->program;
 

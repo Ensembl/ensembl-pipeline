@@ -84,7 +84,7 @@ sub new {
   $ssaha = 'ssaha' unless ($ssaha);
   $self->ssaha($self->find_executable($ssaha));
 
-  $self->query($seq) if ($seq);
+  $self->clone($seq) if ($seq);
   $self->min_length($len) if ($len);
   $self->database($db) if ($db);
 
@@ -96,7 +96,7 @@ sub new {
 #################
 # really ough to be renamed "sequence" but this involves rewriting RunnableI::writefile and also any other modules that inherit from it.
 # to do!
-sub query {
+sub clone {
   my ($self, $seq) = @_;
   if ($seq)
   {
@@ -106,7 +106,7 @@ sub query {
       }
       $self->{'_sequence'} = $seq ;
 
-      $self->filename($self->query->id.".$$.seq");
+      $self->filename($self->clone->id.".$$.seq");
       $self->results($self->filename.".out");
   }
   return $self->{'_sequence'};
@@ -159,7 +159,7 @@ sub database {
 sub run {
     my ($self) = @_;
     #check clone
-    my $seq = $self->query() || $self->throw("Clone required for ssaha\n");
+    my $seq = $self->clone() || $self->throw("Clone required for ssaha\n");
     #set directory if provided
     $self->workdir('/tmp') unless ($self->workdir());
     $self->checkdir();
