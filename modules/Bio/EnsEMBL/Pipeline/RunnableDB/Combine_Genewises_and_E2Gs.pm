@@ -419,9 +419,8 @@ print STDERR "Have " . scalar ($self->output) . "genes to write\n";
 sub make_gene{
   my ($self, $genetype, @transcripts) = @_;
 
-  # the genetype should be given in Bio::EnsEMBL::Pipeline::GeneConf
   unless ( $genetype ){
-    $self->throw("You must define GB_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::GeneConf");
+    $self->throw("You must define GB_GENEWISE_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::GeneBuild::Combined");
   }
 
   # an analysis should be passed in via the RunnableDB.m parent class:
