@@ -766,7 +766,10 @@ sub _transcript {
 	}
 	
 	$self->{'_transcript'} = $candidate_transcript;
-	
+
+	# Get the strand of our gene
+	$self->_strand($candidate_gene->strand);
+
 	last GENE;
       }
     }
@@ -810,6 +813,38 @@ sub _slice {
 
   return $self->{'_slice'};
 }
+
+
+=head2 _strand
+
+  Arg [1]    :
+  Example    : 
+  Description: 
+  Returntype : 
+  Exceptions : 
+  Caller     : 
+
+=cut
+
+sub _strand {
+  my ($self, $value) = @_;
+
+  # Potential gotcha.  The strand is most likely determined in
+  # the _transcript method, as it is easiest to derive it then.
+  # This method doesn't actually figure anything out.
+
+  if (defined $value) {
+    $self->{'_strand'} = $value;
+  }
+
+  if (! defined $self->{'_strand'}){
+    $self->warn("No value for strand set.  Disaster awaits.");
+  }
+
+  return $self->{'_strand'};
+}
+
+
 
 
 =head2 _seq_fetcher
@@ -876,7 +911,7 @@ sub _corroborating_sequences {
     
   FEATURE:
     foreach my $base_align_feature (@{$exon->get_all_supporting_features}){
-      
+
       if ((($type eq 'nucleotide')
 	   &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	  ||(($type eq 'protein')
@@ -884,8 +919,10 @@ sub _corroborating_sequences {
 	next FEATURE;
       }
 
-      next FEATURE 
-	if $base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'};
+      if ((defined $base_align_feature->percent_id)
+	  &&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
+	  next FEATURE;
+	}
 
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaDnaAlignFeature")){
 
@@ -942,9 +979,14 @@ sub _fiddly_bits {
 
   my $fetched_seq;
 
+  # Fetching the hit sequence with our seqfetcher.  Often
+  # these sequences are missing, so we have to fetch in
+  # an eval mediated manner.
+
+  # Here we have a bit of fiddling around to cache sequences.
+
   if ($self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname}) {
 
-print STDERR "Using cached sequence.\n";
     $fetched_seq = $self->{'_fetched_seq_cache'}->{$base_align_feature->hseqname};
 
   } else {
@@ -981,6 +1023,7 @@ print STDERR "Using cached sequence.\n";
     # Splice out the matched region of our feature sequence
     my $first_aa = ($hstart - 1) * 3;
     my $last_aa = (($hend -1) * 3) + 2;
+
     
     @fetched_seq = splice(@fetched_seq, $first_aa, $last_aa);
   } 
@@ -1035,27 +1078,44 @@ print STDERR "Using cached sequence.\n";
     }
     
   }
+
+  # Determine the point in the genomic sequence that the
+  # features starts at.  Need to worry about strand and whether 
+  # the feature starts or ends outside of our slice.
+
+  my $genomic_start;  # Feature insertion point
+
+  if ($self->_strand == 1) {
+    $genomic_start = $base_align_feature->start - 1;
+  } elsif ($self->_strand == -1) {
+#    $genomic_start = $self->_slice->length - $base_align_feature->end - 1;
+    $genomic_start = $self->_slice->length - $base_align_feature->end;
+  }
+
   
+#  # This little section of code handles any sequence that
+#  # overshoots the end of our slice.  Chop.
+
+#  my $genomic_start = $base_align_feature->start;
+  
+#  if ($genomic_start < 0) {
+#    warn("Feature extends past the ends of genomic slice.  Don\'t worry, truncating it to fit.");
+    
+#    $genomic_start = 0;
+    
+#    my $overshoot = $base_align_feature->start * -1;      
+    
+#    splice (@fetched_seq, 0, $overshoot);
+#  }
+  
+  # Here we are actually building the sequence that will
+  # align to our slice
+
   my $feature_sequence = '-' x $self->_slice->length;
   my @feature_sequence = split //, $feature_sequence;
-  
-  # This little section of code handles any sequence that
-  # overshoots the end of our slice.  It chopped off, really.
 
-  my $genomic_start = $base_align_feature->start;
-  
-  if ($genomic_start < 0) {
-    warn("Feature extends past the ends of genomic slice.  Don\'t worry, truncating it to fit.");
-    
-    $genomic_start = 0;
-    
-    my $overshoot = $base_align_feature->start * -1;      
-    
-    splice (@fetched_seq, 0, $overshoot);
-  }
-  
-  splice (@feature_sequence, ($genomic_start - 1), 0, @fetched_seq);
-  
+  splice (@feature_sequence, $genomic_start, (scalar @fetched_seq), @fetched_seq);
+
   # Create a hash that has all the information we want to return.
 
   my %partially_aligned = ('name'      => $base_align_feature->hseqname,
@@ -1084,7 +1144,16 @@ sub _genomic_sequence {
 
   if (!defined $self->{'_genomic_sequence'}) {
 
-    my @genomic_sequence = split //, $self->_slice->seq;
+    my $genomic_sequence;
+
+    if ($self->_strand == 1) {
+      $genomic_sequence = $self->_slice->seq;
+    } elsif ($self->_strand == -1) {
+print STDERR "Reverse complimenting genomic sequence.\n";
+      $genomic_sequence = $self->_slice->revcom->seq;
+    }
+
+    my @genomic_sequence = split //, $genomic_sequence;
 
     # Fill in the blanks
 
@@ -1120,14 +1189,21 @@ sub _exon_nucleotide_sequence {
   if (!defined $self->{'_exon_nucleotide_sequence'}) {
     
     my @exon_only_sequence;
-    
+
     foreach my $exon (@{$self->_transcript->get_all_Exons}) {
-      
+
       # Add the exon sequence to our 'exons only' sequence.
       
       my @exon_seq = split //, $exon->seq->seq;
-      
-      my $exon_position = $exon->start - 1;
+
+      my $exon_position;
+
+      if ($self->_strand == 1) {
+	$exon_position = $exon->start - 1;
+      }elsif ($self->_strand == -1) {
+	$exon_position = $self->_slice->length - $exon->end;
+      }
+
       
       foreach my $exon_nucleotide (@exon_seq){
 	if (!defined $exon_only_sequence[$exon_position]){
@@ -1138,9 +1214,9 @@ sub _exon_nucleotide_sequence {
 	}
       }
       
-      if ($exon_position != ($exon->end)){
-	$self->throw("Problem with exon length or sequence.\n$@");
-      }      
+#      if ($exon_position != ($exon->end)){
+#	$self->throw("Problem with exon length or sequence.\n$@");
+#      }      
     }    
     
     # Fill in the blanks
@@ -1184,10 +1260,11 @@ sub _exon_protein_translation {
       
       my $peptide_obj = $exon->peptide($self->_transcript);
       my $peptide = $peptide_obj->seq;
+print STDERR "Peptide " . $peptide . "\n";
       $peptide =~ s/(.)/$1\-\-/g;
-      
+print STDERR "Mangled Peptide " . $peptide . "\n";
       my @peptide = split //, $peptide;
-      
+print STDERR "Size of split peptide is : " . scalar @peptide . "\n";      
       # Whack off the first residue if it is only a partial 
       # codon (the internal rule is to:
       #   - include a whole residue for partial codons at ends
@@ -1197,32 +1274,76 @@ sub _exon_protein_translation {
       # By doing this, a complete undeleted/unrepeated sequence 
       # is displayed in the alignment.
       
-      if ($exon->phase != 0) {
+#      unless (($exon->phase == 0)||($exon->phase == -1)) {
+#    }
 
-	$peptide[0] = '-';
+      if ($exon->phase == 2){ 
+	splice (@peptide, 0, 2);
+      }
+
+      if ($exon->phase == 1){
+	shift @peptide;
+      }
+
+      # Darstardly, hidden in here is the coordinate shuffle
+      # to turn reverse strand genes around (the protein sequence
+      # is of course in the forward direction already, just the 
+      # coordinates need to be reversed).
+      
+      my $exon_start = $exon->start;
+      my $exon_end = $exon->end;
+      my $exon_length = $exon_end - $exon_start;
+      my $exon_phase = $exon->phase;
+      my $exon_end_phase = $exon->end_phase;
+      
+      if ($self->_strand == -1) {
+	
+	$exon_start = $self->_slice->length - $exon_end;
+	$exon_end = $exon_start + $exon_length - 1;
+
+#	($exon_phase, $exon_end_phase) = ($exon_end_phase, $exon_phase);
 
       }
 
       # Jiggling the exons about to get frame right
       my $extra_length = 0;
-      $extra_length = 1 if $exon->end_phase == 2;
-      $extra_length = 2 if $exon->end_phase == 1;
-      #  $extra_length += $exon->phase;
-      
+
+#      $extra_length += 3 if (($exon->phase != 0) && ($exon->phase != -1));
+      $extra_length += 3 if (($exon_end_phase != 0) && ($exon_end_phase != -1));
+
+#      $extra_length -= 2 if $exon->phase == 2;
+#      $extra_length -= 1 if $exon->phase == 1;
+
+      $extra_length -= 2 if $exon_end_phase == 2;
+      $extra_length -= 1 if $exon_end_phase == 1;
+
+
+print STDERR "Exon phase : " .$exon->phase . "\tend-phase : " . $exon->end_phase . "\tExtra length : " . $extra_length . "\tFiddled exon end :  $exon_end\tUnfiddled exon end : " . $exon->end . "\n";      
+print STDERR "Extra length : " . $extra_length . "\n";
       my $peptide_genomic_start;
-      
-      if ($exon->end_phase >= 0) {
-	$peptide_genomic_start = $exon->end - (scalar @peptide) + $extra_length + 1;
+
+      if ($exon_end_phase != -1) {
+	$peptide_genomic_start = $exon_end - (scalar @peptide) + $extra_length + 1 - 1;
+
       } else {
-	$peptide_genomic_start = $exon->start - $exon->phase;
+	$peptide_genomic_start = $exon_start - 1;
+      }
+
+      # This HAS to be removed, it is just necessary to make this work.
+      # There is something about reversed sequences that puts them two
+      # base positions upstream.
+      if ($self->_strand == -1) {
+	$peptide_genomic_start += 2;
       }
       
-      my $insert_point = $peptide_genomic_start - 1;
+      my $insert_point = $peptide_genomic_start;
       
       foreach my $exon_aa (@peptide) {
 	$exon_translation_sequence[$insert_point] = $exon_aa;
+print STDERR $exon_aa;
 	$insert_point++;
       }
+print STDERR "\n";
     }
 
     # Fill in the blanks
