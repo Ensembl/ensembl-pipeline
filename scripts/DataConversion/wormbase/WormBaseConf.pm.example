@@ -1,0 +1,104 @@
+package WormBaseConf;
+
+use strict;
+use vars qw( %WormBaseConf );
+
+
+%WormBaseConf = (
+		 #location of agp and gff files
+		 WB_CHR_INFO => [
+				 { 
+				  chr_name => 'I',
+				  agp_file => '',
+				  length => '15080471',
+				  gff_file => '',
+				 },
+				 { 
+				  chr_name => 'II',
+				  agp_file => '',
+				  length => '15279300',
+				  gff_file => '',
+				 },
+				 { 
+				  chr_name => 'III',
+				  agp_file => '',
+				  length => '13783262',
+				  gff_file => '',
+				 },
+				 { 
+				  chr_name => 'IV',
+				  agp_file => '',
+				  length => '17493790',
+				  gff_file => '',
+				 },
+				 { 
+				  chr_name => 'V',
+				  agp_file => '',
+				  length => '20916335',
+				  gff_file => '',
+				 },
+				 { 
+				  chr_name => 'X',
+				  agp_file => '',
+				  length => '17705013',
+				  gff_file => '',
+				 }
+			       ],
+		 WB_AGP_TYPE => '', # agp type which gets written to database meta
+		 
+		 # database to put sequnece and genes into
+		 WB_DBNAME => '',
+		 WB_DBHOST => '',
+		 WB_DBUSER => '',
+		 WB_DBPASS => '',
+		 #path to index based on clone name
+		 WB_CLONE_INDEX => [''],
+		 # logic name of analysis object to be assigned to genes
+		 WB_LOGIC_NAME => 'wormbase',
+		 # if want the debug statements in wormbase to ensembl scripts printed
+		 WB_DEBUG => 1,
+		 # location to write file containing dodgy seq ids
+		 WB_SEQ_IDS => '',
+		 # location to write ids of genes which don't translate
+		 WB_NON_TRANSLATE => '',
+		 # location to write ids of genes which don't transform
+		 WB_NON_TRANSFORM => '',
+		 WB_WORMPEP_FILE => '',
+		 WB_WORMPEP_RELEASE => ,
+		 WB_NEW_CONTIGS => '', # when running raw_computes_transfer.pl this the the file where the tab file for loading into the 
+		 #input_id_analysis table to run new raw computes will be written too
+		 WB_SUBMIT_CONTIG_ID => '' #the analysis id of the submit contig analysis object for the raw computes
+		 WB_RAW_COMPUTES => 0 #check for wormbase_to_ensembl.pl to see if there are existing raw computes if set to 0 will write entries to input_id_analysis table
+		);
+
+sub import {
+    my ($callpack) = caller(0); # Name of the calling package
+    my $pack = shift; # Need to move package off @_
+
+    # Get list of variables supplied, or else
+    # all of GeneConf:
+    my @vars = @_ ? @_ : keys( %WormBaseConf );
+    return unless @vars;
+
+    # Predeclare global variables in calling package
+    eval "package $callpack; use vars qw("
+         . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $WormBaseConf{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$WormBaseConf{ $_ };
+	} else {
+	    die "Error: WormBaseConf: $_ not known\n";
+	}
+    }
+}
+
+1;
+
+

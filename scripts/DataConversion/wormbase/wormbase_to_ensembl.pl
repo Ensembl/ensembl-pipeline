@@ -87,6 +87,11 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
       die("couldn't store ".$clone->id." ".$clone->embl_id." $@");
     }
     $contig_id{$id} = $contig->dbID;
+    if(!$WB_RAW_CONTIGS){
+      my $sql = "insert into input_id_analysis(input_id, analysis_id,  created) values('$contig_id', $WB_SUBMIT_CONTIG_ID, now())";
+      my $sth = $db->prepare($sql);
+      $sth->execute($contig_id, $WB_SUBMIT_CONTIG_ID);
+    }
   }
 
   foreach my $id(keys(%chr_hash)){
