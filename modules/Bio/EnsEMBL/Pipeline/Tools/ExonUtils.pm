@@ -212,7 +212,12 @@ sub _clone_Exon{
       next;
     }
     $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
-    $newexon->add_supporting_features( $sf );
+    eval{
+      $newexon->add_supporting_features( $sf );
+    };
+    if ( $@ ){
+      print STDERR "_clone_Exon: problem transferring the supporting evidence\n";
+    }
   }
   return $newexon;
 }
