@@ -86,7 +86,7 @@ sub new {
     # define the database
     $params .= "-database=>".$self->analysis->db_file.",";
     # set the filter
-    if ($self->analysis->db =~ /swall/i) {
+    if ($self->analysis->db =~ /slim/i) {
         $params .= "-filter=>1,";
     }
     # define some threshold
@@ -141,7 +141,7 @@ sub write_output {
     my ($self) = @_;
     my $proteinFeatureAdaptor = $self->dbobj->get_Protfeat_Adaptor;
     my @featurepairs = $self->output;
-    $proteinFeatureAdaptor->store (@featurepairs);
+    $proteinFeatureAdaptor->write_Protein_feature (@featurepairs);
 }
 
 # runnable method
