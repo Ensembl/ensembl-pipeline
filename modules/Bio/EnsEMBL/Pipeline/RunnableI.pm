@@ -448,4 +448,26 @@ sub options {
     return $self->{'_options'};
 }
 
+
+=head2 trunc_float_3
+
+  Arg  1      float $value
+              floating point number
+  Function    Truncates a float to 3 places of decimal
+  Returntype  float
+  Exceptions  none
+  Caller      Anyone!
+
+=cut
+
+sub trunc_float_3 {
+    my ($self, $arg) = @_;
+
+    # deal only with valid numbers
+    # and only need cases of the form [+/-]xx.yyyyy
+    return $arg unless $arg =~ /^[+-]?\d*\.\d+$/;
+
+    return 0.001 * int (1000 * $arg);
+}
+
 1;
