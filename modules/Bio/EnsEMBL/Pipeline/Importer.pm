@@ -182,6 +182,8 @@ sub importClones {
 sub checkClones {
   my ($self) = @_;
 
+  my $sic = $self->dbobj->get_StateInfoContainer;
+
   my @analysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_logic_name('SubmitContig');
 
   if ($#analysis != 0) {
@@ -279,10 +281,8 @@ sub checkClones {
             {
 	      print STDERR "Deleting clone : Found new version for " . $clone->id . " old - $oldversion new - " . $clone->embl_version . "\n";
 	    
-	      my $std = $self->dbobj->get_AnalysisAdaptor;
-	    
 	      foreach my $contig ($oldclone->get_all_Contigs) {
-	        $std->removeInputId($contig->id,'contig',$analysis[0]);
+	        $sic->delete_InputId($contig->id,'contig',$analysis[0]);
 	      }
 	    
 	      $oldclone->delete;
@@ -307,8 +307,8 @@ sub writeClones {
 
   print STDERR "Writing clones\n";
 
-  my $std = $self->dbobj->get_AnalysisAdaptor;
-  my @analysis = $std->fetch_by_logic_name('SubmitContig');
+  my $sic = $self->dbobj->get_StateInfoContainer;
+  my @analysis = $self->dbobj->get_AnalysisAdaptor->fetch_by_logic_name('SubmitContig');
 
   if ($#analysis != 0) {
     $self->throw("More than one or none SubmitContig logic name. Eeek!");
@@ -322,7 +322,7 @@ sub writeClones {
     };
     if (!$@) {
       foreach my $contig ($clone->get_all_Contigs) {
-	$std->submitInputId($contig->id,'contig',$analysis[0]);
+	$sic->store_inputId_class_analysis($contig->id,'contig',$analysis[0]);
       }
     } else {
       $self->warn("Couldn't write clone " . $clone->id . " [$@]");
