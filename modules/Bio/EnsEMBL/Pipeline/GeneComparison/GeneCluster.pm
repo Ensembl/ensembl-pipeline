@@ -244,42 +244,46 @@ sub pair_Transcripts {
   my ($self) = @_;
   
   # get the genes separated by type list 'benchmark'-like or 'prediction'-like
-  my ( $genes2, $genes1 ) = $self->get_separated_Genes;
-  my (@transcripts1,@transcripts2);
-  my (@trans1,@trans2);
-  foreach my $gene ( @$genes1 ){
-    push( @trans1, $gene->each_Transcript );
+  my ( $ann_genes, $pred_genes ) = $self->get_separated_Genes;
+  my (@ann_transcripts,@pred_transcripts);
+  my (@ann_trans,@pred_trans);
+  foreach my $gene ( @$pred_genes ){
+    print STDERR "gene ".$gene->type." put in pred_trans array\n";
+    push( @pred_trans, $gene->each_Transcript );
   }
-  foreach my $gene ( @$genes2 ){
-    push( @trans2, $gene->each_Transcript );
+  foreach my $gene ( @$ann_genes ){
+    print STDERR "gene ".$gene->type." put in ann_trans array\n";
+    push( @ann_trans, $gene->each_Transcript );
   }
   
+  # tran1 are predicted genes
   # first sort the transcripts by their start position coordinate
-  my %start_table1;
-  my %start_table2;
+  my %start_table_pred;
+  my %start_table_ann;
   my $i=0;
-  foreach my $tran ( @trans1 ) {
-    $start_table1{$i} = $tran->start_exon->start;
+  foreach my $tran ( @pred_trans ) {
+    $start_table_pred{$i} = $tran->start_exon->start;
     $i++;
   }
   my $j=0;
-  foreach my $tra ( @trans2  ) {
-    $start_table2{$j} = $tra->start_exon->start;
+  foreach my $tran ( @ann_trans  ) {
+    $start_table_ann{$j} = $tran->start_exon->start;
     $j++;
   }
-  foreach my $pos ( sort { $start_table1{$a} <=> $start_table1{$b} } keys %start_table1 ){
-    push (@transcripts1, $trans1[$pos]);
+  foreach my $pos ( sort { $start_table_pred{$a} <=> $start_table_pred{$b} } keys %start_table_pred ){
+    push (@pred_transcripts, $pred_trans[$pos]);
   }
-  foreach my $pos ( sort { $start_table2{$a} <=> $start_table2{$b} } keys %start_table2 ){
-    push (@transcripts2, $trans2[$pos]);
+  foreach my $pos ( sort { $start_table_ann{$a}  <=> $start_table_ann{$b}  } keys %start_table_ann ){
+    push (@ann_transcripts, $ann_trans[$pos]);
   }
 
   # pair the transcripts, but first, some variable definition
 
-  my %seen1;           # these keep track of those transcript linked and with how much overlap
-  my %seen2;           # ditto, for @transcripts2
+  my %seen_pred;           # these keep track of those transcript linked and with how much overlap
+  my %seen_ann;           # ditto, for @transcripts2
   my @pairs;           # list of (Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster) transcript-pairs being created 
-  my @unpaired;        # list of Bio::EnsEMBL::Transcript which are left unpaired
+  my @unpaired_ann;        # list of prediction Bio::EnsEMBL::Transcript which are left unpaired
+  my @unpaired_pred;        # list of annotation Bio::EnsEMBL::Transcript which are left unpaired
   my @doubled;         # those which have been paired up twice
   my $overlap_matrix;  # matrix holding the number of exon overaps for each pair of transcripts
   my $link;            # matrix with 1 for the pairs linked and undef otherwise 
@@ -287,10 +291,11 @@ sub pair_Transcripts {
   my %repeated;        # to keep track of repeated transcripts
 
   # first calculate all possible overlaps
-  foreach my $tran1 ( @transcripts1 ){
-    foreach my $tran2 ( @transcripts2 ){
-      $$overlap_matrix{ $tran1 }{ $tran2 } = _compare_Transcripts( $tran1, $tran2 );
-      my @list = ( $$overlap_matrix{ $tran1 }{ $tran2 }, $tran1, $tran2 );
+  foreach my $pred_tran ( @pred_transcripts ){
+    foreach my $ann_tran ( @ann_transcripts ){
+      my ($overlap_number,$overlap_length) = _compare_Transcripts( $pred_tran, $ann_tran );
+      $$overlap_matrix{ $pred_tran }{ $ann_tran } = $overlap_number;
+      my @list = ( $$overlap_matrix{ $pred_tran }{ $ann_tran }, $pred_tran, $ann_tran , $overlap_length);
       push ( @overlap_pairs, \@list );
       #print STDERR "Overlap( ".$tran1->stable_id.",".$tran2->stable_id." ) = "
       #.$$overlap_matrix{ $tran1 }{ $tran2 }."\n";
@@ -298,19 +303,32 @@ sub pair_Transcripts {
   }
   if ( @overlap_pairs ){
     # sort the list of @overlap_pairs on the overlap
-    my @sorted_pairs = sort { $$b[0] <=> $$a[0] } @overlap_pairs;
+    my @sorted_pairs = sort { my $result = ( $$b[0] <=> $$a[0] );
+			      if ($result){
+				return $result;
+			      }
+			      else{
+				return ( $$b[3] <=> $$a[3] );
+			      }
+			    } @overlap_pairs;
     
+    #foreach my $pair ( @sorted_pairs ){
+    #  print STDERR "pred: $$pair[1], ann: $$pair[2], overlaps: $$pair[0], length: $$pair[3]\n";
+    #}
+
+
     # take the first pair of the list
     my $first = shift @sorted_pairs;
-    my ($max_overlap,$tran1,$tran2) =  @$first;
-    $seen1{ $tran1 } = $max_overlap;
-    $seen2{ $tran2 } = $max_overlap;
-    $$link{ $tran1 }{ $tran2 } = 1;
+    my ($max_overlap,$pred_tran,$ann_tran,$max_overlap_length) =  @$first;
+    $seen_pred{ $pred_tran } = $max_overlap;
+    $seen_ann{ $ann_tran }   = $max_overlap;
+    $$link{ $pred_tran }{ $ann_tran } = 1;
+    #print STDERR "putting together $pred_tran and $ann_tran\n";
     
     # scan through each overlap
   PAIR:
     foreach my $list ( @sorted_pairs ){
-      # each list contains @$list = ( overlap, transcript1, transcript2 )
+      # each list contains @$list = ( overlap, transcript1, transcript2 , overlap_length)
       
       # first of all, if the overlap is zero, ditch it
       if ( $$list[0] == 0 ){
@@ -318,7 +336,7 @@ sub pair_Transcripts {
       }
       
       # if we've seen both transcripts already reject them
-      if ( $$link{ $$list[1] }{ $$list[2] } && defined( $seen1{ $$list[1] } ) && defined( $seen2{ $$list[2] } ) ){
+      if ( $$link{ $$list[1] }{ $$list[2] } && defined( $seen_pred{ $$list[1] } ) && defined( $seen_ann{ $$list[2] } ) ){
 	next PAIR;
       }
       
@@ -326,74 +344,76 @@ sub pair_Transcripts {
       if ( $$list[0] == $max_overlap ) {
 	
 	# if we've seen both transcripts already, check they have the highest score
-	if ( defined( $seen1{ $$list[1] } ) && defined( $seen2{ $$list[2] } ) ){
-	  if ( $$list[0] == $seen1{ $$list[1] } && $$list[0] == $seen2{ $$list[2] } ){
-	    $$link{ $$list[1] }{ $$list[2] } = 1;
-	  }
-	  next PAIR;
-	}
+	#if ( defined( $seen1{ $$list[1] } ) && defined( $seen2{ $$list[2] } ) ){
+	#  if ( $$list[0] == $seen1{ $$list[1] } && $$list[0] == $seen2{ $$list[2] } ){
+	#    $$link{ $$list[1] }{ $$list[2] } = 1;
+	#  }
+	#  next PAIR;
+	#}
 	
 	# if the pair is entirely new, we accept it
-	if ( !defined( $seen1{ $$list[1] } ) && !defined( $seen2{ $$list[2] } ) ){
+	if ( !defined( $seen_pred{ $$list[1] } ) && !defined( $seen_ann{ $$list[2] } ) ){
 	  $$link{ $$list[1] }{ $$list[2] } = 1;
-	  $seen1{ $$list[1] } = $$list[0];
-	  $seen2{ $$list[2] } = $$list[0];
+	  #print STDERR "putting together $$list[1] and $$list[2]\n";
+	  $seen_pred{ $$list[1] } = $$list[0];
+	  $seen_ann{ $$list[2] } = $$list[0];
 	  next PAIR;
 	}
 	
 	# we accept repeats only if this is their maximum overlap as well
-	if ( !defined( $seen2{$$list[2]} ) && defined( $seen1{$$list[1]} ) && $$list[0] == $seen1{$$list[1]} ){
-	  $$link{ $$list[1] }{ $$list[2] } = 1;
-	  $seen2{ $$list[2] } = $$list[0];
-	  if ( !defined( $repeated{ $$list[1] } ) ){
-	    push( @doubled, $$list[1] );
-	    $repeated{ $$list[1] } = 1;
-	  }
-	  next PAIR;
-	}
-	if ( !defined( $seen1{$$list[1]} ) && defined( $seen2{$$list[2]} ) && ($$list[0] == $seen2{$$list[2]}) ){ 
-	  $$link{ $$list[1] }{ $$list[2] } = 1;
-	  $seen1{ $$list[1] } = $$list[0];
-	  if ( !defined( $repeated{ $$list[2] } ) ){
-	    push( @doubled, $$list[2] );
-	    $repeated{ $$list[2] } = 1;
-	  }
-	  next PAIR;
-	}
+	#if ( !defined( $seen_ann{$$list[2]} ) && defined( $seen_pred{$$list[1]} ) && $$list[0] == $seen_pred{$$list[1]} ){
+	#  $$link{ $$list[1] }{ $$list[2] } = 1;
+	#  $seen_ann{ $$list[2] } = $$list[0];
+	#  if ( !defined( $repeated{ $$list[1] } ) ){
+	#    push( @doubled, $$list[1] );
+	#    $repeated{ $$list[1] } = 1;
+	#  }
+	#  next PAIR;
+        #}
+	#if ( !defined( $seen_pred{$$list[1]} ) && defined( $seen_ann{$$list[2]} ) && ($$list[0] == $seen_ann{$$list[2]}) ){ 
+	#  $$link{ $$list[1] }{ $$list[2] } = 1;
+	#  $seen_pred{ $$list[1] } = $$list[0];
+	#  if ( !defined( $repeated{ $$list[2] } ) ){
+	#    push( @doubled, $$list[2] );
+	#    $repeated{ $$list[2] } = 1;
+	#  }
+	#  next PAIR;
+	#}
       }
       
       # if the score is lower, only accept if the pair is completely new
       if ( $$list[0] < $max_overlap ){
-	if ( !defined( $seen1{ $$list[1] } ) && !defined( $seen2{ $$list[2] } ) ){
+	if ( !defined( $seen_pred{ $$list[1] } ) && !defined( $seen_ann{ $$list[2] } ) ){
 	  $$link{ $$list[1] }{ $$list[2] } = 1;
-	  $seen1{ $$list[1] } = $$list[0];
-	  $seen2{ $$list[2] } = $$list[0];
+	  $seen_pred{ $$list[1] } = $$list[0];
+	  $seen_ann{  $$list[2] } = $$list[0];
 	  $max_overlap = $$list[0];
+	  #print STDERR "putting together $$list[1] and $$list[2]\n";
 	  next PAIR;
 	}
       }
     }
     
     # create a new cluster for each pair linked
-    foreach my $tran1 ( @transcripts1 ){
-      foreach my $tran2 ( @transcripts2 ){
-	if ( $$link{ $tran1 }{ $tran2} && $$link{ $tran1 }{ $tran2 } == 1 ){
+    foreach my $pred_tran ( @pred_transcripts ){
+      foreach my $ann_tran ( @ann_transcripts ){
+	if ( $$link{ $pred_tran }{ $ann_tran } && $$link{ $pred_tran }{ $ann_tran } == 1 ){
 	  my $pair = Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster->new();
-	  $pair->put_Transcripts( $tran1, $tran2 );
+	  $pair->put_Transcripts( $pred_tran, $ann_tran );
 	  push( @pairs, $pair );
 	}
       }
     }
     
     # finally, check for the unseen ones
-    foreach my $tran1 ( @transcripts1 ){
-      if ( !defined( $seen1{ $tran1 } ) ){
-	push( @unpaired, $tran1 );
+    foreach my $pred_tran ( @pred_transcripts ){
+      if ( !defined( $seen_pred{ $pred_tran } ) ){
+	push( @unpaired_pred, $pred_tran );
       }
     }
-    foreach my $tran2 ( @transcripts2 ){
-      if ( !defined( $seen2{ $tran2 } ) ){
-	push( @unpaired, $tran2 );
+    foreach my $ann_tran ( @ann_transcripts ){
+      if ( !defined( $seen_ann{ $ann_tran } ) ){
+	push( @unpaired_ann, $ann_tran );
       }
     }
     #print STDERR scalar(@pairs)." transcript pairs created\n";
@@ -411,12 +431,14 @@ sub pair_Transcripts {
     
   }
   else{
-    print STDERR "no pairs could be created from ".scalar(@transcripts1). " and ".scalar(@transcripts2)."\n";
+    print STDERR "no pairs could be created from comparing ".scalar(@pred_transcripts). " predicted transcripts and "
+      .scalar(@ann_transcripts)." annotated transcripts\n";
     @pairs = ();
-    @unpaired = ();
+    @unpaired_ann  = ();
+    @unpaired_pred = ();
     @doubled  = ();
   }
-  return (\@pairs,\@unpaired,\@doubled);
+  return (\@pairs,\@unpaired_ann,\@unpaired_pred);
 }
 
 #########################################################################
@@ -430,23 +452,41 @@ sub pair_Transcripts {
 =cut
 
 sub _compare_Transcripts {         
-  my ($transcript1,$transcript2) = @_;
-  my @exons1   = $transcript1->get_all_Exons;
-  my @exons2   = $transcript2->get_all_Exons;
+  my ($tran1, $tran2) = @_;
+  my @exons1   = $tran1->get_all_Exons;
+  my @exons2   = $tran2->get_all_Exons;
   my $overlaps = 0;
-  
+  my $overlap_length = 0;
   foreach my $exon1 (@exons1){
-    
     foreach my $exon2 (@exons2){
-
-      if ( ($exon1->overlaps($exon2)) && ($exon1->strand == $exon2->strand) ){
+      if ( $exon1->overlaps($exon2) && ( $exon1->strand == $exon2->strand ) ){
 	$overlaps++;
+	
+	# calculate the extent of the overlap
+	if ( $exon1->start > $exon2->start && $exon1->start <= $exon2->end ){
+	  if ( $exon1->end < $exon2->end ){
+	    $overlap_length += ( $exon1->end - $exon1->start + 1);
+	  }
+	  elsif ( $exon1->end >= $exon2->end ){
+	    $overlap_length += ( $exon2->end - $exon1->start + 1);
+	  }
+	}
+	elsif( $exon1->start <= $exon2->start && $exon2->start <= $exon1->end ){
+	  if ( $exon1->end < $exon2->end ){
+	    $overlap_length += ( $exon1->end - $exon2->start + 1);
+	  }
+	  elsif ( $exon1->end >= $exon2->end ){
+	    $overlap_length += ( $exon2->end - $exon2->start + 1);
+	  }
+	}
       }
     }
   }
-  return $overlaps;  # we keep track of the number of overlaps to be able to choose the best match
-}    
-
+  
+  return ($overlaps,$overlap_length);
+			
+} 
+	
 
 
 #########################################################################

@@ -637,7 +637,7 @@ sub compare_CDS{
 
  CLUSTER:
   foreach my $gene_cluster (@$clusters){
-    my ( $pairs, $ann_unpaired, $pred_unpaired, $ann_doubled, $pred_doubled) = $gene_cluster->pair_Transcripts;
+    my ( $pairs, $ann_unpaired, $pred_unpaired ) = $gene_cluster->pair_Transcripts;
     my @pairs = @{ $pairs };
     
     #my @ann_unpaired;
@@ -651,8 +651,8 @@ sub compare_CDS{
     
     #push ( @total_ann_doubled  , @ann_doubled   );
     #push ( @total_pred_doubled , @pred_doubled  );
-    #push ( @total_ann_unpaired , @ann_unpaired  ); 
-    #push ( @total_pred_unpaired, @pred_unpaired );
+    push ( @total_ann_unpaired , @$ann_unpaired  ); 
+    push ( @total_pred_unpaired, @$pred_unpaired );
 
     # for each pair we keep track of the exon comparison
  
@@ -860,7 +860,8 @@ sub compare_Translations{
   
 sub compare_Exons{
   my ($self,$clusters,$coding,$verbose) = @_;
-  
+
+  my $global_count = 1;
   my @pairs_missing;                # holds the transcript pairs that have one or more exons missing
   my $pairs_count;                  # this will count the total number of pairs compared
   my $total_missing_exon_count = 0; # counts the number of overpredicted exons
@@ -919,8 +920,20 @@ sub compare_Exons{
     $cluster_count++; 
 
     # pair_Transcripts returns (\@pairs,\@ann_unpaired,\@pred_unpaired,\@ann_doubled,\@pred_doubled)
-    print STDERR "pairing up transcripts ...\n";
-    my ( $pairs, $ann_unpaired, $pred_unpaired, $ann_doubled, $pred_doubled) = $gene_cluster->pair_Transcripts;
+    #print STDERR "pairing up transcripts ...\n";
+    my ( $pairs, $ann_unpaired, $pred_unpaired ) = $gene_cluster->pair_Transcripts;
+    print STDERR "found ".scalar(@$pairs)." pairs\n";
+    
+    # print the unpaired transcripts if gff_file is available
+    if ($self->gff_file){
+      foreach my $tran ( @$ann_unpaired ){
+	$self->toGFF($tran,"annotation","unpaired");
+      }
+      foreach my $tran ( @$pred_unpaired ){
+	$self->toGFF($tran,"prediction","unpaired");
+      }
+    }
+
     my @pairs = @{ $pairs };
     my @ann_unpaired;
     my @pred_unpaired;
@@ -934,14 +947,15 @@ sub compare_Exons{
       push ( @pred_unpaired, @{ $pred_unpaired } );
       $total_prediction_length  += $self->_get_length_of_Transcripts( $pred_unpaired );
     }
-    if ( $ann_doubled ){ 
-      push ( @ann_doubled  , @{ $ann_doubled }   );    
-    }
-    if ( $pred_doubled ){
-      push ( @pred_doubled , @{ $pred_doubled }  );
-    }
-    push ( @total_ann_doubled  , @ann_doubled   );
-    push ( @total_pred_doubled , @pred_doubled  );
+    
+    #if ( $ann_doubled ){ 
+    #  push ( @ann_doubled  , @{ $ann_doubled }   );    
+    #}
+    #if ( $pred_doubled ){
+    #  push ( @pred_doubled , @{ $pred_doubled }  );
+    #}
+    #push ( @total_ann_doubled  , @ann_doubled   );
+    #push ( @total_pred_doubled , @pred_doubled  );
     push ( @total_ann_unpaired , @ann_unpaired  ); 
     push ( @total_pred_unpaired, @pred_unpaired );
 
@@ -954,7 +968,16 @@ sub compare_Exons{
       # we match the exons in the pair
       my ($printout, $missing_stats, $over_stats, $mismatch_stats, $match_stats, $matchlength_stats) = 
 	$self->_match_Exons($pair, $coding);
-  
+
+      # print to gff info about this pair if gff_file is available
+      my ($prediction,$annotation) = $pair->get_Transcripts;
+      if ($self->gff_file){
+	#print STDERR "printing to GFF: ".$prediction->dbID.",".$annotation->dbID."\n";
+	$self->toGFF($prediction,"prediction",$global_count);
+	$self->toGFF($annotation,"annotation",$global_count);
+	$global_count++;
+      }
+      
       # where 
       # printout{ pair }{ exon_number }  = [ exon/no link, exon/no link, extra comments      ];
       # $missing_stats                   = [ $missing_exon_count , \%missing_exon_position   ];
@@ -1035,23 +1058,42 @@ sub compare_Exons{
     }
     print STDERR $id."\n";
   }
-
-  print STDERR "Transcripts repeated: ".scalar( @total_ann_doubled )." from annotation, and ".
-    scalar( @total_pred_doubled )." from prediction\n";
-  foreach my $tran ( @total_ann_doubled ){
-    print STDERR $tran->stable_id."\n";
-  }
-  foreach my $tran ( @total_pred_doubled ){
-    print STDERR $tran->stable_id."\n";
-  }
+  
+  #print STDERR "Transcripts repeated: ".scalar( @total_ann_doubled )." from annotation, and ".
+  #  scalar( @total_pred_doubled )." from prediction\n";
+  #foreach my $tran ( @total_ann_doubled ){
+  #  print STDERR $tran->stable_id."\n";
+  #}
+  #foreach my $tran ( @total_pred_doubled ){
+  #  print STDERR $tran->stable_id."\n";
+  #}
 
   print STDERR "\n";
   print STDERR "Exact matches                 : ".$exact_matches." out of ".$exon_pair_count."\n";  
   print STDERR "Total exon mismatches         : ".$total_exon_mismatches."\n";
+  
+
   print STDERR "Exons missed by the prediction: ".$total_missing_exon_count."\n";
-  foreach my $key ( keys( %missing_exon_position ) ){
+  if ( $missing_exon_position{"first"} ){
+    printf STDERR " position %5s = %2d missed\n", ("first" , $missing_exon_position{"first"});
+  }
+  my @newkeys;
+  foreach my $key ( keys ( %missing_exon_position ) ){
+    unless ( $key eq "first" || $key eq "last" ){
+      push ( @newkeys, $key );
+    }
+  }
+  @newkeys = sort { $a <=> $b } @newkeys;
+  foreach my $key ( @newkeys ) {
+    if ( $key eq "first" || $key eq "last" ){
+      next;
+    }
     printf STDERR " position %5s = %2d missed\n", ($key , $missing_exon_position{$key});
   }
+  if ( $missing_exon_position{"last"} ){
+    printf STDERR " position %5s = %2d missed\n", ("last" , $missing_exon_position{"last"});
+  }
+
   print STDERR "Exons overpredicted           : ".$total_over_exon_count."\n";
   foreach my $key ( keys( %over_exon_position ) ){
     printf STDERR " position %2s = %2d overpredicted\n", ($key , $over_exon_position{$key});
@@ -1407,7 +1449,8 @@ sub _get_length_of_Transcripts {
 ####################################################################################
 
 
-sub input_id {  my $self = shift @_;
+sub input_id {  
+  my $self = shift @_;
   my ($chr,$chrstart,$chrend) = @_;
   if ( $chr && $chrstart && $chrend ){
     $self->{'_chr_name'}  = $chr;
@@ -2174,7 +2217,7 @@ sub flush_gene_Clusters {
 =cut
 
 sub exon_Coverage{
-  my ($self,$ann_genes,$pred_genes) = @_;
+  my ($self,$ann_genes,$pred_genes,$lower_bound) = @_;
   
   # first get all exons
   my @ann_exons;
@@ -2224,33 +2267,53 @@ sub exon_Coverage{
 
   print STDERR "               Sensitivity: $sensitivity\n";
   print STDERR "               Specificity: $specificity\n";
+  print STDERR "\n";
 
-  
-  my %seen_exon;
-  my $count_covered_exons = 0;
- ANN_EXON:
-  foreach my $ann_exon ( @ann_exons ){
-    if ( $seen_exon{ $ann_exon } ){
-      next ANN_EXON;
-    }
+
+  ### now calculate the coverage according to $lower_bound percentage overlap
+  if ($lower_bound){
+    my %seen_exon3;
+    my $count_covered_exons3 = 0;
+    my %perc_overlap_distribution3;
+    
+  ANN_EXON:
+    foreach my $ann_exon ( @ann_exons ){
+      if ( $seen_exon3{ $ann_exon } ){
+	next ANN_EXON;
+      }
+      
   PRED_EXON:
     foreach my $pred_exon ( @pred_exons ){
-      if ( $seen_exon{ $pred_exon } ){
+      if ( $seen_exon3{ $pred_exon } ){
 	next PRED_EXON;
       }
       if ( $ann_exon->overlaps( $pred_exon ) ){
 	my $overlap_length = $self->_exon_Overlap($ann_exon, $pred_exon);
 	my $ann_length     = $ann_exon->length;
 	my $perc_overlap   = 100 * ( $overlap_length / $ann_length);
-	if ( $perc_overlap >= 90 ){
-	  $seen_exon{ $ann_exon }  = 1;
-	  $seen_exon{ $pred_exon } = 1;
-	  $count_covered_exons++;
+	if ( $perc_overlap >= $lower_bound ){
+	  $seen_exon3{ $ann_exon }  = 1;
+	  $seen_exon3{ $pred_exon } = 1;
+	  $count_covered_exons3++;
+	  next ANN_EXON;
 	}
       }
     }
-  }
+    }
 
+
+  print STDERR "EXON COVERAGE ACCORDING TO EXON-OVERLAP >= $lower_bound %\n";
+  print STDERR "Total predicted exons: ".scalar(@pred_exons)."\n";
+  print STDERR "Total annotated exons: ".scalar(@ann_exons)."\n";
+  print STDERR "Found annotated exons: ".$count_covered_exons3."\n";
+  
+  my $sensitivity3 = $count_covered_exons3/scalar(@ann_exons);
+  my $specificity3 = $count_covered_exons3/scalar(@pred_exons);
+
+  print STDERR "               Sensitivity: $sensitivity3\n";
+  print STDERR "               Specificity: $specificity3\n";
+  print STDERR "\n";
+  }
 }  
 
 ############################################################
@@ -2327,16 +2390,16 @@ sub match {
       $rev2,
      );
 
-  # Swap the coords round if necessary
-  if ($f1->start > $f1->end) {
-    $start1 = $f1->end;
-    $end1   = $f1->start;
-    $rev1   = 1;
-  } else {
-    $start1 = $f1->start;
-    $end1   = $f1->end;
-  }
-
+	     # Swap the coords round if necessary
+	     if ($f1->start > $f1->end) {
+	       $start1 = $f1->end;
+	       $end1   = $f1->start;
+	       $rev1   = 1;
+	     } else {
+	       $start1 = $f1->start;
+	       $end1   = $f1->end;
+	     }
+  
   if ($f2->start > $f2->end) {
     $start2 = $f2->end;
     $end2   = $f2->start;
@@ -2345,36 +2408,143 @@ sub match {
     $start2 = $f2->start;
     $end2   = $f2->end;
   }
-
+  
   # Now check for an overlap
   if (($end2 > $start1 && $start2 < $end1) ) {
-	
-	#  we have an overlap so we now need to return 
-	#  two numbers reflecting how accurate the span 
-	#  is. 
-	#  0,0 means an exact match with the exon
-	# a positive number means an over match to the exon
-	# a negative number means not all the exon bases were matched
-
-	my $left  = ($start2 - $start1);
-	my $right = ($end1 - $end2);
-	
-	if ($rev1) {
-	    my $tmp = $left;
-	    $left = $right;
-	    $right = $tmp;
-	}
-	
-	my @overlap;
-
-	push (@overlap,1);
-
-	push (@overlap,$left);
-	push (@overlap,$right);
-
-	return @overlap;
-      }
     
+    #  we have an overlap so we now need to return 
+    #  two numbers reflecting how accurate the span 
+    #  is. 
+    #  0,0 means an exact match with the exon
+    # a positive number means an over match to the exon
+    # a negative number means not all the exon bases were matched
+    
+    my $left  = ($start2 - $start1);
+    my $right = ($end1 - $end2);
+    
+    if ($rev1) {
+      my $tmp = $left;
+      $left = $right;
+      $right = $tmp;
+    }
+    
+    my @overlap;
+    
+    push (@overlap,1);
+    
+    push (@overlap,$left);
+    push (@overlap,$right);
+    
+    return @overlap;
+  }
 }
+
+############################################################
+
+sub gff_file{
+  my ($self,$filename) = @_;
+  if ($filename){
+    $self->{'_gff_file'} = $filename;
+  }
+  return $self->{'_gff_file'};
+}
+
+############################################################
+
+sub toGFF{
+  my ($self,$transcript,$gene_type,$label) = @_;
+  
+  unless( $self->gff_file ){
+    print STDERR "Can't print to gff_file if you don't specify one in gff_file()\n";
+    return;
+  }
+  unless( $self->input_id ){
+    print STDERR "need to specify the virtual contig in vc()\n";
+    return;
+  }
+
+  my ( $chrname,$chrstart,$chrend ) = $self->input_id;
+  
+  my $filename = $self->gff_file;
+  
+  open(OUT,">>$filename");
+
+  my $genetype;
+  if ( $gene_type eq "annotation" ){
+    my $gene_adaptor = $self->annotation_db->get_GeneAdaptor;
+    $genetype = $gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
+    unless ( $genetype ){
+      $genetype = "ann_undetermined";
+    }
+  }
+  elsif ( $gene_type eq "prediction" ){
+    my $gene_adaptor = $self->prediction_db->get_GeneAdaptor;
+    $genetype = $gene_adaptor->get_Type_by_Transcript_id($transcript->dbID);
+    unless ( $genetype ){
+      $genetype = "pred_undetermined";
+    }
+  }
+  else{
+    $genetype = "undetermined";
+  }
+ 
+  my $id = $transcript->dbID;
+  if ($label){  
+    $id .= "_".$label;
+  }
+  
+  print STDERR "gene: $gene_type, type: $genetype, transcript_id: $id\n";
+
+
+  foreach my $exon ( $transcript->get_all_Exons ){
+    my $strand_label;
+    if ( $exon->strand == 1 ){
+      $strand_label = "+";
+    }
+    elsif( $exon->strand == -1 ){
+      $strand_label = "-";
+    }
+    else{
+      $strand_label = "+";
+    }
+    
+    print OUT $exon->dbID
+      ."\t".$genetype
+	."\texon" 
+	  ."\t".($chrstart+$exon->start)
+	    ."\t".($chrstart+$exon->end) 
+	      ."\t100"
+		."\t".$strand_label
+		  ."\t".$exon->phase 
+		    ."\t". $id
+		      ."\n";
+  }
+  close(OUT);
+}
+
+
+############################################################
+
+sub annotation_db{
+  my ($self,$db)=@_;
+  if ($db){
+    $self->{'_annotation_db'} = $db;
+  }
+  return $self->{'_annotation_db'};
+}
+
+############################################################
+
+sub prediction_db{
+  my ($self,$db)=@_;
+  if ($db){
+    $self->{'_prediction_db'} = $db;
+  }
+  return $self->{'_prediction_db'};
+}
+
+############################################################
+
+
 1;
 
