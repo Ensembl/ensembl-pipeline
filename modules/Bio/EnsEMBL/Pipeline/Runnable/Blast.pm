@@ -161,7 +161,7 @@ sub new {
                                   FILTER 
                                   COVERAGE
                                   PRUNE
-				  HARDPRUNE
+                                  HARDPRUNE
                                   UNGAPPED
                                   OPTIONS)], 
                               @args);
@@ -185,29 +185,29 @@ sub new {
       $self->options(' -cpus=1 ');  
     }
     
-    if (defined($threshold)) {
+    if ($threshold) {
       $self->threshold($threshold);
     }
 
-    if (defined($threshold_type)) {
+    if ($threshold_type) {
       $self->threshold_type($threshold_type);
     }
 
-    if (defined($filter)) {
+    if ($filter) {
         $self->filter($filter);
     }
     
-    if (defined($prune)) {
+    if ($prune) {
       $self->prune($prune);
     }
-    if (defined($hardprune)) {
+    if ($hardprune) {
       $self->hardprune($hardprune);
     }
-    if (defined($coverage)) {
+    if ($coverage) {
       $self->coverage($coverage);
     }
     #print STDERR "setting ungapped = ".$ungapped."\n";
-    if (defined($ungapped)) {
+    if ($ungapped) {
       $self->ungapped($ungapped);
     }
     return $self; # success - we hope!
@@ -251,7 +251,7 @@ sub run {
 sub databases {
   my ($self,@dbs) = @_;
 
-  if (!defined($self->{_databases})) {
+  if (!$self->{_databases}) {
      $self->{_databases} = [];
   }
   if (@dbs) {
@@ -406,7 +406,7 @@ sub parse_results {
   my $count = 0;
   my @parsers;
  
-  if (defined($fh)) {
+  if ($fh) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
@@ -431,7 +431,7 @@ sub parse_results {
   @parsers = ();
   seek $fh, 0, 0 if ref $fh;
 
-  if (defined($fh)) {
+  if ($fh) {
     my $parser = new Bio::EnsEMBL::Pipeline::Tools::BPlite(-fh => $fh);
     push(@parsers,$parser);
   } else {
@@ -457,7 +457,7 @@ sub parse_results {
     }
 
     # print STDERR "Name " . $fasta_header . "\n";
-     if (($self->filter == 1) && !defined($ids{$fasta_header})) {
+     if (($self->filter == 1) && !($ids{$fasta_header})) {
       next NAME;
     }
 
@@ -467,13 +467,13 @@ sub parse_results {
       
       if ($self->threshold_type eq "PID") {
 	next HSP
-	  if defined $self->threshold and ($hsp->percent < $self->threshold);
+	  if  $self->threshold and ($hsp->percent < $self->threshold);
       } elsif ($self->threshold_type eq "SCORE") {
 	next HSP
-	  if defined($self->threshold) and ($hsp->score < $self->threshold);
+	  if ($self->threshold) and ($hsp->score < $self->threshold);
       } elsif ($self->threshold_type eq "PVALUE") {
 	next HSP
-	  if defined($self->threshold) and ($hsp->P > $self->threshold);
+	  if ($self->threshold) and ($hsp->P > $self->threshold);
       }
       # Each HSP is a gapped alignment.
       # This method splits the gapped alignment into
@@ -522,7 +522,7 @@ sub parse_results {
 sub prune {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_prune} = $arg;
   }
   return $self->{_prune};
@@ -531,7 +531,7 @@ sub prune {
 sub hardprune {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_hardprune} = $arg;
   }
   return $self->{_hardprune};
@@ -540,7 +540,7 @@ sub hardprune {
 sub coverage {
   my($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_coverage} = $arg;
   }
   return $self->{_coverage};
@@ -561,13 +561,13 @@ sub filter_hits {
 
       if ($self->threshold_type eq "PID") {
         next HSP
-	  if defined $self->threshold and ($hsp->percent < $self->threshold);
+	  if $self->threshold and ($hsp->percent < $self->threshold);
       } elsif ($self->threshold_type eq "SCORE") {
         next HSP
-	  if defined $self->threshold and ($hsp->score < $self->threshold);
+	  if $self->threshold and ($hsp->score < $self->threshold);
       } elsif ($self->threshold_type eq "PVALUE") {
         next HSP
-	  if defined $self->threshold and ($hsp->P > $self->threshold);
+	  if $self->threshold and ($hsp->P > $self->threshold);
       } 
       
       my $qstart = $hsp->query->start();
@@ -1031,7 +1031,7 @@ sub output {
       @{$self->{'_fplist'}} = @arg;
     }
 
-    if (!defined($self->{'_fplist'})) {
+    if (!($self->{'_fplist'})) {
        $self->{'_fplist'} = [];
     }
     return @{$self->{'_fplist'}};
@@ -1092,7 +1092,7 @@ sub database {
   my ($self, $db) = @_;
   my $re_string;
     
-  if (defined($db)) {
+  if ($db) {
     $self->{'_database'} = $db;
     $db =~ s!.*/!!;       
     #print STDERR "have ".keys(%$FASTA_HEADER)." blast regexs defined\n";
@@ -1113,7 +1113,7 @@ sub database {
 sub options {
   my ($self, $args) = @_;
   
-  if (defined($args)) {
+  if ($args) {
     $self->{'_options'} = $args ;
   }
   return $self->{'_options'};
@@ -1122,7 +1122,7 @@ sub options {
 sub ungapped {
   my ($self,$arg) = @_;
 
-  if (defined($arg)) {
+  if ($arg) {
     $self->{_ungapped} = $arg;
   }
   return $self->{_ungapped};
@@ -1133,7 +1133,7 @@ sub ungapped {
 sub filter {
     my ($self,$args) = @_;
 
-    if (defined($args)) {
+    if ($args) {
         if ($args != 0 && $args != 1) {
             $self->throw("Filter option must be 0 or 1");
         }
@@ -1154,7 +1154,7 @@ sub threshold_type {
   my %allowed = map { $_, 1 } $self->get_threshold_types;
   
   if ($type) {
-    unless (defined $allowed{$type}) {
+    unless  $allowed{$type}) {
       $self->throw("Unallowed threshold type $type");
     }
     $self->{'_threshold_type'} = $type;
@@ -1168,7 +1168,7 @@ sub blast_re {
   my ($self, $re_string) = @_;
   my $re;
 
-  if (defined $re_string) {
+  if ( $re_string) {
     eval {
       $re = $re_string;
     };
