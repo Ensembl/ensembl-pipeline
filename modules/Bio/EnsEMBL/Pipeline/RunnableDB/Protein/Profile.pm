@@ -161,7 +161,7 @@ sub write_output {
 
     #print STDERR "ARRAY: @features\n";
 
-     my $feat_Obj= $self->dbobj->get_Protein_Feature_Adaptor;
+     my $feat_Obj= $self->dbobj->get_Protfeat_Adaptor;
 
     foreach my $feat(@features) {
 	

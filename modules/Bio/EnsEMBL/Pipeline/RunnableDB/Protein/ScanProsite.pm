@@ -1,6 +1,5 @@
-
 #
-# BioPerl module for Prints.pm
+# BioPerl module for Profile.pm
 #
 # Cared for by Emmanuel Mongin <mongin@ebi.ac.uk>
 #
@@ -36,11 +35,11 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints;
+package Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints;
+use Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite;
 use Bio::EnsEMBL::DBSQL::Protein_Adaptor;
 use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
 
@@ -55,7 +54,7 @@ use Bio::EnsEMBL::DBSQL::Protein_Feature_Adaptor;
                            -INPUT_ID    => $id
                            -ANALYSIS    => $analysis);
                            
-    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints object
+    Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Blast object
     Args    :   -dbobj:     A Bio::EnsEMBL::DB::Obj, 
                 -input_id:   Contig input id , 
@@ -114,11 +113,15 @@ sub fetch_input {
 #get/set for runnable and args
 sub runnable {
     my ($self) = @_;
+
+    print STDERR "PROGR :".$self->analysis->program."\t".$self->analysis->parameters."\n";
     
     if (!defined($self->{'_runnable'})) {
-      my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints->new(-query     => $self->genseq,
-							      -database  => $self->analysis->db,
-							      -program   => $self->analysis->program);
+      my $run = Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->new(
+									    -query => $self->genseq,
+									    -database  => $self->analysis->db,
+									    -program   => $self->analysis->program,
+									    -parameters => $self->analysis->parameters);
  
            
       $self->{'_runnable'} = $run;
@@ -131,7 +134,7 @@ sub runnable {
 
     Title   :   run
     Usage   :   $self->run();
-    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Blast->run()
+    Function:   Runs Bio::EnsEMBL::Pipeline::Runnable::Protein::ScanProsite->run()
     Returns :   none
     Args    :   none
 
@@ -162,7 +165,7 @@ sub write_output {
 
     #print STDERR "ARRAY: @features\n";
 
-     my $feat_Obj=$self->dbobj->get_Protfeat_Adaptor;  
+     my $feat_Obj= $self->dbobj->get_Protfeat_Adaptor;
 
     foreach my $feat(@features) {
 	
