@@ -297,7 +297,7 @@ sub flush_runs {
 
   for my $queue ( @queues ) {
 
-    if( ! scalar( @{$batched_jobs{$queue}} )) {
+    if (! (defined $batched_jobs{$queue}) || ! scalar (@{$batched_jobs{$queue}})) {
       next;
     }
 
