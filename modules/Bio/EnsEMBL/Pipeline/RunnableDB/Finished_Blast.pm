@@ -5,6 +5,8 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 
+use Data::Dumper;
+
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB::Blast);
 
@@ -54,10 +56,11 @@ sub run {
         }
     }
     print $arguments. "\n";
-    $parameters{'-query'}    = $self->genseq;
-    $parameters{'-database'} = $self->analysis->db;
-    $parameters{'-program'}  = $self->analysis->program;
-    $parameters{'-options'}  = $arguments if $arguments;
+    $parameters{'-query'}      = $self->genseq;
+    $parameters{'-database'}   = $self->analysis->db;
+    $parameters{'-program'}    = $self->analysis->program;
+    $parameters{'-options'}    = $arguments if $arguments;
+    $parameters{'-seqfetcher'} = $self->make_seqfetcher;
     if ( $thresh && $thresh_type ) {
         $parameters{'-threshold'}      = $thresh;
         $parameters{'-threshold_type'} = $thresh_type;
@@ -67,11 +70,38 @@ sub run {
         $parameters{'-threshold_type'} = 'PVALUE';
     }
 
-    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast->new( %parameters );
+    my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast->new(%parameters);
     $runnable->split_gapped_alignments($split_gapped);
 
     $runnable->run();
     $self->runnable($runnable);
+
+    # Write the descrptions
+    my @output = $runnable->output;
+    my $dbobj = $self->dbobj;
+    my $seqfetcher = $self->make_seqfetcher;
+    my %ids = map { $_->hseqname, $_ } @output;
+    $seqfetcher->write_descriptions($dbobj, keys(%ids) );
+   
+
 }
+
+sub make_seqfetcher {
+    my ( $self, $index ) = @_;
+
+    my $seqfetcher;
+    if ( my $dbf = $self->analysis->db_file ) {
+
+        my @dbs = $dbf;
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
+            -db => \@dbs,
+        );
+    }
+    else {
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
+    }
+    return $seqfetcher;
+}
+
 
 1;

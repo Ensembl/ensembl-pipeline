@@ -48,19 +48,11 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::FeaturePair;
-use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis;
-use Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Root::RootI;
-use Bio::Tools::BPlite;
-use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm;
-use DB_File;
-use Fcntl;
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
@@ -90,12 +82,11 @@ sub new {
     $self->{'_hmmfetch'}        = undef;
     $self->{'_hmmdb'}           = undef;
     $self->{'_hmmfilename'}     = undef;    #file to store protein profile hmms
-    $self->{'_errorfile'} = undef;    #file to store any errors hmmfetch throw
-    $self->{'_dbm_file'}  = undef;
+    $self->{'_errorfile'}       = undef;    #file to store any errors hmmfetch throw
+    $self->{'_dbm_file'}        = undef;
 
     #print"args = @args\n";
-    my ( $genomic, $features, $hmmfetch, $hmmdb, $dbmfile, $memory ) =
-      $self->_rearrange(
+    my ( $genomic, $features, $hmmfetch, $hmmdb, $dbmfile, $memory ) = $self->_rearrange(
         [
             qw(GENOMIC
             FEATURES
@@ -153,8 +144,7 @@ sub genomic_sequence {
     if ($value) {
 
         #need to check if passed sequence is Bio::Seq object
-        $value->isa("Bio::PrimarySeqI")
-          || $self->throw("Input isn't a Bio::PrimarySeqI");
+        $value->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
         $self->{'_genomic_sequence'} = $value;
     }
     return $self->{'_genomic_sequence'};
@@ -291,7 +281,7 @@ sub memory {
         $self->{'_memory'} = $arg;
     }
 
-    return $self->{'_memory'} || 400000;
+    return $self->{'_memory'} || 40000000;
 }
 
 ##########
@@ -314,13 +304,6 @@ sub run {
     #print "running halfwise\n";
     my %swissprot_ids = $self->get_swissprot_ids();
 
-    #print "got swiss prot ids \n";
-    my @keys = keys(%swissprot_ids);
-
-    #foreach my $key (@keys){
-    #  print "hid = ".$key." strand = ".$swissprot_ids{$key}."\n";
-    #}
-
     my %pfam_ids = $self->get_pfam_ids( \%swissprot_ids );
 
     #print "got pfam ids \n";
@@ -337,7 +320,8 @@ sub run {
 
 =cut
 
-### 1, -1 and 0 are used to repesent strand, 1 and -1 have the same meaning as in teh ensembl databases 1 is the forward strand and -1 is the reverse 
+### 1, -1 and 0 are used to repesent strand, 1 and -1 have the same meaning as in the ensembl databases
+### 1 is the forward strand and -1 is the reverse 
 ### 0 is used if a particular id has hit on both strands
 sub get_swissprot_ids {
 
@@ -353,7 +337,7 @@ sub get_swissprot_ids {
             $swissprot_ids{ $f->hseqname } = $f->strand;
 
         }
-        elsif ( defined $swissprot_ids{ $f->hseqname } ) {
+        elsif (  $swissprot_ids{ $f->hseqname } ) {
 
             if ( $swissprot_ids{ $f->hseqname } != $f->strand ) {
                 $swissprot_ids{ $f->hseqname } = 0;
@@ -372,8 +356,9 @@ sub get_swissprot_ids {
 
 =head2 get_pfam_ids
 
-    Arg      : reference to a hash of swissprotids and stands
-    Function : gets all pfam ids for a particular swissprot id and puts them in a hash along with the strand the swissprot id is found on and returns its
+    Arg      : reference to a hash of swissprot ids and strands
+    Function : gets all pfam ids for a particular swissprot id and 
+             : puts them in a hash along with the strand the swissprot id is found on and returns its
     Exception: warns if swissprot id has no pfam domains
     Caller   : 
 
@@ -383,54 +368,68 @@ sub get_pfam_ids {
 
     my ( $self, $swissprot_ids ) = @_;
 
-    my %swiss_pfam;
-    my %pfams;
-    my $permission = O_RDONLY;
-    tie( %swiss_pfam, "DB_File", $self->dbm_file, $permission, 0400 )
-      or die "couldn't open " . $self->dbm_file . " : $!\n";
-    ;
+    my %pfam_hash;
+    
+    #my %swiss_pfam;
+    #    my $permission = O_RDONLY;
+    #    tie( %swiss_pfam, "DB_File", $self->dbm_file, $permission, 0400 )
+    #      or die "couldn't open " . $self->dbm_file . " : $!\n";
+
+    # Connect to Pfam database where we can fetch the pfam ids 
+    # corresponding to our blast hits
+    
+    my ($dbh);
+    eval {
+        my $user     = 'pfam';
+        my $password = 'mafp1';
+        my $host     = 'webdbsrv1';
+        my $dbname   = 'pfamlive';
+        my $port     = 3306;
+
+        $dbh =
+          DBI->connect( "DBI:mysql:host=$host;port=$port;database=$dbname", $user, $password, { RaiseError => 1 } );
+
+    };
+    if ($@) { die $@; }
 
     foreach my $swiss_id ( keys(%$swissprot_ids) ) {
 
-        #print "searching for pfam ids for ".$swiss_id."\n";  
-        my $strand = $swissprot_ids->{$swiss_id};
+        my $query = qq{
+                        SELECT pfamA.pfamA_acc
+                        FROM pfamA
+                          , pfamseq
+                          , pfamA_reg_full
+                        WHERE pfamseq.pfamseq_id = '$swiss_id'
+                          AND pfamseq.auto_pfamseq = pfamA_reg_full.auto_pfamseq
+                          AND pfamA_reg_full.auto_pfamA = pfamA.auto_pfamA
+                          AND pfamA.auto_pfamA 
+                          AND in_full = "1"};
 
-        my $pfam = $swiss_pfam{$swiss_id};
+        my $sth = $dbh->prepare($query);
+        $sth->execute();
+        while ( my ($pfam_id) = $sth->fetchrow ) {
 
-        #print "found these pfam domains ".$pfam." \n";
-        if ( !$pfam ) {
+            my $strand = $swissprot_ids->{$swiss_id};
 
-#$self->warn("the swissprot ".$swiss_id ."entry has no pfam domains :!")
-        }
-        my @pfams = split /,/, $pfam;
+            if ( !$pfam_hash{$pfam_id} ) {
 
-        #print "pfams = @pfams\n";
-        foreach my $pfam_id (@pfams) {
-
-            #print "trying to create a hash entry for pfam".$pfam_id."\n";
-            if ( !defined $pfams{$pfam_id} ) {
-
-                #print "defining pfam hash key\n";
-                $pfams{$pfam_id} = $strand;
+                $pfam_hash{$pfam_id} = $strand;
 
             }
-            elsif ( defined $pfams{$pfam_id} ) {
-                if ( $pfams{$pfam_id} != $strand ) {
-                    $pfams{$pfam_id} = 0;
+            elsif ( defined $pfam_hash{$pfam_id} ) {
+                if ( $pfam_hash{$pfam_id} != $strand ) {
+                    $pfam_hash{$pfam_id} = 0;
                 }
                 else {
-                    $pfams{$pfam_id} = $strand;
+                    $pfam_hash{$pfam_id} = $strand;
                 }
             }
         }
     }
 
-    # my @ids = keys(%pfams);
-    # foreach my $id(@ids){
-    #   print $id."\n";
-    # }
-    return %pfams;
+    return %pfam_hash;
 }
+
 
 =head2 create_genewisehmm
 
@@ -449,15 +448,15 @@ sub create_genewisehmm {
     $self->workdir('/tmp') unless ( $self->workdir($dir) );
     $self->checkdir();
 
-    #print "running HalfwiseHMM\n";
-    #system("pwd");
+    print "running HalfwiseHMM\n";
+    system("pwd");
     my @ids = keys(%$pfam_ids);
     my $genewisehmm;
     my @features;
     my $memory = $self->memory;
     my %pfam_run;
 
-    #print "there are ".scalar(@ids)." pfam ids to run\n";
+    print "there are ".scalar(@ids)." pfam ids to run\n";
     foreach my $id (@ids) {
 
         my $strand = $pfam_ids->{$id};
@@ -468,10 +467,10 @@ sub create_genewisehmm {
             next;
         }
 
-        #print $id."\n";
+        print $id."\n";
         if ( $pfam_run{$id} ) {
 
-            #print "running twice on ".$id."\n";
+            print "running twice on ".$id."\n";
         }
         else {
             $pfam_run{$id} = 1;
@@ -479,12 +478,12 @@ sub create_genewisehmm {
         if ( $strand == 1 ) {
             @features = [];
 
-            #print "running on ".$strand."\n";
+            print "running on ".$strand."\n";
             $genewisehmm = $self->run_genewisehmm( $strand, $memory );
             $genewisehmm->run();
             @features = $genewisehmm->output();
 
-            #$self->display_genes(\@features);
+            $self->display_genes(\@features);
             #print "adding ".scalar(@features)." to output\n";
             unlink $self->hmmfilename();
             $self->add_output_features( \@features );
@@ -492,12 +491,12 @@ sub create_genewisehmm {
         elsif ( $strand == -1 ) {
             @features = [];
 
-            #print "running on ".$strand."\n";
+            print "running on ".$strand."\n";
             $genewisehmm = $self->run_genewisehmm( $strand, $memory );
             $genewisehmm->run();
             @features = $genewisehmm->output();
 
-            #$self->display_genes(\@features);
+            $self->display_genes(\@features);
             #print "adding ".scalar(@features)." to output\n";
             unlink $self->hmmfilename();
             $self->add_output_features( \@features );
@@ -505,12 +504,12 @@ sub create_genewisehmm {
         elsif ( $strand == 0 ) {
             @features = [];
 
-            #print "running on ".$strand."\n";
+            print "running on ".$strand."\n";
             $genewisehmm = $self->run_genewisehmm( 1, $memory );
             $genewisehmm->run();
             @features = $genewisehmm->output();
 
-            #$self->display_genes(\@features); 
+            $self->display_genes(\@features); 
             #print "adding ".scalar(@features)." to output\n";
             $self->add_output_features( \@features );
             $genewisehmm = $self->run_genewisehmm( -1, $memory );
@@ -524,8 +523,7 @@ sub create_genewisehmm {
             $self->add_output_features( \@features );
         }
         else {
-            $self->throw(
-                "strand = " . $strand . " something funnies going on : $!\n" );
+            $self->throw( "strand = " . $strand . " something funnies going on : $!\n" );
         }
 
     }
@@ -552,9 +550,8 @@ sub run_genewisehmm {
         $reverse = undef;
     }
 
-    #print "creating genewisehmm\n";
-    my $genewisehmm =
-      Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm->new(
+    print "creating genewisehmm\n";
+    my $genewisehmm = Bio::EnsEMBL::Pipeline::Runnable::Finished_GenewiseHmm->new(
         '-genomic' => $self->genomic_sequence(),
         '-memory'  => $memory,
         '-hmmfile' => $self->hmmfilename(),
@@ -582,11 +579,11 @@ sub get_hmm {
     $self->hmmfilename( $id . "." . $$. ".hmm" );
 
     #print "getting hmm for id ".$id."\n";
-    my $command =
-      $self->hmmfetch . " " . $self->hmmdb . " " . $id . " > "
-      . $self->hmmfilename;
+    my $command = $self->hmmfetch . " " . $self->hmmdb . " " . $id . " > " . $self->hmmfilename;
 
-    #print "command = ".$command."\n";
+    
+    
+    print "command = ".$command."\n";
     #system ('pwd');
     eval { system($command); };
     if ($@) {
@@ -597,8 +594,7 @@ sub get_hmm {
         $self->warn("hmm file not created :$!");
     }
     elsif ( -e $self->hmmfilename ) {
-        open( ERROR, $self->hmmfilename )
-          or die "couldn't open error file : $!";
+        open( ERROR, $self->hmmfilename ) or die "couldn't open error file : $!";
         while (<ERROR>) {
             if (/no such hmm/i) {
                 print STDERR "error message : " . $_ . "\n";
@@ -668,8 +664,7 @@ sub display_genes {
                 print STDERR "Exon:  " . $exon->gffstring . "\n";
                 if ( $exon->sub_SeqFeature ) {
                     foreach my $sub ( $exon->sub_SeqFeature ) {
-                        print STDERR "supporting features:  " . $sub->gffstring
-                          . "\n";
+                        print STDERR "supporting features:  " . $sub->gffstring . "\n";
                     }
                 }
             }

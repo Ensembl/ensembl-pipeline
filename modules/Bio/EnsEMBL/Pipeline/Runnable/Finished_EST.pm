@@ -91,7 +91,7 @@ sub default_blast_parameters {
     return (
         '-query'          => $self->query,
         '-database'       => $ana->db,
-        '-program'        => $ana->program || 'wublastn.new',
+        '-program'        => $ana->program || 'wublastn',
         '-threshold_type' => 'PVALUE',
         '-threshold'      => 1e-4,
         '-options'        => 'Z=500000000 cpus=1',
@@ -120,7 +120,7 @@ sub _make_blast_parameters {
         }
     }
     $param{'-options'} = $arguments if $arguments;
-
+    
     return %param;
 }
 
@@ -198,7 +198,6 @@ sub run_est_genome_on_strand {
             }
         }
 
-        # print STDERR "Made ", scalar(@sets), " sets\n";
 
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
@@ -208,6 +207,8 @@ sub run_est_genome_on_strand {
 
 sub do_mini_est_genome {
     my ( $self, $linear ) = @_;
+
+
 
     ### Is this merging features?  - May be cause of duplicate features if isn't
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome(
@@ -245,9 +246,12 @@ sub add_output {
     foreach my $f (@feat) {
         $f->analysis($ana);
     }
-
+    
+    
     $self->{'_output'} ||= [];
+    
     push ( @{ $self->{'_output'} }, @feat );
+    
 }
 
 sub output {
@@ -260,6 +264,7 @@ sub output {
         return;
     }
 }
+
 
 1;
 

@@ -184,7 +184,7 @@ sub run {
 	$parameters{'-threshold_type'} = $thresh_type;
     }
     else {
-	$parameters{'-threshold'} = 1e-3;
+	$parameters{'-threshold'} = 1e-4;
 	$parameters{'-threshold_type'} = 'PVALUE';
     }
 
@@ -195,8 +195,6 @@ sub run {
 
 	$runnable->run();
 	$self->runnable($runnable);                                        
-
-    
 
 }
 

@@ -27,11 +27,14 @@ sub run_blaste2g {
     $eg->run;
     
     foreach my $fp ($eg->output) {
+        
+                    print "!!!";
+
         my @converted = $miniseq->convert_FeaturePair($fp);
         if (@converted > 1) {
             warn "feature converts into '" . scalar(@converted) . "' > 1 features - ignoring\n";
         } else {            
-                                    
+
             # convert_FeaturePair zaps strand and hseqname,0
             # so we put them back here.
             my $new = $converted[0];

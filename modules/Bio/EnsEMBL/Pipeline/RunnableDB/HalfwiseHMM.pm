@@ -1,12 +1,11 @@
-#
-#
-# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
-#
-# Copyright GRL & EBI
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
+
+#Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
+
+#Copyright GRL & EBI
+
+#You may distribute this module under the same terms as perl itself
+
+#POD documentation - main docs before the code
 
 =pod 
 
@@ -16,15 +15,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM->new(
-					     -dbobj     => $db,
-					     -input_id  => $id
-                                             );
-    $obj->fetch_input
-    $obj->run
-
-    my @newfeatures = $obj->output;
-
+    
 
 =head1 DESCRIPTION
 
@@ -32,7 +23,7 @@ runs HalfwiseHMM runnable and converts it output into genes which can be stored 
 
 =head1 CONTACT
 
-lec@sanger.ac.uk
+<ensembl-dev@sanger.ac.uk>
 
 =head1 APPENDIX
 
@@ -41,17 +32,13 @@ Internal methods are usually preceded with a _
 
 =cut
 
-# Let the code begin...
-
 package Bio::EnsEMBL::Pipeline::RunnableDB::HalfwiseHMM;
 
+use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::Root::RootI;
+use Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
 
 use vars qw(@ISA);
-use strict;
-
-use Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -81,7 +68,8 @@ sub new {
 =head2  fetch_input
 
     Arg      : none
-    Function : fetches the repeatmasked sequence and the swall features for the contig being run on and creates the HalfwiseHMM Runnable
+    Function : fetches the repeatmasked sequence and the swall features 
+             : for the contig being run on and creates the HalfwiseHMM Runnable
     Exception: throws if no input_id has been provided
     Caller   : 
     Example  : 
@@ -102,12 +90,7 @@ sub fetch_input {
     #print "got contig\n";
     my $repeatmasked_seq = $contig->get_repeatmasked_seq;
 
-    #print "got dnaseq\n";
-    my @features =
-      $contig->get_all_SimilarityFeatures_above_score( "swall", 1, 0 );
-
-    #print $features[0]."\n";
-    #print "got data\n";
+    my @features = $contig->get_all_SimilarityFeatures_above_score( "Swall", 1, 0 );
 
     foreach my $f (@features) {
         if ( $f->isa("Bio::EnsEMBL::FeaturePair") && defined( $f->hseqname ) ) {
@@ -115,17 +98,13 @@ sub fetch_input {
         }
     }
 
-    #print "got".scalar(@fps)." feature pairs\n";
-
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new(
         '-genomic'  => $repeatmasked_seq,
         '-features' => \@fps,
     );
 
-    #print "created HalfwiseHMM Runnable\n";  
     $self->runnable($runnable);
 
-    #print "finshed fetching input\n";
 }
 
 =head2  runnable
@@ -213,11 +192,10 @@ sub write_output {
 
     my $gene_adaptor = $self->dbobj->get_GeneAdaptor;
 
-    GENE: foreach my $gene (@genes) {
+    foreach my $gene (@genes) {
 
         # do a per gene eval...
-        eval {#print "gene = ".$gene->type()."\n";
-            $gene_adaptor->store($gene); };
+        eval { $gene_adaptor->store($gene); };
         if ($@) {
             print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
         }
@@ -229,7 +207,8 @@ sub write_output {
 =head2  _convert_output
 
     Arg      : none
-    Function : takes the features from the halfwise runnable and runs _make_genes to convert them into Bio::EnsEMBL::Genes with appropriately attached exons and supporting evidence
+    Function : takes the features from the halfwise runnable and runs _make_genes to convert them
+             : nto Bio::EnsEMBL::Genes with appropriately attached exons and supporting evidence
     Exception: thows if there are no analysis types
     Caller   : 
     Example  :
@@ -239,7 +218,6 @@ sub write_output {
 sub _convert_output {
     my ($self) = @_;
 
-    #print "converting genes to features\n";
     my @genes;
     my $genetype   = 'Halfwise';
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
@@ -268,7 +246,6 @@ sub _convert_output {
     my $runnable = $self->runnable();
     my @out      = $runnable->output;
 
-    #print "HalfwiseDB\n";
     #"converting ".scalar(@out)." features to genes\n";
     my @g = $self->_make_genes( $genetype, $analysis, \@out );
     push ( @genes, @g );
@@ -285,7 +262,8 @@ sub _convert_output {
 =head2  _make_genes
 
     Arg      : runnable being run and analysis object being used
-    Function : converts the seqfeatures outputed by the runnable and actually converts them into Bio::EnsEMBL::Genes
+    Function : converts the seqfeatures outputed by the runnable and actually 
+             : converts them into Bio::EnsEMBL::Genes
     Exception: none
     Caller   : 
     Example  :
@@ -313,8 +291,7 @@ sub _make_genes {
     #  print "genetype = ".$genetype."\n";
     foreach my $tmpf (@tmpf) {
         my $gene       = new Bio::EnsEMBL::Gene;
-        my $transcript =
-          $self->_make_transcript( $tmpf, $contig, $genetype, $analysis_obj );
+        my $transcript = $self->_make_transcript( $tmpf, $contig, $genetype, $analysis_obj );
 
         #my $translation = $transcript->translate;
         #if($translation->seq =~ /\*/){
@@ -324,9 +301,7 @@ sub _make_genes {
         $gene->analysis($analysis_obj);
         $gene->add_Transcript($transcript);
 
-        push ( @genes, $gene )
-
-          #}
+        push ( @genes, $gene );
     }
 
     return @genes;
@@ -402,8 +377,6 @@ sub _make_transcript {
         # printSTDERR "Odd.  No exons found\n";
     }
     else {
-
-        #print STDERR "num exons: " . scalar(@exons) . "\n";
 
         if ( $exons[0]->strand == -1 ) {
             @exons = sort { $b->start <=> $a->start } @exons;

@@ -254,6 +254,7 @@ sub output {
     if (!defined($self->{'_output'})) {
 	$self->{'_output'} = [];
     }
+    
     return @{$self->{'_output'}};
 }
 

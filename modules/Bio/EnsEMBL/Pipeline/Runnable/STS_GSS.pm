@@ -39,23 +39,23 @@ sub new {
 
     my $self = $class->SUPER::new(@args);
 
-    $self->{'_query'}         = undef;  # location of Bio::Seq object
-    $self->{'_unmasked'}      = undef;
-    $self->{'_blast_program'} = undef;  # location of Blast
-    $self->{'_est_program'}   = undef;  # location of Blast
-    $self->{'_database'}      = undef;  # name of database
-    $self->{'_threshold'}     = undef;  # Threshold for hit filterting
-    $self->{'_options'}       = undef;  # arguments for blast
-    $self->{'_filter'}        = 0;      # Do we filter features?
-    $self->{'_fplist'}        = [];     # an array of feature pairs (the output)
-    $self->{'_no_blast'}      = 0;
-    $self->{'_features'}      = [];
-    $self->{'_workdir'}       = undef;  # location of temp directory
-    $self->{'_filename'}      = undef;  # file to store Bio::Seq object
-    $self->{'_results'}       = undef;  # file to store results of analysis
-    $self->{'_seqfetcher'}    = undef;
-    $self->{'_prune'}         = 0;      #
-    $self->{'_coverage'}      = 10;
+    $self->{'_query'}           = undef;    # location of Bio::Seq object
+    $self->{'_unmasked'}        = undef;
+    $self->{'_blast_program'}   = undef;    # location of Blast
+    $self->{'_est_program'}     = undef;    # location of Blast
+    $self->{'_database'}        = undef;    # name of database
+    $self->{'_threshold'}       = undef;    # Threshold for hit filterting
+    $self->{'_options'}         = undef;    # arguments for blast
+    $self->{'_filter'}          = 0;        # Do we filter features?
+    $self->{'_fplist'}          = [];       # an array of feature pairs (the output)
+    $self->{'_no_blast'}        = 0;
+    $self->{'_features'}        = [];
+    $self->{'_workdir'}         = undef;    # location of temp directory
+    $self->{'_filename'}        = undef;    # file to store Bio::Seq object
+    $self->{'_results'}         = undef;    # file to store results of analysis
+    $self->{'_seqfetcher'}      = undef;
+    $self->{'_prune'}           = 0;        #
+    $self->{'_coverage'}        = 10;
     $self->{'_merged_features'} = [];
     $self->{'_percent_id'}      = undef;
     $self->{'_padding'}         = undef;
@@ -65,10 +65,9 @@ sub new {
     # Now parse the input options and store them in the object
     #print "@args\n";
     my (
-        $query,     $unmasked,       $program,    $database,
-        $threshold, $threshold_type, $filter,     $coverage,
-        $prune,     $options,        $seqfetcher, $features,
-        $no_blast,  $percent_id,     $padding,    $tandem
+        $query,    $unmasked,   $program, $database, $threshold,  $threshold_type,
+        $filter,   $coverage,   $prune,   $options,  $seqfetcher, $features,
+        $no_blast, $percent_id, $padding, $tandem
       )
       = $self->_rearrange(
         [
@@ -112,7 +111,7 @@ sub new {
     }
 
     #print "2unmasked = ".$self->unmasked."\n";
-#print STDERR "find executable output ".$self->find_executable($program)."\n";
+    #print STDERR "find executable output ".$self->find_executable($program)."\n";
     if ($program) {
         $self->program( $self->find_executable($program) );
     }
@@ -151,7 +150,7 @@ sub new {
     }
     if ($options) {
 
-#this option varies the number of HSP displayed proportionally to the query contig length
+        #this option varies the number of HSP displayed proportionally to the query contig length
         $self->options($options);
     }
     else {
@@ -253,8 +252,7 @@ sub program {
     my ( $self, $location ) = @_;
 
     if ($location) {
-        $self->throw("executable not found at $location: $!\n")
-          unless ( -e $location && -x $location );
+        $self->throw("executable not found at $location: $!\n") unless ( -e $location && -x $location );
         $self->{'_blast_program'} = $location;
     }
     return $self->{'_blast_program'};
@@ -370,9 +368,7 @@ sub threshold_type {
         }
         if ( $found == 0 ) {
 
-            $self->throw(
-"Type [$type] is not an allowed type.  Allowed types are [@types]"
-            );
+            $self->throw("Type [$type] is not an allowed type.  Allowed types are [@types]");
         }
         else {
             $self->{_threshold_type} = $type;
@@ -397,8 +393,7 @@ sub seqfetcher {
     if ($value) {
 
         #need to check if passed sequence is Bio::DB::RandomAccessI object
-        $value->isa("Bio::DB::RandomAccessI")
-          || $self->throw("Input isn't a Bio::DB::RandomAccessI");
+        $value->isa("Bio::DB::RandomAccessI") || $self->throw("Input isn't a Bio::DB::RandomAccessI");
         $self->{'_seqfetcher'} = $value;
     }
     return $self->{'_seqfetcher'};
@@ -458,8 +453,7 @@ sub run {
 
     }
     else {
-        my $seq = $self->clone
-          || $self->throw("Query seq required for blast\n");
+        my $seq = $self->clone || $self->throw("Query seq required for blast\n");
 
         @blast_output = $self->run_blasts();
     }
@@ -471,8 +465,8 @@ sub run {
     my @features = $self->each_merged_feature;
     my @results;
     foreach my $feature (@features) {
-        print STDERR "running on " . $feature->hseqname . " with score "
-          . $feature->score . " and evalue " . $feature->p_value . "\n";
+        print STDERR "running on " . $feature->hseqname . " with score " . $feature->score . " and evalue "
+          . $feature->p_value . "\n";
 
         #print "there are ".scalar(@genes)." results\n";
         push ( @results, $self->run_est2genome($feature) );
@@ -570,7 +564,7 @@ sub expand_and_merge_features {
 
     ## For each sequence hit, all the features which correspond to that sequence
     ## have their start and end extended.  The start and end are extended so
-## there is enough query sequence to cover the entire hit sequence plus a bit of padding
+    ## there is enough query sequence to cover the entire hit sequence plus a bit of padding
     ## which is set to 200 as default    
     my $count          = 0;
     my $padding        = $self->padding;
@@ -603,8 +597,7 @@ sub expand_and_merge_features {
                 }
             }
             elsif ( $feature->strand == -1 ) {
-                $feature->start(
-                    $genomic_start - ( $hid_len - $hend ) - $padding );
+                $feature->start( $genomic_start - ( $hid_len - $hend ) - $padding );
                 if ( $feature->start < 1 ) {
                     $feature->start(1);
                 }
@@ -617,9 +610,7 @@ sub expand_and_merge_features {
                 }
             }
             else {
-                $self->throw(
-                    $feature->hseqname . " has got " . $feature->strand
-                    . " as a stand : $!\n" );
+                $self->throw( $feature->hseqname . " has got " . $feature->strand . " as a stand : $!\n" );
             }
 
 #print "after seqname = ".$hid."start ".$feature->start." end ".$feature->end." hstart ".$feature->hstart." hend ".$feature->hend." strand ".$feature->strand."\n";
@@ -640,12 +631,8 @@ sub expand_and_merge_features {
                 $self->throw( $feature->hid . " has strand '$strand' : $!\n" );
             }
         }
-        @sorted_forward_features =
-          sort { $a->start <=> $b->start || $a->end <=> $b->end }
-          @sorted_forward_features;
-        @sorted_reverse_features =
-          sort { $a->start <=> $b->start || $a->end <=> $b->end }
-          @sorted_reverse_features;
+        @sorted_forward_features = sort { $a->start <=> $b->start || $a->end <=> $b->end } @sorted_forward_features;
+        @sorted_reverse_features = sort { $a->start <=> $b->start || $a->end <=> $b->end } @sorted_reverse_features;
         $self->fuse_overlapping_features( \@sorted_forward_features );
         $self->fuse_overlapping_features( \@sorted_reverse_features );
     }
@@ -686,8 +673,7 @@ sub fuse_overlapping_features {
 
             # Critical error check!
             if ( $f_a->start > $f_a->end ) {
-                die "Feature start (", $f_a->start, ") greater than end (",
-                  $f_a->end, ")";
+                die "Feature start (", $f_a->start, ") greater than end (", $f_a->end, ")";
             }
         }
         else {
@@ -717,19 +703,19 @@ sub run_est2genome {
 
     my ( $self, $feature ) = @_;
 
-    my $est       = $self->seqfetcher->get_Seq_by_acc( $feature->hseqname );
-    my $seq       = $self->unmasked->subseq( $feature->start, $feature->end );
-    my $start     = $feature->start;
-    my $strand    = $feature->strand;
-    my $end       = $feature->end;
-    
+    my $est    = $self->seqfetcher->get_Seq_by_acc( $feature->hseqname );
+    my $seq    = $self->unmasked->subseq( $feature->start, $feature->end );
+    my $start  = $feature->start;
+    my $strand = $feature->strand;
+    my $end    = $feature->end;
+
     my $query_seq = Bio::Seq->new(
         -seq       => $seq,
         -id        => $self->unmasked->id,
         -accession => $self->unmasked->id
     );
 
-    my $est_length = length($est->primary_seq->seq);
+    my $est_length = length( $est->primary_seq->seq );
 
     #print "running est2genome on ".$feature->hseqname." strand ".$feature->strand." start = ".$start." end ".$end."\n";
     my $est2genome = Bio::EnsEMBL::Pipeline::Runnable::Finished_Est2Genome->new(
@@ -743,14 +729,14 @@ sub run_est2genome {
     #print "est2 genome outputted ".scalar(@features)."\n";
     my @output;
     foreach my $f (@features) {
-            
-            my $coverage = ($f->length/$est_length);       
-            $f->start( $f->start + $start - 1 );
-            $f->end( $f->end + $start - 1 );
 
-            if ( ( $f->hstart  <= 5 || $f->hend >= ( $est_length - 4 ) ) && $coverage>=0.9 && $f->percent_id >=95) {    
-                push ( @output, $f );
-            }
+        my $coverage = ( $f->length / $est_length );
+        $f->start( $f->start + $start - 1 );
+        $f->end( $f->end + $start - 1 );
+
+        if ( ( $f->hstart <= 5 || $f->hend >= ( $est_length - 4 ) ) && $coverage >= 0.9 && $f->percent_id >= 95 ) {
+            push ( @output, $f );
+        }
     }
 
     #print "there are ".scalar(@output)." outputted\n";

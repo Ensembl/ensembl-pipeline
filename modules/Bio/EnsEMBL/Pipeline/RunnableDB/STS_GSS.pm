@@ -1,5 +1,6 @@
 
 
+
 package Bio::EnsEMBL::Pipeline::RunnableDB::STS_GSS;
 
 use Bio::EnsEMBL::Pipeline::RunnableDB;
@@ -99,14 +100,14 @@ sub fetch_input {
   
     my $percent_id = 95;
     
-    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new(-query => $repeatmasked_seq,
-							         -unmasked =>$genseq,
-							         -database =>$self->analysis->db,
-							         -program =>$self->analysis->program,
-							         -options => $arguments,
-							         -seqfetcher => $self->seqfetcher,
-							         -percent_id => $percent_id
-							         -percent_filter => 1);
+    my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::STS_GSS->new( -query => $repeatmasked_seq,
+							            -unmasked =>$genseq,
+							            -database =>$self->analysis->db,
+							            -program =>$self->analysis->program,
+							            -options => $arguments,
+							            -seqfetcher => $self->seqfetcher,
+							            -percent_id => $percent_id
+							            -percent_filter => 1);
 
     $self->runnable($runnable);
   
@@ -164,6 +165,13 @@ sub run {
       $f->source_tag($self->analysis->db);
       #print $f->source_tag."\n";
     }
+    
+    my @output = $runnable->output;
+    my $dbobj = $self->dbobj;
+    my $seqfetcher = $self->make_seqfetcher;
+    my %ids = map { $_->hseqname, $_ } @output;
+    $seqfetcher->write_descriptions($dbobj, keys(%ids) );
+    
 }
 
 
@@ -194,16 +202,23 @@ sub output {
 
 =cut
 
-
 sub make_seqfetcher {
-  my ( $self ) = @_;
-  
-  my $seqfetcher = new Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
-  
+    my ( $self, $index ) = @_;
 
-  return $seqfetcher;
+    my $seqfetcher;
+    if ( my $dbf = $self->analysis->db_file ) {
 
+        my @dbs = $dbf;
+        $seqfetcher =
+          Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(
+            -db => \@dbs,
+        );
+
+    }
+    else {
+        $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new;
+    }
+    return $seqfetcher;
 }
-
 
 1;

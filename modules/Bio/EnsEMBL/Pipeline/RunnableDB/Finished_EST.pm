@@ -12,6 +12,7 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_EST;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -80,6 +81,13 @@ sub run {
     $runnable || $self->throw("Can't run - no runnable object");
 
     $runnable->run;
+    
+    my @output = $runnable->output;
+    my $dbobj = $self->dbobj;
+    my $seqfetcher = $self->make_seqfetcher;
+    my %ids = map { $_->hseqname, $_ } @output;
+    $seqfetcher->write_descriptions($dbobj, keys(%ids) );
+    
 }
 
 sub output {
@@ -87,11 +95,12 @@ sub output {
 
     my @runnable = $self->runnable;
     my @results;
-
     foreach my $runnable (@runnable) {
         print STDERR "runnable = " . $runnable[0] . "\n";
         push ( @results, $runnable->output );
     }
+   
+   
     return @results;
 }
 
@@ -113,6 +122,10 @@ sub make_seqfetcher {
     }
     return $seqfetcher;
 }
+
+
+
+
 
 1;
 
