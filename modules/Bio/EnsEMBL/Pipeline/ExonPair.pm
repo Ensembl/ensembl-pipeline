@@ -1,5 +1,4 @@
 #
-#
 # BioPerl module for Bio::EnsEMBL::Pipeline::ExonPair
 #
 # You may distribute this module under the same terms as perl itself
@@ -233,7 +232,7 @@ sub is_Covered {
 
     my $est = 0;
 
-    for my $f ($self->get_all_Evidence) {
+    for my $f (@{$self->get_all_Evidence}) {
 	
 	if ($f->source_tag eq "est2genome" || $f->source_tag eq "genewise") {
 	    $est = 1;
@@ -305,7 +304,7 @@ sub add_Evidence {
  Function: Returns all the feature pairs that were
            used to create this pair
  Example : 
- Returns : Array of Bio::EnsEMBL::FeaturePair
+ Returns : Arrayref of Bio::EnsEMBL::FeaturePair
  Args    : none
 
 =cut
@@ -318,7 +317,7 @@ sub get_all_Evidence {
 	$self->{'_evidence'} = [];
     }
 
-    return @{$self->{'_evidence'}};
+    return $self->{'_evidence'};
 }
 
 
