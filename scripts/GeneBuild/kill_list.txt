@@ -201,3 +201,4 @@ Q8CDH6 hypothetical protein - multiple pmatches vac
 Q9QUJ6 L1 element - multiple pmatches vac
 Q9R225 Mus musculus L1 retrotransposon - multiple pmatches vac
 Q9QUR4 Mus musculus L1 retrotransposon - multiple pmatches vac
+O62658 Canis familiaris LINE-1 element ORF2.
