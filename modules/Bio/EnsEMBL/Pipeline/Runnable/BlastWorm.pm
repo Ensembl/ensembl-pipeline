@@ -475,6 +475,9 @@ sub parse_results {
     # Loop over each blast hit
     my %ids;
 
+    # i undef this coz it was preventing things working - dont know what its doing or why it breaks
+    $self->{_filter} = 0;
+
     if ($self->filter) {
         print STDERR "filtering hits: ";
         %ids = $self->filter_hits($parser);
@@ -597,8 +600,8 @@ sub filter_hits {
 	    $feature1->end  ($qend);
 	    $feature1->strand($qstrand);
 	    $feature1->score($score);
-	    $feature1->source_tag('tmp');
-	    $feature1->primary_tag('similarity');
+	    #$feature1->source_tag('tmp');
+	    #$feature1->primary_tag('similarity');
 
 	    my $feature2 = new Bio::EnsEMBL::SeqFeature();
 	    $feature2->start  ($hstart);
@@ -606,8 +609,8 @@ sub filter_hits {
 	    $feature2->strand ($hstrand);
 	    $feature2->score  ($score);
 	    $feature2->seqname($name);
-	    $feature2->source_tag('tmp');
-	    $feature2->primary_tag('similarity');
+	    #$feature2->source_tag('tmp');
+	    #$feature2->primary_tag('similarity');
 
 	    my $fp = new Bio::EnsEMBL::FeaturePair(-feature1 => $feature1,
 		  			           -feature2 => $feature2);
@@ -836,11 +839,9 @@ sub create_feature {
     $feature1->score ($feat->{score});
     $feature1->p_value ($feat->{p_value});
     $feature1->percent_id ($feat->{percent_id});
-    $feature1->source_tag ($feat->{source});
-    $feature1->primary_tag ($feat->{primary});
+   # $feature1->source_tag ($feat->{source});
+   # $feature1->primary_tag ($feat->{primary});
     $feature1->analysis ($self->analysis);
-
-    $feature1->add_tag_value ('cigar', $feat->{cigar});
 
     my $feature2 = Bio::EnsEMBL::SeqFeature->new ();
     $feature2->seqname ($feat->{hname});
@@ -850,13 +851,17 @@ sub create_feature {
     $feature2->score ($feat->{score});
     $feature2->p_value ($feat->{p_value});
     $feature2->percent_id ($feat->{percent_id});
-    $feature2->source_tag ($feat->{source});
-    $feature2->primary_tag ($feat->{primary});
+   # $feature2->source_tag ($feat->{source});
+   # $feature2->primary_tag ($feat->{primary});
     $feature2->analysis ($self->analysis);
 
-    my $featurepair = Bio::EnsEMBL::FeaturePair->new ();
-    $featurepair->feature1 ($feature1);
-    $featurepair->feature2 ($feature2);
+    my $featurepair = Bio::EnsEMBL::FeaturePair->new (
+						      -feature1 => $feature1,
+						      -feature2 => $feature2
+						     );
+
+
+    $featurepair->feature1->add_tag_value ('cigar', $feat->{cigar});
 
     if ($featurepair) {
         $featurepair->feature1->validate_prot_feature (1);

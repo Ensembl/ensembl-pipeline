@@ -125,13 +125,24 @@ sub fetch_input {
     my $contig    = $self->db->get_RawContigAdaptor->fetch_by_name($contigid);
     my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
 
+#    print STDERR "Setting genseq to " . $genseq. "\n";
+
+#    $self->genseq($genseq);
+#    print STDERR "Set genseq to " . $self->genseq. "\n";
+#    # input sequence needs to contain at least 3 consecutive nucleotides
+#    my $seq = $self->genseq->seq;
+
     print STDERR "Setting genseq to " . $genseq. "\n";
 
-    $self->genseq($genseq);
-    print STDERR "Set genseq to " . $self->genseq. "\n";
+    $self->query($genseq);
+    print STDERR "Set genseq to " . $self->query. "\n";
     # input sequence needs to contain at least 3 consecutive nucleotides
-    my $seq = $self->genseq->seq;
+    my $seq = $self->query->seq;
+
+
+    #my $seq = $contig->seq;
     $self->throw("Need at least 3 nucleotides") unless ($seq =~ /[CATG]{3}/);
+    $self->runnable->query($genseq);
 }
 
 
@@ -149,28 +160,46 @@ sub fetch_input {
 
 sub write_output {
     my ($self) = @_;
-
+    my $db       = $self->db();
     my @featurepairs = $self->output;
-
+    my $contig;
     unless (@featurepairs >= 1) {
         return;
     }
+    
+    my $debug_file = glob("~wormpipe/write_output_debug");
+    open (DEBUG,">$debug_file") or die "$debug_file\n";
+
+
+    print DEBUG "got featurepairs\n@featurepairs\n";
 
     # get the internal id of the contig
-    my $sth = $self->db->prepare ( q{ SELECT internal_id
+    my $sth = $self->db->prepare ( q{ SELECT contig_id
                                            FROM contig
-                                          WHERE id = ?
+                                          WHERE name = ?
                                        } );
     $sth->execute ($featurepairs[0]->seqname);
     my $internalId = ($sth->fetchrow_array)[0];
 
 
-    $sth = $self->db->prepare ( q{ INSERT INTO feature
-                                                  (id, contig, seq_start, seq_end,
-                                                   score, strand, analysis, name,
-                                                   hstart, hend, hid, evalue, perc_id, cigar)
-                                           VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                                    } );
+    $sth = $self->db->prepare ( q{ INSERT INTO dna_align_feature
+				   (
+				    dna_align_feature_id,
+				    contig_id, 
+				    contig_start,
+				    contig_end,
+				    contig_strand,
+				    hit_start,
+				    hit_end,
+				    hit_name,
+				    analysis_id,
+				    score, 
+				    evalue,
+				    perc_ident,
+				    cigar_line
+				   )
+				   VALUES ('NULL', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+				 } );
 
 
     # get AnalysisAdaptor
@@ -192,7 +221,7 @@ sub write_output {
     foreach my $featurepair (@featurepairs) {
 
         $featurepair->feature1->validate_prot_feature;
-        $featurepair->feature2->validate_prot_feature;
+        #$featurepair->feature2->validate_prot_feature; not necessary ? ar2 calles different routinte
 
         my $cigar_string;
         if ($featurepair->feature1->has_tag ('cigar')) {
@@ -214,15 +243,25 @@ sub write_output {
 
         ################
 
-        $sth->execute ($internalId, $featurepair->start, $featurepair->end,
-                       $featurepair->score, $featurepair->strand,
-                       $analysisId, $self->analysis->program, 
-#                       $featurepair->hstart, $featurepair->hend, $featurepair->hseqname,
-                      $featurepair->hstart, $featurepair->hend, $target_seqname, 
-                      $featurepair->p_value, $featurepair->percent_id, $cigar_string);
+        $sth->execute (
+		       #dna_align_feature_id filled in by table
+		       $internalId, 
+		       $featurepair->start,
+		       $featurepair->end,
+		       $featurepair->strand,
+		       $featurepair->hstart,
+		       $featurepair->hend,
+		       $target_seqname,
+                       $analysisId, 
+                       $featurepair->score,
+		       $featurepair->p_value,
+		       $featurepair->percent_id,
+		       $cigar_string
+		      );
         
     }
     $sth->finish;
+    print DEBUG "finish\n";
 }
 
 
