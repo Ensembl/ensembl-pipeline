@@ -645,7 +645,7 @@ sub get_file {
 
     my $dir = "/nfs/disk100/humpub1/michele/est2genome/";
 
-    my $num = int(rand(10));
+    my $num = int(rand(20));
     $dir = $dir . "$num/";
 
     # Should check disk space here.
