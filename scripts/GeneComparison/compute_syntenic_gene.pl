@@ -166,12 +166,15 @@ if (@$slices2){
       my $result = $gene_pair->compare( $gene1, $gene2, $coding_exons);
       
       unless( $result ){
-	print STDERR "NO_PAIR gene $gene_id1 has no good match in the syntenic region\n";
+	print STDERR "DP_NO_PAIR gene $gene_id1 has no good match  with $gene_id2 in the syntenic region\n";
       }
-      #print STDERR "comparing orthologous $gene_id1 $gene_id2\n";
-      #print STDERR "finding exact matches between transcripts\n";
-      #$gene_pair->find_exact_matches( $gene1, $gene2, $coding_exons);
+      print STDERR "comparing orthologous $gene_id1 $gene_id2\n";
+      print STDERR "finding exact matches between transcripts\n";
+      my $result2 = $gene_pair->find_exact_matches( $gene1, $gene2, $coding_exons);
       
+      unless( $result2 ){
+	print STDERR "NO_PAIR gene $gene_id1 has no good match with $gene_id2 in the syntenic region\n";
+      }
       ############################################################
     }
   }
