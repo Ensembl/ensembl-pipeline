@@ -1,0 +1,114 @@
+#!/usr/local/ensembl/bin/perl -w
+                                                             
+use strict;
+use Getopt::Long;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+
+
+#parameters
+
+my $database;
+my $host;
+my $user;
+my $port;
+my $pass;
+my $runhost = 0;
+
+my $help = sub{ exec('perldoc', $0) };
+GetOptions('dbhost=s'        => \$host,
+           'dbport=i'        => \$port,
+           'dbname=s'        => \$database,
+           'dbuser=s'        => \$user,
+           'dbpass=s'        => \$pass,
+	   'runhost!'        => \$runhost,
+	   'h|help'          => $help,
+	   ) or $help->();
+unless ($host and $port and $database and $user) {
+    $help->();
+}
+
+# get mysql db connection
+
+my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+    -host   => $host,
+    -user   => $user,
+    -dbname => $database,
+    -pass   => $pass,
+    -port   => $port,
+    -runhost => $runhost
+)
+or die ("Failed to create Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor to db $database \n");
+
+
+#get statement handle
+
+my $sth = $db->prepare("select i.db_version as dbversion 
+                             , i.runhost as runhost
+                             , a.logic_name as logicname 
+                             , a.analysis_id as analysisid
+                             , count(*) as noofinputids 
+                          from input_id_analysis i, analysis a  
+                          where a.analysis_id = i.analysis_id 
+                          and i.db_version <> '' 
+                          group by i.analysis_id, i.db_version" . ( $runhost ? ', i.runhost' : '' ));
+
+my $res =$sth->execute;
+
+# formatting - define variables
+
+my $analysisid;
+my $logicname;
+my $version;
+my $rhost;
+my $noinput;
+
+
+format  =
+@<<<<<<<<<<<<<<< @<<<<<<<<<<<<<<<<  @<<<<<<<<<<<<<<<<<<<  @<<<<<<<<<<<<<<<<  @<<<<<<<<<<<<<
+$analysisid,     $logicname,        $version,              $noinput,           $rhost
+.
+
+if ($runhost) {
+
+    print "\nAnalysis ID \t Logic Name \t   DB Version \t No. Of Sequences \t    Run Host";
+
+
+}
+
+else {
+
+    print "\nAnalysis ID \t Logic Name \t    DB Version \t        No. Of Sequences\n";
+
+}
+
+
+while (my $ref = $sth->fetchrow_hashref) {
+
+    print "\n";
+    $analysisid = $ref->{'analysisid'};
+    $logicname =  $ref->{'logicname'};
+    $version=$ref->{'dbversion'};
+    $rhost=$ref->{'runhost'};
+    $noinput=$ref->{'noofinputids'};
+
+    if (! $runhost) {
+	$rhost="";
+    }
+
+    write;
+
+
+}
+
+print "\n\n";
+
+
+__END__
+
+=head1 NAME - show_searched_blast_versions
+
+=head1 DESCRIPTION
+
+=head1 AUTHOR
+
+Sindhu Pillai email sp1@sanger.ac.uk
