@@ -1,6 +1,6 @@
 
 #
-# Ensembl module for Prints
+# Ensembl module for Profile
 #
 # Cared for by Emmanuel Mongin <mongin@ebi.ac.uk>
 #
@@ -12,7 +12,7 @@
 
 =head1 NAME
 
-Prints - DESCRIPTION of Object
+Profile - DESCRIPTION of Object
 
 =head1 SYNOPSIS
 
@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
-package Bio::EnsEMBL::Pipeline::Runnable::Protein::Prints;
+package Bio::EnsEMBL::Pipeline::Runnable::Protein::Profile;
 use vars qw(@ISA);
 use strict;
 
@@ -75,11 +75,11 @@ sub new {
     
     $self->{'_flist'}     = [];    # an array of Bio::SeqFeatures
     $self->{'_sequence'}  = undef; # location of Bio::Seq object
-    $self->{'_program'}   = undef; # location of prints executable
+    $self->{'_program'}   = undef; # location of Profile executable
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
     $self->{'_database'}  = undef; # Location of the database
-    $self->{'_results'}   = undef; # file to store results of prints
+    $self->{'_results'}   = undef; # file to store results of Profile
     $self->{'_threshold'} = undef; # Value of the threshod
     $self->{'_protected'} = [];    # a list of files protected from deletion ???
     
@@ -105,7 +105,7 @@ sub new {
     if ($program) {   
 	$self->program($program); }
     else {   
-	$self->program($self->locate_executable('FingerPRINTScan')); }
+	$self->program($self->locate_executable('pfscan')); }
     
     if ($threshold) {
 	$self->threshold($threshold);
@@ -242,21 +242,14 @@ sub run {
 sub run_analysis {
     my ($self) = @_;
 
-    
-    # This routine expands the database name into $db-1 etc for
-    # split databases
+    print STDERR "RUNNING: ".$self->program . ' -fz ' .$self->filename. ' ' .$self->database . ' > ' .$self->results."\n";
 
-    #print STDERR $self->program." ".$self->database." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
-	$self->throw("Failed during prints run $!\n")
+    $self->throw("Failed during Profile run $!\n")
 	    
-	    #print STDERR $self->program." ".$self->database." ".$self->filename. " " ."-fj -a -o 15   > ".$self->results, "\n";
-
-	    unless (system ($self->program . ' ' . 
-			    $self->database . ' ' .
-			    $self->filename. ' ' .
-			    '-fjR >'.
-			    #'-fj -a -o 15   > ' . 
-			    $self->results) == 0) ;
+	unless (system ($self->program . ' -fz ' . 
+			$self->filename. ' ' .
+			$self->database . ' > ' .
+			$self->results) == 0) ;
 }
 
 
@@ -273,14 +266,14 @@ sub run_analysis {
 =cut
 sub parse_results {
     my ($self) = @_;
-   
+    
     my $filehandle;
     my $resfile = $self->results();
     
     if (-e $resfile) {
 	
 	if (-z $self->results) {  
-	    print STDERR "Printscan didn't find any hits\n";
+	    print STDERR "pfscan didn't find any hits\n";
 	    return; }       
 	else {
 	    open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
@@ -294,55 +287,21 @@ sub parse_results {
     while (<CPGOUT>) {
 	$line = $_;
 	chomp $line;
-	# Pattern match the Sn; field which should contain the SequenceId and Accession
-	
-	if ($line =~ s/^Sn;//) { # We have identified a Sn; line so there should be the following:
-	    
-	    #ENSP00000003603 Gene:ENSG00000000003 Clone:AL035608 Contig:AL035608.00001 Chr:chrX basepair:97227305
-	    ($sequenceId) = $line =~ /^\s*(\w+)/;
-	    print STDERR "$sequenceId\n";
-	}
+	#print STDERR "$line\n";
+	my ($nscore,$rawscore,$from,$to,$hfrom,$hto,$ac) = $line =~ /(\S+)\s+(\d+)\s*pos.\s+(\d*)\s*-\s+(\d*)\s*\[\s+(\d*),\s+(\S*)\]\s*(\w+)/;
+	#print STDERR "$nscore,$rawscore,$from,$to,$hfrom,$hto,$ac\n";
 
 
-	if ($line =~ s/^1TBH//) {
-	   my  ($id) = $line =~ /^\s*(\w+)/;
-	   my ($ac) = $line =~ /(\PR\w+)\s*$/;
-	   $printsac{$id} = $ac;
-       }
-	
-	if ($line =~ s/^3TB//) {
-	    if ($line =~ s/^[HN]//) {
-		my ($num,$temp,$tot) = "";
-		# Grab these lines
-		#       1433ZETA        1  of  6  88.19   1328    1.00e-16  ELTVEERNLLSVAYKNVIGARRASWRIITS                          30   35   36   48
-		# split line on space, hence strip off all leading spaces first.
-		$line =~ s/^\s+//;
-		
-		# Place all elements of list into an array      
-		my @elements = split /\s+/, $line; 
-		
-		# Name each of the elements in the array
-		my ($fingerprintName,$motifNumber,$temp,$tot,$percentageIdentity,$profileScore,$pvalue,$subsequence,$motifLength,$lowestMotifPosition,$matchPosition,$highestMotifPosition) = @elements;
-	
-		#print STDERR "$fingerprintName\n";
-		my $start = $matchPosition;
-		my $end = $matchPosition + $motifLength;
-		my $print =  $printsac{$fingerprintName};
-						
-		my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
+	my $feat = "$ac,$from,$to,$hfrom,$hto,$nscore";
 		
 		push (@features,$feat);
 	    }
-	    if ($line =~ s/^F//) {
 		
-		foreach my $feats (@features) {
-		    $self->create_feature($feats,$sequenceId);
-		    print STDERR "$feats\n";
-		}
-		@features = 0;
-	    }
-	}
-    }   
+    foreach my $feats (@features) {
+	$self->create_feature($feats,$sequenceId);
+	print STDERR "$feats\n";
+    }
+    @features = 0;
 }
 
 
@@ -376,30 +335,39 @@ sub output {
 =cut
 sub create_feature {
     my ($self, $feat, $sequenceId) = @_;
-
+    
     #create analysis object
     my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => "PRINTS",
-                            -db_version      => 1,
-                            -program         => "FingerPRINTScan",
-                            -program_version => 1,
-                            -gff_source      => "prints",
-                            -gff_feature     => "domain");
-
+	(   -db              => "PROSITE",
+	    -db_version      => 1,
+	    -program         => "pfscan",
+	    -program_version => 1,
+	    -gff_source      => "profile",
+	    -gff_feature     => "domain");
+    
 #my $feat = "$print,$start,$end,$percentageIdentity,$profileScore,$pvalue";
     my @f = split (/,/,$feat);
     
-    
+#$f[4] represents here the position of the match on the profile but if its values its -1, it means that the match is on the entire profile, thus we should calculate it.
+
+    my $hto = $f[4];
+
+    if ($f[4] =~ /-1/) {
+#Calculate the lenght of the match using the values given for the sequence.
+	$hto = $f[2] - $f[1] + 1;
+    }
+
+
     my $feat1 = new Bio::EnsEMBL::SeqFeature ( -start => $f[1],                   
 					       -end => $f[2],        
-					       -score => $f[4],
+					       -score => $f[5],
 					       -analysis => $analysis_obj,
 					       -seqname => $self->clone->id,
-					       -percent_id => $f[3],
-					       -p_value => $f[5]);
+					       -percent_id => 'NULL',
+					       -p_value => 'NULL');
     
-    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start =>0,
-					      -end => 0,
+    my $feat2 = new Bio::EnsEMBL::SeqFeature (-start => $f[3],
+					      -end => $hto,
 					      -analysis => $analysis_obj,
 					      -seqname => $f[0]);
     
