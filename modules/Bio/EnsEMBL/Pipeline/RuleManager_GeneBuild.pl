@@ -101,8 +101,10 @@ GetOptions(
 )
 or die ("Couldn't get options");
 
+#print STDERR "dbhost ".$dbhost." dbuse ".$dbuser." dbname ".$dbname."\n";
+
 unless ($dbhost && $dbname && $dbuser) {
-    print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
+    die "Must specify database with -dbhost, -dbname, -dbuser and -dbpass $! \n";
     exit 1;
 }
 
@@ -202,6 +204,18 @@ while (1) {
     # This loop reads input ids from the database a chunk at a time
     # until we have all the input ids.
 
+    if($batch_q_module->can('get_job_time')){
+      my @running_jobs = $job_adaptor->fetch_by_Status('RUNNING');
+      open(KILLED, "+>>".$GB_KILLED_INPUT_IDS) or die("couldn't open ".$GB_KILLED_INPUT_IDS." $!");
+      foreach my $job(@running_jobs){
+	my $time = $batch_q_module->get_job_time($job->submission_id);
+	if($time >= $GB_MAX_JOB_TIME){
+	  $batch_q_module->kill_job($job->submission_id);
+	  print KILLED $job->input_id." ".$job->analysis->logic_name." ".$job->analysis->module."\n";
+	  $job->set_status('KILLED');
+	}
+      }
+    }
     if (defined $idlist) {
 
         # read list of id's from a file,
@@ -224,7 +238,7 @@ while (1) {
         # the 'chunksize' variable to a small number doesn't really achieve much.
 
         if (!$completeRead) {
-            print "Reading IDs ... ";
+            #print "Reading IDs ... ";
 
 	    foreach my $a (@start_from) {
 		push @id_list, @{$sic->list_input_id_by_Analysis($a)};
@@ -258,7 +272,7 @@ while (1) {
             $alarm = 0;
 
             # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
-            while ($get_pend_jobs && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
+            while ($get_pend_jobs && !$term_sig && &$get_pend_jobs >= $MAX_PENDING_JOBS) {
                 sleep 600;
             }
             alarm $wakeup;
@@ -281,16 +295,16 @@ while (1) {
             if (keys %analyses && ! defined $analyses{$rule->goalAnalysis->dbID}) {
                next RULE;
             }
-            print "Check ",$rule->goalAnalysis->logic_name, " - " . $id;
+            #print "Check ",$rule->goalAnalysis->logic_name, " - " . $id;
 
             my $anal = $rule->check_for_analysis (@anals);
 
             if ($anal) {
 
-                print " fullfilled.\n";
+             #   print " fullfilled.\n";
                 $analHash{$anal->dbID} = $anal;
             } else {
-                print " not fullfilled.\n";
+             #   print " not fullfilled.\n";
             }
         }
 
@@ -339,7 +353,7 @@ while (1) {
 						      -output_dir => $output_dir);
 
 
-            print "Store ", $id, " - ", $anal->logic_name, "\n";
+            #print "Store ", $id, " - ", $anal->logic_name, "\n";
             $submitted++;
             $job_adaptor->store($job);
 
@@ -371,7 +385,7 @@ while (1) {
         $completeRead = 0;
         $currentStart = 0;
         @id_list = ();
-        print "Waking up and run again!\n";
+        #print "Waking up and run again!\n";
     }
 
 }
@@ -381,7 +395,10 @@ while (1) {
 sub shut_down {
     my ($db) = @_;
 
-    Bio::EnsEMBL::Pipeline::Job->flush_runs($db->get_JobAdaptor);
+    my ($a_job) = $db->get_JobAdaptor->fetch_by_Status("CREATED");
+    if ($a_job) {
+        $a_job->flush_runs($db->get_JobAdaptor);
+    }
     $db->pipeline_unlock;
     exit 0;
 }
