@@ -198,6 +198,7 @@ sub run {
    $runnable->run();
   
     $self->align_hits_to_contig($runnable->output);
+    1;
 }
 
 sub check_features {

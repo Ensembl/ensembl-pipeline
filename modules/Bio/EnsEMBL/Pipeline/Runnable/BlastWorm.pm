@@ -333,6 +333,7 @@ sub run {
     # parse output
     $self->parse_results;
     $self->deletefiles;
+    1;
 }
 
 

@@ -198,6 +198,8 @@ sub run {
     # get output
     $self->parse_results;
     $self->deletefiles;
+
+    1;
 }
 
 

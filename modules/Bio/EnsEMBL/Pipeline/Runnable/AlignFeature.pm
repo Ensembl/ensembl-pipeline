@@ -540,6 +540,7 @@ sub run {
 	push(@{$self->{'_output'}},@f);
 
     }
+    1;
 }
 
 sub minirun {

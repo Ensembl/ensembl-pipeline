@@ -253,6 +253,8 @@ sub run {
     #parse output of cpg
     $self->parse_results();
     $self->deletefiles();
+
+    1;
 }
 
 

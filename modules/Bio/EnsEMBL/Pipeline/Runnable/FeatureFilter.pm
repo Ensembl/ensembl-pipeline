@@ -312,6 +312,7 @@ sub run{
 
   return @accepted_features;
     
+  1;
 }
 
 =head2 hardprune

@@ -193,6 +193,7 @@ sub run {
 
   $self->align_hits_to_contig($runnable->output);
   print "Output " . $runnable->output. "\n"; 
+  1;
 }
 
 

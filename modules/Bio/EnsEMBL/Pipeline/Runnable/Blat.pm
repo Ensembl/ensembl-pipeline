@@ -373,7 +373,8 @@ sub run {
   unlink $query;
   
   $self->output( @features_within_features );
- 
+
+  1;
 }
 
 ############################################################

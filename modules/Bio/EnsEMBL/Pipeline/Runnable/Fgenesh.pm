@@ -429,6 +429,8 @@ sub run {
     $self->parse_results();
     #print "have parsed output\n";
     $self->deletefiles();
+
+    1;
 }
 
 =head2 run_fgenesh

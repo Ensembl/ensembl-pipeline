@@ -240,6 +240,8 @@ sub run {
     #parse output of eponine
     $self->parse_results();
     $self->deletefiles();
+
+    1;
 }
 
 
