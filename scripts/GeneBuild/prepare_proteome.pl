@@ -46,8 +46,8 @@ my $sptr     = $::scripts_conf{'sptr'};
 my $protfile = $::scripts_conf{'pfasta'};
 my $pmatch   = $::scripts_conf{'pmatch'};
 
-&parse_refseq;
-&parse_sptr;
+if( -e $refseq ) { &parse_refseq; }
+if( -e $sptr )   { &parse_sptr; }
 
 &test_protfile;
 
