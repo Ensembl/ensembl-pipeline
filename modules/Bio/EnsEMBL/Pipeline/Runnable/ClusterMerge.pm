@@ -182,12 +182,12 @@ sub new {
     $self->_minimum_order(1);
   }
   
-  if ( $splice_mismatch ){
+  if ( defined $splice_mismatch ){
     $self->_splice_mismatch( $splice_mismatch);
     print STDERR "splice mismatch ".$self->_splice_mismatch."\n";
   }
   else{
-    $self->_splice_mismach( 10 );
+    $self->_splice_mismatch( 10 );
     print STDERR "defaulting splice mismatch to ".$self->_splice_mismatch."\n";
   }
 
@@ -1051,6 +1051,9 @@ sub compare{
   my ($self,$newnode,$node) = @_;
   my $newtrans = $newnode->transcript;
   my $trans    = $node->transcript;
+
+
+  #print STDERR "comparirson_level: ".$self->_comparison_level."\n";
   my $comparator = 
     Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator
       ->new(
@@ -1128,7 +1131,7 @@ sub run {
   print STDERR scalar(@transcript_clusters1)." clusters returned from _cluster_Transcripts\n";
 	 
   # restrict the number of ESTs per cluster, for the time being, to avoid deep recursion 
-  my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1, 900);
+  my @transcript_clusters = $self->_filter_clusters(\@transcript_clusters1,100);
 
   # find the lists of clusters that can be merged together according to consecutive exon overlap
   my @lists = $self->link_Transcripts( \@transcript_clusters );
@@ -1162,7 +1165,7 @@ sub _filter_clusters{
   TRAN:
     foreach my $t ( @transcripts ){
       $count++;
-      if ( $count > 400 ){
+      if ( $count > $threshold){
 	last TRAN;
       }
       push( @to_be_added, $t );
@@ -1238,8 +1241,20 @@ sub _cluster_Transcripts_by_genomic_range{
     return;
   }
 
+  # filter some small transcripts:
+  my @transcripts = sort { scalar( @{$b->get_all_Exons} ) <=> scalar( @{$a->get_all_Exons} ) } @mytranscripts;
+  
+  # take only the longest 50;
+  @mytranscripts = ();
+  my $c = 0;
+  foreach my $t ( @transcripts ){
+    $c++;
+    push( @mytranscripts, $t);
+    last if $c == 50;
+  }
+  
   # first sort the transcripts
-  my @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+  @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
 				 if ($result){
 				     return $result;
 				 }
@@ -1260,8 +1275,8 @@ sub _cluster_Transcripts_by_genomic_range{
   # put the first transcript into these cluster
   $cluster->put_Transcripts( $transcripts[0] );
   #print STDERR "first cluster:\n";
- #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[0] );
-
+  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript( $transcripts[0] );
+  
   $cluster_starts[$count] = $self->transcript_low( $transcripts[0]);
   $cluster_ends[$count]   = $self->transcript_high($transcripts[0]);
   
