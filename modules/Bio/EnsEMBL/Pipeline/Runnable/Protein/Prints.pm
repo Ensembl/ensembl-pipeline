@@ -362,7 +362,7 @@ sub parse_results {
 		    $self->create_feature($feats,$sequenceId);
 		    print STDERR "$feats\n";
 		}
-		@features = 0;
+		@features = ();
 	    }
 	}
     }   
