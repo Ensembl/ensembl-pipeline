@@ -129,11 +129,13 @@ sub runnable {
             }
         }
         $parameters{'-java'} = $self->analysis->program_file;
+        $self->fetch_input;
         #creates empty Bio::EnsEMBL::Runnable::EponineTSS object
         $self->{'_runnable'} = $runnable->new
 	    ( '-threshold' => $parameters{'-threshold'},
 	      '-epojar' => $parameters{'-epojar'},
 	      '-java' => $parameters{'-java'},
+	      '-query' => $self->query
 	      );
     }
     return $self->{'_runnable'};
@@ -157,6 +159,7 @@ sub write_output{
   foreach my $f(@features){
     $f->analysis($self->analysis);
     $f->attach_seq($contig);
+    $f->display_label("eponine");
     $simple_f_a->store($f);
   }
 
