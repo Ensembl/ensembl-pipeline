@@ -118,7 +118,7 @@ sub run{
   close(E);
   
   #   open(GW,"genomewise $genome_file $evi_file |");
-  open(GW,"genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file |");
+  open(GW,"/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file |");
   
 
   
@@ -210,7 +210,7 @@ sub run{
 		  } else {
 		      # not abutting; should be fine.
 		      $exon =  Bio::EnsEMBL::Exon->new();
-		      $t->add_Exon($t);
+		      $t->add_Exon($exon);
 		  }
 
 
@@ -237,14 +237,15 @@ sub run{
 	  }
       }
       chomp;
+      print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
       $self->throw("Should not able to happen - unparsable in between gene line $_");
-  }
+    }
 
 		      
   
   # tidy up output files.
-  unlink $genome_file;
-  unlink $evi_file;
+  #unlink $genome_file;
+  #unlink $evi_file;
 
 }
 
