@@ -414,11 +414,18 @@ sub transcript_low{
 	  then choose the best in this priority: a complete list >>
 	  the longer proper sublist
 
-          Note: it seems that ESTs that have been used as internal previously are bound
+          Note: it may seem that ESTs that have been used as internal previously are bound
 	  to give us lists that are embedded in previous lists and that will get
-	  rejected anyway later one. We could skip such ESTs.
-	  Not sure yet about those that have appeared previously as ast eements,
-	  I'll have to check few test cases. Try to find a formal way of proving this.s
+	  rejected anyway later one. This is not true. Consider this:
+
+	  1    #####-----#####-------######-------####----------#####
+	  2              #####-------####
+	  3                           #####-------####
+	  4                                       ####--####---####
+	  In this case we would have 1->2->3 and 2->3->4,
+	  so being 2 a middle link, does not imply that all lists starting
+	  in 2 are necessarily embedded in previous lists.
+
   
 	  for each list(i)(a), a = 0,...,N {
   
@@ -454,151 +461,163 @@ sub transcript_low{
 ############################################################
 
 sub link_Transcripts{
-  my ($self,$transcript_clusters) = @_;
-
-  my @final_lists;  
-
-  # look in each cluster
- CLUSTER:
-  foreach my $cluster ( @{ $transcript_clusters} ){
-
-     
-    my %overlap_matrix;
-    $self->matrix(\%overlap_matrix);
-
-    # keep track of all the lists
-    my @lists;
+    my ($self,$transcript_clusters) = @_;
     
-    # keep track of every list starting in each transcript:
-    my %lists;
-
-    # get the transcripts in this cluster
-    my @transcripts = @{$cluster->get_Transcripts};
+    my @final_lists;  
     
-    # sort the transcripts by the left most coordinate in ascending order
-    # for equal value, order by the right most coordinate in descending order
-    @transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
-	  		  if ($result){
-		 	    return $result;
-			  }
-			  else{
-			    return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
-			  }
-			} @transcripts;
-    
-    #print STDERR "Cluster: (sorted transcripts)\n";
-    #foreach my $t ( @transcripts ){
-    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-    #}
-
-    # for each transcript
-  TRAN1:
-    for (my $i=0; $i<scalar(@transcripts); $i++){
-
-
-      print STDERR "we should check here whether this est has been used previously as
-      internal element in a previous list. If true, it will be bound to give us lists
-      embedded in previously generated lists, so they wil be rejected in the post
-      processing. So that they can be skipped at this stage and the algorithm will
-      improve in speed.\n";
-      # store this one in the first list
-      my @first_list = ();
-      push (@first_list, $transcripts[$i]);
-
-      # store all the lists created started in this transcript:
-      my @current_lists = ();
-      push (@current_lists, \@first_list );
-            
-      # go over the rest
-    TRAN2:
-      for (my $j=$i+1; $j<scalar(@transcripts); $j++){
+    # look in each cluster
+  CLUSTER:
+    foreach my $cluster ( @{ $transcript_clusters} ){
 	
-	# loop over each of the lists{i}
+	my %overlap_matrix;
+	$self->matrix(\%overlap_matrix);
+	
+	# keep track of all the lists
+	my @lists;
+	
+	# keep track of every list starting in each transcript:
+	my %lists;
+	
+	# get the transcripts in this cluster
+	my @transcripts = @{$cluster->get_Transcripts};
+	
+	# sort the transcripts by the left most coordinate in ascending order
+	# for equal value, order by the right most coordinate in descending order
+	@transcripts = sort { my $result = ( $self->transcript_low($a) <=> $self->transcript_low($b) );
+			      if ($result){
+				  return $result;
+			      }
+			      else{
+				  return ( $self->transcript_high($b) <=> $self->transcript_high($a) );
+			      }
+			  } @transcripts;
+	
+	#print STDERR "Cluster: (sorted transcripts)\n";
+	#foreach my $t ( @transcripts ){
+	#  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+	#}
+	
+	# leep track of those ESTs/cDNAs used as middle or last elements in a linked list
+	my %is_middle_link;
+	
+	# for each transcript
+	# try to find al the linked lists that start in this transcript
+      TRAN1:
+	for (my $i=0; $i<scalar(@transcripts); $i++){
+	    
+	    # store this one in the first list
+	    my @first_list = ();
+	    push (@first_list, $transcripts[$i]);
+	    
+	    # store all the lists created started in this transcript:
+	    my @current_lists = ();
+	    push (@current_lists, \@first_list );
+	    
+	    # go over the rest
+	  TRAN2:
+	    for (my $j=$i+1; $j<scalar(@transcripts); $j++){
+		
+		my @complete_lists = ();
+		my @sublists       = (); 
+		
+		# loop over all the lists{i}
+		# we store all the potential links
+	      LIST:
+		foreach my $list ( @current_lists ){
+		    
+		    # check whether this trans can be linked to this list or to a proper sublist
+		    my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
+		    
+		    # maybe it does not link to this one
+		    unless ( $new_list ){
+			next LIST;
+		    }
+		    
+		    # if it returns the same list, then add it to the set of complete_lists
+		    if ( $new_list == $list ){
+			push ( @complete_lists, $new_list );
+			
+			## add the it to the current list:
+			#push( @$list, $transcripts[$j] );
+			#next TRAN2;
+		    }
+		    # if it returns a proper sublist, add it to the set of sublists
+		    elsif( $new_list != $list ){
+			push ( @sublists, $new_list );
+		    }
+		}    # end of LIST
+		
+		# if we have complete lists, we add $transcripts[$j] to the end of all of them
+		if ( @complete_lists ){
+		    foreach my $list ( @complete_lists ){
+			push ( @$list, $transcripts[$j] );
+		    }
+		    next TRAN2;
+		}
+		# if we only have sublists, we add $transcripts[$k] to the longest one
+		elsif( @sublists ){
+		    my @sorted_sublists = sort { scalar( @$b ) <=> scalar( @$a ) } @sublists;
+		    
+		    # add it to the longest sublist:
+		    my $longer_sublist  = $sorted_sublists[0];
+		    push ( @$longer_sublist , $transcripts[$j] );
+		    
+		    # add this new list to the set $lists{$i}
+		    push ( @current_lists, $longer_sublist );
+		    next TRAN2;
+		}
+		
+	    }   # end of TRAN2
+	    
+	    #put @current_lists in @lists
+	    push ( @lists, @current_lists );
+	    
+	    #print STDERR "current lists:\n";
+	    #foreach my $list ( @current_lists ){
+	    # foreach my $t (@$list){
+	    #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
+	    # }
+	    #}
+	    
+	}  
+	
+	# remove 'properly' lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
+	
+	# sort the lists in descending by the number of elements
+	my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
+	
+	my @accepted_lists;
+	
+	# accept the longest list
+	push ( @accepted_lists, shift @sorted_lists );
+	
+	# check the rest
       LIST:
-	foreach my $list ( @current_lists ){
-	  
-	  # check whether this trans can be linked to this list or to a proper sublist
-
-           print STDERR "IMPORTANT: this should be checking all the
-	   lists l(i)(a) first and then make the decision, otherwise
-	   t(j) could be added to the wrong sublist, if this is found
-	   earlier than the actual list to which it should be linked";
-
-	  # or maybe to none of the above
-	  my $new_list = $self->_test_for_link( $list, $transcripts[$j] );
-	  
-	  unless ( $new_list ){
-	    next LIST;
-	  }
-	  # if it returns the same list
-	  if ( $new_list == $list ){
+	while ( @sorted_lists ){
+	    my $list = shift @sorted_lists;
+	    my $found_embedding = 0;
 	    
-	    # add the it to the current list:
-	    push( @$list, $transcripts[$j] );
-	    next TRAN2;
-	  }
-	  # it could return a proper sub list
-	  elsif( $new_list != $list ){
+	  ACCEPTED_LIST:
+	    foreach my $accepted_list ( @accepted_lists ){
+		if ( $self->_check_embedding( $list, $accepted_list ) ){
+		    next LIST;
+		}
+	    }
 	    
-	    # add it to the sublist:
-	    push ( @$new_list , $transcripts[$j] );
-	    
-	    # add this new list to the $lists{$i}
-	    push ( @current_lists, $new_list );
-	  }
-	  
-	} # end of LIST
-      }   # end of TRAN2
-      
-      #put @current_lists in @lists
-      push ( @lists, @current_lists );
-
-      #print STDERR "current lists:\n";
-      #foreach my $list ( @current_lists ){
-      # foreach my $t (@$list){
-      #  Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_SimpleTranscript($t);
-      # }
-      #}
-      
-    }  
-    
-    # remove lists embedded in longer lists (e.g. 3->4 is embedded in 1->3->4 )	       
-    
-    # sort the lists in descending by the number of elements
-    my @sorted_lists = map  { $_->[1] } sort { $b->[0] <=> $a->[0] } map  { [ scalar( @{$_} ), $_] } @lists;
-    
-    my @accepted_lists;
-
-    # accept the longest list
-    push ( @accepted_lists, shift @sorted_lists );
-    
-    # check the rest
-  LIST:
-    while ( @sorted_lists ){
-      my $list = shift @sorted_lists;
-      my $found_embedding = 0;
-      
-    ACCEPTED_LIST:
-      foreach my $accepted_list ( @accepted_lists ){
-	if ( $self->_check_embedding( $list, $accepted_list ) ){
-	  next LIST;
+	    # if we get to this point, it means that this list is genuine
+	    push( @accepted_lists, $list );
 	}
-      }
-      
-      # if we get to this point, it means that this list is genuine
-      push( @accepted_lists, $list );
-    }
+	
+	# store the lists for this cluster into the big final list:
+	push (@final_lists, @accepted_lists);
+	
+    } # end of CLUSTER
     
-    # store the lists for this cluster into the big final list:
-    push (@final_lists, @accepted_lists);
     
-  } # end of CLUSTER
-		     
-	     
-  # @final_lists contain a list of listrefs, 
-  # each one containing the transcripts that can merge with each other		      
-
-
+    # @final_lists contain a list of listrefs, 
+    # each one containing the transcripts that can merge with each other		      
+    
+    
   $self->sub_clusters( @final_lists );
 
   print STDERR "final lists:\n";
