@@ -443,15 +443,10 @@ sub parse_results {
 sub split_gapped_feature {
     my ($self, $feat1, $feat2) = @_;
     
-    print STDERR "Name ".$feat2->{'name'}."\n";
-    print STDERR $feat2->{'alignment'}."\n";
-    print STDERR $feat1->{'alignment'}."\n";
-    
     my (@masked_f1, @masked_f2);
     #replace bases and gaps with positions and mask number
     @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'alignment'});
     @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'alignment'});
-    
     $self->throw("Can't split feature where alignment lengths don't match: F1 ("
                  .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
                 if (scalar(@masked_f1) != scalar(@masked_f2)); 
@@ -459,7 +454,6 @@ sub split_gapped_feature {
     my $building_feature;
     my $mask_len = scalar(@masked_f1);
     my ($f1_start, $f2_start);
-    my ($start_index);
     for (my $index =0; $index < $mask_len; $index++)
     {
         
@@ -469,14 +463,15 @@ sub split_gapped_feature {
             #Either start a new feature or end current one.
             if ($building_feature)
             {
-                print STDERR "Feat: ".$feat2->{'name'}
-                             ." F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
-                             ." S1 ".$f1_start." - ".$masked_f1[$index-1]
-                             ." F2 ".$feat2->{'start'}." - ".$feat2->{'end'}
-                             ." S2 ".$f2_start." - ".$masked_f2[$index-1]."\n";             
+                #print STDERR "Feat: ".$feat2->{'name'}
+                #             ." F1 ".$feat1->{'start'}." - ".$feat1->{'end'}
+                #             ." S1 ".$f1_start." - ".$masked_f1[$index-1]
+                #             ." F2 ".$feat2->{'start'}." - ".$feat2->{'end'}
+                #             ." S2 ".$f2_start." - ".$masked_f2[$index-1]."\n";             
+                
                 $feat1->{'start'}   = $f1_start; 
                 $feat2->{'start'}   = $f2_start;
-                #feature ended at previous position
+                #feature ended at previous position unless end of alignment reached
                 $feat1->{'end'}     = ($index == $mask_len -1) 
                                         ? $masked_f1[$index] : $masked_f1[$index-1];
                 $feat2->{'end'}     = ($index == $mask_len -1) 
@@ -484,12 +479,6 @@ sub split_gapped_feature {
                 
                 $self->createfeaturepair($feat1, $feat2);
                 $building_feature = 0;
-                print STDERR substr($feat1->{alignment}, 
-                                    $start_index, 
-                                    ($feat1->{end} - $feat1->{start}) +1)."\n";
-                print STDERR substr($feat2->{alignment}, 
-                                    $start_index, 
-                                    ($feat1->{end} - $feat1->{start}) +1)."\n";
             }
             
         }
@@ -500,7 +489,6 @@ sub split_gapped_feature {
             {
                 $f1_start = $masked_f1[$index];
                 $f2_start = $masked_f2[$index];
-                $start_index = $index;
                 $building_feature =1;
             }
         }
