@@ -1,46 +1,45 @@
+
+# TABLE job - Stores information about all jobs in the pipeline system
+# job_id        - job internal ID
+# input_id      - name (e.g. accession/Ensembl ID) of input
+# taskname      - name of the task which created this job
+# module        - the module which this job runs
+# *_file        - files created to contain job output/error
+
 CREATE TABLE job (
   job_id            int(10) unsigned DEFAULT '0' NOT NULL auto_increment,
+  taskname          varchar(40) NOT NULL,
   input_id          varchar(40) NOT NULL,
-  analysis_id       smallint(5) unsigned NOT NULL,
-  submission_id     mediumint(10) unsigned NOT NULL,
+  parameter         varchar(255),
+  module            varchar(255),
   stdout_file       varchar(100) NOT NULL,
   stderr_file       varchar(100) NOT NULL,
-  retry_count       tinyint(2) unsigned default 0,
 
   PRIMARY KEY (job_id),
   KEY         (input_id),
-  KEY         (analysis_id)
+  KEY         (taskname)
 );
 
-# job_id        - job internal ID
-# input_id      - name (e.g. accession/Ensembl ID) of input
-# analysis_id   - internal ID of analysis (analysis table)
-# submission_id - ID of job in LSF
-# *_file        - files created to contain job output/error
-# retry_count   - number of times job restarted
-
-# ?? what is job.objectfile - do we need/use it?
 
 
-
-
-CREATE TABLE job_status (
-  job_id            int(10) unsigned NOT NULL,
-  status            varchar(40) DEFAULT 'CREATED' NOT NULL,
-  time              datetime NOT NULL,
-  is_current        enum('n', 'y') DEFAULT 'n',
-
-  KEY (job_id),
-  KEY (status),
-  KEY (is_current)
-);
-
-# job 'history' table - tracks each state of a job in its 'life'
-# one line per job/status
+# TABLE job_status - contains a history of the states of all jobs
+#                    the current status of a job is the one with the most
+#                    recent timestamp
 #
 # job_id     - job internal ID
 # status     - text string (e.g. 'CREATED' , 'RUNNING')
-# is_current - whether this status is the current status
+
+
+CREATE TABLE job_status (
+  job_id   int(10) unsigned NOT NULL,
+  status   enum('CREATED', 'SUBMITTED', 'READING', 'WRITING',
+                'RUNNING', 'SUCCESFUL', 'FATAL', 'KILLED') NOT NULL,
+  time     datetime NOT NULL,
+
+  KEY (job_id),
+  KEY (status)
+);
+
 
 
 CREATE TABLE config (
