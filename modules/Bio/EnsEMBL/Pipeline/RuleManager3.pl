@@ -737,9 +737,9 @@ sub db_sanity_check{
   #check that all types which aren't accumulators have entries in
   #input__id_analysis table
   $query = qq{SELECT DISTINCT(t.input_id_type)
-                FROM input_id_type_analysis t
-                LEFT JOIN input_id_analysis i ON t.input_id_type = i.input_id_type
-	        WHERE i.input_id_type IS NULL
+                FROM input_id_analysis i 
+                LEFT JOIN input_id_type_analysis t ON i.input_id_type = t.input_id_type
+	        WHERE t.input_id_type IS NULL
                 && t.input_id_type != 'ACCUMULATOR'};
   $msg = "Some of your types don't have entries in the".
          " input_id_type_analysis table";
