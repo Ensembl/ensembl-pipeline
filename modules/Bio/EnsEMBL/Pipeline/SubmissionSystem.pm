@@ -21,12 +21,12 @@ sub new {
   my $caller = shift;
   my $config = shift;
 
-	my $class = ref($caller) || $caller;
-
-	$self->throw('config argument required') if(!$config);
-	$self = bless( {'config' => $config} $class);
-	
-	return $self;
+  my $class = ref($caller) || $caller;
+  
+  
+  my $self = bless( {'config' => $config}, $class);
+  $self->throw('config argument required') if(!$config);
+  return $self;
 }
 
 
