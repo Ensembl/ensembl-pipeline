@@ -96,6 +96,7 @@ sub bsub{
 sub construct_command_line{
   my($self, $command, $stdout, $stderr) = @_; 
 #command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
+  
   if(!$command){
     $self->throw("cannot create bsub if nothing to submit to it : $!\n");
   }
@@ -130,17 +131,18 @@ sub construct_command_line{
   ## must ensure the prexec is in quotes ##
   $bsub_line .= " ".$command;
   $self->bsub($bsub_line);
-  #print "have command line\n";
+  
 }
 
 
 
 sub open_command_line{
-  my ($self)= @_;
+  my ($self, $verbose)= @_;
 
   open(SUB, $self->bsub." 2>&1 |");
   my $lsf;
   while(<SUB>){
+    print STDERR if($verbose);
     if (/Job <(\d+)>/) {
       $lsf = $1;
     }
@@ -179,25 +181,81 @@ sub get_pending_jobs {
 # the next two methods are used together in the RuleMAnager_Genebuild script
 # if you implement one you must implement the other
 
+#sub get_job_time{
+#  my ($self, $job) = @_;
+#  my $command = "bjobs -l ".$job->submission_id;
+#  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
+
+#  while(<BJOB>){
+#    chomp;
+#    if($_ =~ /The CPU time used/){
+#      my ($time) = $_ =~ /The CPU time used is (\d+)/;
+#      return $time;
+#    }elsif($_ =~ /is not found/){
+#      print STDERR "job ".$job->submission_id." doesn't appear to be ".
+#	"found\n";
+#      print STDERR $_."\n";
+#      return($job);
+#    }else{
+#      next;
+#    }
+#  }
+#  close(BJOB) or $self->throw("couldn't close pipe to bjobs");
+#  print STDERR "CPU time isn't yet reported for job ".$job->submission_id."\n";
+#  return undef;
+#}
+
 sub get_job_time{
-  my ($self, $job_id) = @_;
-
-  my $command = "bjobs -l ".$job_id;
-  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs: $!");
-
+  my ($self, $ids) = @_;
+  my $submission_ids = join(" ", @$ids);
+  my $command = "bjobs -l $submission_ids";
+  #print $command."\n";
+  my %id_times;
+  if(!scalar(@$ids)){
+    return %id_times;
+  }
+  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
+  my $job_id;
   while(<BJOB>){
     chomp;
-    if($_ =~ /The CPU time used/){
+    if(/Job\s+\<(\d+)\>/){
+      $job_id = $1;
+    }elsif(/The CPU time used/){
       my ($time) = $_ =~ /The CPU time used is (\d+)/;
-      return $time;
-    }else{
-      next;
+      $id_times{$job_id} = $time;
     }
   }
-  print STDERR "CPU time isn't yet reported for job ".$job_id."\n";
-  return undef;
+  #close(BJOB);
+  #or $self->throw("couldn't close pipe to bjobs");
+  return \%id_times;
 }
 
+sub check_existance{
+  my ($self, $ids, $verbose) = @_;
+  my $command = "bjobs";
+  my @table_ids = @$ids;
+  my @lsf_ids;
+  open(BJOB, "$command |") or $self->throw("couldn't open pipe to bjobs");
+  
+  while(<BJOB>){
+    chomp;
+    my @values = split;
+    if($values[0] =~ /\d+/){
+      push(@lsf_ids, $values[0]);
+    }
+  }
+  close(BJOB) or $self->throw("couldn't close pipe to bjobs");
+  my %seen;
+  my @lost;
+  foreach my $id(@table_ids){$seen{$id}++};
+ ID:foreach my $id(@lsf_ids){
+    if(exists($seen{$id})){
+      next ID;
+    }
+    push(@lost, $id);
+  }
+  return \@lost;
+}
 
 
 sub kill_job{
