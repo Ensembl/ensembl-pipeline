@@ -45,27 +45,31 @@ use vars qw( %Similarity );
 
 # Hash containing config info
 %Similarity = (
+
+	       GB_SIMILARITY_INPUTID_EXTRA_REGEX => '(\S+):(\S+)',
+
 	       # fill in one complete hash for each database from which blast 
 	       # features are to be retrieved
 	       GB_SIMILARITY_DATABASES => [
-
-
-					   # example
-					   #{				  
-					   # 'type'       => 'Swall',
-					   # 'threshold'  => '200',
-					   # 'index'      => '/path/to/sequence/index        ',
-					   # 'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
-					   #},
-					  ],
+					   {				  
+					    'type'       => 'Swall',
+					    'threshold'  => '200',
+					    'index'      => '/data/blastdb/Ensembl/swall_index',
+					    'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
+					   },
+					   ],
 	       
 	       # minimum required parent protein coverage
-	       GB_SIMILARITY_COVERAGE           => 70,
+	       GB_SIMILARITY_MULTI_EXON_COVERAGE           => 70,
+
+	       # minimum required parent protein coverage
+	       GB_SIMILARITY_SINGLE_EXON_COVERAGE          => 90,
 
 	       # maximum allowed size of intron 
-	       GB_SIMILARITY_MAX_INTRON         => 10000,
+	       GB_SIMILARITY_MAX_INTRON         => 100000,
 
 	       # minimum coverage required to prevent splitting on long introns - keep it high!
+	       # intentionally set to impossibly high number so that splitting always occurs
 	       GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
 
 	       # low complexity threshold - transcripts whose translations have low
@@ -74,13 +78,25 @@ use vars qw( %Similarity );
 
 	       # gene type for FPC_BlastMiniGenewise
 	       GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
+
+	       # if [] is used no masking will take place 
+	       # if [''] is used all repeats in the table will be masked out
+	       # if only some of the sets of repeats wants to be masked out 
+	       #   put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
 	       GB_SIMILARITY_MASKING => ['RepeatMask'],
-	     #the above setting will lead to RepeatMasker features being masked out, if [] is used no masking will take place, if [''] is used all repeats in the table will be masked out
-	     #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
-	       GB_SIMILARITY_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
-		#No similarity genes will be build overlapping the gene type put in this list. If nothing is put, the default will be to take Targetted genewise genes
-	       GB_SIMILARITY_GENETYPEMASKED => [],
-	       GB_SIMILARITY_BLAST_FILTER => 0, #set it to one if you want to filter the blast scores before sending to BlastMiningenewise. Currently used for anopheles. For Ano, speeds up the process by 10 folds
+
+               # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
+	       GB_SIMILARITY_SOFTMASK => 0, 
+
+
+	       # No similarity genes will be build overlapping the gene type put in this list. 
+	       # If nothing is put, the default will be to take Targetted genewise genes
+	       GB_SIMILARITY_GENETYPEMASKED => ['TGE_gw'],
+
+	       # set this to one if you want to filter the blast scores before sending to BlastMiningenewise. 
+	       # Currently used for anopheles. For Ano, speeds up the process by 10 folds
+	       GB_SIMILARITY_BLAST_FILTER => 0, 
+
 	   );
 
 sub import {

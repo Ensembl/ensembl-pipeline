@@ -60,7 +60,8 @@ use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 =cut
 
 sub validate_Transcript {
-  my ($self, $transcript, $slice, $coverage_threshold, $maxintron, $min_split_coverage, $seqfetchers, $low_complexity ) = @_;
+  my ($self, $transcript, $slice, $multi_coverage_threshold, $single_coverage_threshold, 
+      $maxintron, $min_split_coverage, $seqfetchers, $low_complexity ) = @_;
   
   my @valid_transcripts;
 
@@ -71,21 +72,27 @@ sub validate_Transcript {
   if(defined $low_complexity) {
     return undef unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript, $low_complexity);
   }
-  my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, $coverage_threshold, $seqfetchers);
 
-  return undef unless defined $coverage;
+  my $exon_count = scalar(@{$transcript->get_all_Exons});
+  my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, $seqfetchers);
 
+  if ($exon_count == 1) {
+      return undef unless $coverage >= $single_coverage_threshold;
+  } else {
+      return undef unless $coverage >= $multi_coverage_threshold;
+  }
+  
   # Do we really need to do this? Can we just take out the dbID adaptor stuff
   my $newtranscript  = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($transcript);
 
   # split transcript if necessary - at present in practice all Similarity transcripts 
   # will be run through split_transcripts but very good Targetted predictions having 
   # long introns will not be
-  if($coverage < $min_split_coverage){
+  if($exon_count > 1 and $coverage < $min_split_coverage){
     my $split_transcripts = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->split_Transcript($newtranscript, $maxintron);
     push (@valid_transcripts, @$split_transcripts);
-  }
-  else{
+
+  } else{
     push (@valid_transcripts, $newtranscript);
   }
 
@@ -95,8 +102,7 @@ sub validate_Transcript {
 =head2 _check_coverage
 
   Arg[1]    : Bio::EnsEMBL::Transcript $transcript
-  Arg[2]    : int $coverage_threshold 
-  Arg[3]    : ref to array of Bio::DB::RandomAccessI $seqfetchers
+  Arg[2]    : ref to array of Bio::DB::RandomAccessI $seqfetchers
   Function  : calculates how much of the parent protein is covered by the predicted translation 
               and compares to a passed in coverage threshold.
   ReturnType: undef calculated coverage less than $coverage_threshold, otherwise int (coverage)
@@ -107,7 +113,7 @@ sub validate_Transcript {
 =cut
 
 sub _check_coverage {
-  my ( $self, $transcript, $coverage_threshold, $seqfetchers) = @_;
+  my ( $self, $transcript, $seqfetchers) = @_;
   
   my $matches = 0;
   my $pstart  = 0;
@@ -156,23 +162,18 @@ sub _check_coverage {
   }
   
   if(!defined $seq){
-    warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, letting gene through\n");
+    warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, assuming 100%\n");
     return 100;
   }
   
   $plength = $seq->length;
   
   if(!defined($plength) || $plength == 0){
-    warn("GeneUtils: no sensible length for $protname - can't get coverage\n");
+    warn("GeneUtils: no sensible length for $protname - assuming 0%\n");
     return 0;
   }
   
   my $realcoverage = int(100 * $matches/$plength);
-  
-  if ($realcoverage < $coverage_threshold){
-    warn("GeneUtils: Rejecting transcript for low coverage: $realcoverage\n");
-    return undef;
-  }
   
   return $realcoverage;
   

@@ -69,7 +69,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_DATABASES
-							      GB_SIMILARITY_COVERAGE
+							      GB_SIMILARITY_INPUTID_EXTRA_REGEX
+							      GB_SIMILARITY_MULTI_EXON_COVERAGE
+							      GB_SIMILARITY_SINGLE_EXON_COVERAGE
 							      GB_SIMILARITY_MAX_INTRON
 							      GB_SIMILARITY_MIN_SPLIT_COVERAGE
 							      GB_SIMILARITY_GENETYPE
@@ -154,7 +156,9 @@ sub write_output {
 
     my $gene_adaptor = $self->genewise_db->get_GeneAdaptor;
     my @genes = $self->output;
-    print STDERR "have ".@genes." genes\n";
+    print STDERR "Have ".@genes." genes\n";
+
+    my $unwritten_genes = 0;
     GENE: foreach my $gene (@genes) {	
 	# do a per gene eval...
 	eval {
@@ -163,8 +167,12 @@ sub write_output {
 	}; 
 	if( $@ ) {
 	    print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
-	}
-	
+	    $unwritten_genes++;
+	}	
+    }
+
+    if ($unwritten_genes) {
+	$self->throw("Failed to write $unwritten_genes genes\n");
     }
    
 }
@@ -180,165 +188,231 @@ sub write_output {
 =cut
 
 sub fetch_input {
-  my( $self) = @_;
-  
-  print STDERR "Fetching input id : " . $self->input_id. " \n";
-  
-  $self->throw("No input id") unless defined($self->input_id);
-  my $input_id = $self->input_id;
-  
-  $input_id =~ /$GB_INPUTID_REGEX/;
-  
-  my $chrid    = $1;
-  my $chrstart = $2;
-  my $chrend   = $3;
-  
-  
-  my $sla       = $self->genewise_db->get_SliceAdaptor();
-  my $slice     = $sla->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
-  my $seq;
-  $self->query($slice);
-  $slice->chr_name($chrid);
-  if(@$GB_SIMILARITY_MASKING){
-    $seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
-  }else{
-    $seq = $slice;
-  }
-  
-  # No similarity genes will be build overlapping the gene type put in 
-  # the list 'GB_SIMILARITY_GENETYPEMASKED'. If nothing is put, the default 
-  # will be to take Targetted genewise genes
-  
-  my @genes;
-  
-  if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-    foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-	    print STDERR "FETCHING GENE TYPE : $type\n";
-	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
-        push (@genes,$mask_genes);
+    my( $self) = @_;
+    
+    print STDERR "Fetching input id : " . $self->input_id. " \n";
+    
+    $self->throw("No input id") unless defined($self->input_id);
+    my $input_id = $self->input_id;
+    
+    $input_id =~ /$GB_INPUTID_REGEX/;
+    
+    my ($chrid, $chrstart, $chrend, $rest_of_input_id) = ($1, $2, $3, $4);
+
+    $self->throw("Input id '$input_id' could not be parsed into chr_name/start/end with $GB_INPUTID_REGEX")
+	if $chrstart !~ /^\d+$/ or $chrend !~ /^\d+$/; 
+
+    my ($single_pid_db, $single_pid, $id_pool_bins, $id_pool_index);
+
+    if ($rest_of_input_id) {
+	my @items = ($rest_of_input_id =~ /$GB_SIMILARITY_INPUTID_EXTRA_REGEX/);
+
+	if (scalar(@items) == 2) {
+	    if ($items[0] =~ /^\d+$/ and $items[1] =~ /^\d+$/) {
+		# assume to be a pair of number for splitting protein set. See later
+
+		($id_pool_bins, $id_pool_index) = ($items[0], $items[1]);
+
+		if ($id_pool_index > $id_pool_bins or
+		    $id_pool_index < 1) {
+
+		    $self->warn("Could not get sensible values for id_pool_bins ('$id_pool_bins')". 
+				" and id_pool_index ('$id_pool_index'); doing all proteins in region"); 
+		    		    
+		    ($id_pool_bins, $id_pool_index) = (0,0);
+		}
 	    }
+	    else {
+		# assume to be a database type name (from config) and protein id
+
+		($single_pid_db, $single_pid) = ($items[0], $items[1]);
+	    }
+	}
+	else {
+	    $self->warn("FPC_BlastMiniGenewise does not understand the rest of your input id ($rest_of_input_id); ignoring\n");	    
+	}
+
     }
-  } else {
-    print STDERR "FETCHING GENE TYPE : $GB_TARGETTED_GW_GENETYPE\n";
-    @genes     = @{$slice->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)};
-  }
-  my $database_count = 0;
- DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
-    
-    printf(STDERR "Fetching features for %s with score above %d ".
-           "from %s\@%s...", 
-           $database->{'type'}, 
-           $database->{'threshold'}, 
-           $self->db->dbname, 
-           $self->db->host);
-    
-    my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
-    my @features  = @{$pafa->
-                        fetch_all_by_Slice_and_score($slice, 
-                                                     $database->{'threshold'}, 
-                                                     $database->{'type'})};
-    print STDERR "got " . @features." \n";
-    next DATABASE if not @features;
-    
-    foreach my $f(@features) {
-	    my $name = $f->hseqname;
-	    if ($name =~ /(\S+)\.\d+/) { 
-        $f->hseqname($1);
-	    }
-    }
-    
-    # check which TargettedGenewise exons overlap similarity features
-    
-    my @all_exons;
-    foreach my $gene (@genes) {
-	    foreach my $tran (@{$gene->get_all_Transcripts}) {
-        foreach my $exon (@{$tran->get_all_Exons}) {
-          if ($exon->seqname eq $slice->id) {
-            push @all_exons, $exon;
-          }
-        }
-	    }
-    }
-    @all_exons = sort {$a->start <=> $b->start} @all_exons;
-    
-    my %redids;
-    my $ex_idx = 0;
-    
-  FEAT: foreach my $f (sort {$a->start <=> $b->start} @features) {
-	    for( ; $ex_idx < @all_exons; ) {
-        my $exon = $all_exons[$ex_idx];
-        
-        if ($exon->overlaps($f)) {
-          $redids{$f->hseqname} = 1;
-          next FEAT;
-        }
-        elsif ($exon->start > $f->end) {
-          # no exons will overlap this feature
-          next FEAT;
-        }
-        else {
-          $ex_idx++;
-        }
-	    }
+   
+    my $slice = $self->genewise_db->get_SliceAdaptor->fetch_by_chr_start_end($chrid,
+									     $chrstart,
+									     $chrend);
+    $self->query($slice);
+    $slice->chr_name($chrid);
+
+    my $seq;
+    if(@$GB_SIMILARITY_MASKING){
+	$seq = $slice->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
+    }else {
+	$seq = $slice;
     }
 
-    # collect those features which haven't been used by Targetted Genewise
-    my (%idhash);
-    # reject them if they appear in the kill list
-    my %kill_list = %{$self->fill_kill_list};
-    
-    foreach my $f (@features) {
-	    # print "Feature : " . $f->gffstring . "\n";
-      
-	    if (defined $kill_list{$f->hseqname}){
-        print STDERR "skipping over " . $f->hseqname . " : in kill list\n";
-        next;
-	    }	
-      
-	    if ($f->isa("Bio::EnsEMBL::FeaturePair") && 
-          $f->hseqname &&
-          !$redids{$f->hseqname}) {
-        push(@{$idhash{$f->hseqname}},$f);
-	    }else{
-        print STDERR "Skipping over ".$f->hseqname." as overlaps with ".
-          "something else\n"; 
-      }
+    if ($single_pid_db and $single_pid) {
+	# force a run on this protein, regardless of whether it is masked or killed; 
+	# primarily useful for testing and clean-up after a main run
+
+	my ($database) = grep { $_->{'type'} eq $single_pid_db } @{$GB_SIMILARITY_DATABASES};
+		
+	if (not $database) {
+	    $self->throw("Your input id ($input_id) refers to a database ($single_pid_db) that isnt present in config\n");
+	}
+
+	printf(STDERR "Restricting to $single_pid from $single_pid_db based on input id\n");
+
+	my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
+									       '-ids'      => [$single_pid],
+									       '-seqfetcher' => $seqfetcher);	
+	$self->runnable($runnable);
     }
-    
-    my @ids = keys %idhash;
-    
-    if ($GB_SIMILARITY_BLAST_FILTER) {
-	    print STDERR "Performing Anopheles-stle filtering...\n";
-	    print "  No. IDS BEFORE FILTER: ".scalar(@ids)."\n"; 
+    else {	
+	# Features will be masked before using them as seeds to BlastMiniGenewise. 
+
+	#
+	#   First masking is by sepecified gene types already in the region 
+	#
+	my (@mask_gene_types, @mask_exons);
+	if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+	    @mask_gene_types = @{$GB_SIMILARITY_GENETYPEMASKED};
+	} else {
+	    @mask_gene_types = ($GB_TARGETTED_GW_GENETYPE);
+	}
+	foreach my $type (@mask_gene_types) {
+	    print STDERR "Fetching gene type : $type\n";
+
+	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
+		foreach my $mask_exon (@{$mask_genes->get_all_Exons}) {
+		    if ($mask_exon->seqname eq $slice->id) {
+			push @mask_exons, $mask_exon;
+		    }
+		}
+	    }
+	    printf STDERR "  Mask exon list now %d long\n", scalar(@mask_exons);
+	}
+	#@mask_exons = sort {$a->start <=> $b->start} @mask_exons;
+	# make the mask list non-redundant. Much faster when checking against features
+	my @mask_regions;
+	foreach my $mask_exon (sort {$a->start <=> $b->start} @mask_exons) {
+	    if (@mask_regions and $mask_regions[-1]->{'end'} > $mask_exon->start) {
+		if ($mask_exon->end > $mask_regions[-1]->{'end'}) {
+		    $mask_regions[-1]->{'end'} = $mask_exon->end;
+		}
+	    } else {
+		push @mask_regions, {start => $mask_exon->start, end => $mask_exon->end}
+
+	    }
+	}
+	printf STDERR "Mask region list is %d\n", scalar(@mask_regions);
+
+	#
+	#   Second masking is by a list of "bad" proteins that should not be built from
+	#
+	my %kill_list = %{$self->fill_kill_list};
+        
+        DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
+	    my (%features);
 	    
-	    my @sortedids = $self->sort_hids_by_coverage($database,\%idhash);
-	    my @newids = $self->prune_features($seq,\@sortedids,\%idhash);
+	    my $pafa = $self->db->get_ProteinAlignFeatureAdaptor();
 	    
-	    print "  No. IDS AFTER FILTER: ".scalar(@newids)."\n"; 
+	    my @all_feats = @{$pafa->fetch_all_by_Slice_and_score($slice, 
+								  $database->{'threshold'}, 
+								  $database->{'type'})};
 	    
-	    @ids = @newids;
+	    printf(STDERR "Fetched %d features for %s with score above %d from %s\@%s", 
+		   scalar(@all_feats),
+		   $database->{'type'}, 
+		   $database->{'threshold'}, 
+		   $self->db->dbname, 
+		   $self->db->host);
+	    
+	    foreach my $f (@all_feats) {
+		my $name = $f->hseqname;
+		if ($name =~ /(\S+)\.\d+/) { 
+		    $f->hseqname($1);
+		}
+		
+		push @{$features{$f->hseqname}}, $f;
+	    }
+	    
+	    printf(STDERR " (feats come from %d proteins)\n", scalar(keys %features));
+	    	    
+	    if ($id_pool_bins and $id_pool_index) {
+		my @ids = sort keys %features;
+		
+		my (@restricted_list);
+		for (my $i = $id_pool_index - 1; $i < @ids; $i += $id_pool_bins) {
+		    push @restricted_list, $ids[$i];
+		}
+		
+		%features = map { $_ => $features{$_} } @restricted_list;
+		
+		printf(STDERR "Restricting to %d prots based on input id : @restricted_list\n", scalar(@restricted_list));
+	    }
+	    
+	    # flag IDs that have a feature that overlaps with a mask feature
+	    
+	    my @ids_to_ignore;
+	    SEQID: foreach my $sid (keys %features) {
+		my $ex_idx = 0;
+		my $count = 0;
+		#print STDERR "Looking at $sid\n";
+	        FEAT: foreach my $f (sort {$a->start <=> $b->start} @{$features{$sid}}) {
+		    #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
+		    for( ; $ex_idx < @mask_regions; ) {
+			my $mask_exon = $mask_regions[$ex_idx];
+			
+			#printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
+			if ($mask_exon->{'start'} > $f->end) {
+			    # no exons will overlap this feature
+			    next FEAT;
+			}
+			elsif ( $mask_exon->{'end'} >= $f->start) {
+			    # overlap
+			    push @ids_to_ignore, $f->hseqname;
+			    #printf STDERR "Ignoring %s\n", $f->hseqname;
+			    next SEQID;
+			}			
+			else {
+			    $ex_idx++;
+			}
+		    }
+		}
+	    }
+	    
+	    # remove those IDs that are either masked targetted genes or killed; 
+	    
+	    foreach my $dud_id (@ids_to_ignore, keys %kill_list) {
+		if (exists $features{$dud_id}) {
+		    delete $features{$dud_id};
+		}
+	    }
+	    
+	    my @ids = sort keys %features;
+	    
+	    printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(@ids));
+
+	    if ($GB_SIMILARITY_BLAST_FILTER) {
+		my @sortedids = $self->sort_hids_by_coverage($database,\%features);
+		my @newids = $self->prune_features($seq,\@sortedids,\%features);
+		
+		@ids = sort @newids;
+		
+		printf (STDERR "There are %d prots left after Anopheles fileter\n", scalar(@ids)); 
+	    }
+
+	    if (@ids) {
+		# only make a runnable if there are any ids to do
+		
+		my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
+		my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'  => $seq,
+										       '-ids'      => \@ids,
+										       '-seqfetcher' => $seqfetcher);
+		
+		$self->runnable($runnable);	
+		# at present, we'll only ever have one ...
+	    }
+	}
     }
-    
-    my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
-    if(!@ids){
-      print STDERR $database->{'type'}." has no features to put into ".
-        "BlastMiniGenewise\n";
-      next DATABASE;
-    }else{
-      $database_count++;
-    }
-    my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
-      ('-genomic'  => $seq,
-       '-ids'      => \@ids,
-       '-seqfetcher' => $seqfetcher,
-       '-trim'     => 1);
-	
-    $self->runnable($runnable);	
-  }
-  if(!$database_count){
-    print $self->input_id." had no features to pass into BMG is this ".
-      " correct?\n";
-  }
 }    
   
 
@@ -440,15 +514,24 @@ sub make_genes {
   foreach my $tmpf (@{$results}) {
       $count++;
 
+      my ($first_exon) = $tmpf->sub_SeqFeature;
+      my ($first_supp_feat) = $first_exon->sub_SeqFeature;
+      my $prot_id;
+      if ($first_supp_feat) {
+	  $prot_id = $first_supp_feat->hseqname;
+      }
+      else {
+	  $prot_id = "Unknown protein";
+      }
+
       my $unchecked_transcript = 
 	  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->SeqFeature_to_Transcript($tmpf, 
 									     $self->query, 
 									     $analysis_obj, 
-									 $self->genewise_db, 
+									     $self->genewise_db, 
 									     0);
-
       if (not defined $unchecked_transcript) {
-	  print STDERR "   Transcript $count : REJECTED because could not make from SeqFeatures\n";
+	  printf(STDERR "   Transcript %d (%s) : REJECTED (could not make from SeqFeatures)\n", $count, $prot_id);
 	  next;
       }
 
@@ -459,20 +542,20 @@ sub make_genes {
       my $valid_transcripts = 
 	  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($unchecked_transcript, 
 									$self->query, 
-									$GB_SIMILARITY_COVERAGE, 
+									$GB_SIMILARITY_MULTI_EXON_COVERAGE, 
+									$GB_SIMILARITY_SINGLE_EXON_COVERAGE, 
 									$GB_SIMILARITY_MAX_INTRON, 
 									$GB_SIMILARITY_MIN_SPLIT_COVERAGE, 
 									\@seqfetchers, 
 									$GB_SIMILARITY_MAX_LOW_COMPLEXITY);
+
       if (not defined $valid_transcripts) {
-	  print STDERR "   Transcript $count : REJECTED because validation failed\n";
+	  printf (STDERR "   Transcript %d (%s) : REJECTED (validation failed)\n", $count, $prot_id);
 	  next;
       }
       
       # make genes from valid transcripts
       foreach my $checked_transcript(@$valid_transcripts){
-	  #print "have ".$checked_transcript." as a transcript\n";
-	  
 	  # add start codon if appropriate
 	  $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
 
@@ -703,22 +786,22 @@ sub get_seqfetcher_by_type{
 =cut
 
 sub fill_kill_list {
-  my ($self) = @_;
-  my %kill_list;
-
-  if (defined($GB_KILL_LIST) && $GB_KILL_LIST ne '') {
-  open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
-  while (<KILL_LIST>) {
-
-    chomp;
-    my @list = split;
-    next unless scalar(@list); 	# blank or empty line
-    $kill_list{$list[0]} = 1;
-  }
-
-  close KILL_LIST or die "error closing $GB_KILL_LIST\n";
-  }
-  return \%kill_list;
+    my ($self) = @_;
+    my %kill_list;
+    
+    if (defined($GB_KILL_LIST) && $GB_KILL_LIST ne '') {
+	open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
+	while (<KILL_LIST>) {
+	    
+	    chomp;
+	    my @list = split;
+	    next unless scalar(@list); 	# blank or empty line
+	    $kill_list{$list[0]} = 1;
+	}
+	
+	close KILL_LIST or die "error closing $GB_KILL_LIST\n";
+    }
+    return \%kill_list;
 }
 
 
@@ -726,12 +809,13 @@ sub fill_kill_list {
 
  Title   : sort_hids_by_coverage
  Usage   : my @sorted_ids = $self->sort_hids_by_coverage($database,\%hids)
- Function: This is supposed to order each hid in function of there coverage with the sequence they            have been build with
+ Function: This is supposed to order each hid in function of there coverage with the sequence they
+    have been build with
  Example :
  Returns : an array of ordered hids
- Args    : Database description(where to fetch the feature from). A hash refererence containing hid           and its features.
-
-
+ Args    : Database description(where to fetch the feature from). A hash refererence containing hid
+    and its features.
+    
 =cut
 
 sub sort_hids_by_coverage{
@@ -752,172 +836,159 @@ sub sort_hids_by_coverage{
    my %idsreturned;
    my @sorted;
 
- IDS: foreach my $id (@id) {
-
-     $protname = undef;
-     $seq = undef;
-     $plength = 0;
-     $forward_start = 0;
-     $forward_end = 0;
-     $reverse_start = 0;
-     $reverse_end = 0;
-     $best_cov = 0;
-     $features = $hash_ref->{$id};
-     
-
-   FEAT: foreach my $feat(@$features) {
-	  if ($feat->strand == 1) {
-	      if (!defined($protname)){
-		  $protname = $feat->hseqname;
-	      }
-	      if($protname ne $feat->hseqname){
-		  warn ("$protname ne " . $feat->hseqname . "\n");
-	      }
-	      
-	      
-      
-	      if((!$forward_start) || $forward_start > $feat->hstart){
-		  $forward_start = $feat->hstart;
-	      }
-	      
-	      if((!$forward_end) || $forward_end < $feat->hend){
-		  $forward_end= $feat->hend;
-	      }
-	  }
-
-	  if ($feat->strand == -1) {
-	      if (!defined($protname)){
-		  $protname = $feat->hseqname;
-	      }
-	      if($protname ne $feat->hseqname){
-		  warn ("$protname ne " . $feat->hseqname . "\n");
-	      }
-	      
-	      
-      
-	      if((!$reverse_start) || $reverse_start > $feat->hstart){
-		  $reverse_start = $feat->hstart;
-	      }
-	      
-	      if((!$reverse_end) || $reverse_end < $feat->hend){
-		  $reverse_end= $feat->hend;
-	      }
-	  }
-	      
-      }
-
- 
-     $f_matches = ($forward_end - $forward_start + 1);
-     $r_matches = ($reverse_end - $reverse_start + 1);
-
-     if($self->get_length_by_id($protname)) {
-	 $plength = $self->get_length_by_id($protname);
-     }
-
-     else {
+   IDS: foreach my $id (@id) {
+       
+       $protname = undef;
+       $seq = undef;
+       $plength = 0;
+       $forward_start = 0;
+       $forward_end = 0;
+       $reverse_start = 0;
+       $reverse_end = 0;
+       $best_cov = 0;
+       $features = $hash_ref->{$id};
+              
+       FEAT: foreach my $feat(@$features) {
+	   if ($feat->strand == 1) {
+	       if (!defined($protname)){
+		   $protname = $feat->hseqname;
+	       }
+	       if($protname ne $feat->hseqname){
+		   warn ("$protname ne " . $feat->hseqname . "\n");
+	       }
+	       	       	       
+	       if((!$forward_start) || $forward_start > $feat->hstart){
+		   $forward_start = $feat->hstart;
+	       }
+	       
+	       if((!$forward_end) || $forward_end < $feat->hend){
+		   $forward_end= $feat->hend;
+	       }
+	   }
+	   
+	   if ($feat->strand == -1) {
+	       if (!defined($protname)){
+		   $protname = $feat->hseqname;
+	       }
+	       if($protname ne $feat->hseqname){
+		   warn ("$protname ne " . $feat->hseqname . "\n");
+	       }
+	       
+	       
+	       
+	       if((!$reverse_start) || $reverse_start > $feat->hstart){
+		   $reverse_start = $feat->hstart;
+	       }
+	       
+	       if((!$reverse_end) || $reverse_end < $feat->hend){
+		   $reverse_end= $feat->hend;
+	       }
+	   }
+	   
+       }
+       
+       
+       $f_matches = ($forward_end - $forward_start + 1);
+       $r_matches = ($reverse_end - $reverse_start + 1);
+       
+       if($self->get_length_by_id($protname)) {
+	   $plength = $self->get_length_by_id($protname);
+       }
+       
+       else {
      
        SEQFETCHER:
-	 foreach my $seqfetcher( $self->each_seqfetcher){
-	     eval{
-		 $seq = $seqfetcher->get_Seq_by_acc($protname);
-	     };
-	 
-	     if ($@) {
-		 $self->warn("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
-	     }
-	 
-	     if (defined $seq) {
-		 last SEQFETCHER;
-	     }
-	 
-	 }
-     
-	 if(!defined $seq){
-	     $self->warn("FPC_BMG:No sequence fetched for [$protname] - can't check coverage - set coverage to 1 (entry will be considered as having low coverage...sorry\n");
-	 }
-     
-	 eval {
-	     $plength = $seq->length
-	     };
+	   foreach my $seqfetcher( $self->each_seqfetcher){
+	       eval{
+		   $seq = $seqfetcher->get_Seq_by_acc($protname);
+	       };
+	       
+	       if ($@) {
+		   $self->warn("FPC_BMG:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+	       }
+	       
+	       if (defined $seq) {
+		   last SEQFETCHER;
+	       }
+	       
+	   }
+	   
+	   if(!defined $seq){
+	       $self->warn("FPC_BMG:No sequence fetched for [$protname] - can't check coverage - set coverage to 1 (entry will be considered as having low coverage...sorry\n");
+	   }
+	   
+	   eval {
+	       $plength = $seq->length;
+	   };
 
-	 if($plength) {
-	     $self->add_length_by_id($protname,$plength);
-	 }
-     }	 
-
-     my $f_coverage;
-     my $r_coverage;
-     
-#check the low complexity
-     my $valid = 0;
-     if ($seq) {
-	 
-	 eval {
-	     # Ugh! 
-	     my $analysis = Bio::EnsEMBL::Analysis->new(
-							-db           => 'low_complexity',
-							-program      => '/usr/local/ensembl/bin/seg',
-							-program_file => '/usr/local/ensembl/bin/seg',
-							-gff_source   => 'Seg',
-							-gff_feature  => 'annot',
-							-module       => 'Seg',
-							-logic_name   => 'Seg'
-							
-						    );
-	     
-	     my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
-									       -query    => $seq,
-									       -analysis => $analysis,
-									   );
-	     
-	     $seg->run;
-	     
-	     
-	     if($seg->get_low_complexity_length > $GB_SIMILARITY_MAX_LOW_COMPLEXITY){
-		 warn("discarding feature too much low complexity\n");
-		 $valid = 0;
-	     }
-	 $valid = 1;
-	 
-	 
-	 };
-     
-	 if($@){
-	     print STDERR "problem running seg: \n[$@]\n";
-	     $valid = 1;		# let transcript through
-	 }
-     }
- 
-
-#
-
-
-
-
-   if(!defined($plength) || $plength == 0 || $valid == 0){
-       warn("no sensible length for $protname - can't get coverage - or too much low complexity\n");
+	   if($plength) {
+	       $self->add_length_by_id($protname,$plength);
+	   }
+       }	 
        
-       #Can't check the length of the protein, set the coverage to 1 for both strand
-       $f_matches = 1;
-       $r_matches = 1;
-       $plength = 100;
+       my $f_coverage;
+       my $r_coverage;
+       
+       #check the low complexity
+       my $valid = 0;
+       if ($seq) {	   
+	   eval {
+	       # Ugh! 
+	       my $analysis = Bio::EnsEMBL::Analysis->new(
+							  -db           => 'low_complexity',
+							  -program      => '/usr/local/ensembl/bin/seg',
+							  -program_file => '/usr/local/ensembl/bin/seg',
+							  -gff_source   => 'Seg',
+							  -gff_feature  => 'annot',
+							  -module       => 'Seg',
+							  -logic_name   => 'Seg'
+							
+							  );
+	     
+	       my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
+										 -query    => $seq,
+										 -analysis => $analysis,
+										 );
+	     
+	       $seg->run;
+	     
+	     
+	       if($seg->get_low_complexity_length > $GB_SIMILARITY_MAX_LOW_COMPLEXITY){
+		   warn("discarding feature too much low complexity\n");
+		   $valid = 0;
+	       }
+	       $valid = 1;	 	 
+	   };
+	   
+	   if($@){
+	       print STDERR "problem running seg: \n[$@]\n";
+	       $valid = 1;		# let transcript through
+	   }
+       }
+
+       if(!defined($plength) || $plength == 0 || $valid == 0){
+	   warn("no sensible length for $protname - can't get coverage - or too much low complexity\n");
+	   
+	   #Can't check the length of the protein, set the coverage to 1 for both strand
+	   $f_matches = 1;
+	   $r_matches = 1;
+	   $plength = 100;
+       }
+       
+       $f_coverage = $f_matches/$plength;
+       $r_coverage = $r_matches/$plength;
+       $f_coverage *= 100;
+       $r_coverage *= 100;
+       
+       if ($f_coverage > $r_coverage) {
+	   $best_cov = $f_coverage;
+       }
+       else {
+	   $best_cov = $r_coverage;
+       }
+       
+       $idsreturned{$protname} = $best_cov;
    }
-
-
-   $f_coverage = $f_matches/$plength;
-   $r_coverage = $r_matches/$plength;
-   $f_coverage *= 100;
-   $r_coverage *= 100;
-     
-     if ($f_coverage > $r_coverage) {
-	 $best_cov = $f_coverage;
-     }
-     else {
-	 $best_cov = $r_coverage;
-     }
-
-     $idsreturned{$protname} = $best_cov;
- }
    
    @sorted = sort { $idsreturned{$b} <=> $idsreturned{$a} }  keys %idsreturned;
    
@@ -932,8 +1003,8 @@ sub sort_hids_by_coverage{
  Function: This method as for goal to limit the number of hids sent to BlastMiniGenewise.
  Example :
  Returns : An array of pruned hids
- Args    : genomic sequence, an array of sorted hids, an array reference of all the hids and their             features
-
+ Args    : genomic sequence, an array of sorted hids, an array reference of all the hids and 
+    their features
 
 =cut
 
@@ -947,69 +1018,61 @@ sub prune_features{
     
     my @ident = @$sortedids_array_ref;
 
-  IDS: foreach my $id (@ident) {
-      my $features = $hash_ref->{$id};
-      
-      my @exons;
-      
-      next IDS unless (ref($features) eq "ARRAY");
-      
-      next IDS unless (scalar(@$features) >= 1);
-      
-    FEAT: foreach my $feat(@$features) {
-	my $length = $feat->end - $feat->start + 1;
-		
-	if($feat->strand == 1) {
-	    my $count = 0;
-	    
-	    my $str = substr($forwardcountstring,$feat->start,$length);
-	    
-	    foreach my $byte (split //, $str) {
-		$count = $count + $byte;
-	    }
-	   
-
-	    $hidcount{$id}->{'lengthforward'} = $hidcount{$id}->{'lengthforward'} + $length;
-	    $hidcount{$id}->{'coverageforward'} = $hidcount{$id}->{'coverageforward'} + $count;
-	   
-	     
-	    if ($count > 10) {
-		next FEAT;
-	    }
-	   
-	    else {
-		substr($forwardcountstring,$feat->start,$length) = '1' x $length; 
-		$ids{$feat->hseqname} = 1;
-	    }
-	}
-	   
-	elsif ($feat->strand == -1) {
-	    my $count = 0;
+    IDS: foreach my $id (@ident) {
+	my $features = $hash_ref->{$id};
+	
+	my @exons;
+	
+	next IDS unless (ref($features) eq "ARRAY");
+	next IDS unless (scalar(@$features) >= 1);
+	
+        FEAT: foreach my $feat(@$features) {
 	    my $length = $feat->end - $feat->start + 1;
 	    
-	   
-
-	    my $str = substr($reversecountstring,$feat->start,$length);
-	       
-	    foreach my $byte (split //, $str) {
-		$count = $count + $byte;
-	    }
-	    $hidcount{$id}->{'lengthreverse'} = $hidcount{$id}->{'lengthreverse'} + $length;
-	    $hidcount{$id}->{'coveragereverse'} = $hidcount{$id}->{'coveragereverse'} + $count;
-	    
-	    if ($count > 10) {
-		next FEAT;
-	    }
-
-	    else {
-		substr($reversecountstring,$feat->start,$length) = '1' x $length; 
+	    if($feat->strand == 1) {
+		my $count = 0;
 		
-		$ids{$feat->hseqname} = 1;
-
+		my $str = substr($forwardcountstring,$feat->start,$length);
+		
+		foreach my $byte (split //, $str) {
+		    $count = $count + $byte;
+		}
+				
+		$hidcount{$id}->{'lengthforward'} = $hidcount{$id}->{'lengthforward'} + $length;
+		$hidcount{$id}->{'coverageforward'} = $hidcount{$id}->{'coverageforward'} + $count;
+				
+		if ($count > 10) {
+		    next FEAT;
+		}
+		
+		else {
+		    substr($forwardcountstring,$feat->start,$length) = '1' x $length; 
+		    $ids{$feat->hseqname} = 1;
+		}
+	    }
+	    elsif ($feat->strand == -1) {
+		my $count = 0;
+		my $length = $feat->end - $feat->start + 1;
+						
+		my $str = substr($reversecountstring,$feat->start,$length);
+		
+		foreach my $byte (split //, $str) {
+		    $count = $count + $byte;
+		}
+		$hidcount{$id}->{'lengthreverse'} = $hidcount{$id}->{'lengthreverse'} + $length;
+		$hidcount{$id}->{'coveragereverse'} = $hidcount{$id}->{'coveragereverse'} + $count;
+		
+		if ($count > 10) {
+		    next FEAT;
+		}
+		
+		else {
+		    substr($reversecountstring,$feat->start,$length) = '1' x $length; 		    
+		    $ids{$feat->hseqname} = 1;		    
+		}
 	    }
 	}
-   }
-  }
+    }
     
     foreach my $hidk (keys %ids) {
 	my $percforward;
