@@ -374,8 +374,11 @@ sub _has_repeat_in_intron{
   my $slice = $repeat_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, $slice_start, $slice_end );
   my @features = @{$slice->get_all_RepeatFeatures( 'RepeatMask' )};
   print STDERR "found ".scalar(@features)." repeats\n";
+  unless( @features ){
+    return 0;
+  }
   my @clusters = @{$self->_cluster_Features(@features)};
-
+  
   my $introns_with_repeats = 0;
  INTRON:
   for (my $i=0; $i<$#exons; $i++ ){
