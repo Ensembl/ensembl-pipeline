@@ -54,7 +54,7 @@ use vars qw(@ISA);
 
     Title   :   fetch_input
     Usage   :   $self->fetch_input
-    Function:   Fetches input data for dust from the database
+    Function:   Fetches input data for cpg from the database
     Returns :   none
     Args    :   none
 
@@ -78,7 +78,7 @@ sub fetch_input {
 
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::CPG(
               -query   => $self->query,
-              -dust    => $self->analysis->program_file,
+              -cpg     => $self->analysis->program_file,
               -args    => $self->arguments
     );
 
