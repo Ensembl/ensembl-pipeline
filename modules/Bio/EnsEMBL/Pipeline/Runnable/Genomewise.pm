@@ -67,7 +67,7 @@ sub new {
     my($class,@args) = @_;
     
     my $self = $class->SUPER::new(@args);
-    
+
     $self->{'_transcript_array'} = [];
     $self->{'_output_array'}     = [];
     return $self;
@@ -90,7 +90,9 @@ Returntype: it does not return anything, but instead it populates the get/set co
 
 sub run{
   my ($self) = @_;
-  
+
+#  $self->analysis($self->_make_Analysis) unless $self->analysis;
+
   if( !defined $self->workdir ) {
     $self->workdir('/tmp');
   }
@@ -146,23 +148,11 @@ sub run{
   }
   close(E);
   
-
-#
-#   open(GW,"genomewise $genome_file $evi_file |");
-#  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
-#  open(GW,"</tmp/test.out");
-  
-
-# in acari, genomewise is in '/nfs/acari/birney/prog/wise2/src/bin/'
-# or in '/usr/local/ensembl/bin/genomewise'
-
-#### Ewan's version
-#
-#  open(GW,"/nfs/acari/birney/prog/wise2/src/bin/genomewise -silent -nogff -smell 4 -notrans -nogenes -geneutr $genome_file $evi_file |");
-
 #### Steve's version (fixed)
+#  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
 
-  open(GW,"/nfs/acari/searle/progs/ensembl-trunk/wise2/src/models/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
+### 16th August 2002, the version in the blades is the latest, the version in the slates is old.
+  open(GW,"/usr/local/ensembl/bin/genomewise -switch 10000 -silent -nogff -smell 8 -notrans -nogenes -geneutr $genome_file $evi_file |");
 
   
   # parse gff output for start, stop, strand, phase
@@ -207,8 +197,9 @@ sub run{
 	    $exon->start($start);
 	    $exon->end  ($end);
 	    $exon->strand($strand);
-	    # there isn't really a phase in teh UTR exon, but we set it to -1 otherwise later stages fail
-	    $exon->phase(-1); 
+	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
+	    $exon->phase(-1);
+ 	    $exon->end_phase(-1);
 	    $t->add_Exon($exon);
 	    $prev = $exon;
 	    next;
@@ -219,21 +210,38 @@ sub run{
 	    my $strand = 1;
 	    my $phase = $3;
 	    
+	    my $this_start  = $1;
+	    my $this_end    = $2;
+	    my $this_length = $this_end - $this_start + 1;
+
 	    my $cds_start = $start;
 	    my $exon;
 	    if( $seen_cds == 0 && defined $prev && $prev->end+1 == $start ) {
 	      # we have an abutting utr5
 	      $start = $prev->start();
 	      $exon  = $prev;
-	    } else {
+	      # end_phase is number of bases at the end of the exon which do not fall in a codon
+	      my $end_phase = $this_length%3;
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);
+	      $exon->phase($prev->phase);
+	      print STDERR "Genomewise: setting end_phase to $end_phase\n";
+	      $exon->end_phase($end_phase);
+	    } 
+	    else {
 	      # make a new Exon
 	      $exon  = Bio::EnsEMBL::Exon->new();
 	      $t->add_Exon($exon);
+	      $exon->phase($phase);
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->end_phase( ( $end - $start + 1 + $phase ) %3 );
 	    }
-	    $exon->start($start);
-	    $exon->end  ($end);
-	    $exon->strand($strand);
-	    $exon->phase($phase);
+#	    $exon->start($start);
+#	    $exon->end  ($end);
+#	    $exon->strand($strand);
+#	    $exon->phase($phase);
 	    
 	    if( $seen_cds == 0 ) {
 	      $trans->start_Exon($exon);
@@ -241,6 +249,10 @@ sub run{
 	    }
 	    $seen_cds = 1;
 	    $prev = $exon;
+###print STDERR "Genomewise - THIS IS THE EXON ADDED " . $exon . "\n";
+#while (my ($k, $v) = each %$exon){
+#print "     $k => $v\n";
+#}
 	    next;
 	  }
 	  
@@ -262,20 +274,29 @@ sub run{
 	      $orig_end = $prev->end;
 	      $exon     = $prev;
 	      $start    = $prev->start;
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);
+	      $exon->phase($prev->phase);
+	      $exon->end_phase(-1);
 	      
 	    } else {
 	      
 	      #   not abutting; should be fine.
 	      $exon =  Bio::EnsEMBL::Exon->new();
 	      $t->add_Exon($exon);
-	      $exon->phase(-1); 
+	      $exon->start($start);
+	      $exon->end  ($end);
+	      $exon->strand($strand);	    
+	      $exon->phase(-1);
+	      $exon->end_phase(-1);
 	    }
 	    
 	    # there isn't really a phase in the UTR exon, but we set it to -1 otherwise later stages fail
 	    
-	    $exon->start($start);
-	    $exon->end  ($end);
-	    $exon->strand($strand);
+#	    $exon->start($start);
+#	    $exon->end  ($end);
+#	    $exon->strand($strand);
 	    
 	    if( $seen_utr3 == 0 ) {
 	      if( !defined $orig_end ) {
@@ -288,6 +309,10 @@ sub run{
 	      }
 	    }
 	    $seen_utr3 = 1;
+###print STDERR "Genomewise - THIS IS THE EXON ADDED " . $exon . "\n";
+#while (my ($k, $v) = each %$exon){
+#print "     $k => $v\n";
+#}
 	    next;
 	  }
 	  
@@ -324,6 +349,8 @@ sub run{
 	# check just in case
 	if ( $exon_in->overlaps( $exon_out ) ){
 	  foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+#	    $feature->analysis($self->analysis);
+#	    $feature->source_tag($self->analysis->logic_name);
 	    $exon_out->add_supporting_features( $feature );
 	  }
 	}
@@ -339,6 +366,8 @@ sub run{
 	foreach my $exon_out( @exons_out ){
 	  if ( $exon_out->overlaps($exon_in) ){
 	    foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+#	      $feature->analysis($self->analysis);
+#	      $feature->source_tag($self->analysis->logic_name);
 	      $exon_out->add_supporting_features( $feature );
 	    }
 	  }
@@ -361,6 +390,8 @@ sub run{
 	  foreach my $exon_out( @exons_out ){
 	    if ( $exon_out->overlaps($exon_in) ){
 	      foreach my $feature ( @{ $supp_evidence{ $exon_in } } ){
+#		$feature->analysis($self->analysis);
+#		$feature->source_tag($self->analysis->logic_name);
 		$exon_out->add_supporting_features( $feature );
 	      }
 	    }
@@ -400,8 +431,8 @@ sub run{
 #    }
 #  }
   # tidy up output files.
-   #unlink $genome_file;
-   #unlink $evi_file;
+   unlink $genome_file;
+   unlink $evi_file;
 
 }
 
@@ -501,5 +532,34 @@ sub seq{
     return $obj->{'_seq'};
 
 }
+
+#sub _make_Analysis{
+#  my ($self) = @_;
+  
+#  # genes get written in the database with the type specified in Bio/EnsEMBL/Pipeline/EST_conf.pl
+#  my $genetype = 'genomewise';
+    
+#  # sort out analysis here
+#  my $anaAdaptor = $self->db->get_AnalysisAdaptor;
+#  my $analysis = $anaAdaptor->fetch_by_logic_name($genetype);
+
+#  #set analysis
+#  $self->analysis($analysis);
+  
+##  print STDERR "Analysis is: ".$self->analysis->dbID."\n";
+  
+# return $self->analysis;
+#}
+
+#sub analysis{
+#  my ($self,$analysis) = @_;
+#  if ( $analysis ){
+#    $self->{analysis} = $analysis;
+#  }
+#  return $self->{analysis};
+#}
+
+
+
 
 1;
