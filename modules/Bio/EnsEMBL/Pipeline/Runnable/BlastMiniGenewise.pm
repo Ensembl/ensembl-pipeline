@@ -274,9 +274,14 @@ sub run_blast {
      -type      => 'DNA');
   #print STDERR "\n";
   $blastdb->run;
+
   #print STDERR "\n";
   my @blast_features;
-  my $dbname = $blastdb->dbname;
+  my $dbname = $blastdb->dbfile;
+  if($dbname =~/\/tmp\//){
+    $dbname =~ s/\/tmp\///g;
+  } 
+
   my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
   foreach my $seq (@sorted_seqs) {
     # First sort out the header parsing. Blergh! cb25.NA_057.31208-61441 Slice, no descrtipion 
@@ -300,7 +305,7 @@ sub run_blast {
         -database => $blastdb->dbfile,
         -filter => 1,
        );
-     #print STDERR "Adding ".$dbname." ".$regex."\n";
+#     print STDERR "Adding ".$dbname." ".$regex."\n";
      $run->add_regex($dbname, $regex);
      $run->run;
      
