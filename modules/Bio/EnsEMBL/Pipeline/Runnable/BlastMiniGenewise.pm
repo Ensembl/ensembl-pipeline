@@ -297,6 +297,10 @@ sub run_blast {
 
     my ($self,$seq,$db) = @_;
     my $tmpdir = $::pipeConf{'nfstmp.dir'};
+    if(!defined $tmpdir || $tmpdir eq ''){
+      $tmpdir = '/tmp';
+    }
+
     my $blastout = $self->get_tmp_file($tmpdir,"blast","out");
     my $seqfile  = $self->get_tmp_file($tmpdir,"seq","fa");
     my @pairs;
