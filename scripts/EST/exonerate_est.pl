@@ -24,6 +24,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
                                         EST_RUNNER
                                         EST_EXONERATE_RUNNABLE
+                                        EST_EXONERATE_ANALYSIS
                                         EST_EXONERATE
                                         EST_REFDBNAME
                                         EST_REFDBUSER
@@ -34,6 +35,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
                                        );
 
 
+my $analysis;
 my $runner;
 my $runnable;
 my $exonerate;
@@ -53,7 +55,7 @@ my $tmpoutfile;
 
 my $estfile = $estfiledir . "/" . $chunkname;
 
-my $command = "$runner -runnable $runnable -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
+my $command = "$runner -analysis $analysis -runnable $runnable -input_id $input_id -parameters estfile=$estfile,exonerate=$exonerate 2>$tmperrfile | gzip -9 >$tmpoutfile";
 
 print STDERR "command is $command\n";
 
@@ -93,7 +95,7 @@ sub get_variables {
   &GetOptions( 
 	      'chunkname:s'      => \$chunkname,
 	     );
-
+  $analysis   = $EST_EXONERATE_ANALYSIS;
   $runner     = $EST_RUNNER;
   $runnable   = $EST_EXONERATE_RUNNABLE;
   $exonerate  = $EST_EXONERATE;
@@ -106,7 +108,7 @@ sub get_variables {
 
   if(!(defined $host       && defined $dbname    && defined $dbuser &&
        defined $runner     && defined $runnable  && defined $exonerate &&
-       defined $estfiledir && defined $chunkname && 
+       defined $estfiledir && defined $chunkname && defined $analysis &&
        defined $input_id   && defined $outdir)){
     print "Usage: exonerate_est.pl -chunkname\n" .
       "Additional options to be set in ESTConf.pm: EST_RUNNER, EST_EXONERATE_RUNNABLE, EST_EXONERATE, EST_REFDBNAME, EST_REFDBUSER, EST_REFDBHOST, EST_CHUNKDIR, EST_GENOMIC and EST_TMPDIR\n";
