@@ -150,9 +150,11 @@ sub run_alignment {
   }
 
   my %nt_seqs;
+  my %desc_lookup;
 
   foreach my $nt_seq (@$seqs){
-    $nt_seqs{$nt_seq->display_id} = $nt_seq; 
+    $nt_seqs{$nt_seq->display_id}     = $nt_seq; 
+    $desc_lookup{$nt_seq->display_id} = $nt_seq->desc;
   }
 
   my @aa_seqs;
@@ -166,6 +168,9 @@ sub run_alignment {
 
   my $longest_seq = 0;
   foreach my $aligned_seq ($alignment->each_seq){
+    # Tack description lines back onto our aligned sequences.
+    $aligned_seq->desc($desc_lookup{$aligned_seq->display_id});
+
     push(@aligned_seqs, $aligned_seq);
     $longest_seq = $aligned_seq->length if $aligned_seq->length > $longest_seq;
   }
@@ -202,6 +207,7 @@ sub run_alignment {
     }
 
     my $aligned_nt_bioseq = Bio::Seq->new(-display_id => $aligned_seq->display_id,
+					  -desc       => $aligned_seq->desc,
 					  -seq        => $aligned_nt_string);
 
     $self->_alignment('add', $aligned_nt_bioseq);
