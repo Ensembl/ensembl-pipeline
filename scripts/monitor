@@ -117,7 +117,7 @@ if ($assembly_type){
 #	print Dumper($hash);
 
 }
-if ($ft_ana_id =~ /:/){
+if (defined($ft_ana_id) && $ft_ana_id =~ /:/){
 	my ($ft, $ana) = split(/:/, $ft_ana_id);
         my $ana_id;
 	if($ana =~ /^\d+$/ ){
