@@ -460,16 +460,6 @@ sub _align {
     }
   }
 
-foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
-  print STDERR $tracked_deletion . "\t" . 
-    scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
-  foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
-    print STDERR $deletion->[1] ." (" . $deletion->[0] . ")  ";
-  }
-  print STDERR "\n";
-}
-
-
   my @all_deletions = sort {$a <=> $b} keys %all_deletions;
 
   $self->{_total_inserted_deletions} = 0; # Initialise this method-less value.
@@ -496,6 +486,7 @@ foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
     }
 
     # Increment all deletion coords that are greater than this one.
+    # There quite possibly is a better way to do this.
 
       # @all_deletions and %all_deletions
 
@@ -510,18 +501,49 @@ foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
 
     %all_deletions = %new_all_deletions;
 
+
       # %deletion_sets
 
+    my %new_deletion_sets;
     foreach my $evidence_name (keys %evidence_sequence_hash) {
       my @coords = keys %{$deletion_sets{$evidence_name}};
       for (my $i = 0; $i < scalar @coords; $i++) {
 	if ($deletion_sets{$evidence_name}->{$coords[$i]}){
-	  my $this_length = $deletion_sets{$evidence_name}->{$coords[$i]};
-	  delete $deletion_sets{$evidence_name}->{$coords[$i]};
-	  $deletion_sets{$evidence_name}->{$coords[$i]+1} = $this_length;
+	  $new_deletion_sets{$evidence_name}->{$coords[$i]+1} = 
+	    $deletion_sets{$evidence_name}->{$coords[$i]};
+	} else {
+	  $new_deletion_sets{$evidence_name}->{$coords[$i]} = 
+	    $deletion_sets{$evidence_name}->{$coords[$i]};
 	}
       }
     }
+    %deletion_sets = %new_deletion_sets;
+
+
+      # %deletion_tracking
+
+    my %new_deletion_tracking;
+    my @coords = keys %deletion_tracking;
+    for (my $i = 0; $i < scalar @coords; $i++) {
+      if ($coords[$i] > $deletion_coord){
+	$new_deletion_tracking{$coords[$i]+1} = $deletion_tracking{$coords[$i]}
+      } else {
+	$new_deletion_tracking{$coords[$i]} = $deletion_tracking{$coords[$i]}
+      }
+    }
+    %deletion_tracking = %new_deletion_tracking;
+  }
+
+  # Print the locations of our deletions, handy for finding conserved gaps and
+  # frameshifts
+
+  foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
+    print STDERR $tracked_deletion . "\t" . 
+      scalar @{$deletion_tracking{$tracked_deletion}} . "\t";
+    foreach my $deletion (@{$deletion_tracking{$tracked_deletion}}){
+      print STDERR $deletion->[1] ." (" . $deletion->[0] . ")  ";
+    }
+    print STDERR "\n";
   }
 
 
@@ -1595,7 +1617,7 @@ sub _fiddly_bits {
   my $hstrand = $base_align_feature->hstrand;
 
     # Take care of unusual situation where genomic strand gets turned around.
-  if (($self->_strand == -1)&&($base_align_feature->strand == 1)){
+  if (($self->_strand != $base_align_feature->strand)){
       # Force the hstrand around
     $hstrand = $hstrand * -1;
       # Reverse the order of things in the cigar
