@@ -45,10 +45,12 @@ use vars qw( %Combined );
 
 # Hash containing config info
 %Combined = (
-	     
-	     # gene type for Combine_Genewises_and_E2Gs
 	     GB_COMBINED_GENETYPE           => 'combined_gw_e2g',
-	     
+	     # gene type for Combine_Genewises_and_E2Gs
+	     GB_GENEWISE_COMBINED_GENETYPE           => 'UTR',
+
+	     GB_BLESSED_COMBINED_GENETYPE           => 'BlessedUTR',
+
 	     # gene type for genes built from cDNAs with exonerate & est2genome
 	     GB_cDNA_GENETYPE               => 'exonerate_e2g',
 	     
