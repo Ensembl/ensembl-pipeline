@@ -102,7 +102,7 @@ sub fetch_input {
   my $contigid  = $self->input_id;
   my $contig    = $self->dbobj->get_Contig($contigid);
   #print "got contig\n";
-  my $genseq   = $contig->primary_seq;
+  my $repeatmasked_seq   = $contig->get_repeatmasked_seq;
   #print "got dnaseq\n";
   my @features = $contig->get_all_SimilarityFeatures_above_score("swall", 1);
   #print $features[0]."\n";
@@ -116,8 +116,8 @@ sub fetch_input {
   }
   #print "got".scalar(@fps)." feature pairs\n";
 
-  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-genomic'     => $genseq, 
-									    '-features' => \@fps,
+  my $runnable  = Bio::EnsEMBL::Pipeline::Runnable::HalfwiseHMM->new('-genomic'     => $repeatmasked_seq, 
+									                                                 '-features' => \@fps,
 								    );
   #print "created HalfwiseHMM Runnable\n";  
   $self->runnable($runnable);
