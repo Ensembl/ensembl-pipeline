@@ -60,16 +60,11 @@ use Bio::EnsEMBL::SeqFeature;
 @ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
 
 
-=head2 store
+=head2 write_Protein_feature
 
- Title    : store
- Usage    : $self->store ($proteinId, @features)
- Function : Writes a feature on the genomic sequence of a contig into the database.
-            Checks that we have contig_obj, gets its internal_id. Checks that each
-            feature_obj has analysis_obj attached, gets analysis_id from it.
-            Checks what kind of feature(s) is/are passed in and passes it/them
-            further to appropriate _store_blabla function together with contig_internal_id
-            and analysis_id
+ Title    : write_Protein_feature
+ Usage    : $self->write_Protein_feature (@features)
+ Function :
  Example  : 
  Returns  : 
  Args     : array of Bio::EnsEMBL::SeqFeatureI
@@ -77,7 +72,7 @@ use Bio::EnsEMBL::SeqFeature;
 
 =cut
 
-sub store {
+sub write_Protein_feature {
     my ($self, @features) = @_;
 
     # Get AnalysisAdaptor
