@@ -118,15 +118,17 @@ sub run{
   close(E);
   
   #   open(GW,"genomewise $genome_file $evi_file |");
-  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
+#  system "/nfs/acari/birney/prog/wise2/src/models/genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file > /tmp/test.out";
+#  open(GW,"</tmp/test.out");
   
-  open(GW,"</tmp/test.out");
+  open(GW, "genomewise -silent -nogff -notrans -nogenes -geneutr $genome_file $evi_file");
+  
   # parse gff output for start, stop, strand, phase
   my $genename = '';
 
  GENE:
   while( <GW> ) {
-    print STDERR $_;
+    # print STDERR $_;
 
       /\/\// && last;
       if( /Gene/ ) {
@@ -140,12 +142,12 @@ sub run{
 	  my $seen_utr3 = 0;
 	  my $prev = undef;
 	  while( <GW> ) {
-	      print STDERR "$_";
+	    #  print STDERR "$_";
 	      chomp;
 	      #print "Seen $_\n";
 	      if( /End/ ) {
 		  if( $seen_utr3 == 0 ) {
-		    print STDERR "Seen utr - setting end to prev\n";
+		  #  print STDERR "Seen utr - setting end to prev\n";
 		      # ended on a cds 
 		      $trans->end_exon($prev);
 		      $trans->end($prev->length);
@@ -200,7 +202,7 @@ sub run{
 	      }
 
 	      if( /utr3\s+(\d+)\s+(\d+)/ ) {
-		print "Found utr3\n";
+	#	print "Found utr3\n";
 		  my $start = $1;
 		  my $end   = $2;
 		  my $strand = 1;
@@ -208,13 +210,13 @@ sub run{
 		  my $orig_end;
 		  my $exon;
 		  if( $seen_utr3 == 0 && defined $prev && $prev->end+1 == $start ) {
-		    print STDERR "Found abutting utr3\n";
+		#    print STDERR "Found abutting utr3\n";
 		      # abutting 3utr
 		      $orig_end = $prev->end;
 		      $exon = $prev;
 		      $start = $prev->start;
 		  } else {
-		    print STDERR "Non abutting utr3\n";
+		 #   print STDERR "Non abutting utr3\n";
 		      # not abutting; should be fine.
 		      $exon =  Bio::EnsEMBL::Exon->new();
 		      $t->add_Exon($exon);
@@ -250,17 +252,17 @@ sub run{
 #      print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
       $self->throw("Should not able to happen - unparsable in between gene line $_");
     }
-  print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
+#  print STDERR "genomic file: $genome_file, evidence file: $evi_file\n";
  foreach my $t ( @{ $self->{'_output_array'} } ){
-    print STDERR "\nIn Genomewise.run\n";
-    print STDERR " Transcript  : ".$t."\n";
-    print STDERR " Translation : ".$t->translation."\n";
-    print STDERR " translation starts: ".$t->translation->start."\n";
-    print STDERR " translation end   : ".$t->translation->end."\n";
-    print STDERR " start exon        : ".$t->translation->start_exon."\n";
-    print STDERR " end exon          : ".$t->translation->end_exon."\n";
+#    print STDERR "\nIn Genomewise.run\n";
+#    print STDERR " Transcript  : ".$t."\n";
+#    print STDERR " Translation : ".$t->translation."\n";
+#    print STDERR " translation starts: ".$t->translation->start."\n";
+#    print STDERR " translation end   : ".$t->translation->end."\n";
+#    print STDERR " start exon        : ".$t->translation->start_exon."\n";
+#    print STDERR " end exon          : ".$t->translation->end_exon."\n";
     foreach my $exon ($t->get_all_Exons){
-      print STDERR "     Exon          : " . $exon . " ".$exon->phase  . " " . $exon->end_phase ."\tstarts: ".$exon->start."\tends: ".$exon->end."\n";
+#      print STDERR "     Exon          : " . $exon . " ".$exon->phase  . " " . $exon->end_phase ."\tstarts: ".$exon->start."\tends: ".$exon->end."\n";
     }
   }
   # tidy up output files.
