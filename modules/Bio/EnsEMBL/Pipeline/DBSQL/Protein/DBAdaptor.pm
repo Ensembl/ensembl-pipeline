@@ -9,18 +9,18 @@
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor - Object representing an instance of an EnsEMBL DB
+  Bio::EnsEMBL::Pipeline::DBSQL::Protein::DBAdaptor - Object representing an instance of an EnsEMBL DB
 
 =head1 SYNOPSIS
 
-  use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+  use Bio::EnsEMBL::Pipeline::DBSQL::Protein::DBAdaptor;
 
-  $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new ( -host   => 'caldy',
-                                              -user   => 'root',
-                                              -dbname => 'pog',
-                                              -driver => 'mysql',
-                                              -pass   => 'xyz',
-                                            );
+  $db = Bio::EnsEMBL::DBSQL::Protein::DBAdaptor->new ( -host   => 'caldy',
+                                                       -user   => 'root',
+                                                       -dbname => 'pog',
+                                                       -driver => 'mysql',
+                                                       -pass   => 'xyz',
+                                                     );
 
 =head1 DESCRIPTION
 
@@ -43,7 +43,7 @@
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptorMs2;
+package Bio::EnsEMBL::Pipeline::DBSQL::Protein::DBAdaptor;
 
 use vars qw(@ISA);
 use strict;
@@ -53,10 +53,9 @@ use DBI;
 
 use Bio::Root::RootI;
 use Bio::EnsEMBL::DB::ObjI;
-#use Bio::EnsEMBL::DBSQL::Feature_Obj;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::ProteinAdaptorMs2;
-use Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptorMs2;
+use Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
@@ -189,7 +188,7 @@ sub get_JobAdaptor {
  Usage    : $db->get_AnalysisAdaptor
  Function : The Adaptor for Analysis objects in this db
  Example  : 
- Returns  : Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor
+ Returns  : Bio::EnsEMBL::DBSQL::AnalysisAdaptor
  Args     :
  Throws   : 
 
@@ -253,7 +252,7 @@ sub get_StateInfoContainer {
  Usage    : $db->get_ProteinAdaptor
  Function :
  Example  :
- Returns  : Bio::EnsEMBL::Pipeline::DBSQL::ProteinAdaptor 
+ Returns  : Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor 
  Args     :
  Throws   :
 
@@ -263,7 +262,7 @@ sub get_StateInfoContainer {
 sub get_ProteinAdaptor {
     my ($self) = @_;
     unless ($self->{'_ProteinAdaptor'}) {
-        $self->{'_ProteinAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::ProteinAdaptorMs2->new ($self);
+        $self->{'_ProteinAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor->new ($self);
     }
     return $self->{'_ProteinAdaptor'};
 }
@@ -280,7 +279,7 @@ sub get_Protein_Adaptor {
  Usage    : $db->get_ProteinFeatureAdaptor
  Function :
  Example  :
- Returns  : Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptor 
+ Returns  : Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor 
  Args     :
  Throws   :
 
@@ -290,7 +289,7 @@ sub get_Protein_Adaptor {
 sub get_ProteinFeatureAdaptor {
     my ($self) = @_;
     unless ($self->{'_ProteinFeatureAdaptor'}) {
-        $self->{'_ProteinFeatureAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptorMs2->new ($self);
+        $self->{'_ProteinFeatureAdaptor'} = Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor->new ($self);
     }
     return $self->{'_ProteinFeatureAdaptor'};
 }
@@ -303,31 +302,6 @@ sub get_Protein_Feature_Adaptor {
 sub get_Protfeat_Adaptor {
     my ($self) = @_;
     $self->get_ProteinFeatureAdaptor;
-}
-
-#
-
-=head2 get_Feature_Obj
-
- Title    : get_Feature_Obj
- Usage    :
- Function :
- Example  :
- Returns  : 
- Args     :
- Throws   :
-
-=cut
-
-sub get_Feature_Obj {
-    my ($self) = @_;
-    my $feature_obj;
-    unless  ($feature_obj = $self->{'_feature_obj'}) {
-        $feature_obj = Bio::EnsEMBL::DBSQL::Feature_Obj->new ($self);
-        $self->{'_feature_obj'} = $feature_obj;
-    }
- 
-    return $feature_obj;
 }
 
 

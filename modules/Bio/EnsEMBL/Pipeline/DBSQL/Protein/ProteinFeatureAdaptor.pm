@@ -10,17 +10,17 @@
 =head1 NAME
 
   Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptor - Object representing an adaptor
-                                                       for protein features to an EnsEMBL DB
+                                                         for protein features to an EnsEMBL DB
 
 =head1 SYNOPSIS
 
-  use Bio::EnsEMBL::DBSQL::DBAdaptor;
-  use Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptor;
+  use Bio::EnsEMBL::DBSQL::Protein::DBAdaptor;
+  use Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor;
 
-  my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new ( -host   => 'ics1e',
-                                                           -dbname => 'test',
-                                                           -user   => 'marc',
-                                                           -pass   => 'xyz',
+  my $db = Bio::EnsEMBL::Pipeline::DBSQL::Protein::DBAdaptor->new ( -host   => 'ics1e',
+                                                                    -dbname => 'test',
+                                                                    -user   => 'marc',
+                                                                    -pass   => 'xyz',
                                                          );               
 
   my $proteinFeatureAdaptor = $db->get_ProteinFeatureAdaptor;
@@ -46,7 +46,7 @@
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::DBSQL::ProteinFeatureAdaptorMs2;
+package Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinFeatureAdaptor;
 
 use vars qw(@ISA);
 use strict;

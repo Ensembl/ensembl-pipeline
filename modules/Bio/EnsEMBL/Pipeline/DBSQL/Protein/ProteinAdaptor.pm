@@ -8,18 +8,18 @@
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::DBSQL::ProteinAdaptor - Object representing an adaptor
-                                                  for proteins to an EnsEMBL DB
+  Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor - Object representing an adaptor
+                                                           for proteins to an EnsEMBL DB
 
 =head1 SYNOPSIS
 
-  use Bio::EnsEMBL::DBSQL::DBAdaptor;
-  use Bio::EnsEMBL::DBSQL::Protein_Adaptor;
+  use Bio::EnsEMBL::DBSQL::Protein::DBAdaptor;
+  use Bio::EnsEMBL::DBSQL::Protein::Protein_Adaptor;
 
-  my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new ( -host   => 'ics1e',
-                                                           -dbname => 'test',
-                                                           -user   => 'marc',
-                                                         );               
+  my $db = Bio::EnsEMBL::Pipeline::DBSQL::Protein::DBAdaptor->new ( -host   => 'ics1e',
+                                                                    -dbname => 'test',
+                                                                    -user   => 'marc',
+                                                                  );               
 
   my $proteinAdaptor = $db->get_ProteinAdaptor;
   my $protein = $proteinAdaptor->fetch_Protein_by_dbid ($id);
@@ -44,7 +44,7 @@
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::DBSQL::ProteinAdaptorMs2;
+package Bio::EnsEMBL::Pipeline::DBSQL::Protein::ProteinAdaptor;
 
 use vars qw(@ISA);
 use strict;
