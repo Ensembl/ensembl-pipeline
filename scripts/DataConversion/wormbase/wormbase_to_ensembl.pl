@@ -17,26 +17,39 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => $WB_DBHOST,
 					    -dbname => $WB_DBNAME,
 					    -pass  => $WB_DBPASS,
 					   );
+
+
+my $meta_sql = "insert into meta(meta_key, meta_value) values(\'assembly.default\', ?)";
+
+my $meta_sth = $db->prepare($meta_sql);
+$meta_sth->execute($WB_AGP_TYPE); 
+
+my $analysis_adaptor = $db->get_AnalysisAdaptor();
+my $analysis = $analysis_adaptor->fetch_by_logic_name($WB_LOGIC_NAME);
+
 foreach my $chromosome_info(@{$WB_CHR_INFO}){
 
   my $chromosome = Bio::EnsEMBL::Chromosome->new(-chr_name => $chromosome_info->{'chr_name'},
 						 -length => $chromosome_info->{'length'},
 						 -adaptor =>$db->get_ChromosomeAdaptor, 
 						);
+
   $db->get_ChromosomeAdaptor->store($chromosome);
   open(FH, $chromosome_info->{'agp_file'});
   my $fh = \*FH;
   my $seq_ids = &get_seq_ids($fh);
   
+  seek($fh, 0, 0);
   my $pfetch = Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch->new();
-  $pfetch->options('-a');
+  
   my $obda = Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher->new(-db => $WB_CLONE_INDEX);
 
-  my %seqs = %{&get_sequences($seq_ids, $pfetch)};
+  my %seqs = %{&get_sequences_pfetch($seq_ids, $pfetch)};
   my %chr_hash = %{&agp_parse($fh, $chromosome->dbID, $WB_AGP_TYPE)};
   
   foreach my $id(keys(%seqs)){
     my $seq = $seqs{$id};
+   # print STDERR "have sequence ".$seq->length." and contig end ".$chr_hash{$id}->{contig_end}."\n";
     if($seq->length < $chr_hash{$id}->{contig_end}){
       my ($acc) = $id =~ /(\S+)\.\d+/;
       my $clone_name = $WB_ACC_2_CLONE->{$acc};
@@ -80,4 +93,31 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}){
     }
     $contig_id{$id} = $contig->dbID;
   }
+
+  foreach my $id(keys(%chr_hash)){
+    my $agp = $chr_hash{$id};
+    my $contig = $contig_id{$id};
+    my $chr_id = $agp->{'chromosome_id'};
+    my $chr_start = $agp->{'chr_start'};
+    my $chr_end = $agp->{'chr_end'};
+    my $superctg_name = $agp->{'superctg_name'};
+    my $superctg_start = $agp->{'superctg_start'};
+    my $superctg_end = $agp->{'superctg_end'};
+    my $superctg_ori = $agp->{'superctg_ori'};
+    my $contig_start = $agp->{'contig_start'};
+    my $contig_end = $agp->{'contig_end'};
+    my $contig_ori = $agp->{'contig_ori'};
+    my $type = $agp->{'type'};
+
+    my $sql = "insert into assembly(chromosome_id, chr_start, chr_end, superctg_name, superctg_start, superctg_end, superctg_ori, contig_id, contig_start, contig_end, contig_ori, type) values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    my $sth = $db->prepare($sql);
+    $sth->execute($chr_id, $chr_start, $chr_end, $superctg_name, $superctg_start, $superctg_end, $superctg_ori, $contig, $contig_start, $contig_end, $contig_ori, $type); 
+  }
+
+  my $chr = $db->get_SliceAdaptor->fetch_by_chr_start_end($chromosome_info->{chr_name}, 1, ($chromosome_info->{length} - 1));
+  my $genes = &parse_gff($chromosome_info->{'gff_file'}, $chr);
+  my ($non_translating, $non_transforming) = &write_genes($genes, $db);
+
+  print "there are ".keys(%$non_translating)." clones with non translating genes\n";
+  print "there are ".keys(%$non_transforming)." clones with non translating genes\n";
 }

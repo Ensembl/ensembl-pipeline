@@ -1,0 +1,167 @@
+Converting wormbase to ensembl
+==============================
+
+this is the first attempt at a read-me
+
+any questions email laura Clarke at lec@sanger.ac.uk
+
+===============================
+What you need to do this
+===============================
+
+code
+
+I am currently using ensembl and ensembl=pipeline main trunk and bioperl 0.7
+
+data
+
+the wormbase agp and gff files which can be found here
+
+
+ftp://ftp.sanger.ac.uk/pub/wormbase/current_release/CHROMOSOMES
+
+
+a fasta file of wormbase clones
+
+ftp://ftp.sanger.ac.uk/pub/wormbase/sequences/ALL_COSMIDS/allcmid.gz
+
+
+access to something like pfetch or srs to get the embl accessioned sequences in fasta format
+
+a program which you can use to index the allcmid fasta file
+
+preferably one which has a Bio::EnsEMBL::Pipeline::SeqFetcher modules for it
+
+example are indicate by steve searle which uses
+
+ Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+
+and getseqs by james cuff which uses
+
+ Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs;
+
+
+
+=================================
+How to run the process
+=================================
+
+get the required files from the ftp site
+
+---
+
+create a mysql database to hold the information
+
+---
+
+use the sql file in ensembl-pipeline/sql
+
+WormBase_analysis.sql to load the analysis table
+
+mysql -hhost -uuser -ppass databasename < ensembl-pipeline/sql/WormBase_analysis.sql 
+
+
+fill in the fields in WormBaseConf.pm
+
+WB_CHR_INFO, this is an array of information about the chromosomes
+
+there are four fields for each chromosome
+
+chr_name, the name to be used in the chromosome table
+agp_file, path to agp file
+length , length of chromosome
+gff_file, path to gff file
+
+WB_AGP_TYPE
+
+this is the agp type to be used in the assembly table and loaded into the meta table
+
+WB_DBNAME, WB_DBHOST, WB_DBPASS, WB_DBUSER
+
+information about database
+
+WB_CLONE_INDEX
+
+path to index to be used to get wormbase sequences by clone name
+
+this is an anonymous array as the constructors for both the suggested seqfetchers take array refs to index locations
+
+WB_GAPS
+
+some places in the agp don't have embl accessions we treat these are gaps and as such won't store the genes which lie on those pieces
+
+(Note not yet implemented) 
+
+WB_LOGIC_NAME
+
+the logic name in your analysis table to be used for wormbase genes
+
+---
+
+run the script
+
+the script to run is 
+
+wormbase_to_ensembl.pl
+
+if you have filled in all the fields in WormBaseConf correctly this should just run
+
+for the whole genome it will probably take about 1/2 to an hour to run
+
+the script goes through a series of processes
+
+this process is looped for each chromosome
+
+the first is to parse through the agp file to get all the embl accession of the clone in the agp
+
+the sequences of each of the accessions is then fetched using pfetch, this is currently hardcoded in WormBase.pm as pfetch has the option to get archived sequences but this may change in the future
+
+once the sequences have been fetched the agp is parsed properly and a hash is produced keyed on embl accession one line for each line in the assembly table
+
+the lengths of the sequences that have been fetched are compared to the lengths claimed by the agp, if they are different
+
+the clone name for the embl accession is got from Clone2Acc.pm which should be in the same directory as this read me and it contains a mapping of embl accessions to clone names
+
+if thats not there or appears to be wrong the place to try is 
+
+wormbase-help@wormbase.org
+
+once the correct sequences have been found each clone and the required line from the agp are loaded into the database
+
+
+once the sequences have been loaded into the database the script should parse the genes from the gff file
+
+the process also have many steps
+
+the curated CDS lines are parsed out of the gff as these describe the coords of the exons and their start frame
+
+the files contain frame but ensembl uses phase, these are two different values to determine which base is used to start the translation of a exon
+
+they can be interchanged using this sum
+
+my $phase = (3 - $frame)%3;
+
+first a hash keyed on transcript_id(clonename.number(letter)) of the lines in the file for that transcript is produced
+
+this hash is taken and the lines are taken and turned into Bio::EnsEMBL::Exons
+
+end_phase is calculated on the basis of start phase and length of exon
+
+
+once the exons have been created they are pieced together into transcripts
+
+the transcripts are then collected together into genes
+
+the genes translations are checked and and transformed into raw contig coordinates
+
+all the genes which translate and transform are then stored
+
+the genes which don't translate
+
+the sequence of the clone they are on is compared to the sequence of that wormbase have for that clone name
+
+if there sequences are different the clone is deleted and reloaded and the assembly table changed accordingly
+
+for now genes which don't transform are being ignored in future this may change
+
+
