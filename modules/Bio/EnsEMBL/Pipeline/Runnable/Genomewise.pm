@@ -123,14 +123,14 @@ sub run{
 
       # store supporting evidence
       my @evi = @{$exon->get_all_supporting_features};
-      print STDERR "Exon $excount: ".scalar(@evi)." features\n";
+      #print STDERR "Exon $excount: ".scalar(@evi)." features\n";
 
       $supp_evidence{ $exon } = \@evi;
 
       ## test
       if (@evi){
 	foreach my $evi ( @evi ){
-	  print STDERR $evi." - ".$evi->gffstring."\n";
+	  #print STDERR $evi." - ".$evi->gffstring."\n";
 	}
       }
       else{
@@ -185,7 +185,7 @@ sub run{
 	my $seen_utr3 = 0;
 	my $prev = undef;
 	while( <GW> ) {
-	  print STDERR "$_";
+	  #print STDERR "$_";
 	  chomp;
 	  #print "Seen $_\n";
 	  if( /End/ ) {
