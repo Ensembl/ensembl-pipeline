@@ -1,7 +1,14 @@
 use strict;
 use warnings;
 
+
 package Bio::EnsEMBL::Pipeline::Config;
+
+use vars qw(@ISA);
+
+use Bio::EnsEMBL::Root;
+
+@ISA = ('Bio::EnsEMBL::Root');
 
 
 
@@ -20,6 +27,69 @@ package Bio::EnsEMBL::Pipeline::Config;
 
 sub new {
 
+  my $class = shift;
+
+  my $self = bless {}, $class;
+
+  my ($files) = $self->_rearrange([qw( FILES )], @_);
+
+  my @files = split(/ /, $files);
+
+  $self->{'config'} = {};
+
+
+  # read each file
+
+  foreach my $file (@files) {
+
+    print "Parsing $file \n";
+
+    my $header = "";
+
+    open (FILE, $file);
+    while (<FILE>) {
+      chomp();
+
+      # Comment or blank line
+      next if (/^\s$/ || /^\#/);
+
+      # [HEADER]
+      if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
+	$header = lc($1);
+	print "Reading stanza $header\n";
+      }
+
+      # key=value
+      if (/^(\w+)\s*=\s*(\w+)/) {   # $1 = key, $2 = value
+
+	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
+	my $value = $2;
+
+	if (length($header) == 0) {
+	  $self->throw("Found key/value pair $key/$value outside stanza");
+	}
+
+	#print "Key: $key Value: $value\n";
+
+	# Check if this header/key is already defined
+	if (exists($self->{'config'}->{$header}->{$key})) {
+	  $self->throw("$key is already defined for [$header]; cannot be redefined");
+	} else {
+	  # store them
+	  $self->{'config'}->{$header}->{$key} = $value;
+	}
+
+      }
+
+    }
+    close FILE;
+  }
+
+
+ # TODO DB Stuff
+
+  return $self;
+
 }
 
 
@@ -37,9 +107,16 @@ sub new {
 =cut
 
 sub get_parameter {
-	my $self = shift;
-	my $header = shift;
-	my $key = shift;
+
+  my $self      = shift;
+  my $header = lc(shift);
+  my $key    = lc(shift);
+
+  if (!exists($self->{'config'}->{$header}->{$key})) {
+    $self->throw("Key $key is not defined in header $header");
+  }
+  return $self->{'config'}->{$header}->{$key};
+
 }
 
 
@@ -57,9 +134,15 @@ sub get_parameter {
 =cut
 
 sub get_keys {
-	my $self = shift;
-	my $header = shift;
 
+  my $self      = shift;
+  my $header = lc(shift);
+
+  if (!exists($self->{'config'}->{$header})) {
+    $self->throw ("No such header: $header");
+  }
+  my $keys = $self->{'config'}->{$header};
+  return keys(%$keys);
 }
 
 
@@ -77,7 +160,12 @@ sub get_keys {
 =cut
 
 sub get_headers {
-	my $self = shift;
+
+  my $self = shift;
+
+  my $headers = $self->{'config'};
+  return keys(%$headers);
+
 }
 
 
