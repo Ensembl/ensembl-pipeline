@@ -1260,8 +1260,10 @@ sub run {
   $strand = 1;
   my $tcount=0;
 
+  print STDERR "## forward strand ##\n";
+
   my @f_transcripts1 = $self->_forward_transcripts;
-  my @f_transcripts2  = $self->_process_Transcripts(\@f_transcripts1,$strand);
+  my @f_transcripts2 = $self->_process_Transcripts(\@f_transcripts1,$strand);
   my @forward_transcripts;
   
 
@@ -1335,6 +1337,7 @@ sub run {
   $strand = -1;
   my $tcount2=0;
   
+  print STDERR "## reverse strand ##\n";
   my @reverse_transcripts;
   my @r_transcripts1 = $self->_reverse_transcripts;
   my @r_transcripts2 = $self->_process_Transcripts(\@r_transcripts1,$strand);  
@@ -1429,10 +1432,10 @@ sub _select_best_transcripts{
   TRAN:
     foreach my $tran ( @trans ){
       $count++;
-      print STDERR "count: $count\n";
+      #print STDERR "count: $count\n";
       next GENE if $count > $MAX_TRANSCRIPTS_PER_GENE;
       push ( @selected_transcripts, $tran );
-      print STDERR "transcript accepted\n";
+      #print STDERR "transcript accepted\n";
     }
   }
   return @selected_transcripts;
