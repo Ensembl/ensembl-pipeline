@@ -335,7 +335,7 @@ sub write_dbresults {
   # test if there are any prediction transcripts defined (if so, put'em in db)
   if (defined $allpredtrans{$org}) {
 
-    my @all_aref_prediTrans = @{ $aref_all_aref_prediTrans}; # [HPT HPT HPT HPT HPT]  here is the error ! why do we have only 1 ELEMENT ?????
+    my @all_aref_prediTrans = @{ $aref_all_aref_prediTrans}; 
     foreach my $aref_prediTrans (@all_aref_prediTrans) {
       my @prediTrans = @{$aref_prediTrans} ;
       for my $pT (@prediTrans) {
