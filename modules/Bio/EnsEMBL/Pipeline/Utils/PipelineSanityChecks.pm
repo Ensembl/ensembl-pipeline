@@ -3,8 +3,12 @@ use warnings;
 package Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 
 use vars qw(@ISA);
-
-@ISA = ('Bio::EnsEMBL::Root');
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
+use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+use Bio::EnsEMBL::Root;
+@ISA = qw(Bio::EnsEMBL::Root);
 
 
 sub new{
@@ -16,11 +20,11 @@ sub new{
 
   $self->{'db'} = undef;
 
-  my ($db)=$self->_rearrange([qw(DB)], @_);
+  my ($db)= rearrange([qw(DB)], @_);
 
   $self->db($db) if($db);
 
-  $self->throw("you need to pass at least a DBAdaptor to an PipelineSanityChecks") unless($self->db);
+  throw("you need to pass at least a DBAdaptor to an PipelineSanityChecks") unless($self->db);
 
   return $self;
 }
@@ -93,15 +97,15 @@ sub execute_sanity_check{
     my $sth = $db->prepare($query);
     $sth->execute();
     if($warn){
-      warn $msg if $sth->fetchrow();
+      warning($msg) if $sth->fetchrow();
     }else{
-      die $msg if $sth->fetchrow();
+      throw($msg) if $sth->fetchrow();
     }
 }
 
 
 sub accumulator_sanity_check{
-  my ($self, $rules, $accumulators, $die) = @_;
+  my ($self, $rules, $accumulators) = @_;
 
   my $sic = $self->db->get_StateInfoContainer;
   my $aa = $self->db->get_AnalysisAdaptor;
@@ -128,7 +132,6 @@ sub accumulator_sanity_check{
             $rule->goalAnalysis." depends on $logic_names with type ".
               $type." which has no entries in the input_id_type_".
                 "analysis table\n";
-          die("accumulators will be broken") if($die);
           $accumulators = 0;
         }else{
           next TYPE;
@@ -157,7 +160,7 @@ sub rule_type_sanity{
       if(!$condition){
         my $msg = "Can't depend on an analysis which doesn't exist $name";
         if($die){
-          $self->throw($msg);
+          throw($msg);
         }else{
           print STDERR $msg."\n";
         }
@@ -170,14 +173,40 @@ sub rule_type_sanity{
         my $msg = $rule->goalAnalysis->logic_name."'s type ".$type.
                      " doesn't match condition ".$condition->logic_name.
                      "'s type ".$condition->input_id_type;
-        if($die){
-          $self->throw($msg);
-        }else{
-          print STDERR $msg."\n";
-        }
+        throw($msg);
       }
     }
   }
 }
 
+
+sub config_sanity_check {
+  my ($self) = @_;
+
+  my $ok = 1;
+  unless ($QUEUE_MANAGER) {
+    print "Need to specify QUEUE_MANAGER in Config/BatchQueue.pm\n";
+    $ok = 0;
+  }
+  unless ($LIB_DIR) {
+    print "Need to specify LIB_DIR in Config/General.pm\n";
+    $ok = 0;
+  }
+  unless ($DATA_DIR) {
+    print "Need to specify DATA_DIR in Config/General.pm\n";
+    $ok = 0;
+  }
+  unless ($BIN_DIR) {
+    print "Need to specify BIN_DIR in Config/General.pm\n";
+    $ok = 0;
+  }
+
+  if(!$ok){
+    throw("The pipeline config isn't sane");
+  }
+}
+
+
 1;
+
+
