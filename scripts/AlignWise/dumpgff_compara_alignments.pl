@@ -20,7 +20,7 @@ my $verbose = 0;
 my $input_id;
 my $alignment_type = "WGA";
 my $focus_species  = 'Homo sapiens';
-my $compara_host   =  'ecs2d';
+my $compara_host   =  'ecs2f';
 my $compara_name   = 'ensembl_compara_16_1';
 my $compara_port   = '3306';
 my $compara_conf   = '/nfs/acari/eae/ensembl/ensembl-compara/modules/Bio/EnsEMBL/Compara/Compara.conf';
@@ -204,15 +204,16 @@ for( my $i_species = 0; $i_species<=$#target_genomes; $i_species++ ) {
 	    ############################################################
 	    # print GFF
 	    
+	    my $homology_region_id = ($align->query_dnafrag->name).".".($align->query_start)."-".($align->query_end);
 	    print STDOUT $count."\t".
-		"feature\t".
+		"compara\t".
 		    ($qy_gdb->name)."\t". 
 			($p_start) . "\t" . 
 			    ($p_end) . "\t" .
 				$align->score. "\t" . 
-				    $align->strand . "\t" . 
+				    $align->query_strand . "\t" . 
 					".". "\t" . 
-					    ($align->query_dnafrag)."\n";
+					    $homology_region_id."\n";
 	    
 	    # put the align string into result
 	    $count++;
@@ -235,7 +236,7 @@ else {
 sub usage {
   print STDERR <<EOF
 
-Usage: run_alignwise.pl options
+Usage: dumpgff_compara_alignments [options]
   where options should be 
   
   -compara_host
