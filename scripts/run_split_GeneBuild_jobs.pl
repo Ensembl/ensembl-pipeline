@@ -36,16 +36,15 @@ my $params;
 my $size;
 my $pepfile;
 
-
 &GetOptions( 
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
-	     'analysis:n'  => \$analysis_logic_name,
+	     'analysis:s'  => \$analysis_logic_name,
              'write'       => \$write,
              'check'       => \$check,
-             'split_size' => \$size,
+             'split_size:s' => \$size,
              'parameters:s'=> \$params,
-	     );
+	     ) or die "couldnt get options $! \n";
 
 $| = 1;
 
@@ -57,11 +56,15 @@ if ($check) {
    exit(0);
 }
 
-print STDERR "args: $host : $dbuser : $dbpass : $dbname : $input_id : $size";
+print STDERR "args: $host : $dbuser : $dbpass : $dbname : $input_id : $size : $analysis_logic_name\n";
 
 if(!$size){
   print STDERR "Can't work as split_size isn't defined\n";
   exit(0);
+}
+
+if(!$analysis_logic_name){
+  print STDERR "Can't work as analysis isn't defined\n";
 }
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
@@ -85,16 +88,20 @@ if(defined $params){
   }
 }
 
-
+print STDERR $input_id." to be split into ".$size." sized pieces\n";
 my ($chr, $start, $end) = $input_id =~ /$GB_INPUTID_REGEX/;
-
+print STDERR "have ".$chr." ".$start." ".$end."\n";
 my $new_start = $start;
 my $new_end   = $start + ($size -1);
-
-while ( $new_end <= $end && $new_start < $end ){
+print STDERR "start with ".$new_start." ".$new_end."\n";
+if($new_end > $end){
+  print STDERR "slice is smaller than the piece you are trying to make from it sure you have this set up right\n";
+  $new_end = $end;
+}
+while ($new_start < $end){
   
    my $split_input_id  = "$chr.$new_start-$new_end";
-
+   print STDERR "Creating ".$runnable." with input_id ".$split_input_id."\n";
    my $runobj = "$runnable"->new(-db    => $db,
 				 -input_id => $split_input_id,
 				 -analysis => $analysis,
@@ -117,7 +124,7 @@ while ( $new_end <= $end && $new_start < $end ){
    if ( $new_end > $end ){
      $new_end = $end;
    }
-   
+   print STDERR "next ".$new_start." ".$new_end."\n";
  }
 
 
