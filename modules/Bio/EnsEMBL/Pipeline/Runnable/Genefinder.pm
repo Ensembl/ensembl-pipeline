@@ -34,9 +34,9 @@ sub new {
     $self->{'_results'}   = undef; # file to store results of genscan
     $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
     $self->{'_parameters'} =undef; #location of parameters for genscan
-    print "@args\n";
+#    print STDERR "ARGS: @args\n";
     my($query, $genefinder, $parameters, $tablenamefile, $exonpenalty, $intronpenalty) = 
-        $self->_rearrange([qw(CLONE GENEFINDER PARAM TABLENAMEFILE EXONPENALTY INTRONPENALTY)], @args);
+        $self->_rearrange([qw(QUERY GENEFINDER PARAM TABLENAMEFILE EXONPENALTY INTRONPENALTY)], @args);
 
    
     $self->query($query);
@@ -65,11 +65,12 @@ sub new {
 
 sub query {
     my ($self, $seq) = @_;
+  
     if ($seq)
     {
         unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")) 
         {
-            $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
+            $self->throw("Input ".$seq." isn't a Bio::Seq or Bio::PrimarySeq");
         }
         $self->{'_query'} = $seq ;
         $self->filename($self->query->id.".$$.seq");
@@ -160,7 +161,7 @@ sub genefinder_genes {
         $gene->isa("Bio::EnsEMBL::SeqFeature") 
                 || $self->throw("Input isn't a Bio::EnsEMBL::SeqFeature");
         push(@{$self->{'_genes'}}, $gene);
-        @{$self->{'_genes'}} = sort { $a->seqname <=> $b->seqname } @{$self->{'_genes'}};
+        @{$self->{'_genes'}} = sort { $a->seqname cmp $b->seqname } @{$self->{'_genes'}};
     }
     return @{$self->{'_genes'}};
   }
@@ -222,7 +223,7 @@ sub run {
     $self->parse_results();
     $size = -s $self->results;
     #print "3 ".$size."\n";
-    $self->deletefiles();
+#    $self->deletefiles();
   }
 
 
@@ -231,7 +232,7 @@ sub run_genefinder {
     #print "Running genefinder on ".$self->filename."\n";
     #print STDERR `pwd`;
     my $command = $self->genefinder.' -tablenamefile '.$self->tablenamefile.' -intronPenaltyFile '.$self->intronpenalty.' -exonPenaltyFile '.$self->exonpenalty.' /tmp/'.$self->filename.' > '.$self->results; 
-    #print STDERR $command."\n";
+    print STDERR $command."\n";
     system ($command);
     my $size = -s $self->results;
     #print $size."\n";
@@ -240,97 +241,127 @@ sub run_genefinder {
 
 
 
-sub parse_results {
+
+sub parse_results{
   my ($self) = @_;
-  #print STDERR "parsing results\n";
-  my %phaseMap = ( 0 => 0, 1 => 2, 2 => 1 ) ; # bizarre rule
-  
-  my ($seq, $prefix, $seqnum, $exon) ;
-  my ($strand, $score, $phase, $tsl_offset, $tsl_score, $start, $end, @elts) ;
   
   my $resultsfile = $self->results;
-  my $size = -s $self->results;
-  #print "size of file = ".$size."\n";
-  #print STDERR "opening ".$self->results."\n";
-  open(FH, "<".$self->results) || die("couldn't open file $! \n");
-  
-  while (<FH>) {
-    #print "running through file\n";
+  open(FH, "<".$self->results) || die("couldn't open file ".$self->results." $! \n");
+  my $prefix;
+  my @forward_lines;
+  my @reverse_lines;
+  while(<FH>){
     #print;
     chomp;
     if (/Sequence: (\S+)/) {
-      $seq = $1 ;
-      $prefix = $seq ; $prefix =~ s/run20/gf/ ;
-      $seqnum = 0 ;
+      $prefix = $1; 
     }
-    
-    next unless /\.\./ ;
-    
-    # Typical lines are:
-    #
-    #    [ 11.52 ]   51958..52077   52126..52399   52450..52676 end
-    #    [ 12.58 ]  [TSL: -17  3.2]   37537..37698   37746..37877 end
-    # *  [ 29.80 ]   47920..48144   48192..48389   48440..49238   50304..50326 start [TSL: -7  1.9] 
-    #    [ 18.14 ]   48..975 U1
-    # *U0 [ 9.01 ]   342..466   841..865   971..1055   1108..1176 U2
-    #
-    # The tricky cases are the ones with U\d, which means the gene is continues beyond the sequence.
-    # The digit determines the phase.  This can come at the start or end of the sequence.
-    
-    ++$seqnum ;
-    $exon = 0 ;
-    $phase = 0 ;
-    
-    # extract strand, score and TSL info
-    
-    if (s/^\*//) { $strand = '-1' ; } else { $strand = '1' ; }
-    if (s/\[ -?(\d+\.\d+) \]//) { $score = $1 ; } else { die "can't extract score: $_" ; }
-    if (s/\[TSL: (\S+)\s+(\S+)\]//) { $tsl_offset = $1 ; $tsl_score = $2 ; } else { undef $tsl_offset, $tsl_score ; }
-    
-    # make array of remaining material, reverse if '-' strand, and process
-
-    @elts = split ;
-    @elts = reverse @elts if $strand eq '-1' ;
-    for (@elts) {
-      if (/U(\d)/) {
-	$phase = $phaseMap{$1} ;
-      } elsif (($start, $end) = /(\d+)\.\.(\d+)/) {
-	++$exon ;
-	
-	#print join ("\t", $seq,"Genefinder","CDS",$start,$end,$score,$strand,$phase,
-	#              "Sequence $prefix.$seqnum ; Exon $prefix.$seqnum.$exon\n") ;
-	#print STDERR "seqname = $prefix.$seqnum.$exon\n";
-	my $exonname = $prefix.".".$seqnum;
-	#print STDERR "exonname = ".$exonname."\n";
-	$self->create_feature($start, $end, $score, $strand, $phase, $exonname, 'genefinder', '1', 'genefinder', 'prediction');
-	# phase update is tricky
-	# next exon phase is number of bases remaining from partial codon of previous exon
-	
-	$phase = (3 - ($end - $start + 4 - $phase) % 3) % 3 ;
-	
-	#                          \------------------------/
-	#                             3 + number of bp used from start of first full codon
-	#                          \-----------------------------/
-	#                             number of bases started into partial codon
-	  
-	if ($exon == 1 && defined $tsl_offset) {
-	  if ($strand eq '1') {
-	    print join ("\t", $seq,"Genefinder","TSL",
-			($start+$tsl_offset-1),($start+$tsl_offset),
-			$tsl_score,$strand,'.',"Sequence $prefix.$seqnum\n") ;
-	  } else {
-	    print join ("\t", $seq,"Genefinder","TSL",
-			($end-$tsl_offset),($end-$tsl_offset+1),
-			$tsl_score,$strand,'.',"Sequence $prefix.$seqnum\n") ;
-	  }
+    if($_ =~ /\.\./){
+      if($_ =~ /\*/){
+	push(@reverse_lines, $_);
+      }else{
+	push(@forward_lines, $_);
+      }
+      
+    }  
+  }
+  my $gene_count = 0;
+  my $phase = 0;
+  my $strand = 1;
+  #print STDERR "forward strand\n";
+  foreach my $line(@forward_lines){
+    #print STDERR "line ".$line,"\n";
+    $line =~ s/\[TSL: \S+\s+\S+\]//;
+    $line =~ s/end//;
+    $line =~ s/\[ -?(\d+\.\d+) \]//;
+    my $score = $1;
+    #print STDERR "have line ".$line."\n";
+    my @values = split /\s+/, $line;
+    #print STDERR "have values @values\n";
+    if(!$values[0]){
+      my $first = shift @values;  
+    }
+    if($values[0] =~ /U(\d)/){
+      $phase = $1;
+      my $first = shift @values; 
+    }
+    #print STDERR "have values @values\n";
+    my $count = 0;
+    my $exonname = $prefix.".".$gene_count;
+    foreach my $coord(@values){
+      if($coord =~ /U\d/){
+	next;
+      }
+      #print STDERR "have coord ".$coord."\n";
+      my ($start, $end) = split /\.\./, $coord;
+      #print STDERR "have start ".$start," end ".$end."\n";
+      my $end_phase = ($phase + ($end-$start) + 1)%3;
+      $self->create_feature($start, $end, $score, $strand, $phase, $end_phase, $exonname);
+      $phase =  $end_phase;
+      my $count++;
+      if($values[$count] =~ /U(\d)/){
+	if($phase != $1){
+	  $self->warn(" phase ".$phase." and continuation phase ".$1." aren't the same may be issues with translation\n");
 	}
-      } elsif (!/start/ && !/end/) {
-	die "unknown field $_\n" ;
       }
     }
+    $gene_count++;
+  }
+  #print STDERR "reverse strand\n";
+  $phase = 0;
+  $strand = -1;
+  foreach my $line(@reverse_lines){
+    #print STDERR "line ".$line,"\n";
+    $line =~ s/\[TSL: \S+\s+\S+\]//;
+    $line =~ s/start//;
+    $line =~ s/\[ -?(\d+\.\d+) \]//;
+    my $score = $1;
+    if(!$line =~ /\*/){
+      $self->throw("this gene $line isn't on the reverse strand why is it here");
+    }else{
+      $line =~ s/\*//;
+    }
+    my @elements = split /\s+/, $line;
+    $line = '';
+    foreach my $v (reverse(@elements)){
+      $line .= $v." ";
+    } 
+    #print STDERR $line."\n";
+    my @values = split /\s+/, $line;
+    #print STDERR "@values\n";
+    if(!$values[0]){
+      my $first = shift @values;  
+    }
+    if($values[0] =~ /U(\d)/){
+     # print "value is ".$values[0]."\n";
+      $phase = $1;
+      my $phase_variable = shift @values; 
+     # print STDERR "phase has been set to ".$phase."\n";
+    }
+    #print STDERR "@values\n";
+    my $count = 0;
+    my $exonname = $prefix.".".$gene_count;
+    foreach my $coord(@values){
+      if($coord =~ /U\d/){
+	next;
+      }
+     # print STDERR "phase is ".$phase."\n";
+#      print STDERR "have coord ".$coord."\n";
+      my ($start, $end) = split /\.\./, $coord;
+#      print STDERR "have start ".$start," end ".$end."\n";
+      my $end_phase = ($phase + ($end-$start) + 1)%3;
+      $self->create_feature($start, $end, $score, $strand, $phase, $end_phase, $exonname,);
+      $phase =  $end_phase;
+      my $count++;
+      if($values[$count] =~ /U(\d)/){
+	if($phase != $1){
+	  $self->warn(" phase ".$phase." and continuation phase ".$1." aren't the same may be issues with translation\n");
+	}
+      }
+    }
+    $gene_count++;
   }
   $self->create_genes;
-
 }
 
 
@@ -357,18 +388,10 @@ sub each_Transcript {
 
 
 sub create_feature {
-    my ($self, $start, $end, $score, $strand, $phase, $seqname, $program, $program_version, $source, $primary) = @_;
+    my ($self, $start, $end, $score, $strand, $phase, $end_phase, $seqname) = @_;
     #$self->create_gene();
-    #print "seqname ".$seqname."\n";
-    #create analysis object
-    my $analysis_obj = Bio::EnsEMBL::Analysis->new
-                        (   -db              => undef,
-                            -db_version      => undef,
-                            -program         => $program,
-                            -program_version => $program_version,
-                            -gff_source      => $source,
-                            -gff_feature     => $primary);
-
+    #print STDERR " Creating exon seqfeature seqname ".$seqname." start ".$start. " end ".$end." strand ".$strand." phase ".$phase." end phase ".$end_phase." score ".$score."\n" if($strand == -1);
+  #  $self->throw("create feature");
     #create and fill Bio::EnsEMBL::Seqfeature objects   
     my $exon = Bio::EnsEMBL::SeqFeature->new
                         (   -seqname => $seqname,
@@ -377,7 +400,7 @@ sub create_feature {
                             -strand  => $strand,
                             -score   => $score,
                             -phase   => $phase,
-                            -analysis => $analysis_obj);  
+                            -end_phase => $end_phase);  
     $self->exons($exon);
 }
 
@@ -385,7 +408,7 @@ sub create_feature {
 #relies on seqname of exons being in genefinder format 3.01, 3.02 etc
 sub create_genes {
     my ($self) = @_;
-    print "creating genes \n";
+    #print "creating genes \n";
     my (%genes, %gene_start, %gene_end, %gene_score, %gene_p,
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
@@ -397,11 +420,11 @@ sub create_genes {
       #print $exon->seqname."\n";
         my ($group_number) = $exon->seqname;
 	#print "seqname =  ".$exon->seqname."\n";
-	print $group_number."\n";
+	#print $group_number."\n";
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
-	  print "creating a new trancripts for ".$group_number."\n";
+	  #print "creating a new trancripts for ".$group_number."\n";
             $genes          {$group_number} = [];
             $gene_start     {$group_number} = $exon->start;
             $gene_end       {$group_number} = $exon->end;
@@ -410,7 +433,7 @@ sub create_genes {
             $gene_analysis  {$group_number} = $exon->analysis;
         }
         #fill array of exons
-	print "adding an exon to ".$group_number."\n";
+	#print "adding an exon to ".$group_number."\n";
         push (@{$genes {$group_number}}, $exon);
         #calculate gene boundaries and total score
         $gene_start {$group_number} = $exon->start() 
@@ -433,12 +456,14 @@ sub create_genes {
                             -end         => $gene_end      {$gene_number},
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
-
+	$gene->contig($self->query);
         foreach my $exon (@{$genes {$gene_number}})
         {
           $gene->add_sub_SeqFeature($exon, '');
         }
         $self->genefinder_genes($gene); #add gene to main object
+	#print STDERR "contig ".$gene->contig."\n";
+	$self->query->id($gene_number);
 	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
 	#print "have ".$tran."\n";
 	$self->add_transcript($tran);
@@ -558,7 +583,7 @@ sub output_singlefeature {
     my ($start, $end, $score, $analysis, $primary, $source, $p_value);
 
     my (@genes) = $self->genes();
-    print STDERR "No exons predicted\n" unless (@genes);
+    #print STDERR "No exons predicted\n" unless (@genes);
     #calculate boundaries and aggregate values
     foreach my $gene (@genes)
     {
