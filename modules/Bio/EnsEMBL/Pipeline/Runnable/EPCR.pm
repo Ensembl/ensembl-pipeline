@@ -18,13 +18,15 @@ Bio::EnsEMBL::Pipeline::Runnable::EPCR
 
   #create and fill Bio::Seq object
   my $clonefile = '/nfs/disk65/mq2/temp/bA151E14.seq';
-  my $seq = Bio::Seq->new();
   my $seqstream = Bio::SeqIO->new(-file => $clonefile, -fmt => 'Fasta');
-  $seq = $seqstream->next_seq();
-  #create Bio::EnsEMBL::Pipeline::Runnable::EPCR object
+  my $seq = $seqstream->next_seq();
+
+  #create and run Bio::EnsEMBL::Pipeline::Runnable::EPCR object
   my $pcr = Bio::EnsEMBL::Pipeline::Runnable::EPCR->new (-CLONE => $seq);
   $pcr->workdir($workdir);
   $pcr->run();
+
+  # collect results
   my @results = $pcr->output();
 
 =head1 DESCRIPTION
@@ -72,7 +74,6 @@ use strict;
 # Object preamble - inherits from Bio::Root::RootI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::Repeat;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::Analysis; 
 use Bio::Seq;
@@ -315,7 +316,7 @@ sub parse_results {
         $feat1 {'start'}        = $start;
         $feat1 {'end'}          = $end;
         $feat2 {'start'}        = 1;     
-        $feat2 {'end'}          = $end - $start;
+        $feat2 {'end'}          = $end - $start + 1;
         $feat1 {'strand'}       = 0;
         $feat2 {'strand'}       = 0;
         #misc
