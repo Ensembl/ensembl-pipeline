@@ -37,16 +37,16 @@ sub new {
   $self->throw("No target") unless defined $target;
   $self->target($target);
 
-  $self->throw("No qstart") unless defined $qstart;
+  $self->throw("No query start") unless defined $qstart;
   $self->qstart($qstart);
 
-  $self->throw("No qend") unless defined $qend;
+  $self->throw("No query end") unless defined $qend;
   $self->qend($qend);
 
-  $self->throw("No tstart") unless defined $tstart;
+  $self->throw("No target start") unless defined $tstart;
   $self->tstart($tstart);
 
-  $self->throw("No tend") unless defined $tend;
+  $self->throw("No target end") unless defined $tend;
   $self->tend($tend);
 
   $self->throw("No percent") unless defined $percent;

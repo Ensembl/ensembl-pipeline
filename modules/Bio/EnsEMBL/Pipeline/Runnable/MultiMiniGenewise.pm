@@ -237,6 +237,9 @@ sub get_Sequence {
   if ($@) {
     $self->throw("Problem fetching sequence for [$id]: [$@]\n");
   }
+  if(!$seq){
+    print STDERR "have had problems fetching sequence for ".$id."\n";
+  }
   return $seq;
 }
 
