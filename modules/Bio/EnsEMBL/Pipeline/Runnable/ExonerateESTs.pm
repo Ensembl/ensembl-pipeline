@@ -17,7 +17,6 @@ Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs
 =head1 SYNOPSIS
 
     my $obj = Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs->new('-genomic'    => $genseq,
-								   '-seqfetcher' => $seqfetcher
 								   '-ests'       => $ests,
 								   '-resfile'    => $resfile);
 
@@ -60,24 +59,21 @@ use Bio::DB::RandomAccessI;
 
     Title   :   new
     Usage   :   $self->new(-GENOMIC    => $genomicseq,
-			   -ESTS       => $ests,
-                           -SEQFETCHER => $sf);
+			   -ESTS       => $ests);
                            
     Function:   creates a 
                 Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs object
     Returns :   A Bio::EnsEMBL::Pipeline::Runnable::ExonerateESTs object
     Args    :   -genomic:    Bio::PrimarySeqI object (genomic sequence)
                 -ests:       Either path to file containing est seqs or reference to aray of Bio::Seq
-                -seqfetcher  Bio::DB::RandomAccessI object
 =cut
 
 sub new {
     my ($class,@args) = @_;
     my $self = $class->SUPER::new(@args);
 
-    my( $genomic, $ests, $seqfetcher, $resfile) = $self->_rearrange([qw(GENOMIC
+    my( $genomic, $ests, $resfile) = $self->_rearrange([qw(GENOMIC
 									ESTS
-									SEQFETCHER
 									RESFILE)],
 								    @args);
 							   
@@ -94,12 +90,6 @@ sub new {
     $self->throw("No resfile specified") 
       unless defined($resfile);
     $self->resfile($resfile) if defined($resfile);
-
-    $self->throw("No seqfetcher provided")           
-      unless defined($seqfetcher);
-    $self->throw("[$seqfetcher] is not a Bio::DB::RandomAccessI") 
-      unless $seqfetcher->isa("Bio::DB::RandomAccessI");
-    $self->seqfetcher($seqfetcher) if defined($seqfetcher);
 
     return $self; 
 }
@@ -123,27 +113,6 @@ sub genomic_sequence {
     }
     return $self->{'_genomic_sequence'};
 }
-
-=head2 seqfetcher
-
-    Title   :   seqfetcher
-    Usage   :   $self->seqfetcher($seqfetcher)
-    Function:   Get/set method for SeqFetcher
-    Returns :   Bio::DB:RandomAccessI
-    Args    :   Bio::DB:RandomAccessI
-
-=cut
-
-sub seqfetcher {
-    my( $self, $value ) = @_;    
-    if ($value) {
-      #need to check if passed sequence is Bio::EnsEMBL::Pipeline::SeqFetcherI object
-      $self->throw("Input isn't a Bio::DB::RandomAccessI") unless $value->isa("Bio::DB::RandomAccessI");
-      $self->{'_seqfetcher'} = $value;
-    }
-    return $self->{'_seqfetcher'};
-}
-
 
 =head2 resfile
 
