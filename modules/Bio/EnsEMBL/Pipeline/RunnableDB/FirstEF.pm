@@ -100,14 +100,14 @@ sub fetch_input {
     my $slice = $self->db->get_SliceAdaptor->fetch_by_chr_start_end($chr,$start,$end);
     $self->query($slice);
 
-#print ">thing\n" . $self->query->get_repeatmasked_seq->seq . "\n";
+print "FEF_REPEATMASKED : " . $FEF_REPEATMASKED . "\n";
 
     my $runnable = Bio::EnsEMBL::Pipeline::Runnable::FirstEF->new(
-		     -query            => $self->query,
-		     -repeatmasked_seq => $self->query->get_repeatmasked_seq,
-		     -analysis         => $self->analysis,
-		     -firstef_dir      => $FEF_APPLICATION_DIR,
-		     -param_dir        => $FEF_PARAMETER_DIR);
+		     -query        => $self->query,
+		     -repeatmasked => $FEF_REPEATMASKED,
+		     -analysis     => $self->analysis,
+		     -firstef_dir  => $FEF_APPLICATION_DIR,
+		     -param_dir    => $FEF_PARAMETER_DIR);
 
 							   
     $self->runnable($runnable);

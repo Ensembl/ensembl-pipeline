@@ -58,14 +58,17 @@ use vars qw( %FirstEF );
 	    FEF_QUEUE => 'acari',
 
 	    # Stipulate the size of the slices that firstef should run on.
-	    FEF_CHUNKSIZE => '500000',
+	    FEF_CHUNKSIZE => '50000',
 
 	    # Name of the script that actually runs the analysis for each slice.
 	    FEF_RUN_SCRIPT => '',
 
-	    # Reference database where assemble, chromosome, dna, etc information is stored.
-	    FEF_REFDBHOST => 'kaka',
-	    FEF_REFDBUSER => 'anonymous',
+	    # Repeatmasked, or not.
+	    FEF_REPEATMASKED => 1,
+	    
+	    # Reference database where assembly, chromosome, dna, etc information is stored.
+	    FEF_REFDBHOST => '',
+	    FEF_REFDBUSER => '',
 	    FEF_REFDBNAME => '',
 
 	    # The database where the firstef features will be written
@@ -77,13 +80,13 @@ use vars qw( %FirstEF );
 	    # Directory where firstef.* binaries and FirstEF_parser.pl 
 	    # are located.  At runtime, the runnable determines which
 	    # platform specific binary should be used.
-	    FEF_APPLICATION_DIR => '',
+	    FEF_APPLICATION_DIR => '/usr/local/ensembl/firstef/',
 
 	    # Usually, this directory is a sub-directory of the firstef
 	    # application directory called 'parameters'.  This directory
 	    # contains all of the training data that firstef uses for
 	    # identifying first exons.
-	    FEF_PARAMETER_DIR   => '',
+	    FEF_PARAMETER_DIR   => '/usr/local/ensembl/firstef/parameters',
 	   );
 
 sub import {

@@ -54,7 +54,7 @@ sub new {
       $param_dir,
       $workdir) = $self->_rearrange([qw(QUERY
 					DB
-					REPEATMASK
+					REPEATMASKED
 					ANALYSIS
 					FIRSTEF_DIR
 					PARAM_DIR
@@ -67,6 +67,7 @@ sub new {
   $self->_param_dir($param_dir)     if $param_dir;
   $self->workdir($workdir)          if $workdir;
   $self->_analysis($analysis)       if $analysis;
+
 
   if (defined $repeatmask){
     $self->_repeatmask($repeatmask);
@@ -157,8 +158,10 @@ sub _write_seqs_for_firstef {
      # NOTE, this little backwater is where the repeatmasked 
      # sequence is plonked in, or not.
   if ($self->_repeatmask) {
+print "USING REPEATMASKED SEQUENCE\n";
     $seqio_out->write_seq($self->_query_seq->get_repeatmasked_seq);
   } else {
+print "NOT USING REPEATMASKED SEQUENCE\n";
     $seqio_out->write_seq($self->_query_seq)
   }
 
