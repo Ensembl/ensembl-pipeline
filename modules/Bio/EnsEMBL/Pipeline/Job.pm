@@ -421,7 +421,7 @@ sub run_module {
   my ($err, $res);
   my $autoupdate = $AUTO_JOB_UPDATE;
 
-  print STDERR "in run_module have autoupdate set to ".$autoupdate." while running ".$module."\n";
+  #print STDERR "in run_module have autoupdate set to ".$autoupdate." while running ".$module."\n";
 
   STATUS:
   { 
@@ -625,7 +625,7 @@ sub make_filenames {
 
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
-  $stub .= time().".".int(rand(1000));
+  $stub .= int(rand(1000));
 
  
   $self->stdout_file($dir.$stub.".out") unless($self->stdout_file);
@@ -696,7 +696,9 @@ sub submission_id {
 sub output_dir{
  my ($self, $arg) = @_;
 
+ my ($p, $f, $l) = caller;
  if($arg){
+   #print STDERR $f." ".$l." is calling output_dir with ".$arg."\n";
    $self->{'_output_dir'} = $arg;
  }
 

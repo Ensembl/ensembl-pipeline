@@ -60,6 +60,7 @@ package Bio::EnsEMBL::Pipeline::BatchSubmission;
 
 use vars qw(@ISA);
 use strict;
+use Bio::EnsEMBL::Root;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
