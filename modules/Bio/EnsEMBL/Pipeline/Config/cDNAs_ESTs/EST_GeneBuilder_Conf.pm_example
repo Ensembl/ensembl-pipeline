@@ -90,7 +90,7 @@ use vars qw( %EST_GeneBuilder_Conf );
 			 
 	    EST_GENEBUILDER_CHUNKSIZE        => 1000000,      #  we use 1000000 (ie 1MB) chunks
 		  
-	    EST_GENEBUILDER_INPUT_GENETYPE => 'human_est',
+	    EST_GENEBUILDER_INPUT_GENETYPE => 'exonerate',
 	    ESTGENE_TYPE        => 'estgene',
 	    
 	    # ORFs can be calculated with genomewise (which has a bug (14/08/2003))
