@@ -524,6 +524,7 @@ foreach my $tracked_deletion (sort {$a <=> $b} (keys %deletion_tracking)){
     }
   }
 
+
   # Put our working alignments somewhere handy
 
   $self->_working_alignment('genomic_sequence', $self->_genomic_sequence);
@@ -1596,7 +1597,7 @@ sub _fiddly_bits {
     # Take care of unusual situation where genomic strand gets turned around.
   if (($self->_strand == -1)&&($base_align_feature->strand == 1)){
       # Force the hstrand around
-    $hstrand = -1;
+    $hstrand = $hstrand * -1;
       # Reverse the order of things in the cigar
     my @cigar_items = $self->_cigar_reader($cigar);
     @cigar_items = reverse @cigar_items;
