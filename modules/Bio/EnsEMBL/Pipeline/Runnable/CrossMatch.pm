@@ -67,7 +67,7 @@ sub new {
   bless $self,$class;
   
   $self->{'_fp_array'} =[];
-  my ($seq1,$seq2,$workdir,$score,$minmatch,$masklevel) = $self->_rearrange([qw(SEQ1 SEQ2 WORKDIR SCORE MINMATCH MASKLEVEL)],@args);
+  my ($seq1,$seq2,$workdir,$score,$minmatch,$masklevel,$debug) = $self->_rearrange([qw(SEQ1 SEQ2 WORKDIR SCORE MINMATCH MASKLEVEL)],@args);
   if( !defined $seq1 || !defined $seq2 ) {
       $self->throw("Must pass in both seq1 and seq1 args");
   }
@@ -90,8 +90,6 @@ sub new {
   if( defined $masklevel ) {
     $self->masklevel($masklevel);
   }
-
-
   
 # set stuff in self from @args
   return $self;
@@ -145,10 +143,14 @@ sub run{
        unlink($file2);
        $self->throw("Unable to run cross match! (probably no crossmatch executable).\n$@");
    }
-
+   if (!$cm) {
+     #print "0 match entries for ",$self->seq1->id,"\n";
+     return;
+   }
    #process alignments above score
    foreach my $fp ( $cm->fp($self->score) ) {
        my ($seq1,$seq2,$score,$start,$end,$hstart,$hend) = split(/:/,$fp);
+
        my ($strand,$hstrand,$swap);
 
        if( $start > $end ) {
