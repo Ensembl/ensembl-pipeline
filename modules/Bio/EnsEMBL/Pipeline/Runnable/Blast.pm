@@ -159,7 +159,7 @@ sub run {
     my $seq = $self->query || $self->throw("Query seq required for Blast\n");
 
     #set directory if provided (MC this should be in a config file somewhere)
-    $self->workdir('/tmp') unless ($self->workdir($dir));
+    $self->workdir('/work2/michele') unless ($self->workdir($dir));
     $self->checkdir();
 
     #write sequence to file
@@ -236,6 +236,7 @@ sub parse_results {
 
   HSP: while (my $hsp = $sbjct->nextHSP) {
 
+
       next HSP if ($hsp->P > $self->threshold);
       
       my (%feat1, %feat2);
@@ -267,6 +268,8 @@ sub parse_results {
       $sbjct->name =~ /[\||\s|:](\w+)[\||\s|:]/; #extract subjectname
       $feat2 {name}    = $1;
       
+      #MC 29/11/00 The new viersion of BPlite deals with strand 
+      # so we won't have to do this.
       if ($hsp->sbjctBegin < $hsp->sbjctEnd) {
 	$feat2 {start}   = $hsp->sbjctBegin;
 	$feat2 {end}     = $hsp->sbjctEnd;
@@ -276,7 +279,13 @@ sub parse_results {
 	$feat2 {end}     = $hsp->sbjctBegin;
 	$feat2 {strand}  = -1;
       }
-            
+
+      # We force the feat1 strand always to be 1.  This is not necessarily correct
+      my $tmpstrand = $feat1{strand};
+      
+      $feat1{strand} = 1;
+      $feat2{strand} = $tmpstrand * $feat2{strand};
+      
       if ($self->database) {
 	$feat2 {db} = $self->database;
       } else {
@@ -320,6 +329,23 @@ sub parse_results {
 sub split_gapped_feature {
   my ($self, $feat1, $feat2) = @_;
     
+  my $type1;
+  my $type2;
+
+  my $len1 = $feat1->{end} - $feat1->{start} + 1;
+  my $len2 = $feat2->{end} - $feat2->{start} + 1;
+
+  if ($len1/$len2 > 2) {
+    $type1 = 'dna';
+    $type2 = 'pep';
+  } elsif ($len2/$len1 > 2) {
+    $type1 = 'pep';
+    $type2 = 'dna';
+  } else {
+    $type1 = 'dna';
+    $type2 = 'dna';
+  }
+  
   #There's a strange bug in wublastn where a gap is inserted at the end of an alignment
   #The alignment is trimmed of any terminal gaps so that the alignment ends on a valid feature
   while ($feat1->{'alignment'} =~ /-$/ || $feat2->{'alignment'} =~ /-$/) {
@@ -335,9 +361,13 @@ sub split_gapped_feature {
   my (@masked_f1, @masked_f2);
 
   #replace bases and gaps with positions and mask number
-  @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'});
-  @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'});
-    
+  if ($type1 = 'pep' && $type2 == 'dna') {
+    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},1);
+    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},3);
+  } elsif ($type1 = 'dna' && $type2 == 'pep') {
+    @masked_f1 = $self->mask_alignment($feat1->{'start'}, $feat1->{'strand'}, $feat1->{'alignment'},3);
+    @masked_f2 = $self->mask_alignment($feat2->{'start'}, $feat2->{'strand'}, $feat2->{'alignment'},1);
+  }
   $self->throw("Can't split feature where alignment lengths don't match: F1 ("
 	       .scalar(@masked_f1).") F2 (".scalar(@masked_f2).")\n")
     if (scalar(@masked_f1) != scalar(@masked_f2)); 
@@ -386,9 +416,9 @@ sub split_gapped_feature {
                 my $f1_len = $feat1->{'end'} - $feat1->{'start'} +1;
                 my $f2_len = $feat2->{'end'} - $feat2->{'start'} +1; 
                 
-                $self->throw("FeaturePair lengths don't match! ".
-                        "F1 $f1_start - $f1_end ($f1_len) F2 $f2_start - $f2_end ($f2_len)\n") 
-                        if ( $f1_len != $f2_len );
+#                $self->throw("FeaturePair lengths don't match! ".
+#                        "F1 $f1_start - $f1_end ($f1_len) F2 $f2_start - $f2_end ($f2_len)\n") 
+#                        if ( $f1_len != $f2_len );
                  
                         
                 $self->createfeaturepair($feat1, $feat2);
@@ -411,7 +441,7 @@ sub split_gapped_feature {
 
 #Fills gapped alignment with base position number or -1 for insertions. 
 sub mask_alignment {
-    my ($self, $start, $strand, $alignment) =@_;
+    my ($self, $start, $strand, $alignment,$inc) =@_;
     my @masked_array;
     my @array = split (//,$alignment);
     $_ = $alignment;
@@ -426,7 +456,8 @@ sub mask_alignment {
         if ($base ne '-')
         {
             push (@masked_array, $base_count);
-            $base_count = ($strand == 1) ? $base_count + 1  : $base_count - 1; 
+	      $base_count = ($strand == 1) ? $base_count + $inc  : $base_count - $inc; 
+
         }
         else
         {
