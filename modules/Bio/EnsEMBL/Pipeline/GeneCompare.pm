@@ -1,10 +1,9 @@
-
 #
 # BioPerl module for Bio::EnsEMBL::Pipeline::GeneCompare
 #
-# Cared for by Ewan Birney <birney@ebi.ac.uk>
+# Cared for by Simon Kay <sjk@sanger.ac.uk>
 #
-# Copyright Ewan Birney
+# Copyright Simon Kay
 #
 # You may distribute this module under the same terms as perl itself
 
@@ -12,54 +11,39 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneCompare - Comparison of old and new Gene/Transcript/Exons
+Bio::EnsEMBL::Pipeline::GeneCompare - Comparison of a gene against an array of genes
 
 =head1 SYNOPSIS
 
-    # $dbobj is the analysis database
-    # $timdb is the tim database implementing get_old_Exons on the clone
-    # (in the future $dbobj and $timdb could be the same object)
-    # @newexons is a set of exons with temporary ids assigned
-    # @mappedexons is the set of exons with olds ids, version numbers and new ids etc...
-
-    # this module *does not* deal with writing the new, mapped, exons into the database.
-
-
-    ($mapped,$new,$untransfered) = 
-             Bio::EnsEMBL::Pipeline::GeneComp::map_temp_Exons_to_real_Exons($dbobj,
-									    $timdb,
-									    @newexons);
-
-
-    # $mapped - reference to array of tempexons mapped to their new ids, with versions
-    # and modified stamps correctly placed
-
-    # $new - reference to array of new exons, with new ids, versions set to 1 and
-    # modified/created time stamps.
-
-    # $untransfered - reference to array of old exons, with old ids which although were 
-    # remapped did not have exons in the new database to map to.
+$self->{'_standardExons'} is an array of exons found on the standard gene.
+These are compared to the array of exons found on the genes stored in
+@{$self->{'_predictorGenes'}}.
 
 
 =head1 DESCRIPTION
 
-This is a methods bag, not a real object. It deals with mapping exons,
-transcript and genes from old versions through to new versions. This
-is where calls to get_new_ExonID etc are actually made, and where the
-version logic happens. To do the mapping we need to get the old exons
-out in the new coordinates (remapping). This currently is hidden
-behind the method call get_old_Exons() on a contig object. This call
-returns old exon objects in the new coordinates, with the method
-->identical_dna set to true or not.
+This module represents a class that is used for gene comparison. It is a specialisation 
+of Bio::Root::RootI. The constructor (new method) takes an array of genes which is stored
+in the @{$self->{'_predictorGenes'}} property. These are the genes against which all 
+comparisons are made. An array of exons on these genes is obtained by calling the
+_getPredictorExons method. The standard gene is set by the setStandardGene method which
+finds all the standard exons and stores them in the $self->{'_standardExons'} property. 
 
-This module is complex. I dont think there is anyway around
-this. There are two basic pieces of logic - rules for exon migration
-and rules for gene/transcript migration.
+Various methods perform comparisons between the standard gene and the array of predictor genes
+by in turn creating objects of the class Bio::EnsEMBL::Pipeline::ExonCompare and calling
+appropriate methods on these:
 
-For exon migration, if the start/end/strand in new coordinates of the
-exons are the same then it gets the old exon id. If the dna sequence
-has changed, this increments the version number.  If not it stays the
-same.
+isMissed returns 1 if none of the exons on the standard gene are overlapped by the predictor genes.
+isExactlyMatched returns 1 if all the exons on the standard gene are exactly identified 
+by only one of the predictor genes.
+getGeneOverlapCount returns the number of predictor genes that the standard gene overlaps. 
+getExactOverlapRatio returns a list. The first item is the number of exons on the standard 
+gene that are exactly overlapped; the second is the number that are not.
+getMissed returns the number of standard exons which are not overlapped by predictor exons.
+getExonOverlaps returns an array containing predictor exons which the standard gene overlaps.
+getBaseOverlaps returns the number of bases on the standard gene that have true positive, true negative
+and false positive overlaps with all the overlapping exons from the predictor genes. 
+
 
 =head1 CONTACT
 
@@ -85,7 +69,7 @@ use Bio::Root::RootI;
 
  Title   : new
  Usage   : GeneCompare->new()
- Function: 
+ Function: Constructor
  Example : 
  Returns : Reference to an object
  Args    : 
@@ -93,19 +77,9 @@ use Bio::Root::RootI;
 =cut
 
 sub new {
-    my ($class, @args) = @_;
+    my ($class, @predictedGenes) = @_;
     my $self = bless {}, $class;
-
-    my @predictorGenes = $self->_rearrange([qw(PREDICTORGENES)],@args);
-                                          
-    # Note that if different genes have the same exon, @predictorGenes will
-    # include multiple copies of this exon but this is precisely what we want!
-    foreach my $gene (@predictorGenes) {
-        foreach my $exon ($gene->each_unique_Exon() ) {
-            push(@{$self->{'_predictorExons'}}, $exon);
-        }
-    }   
-
+    @{$self->{'_predictorGenes'}} = @predictedGenes;           
     return $self;
 }
 
@@ -115,7 +89,8 @@ sub new {
 
  Title   : setStandardGene
  Usage   : $obj->setStandardGene($standardGene)
- Function: 
+ Function: Gets all the exons from the standard gene parameter and 
+            stores them in $self->{'_standardExons'}. 
  Example : 
  Returns : 
  Args    : $standardGene - reference to a Gene object
@@ -131,11 +106,80 @@ sub setStandardGene {
 
 
 
+=head2 _getStandardExons
+
+ Title   : _getStandardExons
+ Usage   : $obj->_getStandardExons
+ Function: 
+ Example : 
+ Returns : Array of standard exons
+ Args    : 
+
+
+=cut
+
+sub _getStandardExons {
+    my ($self) = @_;
+    
+    return @{$self->{'_standardExons'}}; 
+}
+
+
+
+=head2 _getPredictorGenes
+
+ Title   : _getPredictorGenes
+ Usage   : $obj->_getPredictorGenes
+ Function: 
+ Example : 
+ Returns : Array of predictor genes
+ Args    : 
+
+
+=cut
+
+sub _getPredictorGenes {
+    my ($self) = @_;
+    
+    return @{$self->{'_predictorGenes'}}; 
+}
+
+
+
+=head2 _getPredictorExons
+
+ Title   : _getPredictorExons
+ Usage   : $obj->_getPredictorExons
+ Function: 
+ Example : 
+ Returns : Array of predictor exons
+ Args    : 
+
+
+=cut
+
+sub _getPredictorExons {
+    my ($self) = @_;
+    
+    my @predictorExons;
+    # Note that if different genes have the same exon, @predictorGenes will
+    # include multiple copies of this exon but this is precisely what we want!
+    foreach my $gene ($self->_getPredictorGenes()) {
+        foreach my $exon ($gene->each_unique_Exon() ) {
+            push(@predictorExons, $exon);
+        }
+    } 
+    
+    return @predictorExons;  
+}
+
+
+
 =head2 isMissed
 
  Title   : isMissed
  Usage   : $missed = $obj->isMissed()
- Function: A gene is considered missed if none of its exons are overlapped by a predicted gene.
+ Function: A gene is considered missed if none of its exons are overlapped by any predicted exons.
  Example : 
  Returns : 1 or 0
  Args    : None
@@ -146,15 +190,14 @@ sub setStandardGene {
 sub isMissed {
     my ($self) = @_;
 
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare($self->_getPredictorExons());
 
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+    foreach my $standardExon ($self->_getStandardExons()) { 
         $comparer->setStandardExon($standardExon);            
-        if ($comparer->hasOverlap()) {
+        if ($comparer->hasOverlap()) {   
             return 0;
         }
-    }
-    
+    } 
     return 1;
 }
 
@@ -165,7 +208,7 @@ sub isMissed {
  Title   : isExactlyMatched
  Usage   : $obj->isExactlyMatched()
  Function: A gene is considered exactly matched if all the exons 
-            on the standard gene are exactly identified
+            on the standard gene are exactly identified by only one predictor gene
  Example : 
  Returns : 1 or 0 
  Args    : None
@@ -175,42 +218,56 @@ sub isMissed {
 
 sub isExactlyMatched {
     my ($self) = @_;
-       
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
-
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
-        $comparer->setStandardExon($standardExon);
-        unless ($comparer->hasExactOverlap() == 1) {
-            return 0;
-        } 
-    }
+     
+    foreach my $gene ($self->_getPredictorGenes()) {
     
-    return 1;
+        my @predictorExons = $gene->each_unique_Exon();           
+        my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(@predictorExons);    
+        my $overlap = 1;
+        
+        foreach my $standardExon ($self->_getStandardExons()) {        
+            $comparer->setStandardExon($standardExon);       
+            unless ($comparer->hasExactOverlap()) { 
+                $overlap = 0;
+                # Break from inner loop as this predictor gene doesn't match         
+                last;    
+            }       
+        } 
+        if ($overlap) { 
+            return 1;
+        }
+    }
+   
+    return 0;
 }
 
 
 
-=head2 getOverlaps
+=head2 getGeneOverlapCount
 
- Title   : getOverlaps
- Usage   : $obj->getOverlaps()
- Function: Calculates the number of standard exons that are overlapped by predictor exons. 
+ Title   : getGeneOverlapCount
+ Usage   : $obj->getGeneOverlapCount()
+ Function: Calculates the number of predictor genes that the standard gene overlaps. 
  Example : 
- Returns : int
+ Returns : integer
  Args    : None
 
 
 =cut
 
-sub getOverlaps {
+sub getGeneOverlapCount {
     my ($self) = @_;
     
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
-    
     my $overlaps = 0;
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
-        $comparer->setStandardExon($standardExon);            
-        $overlaps += $comparer->getOverlaps();
+    foreach my $gene ($self->_getPredictorGenes()) { 
+        my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare($gene->each_unique_Exon());
+        foreach my $standardExon ($self->_getStandardExons()) {
+            $comparer->setStandardExon($standardExon);            
+            if ($comparer->hasOverlap()) {
+                $overlaps++;
+                last;
+            }
+        }
     }
     
     return $overlaps;
@@ -224,7 +281,7 @@ sub getOverlaps {
  Usage   : $obj->getExactOverlapRatio()
  Function: Calculates the number of standard exons that are exactly overlapped and the number that are not.
  Example : 
- Returns : (int, int) - $overlaps, $nonOverlaps
+ Returns : (integer, integer) - $overlaps, $nonOverlaps
  Args    : None
 
 
@@ -233,11 +290,11 @@ sub getOverlaps {
 sub getExactOverlapRatio {
     my ($self) = @_;
 
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare($self->_getPredictorExons());
     
     my $overlaps = 0;
     my $nonOverlaps = 0;
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+    foreach my $standardExon ($self->_getStandardExons()) {
     
         $comparer->setStandardExon($standardExon);            
         if ($comparer->hasExactOverlap()) {
@@ -256,9 +313,9 @@ sub getExactOverlapRatio {
 
  Title   : getMissed
  Usage   : $missed = $obj->getMissed()
- Function: 
+ Function: The number of standard exons which are not overlapped by predictor exons.
  Example : 
- Returns : The number of standard exons which are not overlapped by predictor exons.
+ Returns : Integer
  Args    : None
 
 
@@ -267,17 +324,48 @@ sub getExactOverlapRatio {
 sub getMissed {
     my ($self) = @_;
 
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare($self->_getPredictorExons());
 
     my $missed = 0;
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
+    my $count = 0;
+    
+    foreach my $standardExon ($self->_getStandardExons()) {
         $comparer->setStandardExon($standardExon);            
         unless ($comparer->hasOverlap()) {
             $missed++;
         }
+        $count++
     }
     
-    return $missed;
+    return ($missed, $count);
+}
+
+
+
+=head2 getExonOverlaps
+
+ Title   : getExonOverlaps
+ Usage   : @exons = $obj->getExonOverlaps()
+ Function: Finds the predictor exons which the standard gene overlaps.
+ Example : 
+ Returns : Array of references to Bio::EnsEMBL::Exon objects.
+ Args    : None
+
+
+=cut
+
+sub getExonOverlaps {
+    my ($self) = @_;
+
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare($self->_getPredictorExons());    
+    my @overlaps = ();
+    
+    foreach my $standardExon ($self->_getStandardExons()) {
+        $comparer->setStandardExon($standardExon); 
+        @overlaps = (@overlaps, $comparer->getOverlaps());        
+    }  
+    
+    return (@overlaps);
 }
 
 
@@ -286,33 +374,44 @@ sub getMissed {
 
  Title   : getBaseOverlaps
  Usage   : $obj->getBaseOverlaps()
- Function: This just considers the case of the first predictor exon found which has an overlap.
+ Function: Calculates the number of bases involved in true positive, true negative
+            and false positive overlaps between the standard gene and overlapping predictor genes. 
+            True positive means that a standard base is found on a predictor exon;
+            false negative means that a standard base is not found on a predictor exon;
+            false positve means that a base is found on an overlapping predictor gene
+            but not on the standard gene.
  Example : 
- Returns : The number of bases on the standard exon that have true positive, true negative
-            and false positive overlaps with a predictor exon. 
+ Returns : (integer, integer, integer) - $truePositive, $falsePositive, $falseNegative 
  Args    : 
 
 
 =cut
 
 sub getBaseOverlaps {
-    my ($self) = @_;
+    my ($self, $predictorExons) = @_;
         
-    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(-predictorExons => @{$self->{'_predictorExons'}});
+    my $comparer = new Bio::EnsEMBL::Pipeline::ExonCompare(@$predictorExons);
     
     my $truePositive = 0;
     my $falsePositive = 0;
     my $falseNegative = 0;
     
-    foreach my $standardExon (@{$self->{'_standardExons'}}) {
-        $comparer->setStandardExon($standardExon);            
-        my ($tP, $fP, $fN) = $comparer->getBaseOverlaps();
-  
-        $truePositive += $tP;
-        $falsePositive += $fP;
-        $falseNegative += $fN;
-    }  
+    foreach my $standardExon ($self->_getStandardExons()) {
+
+        $comparer->setStandardExon($standardExon); 
         
+        if ($comparer->hasOverlap) {           
+            my ($tP, $fP, $fN) = $comparer->getBaseOverlaps();  
+            $truePositive += $tP;
+            $falsePositive += $fP;
+            $falseNegative += $fN;
+        }
+        # If no overlaps are found then the whole length of the standard exon must be a false negative.
+        else {
+            $falseNegative += $standardExon->length;
+        }
+    }  
+                     
     return ($truePositive, $falsePositive, $falseNegative);         
 }
 
