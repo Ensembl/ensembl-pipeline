@@ -265,6 +265,7 @@ TRAN:
     # to avoid unnecessary processing
     ##########################################
     next TRAN unless ( $score >= 40 && $perc_id >= 40 );
+
     my $id = $self->_evidence_id($transcript);
     push ( @{$matches{$id}}, $transcript );
   }
@@ -482,7 +483,7 @@ sub write_output{
   foreach my $gene (@output){
       eval {
 	  foreach my $tran (@{$gene->get_all_Transcripts}){
-	      &Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($tran);
 	  }
 	  
 	  $gene_adaptor->store($gene);
