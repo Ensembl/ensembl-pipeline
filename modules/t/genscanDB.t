@@ -42,7 +42,7 @@ my $db = $ens_test->get_DBSQL_Obj;
 print "ok 2\n";    
 
 my $runnable = 'Bio::EnsEMBL::Pipeline::RunnableDB::Genscan';
-
+my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $ana = Bio::EnsEMBL::Pipeline::Analysis->new (   -db             => '__NONE__',
                                                     -db_version     => '__NONE__',
                                                     -program        => 'Genscan',
@@ -58,11 +58,11 @@ unless ($ana)
 { print "not ok 3\n"; }
 else
 { print "ok 3\n"; }
-$db->write_Analysis( $ana );
-
+my $id ='AB015752.00001';
+$ana_adaptor->exists( $ana );
 my $runobj = "$runnable"->new(  
                                 -dbobj      => $db,
-			                    -input_id   => 'AB015752.00001',
+			                    -input_id   => $id,
                                 -analysis   => $ana );
 unless ($runobj)
 { print "not ok 4\n"; }
@@ -80,8 +80,8 @@ else
 display(@out);
 
 $runobj->write_output();
-my @features = $db->get_Contig('AB015752.00001')->get_all_PredictionFeatures();
-#display(@features);
+my @features = $db->get_Contig($id)->get_all_PredictionFeatures();
+display(@features);
 
 unless (@features)
 { print "not ok 6\n"; }
