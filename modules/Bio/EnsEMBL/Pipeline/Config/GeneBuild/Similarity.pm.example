@@ -45,6 +45,8 @@ use vars qw( %Similarity );
 
 # Hash containing config info
 %Similarity = (
+
+         GB_SIMILARITY_INPUTID_EXTRA_REGEX => '(\S+):(\S+)',
 	       # fill in one complete hash for each database from which blast 
 	       # features are to be retrieved
 	       GB_SIMILARITY_DATABASES => [

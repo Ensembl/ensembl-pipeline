@@ -55,6 +55,8 @@ use vars qw( %Sequences );
 
 	      # path to cDNA index
 	      GB_CDNA_INDEX    => '',
+
+	      GB_CDNA_SEQFETCHER => ''
 	      
 	   );
 
