@@ -31,17 +31,9 @@ package Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder;
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise;
-use Bio::EnsEMBL::Pipeline::Runnable::Blast;
-use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
+
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::PrimarySeqI;
-use Bio::SeqIO;
-use Bio::DB::RandomAccessI;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
-						   GB_INPUTID_REGEX
-						  );
-use Bio::EnsEMBL::Pipeline::Config::Blast;
+use Bio::EnsEMBL::Slice;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -125,7 +117,7 @@ sub build_runnables {
     # give enough coverage to make it worth continuing.
 
     my $coverage = $self->check_coverage($seqname, $partitioned_features{$seqname});
-
+    
     # If only sparse coverage, go home early.
     unless ($coverage > 0.5) {
 
@@ -194,9 +186,9 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
     GENE:      
       foreach my $gene_cluster (@$gene_clusters){
 
-	my @sorted_gene_cluster = sort {$a->{_gsf_start} <=> $b->{_gsf_start};} @$gene_cluster;
+	my @sorted_gene_cluster = sort {$a->start <=> $b->start;} @$gene_cluster;
 
-	my $rough_gene_length = $sorted_gene_cluster[-1]->{_gsf_end} - $sorted_gene_cluster[0]->{_gsf_start};
+	my $rough_gene_length = $sorted_gene_cluster[-1]->end - $sorted_gene_cluster[0]->start;
 
 	my $padding_length;
 	if ($rough_gene_length > 10000) {
@@ -205,16 +197,16 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
 	  $padding_length = 1000;
 	}
 
-       	my $cluster_start = $sorted_gene_cluster[0]->{_gsf_start} - $padding_length;
-	my $cluster_end = $sorted_gene_cluster[-1]->{_gsf_end} + $padding_length;
+       	my $cluster_start = $sorted_gene_cluster[0]->start - $padding_length;
+	my $cluster_end = $sorted_gene_cluster[-1]->end + $padding_length;
 
         if ($cluster_start < 1) {
-	  if ($sorted_gene_cluster[0]->{_gsf_end} > 0) {
+	  if ($sorted_gene_cluster[0]->end > 0) {
 	    $cluster_start = 1;
 	  }
 	}
         if ($cluster_end > $self->genomic_sequence->length) {
-	  if ($sorted_gene_cluster[0]->{_gsf_start} <= $self->genomic_sequence->length) {
+	  if ($sorted_gene_cluster[0]->start <= $self->genomic_sequence->length) {
 	    $cluster_end = $self->genomic_sequence->length;
 	  } 
 	}        
@@ -231,11 +223,17 @@ print "Multi-gene code has turned itself on.\nProtein sequence is $seqname\nGeno
 	         $self->genomic_sequence->subseq($cluster_start, $cluster_end)
 		 . ('N' x ($self->genomic_sequence->length - ($cluster_end + 1)));
 
-print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
+#print "   Fragmented mini-genomic sequence - Start $cluster_start\tEnd $cluster_end\n";
 
-	my $genomic_subseq = Bio::Seq->new(-seq => $string_seq,
-					   -id  => $self->genomic_sequence->id );
-
+	my $genomic_subseq = Bio::EnsEMBL::Slice->new
+    (
+     -seq => $string_seq,
+     -seq_region_name  => $self->genomic_sequence->seq_region_name,
+     -start => 1,
+     -end => length($string_seq),
+     -coord_system => $self->genomic_sequence->coord_system,
+    );
+  #print STDERR "Have genomic subseq ".$genomic_subseq->name."\n";
 	my $runnable = $self->make_object($genomic_subseq, $unfiltered_partitioned_features{$seqname});
 	push (@runnables, $runnable);
 
@@ -369,7 +367,7 @@ sub form_gene_clusters {
   # Sort clusters according to their location in our
   # hit sequence.
   
-  my @sorted_by_start = sort {$a->[0]->{_hstart} <=> $b->[0]->{_hstart}} @$exon_clusters;  
+  my @sorted_by_start = sort {$a->[0]->hstart <=> $b->[0]->hstart} @$exon_clusters;  
   
   my @final_gene_clusters;
   
@@ -405,8 +403,8 @@ sub form_gene_clusters {
 	  my $closest_feature;
 	  foreach my $candidate_exon (@$other_cluster){
 	    
-	    my $distance = abs($candidate_exon->{_gsf_start} 
-			       - $seed_exon->{_gsf_start});
+	    my $distance = abs($candidate_exon->start 
+			       - $seed_exon->start);
 	    
 	    # The criteria below allows matches so long as the candidate exon 
 	    # is close enough and that the start of the next exon is greater
@@ -415,7 +413,7 @@ sub form_gene_clusters {
 	    # of one another).
 	    
 	    if(($distance < $closest)&&
-	       ($candidate_exon->{_hstart} > $seed_exon->{_hstart})&&
+	       ($candidate_exon->hstart > $seed_exon->hstart)&&
 	       ($distance < 20000)){
 	      if (defined $closest_feature){
 		push (@subtracted_other_cluster, $closest_feature);
@@ -501,13 +499,13 @@ sub make_object {
 sub check_overlap {
   my ($self, $query_feature, $other_feature) = @_;
 
-  my $query_start = $query_feature->{_hstart};
-  my $query_end   = $query_feature->{_hend};
+  my $query_start = $query_feature->hstart;
+  my $query_end   = $query_feature->hend;
 
   if ($query_start > $query_end){($query_start, $query_end) = ($query_end, $query_start)}
   
-  my $other_start = $other_feature->{_hstart};
-  my $other_end   = $other_feature->{_hend};
+  my $other_start = $other_feature->hstart;
+  my $other_end   = $other_feature->hend;
   
   if ($other_start > $other_end) {($other_start, $other_end) = ($other_end, $other_start)}
   
@@ -557,9 +555,9 @@ sub check_coverage {
 
   foreach my $feature (@$features){
 
-    my $start = $feature->{_hstart};
-    my $end = $feature->{_hend};
-
+    my $start = $feature->hstart;
+    my $end = $feature->hend;
+    #print STDERR "Have ".$seqname." start ".$start." end ".$end."\n";
     ($start, $end) = sort {$a <=> $b} ($start, $end);
 
     for (my $j = $start; $j <= $end; $j++){

@@ -80,6 +80,7 @@ sub new {
   $self->subs($subs);
   $options = $GB_GENEWISE_OPTIONS unless($options);
   $self->options($options);
+  #print STDERR "Have genomic of length ".$self->genomic->length."\n";
   return $self;
 }
 
@@ -140,7 +141,7 @@ sub align_protein {
   if (($self->reverse) && $self->reverse == 1) {
     $command .= " -trev ";
   }
-  open FH, '>'.$results_file or $self->throw("can't open $results_file");
+  #open FH, '>'.$results_file or $self->throw("can't open $results_file");
   #print STDERR "Have openned ".$results_file."\n";
   #print STDERR "GENEWISE running on ".$self->protein->id." with command ".$command."\n";
   #my @time = times;
@@ -248,7 +249,7 @@ sub align_protein {
   } 
   
   close(GW) or $self->throw("Error running genewise with command line ".$command."\n $!");
-  close(FH) or $self->throw("error closing $results_file");
+  #close(FH) or $self->throw("error closing $results_file");
   #@time = times;
   #print STDERR "AFTER GENEWISE @time\n"; 
   unlink $genfile;
