@@ -1,0 +1,9 @@
+#!/usr/local/bin/perl
+
+my $filename = shift;
+my $tmhmmdir = "/usr/local/ensembl";
+my $bin = "$tmhmmdir/bin/decodeanhmm";
+my $options = "$tmhmmdir/lib/TMHMM2.0.options";
+my $model = "$tmhmmdir/lib/TMHMM2.0.model";
+
+system "cat $filename | $bin -f $options -modelfile $model"; 

@@ -1,3 +1,4 @@
+#!/usr/local/bin/perl
 # Copyright GRL & EBI 2001
 # Author: Emmanuel Mongin
 # Creation: 03.19.2001
@@ -72,7 +73,7 @@ require "$file.pm";
 if ($check) {
    exit(0);
 }
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -host             => $host,
     -user             => $dbuser,
     -port             => $port,

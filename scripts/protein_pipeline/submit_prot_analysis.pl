@@ -1,3 +1,4 @@
+#!/usr/local/bin/perl
 # Author: Emmanuel Mongin
 # Creation: 03.19.2001
 
@@ -30,38 +31,44 @@ my $dbhost = $::db_conf{'dbhost'};
 my $dbuser = $::db_conf{'dbuser'};
 my $dbpass = $::db_conf{'dbpass'};
 
+#Get the DB handler
+
+my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $::db_conf{'dbhost'},
+					    -user   => $::db_conf{'dbuser'},
+					    -dbname => $::db_conf{'dbname'},
+					    -pass => $::db_conf{'dbpass'},
+					    );
+
 #Get the location of the peptide file
 my $pep_file = $::scripts_conf{'pep_file'};
 
 #Get the location of the scratch directory
 my $scratchdir =  $::scripts_conf{'tmpdir'};
 
+print STDERR "SCRATCH: ".$scratchdir."\n";
+
 #Give for each analysis its corresponding runnable
 
 #prints, prosite, profile, pfam, scanprosite, tmhmm, coils, signalp, seg
 
-$runnables{'prints'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints";
-$runnables{'prosite'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite";
-$runnables{'scanprosite'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite";
-$runnables{'pfam'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
-$runnables{'tmhmm'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm";
-$runnables{'coils'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Coil";
-$runnables{'signalp'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp";
-$runnables{'seg'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Seg";
+$runnables{'Prints'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Prints";
+$runnables{'Prosite'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ScanProsite";
+$runnables{'Pfam'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::ParacelHMM";
+$runnables{'Tmhmm'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Tmhmm";
+$runnables{'ncoils'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Coil";
+$runnables{'Signalp'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Signalp";
+$runnables{'Seg'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Seg";
+$runnables{'Profile'} = "Bio::EnsEMBL::Pipeline::RunnableDB::Protein::Profile";
 
-#my @ids = &get_ids();
+my @ids = &get_ids();
 &make_directories();
 &chunk_pepfile();
-&run_jobs();
+&run_jobs(@ids);
 
 sub get_ids {
     my @id;
     
 #Get all of the protein ids for the given database
-    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $::db_conf{'dbhost'},
-						-user   => $::db_conf{'dbuser'},
-						-dbname => $::db_conf{'dbname'},
-					    );
     
     my $q = "select translation_id from transcript";
     
@@ -138,26 +145,49 @@ sub run_jobs {
     my $pep_file = $::scripts_conf{'pep_file'};
     
      foreach my $r(@toberun) {
+	 #First get the analysisId of the module which is supposed to run
+	 my $q = "select analysisId from analysisprocess where module = '$r'";
+    
+	 my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
+	 my $res = $sth->execute || $db->throw("can't execute: $q");
+    
+	 my ($analysis_id) = $sth->fetchrow_array;
+
+	 unless ($analysis_id) {die "AnalysisId not defined\n"};
+
 	 my $chunk_name = $r."_chunk";
 
 	 my $chunk = $::scripts_conf{$chunk_name};
 
+	 unless ($chunk) {die "No chunk option defined\n"};
+
 	 my $runnabledb = $runnables{$r};
+
+	 unless ($runnabledb) {die "No runnableDB defined\n"};
 
 	 my $check = "-E \"".$runner." -check -runnable ".$runnabledb."\"";
 
 	 if ($chunk == 1) {
 	     foreach my $i(@id) {
-		 my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -o ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -pass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i;
+		 my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$i.".out -e ".$scratchdir."/".$r."/stderr/".$i.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$i." -analysis ".$analysis_id;
 				 
+		 print STDERR "RUNNING: $command\n";
+		 
+		 system($command)==0 || die "$0\Error running '$command' : $!";
+
 	     }
 	 }
 
 	 
-	 if ($chunk == 0) {
-	     my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -o ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -pass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$r;
+	 if ($chunk == 3) {
+	     my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$r.".out -e ".$scratchdir."/".$r."/stderr/".$r.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$pep_file." -analysis ".$analysis_id;
+	    
+
+	     print STDERR "RUNNING: $command\n";
 	     
-	     print STDERR "COMMAND: $command\n";
+	     system($command)==0 || die "$0\Error running '$command' : $!";
+	     
+	    
 	 }
 	 
 	 if ($chunk == 2) {
@@ -168,7 +198,13 @@ sub run_jobs {
 	     
 	     foreach my $f(@allfiles) {
 		 if (($f ne ".") && ($f ne "..")) {
-		      my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -o ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -pass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$f;
+		      my $command = "bsub -q ".$queue." -o ".$scratchdir."/".$r."/stdout/".$f.".out -e ".$scratchdir."/".$r."/stderr/".$f.".err ".$check." ".$runner." -runnable ".$runnabledb." -dbuser ".$dbuser." -dbpass ".$dbpass." -dbname ".$dbname." -host ".$dbhost." -input_id ".$dir."/".$f." -analysis ".$analysis_id;
+		  
+
+		      print STDERR "RUNNING: $command\n";
+	     
+		      system($command)==0 || die "$0\Error running '$command' : $!";
+
 		  }
 	     }
 	 }
