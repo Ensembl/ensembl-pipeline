@@ -202,7 +202,7 @@ sub run {
       " --querytype " . $self->query_type .
       " --targettype " . $self->target_type .
       " --query " . $self->query_file .
-      " --target " . $self->target_file;
+      " --target " . $self->target_file. " --forwardcoordinates FALSE";
   
 
   # Execute command and parse results
@@ -288,6 +288,11 @@ sub parse_results {
     my $aligned_query_residues = 0;
 
     foreach my $proto_exon (@$proto_exons){
+
+      if(not defined $proto_exon->[0]){
+        next;
+      }
+
       my @feature_pairs;
       my $exon_end    = undef; # Where the overall exon end is tallied.
       my $exon_start  = undef; # Where the overall exon start is tallied.
