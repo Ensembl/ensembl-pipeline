@@ -174,7 +174,7 @@ while( 1 ) {
 	        $job->batch_runRemote($queue);
 	      };
 	      if ($@) {
-		rpint STDERR "ERROR rnning job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
+		print STDERR "ERROR rnning job " . $job->dbID . " " . $job->stderr_file . " [$@]\n";
 	      }
             }
 
