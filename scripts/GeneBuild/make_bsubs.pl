@@ -1,18 +1,57 @@
 #!/usr/local/bin/perl
+
+=head1 NAME
+
+  make_bsubs.pl
+
+=head1 SYNOPSIS
+ 
+  make_bsubs.pl
+
+=head1 DESCRIPTION
+
+=head1 OPTIONS
+  
+  Options are to be set in GeneBuild config files
+  The important ones for this script are:
+
+     GeneBuild::Databases::GB_DBNAME   
+     GeneBuild::Databases::GB_DBHOST   
+     GeneBuild::Databases::GB_DBUSER   
+     GeneBuild::Databases::GB_DBPASS   
+
+     GeneBuild::Scripts::GB_RUNNER
+     GeneBuild::Scripts::GB_QUEUE
+     GeneBuild::Scripts::GB_OUTPUT_DIR
+     GeneBuild::Scripts::GB_LENGTH_RUNNABLES
+     GeneBuild::Scripts::GB_TARGETTED_RUNNABLES
+     GeneBuild::Scripts::GB_PM_OUTPUT
+     GeneBuild::Scripts::GB_SIZE
+							   
+     GeneCombinerConf::RUNNER
+     GeneCombinerConf::GENECOMBINER_RUNNABLES
+     GeneCombinerConf::SLICE_SIZE
+     GeneCombinerConf::QUEUE
+     GeneCombinerConf::OUTPUT_DIR
+
+=cut
+
 use strict;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (GB_RUNNER
-					 GB_DBNAME
-					 GB_DBHOST
-					 GB_DBUSER
-					 GB_DBPASS
-					 GB_QUEUE
-					 GB_OUTPUT_DIR
-					 GB_LENGTH_RUNNABLES
-					 GB_TARGETTED_RUNNABLES
-					 GB_PM_OUTPUT
-					 GB_SIZE
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (GB_DBNAME
+							     GB_DBHOST
+							     GB_DBUSER
+							     GB_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (GB_RUNNER
+							   GB_QUEUE
+							   GB_OUTPUT_DIR
+							   GB_LENGTH_RUNNABLES
+							   GB_TARGETTED_RUNNABLES
+							   GB_PM_OUTPUT
+							   GB_SIZE
+							  );
 
 use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw (RUNNER
 						 GENECOMBINER_RUNNABLES
@@ -23,21 +62,21 @@ use Bio::EnsEMBL::Pipeline::GeneCombinerConf qw (RUNNER
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 if($GB_DBUSER eq 'ensadmin' && $GB_DBPASS eq ''){
-  print "You cannot have dbuser set to ensadmin with no dbpass set!\nPlease correct the entries in GeneConf.pm\n";
+  print "You cannot have dbuser set to ensadmin with no dbpass set!\nPlease correct the entries in GeneBuild config files\n";
   exit(1);
 }
 
 foreach my $arg($GB_RUNNER, $GB_DBNAME, $GB_DBHOST, $GB_DBUSER, $GB_QUEUE, $GB_OUTPUT_DIR){
   if ($arg eq '' ){
-    print "You need to set various parameters in GeneConf.pl\n" .  
+    print "You need to set various parameters in GeneBuild config files\n" .  
       "Here are your current values for required settings: \n" .
-	"runner      => $GB_RUNNER\n" .
-	  "dbname      => $GB_DBNAME\n" .
-	    "dbhost      => $GB_DBHOST\n" .
-	      "dbuser      => $GB_DBUSER\n" .
-		"dbpass      => $GB_DBPASS\n" .
-		  "queue       => $GB_QUEUE\n" .		  
-		    "output_dir      => $GB_OUTPUT_DIR\n" ;
+      "runner      => $GB_RUNNER\n" .
+      "dbname      => $GB_DBNAME\n" .
+      "dbhost      => $GB_DBHOST\n" .
+      "dbuser      => $GB_DBUSER\n" .
+      "dbpass      => $GB_DBPASS\n" .
+      "queue       => $GB_QUEUE\n" .		  
+      "output_dir      => $GB_OUTPUT_DIR\n" ;
     
     exit(1);
   }
@@ -110,9 +149,9 @@ sub make_tbsubs {
   # check them!
   foreach my $arg($pm_out){
     if ($arg eq '' ){
-      print "You need to set various parameters in GeneConf.pl\n" .  
+      print "You need to set various parameters in GeneBuild config files\n" .  
 	"Here are your current values for required settings: \n" .
-	"pm_output  => $GB_PM_OUTPUT\n" ;
+	"GB_PM_OUTPUT  => $GB_PM_OUTPUT\n" ;
 
       exit(1);
     }
@@ -187,10 +226,10 @@ sub make_lbsubs {
   # check them!
   foreach my $arg($size, $GB_OUTPUT_DIR){
     if ($arg eq '' ){
-      print "You need to set various parameters in GeneConf.pl\n" .  
+      print "You need to set various parameters in GeneBuild config files\n" .  
 	"Here are your current values for required settings: \n" .
-	  "size   => $size\n" .
-	    "tmpdir => $GB_OUTPUT_DIR\n";
+	"GB_SIZE   => $size\n" .
+	"GB_OUTPUT_DIR => $GB_OUTPUT_DIR\n";
       
       exit(1);
     }
@@ -251,10 +290,10 @@ sub make_genecombiner_bsubs {
   # check them!
   foreach my $arg ($size, $OUTPUT_DIR){
     if ($arg eq '' ){
-      print "You need to set various parameters in GeneConf.pl\n" .  
+      print "You need to set various parameters in GeneBuild config files\n" .  
 	"Here are your current values for required settings: \n" .
-	  "size   => $SLICE_SIZE\n" .
-	    "tmpdir => $OUTPUT_DIR\n";
+	"GB_SIZE       => $SLICE_SIZE\n" .
+	"GB_OUTPUT_DIR => $OUTPUT_DIR\n";
       
       exit(1);
     }

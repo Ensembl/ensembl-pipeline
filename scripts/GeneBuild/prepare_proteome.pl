@@ -23,7 +23,7 @@ use strict;
 
 =head1 OPTIONS
   
-  Options are to be set in GeneConf.pm
+  Options are to be set in GeneBuild config files
   The important ones for this script are:
      GB_REFSEQ      location of refseq file in fasta format
      GB_SPTR        location of swissprot file in fasta format
@@ -31,22 +31,15 @@ use strict;
      GB_PMATCH      location of the pmatch executable
      GB_KILL_LIST   location of text file listing Swissprot IDs to ignore
 
-     eg.
-	    GB_REFSEQ      => '/work2/vac/GeneBuild/rf.fa',
-	    GB_SPTR        => '/work2/vac/GeneBuild/sptr.fa',
-	    GB_PFASTA      => '/work2/vac/GeneBuild/human_proteome.fa',
-	    GB_KILL_LIST   => '/work2/vac/GeneBuild/kill_list.txt',
-	    GB_PMATCH      => '/work2/vac/rd-utils/pmatch',
-  
 =cut
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-                                         GB_REFSEQ
-                                         GB_SPTR
-                                         GB_PFASTA
-					 GB_KILL_LIST
-                                         GB_PMATCH
-                                        );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
+                                                           GB_REFSEQ
+                                                           GB_SPTR
+                                                           GB_PFASTA
+					                   GB_KILL_LIST
+                                                           GB_PMATCH
+                                                          );
 
 my $refseq    = $GB_REFSEQ;
 my $sptr      = $GB_SPTR;

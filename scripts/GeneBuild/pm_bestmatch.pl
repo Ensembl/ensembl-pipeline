@@ -35,15 +35,17 @@ BEGIN {
 
 =head1 OPTIONS
   
-  Options are to be set in GeneConf.pm
+  Options are to be set in GeneBuild config files
   The important ones for this script are:
-     pm_output   directory to write filtered output files
+     GeneBuild::Scripts:GB_PM_OUTPUT   directory to write filtered output files
 
-     eg.
-	    'pm_output'   => '/work2/vac/GeneBuild/',
-  
-  If pm_output directory is not provided, output file is written to current directory
+  If GB_PM_OUTPUT is not provided, output file is written to current directory
     
+  Database details:
+     GeneBuild::Databases::GB_DBNAME
+     GeneBuild::Databases::GB_DBHOST
+     GeneBuild::Databases::GB_DBUSER
+     GeneBuild::Databases::GB_DBPASS
 =cut
 
 use strict;
@@ -53,13 +55,17 @@ use File::Find;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
-					 GB_PM_OUTPUT
-                                         GB_DBNAME
-					 GB_DBHOST
-					 GB_DBUSER
-                                         GB_DBPASS
-					);
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+							     GB_DBNAME
+							     GB_DBHOST
+							     GB_DBUSER
+							     GB_DBPASS
+							    );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
+							  GB_PM_OUTPUT
+							 );
+
 
 # global vars
 my @hits;     # stores the hits from pmatch runs

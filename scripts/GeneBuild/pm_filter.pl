@@ -25,10 +25,10 @@ BEGIN {
   needs to be given the location of the fasta file contain the human proteome, 
   the directory at the head of the tree containing all the fpc contig fasta 
   files and the chromosome on which to run. The first two options are common 
-  with other scripts and should be set in GeneConf.pm
+  with other scripts and should be set in GeneBuild config files.
 
   pm_filter.pl should be run once for each chromosome. The results are written out to 
-  chr_name.pm.dat in the GB_PM_OUTPUT directory specified in GeneConf.pm
+  chr_name.pm.dat in the GB_PM_OUTPUT directory specified in GeneBuild config files.
 
   The script analyses the whole chromosome by running pmatch for the protein data 
   against each fpc contig file in turn, and then combining the results to find 
@@ -46,22 +46,15 @@ BEGIN {
 
 =head1 OPTIONS
   
-  Options are to be set in GeneConf.pm
+  Options are to be set in GeneBuild config files
   The important ones for this script are:
-     GB_PFASTA      clean file of proteins in fasta format
-     GB_PMATCH      location of the pmatch executable
-     GB_PM_OUTPUT   directory to write filtered output files
-     GB_FPCDIR      top of the hierarchy where the fpcctg fasta files are
-     GB_TMPDIR      scratch area
+     GeneBuild::Scripts::GB_PFASTA      clean file of proteins in fasta format
+     GeneBuild::Scripts::GB_PMATCH      location of the pmatch executable
+     GeneBuild::Scripts::GB_PM_OUTPUT   directory to write filtered output files
+     GeneBuild::Scripts::GB_FPCDIR      top of the hierarchy where the fpcctg fasta files are
+     GeneBuild::Scripts::GB_OUTPUT_DIR  scratch area
 
-     eg.
-	    GB_PFASTA      => /work2/vac/GeneBuild/human_proteome.fa,
-	    GB_PMATCH      => /work2/vac/rd-utils/pmatch,
-	    GB_PM_OUTPUT   => /work2/vac/GeneBuild/,
-	    GB_FPCDIR      => /work2/vac/data/humangenome,
-	    GB_OUTPUT_DIR      => /work5/scratch/vac,
-  
-  If pm_output directory is not provided, output file is written to current directory
+  If GB_PM_OUTPUT is not provided, output file is written to current directory
     
 =cut
 
@@ -72,7 +65,7 @@ use File::Find;
 use Getopt::Long;
 use FileHandle;
 
-use Bio::EnsEMBL::Pipeline::GeneConf qw (
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
 					 GB_PFASTA
 					 GB_PMATCH
                                          GB_PMATCH_MAX_INTRON
@@ -115,7 +108,7 @@ print STDERR "have started running pm filter \n";
 # final check to make sure all parameters are set before we go ahead
 if(!defined($protfile) || !defined($fpcdir) || !defined($pmatch) || 
    $protfile eq '' || $fpcdir eq '' || $pmatch eq ''){
-  print "You must set GB_PFASTA, GB_FPCDIR and GB_PMATCH in the config file, GeneConf.pm: $protfile : $fpcdir : $pmatch\n";
+  print "You must set GB_PFASTA, GB_FPCDIR and GB_PMATCH in the GeneBuild config files: $protfile : $fpcdir : $pmatch\n";
   exit (0);
 } 
 
