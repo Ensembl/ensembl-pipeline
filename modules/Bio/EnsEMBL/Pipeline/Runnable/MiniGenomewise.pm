@@ -628,7 +628,7 @@ sub _skip_small_exons{
     if ( $skip_small_exons ){
 	$self->{_skip_small_exons} = $skip_small_exons;
     }
-    return $skip_small_exons;
+    return $self->{_skip_small_exons};
 }
 
 ############################################################

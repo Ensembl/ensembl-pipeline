@@ -210,7 +210,7 @@ sub run{
   my $smell  = $self->smell;
   print STDERR "running genomewise with smell: $smell and switch: $switch\n";
   if ( $self->_skip_small_exons ){
-      print STDERR "skipping exons smaller than ".$self->_skip_small_exons\n";
+      print STDERR "skipping exons smaller than ".$self->_skip_small_exons."\n";
   }
 
   #### Steve's version (fixed)
