@@ -108,16 +108,12 @@ foreach my $job (@jobs) {
     my $output= $job->output_file();
     print STDERR "Got output file $output\n\n";
 
-    my $object;
-    open (IN,"<$output");
-    while (<IN>) {
-	$_ =~ s/\[//;
-	$_ =~ s/\]//;
-	$object .= $_;
-    }
-    close(IN);
-
-    my ($obj) = FreezeThaw::thaw($object);
-    print STDERR "Got an ".$obj->id." \n";
+    my $runnable = "$module"->new(-input_id => $job->input_id,
+				  -dbobj    => $anadb);
+    my @features=$runnable->fetch_output($output);
+    print STDERR "Got features from frozen output (when it's fixed)\n";
+    $runnable->write_output(@features);
+    $job->set_status('DONE');    
+    
 }
 
