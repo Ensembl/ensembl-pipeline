@@ -1,6 +1,5 @@
-
 #
-# Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::SearchFilter
+# Ensembl module for Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter
 #
 # Cared for by Ewan Birney <birney@ebi.ac.uk>
 #
@@ -12,16 +11,16 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::SearchFilter - Filters a search runnable
+Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter - Filters a search runnable
 
 =head1 SYNOPSIS
 
-    $search = Bio::EnsEMBL::Pipeline::Runnable::SearchFilter->new( -coverage  => 5,
-								   -minscore  => 100,
-								   -maxevalue => 0.001,
-								   -prune     => 1
-								 );
-    
+   $search = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new(
+                                                    -coverage  => 5,
+					            -minscore  => 100,
+					            -maxevalue => 0.001,
+					            -prune     => 1
+				                                 );
 
    my @filteredfeatures = $search->run(@features);
 
@@ -36,8 +35,8 @@ follows:
 
   for each hit-sequence-accession in turn:
 
-    if all parts of all features for hit-sequence-accession
-    are covered by other features to a depth of <coverage>
+    if all parts of all features for hit-sequence-accession are
+    already covered by other features to a depth of <coverage>
 
       remove all features for this hit-sequence-accession;
 
@@ -46,9 +45,10 @@ hit-sequence-accessions of equal maximum HSP score.
 
 The option prune allows only a maximum number of features per
 strand per genomic base per hit sequence accession, this number also
-being specified by the coverage parameter. Prune removed features
-until the criterion is met. Prune filtering occurs after coverage
-filtering.
+being specified by the coverage parameter. Prune works on a
+per-hit-sequence-accession basis and removes features (not entire
+hit-sequence-accessions) until the criterion is met. Prune filtering
+occurs after coverage filtering.
 
 =head1 CONTACT
 
@@ -205,7 +205,7 @@ sub run{
   
   # this now holds the accepted hids ( a much smaller array )
   my @accepted_hids;
-  # print "have ".@inputids." acepted hids\n";
+  print "have ".@inputids." accepted hids before filtering on coverage\n";
   # we accept all feature pairs which are valid and meet coverage criteria
   FEATURE :
     foreach my $hseqname ( @inputids ) {
@@ -247,7 +247,7 @@ sub run{
     push(@feature_counts, @{$hitarray{$hid}});
   }
 
-  # print "have ".scalar(@feature_counts)." after filtering by coverage\n";
+  print "have ".scalar(@accepted_hids)." accepted hids after filtering by coverage\n";
 
   # print "have ".@accepted_hids." acepted hids\n";
   # drop this huge array to save memory
