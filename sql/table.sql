@@ -59,7 +59,7 @@ CREATE TABLE InputIdAnalysis (
   created           datetime not null,
 
   PRIMARY KEY (analysisId, inputId, class),
-  KEY inputIdx      (inputId, created)
+  KEY inputIdx      (inputId, created),
   KEY inputId_class (inputId, class)
 );
 
