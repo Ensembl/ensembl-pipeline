@@ -60,7 +60,7 @@ sub new{
   my ($created, $submitted, $reading, $running, $writing,$successful, $failed, $fatal, $killed, $existing) = $self->_rearrange([qw(CREATED SUBMITTED READING RUNNING WRITING SUCCESSFUL FAILED FATAL KILLED EXISTING)], @args);
 
   $self->{'_created'} = undef;
-  $self->{'_submitted'} = undef;
+  $self->{'_submitted'} = undef; 
   $self->{'_reading'} = undef;
   $self->{'_running'} = undef;
   $self->{'_writing'} = undef;
@@ -190,8 +190,8 @@ sub add_successful{
   if(!$self->{'_successful'}){
     $self->{'_successful'} = $idset;
   }else{
-    $self->{'_successful'} = ($self->{'_successful'}) ?
-      $self->{'_successful'}->or($idset) : $idset;
+    $self->{'_successful'} = ( $self->{'_successful'}) ?
+       $self->{'_successful'}->or($idset) : $idset;
   }
 }
 
@@ -271,54 +271,73 @@ sub add_existing{
 
 sub get_created{
     my ($self) = @_;
+    if(!$self->{'_created'}){
+      $self->{'_created'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_created'};
 }
 
 sub get_submitted{
     my ($self) = @_;
-
+    if(!$self->{'_submitted'}){
+      $self->{'_submitted'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_submitted'};
 }
 
 sub get_reading{
     my ($self) = @_;
-
+    if(!$self->{'_reading'}){
+      $self->{'_reading'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_reading'};
 }
 
 sub get_running{
     my ($self) = @_;
-
+    if(!$self->{'_running'}){
+      $self->{'_running'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_running'};
 }
 
 sub get_writing{
     my ($self) = @_;
-
+    if(!$self->{'_writing'}){
+      $self->{'_writing'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_writing'};
 }
 
 sub get_successful{
     my ($self) = @_;
-
-    return $self->{'_successful'};
+    if(!$self->{'_successful'}){
+      $self->{'_successful'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
+    return $self->{'_successful'} ;
 }
 
 sub get_failed{
     my ($self) = @_;
-
+    if(!$self->{'_failed'}){
+      $self->{'_failed'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_failed'};
 }
 
 sub get_fatal{
     my ($self) = @_;
-
+    if(!$self->{'_fatal'}){
+      $self->{'_fatal'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_fatal'};
 }
 
 sub get_killed{
     my ($self) = @_;
-
+    if(!$self->{'_killed'}){
+      $self->{'_killed'} = Bio::EnsEMBL::Pipeline::IDSet->new;
+    }
     return $self->{'_killed'};
 }
 

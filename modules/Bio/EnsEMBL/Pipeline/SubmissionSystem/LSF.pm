@@ -214,20 +214,20 @@ sub flush {
     my $bsub = 'bsub ' . join(' ', @args, $other_parms, $command);
 
     print STDERR "LSF: EXECUTING COMMAND:\n$bsub\n";
-    my $sub_id = int(rand(100000));
+    #my $sub_id = int(rand(100000));
 
-#    open(SUB, $bsub." 2>&1 |") or
-#      $self->throw("could not execute command [$bsub]");
-#    my $sub_id;
+    open(SUB, $bsub." 2>&1 |") or
+      $self->throw("could not execute command [$bsub]");
+    my $sub_id;
     my $err;
-#    while(<SUB>) {
-#      if (/Job <(\d+)>/) {
-#        $sub_id = $1;
-#      } else {
-#        $err .= $_;
-#      }
-#    }
-#    close(SUB);
+    while(<SUB>) {
+      if (/Job <(\d+)>/) {
+        $sub_id = $1;
+      } else {
+        $err .= $_;
+      }
+    }
+    close(SUB);
 
     #if the bsub failed, set the status of all the jobs to failed
     #otherwise update them with submission ids

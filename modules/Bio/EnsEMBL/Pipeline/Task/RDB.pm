@@ -31,6 +31,8 @@ sub new {
 
     $self->{'input_id_factory'} = undef;
     $self->{'input_ids'} = undef;
+    $self->{'config'} = undef;
+
     my $inputidfac = Bio::EnsEMBL::Pipeline::Task::Utils::InputIDFactory->new(
   -CONFIG => $self->get_Config,
   -TASKNAME => $self->name,
@@ -258,10 +260,16 @@ sub run{
   my $potential = $self->input_ids_to_start;
   my $existing = $self->get_TaskStatus->get_existing;
   my $id_set = $potential->not($existing)->subset($self->max_create);
-  $self->create_Jobs($module, 
-		     $id_set, $parameters);
+  eval{
+    $self->create_Jobs($module, 
+		       $id_set, $parameters);
+  };
 
-  return 2; #TASK_DONE
+  if($@){
+    return 'TASK_FAILED';
+  }
+
+  return 'TASK_OK'; 
 }
 
 
@@ -293,6 +301,16 @@ sub is_finished{
   }else{
     return 0;
   }
+}
+
+sub get_Config{
+  my ($self) = @_;
+
+  if(!$self->{'config'}){
+    $self->{'config'} = $self->get_PipelineManager->get_Config;
+  }
+
+  return $self->{'config'};
 }
 
 

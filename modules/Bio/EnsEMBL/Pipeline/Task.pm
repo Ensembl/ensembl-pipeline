@@ -194,7 +194,7 @@ sub get_TaskStatus {
   my $taskname = shift;
 
   if($taskname && $taskname ne $self->name()) {
-    return $self->get_PipelineManager($taskname);
+    return $self->get_PipelineManager->get_TaskStatus($taskname);
   }
   
   return $self->{'TaskStatus'};
@@ -236,5 +236,19 @@ sub description{
     " this method is useful so others can see what a Task does and what".
       "its dependancies are\n";
 }
+
+
+sub get_Config{
+  my ($self) = @_;
+
+  if(!$self->{'config'}){
+    $self->{'config'} = $self->get_PipelineManager->get_Config;
+  }
+
+  return $self->{'config'};
+}
+
+
+
 
 1;

@@ -250,7 +250,7 @@ sub run {
       #
       # update task status by contacting job adaptor
       #
-      print STDERR "UPDATING STATUS!\n";
+      #print STDERR "UPDATING STATUS!\n";
       $self->_update_task_status();
       $last_check = time();
     }
@@ -260,7 +260,7 @@ sub run {
     #
     foreach my $taskname (keys %pending_tasks) {
       my $task = $pending_tasks{$taskname};
-
+      #print STDERR "Checking pending tasks ".$taskname."\n";
       if($task->can_start()) {
         delete $pending_tasks{$taskname};
         $running_tasks{$taskname} = $task;
@@ -275,6 +275,7 @@ sub run {
     # and give each running task a bit of time to create jobs
     #
     foreach my $taskname (keys %running_tasks) {
+      #print STDERR "Checking running tasks ".$taskname."\n";
       my $task = $running_tasks{$taskname};
       my $subsystem = $self->_submission_systems->{$taskname};
 
@@ -285,11 +286,11 @@ sub run {
         my $retcode = $task->run();
 	
         if($retcode eq 'TASK_FAILED') {
-          $self->warn('Task [$taskname] failure');
+          $self->warn("Task [$taskname] failure");
         } elsif ($retcode eq 'TASK_DONE') {
           $subsystem->flush($taskname);
         } elsif ($retcode ne 'TASK_OK') {
-          $self->warn('Task [$taskname] returned unknown status $retcode');
+          $self->warn("Task [$taskname] returned unknown status $retcode");
         }
       }
 
