@@ -12,26 +12,47 @@ BEGIN {
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 my %gbc = %::GB_conf;
+if($gbc{'dbuser'} eq 'ensadmin' && $gbc{'dbpass'} eq ''){
+  print "You cannot have dbuser set to ensadmin with no dbpass set!\nPlease correct the entries in GB_conf\n";
+  exit(1);
+}
+
+foreach my $arg($gbc{'runner'}, $gbc{'dbname'}, $gbc{'dbhost'}, $gbc{'dbuser'}, $gbc{'queue'},$gbc{'tmpdir'}){
+    if ($arg eq '' ){
+      print "You need to set various parameters in GB_conf.pl\n" .  
+	"Here are your current values for required settings: \n" .
+	"runner     => $gbc{'runner'}\n" .
+	"dbname     => $gbc{'dbname'}\n" .
+	"dbhost     => $gbc{'dbhost'}\n" .
+	"dbuser     => $gbc{'dbuser'}\n" .
+	"dbpass     => $gbc{'dbpass'}\n" .
+	"queue      => $gbc{'queue'}\n" .
+	"tmpdir     => $gbc{'tmpdir'}\n" ;
+
+      exit(1);
+    }
+  }
 
 my %chrhash;
 
 &get_chrlengths;
 
 foreach my $lr(@{$gbc{'length_runnables'}}) {
-  make_lbsubs($lr);
+  make_lbsubs($lr) unless $lr eq '';
 }
 
 foreach my $tr(@{$gbc{'targetted_runnables'}}) {
-  make_tbsubs($tr);
+  make_tbsubs($tr) unless $tr eq '';
 }
 
 
 ### SUBROUTINES ###
 
 sub get_chrlengths{
+
   my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $gbc{'dbhost'},
 					      -user   => $gbc{'dbuser'},
-					      -pass   => $gbc{'dbpass'};
+					      -pass   => $gbc{'dbpass'},
 					      -dbname => $gbc{'dbname'},
 					     );
   my $q = "SELECT chr_name,max(chr_end) FROM static_golden_path GROUP BY chr_name";
@@ -59,11 +80,23 @@ sub make_tbsubs {
   $pm_out .= "pm_best.out";
   my $cdnas  = $gbc{'cdna_pairs'};
 
+  # check them!
+  foreach my $arg($pm_out, $cdnas){
+    if ($arg eq '' ){
+      print "You need to set various parameters in GB_conf.pl\n" .  
+	"Here are your current values for required settings: \n" .
+	"pm_output  => $gbc{'pm_output'}\n" .
+	"cdna_pairs => $cdnas\n";
+
+      exit(1);
+    }
+  }
+
   # parse pmatch and cdna results
   my %pm_ids;
   my %cdnas;
   
-  open(CDNA, "<$cdnas") or die "Can't open $cdnas\n";
+  open(CDNA, "<$cdnas") or die "Can't open cdnafile $cdnas\n";
 
   while(<CDNA>){
     #  NP_002923.1 : L26953
@@ -79,10 +112,10 @@ sub make_tbsubs {
   closedir(DIR);
   my $outf  = "$runnable.jobs.dat";
 
-  open(OUTF, ">$outf") or die "Can't open $outf\n";
+  open(OUTF, ">$outf") or die "Can't open outfile $outf\n";
 
   # generate bsubs, one per protein
-  open(PM, "<$pm_out") or die "Can't open $pm_out\n";
+  open(PM, "<$pm_out") or die "Can't open pmoutfile $pm_out\n";
   my $tracker = 0;
   my $resdir = $dir . "/jobs0";
    
@@ -140,6 +173,19 @@ sub make_lbsubs {
   my $size   = $gbc{'size'};
   my $dir    = $gbc{'tmpdir'} . "/$runnable";
   
+  # check them!
+  foreach my $arg($size, $gbc{'tmpdir'}){
+    if ($arg eq '' ){
+      print "You need to set various parameters in GB_conf.pl\n" .  
+	"Here are your current values for required settings: \n" .
+	"size   => $size\n" .
+	"tmpdir => $gbc{'tmpdir'}\n";
+
+      exit(1);
+    }
+  }
+
+
   # ought to do some checking here - does it exist, are there files in it, etc
   system("mkdir $dir") unless opendir(DIR, $dir);
   closedir(DIR);
