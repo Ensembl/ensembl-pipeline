@@ -79,6 +79,8 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_MASKING
 							      GB_SIMILARITY_SOFTMASK
 							      GB_SIMILARITY_GENETYPEMASKED
+							      GB_SIMILARITY_POST_GENEMASK
+							      GB_SIMILARITY_POST_EXONMASK
 							      GB_SIMILARITY_BLAST_FILTER
 							      
 							    );
@@ -203,35 +205,35 @@ sub fetch_input {
 	if $chrstart !~ /^\d+$/ or $chrend !~ /^\d+$/; 
 
     my ($single_pid_db, $single_pid, $id_pool_bins, $id_pool_index);
+    my @extra_input_id_items = ($input_id =~ /$GB_SIMILARITY_INPUTID_EXTRA_REGEX/);
 
-    if ($rest_of_input_id) {
-	my @items = ($rest_of_input_id =~ /$GB_SIMILARITY_INPUTID_EXTRA_REGEX/);
-
-	if (scalar(@items) == 2) {
-	    if ($items[0] =~ /^\d+$/ and $items[1] =~ /^\d+$/) {
+    if (@extra_input_id_items > 0) {
+	# input id is loaded with something extra
+	if (scalar(@extra_input_id_items) == 2) {
+	    if ($extra_input_id_items[0] =~ /^\d+$/ and 
+		$extra_input_id_items[1] =~ /^\d+$/) {
 		# assume to be a pair of number for splitting protein set. See later
 
-		($id_pool_bins, $id_pool_index) = ($items[0], $items[1]);
-
+		($id_pool_bins, $id_pool_index) = ($extra_input_id_items[0], $extra_input_id_items[1]);
+		
 		if ($id_pool_index > $id_pool_bins or
 		    $id_pool_index < 1) {
-
+		    
 		    $self->warn("Could not get sensible values for id_pool_bins ('$id_pool_bins')". 
 				" and id_pool_index ('$id_pool_index'); doing all proteins in region"); 
-		    		    
+		    
 		    ($id_pool_bins, $id_pool_index) = (0,0);
 		}
 	    }
 	    else {
 		# assume to be a database type name (from config) and protein id
-
-		($single_pid_db, $single_pid) = ($items[0], $items[1]);
+		
+		($single_pid_db, $single_pid) = ($extra_input_id_items[0], $extra_input_id_items[1]);
 	    }
 	}
 	else {
-	    $self->warn("FPC_BlastMiniGenewise does not understand the rest of your input id ($rest_of_input_id); ignoring\n");	    
+	    $self->warn("FPC_BlastMiniGenewise does not understand the end of your input id ($input_id); ignoring\n");
 	}
-
     }
    
     my $slice = $self->genewise_db->get_SliceAdaptor->fetch_by_chr_start_end($chrid,
@@ -268,45 +270,9 @@ sub fetch_input {
     else {	
 	# Features will be masked before using them as seeds to BlastMiniGenewise. 
 
-	#
-	#   First masking is by sepecified gene types already in the region 
-	#
-	my (@mask_gene_types, @mask_exons);
-	if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
-	    @mask_gene_types = @{$GB_SIMILARITY_GENETYPEMASKED};
-	} else {
-	    @mask_gene_types = ($GB_TARGETTED_GW_GENETYPE);
-	}
-	foreach my $type (@mask_gene_types) {
-	    print STDERR "Fetching gene type : $type\n";
+	my ($ex_msk_reg_ref) = $self->mask_gene_region_lists($slice);
+	my @exonmask_regions = @$ex_msk_reg_ref;
 
-	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
-		foreach my $mask_exon (@{$mask_genes->get_all_Exons}) {
-		    if ($mask_exon->seqname eq $slice->id) {
-			push @mask_exons, $mask_exon;
-		    }
-		}
-	    }
-	    printf STDERR "  Mask exon list now %d long\n", scalar(@mask_exons);
-	}
-	#@mask_exons = sort {$a->start <=> $b->start} @mask_exons;
-	# make the mask list non-redundant. Much faster when checking against features
-	my @mask_regions;
-	foreach my $mask_exon (sort {$a->start <=> $b->start} @mask_exons) {
-	    if (@mask_regions and $mask_regions[-1]->{'end'} > $mask_exon->start) {
-		if ($mask_exon->end > $mask_regions[-1]->{'end'}) {
-		    $mask_regions[-1]->{'end'} = $mask_exon->end;
-		}
-	    } else {
-		push @mask_regions, {start => $mask_exon->start, end => $mask_exon->end}
-
-	    }
-	}
-	printf STDERR "Mask region list is %d\n", scalar(@mask_regions);
-
-	#
-	#   Second masking is by a list of "bad" proteins that should not be built from
-	#
 	my %kill_list = %{$self->fill_kill_list};
         
         DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
@@ -317,6 +283,10 @@ sub fetch_input {
 	    my @all_feats = @{$pafa->fetch_all_by_Slice_and_score($slice, 
 								  $database->{'threshold'}, 
 								  $database->{'type'})};
+
+	    if ($database->{'upper_threshold'}) {
+		@all_feats = grep { $_->score <= $database->{'upper_threshold'} } @all_feats;
+	    }
 	    
 	    printf(STDERR "Fetched %d features for %s with score above %d from %s\@%s", 
 		   scalar(@all_feats),
@@ -335,31 +305,17 @@ sub fetch_input {
 	    }
 	    
 	    printf(STDERR " (feats come from %d proteins)\n", scalar(keys %features));
-	    	    
-	    if ($id_pool_bins and $id_pool_index) {
-		my @ids = sort keys %features;
-		
-		my (@restricted_list);
-		for (my $i = $id_pool_index - 1; $i < @ids; $i += $id_pool_bins) {
-		    push @restricted_list, $ids[$i];
-		}
-		
-		%features = map { $_ => $features{$_} } @restricted_list;
-		
-		printf(STDERR "Restricting to %d prots based on input id : @restricted_list\n", scalar(@restricted_list));
-	    }
 	    
 	    # flag IDs that have a feature that overlaps with a mask feature
 	    
 	    my @ids_to_ignore;
 	    SEQID: foreach my $sid (keys %features) {
 		my $ex_idx = 0;
-		my $count = 0;
 		#print STDERR "Looking at $sid\n";
 	        FEAT: foreach my $f (sort {$a->start <=> $b->start} @{$features{$sid}}) {
 		    #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
-		    for( ; $ex_idx < @mask_regions; ) {
-			my $mask_exon = $mask_regions[$ex_idx];
+		    for( ; $ex_idx < @exonmask_regions; ) {
+			my $mask_exon = $exonmask_regions[$ex_idx];
 			
 			#printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
 			if ($mask_exon->{'start'} > $f->end) {
@@ -386,10 +342,23 @@ sub fetch_input {
 		    delete $features{$dud_id};
 		}
 	    }
-	    
+	    	    
+	    printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(keys %features));
+
+	    if ($id_pool_bins and $id_pool_index) {
+		my @local_ids = sort keys %features;
+		
+		my (@restricted_list);
+		for (my $i = $id_pool_index - 1; $i < @local_ids; $i += $id_pool_bins) {
+		    push @restricted_list, $local_ids[$i];
+		}
+		
+		%features = map { $_ => $features{$_} } @restricted_list;
+		
+		printf(STDERR "Restricting to %d prots based on input id : @restricted_list\n", scalar(@restricted_list));
+	    }
+
 	    my @ids = sort keys %features;
-	    
-	    printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(@ids));
 
 	    if ($GB_SIMILARITY_BLAST_FILTER) {
 		my @sortedids = $self->sort_hids_by_coverage($database,\%features);
@@ -397,7 +366,7 @@ sub fetch_input {
 		
 		@ids = sort @newids;
 		
-		printf (STDERR "There are %d prots left after Anopheles fileter\n", scalar(@ids)); 
+		printf (STDERR "There are %d prots left after Anopheles-style filter\n", scalar(@ids)); 
 	    }
 
 	    if (@ids) {
@@ -437,6 +406,80 @@ sub run {
     $self->convert_output;
     # print STDERR "HAVE CONVERTED OUTPUT\n";
 }
+
+
+
+=head2 mask_gene_region_lists
+
+    Title   :   mask_gene_region_list
+    Usage   :   @list = $self->mask_region_list
+    Function:   Gets, records and returns a list of start/ends that 
+                correspond to regions already covered by exons
+    Returns :   a list
+    Args    :   none
+
+=cut
+
+sub mask_gene_region_lists {
+    my ($self, $slice) = @_;
+
+    if (not defined($self->{'_mask_region_lists'})) { 
+	my (@mask_gene_types);
+
+	if (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+	    @mask_gene_types = @{$GB_SIMILARITY_GENETYPEMASKED};
+	} else {
+	    @mask_gene_types = ($GB_TARGETTED_GW_GENETYPE);
+	}
+	
+	my (@mask_gene_regions, @mask_exon_regions);
+
+	foreach my $type (@mask_gene_types) {
+	    #print STDERR "Fetching gene type : $type\n";
+	    
+	    foreach my $mask_genes (@{$slice->get_all_Genes_by_type($type)}) {
+		my @mask_exons = grep { $_->seqname eq $slice->id } (sort {$a->start <=> $b->start} @{$mask_genes->get_all_Exons});
+		push @mask_gene_regions, { start => $mask_exons[0]->start, 
+					   end   => $mask_exons[-1]->end };
+	    
+		foreach my $mask_exon (@mask_exons) {
+		    push @mask_exon_regions, { start => $mask_exon->start,
+					       end   => $mask_exon->end };
+		}
+	    }
+	    #printf STDERR "  Initial mask gene list %d long\n", scalar(@mask_gene_regions);
+	    #printf STDERR "  Initial mask exon list %d long\n", scalar(@mask_exon_regions);
+	}
+	# make the mask list non-redundant. Much faster when checking against features
+	my (@nr_mask_exon_regions, @nr_mask_gene_regions);
+
+	foreach my $mask_exon_reg (sort {$a->{'start'} <=> $b->{'start'}} @mask_exon_regions) {
+	    if (@nr_mask_exon_regions and $nr_mask_exon_regions[-1]->{'end'} > $mask_exon_reg->{'start'}) {
+		if ($mask_exon_reg->{'end'} > $nr_mask_exon_regions[-1]->{'end'}) {
+		    $nr_mask_exon_regions[-1]->{'end'} = $mask_exon_reg->{'end'};
+		}
+	    } else {
+		push @nr_mask_exon_regions, $mask_exon_reg;		
+	    }
+	}
+	foreach my $mask_gene_reg (sort {$a->{'start'} <=> $b->{'start'}} @mask_gene_regions) {
+	    if (@nr_mask_gene_regions and $nr_mask_gene_regions[-1]->{'end'} > $mask_gene_reg->{'start'}) {
+		if ($mask_gene_reg->{'end'} > $nr_mask_gene_regions[-1]->{'end'}) {
+		    $nr_mask_gene_regions[-1]->{'end'} = $mask_gene_reg->{'end'};
+		}
+	    } else {
+		push @nr_mask_gene_regions, $mask_gene_reg;		
+	    }
+	}
+
+	$self->{'_mask_region_lists'} = [\@nr_mask_exon_regions, \@nr_mask_gene_regions];
+    }
+
+    return @{$self->{'_mask_region_lists'}};
+}
+    
+    
+
 
 =head2 convert_output
 
@@ -481,6 +524,62 @@ sub convert_output {
     }
 
     my @results = $runnable->output;
+
+
+    # filter out masked genes here if appropriate
+    if ($GB_SIMILARITY_POST_GENEMASK or $GB_SIMILARITY_POST_EXONMASK) {
+	my (@mask_regions, @filtered_results);
+	
+	my ($exonmask_regions, $genemask_regions) = $self->mask_gene_region_lists;
+
+	if ($GB_SIMILARITY_POST_GENEMASK) {
+	    @mask_regions = @$genemask_regions;
+
+	} else {
+	    @mask_regions = @$exonmask_regions;
+	}
+
+        GENE: foreach my $gene (@results) {
+	    my $keep_gene = 1;
+	    my $mask_reg_idx = 0;
+
+	    my @exons = sort {$a->start <=> $b->start} ($gene->sub_SeqFeature);
+	    my @test_regions;
+
+	    if ($GB_SIMILARITY_POST_GENEMASK) {
+		@test_regions = ({start => $exons[0]->start, end => $exons[-1]->end});
+	    }
+	    else {
+		@test_regions = map { { start => $_->start, end => $_->end } } @exons;
+	    }
+
+	    FEAT: foreach my $f (@test_regions) {
+		for( ; $mask_reg_idx < @mask_regions; ) {
+		    my $mask_reg = $mask_regions[$mask_reg_idx];
+			
+		    if ($mask_reg->{'start'} > $f->{'end'}) {
+			# no mask regions will overlap this feature
+			next FEAT;
+		    }
+		    elsif ( $mask_reg->{'end'} >= $f->{'start'}) {
+			# overlap			
+			$keep_gene = 0;
+			last FEAT;
+		    }			
+		    else {
+			$mask_reg_idx++;
+		    }
+		}
+	    }
+
+	    if ($keep_gene) {
+		push @filtered_results, $gene;
+	    }
+	}
+
+	@results = @filtered_results;
+    }
+
     my $genes = $self->make_genes($genetype, $analysis_obj, \@results);
 
     my @remapped = @{$self->remap_genes($genes)};
@@ -552,6 +651,9 @@ sub make_genes {
       if (not defined $valid_transcripts) {
 	  printf (STDERR "   Transcript %d (%s) : REJECTED (validation failed)\n", $count, $prot_id);
 	  next;
+      }
+      else {
+	  printf (STDERR "   Transcript %d (%s) : ACCEPTED\n", $count, $prot_id);
       }
       
       # make genes from valid transcripts

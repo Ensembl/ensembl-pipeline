@@ -46,14 +46,15 @@ use vars qw( %Similarity );
 # Hash containing config info
 %Similarity = (
 
-	       GB_SIMILARITY_INPUTID_EXTRA_REGEX => '(\S+):(\S+)',
+	       GB_SIMILARITY_INPUTID_EXTRA_REGEX => '^\S+\.\d+\-\d+:(\S+):(\S+)',
 
 	       # fill in one complete hash for each database from which blast 
 	       # features are to be retrieved
 	       GB_SIMILARITY_DATABASES => [
-					   {				  
+					  {				  
 					    'type'       => 'Swall',
-					    'threshold'  => '200',
+					    'threshold'  => '100',
+					    # 'upper_threshold' => '200',
 					    'index'      => '/data/blastdb/Ensembl/swall_index',
 					    'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					   },
@@ -69,7 +70,6 @@ use vars qw( %Similarity );
 	       GB_SIMILARITY_MAX_INTRON         => 100000,
 
 	       # minimum coverage required to prevent splitting on long introns - keep it high!
-	       # intentionally set to impossibly high number so that splitting always occurs
 	       GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
 
 	       # low complexity threshold - transcripts whose translations have low
@@ -88,10 +88,14 @@ use vars qw( %Similarity );
                # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
 	       GB_SIMILARITY_SOFTMASK => 0, 
 
-
-	       # No similarity genes will be build overlapping the gene type put in this list. 
+	       # No similarity genes will be build with seeds overlapping the gene type put in this list. 
 	       # If nothing is put, the default will be to take Targetted genewise genes
 	       GB_SIMILARITY_GENETYPEMASKED => ['TGE_gw'],
+
+	       # if one of the below is set, the above mask gene types will be used to filter out RESULTING genes
+	       # that share gene/exon overlap with mask genes/exons of the above type.
+	       GB_SIMILARITY_POST_GENEMASK => 0,
+	       GB_SIMILARITY_POST_EXONMASK => 0,
 
 	       # set this to one if you want to filter the blast scores before sending to BlastMiningenewise. 
 	       # Currently used for anopheles. For Ano, speeds up the process by 10 folds

@@ -18,18 +18,18 @@ strategy that is performed at raw compute stage, most commonly by BLASTing the
 genscan peptides against SWALL) against a chromosome. There are two ways of 
 distributing this work:
 
-1. Spiltting the chromosome up into chunks. This is the classical method. The
+1. Splitting the chromosome up into chunks. This is the classical method. The
 drawback is that (a) it is difficult to know in advance what the granulatity 
-of the split is. Too large and the jobs may take too long to complete; too
-small and we increase the chances of a split occurring in the middle of a 
-gene. This script attempts to split the chromosomes (by way of input_id construction)
+of the split should be; too large and the jobs may take too long to complete; 
+too small and we increase the chances of a split occurring in the middle of a 
+gene. The idea would be to split the chromosomes (by way of input_id construction)
 heuristically in the hope of arriving at an effective distribution of work. 
 
 2. Partitioning the chromosomes based on the protein features. In the past, 
 this has been difficult to do due to the way that Runnables/RunnableDBs work.
-However, I have added functionality to the FPC_BlastMiniGenewise runnable (to
-start with) that is able to make use of a more heavily loaded input id. Specifically,
-input_ids of the form
+However, I have added functionality to the FPC_BlastMiniGenewise runnabledb (to
+start with) that is able to make use of a more heavily loaded input id. 
+Specifically, input_ids of the form
 
 chr_name.start-end:10:3
 
@@ -65,10 +65,19 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_DBUSER
 							     GB_DBPASS
 							     GB_DBPORT
+							     GB_GW_DBNAME
+							     GB_GW_DBHOST
+							     GB_GW_DBUSER
+							     GB_GW_DBPASS
+							     GB_GW_DBPORT
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_DATABASES
+							      GB_SIMILARITY_GENETYPEMASKED
+							    );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
+							     GB_KILL_LIST
 							    );
 
 use strict;
@@ -116,6 +125,17 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
 
 ) or die "Could not connect to the pipeline database; check config\n";
 
+my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+	'-host'   => $GB_GW_DBHOST,
+        '-user'   => $GB_GW_DBUSER,
+	'-pass'   => $GB_GW_DBPASS,
+	'-port'   => $GB_GW_DBPORT,
+	'-dbname' => $GB_GW_DBNAME,
+						     
+)  or die "Could not connect to the genewise database; check config\n";
+    
+
+
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if (not $analysis) {
     die "Could not find analysis for $logic_name\n";
@@ -129,7 +149,9 @@ if (not $ana_type) {
 $max_slice_size = 5000000 if not $max_slice_size;
 
 my $sl_adp = $db->get_SliceAdaptor;
+
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db);
+my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
 
 # at the moment, we generate slices according to the input slice size. In a later
@@ -142,20 +164,87 @@ $verbose and print STDERR "Generating Initial input ids...\n";
 foreach my $slice_id ($inputIDFactory->generate_slice_input_ids($max_slice_size, 0)) {
     my ($chr_name, $chr_start, $chr_end) = $slice_id =~ /^(\S+)\.(\d+)\-(\d+)$/;
 
-    my $chr_slice = $sl_adp->fetch_by_chr_start_end( $chr_name, $chr_start, $chr_end );
+    my $chr_slice = $sl_adp->fetch_by_chr_start_end( $chr_name, 
+						     $chr_start, 
+						     $chr_end );
+    my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, 
+									       $chr_start, 
+									       $chr_end );
 
     $verbose and print STDERR "Getting hits for $chr_name.$chr_start-$chr_end\n";
 
-    my $seeds = {};
-    foreach my $db (@{$GB_SIMILARITY_DATABASES}) {
-	foreach my $f (@{$chr_slice->get_all_ProteinAlignFeatures($db->{'type'}, 
-								  $db->{'threshold'})}) {
-	    push @{$seeds->{$f->hseqname}->{'hits'}}, $f;	    
+    my @mask_exons;
+    # remove masked and killed hits as will be done in the build itself
+    foreach my $type (@{$GB_SIMILARITY_GENETYPEMASKED}) {
+	foreach my $mask_genes (@{$chr_gw_slice->get_all_Genes_by_type($type)}) {
+	    foreach my $mask_exon (@{$mask_genes->get_all_Exons}) {
+		if ($mask_exon->seqname eq $chr_gw_slice->id) {
+		    push @mask_exons, $mask_exon;
+		}
+	    }
 	}
     }
+    # make the mask list non-redundant. Much faster when checking against features
+    my @mask_regions;
+    foreach my $mask_exon (sort {$a->start <=> $b->start} @mask_exons) {
+	if (@mask_regions and $mask_regions[-1]->{'end'} > $mask_exon->start) {
+	    if ($mask_exon->end > $mask_regions[-1]->{'end'}) {
+		$mask_regions[-1]->{'end'} = $mask_exon->end;
+	    }
+	} else {
+	    push @mask_regions, {start => $mask_exon->start, end => $mask_exon->end}
+	    
+	}
+    }
+    #printf STDERR "Mask region list is %d\n", scalar(@mask_regions);
 
-    # printf "Seqs for chr %s (%d) : %d\n", $chr->chr_name, $chr->length, scalar(keys %$seeds);
-    my $num_seeds = scalar(keys %$seeds);
+    my $num_seeds = 0;
+    foreach my $db (@{$GB_SIMILARITY_DATABASES}) {
+	my %features;
+
+	foreach my $f (@{$chr_slice->get_all_ProteinAlignFeatures($db->{'type'}, 
+								$db->{'threshold'})}) {
+	    if (not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'}) {
+		push @{$features{$f->hseqname}}, $f;
+	    }
+	}
+
+	my @ids_to_ignore;
+        SEQID: foreach my $sid (keys %features) {
+	    my $ex_idx = 0;
+	    my $count = 0;
+	    #print STDERR "Looking at $sid\n";
+	    FEAT: foreach my $f (sort {$a->start <=> $b->start} @{$features{$sid}}) {
+		#printf STDERR "Feature: %d %d\n", $f->start, $f->end;
+		for( ; $ex_idx < @mask_regions; ) {
+		    my $mask_exon = $mask_regions[$ex_idx];
+		    
+		    #printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
+		    if ($mask_exon->{'start'} > $f->end) {
+			# no exons will overlap this feature
+			next FEAT;
+		    }
+		    elsif ( $mask_exon->{'end'} >= $f->start) {
+			# overlap
+			push @ids_to_ignore, $f->hseqname;
+			#printf STDERR "Ignoring %s\n", $f->hseqname;
+			next SEQID;
+		    }			
+		    else {
+			$ex_idx++;
+		    }
+		}
+	    }
+	}
+
+	foreach my $dud_id (@ids_to_ignore, keys %kill_list) {
+	    if (exists $features{$dud_id}) {
+		delete $features{$dud_id};
+	    }
+	}
+
+	$num_seeds += scalar(keys %features);
+    }
 
     next if $num_seeds == 0;
 
@@ -188,4 +277,24 @@ if ($write) {
 	}
     }
 
+}
+
+
+
+sub fill_kill_list {
+    my %kill_list;
+    
+    if (defined($GB_KILL_LIST) && $GB_KILL_LIST ne '') {
+	open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
+	while (<KILL_LIST>) {
+	    
+	    chomp;
+	    my @list = split;
+	    next unless scalar(@list); 	# blank or empty line
+	    $kill_list{$list[0]} = 1;
+	}
+	
+	close KILL_LIST or die "error closing $GB_KILL_LIST\n";
+    }
+    return \%kill_list;
 }
