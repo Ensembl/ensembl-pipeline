@@ -49,7 +49,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniEst2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniEst2Genome;
 use Bio::EnsEMBL::Analysis;

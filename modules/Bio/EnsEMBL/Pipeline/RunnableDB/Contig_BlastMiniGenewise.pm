@@ -50,7 +50,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Contig_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 
 use Data::Dumper;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
 
 sub _initialize {
     my ($self,@args) = @_;

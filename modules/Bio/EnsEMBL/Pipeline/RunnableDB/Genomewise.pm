@@ -48,7 +48,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Genomewise;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Genomewise;
 use Bio::EnsEMBL::Pipeline::Runnable::Est2Genome;
@@ -61,7 +61,7 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 					 PROTEIN_ID_SUBSCRIPT
 					 );
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::Object );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB Bio::Root::RootI);
 
 sub new {
     my ($class,@args) = @_;

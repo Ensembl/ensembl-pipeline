@@ -50,7 +50,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Exonerate;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
@@ -61,7 +61,7 @@ use Bio::SeqIO;
 
 use Data::Dumper;
 
-#@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::Object);
+#@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDBI Bio::Root::RootI);
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {

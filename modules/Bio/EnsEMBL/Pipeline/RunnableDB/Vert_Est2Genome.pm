@@ -48,7 +48,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::Vert_Est2Genome;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::AlignFeature;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;

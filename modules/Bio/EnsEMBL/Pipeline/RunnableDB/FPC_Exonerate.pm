@@ -50,7 +50,7 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_Exonerate;
 use vars qw(@ISA);
 use strict;
 
-# Object preamble - inherits from Bio::Root::Object;
+# Object preamble - inherits from Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;

@@ -48,14 +48,14 @@ use Bio::EnsEMBL::Pipeline::GeneConf qw (EXON_ID_SUBSCRIPT
 # Object preamble - inheriets from Bio::Root::RootI
 
 
-use Bio::Root::Object;
+use Bio::Root::RootI;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Pipeline::SeqFetcher;
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 
-@ISA = qw(Bio::Root::Object Bio::EnsEMBL::Pipeline::RunnableDB );
+@ISA = qw(Bio::Root::RootI Bio::EnsEMBL::Pipeline::RunnableDB);
 
 sub new {
   my ($class,@args) = @_;
