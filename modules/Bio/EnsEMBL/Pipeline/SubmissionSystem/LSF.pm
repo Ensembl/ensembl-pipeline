@@ -411,21 +411,12 @@ sub get_pending_jobs{
   my $command = "bjobs -p";
   $command .= " -q $queue | grep PEND" if($queue);
   my @lines;
-  open (BJOBS, "$command 2>&1 |") or do{
-    return 0;
-  };
+  open (BJOBS, "$command 2>&1 |") or return 0;
   @lines = <BJOBS>;
+  close(BJOBS) or return 0;
   
-  close(BJOBS) or do{
-    return 0;
-  };
-  
-
   return 0 if $lines[0] =~ /No pending job found/;
-  return scalar(@lines);
-  
-  
-  
+  return scalar(@lines);  
 }
 
 

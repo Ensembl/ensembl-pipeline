@@ -189,7 +189,7 @@ sub _create_submission_systems {
     eval "require $module";
     if($@) {
       $self->throw("$module cannot be found for submission system $ss.\n" .
-									 "Exception $@\n");
+		   "Exception $@\n");
     }
     
     my $subsys = $module->new($config);
@@ -531,11 +531,12 @@ sub create_Job {
   my ($self, $taskname, $modulename, $input_id, $parms) = @_;
   my $ssystem = $self->_submission_systems()->{$taskname};
   my $job = $ssystem->create_Job($taskname, $modulename, $input_id, $parms);
-  #print STDERR "Have job ".$job." \n";
+
   if(!$job){
-    #print STDERR "no job was returned must be too many pending jobs\n";
+    #too many pending jobs already
     return undef;
   }
+
   #add the id to the taskstatus as existing and created...
   my $ts = $self->get_TaskStatus($taskname);
 
@@ -590,11 +591,9 @@ sub create_Jobs {
   #
   # submit the jobs
   #
-  JOB:foreach my $id (@{$id_set->ID_list}) {
+  foreach my $id (@{$id_set->ID_list}) {
     my $job = $self->create_Job($taskname, $modulename, $id, $parms);
-    if(!$job){
-      last JOB;
-    }
+    last if(!$job);
   }
 }
 
