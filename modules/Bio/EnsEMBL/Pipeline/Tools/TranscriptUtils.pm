@@ -897,48 +897,42 @@ sub find_transcripts_by_protein_evidence{
   
   my @tranz;
   
-  if ( $type ){
-    my $q = qq( SELECT distinct(t.transcript_id)
-		FROM   exon e, supporting_feature sf, protein_align_feature pf,
-		       exon_transcript et, transcript t, gene g
-		WHERE  sf.exon_id      = e.exon_id                   AND
-		       sf.feature_id   = pf.protein_align_feature_id AND
-		       sf.feature_type = "protein_align_feature"     AND
-		       pf.hit_name     = "$id"                       AND
-	               pf.contig_id    = e.contig_id                 AND
-	               et.exon_id      = e.exon_id                   AND
-	               et.transcript_id = t.transcript_id            AND
-	               g.gene_id       = t.gene_id                   AND
-		       g.type          = "$type"
- 	      );
-    
-    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-    my $res = $sth->execute || $db->throw("can't execute: $q");
-    
-    while( my ($t_id) =  $sth->fetchrow_array) {
-      push( @tranz, $t_id );
-    }
+  my $pfa_sql = qq(SELECT protein_align_feature_id 
+		   FROM protein_align_feature 
+		   WHERE hit_name = ?);
+  my $pfa_sth = $db->prepare($pfa_sql);
+  my $pf_id;
+  $pfa_sth->execute($id);
+  $pfa_sth->bind_columns(\$pf_id);
+  my @id_array;
+  
+  while($pfa_sth->fetch){
+    push(@id_array, $pf_id);
   }
-  else{
-    my $q = qq( SELECT distinct(t.transcript_id)
-		FROM   exon e, supporting_feature sf, protein_align_feature pf,
-		exon_transcript et, transcript t
-		WHERE  sf.exon_id      = e.exon_id                   AND
-		      sf.feature_id   = pf.protein_align_feature_id AND
-		      sf.feature_type = "protein_align_feature"     AND
-		      pf.hit_name     = "$id"                       AND
-	              pf.contig_id    = e.contig_id                 AND
-	              et.exon_id      = e.exon_id                   AND
-	              et.transcript_id = t.transcript_id
-	      );
+  my $id_list = join(',',@id_array);
+  
+  my $transcript_sql;
+  $transcript_sql = "SELECT distinct(t.transcript_id) ". 
+    "FROM transcript t, exon_transcript et, exon e, ".
+      "supporting_feature sf, ";
+  $transcript_sql .= "gene g " if($type);
+  $transcript_sql .= "WHERE  sf.feature_id in (".$id_list.") and ".
+    "e.exon_id=et.exon_id and et.transcript_id=t.transcript_id and ".
+      "sf.exon_id=e.exon_id and sf.feature_type= 'protein_align_feature' ";
+  $transcript_sql .= "and t.gene_id = g.gene_id and g.type = '$type'" if($type);
+
+  my $transcript_sth = $db->prepare($transcript_sql);
+
+  $transcript_sth->execute;
+  
+  my $transcript_id;
+  
+  $transcript_sth->bind_columns(\$transcript_id);
     
-    my $sth = $db->prepare($q) || $db->throw("can't prepare: $q");
-    my $res = $sth->execute || $db->throw("can't execute: $q");
-    
-    while( my ($t_id) =  $sth->fetchrow_array) {
-      push( @tranz, $t_id );
-    }
-  }
+  while($transcript_sth->fetch){
+    push(@tranz, $transcript_id);
+  } 
+  
   
   my $t_adaptor = $db->get_TranscriptAdaptor;
   my $s_adaptor = $db->get_SliceAdaptor;
@@ -946,6 +940,7 @@ sub find_transcripts_by_protein_evidence{
   ############################################################
   # create transcripts in slice coordinates
   my @transcripts;
+  print STDERR "have ".@tranz." transcript ids\n";
   foreach my $t_id ( @tranz ){
     my $tran     = $t_adaptor->fetch_by_dbID($t_id);
     my $slice    = $s_adaptor->fetch_by_transcript_id($tran->dbID);
