@@ -217,24 +217,20 @@ sub fetch_input {
     my @features;
     if ($::genebuild_conf{'bioperldb'}) {
       my $bpDBAdaptor = $self->bpDBAdaptor;
-      my (@bioperldbs) = split / /,$::genebuild_conf{'supporting_databases'};
+      my (@bioperldbs) = split /\,/,$::genebuild_conf{'supporting_databases'};
+
       foreach my $bioperldb (@bioperldbs){
-	print STDERR "Fetching features with analysis_type: $bioperldb\n";
-	my @features  = $contig->get_all_SimilarityFeatures_above_score($bioperldb,85);
-	print STDERR "Number of features fetched : ".scalar(@features)."\n";
-	my %idhash;
-    
-    	foreach my $f (@features) {
-	  #print "Feature " . $f . " " . $f->seqname . " " . $f->source_tag . "\n";
-	  if ($f->isa("Bio::EnsEMBL::FeaturePair") && defined($f->hseqname)) {
-	    $idhash{$f->hseqname} = 1;
-	  }
-	}
-    
-    	my @ids = keys %idhash;
-	$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
+
+		print STDERR "Fetching features with analysis_type: $bioperldb\n";
+		my @features  = $contig->get_all_SimilarityFeatures_above_score($bioperldb,10);
+		print STDERR "Number of features fetched : ".scalar(@features)."\n";
+
+		# _select_features() to pick out the best HSPs with in a region.
+		my @ids= $self->_select_features (@features);
+
+		$self->seqfetcher($bpDBAdaptor->fetch_BioSeqDatabase_by_name($bioperldb));
 	
-	my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
+		my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
 									       '-ids'        => \@ids,
 									       '-seqfetcher' => $self->seqfetcher,
 									       '-trim'       => 1);
@@ -261,7 +257,6 @@ sub fetch_input {
       my @ids = keys %idhash;
       
       print STDERR "Feature ids are @ids\n";
-      
       my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise('-genomic'    => $genseq,
 									     '-ids'        => \@ids,
 									     '-seqfetcher' => $self->seqfetcher,
@@ -320,7 +315,11 @@ sub convert_output {
     }
 
     my $anaAdaptor = $self->dbobj->get_AnalysisAdaptor;
-    my @analyses = $anaAdaptor->fetch_by_logic_name($genetype);
+
+	#use logic name from analysis object if possible, else take $genetype;
+	my $anal_logic_name = ($self->analysis->logic_name)	?	$self->analysis->logic_name : $genetype	;	
+	
+    my @analyses = $anaAdaptor->fetch_by_logic_name($anal_logic_name);
     my $analysis_obj;
     if(scalar(@analyses) > 1){
       $self->throw("panic! > 1 analysis for $genetype\n");
@@ -429,6 +428,7 @@ sub _make_transcript{
     
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
+      $subf->feature1->seqname($contig->internal_id);
       $subf->feature1->source_tag($genetype);
       $subf->feature1->primary_tag('similarity');
       $subf->feature1->score(100);
@@ -567,5 +567,46 @@ sub bpDBAdaptor {
   return $self->{'_bpDBAdaptor'};
 
 }
+
+=head2 _select_features
+ 
+  Title   : _select_features
+  Usage   : $self->_select_features(@features)
+  Function: obtain the best scoring HSP within a certain area
+  Returns : Array of FeaturePairs
+  Args    : Array of selected hseqnames
+ 
+=cut
+
+sub _select_features {
+
+	my ($self,@features) = @_;
+	
+	@features= sort {
+		$a->strand<=> $b->strand
+			||
+		$a->start<=> $b->start
+		} @features;
+
+	my @selected_hids;
+ 
+    my $best_hit = @features[0];
+ 
+    foreach my $feat (@features){
+		if ($feat->isa("Bio::EnsEMBL::FeaturePair") && defined($feat->hseqname)){ 
+          if ($feat->overlaps($best_hit,'strong')) {
+            if ($feat->score > $best_hit->score) {
+                $best_hit = $feat;
+            }
+          }else {
+            push (@selected_hids,$best_hit->hseqname);
+            $best_hit = $feat;
+          }
+		}
+    } 
+
+	return @selected_hids;
+}
+
 
 1;
