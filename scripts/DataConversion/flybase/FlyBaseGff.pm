@@ -18,8 +18,7 @@ use Bio::EnsEMBL::Gene;
 $|=1;
 
 
-
-# construct newFlyBaseGff-object (GFF Version 3)
+# construct newFlyBaseGff-object (GFF Version 3) of flybase gff
 
 sub new  {
   my ($class,@args) = @_;
@@ -50,22 +49,6 @@ sub new  {
 # getters
 #
  ################################################################################
-
-
-# processed_exon($exon) returns ref. to exon if the exon was already stored or null otherwise
-
-sub processed_exon{
-  my ($self,$exon)=@_;
-
-  my %tmp = %{$self->{exons}};
-
-  if(exists $tmp{$exon->stable_id}){
-    return $tmp{$exon->stable_id};
-  }
-  $tmp{$exon->stable_id}=$exon;
-  $self->{exons}=\%tmp;
-  return 0;
-}
 
 
 
@@ -147,11 +130,11 @@ sub get_all_childs_of_id{
 sub get_spec_child_of_id{
   my ($self,$parent_id,$spec_type) = @_;
   my @matching_ids;
-  if( ${ $self->parent2childs} {$parent_id} ){
+  if ( ${ $self->parent2childs} {$parent_id} ) {
     my @poss_child_ids = @{${$self->parent2childs}{$parent_id}};
-    for my $child (@poss_child_ids){
-      for my $typ(@{ $self->get_type_of_id($child) } ){
-        if ($typ =~ m/$spec_type/){
+    for my $child (@poss_child_ids) {
+      for my $typ(@{ $self->get_type_of_id($child) } ) {
+        if ($typ =~ m/$spec_type/) {
           push @matching_ids,$child;
         }
       }
@@ -210,72 +193,65 @@ sub store_genes{
   my @gene_ids =@{$self->get_ids_by_type("gene")};
 
   my %all_processed_exons;
-  for my $gene_id (@gene_ids){
+  for my $gene_id (@gene_ids) {
     my @all_nw_transcripts;
 
-    print "....processing Gene $gene_id:\n";
+
     #---- start process each alternative transcript of gene ("mRNA") ----
 
-    unless ($self->get_spec_child_of_id($gene_id,"mRNA")){
+    unless ($self->get_spec_child_of_id($gene_id,"mRNA")) {
       print "gene_id $gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
-    }else{ 
- 
-    for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"mRNA")}){
-      my $nw_transcript = new Bio::EnsEMBL::Transcript(
+    }else{
+
+
+      for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"mRNA")}) {
+        my $nw_transcript = new Bio::EnsEMBL::Transcript(
                                                        -STABLE_ID => $trans_id,
                                                        -VERSION => 3,
                                                       );
 
-      #---- start store each exon ----
-      my @exons =  @{$self->get_spec_child_of_id($trans_id,"exon")};
+        #---- start store each exon ----
+        my @exons =  @{$self->get_spec_child_of_id($trans_id,"exon")};
 
-      for my $exon (@exons){
-        my @gff_line = @{$self->get_attributes_by_id($exon)};
-        my ($seqid,$source,$type,$ex_start,$ex_end,$score,$ex_strand,$phase,$attrib) = @{$gff_line[0]};
-        warn_inconsistency("ID of exon $exon is not unique \n") if (exists $gff_line[1]);
+        for my $exon (@exons) {
+          my @gff_line = @{$self->get_attributes_by_id($exon)};
+          my ($seqid,$source,$type,$ex_start,$ex_end,$score,$ex_strand,$phase,$attrib) = @{$gff_line[0]};
+          warn_inconsistency("ID of exon $exon is not unique \n") if (exists $gff_line[1]);
 
-        my $ex = Bio::EnsEMBL::Exon->new(
-                                         -START     => $ex_start,
-                                         -END       => $ex_end,
-                                         -STRAND    => $ex_strand,
-                                         -PHASE     => 0,
-                                         -END_PHASE => 0,
-                                         -SLICE     => $self->slice,
-                                         -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
-                                         -STABLE_ID => ${  ${ $attrib }{'ID'} }[0] ,
-                                         -VERSION   => 3
-                                        );
+          my $ex = Bio::EnsEMBL::Exon->new(
+                                           -START     => $ex_start,
+                                           -END       => $ex_end,
+                                           -STRAND    => $ex_strand,
+                                           -PHASE     => 0,
+                                           -END_PHASE => 0,
+                                           -SLICE     => $self->slice,
+                                           -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
+                                           -STABLE_ID => ${  ${ $attrib }{'ID'} }[0] ,
+                                           -VERSION   => 3
+                                          );
 
-       my $esid = ${  ${ $attrib }{'ID'} }[0] ;
-       $nw_transcript->add_Exon($ex);
-      }
+          my $esid = ${  ${ $attrib }{'ID'} }[0] ;
+          $nw_transcript->add_Exon($ex);
+        }
 
 
-     #debug
-#       print "\n----------Transcript: -$trans_id:--------------------\n";
-#       for( @{$nw_transcript->get_all_Exons}){
-#        print "EXON:".$_->stable_id . $_->hashkey . "Sphase:".$_->phase."Ephase:".$_->end_phase."\n";
-#      }
-
-      #---- add Translation to transcript if CDS exists
+        #---- add Translation to transcript if CDS
 
        #  check if there is a CDS annotated for the mRNA and get coordiantes
         my $cds_id = ${$self->get_spec_child_of_id($trans_id,"CDS")}[0];
 
-	if ($cds_id){
+        if ($cds_id) {
           warn_inconsistency("There is a mRNA with more than one CDS\n") if exists ${$self->get_spec_child_of_id($trans_id,"CDS")}[1];
           my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_attributes_by_id($cds_id)}[0]}[3,4,6];   # get 3,4 and 6th attribute of gff-line
 
           # add Translatio to transcript
           $nw_transcript = addTranslationObject($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand);
-          # set phases of other exons if there is more than one exon
-        
+
+          # set phases of other exons
           $nw_transcript =  $self->setExonPhases($nw_transcript);
-          
-          # new method which stores processed exons in a object-variable
 
       }else{
-         print "mRNA $trans_id has no CDS\n";         # mRNA has no CDS
+         warn("mRNA $trans_id has no CDS\n");
       }
        push @all_nw_transcripts, $nw_transcript;
 
@@ -292,7 +268,7 @@ sub store_genes{
 
     foreach my $trans ( @all_nw_transcripts ) {
       foreach my $e ( @{$trans->get_all_Exons} ) {
-        if(exists $exoncheck{$e->stable_id}){
+        if (exists $exoncheck{$e->stable_id}) {
           ${$exoncheck{$e->stable_id}}{$e->hashkey} = $e->stable_id;;
         }else{
           ${ $exoncheck{$e->stable_id} }  {$e->hashkey} = $e->stable_id;
@@ -304,9 +280,9 @@ sub store_genes{
    }
    # find exons which have the same id (CG923:1) but different hashkeys
    my @multiple_hashkey;
-   for (keys %exoncheck){
-     if (scalar (keys %{$exoncheck{$_}} )  > 1){
-       for my $hashkey (keys %{$exoncheck{$_}}){
+   for (keys %exoncheck) {
+     if (scalar (keys %{$exoncheck{$_}} )  > 1) {
+       for my $hashkey (keys %{$exoncheck{$_}}) {
          push @multiple_hashkey, $hashkey;
        }
      }
@@ -315,27 +291,27 @@ sub store_genes{
    # make new names for exon with same bounds but different phases
    my %same_bounds;
 
-   for my $mh(@multiple_hashkey){
+   for my $mh(@multiple_hashkey) {
      my @line = split /\-/,$mh;
      ${$same_bounds{"$line[0]-$line[1]-$line[2]"}}{$mh}=();
    }
 
    # construct new name for each of the diffrent hahskeys
-   for(keys %same_bounds){
+   for(keys %same_bounds) {
      my %exon_hk = %{$same_bounds{$_}};
      my $cnt = "A";
-     for my $ehk(keys %exon_hk){
+     for my $ehk(keys %exon_hk) {
        $hk_name{$ehk} = $hk_name{$ehk}."-$cnt";
        $cnt++;
      }
    }
 
    # rename the exons with diff. hashkeys
-   for my $mh(@multiple_hashkey){
+   for my $mh(@multiple_hashkey) {
      foreach my $trans ( @all_nw_transcripts ) {
        foreach my $e ( @{$trans->get_all_Exons} ) {
          # change stable_id
-         if ($e->hashkey eq $mh){
+         if ($e->hashkey eq $mh) {
            $e->stable_id($hk_name{$mh});
 
          }
@@ -353,9 +329,8 @@ foreach my $trans ( @all_nw_transcripts ) {
     # get all unique genes which share this exon
     my %genes_of_exon = %{$all_processed_exons{"$line[0]-$line[1]-$line[2]"} };
 
-    for my $gid (keys %genes_of_exon){
-      print "gid  $gid \n";
-      if($gid ne $gene_id){
+    for my $gid (keys %genes_of_exon) {
+      if ($gid ne $gene_id) {
         # if the exon is shared by another gene than the actual one rename the exon
         # processed_gene : CG233
         # name of exon CG100:4
@@ -397,7 +372,6 @@ foreach my $trans ( @all_nw_transcripts ) {
 
    map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
 
-   print "--->all exons added to transc and transc added to gene,calling self->db-> GeneAdaptor->store(gene $gene_id)\n\n";
    $self->db->get_GeneAdaptor->store($gene);
   } #end foreach gene
  } #end unless...else
@@ -441,10 +415,10 @@ sub prune_Exons {
       }
       if (defined($found)) {
         push(@newexons,$found);
-        if ($exon == $tran->translation->start_Exon){
+        if ($exon == $tran->translation->start_Exon) {
           $tran->translation->start_Exon($found);
         }
-        if ($exon == $tran->translation->end_Exon){
+        if ($exon == $tran->translation->end_Exon) {
           $tran->translation->end_Exon($found);
         }
       } else {
@@ -489,13 +463,13 @@ sub store_as_simple_feature{
   my $analysis = $self->create_analysis($logic_name);
 
   # check if there is such a feature in gff
-  if ($self->get_ids_by_type($type)){
+  if ($self->get_ids_by_type($type)) {
 
     my @ids_of_given_type = @{$self->get_ids_by_type($type)};   # get all ids of simplefeaturs of a given type
 
     my @simple_features;
 
-    for(@ids_of_given_type){                                 # process each simple_feature
+    for(@ids_of_given_type) {                                 # process each simple_feature
       my @attributes = @{${$self->id2attributes}{$_}};    # get attributes of SimpleFeature
       warn_inconsistency("Featureid $_ of TYPE <$type> is not unique\n") if (scalar(@attributes) > 1);
 
@@ -504,10 +478,9 @@ sub store_as_simple_feature{
 
       # process attributes of the SimpleFeature to get the DisplayId if no $label is given
       my $display_label;
-      unless ($label){   # use id as label if no label has been supplied
+      unless ($label) {   # use id as label if no label has been supplied
         my %vals = %$href;
         $display_label = ${$vals{ID}}[0];
-        print $display_label."\n";
       }else{
        $display_label = $label;
       }
@@ -618,7 +591,7 @@ sub parse_gff{
 ################################################################################
 my $cnt=0;
   open(GFF,$self->gff)|| die "Could not open ".$self->gff."\n";
-  while(<GFF>){
+  while(<GFF>) {
     chomp;
     next if /\#/;
     my @line = split/\t/;    # line consists of 9 tab-delimited fields in GFF Version v3.0
@@ -626,17 +599,17 @@ my $cnt=0;
 
 
     # ENSEMBL-STRAND-CONVERSION
-    if($strand eq '-'){
+    if ($strand eq '-') {
       $strand = $line[6] = "-1";
     }
 
 
-    if($strand eq '+'){
+    if ($strand eq '+') {
       $strand = $line[6] = "+1";
     }
 
 
-    if($strand eq '.'){
+    if ($strand eq '.') {
       $strand = $line[6] = "0";
     }
 
@@ -649,7 +622,7 @@ my $cnt=0;
 
     my (%tags) ;
 
-    for(@attributes){     #process all values of an attrribute Parent=ID1,ID2,ID3 and write them in an attribute_hash
+    for(@attributes) {     #process all values of an attrribute Parent=ID1,ID2,ID3 and write them in an attribute_hash
       my ($id_name, $id_values ) = split /=/;
       # $id_name = Parent or ID....
 
@@ -660,7 +633,7 @@ my $cnt=0;
 
     # GET (SEMI-UNIQUE) ID OF LINE/OBJECT
     my $semi_unique_id;
-    if (exists $tags{'ID'}){
+    if (exists $tags{'ID'}) {
       $semi_unique_id =${$tags{'ID'}}[0];
       # STORE ALL FEATURE_IDENTIFIERS OF THE SAME TYPE IN A HASH
       push @{$m_type2id{$type}} , $semi_unique_id ;
@@ -670,7 +643,7 @@ my $cnt=0;
 
 
     # IF THE ITEM PROCESSED HAS PARENTS it has also an ID
-    if (exists $tags{'Parent'}){
+    if (exists $tags{'Parent'}) {
       my $child_id = $semi_unique_id;
       my @parents = @{$tags{'Parent'}};
 
@@ -711,8 +684,8 @@ my $cnt=0;
    ################################################################################
 
 
-  for(keys %non_unique_feature_identifiers){
-    if ($non_unique_feature_identifiers{$_}>1){
+  for(keys %non_unique_feature_identifiers) {
+    if ($non_unique_feature_identifiers{$_}>1) {
       $self->non_unique_ids($_);
     }
   }
@@ -945,7 +918,7 @@ sub db{
 
 sub gff{
   my ($self,$gff)=@_;
-  if($gff){
+  if ($gff) {
     $self->{gff}=$gff;
     $self->throw("gff not found $gff: $!\n") unless (-e $gff);
   }
