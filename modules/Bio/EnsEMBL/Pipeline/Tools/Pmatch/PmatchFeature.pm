@@ -35,24 +35,26 @@ sub new {
   my($class,@args) = @_;
 
   my $self = $class->SUPER::new(@args);
-
-  my ($protein_id,$cdna_id,$chr_name,$start,$end,$coverage,$analysis) = $self->_rearrange([qw(PROTEIN_ID
-										 CDNA_ID
-										 CHR_NAME
-										 START
-										 END
-										 COVERAGE
-										 ANALYSIS	      
-										)],@args);
+  my ($p, $f, $l) = caller;
+  #print STDERR "args:@args $f:$l\n";
+  my ($protein_id,$cdna_id,$chr_name,
+      $start,$end,$coverage,$name) = $self->_rearrange([qw(PROTEIN_ID
+							   CDNA_ID
+							   CHR_NAME
+							   START
+							   END
+							   COVERAGE
+							   NAME	      
+							  )],@args);
   
-  
+  #print STDERR "have name ".$name."\n";
   $self->protein_id($protein_id);
   $self->chr_name($chr_name);
   $self->start($start);
   $self->end($end);
   $self->cdna_id($cdna_id);
   $self->coverage($coverage);
-  $self->analysis($analysis);
+  $self->name($name);
   return $self;
 }
 
@@ -118,22 +120,17 @@ sub end {
   return $self->{_end};
 }
 
-sub analysis {
-   my ($self,$value) = @_;
+sub name {
+   my $self = shift;
 
-   if(!$self->{_analysis}){
-     $self->{_analysis} = undef;
+   #print "@_\n";
+   if(@_){
+     my $name = shift;
+     #print STDERR "have name ".$name."\n";
+     $self->{'_name'} = $name;
    }
-   if ($value) {
-     unless($value->isa('Bio::EnsEMBL::Analysis')) {
-       $self->throw("Analysis is not a Bio::EnsEMBL::Analysis object "
-		    . "but a $value object");
-     }
-
-     $self->{_analysis} = $value;
-   } 
-
-   return $self->{_analysis};
+   
+   return $self->{'_name'};
 }
 
 
