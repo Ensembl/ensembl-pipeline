@@ -45,9 +45,11 @@ else
 { print "ok 2\n"; }
 
 #create Genscan object    
-my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new (  -CLONE => $clone,
-                                                                -GENSCAN => '/usr/local/ensembl/bin/genscan',
-                                                                -MATRIX  => '/usr/local/ensembl/data/HumanIso.smat');
+my $genscan = Bio::EnsEMBL::Pipeline::Runnable::Genscan->new(
+    -CLONE => $clone,
+    -GENSCAN => '/usr/local/ensembl/bin/genscan',
+    -MATRIX  => '/usr/local/ensembl/data/HumanIso.smat'
+);
  
 unless ($genscan)
 { print "not ok 3\n"; }
