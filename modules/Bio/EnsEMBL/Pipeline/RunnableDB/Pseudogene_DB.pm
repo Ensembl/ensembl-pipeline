@@ -42,13 +42,54 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+
+=head2 gene_db
+
+  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Description: get/set gene db adaptor
+  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub gene_db {
+  my ($self, $gene_db) = @_;
+  
+  unless ($gene_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
+  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $gene_db");
+}
+    $self->{'_gene_db'} = $gene_db;
+  return $self->{'_gene_db'};
+}
+
+=head2 rep_db
+
+  Arg [1]    : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Description: get/set gene db adaptor
+  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Exceptions : none
+  Caller     : general
+
+=cut
+
+sub rep_db {
+  my ($self, $rep_db) = @_;
+  
+  unless ($rep_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")){
+  $self->throw("gene db is not a Bio::EnsEMBL::DBSQL::DBAdaptor, it is a $rep_db");
+}
+  $self->{'_rep_db'} = $rep_db;
+  return $self->{'_rep_db'};
+}
+
 =head2 fetch_input
 
-    Title   :   fetch_input
-    Usage   :   $self->fetch_input
-    Function:   Fetches input data for Pseudogene.pm from the database
-    Returns :   none
-    Args    :   none
+Title   :   fetch_input
+  Usage   :   $self->fetch_input
+ Function:   Fetches input data for Pseudogene.pm from the database
+  Returns :   none
+  Args    :   none
 
 =cut
 
@@ -74,6 +115,8 @@ sub fetch_input {
      '-pass'   => $GB_DBPASS,
      '-port'   => $GB_DBPORT,
     );
+  #store repeat db internally
+  $self->rep_db($rep_db);
 
   my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
@@ -83,8 +126,10 @@ sub fetch_input {
      '-pass'   => $GB_FINALDBPASS,
      '-port'   => $GB_FINALDBPORT,
     );
+  #store gene db internally
+  $self->gene_db($genes_db); 
 
-#genes come from final genebuild database
+  #genes come from final genebuild database
 
   my $genes_slice = $genes_db->get_SliceAdaptor->fetch_by_region(
 								 'chromosome',
@@ -98,7 +143,7 @@ sub fetch_input {
   foreach my $gene (@{$genes}) {
     my $rsa = $rep_db->get_SliceAdaptor;
 
-#repeats come from core database
+    #repeats come from core database
 
     my $rep_gene_slice = $rsa->fetch_by_region(
 					       'chromosome',
@@ -107,14 +152,14 @@ sub fetch_input {
 					       $gene->end,
 					      );
 
-##########################################################################
-#transfer gene coordinates to entire chromosome to prevent problems arising 
-# due to offset with repeat features 
+    ##########################################################################
+    #transfer gene coordinates to entire chromosome to prevent problems arising 
+    # due to offset with repeat features 
 
     my $chromosome_slice = $self->query->adaptor->fetch_by_region(
-									'chromosome',
-									$self->query->chr_name,
-								       );
+								  'chromosome',
+								  $self->query->chr_name,
+								 );
 
     my $transferred_gene = $gene->transfer($chromosome_slice);
     push @transferred_genes,$transferred_gene;
@@ -139,8 +184,8 @@ sub fetch_input {
 
 =head2 get_all_repeat_blocks
 
-  Args       : none
-  Description: merges repeats into blocks for each gene
+Args       : none
+ Description: merges repeats into blocks for each gene
   Returntype : array of Seq_Feature blocks;
 
 =cut 
@@ -152,36 +197,35 @@ sub get_all_repeat_blocks {
   @repeats = sort {$a->start <=> $b->start} @repeats;
   my $curblock = undef;
 
-  REPLOOP: foreach my $repeat (@repeats) {
-      my $rc = $repeat->repeat_consensus;
-      if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) { 
-	next REPLOOP;
-      }
-      if ($repeat->start <= 0) { 
-	$repeat->start(1); 
-      }
-      if (defined($curblock) && $curblock->end >= $repeat->start) {
-	if ($repeat->end > $curblock->end) { 
-	  $curblock->end($repeat->end); 
-	}
-      }
-      else {
-	$curblock = Bio::EnsEMBL::SeqFeature->new(
-						  -START => $repeat->start,
-						  -END => $repeat->end, 
-						  -STRAND => $repeat->strand
-						 );
-	push (@repeat_blocks,$curblock);
-      }
+ REPLOOP: foreach my $repeat (@repeats) {
+    my $rc = $repeat->repeat_consensus;
+    if ($rc->repeat_class !~ /LINE/ && $rc->repeat_class !~ /LTR/ && $rc->repeat_class !~ /SINE/) { 
+      next REPLOOP;
     }
+    if ($repeat->start <= 0) { 
+      $repeat->start(1); 
+    }
+    if (defined($curblock) && $curblock->end >= $repeat->start) {
+      if ($repeat->end > $curblock->end) { 
+	$curblock->end($repeat->end); 
+      }
+    } else {
+      $curblock = Bio::EnsEMBL::SeqFeature->new(
+						-START => $repeat->start,
+						-END => $repeat->end, 
+						-STRAND => $repeat->strand
+					       );
+      push (@repeat_blocks,$curblock);
+    }
+  }
   @repeat_blocks = sort {$a->start <=> $b->start} @repeat_blocks;
   return\@repeat_blocks;
 }
 
 =head2 write_output
 
-  Args       : none
-  Description: writes gene array into db specified in Bio::EnsEMBL::Config::GeneBuild::Databases.pm
+Args       : none
+ Description: writes gene array into db specified in Bio::EnsEMBL::Config::GeneBuild::Databases.pm
   exception  : warns if it cannot write gene
   Returntype : array of Seq_Feature blocks;
 
@@ -192,7 +236,7 @@ sub write_output {
   my($self) = @_;
   my @genes = @{$self->output};
 
-  empty_Analysis_cache();
+  #  empty_Analysis_cache();
 
   # write genes out to a different database from the one we read genes from.
   my $dbname = $PSEUDO_DBNAME;
@@ -215,70 +259,21 @@ sub write_output {
     $self->throw("an analysis logic name must be defined in the command line");
   }
 
-  #make sure all the anaysis analysis objects for objects associated with the gene
-  #have adaptors that point to the new database 
-
-
   my $gene_adaptor = $db->get_GeneAdaptor;
   foreach my $gene (@genes) { 
     foreach my $trans (@{$gene->get_all_Transcripts}) {
       $trans->translation;
-      foreach my $exon (@{$trans->get_all_Exons}) {
-        foreach my $sf (@{$exon->get_all_supporting_features}) {
-          $sf->analysis(get_Analysis_by_type($gene_adaptor->db,
-                                             $sf->analysis->logic_name));
-        }
-      }
     }
-    my $anal = get_Analysis_by_type($gene_adaptor->db, 
-                                    $analysis->logic_name);
 
-    $gene->analysis($anal);
-
+    # store
     eval {
-      #make sure display_xrefs point in the right direction
-      if (defined ($gene->display_xref->adaptor)){
-	$gene->display_xref->adaptor($gene_adaptor);
-      }      
-      #make sure xrefs point in the right direction
-      foreach my $xrefs (@{$gene->get_all_DBLinks}){
-	if (defined ($xrefs->analysis)){
-	  $xrefs->analysis(get_Analysis_by_type($gene_adaptor->db,
-						$xrefs->analysis->logic_name));;
-	}
-      }
-    };
-	# store
-    eval {
-     $gene_adaptor->store($gene);
+      $gene_adaptor->store($gene);
       print STDERR  "wrote gene " . $gene->dbID . " to database ".
 	$gene_adaptor->db->dbname."\n";
     };
     if ( $@ ) {
       $self->warn("UNABLE TO WRITE GENE:\n$@");
     }
-  }
-}
-
-{
-  my (%ana);
-
-  sub empty_Analysis_cache {
-    %ana = ();
-  }
-
-  sub get_Analysis_by_type {
-    my ($dba, $type) = @_;
-    unless (exists($ana{$type})) {
-      my $logic    = $type;
-      my $ana_aptr = $dba->get_AnalysisAdaptor;
-      $ana{$type}  = $ana_aptr->fetch_by_logic_name($logic);
-      if (!defined($ana{$type})) {
-        $ana{$type} = new Bio::EnsEMBL::Analysis( -logic_name => $type);
-        $ana_aptr->store($ana{$type});
-      }
-    }
-    return $ana{$type};
   }
 }
 
@@ -294,11 +289,11 @@ sub write_output {
 
 sub validate_genes {
   my ($self,$genes) =@_;
-   foreach my $gene (@{$genes}) {
-     unless ($gene->isa('Bio::EnsEMBL::Gene')){
-       $self->throw('Object is not a valid gene, it is a $gene');
-     }
-   }
+  foreach my $gene (@{$genes}) {
+    unless ($gene->isa('Bio::EnsEMBL::Gene')){
+      $self->throw('Object is not a valid gene, it is a $gene');
+    }
+  }
   return 1;
 }
 
@@ -313,32 +308,32 @@ before runnning the runnable
 
 sub run  {
 
-    my ($self) = @_;
+  my ($self) = @_;
 
-    foreach my $runnable ($self->runnable) {
+  foreach my $runnable ($self->runnable) {
 
-      $self->throw("Runnable module not set") unless ($runnable);
+    $self->throw("Runnable module not set") unless ($runnable);
 
-      # Not sure about this
- #     $self->throw("Input not fetched")       unless ($self->query);
+    # Not sure about this
+    #     $self->throw("Input not fetched")       unless ($self->query);
 
-      $runnable->run();
-      if($self->validate_genes){
-	$self->output($runnable->output);
-      }
+    $runnable->run();
+    if ($self->validate_genes) {
+      $self->output($runnable->output);
     }
-    return 1;
+  }
+  return 1;
 }
 
 sub output{
-    my ($self,$genes ) = @_;
-    unless ( $self->{_genes} ){
-	$self->{_genes} = [];
-    }
-    if ($genes){
-	$self->{_genes} = $genes;
-    }
-    return $self->{_genes};
+  my ($self,$genes ) = @_;
+  unless ( $self->{_genes} ) {
+    $self->{_genes} = [];
+  }
+  if ($genes) {
+    $self->{_genes} = $genes;
+  }
+  return $self->{_genes};
 }
 
 1;
