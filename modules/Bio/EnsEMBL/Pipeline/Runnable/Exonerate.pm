@@ -1,870 +1,613 @@
 #
+# Written by Eduardo Eyras
 #
-# Cared for by EnsEMBL  <ensembl-dev@ebi.ac.uk>
-#
-# Copyright GRL & EBI
+# Copyright GRL/EBI 2002
 #
 # You may distribute this module under the same terms as perl itself
 #
 # POD documentation - main docs before the code
 
-=pod 
+=pod
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Runnable::Exonerate
+Bio::EnsEMBL::Pipeline::Runnable::NewExonerate
 
 =head1 SYNOPSIS
+$database  = a full path location for the directory containing the target (genomic usually) sequence,
+@sequences = a list of Bio::Seq objects,
+$exonerate = a location for the binary,
+$options   = a string with options ,
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new(
-                                             -genomic => $genseq,
-                                             -est     => $estseq,
-                                             );
-    or
-    
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new()
+  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::NewExonerate->new(
+								 -database      => $database,
+								 -query_seqs    => \@sequences,
+								 -query_type    => 'dna',
+			                                         -target_type   => 'dna',
+                                                                 -exonerate     => $exonerate,
+								 -options       => $options,
+								);
 
+ $runnable->run; #create and fill Bio::Seq object
+ my @results = $runnable->output;
+ 
+ where @results is an array of SeqFeatures, each one representing an alignment (e.g. a transcript), 
+ and each feature contains a list of alignment blocks (e.g. exons) as sub_SeqFeatures, which are
+ in fact feature pairs.
+ 
 =head1 DESCRIPTION
 
-Exonerate is a fast EST:genomic alignment program written by Guy Slater.
-This object runs exonerate over input EST and genomic sequences, and stores the 
-exonerate matches as an array of Bio::EnsEMBL::FeaturePair
+NewExonerate takes a Bio::Seq (or Bio::PrimarySeq) object and runs Exonerate
+against a set of sequences.  The resulting output file is parsed
+to produce a set of features.
 
-The passed in $genseq and $estseq can be filenames or references to arrays of Bio::Seq; exonerate 
-runs faster if given multiple query sequences at once. 
+ here are a few examples of what it can do at this stage:
 
-=head2 Methods:
+1. Aligning cdnas to genomic sequence:
+   exonerate --exhaustive no --model est2genome cdna.fasta genomic.masked.fasta
+   ( this is the default )
 
- new,
- genomic_sequence,
- est_sequence,
- run,
- output.
+2. Behaving like est2genome:
+   exonerate --exhaustive yes --model est2genome cdna.fasta genomic.masked.fasta
+
+3. Behaving like blastn:
+   exonerate --model affine:local dna.fasta genomic.masked.fasta
+
+4. Smith-Waterman:
+   exonerate --exhaustive --model affine:local query.fasta target.fasta
+
+5. Needleman-Wunsch:
+   exonerate --exhaustive --model affine:global query.fasta target.fasta
+
+6. Generate ungapped Protein <---> DNA alignments:
+   exonerate --gapped no --showhsp yes protein.fasta genome.fasta
+
 
 =head1 CONTACT
 
-Describe contact details here
+ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
 
-# Let the code begin...
-
-package Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
+package Bio::EnsEMBL::Pipeline::Runnable::NewExonerate;
 
 use vars qw(@ISA);
 use strict;
-# Object preamble
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
-use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::SeqFeature;
-use Bio::EnsEMBL::Analysis;
-use Bio::PrimarySeq;
-use Bio::SeqIO;
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
-use FileHandle;
+use Bio::EnsEMBL::FeaturePair;
+use Bio::EnsEMBL::Analysis;
+use Bio::EnsEMBL::Root;
 
-@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Root );
+@ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
+
 
 sub new {
   my ($class,@args) = @_;
-  my $self = bless {}, $class;
-  
-  my( $genomic, $est, $exonerate, $arguments, $print) = 
-    $self->_rearrange([qw(GENOMIC EST EXONERATE ARGS PRINT)], @args);
+  my $self = $class->SUPER::new(@args);
 
-  $self->throw("no genomic sequence given\n") unless defined $genomic;
-  $self->throw("no est sequence given\n")     unless defined $est;
+  my ($database,
+      $query_seqs,
+      $query_type,
+      $target_type,
+      $exonerate,
+      $options,
+      $verbose) = $self->_rearrange([qw(
+					DATABASE
+					QUERY_SEQS
+					QUERY_TYPE
+					TARGET_TYPE
+					EXONERATE
+					OPTIONS
+					VERBOSE
+				       )
+				    ], @args);
 
-  $self->genomic_sequence($genomic) if $genomic; #create & fill key to Bio::Seq
-  $self->est_sequence($est) if defined $est; 
+  $self->_verbose($verbose) if $verbose;
 
-  if(defined $exonerate){
-    $self->exonerate($exonerate);
+  $self->{_output} = [];
+  # must have a target and a query sequences
+  unless( $query_seqs ){
+    $self->throw("Exonerate needs a query_seqs: $query_seqs");
+  }
+  $self->query_seqs(@{$query_seqs});
+
+  # you can pass a sequence object for the target or a database (multiple fasta file);
+  if( $database ){
+    $self->database( $database );
+  }
+  else{
+    $self->throw("Exonerate needs a target - database: $database");
+  }
+
+  ############################################################
+  # Target type: The default is dna
+  if ($target_type){
+    $self->target_type($target_type);
+  }
+  else{
+    print STDERR "Defaulting target type to dna\n";
+    $self->target_type('dna');
+  }
+
+  ############################################################
+  # Query type: The default is dna
+  if ($query_type){
+    $self->query_type($query_type);
+  }
+  else{
+    print STDERR "Defaulting query type to dna\n";
+    $self->query_type('dna');
+  }
+
+  ############################################################
+  # We default exonerate-0.6.7
+  if ($exonerate) {
+      $self->exonerate($exonerate);
   } else {
-    $self->exonerate($self->find_executable('exonerate')); 
+      $self->exonerate('/usr/local/ensembl/bin/exonerate-0.6.7');
   }
 
-  if (defined $arguments) {   
-    $self->arguments($arguments);
+  ############################################################
+  # options
+  my $basic_options = "--ryo \"RESULT: %S %pi %ql %g %V\\n\" "; 
+
+  # can add extra options as a string
+  if ($options){
+    $basic_options .= " ".$options;
   }
-  
-  if (defined $print) {
-    $self->print_results($print);
-  }
+  $self->options($basic_options);
 
   return $self;
 }
 
-#################
-# get/set methods 
-#################
-=head2 genomic_sequence
-  
-    Title   :   genomic_sequence
-    Usage   :   $self->genomic_sequence($seq)
-    Function:   Get/set method for genomic sequences
-    Returns :   Bio::PrimarySeqI, or filename
-    Args    :   Bio::PrimarySeqI, or filename
+sub DESTROY {
+  my $self = shift;
 
-=cut
-
-sub genomic_sequence {
-  my( $self, $value ) = @_;    
-
-
-  
-  if (defined $value) {
-    if (!ref($value)){
-      # assume it's a filename - check the file exists
-      $self->throw("[$value] : file does not exist\n") unless -e $value;
-      $self->genfilename($value);
-      $self->{'_genomic_sequence'} = $value;
-    }
-    elsif( $value->isa("Bio::PrimarySeqI") ){
-      $self->{'_genomic_sequence'} = $value;
-      my $filename = "/tmp/genfile_$$.fn";
-      $self->genfilename($filename);
-      my $genOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => "Fasta")
-      or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
-    
-      $self->throw ("problem writing genomic seqeunce to $filename\n" ) unless $genOutput->write_seq($value);
-      
-    }
-    else {
-      $self->throw("$value is neither a Bio::Seq  nor a filename\n");
-    }
-  }
-  
-  return $self->{'_genomic_sequence'};
-}
-
-=head2 est_sequence
-
-    Title   :   est_sequence
-    Usage   :   $self->est_sequence($seq)
-    Function:   Get/set method for est sequences
-    Returns :   reference to an array of Bio::Seq
-    Args    :   Either a filename or a reference to an array of Bio::Seq
-
-=cut
-
-sub est_sequence {
-  my( $self, $value ) = @_;
-
-  if ($value) {
-    if (ref($value) eq 'ARRAY') {
-      foreach my $est(@$value) {
-	$est->isa("Bio::PrimarySeqI") || $self->throw("Input isn't a Bio::PrimarySeqI");
-      }
-      $self->{'_est_sequences'} = $value;
-      
-      my $filename = "/tmp/estfile_$$.fn";
-      $self->estfilename($filename);
-      my $estOutput = Bio::SeqIO->new(-file => ">$filename" , '-format' => 'Fasta')
-	or $self->throw("Can't create new Bio::SeqIO from $filename '$' : $!");
-      
-      foreach my $eseq(@$value) {
-	$self->throw ("problem writing est seqeunce to $filename\n" ) unless $estOutput->write_seq($eseq);
-      }
-      
-    }
-    else {
-      # it's a filename - check the file exists
-      $self->throw("[$value] : file does not exist\n") unless -e $value;
-      $self->estfilename($value);
-      $self->{'_est_sequences'} = $value;
-    }
-  }
-  
-  #NB ref to an array of Bio::Seq
-  return $self->{'_est_sequences'};
-}
-
-=head2 exonerate
-
-    Title   :   exonerate
-    Usage   :   $self->exonerate('/path/to/executable')
-    Function:   Get/set method for exonerate executable path
-    Returns :   
-    Args    :   
-
-=cut
-
-sub exonerate {
-  my ($self,$arg) = @_;
-  
-  if (defined($arg)) {
-    $self->{'_exonerate'} = $arg;
-  }
-  return $self->{'_exonerate'};
-}
-
-=head2 arguments
-
-    Title   :   arguments
-    Usage   :   $self->est_sequence($args)
-    Function:   Get/set method for exonerate arguments
-    Returns :   
-    Args    :   
-
-=cut
-
-sub arguments {
-  my ($self, $args) = @_;
-  if ($args) {
-      $self->{'_arguments'} = $args ;
-    }
-  return $self->{'_arguments'};
-}
-
-=head2 print_results
-
-    Title   :   print_results
-    Usage   :   $self->print_results(1)
-    Function:   Get/set method for a flag determining whether exonerate output should be dumped to STDOUT
-    Returns :   0 or 1
-    Args    :   1 or nothing
-
-=cut
-
-sub print_results {
-  my ($self, $print) = @_;
-
-  if (!defined $self->{'_print'}) {
-     $self->{'_print'} = 0;
-  }
-
-  if ($print) {
-      $self->{'_print'} = 1 ;
-    }
-
-  return $self->{'_print'};
-}
-
-=head2 estfilename
-
-    Title   :   estfilename
-    Usage   :   $self->estfilename($filename)
-    Function:   Get/set method for estfilename
-    Returns :   
-    Args    :   
-
-=cut
-
-sub estfilename {
-  my ($self, $estfilename) = @_;
-  $self->{'_estfilename'} = $estfilename if ($estfilename);
-  return $self->{'_estfilename'};
+  unlink $self->_query_file;
 }
 
 
-=head2 genfilename
 
-    Title   :   genfilename
-    Usage   :   $self->genfilename($filename)
-    Function:   Get/set method for genfilename
-    Returns :   
-    Args    :   
-
-=cut
-
-sub genfilename {
-  my ($self, $genfilename) = @_;
-  $self->{'_genfilename'} = $genfilename if ($genfilename);
-  return $self->{'_genfilename'};
-}
+############################################################
+#
+# Analysis methods
+#
+############################################################
 
 =head2 run
 
-  Title   : run
-  Usage   : $self->run
-  Function: Runs exonerate; the optional argument determines
-            whether to run with or without intron modelling
-            - default is with intron modelling.
-  Returns : nothing
-  Args    : one optional argument: if it is defined and
-            nonzero, we run without intron modelling
-
+Usage   :   $obj->run($workdir, $args)
+Function:   Runs exonerate script and puts the results into the file $self->results
+            It calls $self->parse_results, and results are stored in $self->output
 =cut
 
-sub run {  
-  my ($self, $no_intron) = @_;
-
-  if(defined $no_intron and $no_intron){
-    $self->run_no_intron;
-  }
-  else{
-    $self->run_intron;
-  }
-}
-
-sub run_gapped {
-  my ($self) = @_;
-  $self->warn("run_gapped is deprecated, use run_intron instead");
-  return $self->run_intron;
-}
-
-=head2 run_intron
-
-  Title   : run_intron
-  Usage   : $self->run_intron()
-  Function: Runs exonerate with intron modelling and stores
-            results as FeaturePairs
-  Returns : TRUE on success, FALSE on failure.
-  Args    : none 
-
-=cut
-
-sub run_intron {
+sub run {
   my ($self) = @_;
 
-  # this method needs serious tidying
-  #check inputs
-  my $genomicseq = $self->genomic_sequence ||
-    $self->throw("Genomic sequences not provided");
-  my $estseq = $self->est_sequence ||
-    $self->throw("EST sequences not provided");
-  
-  #extract filenames from args and check/create files and directory
-  my $genfile = $self->genfilename;
-  my $estfile = $self->estfilename;
-  
-  # finally we run the beast.
-  my $resfile = "/tmp/exonerate_resfile_" . $$;
-  my $user_args;
-  if ($self->arguments) {
-    $user_args = $self->arguments;
-  } else {
-    $user_args = "";
-  }
-  my $exonerate_command = $self->exonerate() . " " . $user_args
-    . " -A false --cdna $estfile --genomic $genfile >" . $resfile;
-  
-  eval {
-    # better to do this as a pipe?
-    #print (STDERR "command is $exonerate_command\n");
-    $self->throw("Error running exonerate on ".$self->filename."\n") 
-      if (system ($exonerate_command)); 
-    $self->parse_results($resfile);
-    $self->convert_output();
-  };  
-  
-  #clean up temp files
-  if(ref($estseq) eq 'ARRAY'){
-    $self->_deletefiles($genfile, $estfile, $resfile);
-  }
-  else {
-    if(ref($genomicseq) eq 'ARRAY') {
-      $self->_deletefiles($genfile);
-    }
-    $self->_deletefiles($resfile);
-  }
-  if ($@) {
-    $self->throw("Error running exonerate :$@ \n");
-  } 
-  else {
-    return (1);
-  }
-  # store raw output FeaturePairs in $self->output
-  # store "genes" in $self->add_genes via convert_output
-  # $self->convert_output;
+  # Set name of results file
+  $self->results($self->workdir . "/results.$$");
+
+  # Write query sequences to file
+
+  $self->_write_sequences;
+
+  # Build exonerate command
+
+  my $command =$self->exonerate . " " .$self->options .
+      " --querytype " . $self->query_type .
+	" --targettype " . $self->target_type .
+	  " --query " . $self->_query_file .
+	    " --target " . $self->database;
+
+
+  # Execute command and parse results
+
+  print STDERR "Exonerate command : $command\n"
+    if $self->_verbose;
+
+  open( EXO, "$command |" ) || $self->throw("Error running exonerate $!");
+
+  $self->parse_results(\*EXO);
+
+  close(EXO);
+
+  return 1
 }
-
-=head2 parse_results
-  
-    Title   :   parse_results
-    Usage   :   $obj->parse_results($filename)
-    Function:   Parses exonerate output to give a set of features
-                parsefile can accept filenames, filehandles or pipes (\*STDIN)
-    Returns :   none
-    Args    :   optional filename
-
-=cut
 
 sub parse_results {
-  my ($self, $resfile) = @_;
+  my ($self, $fh) = @_;
 
-  # some constant strings
-  my $source_tag  = "exonerate";
-  #  my $primary_tag = "similarity";
-  if (-e $resfile) {
-    open (EXONERATE, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
-  }
-  else {
-    $self->throw("Can't open $resfile :$!\n");
-  }
-  
-  #read output
-  my $queryname = "";
-  while (<EXONERATE>) {
-    
-    # VAC temporary-ish changes - we're not using exonerate fully at the moment.
-    # output parsing needs to be rahashed once exonerate is stable
-    
-    #    if ($_ =~ /exonerate/) {
-    if ($_ =~ /cigar/) {
-      next if($_ =~ /^Message/);
-      
-      #split on whitespace
-      my @elements = split;
+  my %strand_lookup = ('+' => 1, '-' => -1, '.' => 0);
 
-      #      if( $elements[1] ne 'exonerate' ) { next; }
-      next unless $elements[0] eq 'cigar:';
-      
-      if($_ =~ /query\s+\"(\w+)\"/) {
-	$queryname = $1;
-      }
-      
-      # cigar parsing needs a LOT of looking at
-      # cigar: gi|550092|dbj|D29023.1|D29023 0 311 + static0 1996 2307 + 1555.00 M 311
-      #extract values from output line [0] - [7]
-      
-      #      my $primary_tag = $elements[2];
-      my $primary_tag = 'Gene';
-      
-      my $genomic_start  = $elements[6];
-      my $genomic_end    = $elements[7];
-      my $genomic_id     = $elements[5];
-      # start & end on EST sequence are not currently given by exonerate output ...
-      my $est_id     = $elements[1];
-      my $est_start  = $elements[2];
-      my $est_end    = $elements[3];
-      
-      # est seqname
-      my $genomic_score  = $elements[9];
-      if ($genomic_score eq ".") { $genomic_score = 0; } 
-      my $est_score = $genomic_score;
-      
-      my $genomic_source = $source_tag;
-      my $est_source = $source_tag;
-      
-      my $genomic_strand = 1;
-      if ($elements[4] eq '-') {
-	$genomic_strand = -1;
-      }
-      my $est_strand = 1;
-      if ($elements[8] eq '-') {
-	$est_strand = -1;
-      }
-      
-      # currently doesn't deal well with - strand ... genes
-      my $genomic_primary = $primary_tag;
-      my $est_primary = $primary_tag;
-      
-      my $pair = $self->_create_featurepair ($genomic_score, $genomic_id, $genomic_start, $genomic_end, 
-					     $est_id, $est_start, $est_end,
-					     $genomic_source, $est_source, 
-					     $genomic_strand, $est_strand, 
-					     $genomic_primary, $est_primary);
+  # Each alignment will be stored as a transcript with 
+  # exons and supporting features.  Initialise our
+  # transcript.
 
-      $self->output($pair);
-    }    
-  }
-  close(EXONERATE);
-}
+  my @transcripts;
 
-sub run_ungapped {
-  my ($self) = @_;
-  $self->warn("run_ungapped is deprecated, use run_no_intron instead");
-  return $self->run_no_intron;
-}
+  # Parse output looking for lines beginning with 'RESULT:'.
+  # Each line represents a distinct match to one sequence
+  # containing multiple 'exons'.
 
-=head2 run_no_intron
+ TRANSCRIPT:
+  while (<$fh>){
 
-  Title   : run_no_intron
-  Usage   : $self->run_no_intron()
-  Function: Runs exonerate without modelling introns (i.e., with
-            option -n yes) and stores results as FeaturePairs.
-  Returns : TRUE on success, FALSE on failure.
-  Args    : none 
+    print STDERR $_ if $self->_verbose;
 
-=cut
+    next unless /^RESULT:/;
 
-sub run_no_intron {
-  my ($self) = @_;
+    chomp;
 
-  #check inputs
-  my $genomicseq = $self->genomic_sequence ||    $self->throw("Genomic sequences not provided");
-  my $estseq     = $self->est_sequence     ||    $self->throw("EST sequences not provided");
-  
-  #extract filenames from args and check/create files and directory
-  my $genfile = $self->genfilename;
-  my $estfile = $self->estfilename;
-  
-  # output parsing requires that we have both gff and cigar outputs. We don't want to do intron
-  # prediction (ungapped) and we don't want to see alignments. Other options (wordsize, memory etc) 
-  # are got from $self->arguments.
+    my ($tag, $q_id, $q_start, $q_end, $q_strand, $t_id, $t_start, $t_end,
+	$t_strand, $score, $perc_id, $q_length, $gene_orientation,
+	@align_components) = split;
 
-  my $user_args;
-  if ($self->arguments) {
-    $user_args = $self->arguments;
-  } else {
-    $user_args = "";
-  }
-  my $command = $self->exonerate() . " " . $user_args . " -n yes -A false -G yes --cdna $estfile --genomic $genfile";
+    # Increment all our start coordinates.  Exonerate has a 
+    # coordinate scheme that counts _between_ nucleotides.
 
-  #print STDERR "command is $command\n";
+    $q_start++; $t_start++;
 
-  # disable buffering of STDOUT
-  STDOUT->autoflush(1);
-
-  eval {
-    open(EXONERATE, "$command |") or $self->throw("Error forking exonerate pipe on ".$self->genfilename."\n"); 
-
-    my $source_tag  = "exonerate";
-    my $prevstate   = "cigar";
-    my $estname     = undef;
-    my $genname     = "";
-
-    my %gff;
-
-
-    # exonerate output is split up by est.
-    # gff comes first, then all the cigar lines, so we can process all the gff, then all the cigar lines.
-    # if we keep track of when we flip from cigar to gff, we know we're moving on to the next est.
-
-    while(<EXONERATE>){
-      # gff
-      if(/\S+\s+exonerate\s+exon\s+\d+/){
-
-	# is this the first gff? ie have we moved onto a new est?
-	if($prevstate eq 'cigar') {
-
-	  $prevstate = 'gff';
-	  $estname   = undef;
-
-	  foreach my $entry( keys %gff) {
-	    delete $gff{$entry};
-	  }
-	}
-
-	my @cols = split /;/;
-	my $pid  = $cols[$#cols];
-
-	$pid =~ /(\d+)\./;
-	$pid = $1;
-	
-	my @coords = split /\s+/, $cols[0];
-	
-	$estname = $coords[0] unless defined $estname;
-
-	$self->throw("$coords[0] does not match $estname") unless $coords[0] eq $estname;
-
-	# key by start-end-strand
-	my $start = $coords[3]; 
-	$start--;# presently off by one wrt cigar
-
-	my $idstring = $start . "-" . $coords[4] . "-" . $coords[6];
-	$gff{$idstring} = $pid;
-      }
-
-      #cigar
-      elsif ($_ =~ /cigar/) {
-	next if($_ =~ /^Message/);
-	
-	$prevstate = 'cigar';
-
-
-	my ($cig, $hit, $query, $score, $cigar) = $_ =~ /^(cigar):\s+(\S+\s+\d+\s+\d+\s+[\+|-])\s+(\S+\s+\d+\s+\d+\s+[\+|-])\s+(\d+\.\d+)\s+(.+)/;
-	next unless $cig eq 'cigar';
-
-	my($qid, $qstart, $qend, $qstrand) = split / /, $query;
-	my($hid, $hstart, $hend, $hstrand) = split / /, $hit;
-	my $querystr = $qstart . "-" . $qend . "-" . $qstrand;
-        my $pid = $gff{$querystr};
-	if($qstrand eq "-"){
-	  $qstrand = -1;
-	}else{
-	  $qstrand = 1;
-	}
-	if($hstrand eq "-"){
-	  $hstrand = -1;
-	}else{
-	  $hstrand = 1;
-	}
-	my @cigars = split / /, $cigar;
-	my $length = @cigars;
-	if(!$length%2 == 1){
-	  die("there are ".@cigars." elements in the cigar array very odd\n");
-	}
-	my $db_cigar;
-	while(@cigars){
-	  my $state = shift @cigars;
-	  my $number = shift @cigars;
-	  $db_cigar .= $number.$state;
-	}
-
-	$self->throw("$estname(gff) and $hid(cigar) do not match!") unless $estname eq $hid;
-	my $pair = $self->_create_alignfeature($score, $qid, $qstart, $qend, $hid, $hstart, $hend, $qstrand, $hstrand, $pid, $db_cigar, 'exonerate', 'exonerate'); 
-	if($self->print_results) {
-	  print $pair->seqname  . "\t" . $pair->start        . "\t" . $pair->end    . "\t" . 
-	        $pair->score    . "\t" . $pair->percent_id   . "\t" . $pair->strand . "\t" . 
-	        $pair->hseqname . "\t" . $pair->hstart       . "\t" . $pair->hend   . "\t" . 
-                $pair->hstrand  . "\t". $pair->cigar_string."\n";
-	}
-	$self->output($pair);
-      }
-     
+    unless ($t_strand eq '+'){
+      $self->warn("Target strand is not positive [$t_strand].  Was " . 
+		  " not expecting this.");
+      next TRANSCRIPT
     }
-    
-    
-    close (EXONERATE) or $self->throw("Error running exonerate: $command");
-    
-  };  
 
-  #clean up temp files
-  if(ref($estseq) eq 'ARRAY' ) {
-    $self->_deletefiles($estfile);
-  }
-  
-  if($genomicseq ne $genfile) {
-    $self->_deletefiles($genfile);
-  }
-  
-  if ($@) {
-    $self->throw("Error running exonerate :$@ \n");
-  } 
-  else {
-    return (1);
-  }
-}
+    # Start building our pair of features.
+    my %target = (percent => $perc_id,
+		  source  => 'exonerate',
+		  name    => $t_id,
+		  strand  => $strand_lookup{$t_strand},);
 
-=head2 convert_output
-  
-    Title   :   convert_output
-    Usage   :   $obj->convert_output
-    Function:   Parses exonerate output to make "gene" features with exons as subfeatures
-                At present pretty hopeless supporting data for exons themselves ...
-    Returns :   none, but genes can be retrieved using each_gene
-    Args    :   none
+    # Hmm, what to do with the gene orientation?  Nothing for now.
+    $gene_orientation = $strand_lookup{$gene_orientation};
 
-=cut
+    # Initialise the transcript feature that we are about to 
+    # populate with exons.
+    my $transcript = Bio::EnsEMBL::Transcript->new();
 
-sub convert_output {
-  my($self) = @_;
+    # Read vulgar information and extract exon regions.
 
-  my $curr_gene;
-  my @genes;
-  foreach my $fp($self->output){
-    # if it's a gene line, make a gene
-    if($fp->primary_tag eq 'gene'){
-      $curr_gene = $fp->feature1;
-      push (@genes,$curr_gene)
+    my $q_coord = $q_strand eq '+' ? $q_start : $q_end;
+
+    my $proto_exons = $self->_extract_distinct_exons($t_start, 
+						     $q_coord, 
+						     $q_strand,
+						     \@align_components);
+
+    # Build FeaturePairs for each region of query aligned to a single
+    # Exon.  Create a DnaDnaAlignFeature from these FeaturePairs and then
+    # attach this to our Exon.
+
+    my $target_gaps = 0;
+
+    foreach my $proto_exon (@$proto_exons){
+      my @feature_pairs;
+      my $exon_end    = undef; # Where the overall exon end is tallied.
+      my $exon_start  = undef; # Where the overall exon start is tallied.
+      my $prev_end; # This is used to count gaps in the target/genomic sequence.
+
+      foreach my $exon_frag (@$proto_exon){
+	$target{start} = $exon_frag->{target_start};
+	$target{end}   = $exon_frag->{target_end};
+
+	# Account for genomic sequence gaps.
+	$target_gaps += $exon_frag->{target_start} - $prev_end - 1
+	  if defined $prev_end;
+	$prev_end = $target{end};
+
+	# Watch for the ends of our Exon.
+	$exon_end = $target{end}
+	  if $target{end} > $exon_end;
+	$exon_start = $target{start}
+	  if (($target{start} < $exon_start)||(! $exon_start));
+
+	# Build the query feature for our feature pair
+	my %query = (name    => $q_id,
+		     start   => $exon_frag->{query_start},
+		     end     => $exon_frag->{query_end},
+		     strand  => $strand_lookup{$q_strand},
+		     percent => $perc_id,
+		     source  => 'exonerate',);
+
+	$self->throw("Hit coordinate < 1.")
+	  if (($query{start} < 1) || ($query{end} < 1));
+
+	my $feature_pair = 
+	  $self->create_FeaturePair($target{start}, 
+				    $target{end}, 
+				    $target{strand},
+				    $query{start},
+				    $query{end},
+				    $query{strand},
+				    $query{name},
+				    $query{score},
+				    $query{percent},
+				    0,
+				    $target{name});
+
+	push @feature_pairs, $feature_pair;
+      }
+
+      unless (@feature_pairs){
+	$self->warn("Found an exonerate match that didn't " . 
+		    "have any exonic regions.");
+	next TRANSCRIPT
+      }
+
+      # Build our exon and set its key values.
+      my $exon = Bio::EnsEMBL::Exon->new();
+
+      $exon->seqname($t_id);
+      $exon->start($exon_start);
+      $exon->end($exon_end);
+      $exon->strand($strand_lookup{$t_strand});
+      $exon->phase(0);
+      $exon->end_phase(0);
+
+
+      # Use our feature pairs for this exon to create a single 
+      # supporting feature (with cigar line).
+      my $supp_feature;
+
+      eval{
+	$supp_feature =
+	  Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@feature_pairs);
+      };
+
+      if ($@){
+	$self->warn($@);
+	next TRANSCRIPT;
+      }
+
+      $exon->add_supporting_features($supp_feature);
+
+      # Finally, add Exon to growing transcript.
+      $transcript->add_Exon($exon);
     }
-    # if it's an exon line, make an exon and add it to the current gene
-    elsif($fp->primary_tag eq 'exon'){
-      $self->throw("Can't cope with an exon without having a gene first!") unless defined ($curr_gene);
-      $curr_gene->add_sub_SeqFeature($fp->feature1,'');
-      $fp->feature1->add_sub_SeqFeature($fp,'');
+
+    # Calculate query coverage, now that we have seen all matches.
+    my $coverage = sprintf "%.2f",
+	100 * ($q_end - $q_start + 1 - $target_gaps) / $q_length;
+
+    # Retrospectively set the coverage for each item of 
+    # supporting evidence.
+    foreach my $exon ( @{$transcript->get_all_Exons} ){
+      foreach my $evidence ( @{$exon->get_all_supporting_features} ){
+	$evidence->score($coverage);
+      }
     }
-    # otherwise skip it
+
+    push @transcripts, $transcript 
+      if scalar @{$transcript->get_all_Exons};
   }
 
-  $self->add_genes(@genes);
+  $self->output(@transcripts);
+
+  return 1
 }
 
-=head2 add_genes
+sub _extract_distinct_exons {
+  my ($self, $target_start, $query_coord, 
+      $query_strand, $vulgar_components) = @_;
 
-  Title   : add_genes
-  Usage   : $self->add_genes
-  Function: Adds an array of FeaturePairs representing genes, with exons as subFeatures, 
-            into $self->{_'genelist'}. They can be retrieved using each_gene.
-            NB this method is add_genes not add_Genes as these are not Gene objects ...
-  Returns : nothing
-  Args    : @genes: an array of Bio::EnsEMBL:FeaturePair
+  # This method works along the length of a vulgar line 
+  # exon-by-exon.  Matches that comprise an exon are 
+  # grouped and an array of 'proto-exons' is returned.
+  # Coordinates from the vulgar line are extrapolated 
+  # to actual genomic/query coordinates.
 
-=cut
+  my @exons;
+  my $exon_number = 0;
+  my $cumulative_query_coord  = $query_coord;
+  my $cumulative_target_coord = $target_start;
 
-sub add_genes {
+  while (@$vulgar_components){
+    $self->throw("Something funny has happened to the input vulgar string." .
+		 "  Expecting components in multiples of three, but only have [" .
+		 scalar @$vulgar_components . "] items left to process.")
+      unless scalar @$vulgar_components >= 3;
 
-  my ($self, @genes) = @_;
-    if (!defined($self->{'_genelist'})) {
-      $self->{'_genelist'} = [];
+    my $type          = shift @$vulgar_components;
+    my $query_length  = shift @$vulgar_components;
+    my $target_length = shift @$vulgar_components;
+
+    $self->throw("Vulgar string does not start with a match.  Was not " . 
+		 "expecting this.")
+      if ((scalar @exons == 0) && ($type ne 'M'));
+
+    if ($type eq 'M'){
+      my %hash;
+
+      $hash{type}         = $type;
+      $hash{target_start} = $cumulative_target_coord;
+      $hash{target_end}   = $cumulative_target_coord + $target_length - 1;
+
+      if ($query_strand ne '-') {
+	$hash{query_start} = $cumulative_query_coord;
+	$hash{query_end}   = $cumulative_query_coord  + $query_length - 1;
+      } else {
+	$hash{query_start} = $cumulative_query_coord - $query_length + 1;
+	$hash{query_end}   = $cumulative_query_coord;
+      }
+
+      push @{$exons[$exon_number]}, \%hash;
+    }
+
+    $cumulative_target_coord += $target_length;
+
+    if ($query_strand ne '-') {
+      $cumulative_query_coord  += $query_length;
+    } else {
+      $cumulative_query_coord  -= $query_length;
+    }
+
+    $exon_number++ 
+      if $type eq 'I';
   }
 
-   if (@genes) {
-    push(@{$self->{'_genelist'}},@genes);
-  }
-  
+  return \@exons;
 }
 
-=head2 each_gene
 
-  Title   : each_genes
-  Usage   : $self->each_genes
-  Function: Returns results of exonerate as an array of FeaturePair, one per gene. Exons
-            are added as subSeqfeatures of genes, and supporting evidence as subSeqFeatures 
-            of Exons.
-            If you want just the raw Exonerate results as a set of FeaturePairs, use output 
-            instead of each_gene
-            NB this method is each_gene not each_Gene as these are not Gene objects ...
-  Returns : An array of Bio::EnsEMBL::FeaturePair
-  Args    : none
+############################################################
+#
+# get/set methods
+#
+############################################################
 
-=cut
-
-sub each_gene{
-  my ($self) = @_;
-      
-  if (!defined($self->{'_genelist'})) {
-    $self->{'_genelist'} = [];
+sub query_seqs {
+  my ($self, @seqs) = @_;
+  if (@seqs){
+    unless ($seqs[0]->isa("Bio::PrimarySeqI") || $seqs[0]->isa("Bio::SeqI")){
+      $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
+    }
+    push(@{$self->{_query_seqs}}, @seqs) ;
   }
-  
-  return @{$self->{'_genelist'}};
-
+  return @{$self->{_query_seqs}};
 }
 
-=head2 output
+############################################################
 
-  Title   : output
-  Usage   : $self->output
-  Function: Get/set method - can optionally add a FeaturePair to $self->{'_output'}
-            Returns results of exonerate as array of FeaturePair, one per alignment
-            If you want the results returned organised with one FeaturePair per "gene", 
-            with associated exons and supporting features, use each_gene
-  Returns : An array of Bio::EnsEMBL::FeaturePair
-  Args    : either none, or $featpair: a Bio:EnsEMBL::FeaturePair
+sub genomic {
+  my ($self, $seq) = @_;
+  if ($seq){
+    unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")){
+      $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
+    }
+    $self->{_genomic} = $seq ;
+  }
+  return $self->{_genomic};
+}
 
-=cut
+############################################################
+
+sub exonerate {
+  my ($self, $location) = @_;
+  if ($location) {
+    $self->throw("Exonerate not found at $location: $!\n") unless (-e $location);
+    $self->{_exonerate} = $location ;
+  }
+  return $self->{_exonerate};
+}
+
+############################################################
+
+sub options {
+  my ($self, $options) = @_;
+  if ($options) {
+    $self->{_options} = $options ;
+  }
+  return $self->{_options};
+}
+
+############################################################
 
 sub output {
-  my ($self, $featpair) = @_;
+  my ($self, @output) = @_;
 
-  if (!defined($self->{'_output'})) {
-    $self->{'_output'} = [];
+  if (@output) {
+    unless( $self->{_output} ){
+      $self->{_output} = [];
+    }
+    push( @{$self->{_output}}, @output );
+  }
+  return @{$self->{_output}};
+}
+
+############################################################
+
+sub database {
+  my ($self, $database) = @_;
+
+  if ($database) {
+    $self->{_database} = $database;
+    $self->throw("Genomic sequence database file [" . 
+		 $self->{_database} . "] does not exist.")
+      unless -e $self->{_database};
   }
 
-  if (defined $featpair) {
-    push(@{$self->{'_output'}}, $featpair);
+  $self->throw("No genomic sequence database provided for Exonerate.")
+    unless $self->{_database};
+
+  return $self->{_database};
+}
+############################################################
+
+sub query_type {
+  my ($self, $mytype) = @_;
+  if (defined($mytype) ){
+    my $type = lc($mytype);
+    unless( $type eq 'dna' || $type eq 'protein' ){
+      $self->throw("not the right query type: $type");
+    }
+    $self->{_query_type} = $type;
   }
-  
-  return @{$self->{'_output'}};
-
+  return $self->{_query_type};
 }
 
-=head2 _create_featurepair
+############################################################
 
-  Title   : _create_featurepair
-  Usage   : $self->_create_featurepair($f1score, $f1pid, $f1start, $f1end, $f1id, 
-				    $f2start, $f2end, $f2id, $f1source, 
-				    $f2source, $f1strand, $f2strand, 
-				    $f1primary, $f2primary)
-  Function: Makes and returns a FeaturePair
-  Returns : Bio::EnsEMBL::FeaturePair
-  Args    : $f1score, $f1pid, $f1start, $f1end, $f1id, $f2start, $f2end, $f2id,
-            $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary:
-            strings and ints representing the various fileds to be filled in
-            when creating a Bio::EnsEMBL::FeaturePair
-
-=cut
-
-sub _create_featurepair {
-  my ($self, $f1score,  $f1id, $f1start, $f1end, $f2id, $f2start, $f2end,
-      $f1source, $f2source, $f1strand, $f2strand, $f1primary, $f2primary, $f1pid) = @_;
-
-  #create analysis object
-  my $analysis_obj    = new Bio::EnsEMBL::Analysis
-    (-db              => "none",
-     -db_version      => "none",
-     -program         => "exonerate",
-     -program_version => "1",
-     -gff_source      => $f1source,
-     -gff_feature     => $f1primary,);
-  
-  $f1pid = 0 unless defined $f1pid;
-
-  #create features
-  my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
-					     -end         =>   $f1end,
-					     -seqname     =>   $f1id,
-					     -strand      =>   $f1strand,
-					     -score       =>   $f1score,
-					     -percent_id  =>   $f1pid, 
-					     -source_tag  =>   $f1source,
-					     -primary_tag =>   $f1primary,
-					     -analysis    =>   $analysis_obj );
-  
-  my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
-					     -end         =>   $f2end,
-					     -seqname     =>   $f2id,
-					     -strand      =>   $f2strand,
-					     -score       =>   $f1score,
-					     -percent_id  =>   $f1pid, 
-					     -source_tag  =>   $f2source,
-					     -primary_tag =>   $f2primary,
-					     -analysis    =>   $analysis_obj );
-  #create featurepair
-  my $fp = new Bio::EnsEMBL::FeaturePair  (-feature1 => $feat1,
-                                           -feature2 => $feat2) ;
-  
-  return $fp;
+sub target_type {
+  my ($self, $mytype) = @_;
+  if (defined($mytype) ){
+    my $type = lc($mytype);
+    unless( $type eq 'dna'|| $type eq 'protein' ){
+      $self->throw("Not the right target type: $type");
+    }
+    $self->{_target_type} = $type ;
+  }
+  return $self->{_target_type};
 }
 
-sub _create_alignfeature {
-  my ($self, $f1score,  $f1id, $f1start, $f1end, $f2id, $f2start, $f2end, $f1strand, $f2strand, $f1pid, $cigar, $gff_source, $gff_feature) = @_;
-  
-  #print "feature 1 ".$f1id." ".$f1start." ".$f1end." ".$f1strand." ".$f1pid." ".$f1score." \n";
-  #print "feature 2 ".$f2id." ".$f2start." ".$f2end." ".$f2strand." ".$f1pid." ".$f1score." \n";
-  #print "others ".$cigar." ".$gff_source." ".$gff_feature."\n";
-  #create analysis object
-  my $analysis_obj    = new Bio::EnsEMBL::Analysis
-    (-db              => "none",
-     -db_version      => "none",
-     -program         => "exonerate",
-     -program_version => "1",
-     -gff_source      => $gff_source,
-     -gff_feature     => $gff_feature);
-  
-  $f1pid = 0 unless defined $f1pid;
-
-  #create features
-  my $feat1 = new Bio::EnsEMBL::SeqFeature  (-start      =>   $f1start,
-					     -end         =>   $f1end,
-					     -seqname     =>   $f1id,
-					     -strand      =>   $f1strand,
-					     -score       =>   $f1score,
-					     -percent_id  =>   $f1pid, 
-					     -analysis    =>   $analysis_obj );
-  
-  my $feat2 = new Bio::EnsEMBL::SeqFeature  (-start       =>   $f2start,
-					     -end         =>   $f2end,
-					     -seqname     =>   $f2id,
-					     -strand      =>   $f2strand,
-					     -score       =>   $f1score,
-					     -percent_id  =>   $f1pid, 
-					     -analysis    =>   $analysis_obj );
-  #create featurepair
-  my $fp = new Bio::EnsEMBL::DnaDnaAlignFeature  (-feature1 => $feat1,
-						  -feature2 => $feat2,
-						  -cigar_string => $cigar,
-						 );
-  
-  return $fp;
-}
-
-#####################################
-# clearing up temp files
-#####################################
+############################################################
 
 
-sub _deletefiles {
-  my ($self, @files) = @_;
-  
-  my $unlinked = unlink(@files);
-  
-  if ($unlinked == @files) {
-    return 1;
-  } else {
-    my @fails = grep -e, @files;
-    $self->throw("Failed to remove @fails : $!\n");
+sub _write_sequences {
+  my $self = shift;
+
+  my $seqout = Bio::SeqIO->new('-file'   => ">" . $self->_query_file,
+			       '-format' => 'Fasta',
+			      );
+
+  foreach my $query_seq ( $self->query_seqs ){
+    $seqout->write_seq($query_seq);
   }
 }
+
+sub _query_file {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_query_file} = shift;
+  }
+
+  unless ($self->{_query_file}){
+    $self->{_query_file} = $self->workdir . "/query_seqs.$$"
+  }
+
+  return $self->{_query_file};
+}
+
+sub _verbose {
+  my $self = shift;
+
+  if (@_){
+    $self->{_verbose} = shift;
+  }
+
+  return $self->{_verbose}
+}
+
 
 1;
+
