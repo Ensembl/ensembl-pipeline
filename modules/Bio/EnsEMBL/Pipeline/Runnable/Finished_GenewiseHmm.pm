@@ -171,6 +171,8 @@ sub _align_protein {
   my $hmm = $self->hmmfile;
   my $command = "$genewise -hmmer $hmm $genfile -genesf -kbyte $memory -ext 2 -gap 12 -subs 0.0000001 -quiet";
     
+  die $command;
+    
   if ($self->endbias == 1) {
     $command .= " -init endbias -splice flat ";
   }

@@ -145,7 +145,7 @@ sub run {
 #      . $self->results;
 
     foreach my $db (@db_list) {
-        my $command     = "/acari/work7a/keenan/tools/reformat_headers $db | $blat stdin $gen_query $options" . $self->results;
+        my $command     = "/acari/work7a/keenan/tools/reformat_headers $db | $blat stdin $gen_query $options " . $self->results;
         print $command, "\n";
         $self->throw("$command\nFailed during BLAT run $!") unless ( system($command) == 0 );
         $self->parse_results();

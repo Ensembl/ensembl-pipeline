@@ -138,14 +138,13 @@ sub run {
     print STDERR "\nPlus strand est_genome\n";
     $self->run_est_genome_on_strand( 1, $features );
 
-    print STDERR "\nMinus strand est_genome\n";
+    print STDERR "\nMinus strand est_genome\n"; 
     $self->run_est_genome_on_strand( -1, $features );
 
 }
 
 sub run_est_genome_on_strand {
     my ( $self, $strand, $feat ) = @_;
-
 
     my $hit_features = {};
     for ( my $i = 0 ; $i < @$feat ; $i++ ) {
@@ -174,6 +173,10 @@ sub run_est_genome_on_strand {
 
     while ( my ( $hid, $flist ) = each %$hit_features ) {
 
+        print "PRESORTED\n";
+        foreach my $f (@$flist) {
+            print"hit:  " . $f->gffstring . "\n";
+        }
         #print STDERR "$hid\n";
         #next unless $hid =~ /BF965645/;
 
@@ -181,11 +184,16 @@ sub run_est_genome_on_strand {
         @$flist =
           sort { $a->start <=> $b->start or $a->end <=> $b->end } @$flist;
 
+        print "SORTED\n";
+        foreach my $f (@$flist) {
+            print"hit:  " . $f->gffstring . "\n";
+        }
+        
         # Group into linear matches
         my @sets = ( [ $flist->[0] ] );
         my $curr = $sets[0];
-        for ( my $i = 1 ; $i < @$flist ; $i++ ) {
-
+        for ( my $i  = 1 ; $i < @$flist ; $i++ ) {
+                        
             my $prev = $flist->[ $i - 1 ];
             my $this = $flist->[$i];
 
@@ -198,7 +206,7 @@ sub run_est_genome_on_strand {
             }
         }
 
-
+        print "MADE ",scalar(@sets)," LINEAR MATCHES\N";
         foreach my $lin (@sets) {
             $self->do_mini_est_genome($lin);
         }
@@ -208,8 +216,11 @@ sub run_est_genome_on_strand {
 sub do_mini_est_genome {
     my ( $self, $linear ) = @_;
 
-
-
+    print "\nLinear Match\n";
+    foreach my $lin (@$linear) {
+        print "before:  " . $lin->gffstring . "\n";
+    }
+    
     ### Is this merging features?  - May be cause of duplicate features if isn't
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome(
         '-genomic'    => $self->unmasked,
@@ -218,17 +229,12 @@ sub do_mini_est_genome {
     );
     $e2g->run;
 
-    #print STDERR "\n";
-    #foreach my $lin (@$linear) {
-    #       printf STDERR " before: start=%7d end=%7d hstart=%7d hend=%7d\n",
-    #           $lin->start, $lin->end, $lin->hstart, $lin->hend;
-    #   }
+    
 
     foreach my $fp ( $e2g->output ) {
 
-        # printf STDERR "  after: start=%7d end=%7d hstart=%7d hend=%7d\n",
-        #     $fp->start, $fp->end, $fp->hstart, $fp->hend;
-
+        print "after:  " . $fp->gffstring . "\n";
+        
         # source_tag and primary_tag have to be set to
         # something, or validate method in FeaturePair
         # (callled by RunnableDB) throws!
@@ -239,6 +245,7 @@ sub do_mini_est_genome {
     }
 }
 
+
 sub add_output {
     my ( $self, @feat ) = @_;
 
@@ -246,7 +253,6 @@ sub add_output {
     foreach my $f (@feat) {
         $f->analysis($ana);
     }
-    
     
     $self->{'_output'} ||= [];
     

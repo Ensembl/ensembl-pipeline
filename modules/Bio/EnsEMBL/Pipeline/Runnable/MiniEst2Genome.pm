@@ -370,7 +370,9 @@ sub make_miniseq {
 
         $pairaln->addFeaturePair($fp);
 
-        #	$self->print_FeaturePair($fp);
+        #$self->print_FeaturePair($fp);
+        print "Minseq:  " . $fp->gffstring . "\n";
+
 
         $current_coord = $cdna_end + 1;
     }
@@ -381,10 +383,10 @@ sub make_miniseq {
         -pairalign => $pairaln
     );
 
-    my $newgenomic = $miniseq->get_cDNA_sequence->seq;
-    $newgenomic =~ s/(.{72})/$1\n/g;
+    #my $newgenomic = $miniseq->get_cDNA_sequence->seq;
+    #$newgenomic =~ s/(.{72})/$1\n/g;
 
-    #    print ("New genomic sequence is " . $newgenomic. "\n");
+     #   print ("New genomic sequence is " . $newgenomic. "\n");
     return $miniseq;
 
 }
@@ -495,14 +497,21 @@ sub get_Sequence {
 =cut
 
 sub get_all_Sequences {
-    my ( $self, @id ) = @_;
+    my ( $self, @ids ) = @_;
 
-    SEQ: foreach my $id (@id) {
-        my $seq = $self->get_Sequence($id);
-        if ( defined $seq ) {
-            $self->{'_seq_cache'}{$id} = $seq;
-        }
+    my $seqfetcher = $self->seqfetcher;
+
+    #if ( defined( $self->{'_seq_cache'}{$id} ) ) {
+    #    return $self->{'_seq_cache'}{$id};
+    #}
+    
+    my @seqs;
+    eval { @seqs = $seqfetcher->get_Seq_by_acc(@ids); };
+    
+    for (my $i = 0; $i < @seqs; $i++) {
+        $self->{'_seq_cache'}{$ids[$i]} = $seqs[$i];
     }
+    
 }
 
 =head2 run

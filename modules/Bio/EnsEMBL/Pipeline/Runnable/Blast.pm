@@ -126,12 +126,8 @@ sub new {
 
     #print STDERR "@args\n";
     # Now parse the input options and store them in the object
-    my (
-        $query,     $program,        $database,
-        $threshold, $threshold_type, $filter,
-        $coverage,  $prune,          $options
-      )
-      = $self->_rearrange(
+    my ( $query, $program, $database, $threshold, $threshold_type, $filter, $coverage, $prune, $options ) =
+      $self->_rearrange(
         [
             qw(QUERY
             PROGRAM
@@ -141,7 +137,8 @@ sub new {
             FILTER
             COVERAGE
             PRUNE
-            OPTIONS)
+            OPTIONS
+            )
         ],
         @args
     );
@@ -153,7 +150,7 @@ sub new {
         $self->throw("No query sequence input.");
     }
 
-#print STDERR "find executable output ".$self->find_executable($program)."\n";
+    #print STDERR "find executable output ".$self->find_executable($program)."\n";
     $self->program( $self->find_executable($program) );
     if ($database) {
         $self->database($database);
@@ -164,7 +161,7 @@ sub new {
 
     if ($options) {
 
-#this option varies the number of HSP displayed proportionally to the query contig length
+        #this option varies the number of HSP displayed proportionally to the query contig length
         if ( $::pipeConf{'B_factor'} ) {
             my $b_factor = $::pipeConf{'B_factor'};
             my $b_value  = int( $query->length / 1000 * $b_factor );
@@ -196,15 +193,20 @@ sub new {
     if ( defined($prune) ) {
         $self->prune($prune);
     }
+    
     if ( defined($coverage) ) {
         $self->coverage($coverage);
     }
+    
+   
+    
     return $self;    # success - we hope!
 }
 
 ###########
 # Analysis methods
 ##########
+
 
 =head2 run
 
@@ -273,17 +275,13 @@ sub run_analysis {
 
         #allow system call to adapt to using ncbi blastall. defaults to WU blast.	
         my $command = $self->program;
-        $command .= ( $::pipeConf{'blast'} eq 'ncbi' ) ? ' -d ' . $database :
-          ' ' . $database;
-        $command .=
-          ( $::pipeConf{'blast'} eq 'ncbi' ) ? ' -i ' . $self->filename :
-          ' ' . $self->filename;
+        $command .= ( $::pipeConf{'blast'} eq 'ncbi' ) ? ' -d ' . $database : ' ' . $database;
+        $command .= ( $::pipeConf{'blast'} eq 'ncbi' ) ? ' -i ' . $self->filename : ' ' . $self->filename;
         $command .= ' ' . $self->options . ' > ' . $self->results . ".$db";
 
         #system(pwd);
         print STDERR $command . "\n";
-        $self->throw("Failed during blast run $!\n")
-          unless ( system($command) == 0 );
+        $self->throw("Failed during blast run $!\n") unless ( system($command) == 0 );
     }
 
 }
@@ -483,7 +481,7 @@ sub parse_results {
 
     if ( $::pipeConf{'filter_blast'} ) {
 
-    # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
+        # re-filter, with pruning - rewrotee to use a local select_feature function instead of FeatureFilter 
         my @selected_features = $self->select_features( $self->output );
         $self->output(@selected_features);
     }
@@ -496,12 +494,10 @@ sub parse_results {
             # This sorting is pointless, because the first thing FeatureFilter
             # does is to sort by score!
             if ( $self->threshold_type eq "PID" ) {
-                @allfeatures =
-                  sort { $b->percent_id <=> $a->percent_id } @allfeatures;
+                @allfeatures = sort { $b->percent_id <=> $a->percent_id } @allfeatures;
             }
             else {
-                @allfeatures =
-                  sort { $a->p_value <=> $b->p_value } @allfeatures;
+                @allfeatures = sort { $a->p_value <=> $b->p_value } @allfeatures;
             }
             my $filter = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
                 -prune    => $self->prune,
@@ -598,9 +594,7 @@ sub filter_hits {
         @features = sort { $a->p_value <=> $b->p_value } @features;
     }
 
-    my $search =
-      new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter(
-        -coverage => $self->coverage );
+    my $search = new Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter( -coverage => $self->coverage );
 
     my @newfeatures = $search->run(@features);
 
@@ -659,11 +653,10 @@ sub split_HSP {
 
     my ( $qtype,   $htype )   = $self->_findTypes($hsp);
     my ( $qstrand, $hstrand ) = $self->_findStrands($hsp);
-    my ( $qinc,    $hinc )    =
-      $self->_findIncrements( $hsp, $qstrand, $hstrand, $qtype, $htype );
-    
-    #    print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
-    #    print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
+    my ( $qinc,    $hinc )    = $self->_findIncrements( $hsp, $qstrand, $hstrand, $qtype, $htype );
+
+    #print STDERR "Alignment q : " . $hsp->query->start . "\t" . $hsp->query->end . "\t" . $hsp->querySeq . "\n";
+    #print STDERR "Alignment s : " . $hsp->subject->start . "\t" . $hsp->subject->end . "\t" . $hsp->sbjctSeq . "\n";
 
     #    print STDERR "types (increments) $qtype ($qinc) : $htype ($hinc) Strands : $qstrand $hstrand \n";
 
@@ -686,15 +679,14 @@ sub split_HSP {
 
     my @gap;
 
-    my @qchars =
-      split ( //, $hsp->querySeq );    # split alignment into array of char
+    my @qchars = split ( //, $hsp->querySeq );    # split alignment into array of char
     my @hchars = split ( //, $hsp->sbjctSeq );    # ditto for hit sequence
 
-    my $qstart = $hsp->query->start();      # Start off the feature pair start
-    my $hstart = $hsp->subject->start();    # ditto
+    my $qstart = $hsp->query->start();            # Start off the feature pair start
+    my $hstart = $hsp->subject->start();          # ditto
 
-    my $qend = $hsp->query->start();        # Set the feature pair end also
-    my $hend = $hsp->subject->start();      # ditto
+    my $qend = $hsp->query->start();              # Set the feature pair end also
+    my $hend = $hsp->subject->start();            # ditto
 
     if ( $qstrand == -1 ) {
         $qstart = $hsp->query->end;
@@ -724,16 +716,14 @@ sub split_HSP {
         }
         else {
 
-# We have hit a gapped region.  If the feature pair flag is set ($found)
-# then make a feature pair, store it and reset the start and end variables.
+            # We have hit a gapped region.  If the feature pair flag is set ($found)
+            # then make a feature pair, store it and reset the start and end variables.
 
             if ( $found == 1 ) {
 
-                my $fp = $self->_convert2FeaturePair(
-                    $qstart, $qend,    $qstrand, $hstart,
-                    $hend,   $hstrand, $qinc,    $hinc,
-                    $hsp,    $name,    $analysis
-                );
+                my $fp =
+                  $self->_convert2FeaturePair( $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $qinc, $hinc, $hsp,
+                    $name, $analysis );
 
                 #print STDERR "Found " . $fp->gffstring . "\n";		
                 $self->growfplist($fp);
@@ -766,10 +756,9 @@ sub split_HSP {
 
     # Remember the last feature
     if ( $found == 1 ) {
-        my $fp = $self->_convert2FeaturePair(
-            $qstart, $qend, $qstrand, $hstart, $hend,   $hstrand,
-            $qinc,   $hinc, $hsp,     $name,   $analysis
-        );
+        my $fp =
+          $self->_convert2FeaturePair( $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $qinc, $hinc, $hsp, $name,
+            $analysis );
 
         #print STDERR "Found " . $fp->gffstring . "\n";
         $self->growfplist($fp);
@@ -790,11 +779,7 @@ sub split_HSP {
 =cut
 
 sub _convert2FeaturePair {
-    my (
-        $self,    $qstart, $qend, $qstrand, $hstart, $hend,
-        $hstrand, $qinc,   $hinc, $hsp,     $name,   $analysis
-      )
-      = @_;
+    my ( $self, $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $qinc, $hinc, $hsp, $name, $analysis ) = @_;
 
     # The actual end of the alignment is the previous character.
 
@@ -830,9 +815,8 @@ sub _convert2FeaturePair {
 #print STDERR "Creating feature pair " . $tmpqstart . "\t" . $tmpqend . "\t" . $qstrand . "\t" . $tmphstart . "\t" . $tmphend . "\t" . $hstrand . "\n";li
 
     my $fp =
-      $self->_makeFeaturePair( $tmpqstart, $tmpqend, $qstrand, $tmphstart,
-        $tmphend, $hstrand, $hsp->score, $hsp->percent, $hsp->P, $name,
-        $analysis );
+      $self->_makeFeaturePair( $tmpqstart, $tmpqend, $qstrand, $tmphstart, $tmphend, $hstrand, $hsp->score,
+        $hsp->percent, $hsp->P, $name, $analysis );
 
     return $fp;
 }
@@ -849,11 +833,7 @@ sub _convert2FeaturePair {
 =cut
 
 sub _makeFeaturePair {
-    my (
-        $self,    $qstart, $qend, $qstrand, $hstart, $hend,
-        $hstrand, $score,  $pid,  $evalue,  $name,   $analysis
-      )
-      = @_;
+    my ( $self, $qstart, $qend, $qstrand, $hstart, $hend, $hstrand, $score, $pid, $evalue, $name, $analysis ) = @_;
 
     my $source = $self->program;
     $source =~ s/\/.*\/(.*)/$1/;
@@ -963,8 +943,7 @@ sub select_features {
 
     my ( $self, @features ) = @_;
 
-    @features =
-      sort { $a->strand <=> $b->strand || $a->start <=> $b->start } @features;
+    @features = sort { $a->strand <=> $b->strand || $a->start <=> $b->start } @features;
 
     my @selected_features;
 
@@ -985,9 +964,7 @@ sub select_features {
     my @newfeatures;
     FEAT: foreach my $feat (@features) {
         foreach my $sf (@selected_features) {
-            if ( ( $sf->hseqname eq $feat->hseqname )
-                && ( $sf->score == $feat->score ) )
-            {
+            if ( ( $sf->hseqname eq $feat->hseqname ) && ( $sf->score == $feat->score ) ) {
                 push ( @newfeatures, $feat );
                 next FEAT;
             }
@@ -1059,8 +1036,7 @@ sub program {
     my ( $self, $location ) = @_;
 
     if ($location) {
-        $self->throw("executable not found at $location: $!\n")
-          unless ( -e $location && -x $location );
+        $self->throw("executable not found at $location: $!\n") unless ( -e $location && -x $location );
         $self->{'_program'} = $location;
     }
     return $self->{'_program'};
@@ -1134,9 +1110,7 @@ sub threshold_type {
         }
         if ( $found == 0 ) {
 
-            $self->throw(
-"Type [$type] is not an allowed type.  Allowed types are [@types]"
-            );
+            $self->throw( "Type [$type] is not an allowed type.  Allowed types are [@types]" );
         }
         else {
             $self->{_threshold_type} = $type;

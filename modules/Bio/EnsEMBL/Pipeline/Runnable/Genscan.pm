@@ -420,7 +420,8 @@ sub calculate_and_set_phases_new {
     my $count = 1;
     GENE: while ( $i < scalar(@genes) ) {
 
-        my $peptide = $peptides[$i];                
+        my $genscan = $peptides[$i];
+        
         
         my @exons   = $genes[$i]->sub_SeqFeature();
         my @newtran =
@@ -432,24 +433,42 @@ sub calculate_and_set_phases_new {
         foreach my $tran (@newtran) {
 
             my $temp_tran = $tran->translate->seq;
-
+            
+            
             # clean the translated sequence
 
             #genscan translated partial genes correctly whilst exon translation begin with M
             #$temp_tran =~ s/^M//i; #remove initial M from exon was removed as it updets the comparision
 
             # remove any initial X's from the translation                       
-            $temp_tran =~ s/^x//i;
-            # remove any terminal X's from the translation
-            $temp_tran  =~ s/x$//i;
+            my $temp_tran_first_x = $temp_tran =~ s/^X//i;
             
-            my $genscan = $peptides[$i];            
+            # remove any terminal X's from the translation
+            my $temp_tran_last_x = $temp_tran  =~ s/X$//i;
+            
             # remove any initial X's from the prediction   
-            $genscan    =~ s/^X//i;
+            my $genscan_first_x = $genscan =~ s/^X//i;
             
             # remove any terminal X's from the prediction   
-            $genscan    =~ s/X$//i;
-                        
+            my $genscan_last_x = $genscan =~ s/X$//i;
+            
+            if ($temp_tran_first_x or $genscan_first_x) {
+            
+                chop $temp_tran;
+                chop $genscan;
+                
+            }
+            
+            if ($temp_tran_last_x or $genscan_last_x) {
+            
+                substr ($temp_tran, 0, 1) = '';
+                substr ($temp_tran, 0, 1) = '';
+                
+            }
+            
+            print STDERR "\nGENSCAN:    ",$genscan,"\n";
+            print STDERR "TRANSLATED: ",$temp_tran,"\n";
+                      
             # wherever there are X's in translation - insert into prediction 
             # at same position (is this crazy?) 
             my $x       = 0;
