@@ -57,27 +57,33 @@ my $ref_user2   = $REF_DBUSER2;
 
 
 my $input_id;
-my $write  = 0;
-my $check  = 0;
 my $pepfile;
 my $gff_file;
 my $chr_name;
+my $check;
+my $coding_exons;
 
 # options
 &GetOptions( 
 	    'chr_name:s'  => \$chr_name,
 	    'input_id:s'  => \$input_id,
 	    'gff_file:s'  => \$gff_file,
+	    'check'       => \$check,
+	    'coding_exons'=> \$coding_exons,
 	   );
 
 unless( $input_id || $chr_name ){     
   print STDERR "Usage: compare_Exons.pl -input_id < chrname.chrstart-chrend >\n";
   print STDERR "                        -chr_name <chr_name>  (optional instead of -input_id)\n";
   print STDERR "                        -gff_file <file_name> (optional)\n";
+  print STDERR "                        -check\n";
+  exit(0);
+}
+
+if ( $check ){
   exit(0);
 }
     
-
 # connect to the databases 
 my $dna_db1= new Bio::EnsEMBL::DBSQL::DBAdaptor(-host  => $ref_host1,
 					       -user  => $ref_user1,
@@ -151,7 +157,6 @@ elsif ($chr_name ){
 
   $input_id = $chr_name.".1-".$slice1->length."\n";
   print STDERR "fetched region $input_id\n";
-  
 }
 
 
@@ -198,7 +203,11 @@ my $gene_comparison =
 ## cluster the genes we have passed to $gene_comparison
 
 my @gene_clusters    = $gene_comparison->cluster_Genes;
+
+my ($unmatched1,$unmatched2) = $gene_comparison->get_unmatched_Genes;
+
 my @unclustered = $gene_comparison->unclustered_Genes;
+
 
 ## print out the results of the clustering:
 
@@ -239,7 +248,12 @@ if ($gff_file){
 }
 
 # run the analysis
-$gene_comparison->compare_Exons(\@gene_clusters,0,'verbose');
+
+my $coding = $coding_exons ? 1:0;
+
+print STDERR "coding: $coding\n";
+
+$gene_comparison->compare_Exons(\@gene_clusters,$coding,'verbose');
 
 # If you remove the string 'verbose', it'll print out less stuff
 # If you want to look at coding exons only, change the 0 for any defined value
