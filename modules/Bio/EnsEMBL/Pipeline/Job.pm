@@ -433,25 +433,28 @@ sub runInLSF {
   
 
   STATUS:
-  {
+  { 
     # "CREATED"
     eval {
       if( $module =~ /::/ ) {
-	  $module =~ s/::/\//g;
-	  require "${module}.pm";
-	  $rdb = "${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-db => $self->adaptor->db );
-      } else {
-	  require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+          $module =~ s/::/\//g;
+          require "${module}.pm";
           $module =~ s/\//::/g;
-	  $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
-	      ( -analysis => $self->analysis,
-		-input_id => $self->input_id,
-		-db => $self->adaptor->db );
+
+          $rdb = "${module}"->new
+              ( -analysis => $self->analysis,
+                -input_id => $self->input_id,
+                -db => $self->adaptor->db );
+      } else {
+          require "Bio/EnsEMBL/Pipeline/RunnableDB/${module}.pm";
+          $module =~ s/\//::/g;
+          $rdb = "Bio::EnsEMBL::Pipeline::RunnableDB::${module}"->new
+              ( -analysis => $self->analysis,
+                -input_id => $self->input_id,
+                -db => $self->adaptor->db );
       }
     };
+    
     if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
