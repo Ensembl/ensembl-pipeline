@@ -27,6 +27,9 @@ this script allows input_ids to be generated and written to the input_id_analysi
     -help      Displays script documentation with PERLDOC
 
     -contig    signals to insert contig name input_ids
+
+    -logic_name the logic_name of the analysis object which needs to be 
+                associated with these entries 
     
     -slice     signals to insert slice type input ids using
                the format chrname.start-end
@@ -43,11 +46,41 @@ this script allows input_ids to be generated and written to the input_id_analysi
     
     -single if you just want a single dummy input_id ie for genome wide analyses
     
+    -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
     
 
     -input_type if you want to override the standard input_id types
-    
+
+=head1 EXAMPLES
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -contig
+
+this will use all the contig names are input_ids
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -slice -slice_size 1000000
+
+this will make slice names in the format chr_name.start-end all 1M in size
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -file -dir path/to/dir
+
+this will use all the filenames in the dir specified as input_ids
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -file -dir path/to/dir -regex /chunk/
+
+this will use all the filenames in dir which match the specifed regex
+as input_ids
+
+
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
+  -dbname my_database -translation_ids
+
+this will use all the translation ids as input_ids
+
 =cut
 
 
@@ -191,7 +224,7 @@ foreach my $id (@ids) {
     eval {
       print STDERR "Storing input id $id - type " . $analysis->input_id_type . "\n" if($verbose);
 
-      $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis);  
+      $db->get_StateInfoContainer->store_input_id_analysis($id,$analysis, '');  
     };
     if ($@) {
       print "Input id $id already present $@";
