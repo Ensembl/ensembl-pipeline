@@ -8,8 +8,6 @@ use Bio::EnsEMBL::Root;
 @ISA = qw(Bio::EnsEMBL::Root);
 
 
-
-
 sub new {
   my ($class, @args) = @_;
 
@@ -44,6 +42,27 @@ sub distance_method {
 
   return $self->{_distance_method}
 }
+
+sub matrix {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_matrix} = shift;
+  }
+
+  return $self->{_matrix}
+}
+
+sub otus {
+  my $self = shift;
+
+  if (@_) {
+    $self->{_otus} = shift;
+  }
+
+  return $self->{_otus}
+}
+
 
 sub add_match {
   my ($self,
