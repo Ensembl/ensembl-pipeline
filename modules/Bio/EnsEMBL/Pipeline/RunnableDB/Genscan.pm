@@ -200,14 +200,17 @@ sub runnable {
     if ($runnable)
     {
         #extract parameters into a hash
-        my ($parameter_string) = $self->parameters();
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
         my %parameters;
-        foreach my $pair (@pairs)
+        my ($parameter_string) = $self->parameters();
+        if ($parameter_string)
         {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
+            my @pairs = split (/,/, $parameter_string);
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $key =~ s/\s+//g;
+                $parameters{$key} = $value;
+            }
         }
         #creates empty Bio::EnsEMBL::Runnable::Genscan object
         $self->{'_runnable'} = $runnable->new(%parameters);

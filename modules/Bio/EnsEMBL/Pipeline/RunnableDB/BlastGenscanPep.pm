@@ -86,8 +86,8 @@ sub new {
     $self->{'_input_id'}    = undef;
     $self->{'_parameters'}  = undef;
     
-    my ( $dbobj, $input_id, $analysis, $threshold) = 
-            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS', 'THRESHOLD'], @args);
+    my ( $dbobj, $input_id, $analysis) = 
+            $self->_rearrange (['DBOBJ', 'INPUT_ID', 'ANALYSIS'], @args);
     
     $self->throw('Need database handle') unless ($dbobj);
     $self->throw("[$dbobj] is not a Bio::EnsEMBL::DB::ObjI")  
@@ -102,14 +102,6 @@ sub new {
                 unless ($analysis->isa("Bio::EnsEMBL::Pipeline::Analysis"));
     $self->analysis($analysis);
     
-    if ($threshold)
-    {
-        $self->threshold($threshold);
-    }
-    else
-    {
-        $self->threshold(1e-99);
-    }   
     return $self;
 }
 
@@ -160,16 +152,19 @@ sub formatted_parameters {
      
         #extract parameters into a hash
         my ($parameter_string) = $self->parameters;
-        $parameter_string =~ s/\s+//g;
-        my @pairs = split (/,/, $parameter_string);
         my %parameters;
-        foreach my $pair (@pairs)
+        if ($parameter_string)
         {
-            my ($key, $value) = split (/=>/, $pair);
-            $parameters{$key} = $value;
+            my @pairs = split (/,/, $parameter_string);
+            foreach my $pair (@pairs)
+            {
+                my ($key, $value) = split (/=>/, $pair);
+                $key =~ s/\s+//g;
+                $parameters{$key} = $value;
+            }
         }
         $parameters {'-blast'}  = $self->analysis->program;
-        $parameters {'-db'}     = $self->analysis->db;
+        $parameters {'-db'}     = $self->analysis->db_file;
         
     return %parameters;
 }
@@ -202,6 +197,7 @@ sub run {
     my ($self) = @_;
     #need to pass one peptide at a time
     $self->throw("Input must be fetched before run") unless ($self->genseq);
+    print STDERR "Running against ".scalar($self->transcripts)." predictions\n";
     foreach my $transcript ($self->transcripts)
     {
         print STDERR "Creating BioPrimarySeq ".$transcript->id."\n";
@@ -282,10 +278,6 @@ sub write_output {
     {
         #should add conditional for evalue here
 	    print STDERR "Writing features to database\n";
-        foreach my $feature (@features)
-        {
-            print STDERR ($feature->hseqname()."\t");
-        }
         my $feat_Obj=Bio::EnsEMBL::DBSQL::Feature_Obj->new($db);
 	    $feat_Obj->write($contig, @features);
     }

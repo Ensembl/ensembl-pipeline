@@ -87,7 +87,6 @@ sub run {
         my %parameters = $self->formatted_parameters();
         my $runnable = Bio::EnsEMBL::Pipeline::Runnable::Blast->new(%parameters);
         $runnable->clone($gene_seq);
-        $runnable->threshold($self->threshold());
         $runnable->run();
         $self->runnable($runnable);                                        
     }
@@ -182,7 +181,7 @@ my  ($self, $fp, @aligned_exons) = @_;
         {
             $start  =   $ex->{'gen_start'};
             $hstart =   ($ex->{'cdna_start'} - $fp->start) + $fp->hstart;
-            $start_phase = $ex->{'start_phase'};
+            $start_phase = $ex->{'phase'};
         }
         
         if ($$ex{'cdna_end'} > $fp->end)
@@ -204,12 +203,12 @@ my  ($self, $fp, @aligned_exons) = @_;
         #             ."\tf2: ".($fp->hend - $fp->hstart +1)
         #             ."\th1: ".($end - $start + 1)
         #             ."\th2: ".($hend - $hstart +1)."\n";
-        
         #print STDERR "Ex ".$ex->{'cdna_start'}." - ".$ex->{'cdna_end'}
         #             ." Feat ".$fp->start." - ".$fp->end
         #             ." Feat2 ".$fp->hstart." - ".$fp->hend
         #             ." H1 $start - $end H2 $hstart - $hend"
-        #             ." Ex ".$ex->{'gen_start'}." - ".$ex->{'gen_end'}."\n";
+        #             ." Ex ".$ex->{'gen_start'}." - ".$ex->{'gen_end'}
+        #             ."\tPh: ".$start_phase." - ".$end_phase ."\n";
                      
         my $contig_feat = Bio::EnsEMBL::SeqFeature->new (
                                 -seqname    =>  $ex->{'name'},
@@ -238,6 +237,10 @@ my  ($self, $fp, @aligned_exons) = @_;
                                 -source_tag =>  $fp->source_tag, 
                                 -phase      =>  $start_phase,  
                                 -end_phase  =>  $end_phase );
+        
+        #print STDERR "F1 ".$contig_feat->start." - ".$contig_feat->end
+        #            ." F2 ".$hit_feat->start." - ".$hit_feat->end
+        #            ."\tPh: ".$contig_feat->phase." - ".$contig_feat->end_phase ."\n";
         
         my $featurepair = Bio::EnsEMBL::FeaturePair->new (
                                 -feature1   => $contig_feat,
