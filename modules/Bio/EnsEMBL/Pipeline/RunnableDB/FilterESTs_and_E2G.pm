@@ -22,7 +22,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::FilterESTs_and_E2G
     $obj->fetch_input
     $obj->run
 
-    mc @genes = $obj->output;
+    my @genes = $obj->output;
 
 
 =head1 DESCRIPTION
@@ -241,12 +241,14 @@ sub fetch_input {
 
   # get Slice of input region
   $self->input_id  =~ /$EST_INPUTID_REGEX/;
-  my $chrid = $1;
+
+  my $chrid     = $1;
   my $chrstart  = $2;
   my $chrend    = $3;
 
   my $slice_adaptor = $self->estdb->get_SliceAdaptor();
-  my $slice    = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+  my $slice         = $slice_adaptor->fetch_by_chr_start_end($chrid,$chrstart,$chrend);
+
   $self->vcontig($slice);
 
   # find exonerate features amongst all the other features  
@@ -291,9 +293,9 @@ sub fetch_input {
   my %filtered_ests;
   
   # use coverage 10 for now.
-  my $filter = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new( '-coverage' => 10,
-								     '-minscore' => 500,
-								     '-prune'    => 1,
+  my $filter = Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter->new('-coverage' => 10,
+								    '-minscore' => 500,
+								    '-prune'    => 1,
 								   );
   my @filteredfeats = $filter->run(@exonerate_features);
   
@@ -320,6 +322,7 @@ sub fetch_input {
   }
 
   my %final_ests;
+
   foreach my $feat(@blast_features) {
     my $id = $feat->hseqname;
 
@@ -349,7 +352,8 @@ sub fetch_input {
     my $hitlength;
     my $hitstart;
     my $hitend;
-    foreach my $f(@{$final_ests{$id}}){
+
+    foreach my $f (@{$final_ests{$id}}){
       if(!defined $hitstart || (defined $hitstart && $f->hstart < $hitstart)){
 	$hitstart = $f->hstart;
       }
@@ -378,56 +382,13 @@ sub fetch_input {
       next ID;
     }
   
-    # before making a MiniEst2Genome, check that the one we're about to create
-    # is not redundant with any one we have created before
-#    my $do_comparison_stuff = 0;
-#    if ( $do_comparison_stuff == 1 ){
-    
-#      foreach my $id2 ( keys( %accepted_ests ) ){
-	
-#	# compare $id with each $id2
-#	# if $id is redundant, skip it
-#	my @feat1 = sort{ $a->start <=> $b->start } @{$final_ests{$id}};
-#	my @feat2 = sort{ $a->start <=> $b->start } @{$accepted_ests{$id2} };
-#	#print STDERR "comparing ".$id."(".scalar(@feat1).") with ".$id2." (".scalar(@feat2).")\n";    
-	
-#	if ( scalar( @feat1 ) == scalar( @feat2 ) ){
-#	  print STDERR "$id and $id2 have the same number of features\n";
-	  
-#	  # first, let's make a straightforward check for exac matches:
-#	  my $label = 0;
-#	  while ( $label < scalar( @feat1 )                      &&
-#		  $feat1[$label]->start == $feat2[$label]->start &&
-#		  $feat1[$label]->end   == $feat2[$label]->end   ){	        
-#	    print STDERR ($label+1)." == ".($label+1)."\n";
-#	    $label++;
-#	  }
-#	  if ( $label == scalar( @feat1 ) ){
-#	    print STDERR "EXACT MATCH between $id and $id2 features, skipping $id\n";
-#	  }
-#	  # make also a test for overlaps
-#	  $label = 0;
-#	  while ( $label < scalar( @feat1 ) && $feat1[$label]->overlaps( $feat2[$label] )  ){	        
-#	    print STDERR ($label+1)." overlaps ".($label+1)."\t";
-#	    print STDERR $feat1[$label]->start.":".$feat1[$label]->end."   ".
-#	      $feat2[$label]->start.":".$feat2[$label]->end."\n";
-#	    $label++;
-#	  }
-#	  if ( $label == scalar( @feat1 ) ){
-#	    print STDERR "approximate MATCH between $id and $id2 features, skipping $id\n";
-#	  }		
-#	}
-#      }
-#      
-#    }
-
     # make MiniEst2Genome runnables
     # to repmask or not to repmask?    
     my $e2g = new Bio::EnsEMBL::Pipeline::Runnable::MiniEst2Genome(
-								   '-genomic'  => $genomic,
-								   '-features' => \@{$final_ests{$id}},
+								   '-genomic'    => $genomic,
+								   '-features'   => \@{$final_ests{$id}},
 								   '-seqfetcher' => $self->seqfetcher,
-								   '-analysis' => $self->analysis
+								   '-analysis'   => $self->analysis
 								  );
     $self->runnable($e2g);
     $rcount++;
@@ -527,6 +488,7 @@ sub make_genes {
     $gene->temporary_id($self->input_id . ".$genetype.$count");
 
     my $transcript = $self->make_transcript($tmpf, $self->vcontig, $genetype, $count);
+
     $gene->analysis($self->analysis);
     $gene->add_Transcript($transcript);
     $count++;
@@ -575,22 +537,21 @@ sub make_transcript{
     my $exon = new Bio::EnsEMBL::Exon;
     
     $exon->temporary_id($slice->id . ".$genetype.$count.$excount");
-    $exon->contig_id($slice->id);
-    $exon->start($exon_pred->start);
-    $exon->end  ($exon_pred->end);
-    $exon->strand($exon_pred->strand);
+    $exon->contig_id   ($slice->id);
+    $exon->start       ($exon_pred->start);
+    $exon->end         ($exon_pred->end);
+    $exon->strand      ($exon_pred->strand);
     
-    $exon->phase($exon_pred->phase);
-    $exon->end_phase( $exon_pred->end_phase );
-    $exon->attach_seq($slice);
-    $exon->score($exon_pred->score);
-    $exon->adaptor($self->estdb->get_ExonAdaptor);
+    $exon->phase      ($exon_pred->phase);
+    $exon->end_phase  ($exon_pred->end_phase );
+    $exon->attach_seq ($slice);
+    $exon->score      ($exon_pred->score);
+    $exon->adaptor    ($self->estdb->get_ExonAdaptor);
+
     # sort out supporting evidence for this exon prediction
     foreach my $subf($exon_pred->sub_SeqFeature){
  
       $subf->feature1->analysis($self->analysis);
-	
-     
       $subf->feature2->analysis($self->analysis);
       
       $exon->add_supporting_features($subf);
@@ -618,8 +579,8 @@ sub make_transcript{
       $transcript->add_Exon($exon);
     }
     
-    $translation->start_exon($exons[0]);
-    $translation->end_exon  ($exons[$#exons]);
+    $translation->start_Exon($exons[0]);
+    $translation->end_Exon  ($exons[$#exons]);
     
     if ($exons[0]->phase == 0) {
       $translation->start(1);
@@ -654,7 +615,7 @@ sub remap_genes {
  GENEMAP:
   foreach my $gene(@genes) {
     #     print STDERR "about to remap " . $gene->temporary_id . "\n";
-    my @t = $gene->get_all_Transcripts;
+    my @t = @{$gene->get_all_Transcripts};
     my $tran = $t[0];
     eval {
       $gene->transform;
@@ -664,14 +625,14 @@ sub remap_genes {
       
       # temporary transfer of exon scores. Cannot deal with stickies so don't try
       
-      my @oldtrans = $gene->get_all_Transcripts;
-      my @oldexons  = $oldtrans[0]->get_all_Exons;
+      my @oldtrans  = @{$gene->get_all_Transcripts};
+      my @oldexons  = @{$oldtrans[0]->get_all_Exons};
       
-      my @newtrans = $gene->get_all_Transcripts;
-      my @newexons  = $newtrans[0]->get_all_Exons;
+      my @newtrans  = @{$gene->get_all_Transcripts};
+      my @newexons  = @{$newtrans[0]->get_all_Exons};
       
       if($#oldexons == $#newexons){
-	# 1:1 mapping; each_Exon gives ordered array of exons
+	# 1:1 mapping; get_all_Exons gives ordered array of exons
 	foreach( my $i = 0; $i <= $#oldexons; $i++){
 	  $newexons[$i]->score($oldexons[$i]->score);
 	}
@@ -706,9 +667,15 @@ sub remap_genes {
 sub _print_FeaturePair {
   my ($self,$pair) = @_;
   
-  print $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . 
-    $pair->score . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-      $pair->hstart . "\t" . $pair->hend . "\t" . $pair->hstrand . "\n";
+  print $pair->seqname  . "\t" . 
+        $pair->start    . "\t" . 
+        $pair->end      . "\t" . 
+        $pair->score    . "\t" . 
+        $pair->strand   . "\t" . 
+        $pair->hseqname . "\t" . 
+        $pair->hstart   . "\t" . 
+        $pair->hend     . "\t" . 
+        $pair->hstrand  . "\n";
 }
 
 =head2 output
