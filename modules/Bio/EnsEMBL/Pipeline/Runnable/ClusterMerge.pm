@@ -1423,7 +1423,7 @@ sub _merge_Transcripts{
     print STDERR "<<<<<<<<<< merging transcripts >>>>>>>>>>\n";
 	
     my $verbose = $self->verbose;
-    $verbose = 1;
+   
 
     # $list is an arrayref of the ests/cdnas that we can merge
     my @merged_transcripts;
@@ -1485,12 +1485,17 @@ sub _merge_Transcripts{
 
       my @exon_clusters = $cluster_list->sub_SeqFeature;
       
+      my $exon_count = 0;
       foreach my $exon_cluster (@exon_clusters){
-	
+	$exon_count++;
+
 	my $new_exon = Bio::EnsEMBL::Exon->new();
+	
 	$new_exon->start($exon_cluster->start );
 	$new_exon->end  ($exon_cluster->end   );
-	
+	$new_exon->seqname( $transcript->type."_".$exon_count);
+	$new_exon->score(100);
+
 	############################################################
 	# they should not have a translation
 	############################################################
