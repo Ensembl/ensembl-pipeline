@@ -74,7 +74,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
-package Bio::EnsEMBL::Pipeline::PogBuilder;
+package Bio::EnsEMBL::Pipeline::GeneBuilder;
 
 use Bio::EnsEMBL::Pipeline::ExonPair;
 use Bio::EnsEMBL::Transcript;
