@@ -53,7 +53,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDBI;
 use Bio::EnsEMBL::Pipeline::Runnable::Blast;
 use vars qw(@ISA);
-@ISA = qw(Bio::Root::RootI);
+@ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Blast);
 
 =head2 new
 
@@ -188,8 +188,8 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
 
     my $contigid  = $self->input_id;
-    my $contig    = $self->dbobj->get_repeatmasked_seq($contigid);
-    my $genseq    = $contig->primary_seq() or $self->throw("Unable to fetch contig");
+    my $contig    = $self->dbobj->get_Contig($contigid);
+    my $genseq    = $contig->get_repeatmasked_seq() or $self->throw("Unable to fetch contig");
     $self->genseq($genseq);
 }
 
