@@ -64,7 +64,7 @@ sub parse_results {
             if ($name =~ /^[^\|]+\|([^\|]+)\|/) {
                 $name = $1;
             }
-            elsif ($name =~ /^\S+\s+(\S+\.\d+)/) {
+            elsif ($name =~ /^\S+\s+(\S+\.\d+)\b/) {
                 $name = $1;
             }
             elsif ($name =~ /^\S+\s+(\S+)/) {
