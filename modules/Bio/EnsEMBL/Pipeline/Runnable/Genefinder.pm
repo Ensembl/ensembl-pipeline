@@ -11,7 +11,7 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis; 
 use Bio::EnsEMBL::Transcript;
-use Bio::EnsEMBL::DBSQL::Utils;
+use Bio::EnsEMBL::TranscriptFactory;
 use Bio::Root::RootI;
 
 
@@ -27,7 +27,7 @@ sub new {
     $self->{'_tablenamefile'} = undef;
     $self->{'_intronpenalty'} = undef;
     $self->{'_exonpenalty'} = undef;
-    $self->{'_clone'}     = undef; # location of Bio::Seq object
+    $self->{'_query'}     = undef; # location of Bio::Seq object
     $self->{'_genefinder'}   = undef; # location of Genefinder script
     $self->{'_workdir'}   = undef; # location of temp directory
     $self->{'_filename'}  = undef; # file to store Bio::Seq object
@@ -35,11 +35,11 @@ sub new {
     $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
     $self->{'_parameters'} =undef; #location of parameters for genscan
     print "@args\n";
-    my($clone, $genefinder, $parameters, $tablenamefile, $exonpenalty, $intronpenalty) = 
+    my($query, $genefinder, $parameters, $tablenamefile, $exonpenalty, $intronpenalty) = 
         $self->_rearrange([qw(CLONE GENEFINDER PARAM TABLENAMEFILE EXONPENALTY INTRONPENALTY)], @args);
 
    
-    $self->clone($clone);
+    $self->query($query);
     $genefinder = 'genefinder'       unless ($genefinder);
     $tablenamefile = '/usr/local/ensembl/data/nemtables/sanger.tablenamefile.cod' unless($tablenamefile);
     $intronpenalty = '/usr/local/ensembl/data/nemtables/intron_penalty.lookup' unless($intronpenalty);
@@ -63,7 +63,7 @@ sub new {
 #get/set methods
 ###################
 
-sub clone {
+sub query {
     my ($self, $seq) = @_;
     if ($seq)
     {
@@ -71,11 +71,11 @@ sub clone {
         {
             $self->throw("Input isn't a Bio::Seq or Bio::PrimarySeq");
         }
-        $self->{'_clone'} = $seq ;
-        $self->filename($self->clone->id.".$$.seq");
+        $self->{'_query'} = $seq ;
+        $self->filename($self->query->id.".$$.seq");
         $self->results($self->filename.".genscan");
     }
-    return $self->{'_clone'};
+    return $self->{'_query'};
 }
 
 
@@ -204,7 +204,7 @@ sub run {
 
     my ($self, $dir) = @_;
     #check seq
-    my $seq = $self->clone() || $self->throw("Seq required for Genefinder\n");
+    my $seq = $self->query() || $self->throw("Seq required for Genefinder\n");
     #set directory if provided
     if($dir){
       $self->workdir($dir);
@@ -300,7 +300,7 @@ sub parse_results {
 	#print join ("\t", $seq,"Genefinder","CDS",$start,$end,$score,$strand,$phase,
 	#              "Sequence $prefix.$seqnum ; Exon $prefix.$seqnum.$exon\n") ;
 	#print STDERR "seqname = $prefix.$seqnum.$exon\n";
-	my $exonname = $prefix.".".$seqnum.".".$exon;
+	my $exonname = $prefix.".".$seqnum;
 	#print STDERR "exonname = ".$exonname."\n";
 	$self->create_feature($start, $end, $score, $strand, $phase, $exonname, 'genefinder', '1', 'genefinder', 'prediction');
 	# phase update is tricky
@@ -377,8 +377,6 @@ sub create_feature {
                             -strand  => $strand,
                             -score   => $score,
                             -phase   => $phase,
-                            -source_tag  => $source,
-                            -primary_tag => $primary,
                             -analysis => $analysis_obj);  
     $self->exons($exon);
 }
@@ -387,7 +385,7 @@ sub create_feature {
 #relies on seqname of exons being in genefinder format 3.01, 3.02 etc
 sub create_genes {
     my ($self) = @_;
-    #print "creating genes \n";
+    print "creating genes \n";
     my (%genes, %gene_start, %gene_end, %gene_score, %gene_p,
         %gene_strand, %gene_source, %gene_primary, %gene_analysis);
 
@@ -397,22 +395,22 @@ sub create_genes {
     foreach my $exon (@ordered_exons)
     {
       #print $exon->seqname."\n";
-        my ($group_number) = ($exon->seqname =~ /\w+\.\d+\.\d+\.(\d+)\.\d+/);
+        my ($group_number) = $exon->seqname;
 	#print "seqname =  ".$exon->seqname."\n";
-	#print $group_number."\n";
+	print $group_number."\n";
         #intialise values for new gene
         unless (defined ($genes {$group_number}))
         {
+	  print "creating a new trancripts for ".$group_number."\n";
             $genes          {$group_number} = [];
             $gene_start     {$group_number} = $exon->start;
             $gene_end       {$group_number} = $exon->end;
             $gene_score     {$group_number} = 0 ;
             $gene_strand    {$group_number} = $exon->strand;
-            $gene_source    {$group_number} = $exon->source_tag ;
-            $gene_primary   {$group_number} = $exon->primary_tag;
             $gene_analysis  {$group_number} = $exon->analysis;
         }
         #fill array of exons
+	print "adding an exon to ".$group_number."\n";
         push (@{$genes {$group_number}}, $exon);
         #calculate gene boundaries and total score
         $gene_start {$group_number} = $exon->start() 
@@ -433,8 +431,6 @@ sub create_genes {
                                             /(scalar @{$genes {$gene_number}}),
                             -start       => $gene_start    {$gene_number},
                             -end         => $gene_end      {$gene_number},
-                            -source_tag  => $gene_source   {$gene_number},
-                            -primary_tag => $gene_primary  {$gene_number},
                             -analysis    => $gene_analysis {$gene_number}, )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
 
@@ -443,7 +439,7 @@ sub create_genes {
           $gene->add_sub_SeqFeature($exon, '');
         }
         $self->genefinder_genes($gene); #add gene to main object
-	my $tran = Bio::EnsEMBL::DBSQL::Utils::fset2transcript_with_seq($gene, $self->clone);
+	my $tran = Bio::EnsEMBL::TranscriptFactory::fset2transcript_with_seq($gene, $self->query);
 	#print "have ".$tran."\n";
 	$self->add_transcript($tran);
       }
@@ -498,8 +494,6 @@ sub output {
                                            -phase   => $exon->phase,
                                            -end_phase => $exon->end_phase,
                                            -score   => $exon->score,
-                                           -source_tag => 'genefinder',
-                                           -primary_tag => 'prediction',
                                            -analysis     => $analysis);
       my $f2 = new Bio::EnsEMBL::SeqFeature(-seqname => $exon->seqname,
                                             -start   => $exon->start,
@@ -509,8 +503,6 @@ sub output {
                                             -end_phase => $exon->end_phase,
                                             -score   => $exon->score,
                                             -p_value   => $exon->p_value,
-                                            -source_tag => 'genefinder',
-                                            -primary_tag => 'prediction',
                                             -analysis     => $analysis);
 
 #      print STDERR $exon->start . " " . $exon->end . " " . $exon->phase . " " . $exon->strand . "\n";
@@ -586,8 +578,6 @@ sub output_singlefeature {
                             -score          => $score,
                             -start          => $start,
                             -end            => $end,
-                            -source_tag     => $source,
-                            -primary_tag    => $primary,
                             -p_value        => $p_value,
                             -analysis       => $analysis )
                     or $self->throw("Couldn't create Bio::EnsEMBL::SeqFeature object");
