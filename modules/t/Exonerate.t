@@ -1,118 +1,66 @@
-## Bioperl Test Harness Script for Modules
-##
-# Before `make install' is performed this script should be runnable with
-# `make test'. After `make install' it should work as `perl test.t'
-#-----------------------------------------------------------------------
-## perl test harness expects the following output syntax only!
-## 1..3
-## ok 1  [not ok 1 (if test fails)]
-## 2..3
-## ok 2  [not ok 2 (if test fails)]
-## 3..3
-## ok 3  [not ok 3 (if test fails)]
-##
-## etc. etc. etc. (continue on for each tested function in the .t file)
-#-----------------------------------------------------------------------
+use lib 't';
+use Test;
+use strict;
 
-
-## We start with some black magic to print on failure.
-BEGIN { $| = 1; print "1..5\n"; 
-	use vars qw($loaded); }
-
-END { print "not ok 1\n" unless $loaded; }
+BEGIN { $| = 1; plan test => 5;
+	require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
+      }
 
 use Bio::EnsEMBL::Pipeline::Runnable::Exonerate;
 use Bio::PrimarySeq;
 use Bio::Seq;
 use Bio::SeqIO;
 
-BEGIN {
-    require "Bio/EnsEMBL/Pipeline/pipeConf.pl";
-}
+ok(1);
 
-$loaded = 1;
-print "ok 1\n";    # 1st test passed.
+ok(my $est1 =  set_est1());
 
-my ($est1) =  set_est1();
-my ($est2) =  set_est2();
-my ($genomic) =  set_genomic();
+ok(my $est2 =  set_est2());
 
-my $estseq1 =  Bio::PrimarySeq->new(  -seq         => $est1,
-           	                      -id          => 'XX12345',
-                	              -accession   => 'XX12345',
-                        	      -moltype     => 'dna');
-my $estseq2 =  Bio::PrimarySeq->new(  -seq         => $est2,
-           	                      -id          => 'M93650',
-                	              -accession   => 'M93650',
-                        	      -moltype     => 'dna');
+ok(my $genomic =  set_genomic());
 
-my $genseq =  Bio::PrimarySeq->new(  -seq         => $genomic,
-                                     -id          => 'Z83307',
-                                     -accession   => 'Z83307',
-                                     -moltype     => 'dna');
+ok(my $estseq1 =  Bio::PrimarySeq->new(  -seq         => $est1,
+					 -id          => 'XX12345',
+					 -accession   => 'XX12345',
+					 -moltype     => 'dna'));
 
-my @ests;
-my @genomics;
+ok(my $estseq2 =  Bio::PrimarySeq->new(  -seq         => $est2,
+					 -id          => 'M93650',
+					 -accession   => 'M93650',
+					 -moltype     => 'dna'));
 
-push(@ests,$estseq1);
-push(@ests,$estseq2);
+ok(my $genseq =  Bio::PrimarySeq->new(  -seq         => $genomic,
+					-id          => 'Z83307',
+					-accession   => 'Z83307',
+					-moltype     => 'dna'));
 
-foreach my $es(@ests) {
-	
-$es->isa("Bio::PrimarySeqI") || die("argh!");
-}
-
-unless (scalar(@ests) && defined($genseq)) 
-{ print "not ok 2\n"; }
-else
-{ print "ok 2\n"; }
 
 my $exargs = " -w 14 -t 65 -H 100 -D 15 -m 500 ";
 
-#create Exonerate object    
-my $exe = $::pipeConf{'bindir'} . '/exonerate';
-my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => \@ests, 
-								  -GENOMIC   => $genseq,
-	                                                          -EXONERATE => $exe,
-	                                                          -ARGS      => $exargs,
-	                                                          -PRINT     => 1);
+ok(my $exe = $::pipeConf{'bindir'} . '/exonerate');
 
+ok(my $exonerate = Bio::EnsEMBL::Pipeline::Runnable::Exonerate->new (-EST       => [$estseq1,$estseq2],
+								     -GENOMIC   => $genseq,
+								     -EXONERATE => $exe,
+								     -ARGS      => $exargs,
+								     -PRINT     => 1));
 
- unless ($exonerate)
-{ print "not ok 3\n"; }
-else
-{ print "ok 3\n"; }
-
-#run exonerate
-#open(OLDOUT, ">&STDOUT");
-#open(STDOUT,  ">& STDERR");
 my $ungapped = 1;
-$exonerate->run($ungapped);
-#close STDOUT;
-#open(STDOUT, ">&OLDOUT");
-#close OLDOUT;
 
-print "ok 4\n"; # 4th test passed
+ok($exonerate->run($ungapped));
 
-#get and store the output
-my @results = $exonerate->output();
-#display(@results);
+ok(my @results = $exonerate->output());
 
-unless (@results) 
-{ print "not ok 5\n"; }
-else
-{ print "ok 5\n"; }
+ok(display(@results));
 
 sub display {
   my @results = @_;
 
-  foreach my $pair (@results)
-  {
-      print STDERR $pair->seqname . "\t" . $pair->start  . "\t" . $pair->end      . "\t" . 
-                $pair->percent_id . "\t" .
-	        $pair->score   . "\t" . $pair->strand . "\t" . $pair->hseqname . "\t" . 
-                $pair->hstart  . "\t" . $pair->hend   . "\t" . $pair->hstrand  . "\n";
+  foreach my $pair (@results) {
+    print $pair->seqname . "\t" . $pair->start . "\t" . $pair->end . "\t" . $pair->score . "\t" . 
+      $pair->strand . "\t" . $pair->hseqname . "\t" . $pair->hstart . "\t" . $pair->hend . "\n";
   }
+  return 1;
 }
 
 sub set_est1 {
