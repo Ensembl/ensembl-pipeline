@@ -89,18 +89,19 @@ my (
     $verbose,
     $max_slice_size,
     $logic_name);
+my $coord_system ='toplevel' ;
 
 &GetOptions(
 	    'logic_name=s' => \$logic_name,
 	    'write'        => \$write,
 	    'help'         => \$help,
 	    'max_slice=s'  => \$max_slice_size,
-	    'verbose'      => \$verbose
+	    'verbose'      => \$verbose,
+	    'coord_system=s' => \$coord_system,
 );
 exec('perldoc', $0) if $help;
 
 die "Could must give a logic name with -logic_name\n" if not $logic_name;
-
 
 foreach my $arg($GB_DBNAME, $GB_DBHOST, $GB_DBUSER ){
   if ($arg eq '' ){
@@ -153,7 +154,7 @@ my $sl_adp = $db->get_SliceAdaptor;
 my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(-db => $db,
                                                                        -slice => 1,
                                                                        -slice_size => $max_slice_size,
-                                                                       -coord_system => 'toplevel',
+                                                                       -coord_system => $coord_system,
 								       -logic_name => $logic_name);
 my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
