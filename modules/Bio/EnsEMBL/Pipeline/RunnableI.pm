@@ -137,6 +137,11 @@ sub clonename {
 
 sub protect {
     my ($self, @filename) =@_;
+    
+    if (!defined($self->{_protected})) {
+      $self->{_protected} = [];
+    }
+
     push (@{$self->{_protected}}, @filename) if (@filename);
     return @{$self->{_protected}};
 }
@@ -152,11 +157,14 @@ sub protect {
 =cut
 
 sub threshold {
-    my ($self, $value) = @_;
-        
-    $self->{'_threshold'} = $value if (defined $value);
+  my ($self, $value) = @_;
+ 
+  
+  if (defined ($value)) {
+    $self->{_threshold} = $value;
+  }
     
-    return  $self->{'_threshold'};
+  return  $self->{'_threshold'};
 }
 
 =head2 workdir
@@ -177,30 +185,33 @@ sub workdir {
         $self->{_workdir} = $directory;
     }
     return $self->{_workdir};
-}
+  }
 
 sub writefile {
-    my ($self, $seqobj, $seqfilename) = @_;
-    unless ($seqobj)
-    {
-        print "Writing sequence to ".$self->filename."\n";
-        #create Bio::SeqIO object and save to file
-        my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-               or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
-        $clone_out->write_seq($self->clone) 
-                or $self->throw("Couldn't write to file ".$self->filename.":$!");
-    }
-    else
-    {
-        $seqfilename = 'filename' unless ($seqfilename);
-        print "Writing sequence to ".$self->$seqfilename()."\n";
-        #create Bio::SeqIO object and save to file
-        my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
-               or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
-        $clone_out->write_seq($self->$seqobj()) 
-                or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
-    
-    }
+  my ($self, $seqobj, $seqfilename) = @_;
+  
+  if (defined($seqobj)) {
+    $seqfilename = 'filename' unless ($seqfilename);
+    print "Writing sequence to ".$self->$seqfilename()."\n";
+    #create Bio::SeqIO object and save to file
+    my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
+      
+      or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
+
+    $clone_out->write_seq($self->$seqobj()) 
+      or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
+
+
+  } else {
+    print "Writing sequence to ".$self->filename."\n";
+    #create Bio::SeqIO object and save to file
+    my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
+      or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
+
+    # This is bad.  The subclass has the query method not this interface.
+    $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+
+  }
 }
 
 sub deletefiles {
@@ -339,6 +350,7 @@ sub create_repeat {
     #create featurepair
     my $fp = Bio::EnsEMBL::Repeat->new  (  -feature1 => $seqfeature1,
                                            -feature2 => $seqfeature2 ) ;
+
     $self->growfplist($fp);                             
 
 }
