@@ -251,9 +251,10 @@ sub flush_runs {
 
   my @queues;
   
-  my $nodes   = $LSF_params->{'nodes'}   || undef;
-  my $queue   = $LSF_params->{'queue'}   || undef;
-  my $jobname = $LSF_params->{'jobname'} || undef;
+  my $nodes    = $LSF_params->{'nodes'}   || undef;
+  my $queue    = $LSF_params->{'queue'}   || undef;
+  my $jobname  = $LSF_params->{'jobname'} || undef;
+  my $bsub_opt = $LSF_params->{'bsub'}    || undef;
 
   if( !defined $adaptor ) {
     $self->throw( "Cannot run remote without db connection" );
@@ -309,8 +310,9 @@ sub flush_runs {
 	# undef $nodes unless $nodes =~ m{(\w+\ )*\w};
         $cmd .= " -m '$nodes' ";
     }
-    $cmd .= " -q $queue " if defined $queue;
+    $cmd .= " -q $queue "   if defined $queue;
     $cmd .= " -J $jobname " if defined $jobname;
+    $cmd .= " $bsub_opt "   if defined $bsub_opt;
     $cmd .= " -r -e ".$lastjob->stderr_file." -E \"$runner -check\" ";
 
     # check if the password has been defined, and write the

@@ -36,6 +36,7 @@ my $flushsize = $::pipeConf{'batchsize'};
 my $jobname   = $::pipeConf{'jobname'};
 my $retry     = $::pipeConf{'retry'} || 3;
 my $sleep     = $::pipeConf{'sleep'} || 3600;
+my $bsub_opt  = $::pipeConf{'bsub_opt'} || undef;
 
 $| = 1;
 
@@ -96,10 +97,11 @@ my $sic         = $db->get_StateInfoContainer;
 # or on certain nodes, or simply label them with a different jobname.
 
 my $LSF_params = {};
-$LSF_params->{'queue'}     = $queue if defined $queue;
-$LSF_params->{'nodes'}     = $nodes if $nodes;
+$LSF_params->{'queue'}     = $queue     if defined $queue;
+$LSF_params->{'nodes'}     = $nodes     if $nodes;
 $LSF_params->{'flushsize'} = $flushsize if defined $flushsize;
-$LSF_params->{'jobname'}   = $jobname if defined $jobname;
+$LSF_params->{'jobname'}   = $jobname   if defined $jobname;
+$LSF_params->{'bsub'}      = $bsub_opt  if defined $bsub_opt;
 
 # Fetch all the analysis rules.  These contain details of all the
 # analyses we want to run and the dependences between them. e.g. the
