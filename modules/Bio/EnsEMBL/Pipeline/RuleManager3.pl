@@ -84,7 +84,7 @@ my @start_from;
 my %analyses;
 
 GetOptions(
-    'host=s'        => \$dbhost,
+    'dbhost=s'        => \$dbhost,
     'dbname=s'      => \$dbname,
     'dbuser=s'      => \$dbuser,
     'dbpass=s'      => \$dbpass,
