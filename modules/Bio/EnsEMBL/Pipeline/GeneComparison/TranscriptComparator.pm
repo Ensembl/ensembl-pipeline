@@ -839,7 +839,7 @@ sub _test_for_Merge_with_gaps{
 # the length of the overlap
 
 sub _compare_Transcripts {         
-  my ($tran1, $tran2) = @_;
+  my ($self, $tran1, $tran2) = @_;
   my @exons1   = @{$tran1->get_all_Exons};
   my @exons2   = @{$tran2->get_all_Exons};
   my $overlaps = 0;
