@@ -27,4 +27,16 @@
 
     #EnsEMBL DBSQL::Obj module name - optional                   
     'module'        => 'Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor',
+
+    # The following option only needs to be set for tests that use more 
+    # read-only database access - such as the REFDBs of the genebuild process.
+    # When accessing these, the RunnableDB modules insist on read-only db 
+    # objects.  With this option you can pass this information to your
+    # tests.
+
+    # Reference/read-only user name - optional
+    'readonly_user'      => ''
+
+
+
 }
