@@ -24,6 +24,7 @@ CREATE TABLE job (
   module            varchar(255),
   stdout_file       varchar(100),
   stderr_file       varchar(100),
+	retry_count       tinyint unsigned NOT NULL,
 
   PRIMARY KEY (job_id),
   KEY         (input_id),
@@ -46,7 +47,7 @@ CREATE TABLE job_status (
   sequence_num      int unsigned NOT NULL auto_increment, 
 
   KEY (job_id),
-  KEY (status, sequence_num)
+  KEY (sequence_num)
 );
 
 
