@@ -693,7 +693,7 @@ sub _merge_genes {
     # order is crucial
     my @trans = @{$unmerged->get_all_Transcripts};
     if(scalar(@trans) != 1) { 
-      $self->throw("Gene with dbID " . $unmerged->dbID . " has no related transcript. Check preceding analysis \n"); 
+      $self->throw("Gene with dbID " . $unmerged->dbID . " has NO or more than one related transcript, where a 1-gene-to-1-transcript-relation is assumed. Check preceding analysis \n"); 
     }
 
     # check the sanity of the transcript
