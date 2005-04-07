@@ -8,7 +8,7 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 my $dbhost;
 my $dbuser;
-my $dbpass;
+my $dbpass = '';
 my $dbport = 3306;
 my $dbname;
 my $input_id;
