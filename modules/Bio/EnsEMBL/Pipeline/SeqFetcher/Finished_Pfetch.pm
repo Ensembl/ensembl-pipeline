@@ -235,8 +235,6 @@ sub fetch_descriptions {
         my ($succeeded_arch_len, $failed_arch_len)
 			= $self->fetch_lengths_from_archive($chunk, $descriptions);
         my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions, 1);
-        warn "Failed_len = @$failed_arch_len";
-        warn "Failed_desc = @$failed_desc";
         push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
     }
     
