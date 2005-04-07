@@ -193,7 +193,7 @@ sub write_descriptions {
 
     $chunk_size ||= 200;
 
-	my ($descriptions,$failed) = fetch_descriptions($self, $id_list, $chunk_size);
+	my ($descriptions,$failed) = $self->fetch_descriptions($id_list, $chunk_size);
 
     my $sth = $self->prepare_hit_desc_sth($dbobj);
 	for my $accession (keys %$descriptions) {
@@ -230,10 +230,11 @@ sub fetch_descriptions {
     for (my $i = 0; $i < @$failed_first_pass; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         $j = $#$failed_first_pass if $#$failed_first_pass < $j;
+
         my $chunk = [@$failed_first_pass[$i..$j]];
         my ($succeeded_arch_len, $failed_arch_len)
 			= $self->fetch_lengths_from_archive($chunk, $descriptions);
-        my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions);
+        my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions, 1);
         push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
     }
     
@@ -241,11 +242,19 @@ sub fetch_descriptions {
 }
 
 sub fetch_descriptions_by_accession {
-    my( $self, $id_list, $descriptions ) = @_;
+    my( $self, $id_list, $descriptions, $trim_sv_flag ) = @_;
     
     my $srv = $self->get_server;
     warn "Fetching full entries for ", scalar(@$id_list), " identifiers\n";
-    print $srv join(' ', '-F', @$id_list), "\n";
+    if ($trim_sv_flag) {
+        my @req = @$id_list;
+        foreach (@req) {
+            s/\.\d+$//;
+        }
+        print $srv join(' ', '-F', @req), "\n";
+    } else {
+        print $srv join(' ', '-F', @$id_list), "\n";
+    }
 
     # Set the input record separator to split on EMBL
     # entries, which end with "//\n" on a line.
@@ -255,44 +264,46 @@ sub fetch_descriptions_by_accession {
     my $embl_parser = Bio::EnsEMBL::Pipeline::Tools::Embl->new;
 
 	my $failed = [];
-
     for (my $i = 0; $i < @$id_list; $i++) {
         my $entry = <$srv>;
 
         # Each entry may have one or more "no match" lines at the start
-        $i += $entry =~ s/^no match\n//mg;
+        while ($entry =~ s/^no match\n//m) {
+            push(@$failed, $id_list->[$i]);
+            $i++;
+        }
 
         # The end of the loop
         last unless $entry;
-        
+
         my $full_name = $id_list->[$i] or die "No id at '$i' in list:\n@$id_list";
         $embl_parser->parse($entry);
 
         my $name_without_version = $full_name;
         $name_without_version =~ s/\.\d+$//;
 
-		my $found = 0;
-		NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
-			if ($name_without_version eq $one_of_names) {
-				$found = 1;
-				# warn "Found '$name_without_version'";
+	    my $found = 0;
+	    NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
+		    if ($name_without_version eq $one_of_names) {
+			    $found = 1;
+			    # warn "Found '$name_without_version'";
 
-					# NB: do not redefine any of these if already defined
-				$descriptions->{$full_name}{description}||= $embl_parser->description;
-				$descriptions->{$full_name}{length}		||= $embl_parser->seq_length;
-				$descriptions->{$full_name}{taxonid}	||= $embl_parser->taxon;
-				$descriptions->{$full_name}{database}	||= $embl_parser->which_database;
+			    # NB: do not redefine any of these if already defined
+			    $descriptions->{$full_name}{description} ||= $embl_parser->description;
+			    $descriptions->{$full_name}{length}      ||= $embl_parser->seq_length;
+			    $descriptions->{$full_name}{taxonid}     ||= $embl_parser->taxon;
+			    $descriptions->{$full_name}{database}    ||= $embl_parser->which_database;
 
-				last NAMES;
-			}
-		}
-		if(!$found) {
+			    last NAMES;
+		    }
+	    }
+	    unless ($found) {
             my $all_accs = $embl_parser->accession;
             if (my $sv = $embl_parser->sequence_version) {
                 unshift @$all_accs, $sv;
             }
             warn "Expecting '$full_name' but got (@$all_accs)";
-			push @$failed, $full_name;
+		    push @$failed, $full_name;
         }
     }
     return $failed;
