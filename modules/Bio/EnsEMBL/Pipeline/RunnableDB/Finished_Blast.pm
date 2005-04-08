@@ -218,8 +218,10 @@ sub run {
         if ( (my @output = $runnable->output) && !($NO_DESC{$self->analysis->db_file})) {
             my $dbobj      = $self->db;
             my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
-            my %ids        = map { $_->hseqname, 1 } @output;
-            $seqfetcher->write_descriptions( $dbobj, keys(%ids) );
+
+			my $ids_keys = [map $_->hseqname, @output];
+			$seqfetcher->write_descriptions( $dbobj, $ids_keys );
+
         }else{
             warn "Either didn't find anything or Don't fetch descriptions was true\n";
         }
