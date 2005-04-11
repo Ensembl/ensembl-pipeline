@@ -58,6 +58,8 @@ use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Root;
+use Bio::PrimarySeqI;
+use Bio::SeqI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -65,20 +67,21 @@ use Bio::EnsEMBL::Root;
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-  
-  my ($database, $query_seqs, $query_type, $target_type, $blat, $options) = $self->_rearrange([qw(
+#added a parse clause to remove covered alignments, should work without it though  
+  my ($database, $query_seqs, $query_type, $target_type, $blat, $options, $parse) = $self->_rearrange([qw(
 												  DATABASE
 												  QUERY_SEQS
 												  QUERY_TYPE
 												  TARGET_TYPE
 												  BLAT
 												  OPTIONS
+												  PARSE
 												 )
 											      ], @args);
   
   # must have a target and a query sequences
   unless( $query_seqs ){
-    $self->throw("Blat needs a query_seqs: $query_seqs");
+#    $self->throw("Blat needs a query_seqs: $query_seqs");
   }
   $self->query_seqs(@{$query_seqs});
   
@@ -119,8 +122,11 @@ sub new {
   # can choose which blat to use
   $blat ||= 'blat';
   $self->blat($self->find_executable($blat));
-  
-  # can add extra options as a string
+  #To parse or not to parse
+   if ($parse){
+    $self->parse($parse);
+  }
+ # can add extra options as a string
   if ($options){
     $self->options($options);
   }
@@ -151,7 +157,9 @@ sub run {
   my $blat        = $self->blat;
   my $query_type  = $self->query_type;
   my $target_type = $self->target_type;
+  my $parse	  = $self->parse;
   my @query_seqs  = $self->query_seqs;
+
   
   # set the working directory (usually /tmp)
   $self->workdir('/tmp') unless ($self->workdir());
@@ -191,6 +199,7 @@ sub run {
   #my $parameters = $self->analysis->parameters;
 
   my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query stdout ";
+  #my $command ="$blat -out=pslx ".$self->options." -t=$target_type -q=$query_type $target $query stdout ";
   #my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
 
   print STDERR "running blat: $command\n";
@@ -199,9 +208,18 @@ sub run {
     
   #################### Parse Results ####################
 
-  my @features_within_features;
+#  my @features_within_features;
   
+   	my $prev_query='a';
+	my $prev_hit='b';
+	my $hit_count= -1; #so that they'll start at 0
+	my $align_count = -1;
+	my @features;
+    	my @data;
+	my $filesize=0;
+
   while (<BLAT>){
+	#print STDERR "open BLAT\n";
     
     ############################################################
     #  PSL lines represent alignments and are typically taken from files generated 
@@ -234,30 +252,41 @@ sub run {
     chomp;  
       
     my (
-            $matches,      $mismatches,    $rep_matches, $n_count, $q_num_insert, $q_base_insert,
-            $t_num_insert, $t_base_insert, $strand,      $q_name,  $q_length,     $q_start,
-            $q_end,        $t_name,        $t_length,    $t_start, $t_end,        $block_count,
+            $matches,      $mismatches,    $rep_matches, $n_count,  $q_num_insert, $q_base_insert,
+            $t_num_insert, $t_base_insert, $strand,      $q_name,   $q_length,     $q_start,
+            $q_end,        $t_name,        $t_length,    $t_start,  $t_end,        $block_count,
             $block_sizes,  $q_starts,      $t_starts
           )
           = split;
-
-    
-    my $superfeature = Bio::EnsEMBL::SeqFeature->new();
+	        # print STDERR  "$matches,      $mismatches,    $rep_matches, $n_count, $q_num_insert, $q_base_insert,
+            #$t_num_insert, $t_base_insert, $strand,      $q_name,  $q_length,     $q_start,
+            #$q_end,        $t_name,        $t_length,    $t_start, $t_end,        $block_count,
+            #$block_sizes,  $q_starts,      $t_starts\n";
+   
+		
+#    my $superfeature = Bio::EnsEMBL::SeqFeature->new();
     
     # ignore any preceeding text
-    unless ( $matches =~/^\d+$/ ){
+    
+    print STDOUT $_."\n";
+
+    unless ( defined($matches) and $matches =~/^\d+$/ ){
       next;
     }
     
-    #print STDERR $_."\n";
-
     # create as many features as blocks there are in each output line
     my (%feat1, %feat2);
     $feat1{name} = $t_name;
     $feat2{name} = $q_name;
     
-    $feat2{strand} = 1;
-    $feat1{strand} = $strand;
+    ################
+    #Added strand splitter as strand represented by ++ or +- etc
+    if (length($strand)>1){
+    	($feat2{strand},$feat1{strand}) = split //,$strand; 
+   	} else {
+    	$feat2{strand}=$strand;
+    	$feat1{strand}=1;
+  	}
     
     # all the block sizes add up to $matches + $mismatches + $rep_matches
     
@@ -287,13 +316,12 @@ sub run {
     my @q_start_positions = split ",",$q_starts;
     my @t_start_positions = split ",",$t_starts;
     
-    $superfeature->seqname($q_name);
-    $superfeature->score( $score );
-    $superfeature->percent_id( $percent_id );
+#    $superfeature->seqname($q_name);
+#    $superfeature->score( $score );
+#    $superfeature->percent_id( $percent_id );
 
     # each line of output represents one possible entire aligment of the query (feat1) and the target(feat2)
-    for (my $i=0; $i<$block_count; $i++ ){
-      
+       
       #### working out the coordinates: #########################
       #
       #                s        e
@@ -311,29 +339,89 @@ sub run {
       #   Also, hstrand will be always +1
       ############################################################
 
-      my ($query_start,$query_end);
+    ############################################################
 
-      if ( $strand eq '+' ){
-	$query_start = $q_start_positions[$i] + 1;
-	$query_end   = $query_start + $block_sizes[$i] - 1;
-      }
-      else{
-	$query_end   = $q_length  - $q_start_positions[$i];
-	$query_start = $query_end - $block_sizes[$i] + 1;
-      }
-      
-      #$feat2 {start} = $q_start_positions[$i] + 1;
-      #$feat2 {end}   = $feat2{start} + $block_sizes[$i] - 1;
-      $feat2 {start} = $query_start;
-      $feat2 {end}   = $query_end;
-      if ( $query_end <  $query_start ){
-        $self->throw("dodgy feature coordinates: end = $query_end, start = $query_start. Reversing...");
-	$feat2 {end}   = $query_start;
-	$feat2 {start} = $query_end;
+
+    #NB strand may =++ or +- etc rather than just + or -  
+    #
+    #if qstrand negative reverse qstarts and blocks and calculate the correct co-ordinates
+    #
+    #if Tstrand(genomic strand) negative reverse the tstarts and then cal the co-ords
+    #
+    #if both strands are negative then reverse everything ie blocks and starts before calculating using:
+    #
+    # newqstart=length - (qstart + blocklength)  
+    # newqend = length - qstart
+    #NB not sure about when to add the plus 1 -- as psl starts at 0 for start but the end is correct 
+    #NB add +1 to the plus strand starts    
+    
+
+
+
+
+    my @query_starts; my @target_starts; my @query_ends; my @target_ends; my @reversed_block_sizes;
+    my @reversed_q_starts; my @reversed_t_starts;
+
+
+    if ($feat2{strand} eq '+') { #ie query
+
+    	@query_starts= map {my $val=$_; $val+=1} (@q_start_positions);
+	
+    	if ($feat1{strand} eq '-') { #transform  feat1 (t) with blocksizes
+	    
+      	#start by changing sizes 
+			  #@reversed_t_starts=reverse(@t_start_positions);
+		
+    		for (my $i=0; $i<$block_count; $i++) {
+    			$query_ends[$i]=$q_start_positions[$i] + $block_sizes[$i];
+			
+    			$target_ends[$i]=$t_length-$t_start_positions[$i];
+    			$target_starts[$i]=($target_ends[$i]-$block_sizes[$i])+1;
+    		}
+  		} else { #normal
+    		@target_starts= map {my $val=$_; $val+=1} (@t_start_positions);
+		    for (my $i=0; $i<$block_count; $i++) {
+    			$query_ends[$i]=$q_start_positions[$i] + $block_sizes[$i];
+		    	$target_ends[$i]=$t_start_positions[$i] + $block_sizes[$i];
+  			}
+		
+  		}
+  	} else { 
+	    if ($feat1{strand} eq '-') {#
+    		for (my $i=0; $i<$block_count; $i++ ){
+    			$query_ends[$i]=$q_length-$q_start_positions[$i];
+	    		$query_starts[$i]=($query_ends[$i]-$block_sizes[$i])+1;
+  			
+    			$target_ends[$i]=$t_length-$t_start_positions[$i];
+    			$target_starts[$i]=($target_ends[$i]-$block_sizes[$i])+1;
+  			}
+  		} else { #transform query ie feat2 with the blocksizes.
+    		@target_starts= map {my $val=$_; $val+=1} (@t_start_positions);
+    		for (my $i=0; $i<$block_count; $i++ ) {
+          $query_ends[$i]=$q_length-$q_start_positions[$i];
+    			$query_starts[$i]=($query_ends[$i]-$block_sizes[$i])+1;
+			
+    			$target_ends[$i]=$t_start_positions[$i] + $block_sizes[$i];
+		  	}
+		
+  		}
+    }
+		
+	
+
+
+    for (my $i=0; $i<$block_count; $i++ ) {
+
+    	$feat2 {start} = $query_starts[$i];
+     	$feat2 {end}   = $query_ends[$i];
+      if ( $query_ends[$i] <  $query_starts[$i]) {
+      	$self->warn("dodgy feature coordinates: end = $query_ends[$i], start = $query_starts[$i]. Reversing...");
+      	$feat2 {end}   = $query_starts[$i];
+      	$feat2 {start} = $query_ends[$i];
       }
 
-      $feat1 {start} = $t_start_positions[$i] + 1;
-      $feat1 {end}   = $feat1{start} + $block_sizes[$i] - 1;
+      $feat1 {start} = $target_starts[$i];
+      $feat1 {end}   = $target_ends[$i];
       
       # we put all the features with the same score and percent_id
       $feat2 {score}   = $score;
@@ -351,28 +439,54 @@ sub run {
       $feat2 {source}     = 'blat';
       $feat2 {primary}    = 'similarity';
       
-      my $feature_pair = $self->create_FeaturePair(\%feat1, \%feat2);
-      $superfeature->add_sub_SeqFeature( $feature_pair,'EXPAND');
-    }
-    push(@features_within_features, $superfeature);
+#      my $feature_pair = $self->create_FeaturePair(\%feat1, \%feat2);
+#      $superfeature->add_sub_SeqFeature( $feature_pair,'EXPAND');
+      
+			$align_count++;
+			$data[$align_count]={
+						qid		=> $feat2{name},
+						tid		=> $feat1{name},
+						score		=> $score,
+						PID		=> $percent_id,
+						Q_start		=> $query_starts[$i],
+						Q_end		=> $query_ends[$i],
+						Q_strand	=> $feat2{strand},
+						T_start		=> $target_starts[$i],
+						T_end		=> $target_ends[$i],
+						T_strand	=> $feat1{strand},
+				};
+	  }
+#    push(@features_within_features, $superfeature);
   }
   close BLAT;
   
-  #get rid of the results file
+ if (defined($parse)){		
+	foreach my $out (@data){
+		print STDERR $out->{qid}."\tBLAT\tsimilarity\t".$out->{Q_start}."\t".$out->{Q_end}."\t".$out->{tid}."\t".$out->{T_start}."\t".$out->{T_end}."\t".
+                      $out->{score}."\t.\t".$out->{T_strand}."\t". $out->{Q_strand}."\t".$out->{PID}."\t.\t.\n"; #this line is the start of a gff line for display
+			}
+		}
+ #get rid of the results file
   unlink $self->results;
 
   #print STDERR "\n";
   #print STDERR "Features created:\n";
   #foreach my $superf ( @features_within_features ){
-  #  foreach my $subf ( $superf->sub_SeqFeature ){
-  #    print STDERR $subf->gffstring."\n";
-  #  }
+   # foreach my $subf ( $superf->sub_SeqFeature ){
+    #  print STDERR $subf->gffstring."\n";
+    #}
   #}
+  
+ 
   
   # remove interim files (but do not remove the database if you are using one)
   unlink $query;
   
-  $self->output( @features_within_features );
+  
+ 
+ 
+#  $self->output( @features_within_features );
+
 
   1;
 }
@@ -391,7 +505,7 @@ sub query_seqs {
     }
     push(@{$self->{_query_seqs}}, @seqs) ;
   }
-  return @{$self->{_query_seqs}};
+  return @{$self->{_query_seqs} or []};
 }
 
 ############################################################
@@ -477,6 +591,18 @@ sub database {
     $self->{_database} = $database;
   }
   return $self->{_database};
+}
+
+############################################################
+
+############################################################
+
+sub parse {
+  my ($self, $parse) = @_;
+  if ($parse) {
+    $self->{_parse} = $parse;
+  }
+  return $self->{_parse};
 }
 
 ############################################################
