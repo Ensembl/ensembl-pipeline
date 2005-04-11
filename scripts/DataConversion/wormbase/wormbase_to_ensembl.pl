@@ -81,7 +81,7 @@ my $WB_DBPASS     = "";
 
 ##########################################
 
-use lib '/nfs/acari/fsk/cvs_checkout/ensembl-pipeline/scripts/DataConversion/wormbase';
+use lib '~/cvs_checkout/ensembl-pipeline/scripts/DataConversion/wormbase';
 
 use warnings;
 use strict;
@@ -140,7 +140,6 @@ if($comm eq "setup"){
   insert_meta($db);
 
   # 8-insert other features
-  # skipping Mt-DNA as no agp file??  $WB_TRNA_LOGIC_NAME all on Mt-DNA!
   my @steps = ($WB_LOGIC_NAME, $WB_OPERON_LOGIC_NAME, $WB_RNAI_LOGIC_NAME, $WB_EXPR_LOGIC_NAME, $WB_TRNA_LOGIC_NAME);
   foreach my $step (@steps){
     run_scripts($step);
