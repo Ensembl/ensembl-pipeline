@@ -516,8 +516,8 @@ sub starts_from_input_ids{
 
   my %ids;
   foreach my $analysis (@$analyses) {
-    my @ids = @{$self->stateinfocontainer->list_input_ids_by_analysis($analysis)};
-
+    my @ids = @{$self->stateinfocontainer->list_input_ids_by_analysis($analysis->dbID)};
+    print "analysis ".$analysis->logic_name." has got ".@ids." ids\n";
     foreach my $id (@ids){
       $ids{$analysis->input_id_type}{$id} = 1;
     }
