@@ -1106,7 +1106,7 @@ sub input_id_setup{
     my @analyses;
 
     foreach my $logic_name(@$starts_from){
-      my $analysis = $self->analysisadaptor->
+      my $analysis = $self->analysis_adaptor->
         fetch_by_logic_name($logic_name);
       push(@analyses, $analysis);
     }
