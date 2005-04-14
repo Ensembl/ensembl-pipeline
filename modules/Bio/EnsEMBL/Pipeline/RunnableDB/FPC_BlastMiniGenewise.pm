@@ -82,8 +82,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_POST_GENEMASK
 							      GB_SIMILARITY_POST_EXONMASK
 							      GB_SIMILARITY_BLAST_FILTER
-							      
-							    );
+							     );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
 							     GB_TARGETTED_GW_GENETYPE
@@ -575,6 +574,11 @@ sub process_genes {
       my @supp_feat =  @{$exons[0]->get_all_supporting_features};
       my ($first_supp_feat) = $supp_feat[0];
       my $prot_id = $first_supp_feat ? $first_supp_feat->hseqname : "Unknown protein";
+
+      #fetch exon sequence again, avoid caching masked sequence
+      foreach my $exon (@exons) {
+        $exon->slice($exon->slice->adaptor->db->get_SliceAdaptor->fetch_by_name($exon->slice->name));
+      }
 
       my $valid_transcripts = 
         Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($unchecked_transcript,
