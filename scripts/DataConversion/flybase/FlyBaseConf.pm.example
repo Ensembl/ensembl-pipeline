@@ -4,22 +4,23 @@ use strict;
 use vars qw( %FlyBaseConf );
 
 
+
 %FlyBaseConf = (
 		 #location of gff files
 		 FB_CHR_INFO => [
 				 {
-				  chr_name => '2L',
-				  gff_file => 'short.gff',
+				  chr_name => '4',
+				  gff_file => '/Users/jhv/project_droso/bdgp4.1/droso_setup/short.gff',
 				 },
 			       ],
 
-
+                LOGIC_NAME_EXON=>'bla',
                 # details for db-connection are stored in registry-file
-                FB_DBNAME => 'jhv_droso_3_2',
-                FB_DBHOST => 'ecs4',
+                FB_DBNAME => 'jhv_droso_seq_30_41',
+                FB_DBHOST => 'localhost',
                 FB_DBUSER => 'ensadmin',
                 FB_DBPASS => 'ensembl',
-                FB_DBPORT => '3351',
+                FB_DBPORT => '3306',
 
 
                 # parameters for analysis object (logic_name is set in flybase_to_ensembl.pl
