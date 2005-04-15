@@ -92,6 +92,13 @@ as input_ids
 
 this will use all the translation ids as input_ids
 
+./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306
+-logic_name SubmitChromosome -coord_system chromosome -coord_system_version BDGP4.1 -slice
+
+this will use all seq_regions of coord_system_type 'chromosome' and version BDGP4.1 as input
+ids
+
+
 =cut
 
 
