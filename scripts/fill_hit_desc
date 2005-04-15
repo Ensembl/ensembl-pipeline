@@ -11,7 +11,7 @@ use Data::Dumper;
 {
     my $help   = 0;
     my $dbhost = 'otterpipe1';
-    my $dbname = 'human_finished';
+    my $dbname = 'pig_finished';
     my $dbuser = 'ottadmin';
     my $dbpass = undef;
     my $dbport = 3302;
@@ -77,12 +77,22 @@ use Data::Dumper;
         }
     }
 
-    my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
-
-	my $failed = $seqfetcher->write_descriptions($db, $ids);
-    if (@$failed) {
-        warn "Failed to fetch:\n", map("  $_\n", @$failed);
+    my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new(
+        #-PFETCH_PORT    => 22101,
+        #-ARCHIVE_PORT   => 23101,
+        );
+    
+    my $chunk_size = 200;
+    for (my $i = 0; $i < @$ids; $i++) {
+        my $j = $i + $chunk_size - 1;
+        $j = $#$ids if $j > $#$ids;
+        my $chunk = [@$ids[$i..$j]];
+	    my $failed = $seqfetcher->write_descriptions($db, $chunk);
+        if (@$failed) {
+            warn "Failed to fetch:\n", map("  $_\n", @$failed);
+        }
     }
+    print STDERR "FINISHED OK\n"
 }
 
 sub useage{

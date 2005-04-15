@@ -37,7 +37,7 @@ use Getopt::Long 'GetOptions';
         my $where = qq{--where="hit_name in($id_str);"};
         my $command_str = qq{@dump_command $where $database $table >> $out_file};
         system($command_str) == 0
-            or die "command exited with status=$?:\n@dump_command $where human_finished $table";
+            or die "command exited with status=$?:\n$command_str";
     }
 }
 
