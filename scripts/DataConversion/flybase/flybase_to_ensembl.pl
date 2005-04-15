@@ -64,7 +64,7 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   #
   # ###############################################################################
 
- #   $gff->store_as_gene_object("gene");
+  $gff->store_as_gene_object("gene");
 
 
   #
