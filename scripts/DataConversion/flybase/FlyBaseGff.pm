@@ -151,10 +151,13 @@ sub get_all_childs_of_id{
 
 =cut
 
-
+ # work
 sub get_spec_child_of_id{
   my ($self,$parent_id,$spec_type) = @_;
   my @matching_ids;
+
+    print "trying to get child of parent $parent_id ($spec_type)\n" ; 
+
   if ( ${ $self->parent2childs} {$parent_id} ) {
     my @poss_child_ids = @{${$self->parent2childs}{$parent_id}};
     for my $child (@poss_child_ids) {
@@ -166,6 +169,7 @@ sub get_spec_child_of_id{
     }
    return \@matching_ids;
   }else{
+    print "no entry in parent2childs for $parent_id found\n";
     return undef;
   }
 }
@@ -232,15 +236,27 @@ sub store_as_gene_object{
     }
 
 
-    my @all_nw_transcripts;
+
+    my $def_gene_child = "mRNA" ; 
+    my $def_gene_type = "gene" ; 
+    # test if we're processing a pseudo-gene (CR-id)
+
+    if($gene_id =~m/CR/){
+	print "Gene $gene_id seems to be a pseudo-gene with no annotated mRNA...SKIPPING\n" ; 
+        $def_gene_type = "pseudogene" ; 
+	$def_gene_child = "pesudogene" ; 
+    }
+ 
+   my @all_nw_transcripts;
 
     #---- start processing the mRNA-childs (transcripts) ----
 
-    unless ($self->get_spec_child_of_id($gene_id,"mRNA") ) {
+    unless ($self->get_spec_child_of_id($gene_id,"$def_gene_child") ) {
       print "ID=$gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
-    }else{
-
-      for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"mRNA")}) {
+      throw("no defiend transcript (type: mRNA of gene $gene_id"); 
+   }else{
+      print "trying to get child-type $def_gene_child of gene $gene_id \n";
+      for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"$def_gene_child")}) {
 
 
         my $nw_transcript = new Bio::EnsEMBL::Transcript(
@@ -248,6 +264,7 @@ sub store_as_gene_object{
                                                        -VERSION => 3,
                                                       );
 
+        print "having transcr with stable-id $trans_id \n" ; 
 
        my $db_entry = $self->get_dbxref($trans_id, "mRNA");
 
@@ -275,6 +292,7 @@ sub store_as_gene_object{
                                            -STABLE_ID => ${  ${ $attrib }{'ID'} }[0] ,
                                            -VERSION   => 3
                                           );
+	  print "having exon $ex_start\t$ex_end\n" ; 
 
           my $esid = ${  ${ $attrib }{'ID'} }[0] ;
           $nw_transcript->add_Exon($ex);
@@ -410,6 +428,8 @@ foreach my $trans ( @all_nw_transcripts ) {
   # got all alternative transcripts and make genes
   my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$self->get_all_attributes_by_id($gene_id)};
 
+  print "processing gene with id : $gene_id    " ;
+ 	
   my $gene = Bio::EnsEMBL::Gene->new(
                                      -START     => $start,
                                      -END       => $end,
@@ -418,11 +438,13 @@ foreach my $trans ( @all_nw_transcripts ) {
                                      -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
                                      -STABLE_ID => $gene_id,
                                      -VERSION => 3,
+	                             -TYPE    =>$def_gene_type,
                                     );
 
    map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
-
+   print "trying to store gene....." ;
    my $gene_DB_id = $self->db->get_GeneAdaptor->store($gene);
+   print "STORED\n" ;
    my $db_entry = $self->get_dbxref($gene_id, $target);
    $self->db->get_DBEntryAdaptor->store($db_entry,$gene_DB_id,'Gene');
 
@@ -1065,9 +1087,9 @@ sub get_dbxref{
   $primary_id = shift @found;
 
   if($xref_type eq "mRNA"){
-    $db_name = "flybase_transcript";
+    $db_name = "flybase_transcript_id";
   }else{
-    $db_name = "flybase_gene";
+    $db_name = "flybase_gene_id";
   }
 
   if($primary_id){
