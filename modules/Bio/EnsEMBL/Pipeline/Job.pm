@@ -575,7 +575,7 @@ sub run_module {
         $rdb->write_output;
 
         if ($rdb->can('db_version_searched')) {
-          my $new_db_version = $rdb->db_version_searchd();
+          my $new_db_version = $rdb->db_version_searched();
           my $analysis       = $self->analysis();
           my $old_db_version = $analysis->db_version();
 
