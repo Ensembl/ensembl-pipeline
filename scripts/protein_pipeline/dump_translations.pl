@@ -35,7 +35,8 @@ my $dbport    = 3306;
 my $stable_id = 0;
 my $db_id = 0;
 my $file;
-
+my $no_description  ;
+my $protein_stable_id ; 
 GetOptions(
 	   'dbhost=s'    => \$dbhost,
 	   'dbname=s'    => \$dbname,
@@ -49,6 +50,8 @@ GetOptions(
 	   'stable_id!' => \$stable_id,
 	   'db_id!' => \$db_id,
 	   'file=s' => \$file,
+	   'no_description!' => \$no_description,
+	   'protein_stable_id!' => \$protein_stable_id ,
 )
 or die ("Couldn't get options");
 
@@ -56,8 +59,8 @@ if(!$dbhost || !$dbuser || !$dbname){
   die ("need to pass database settings in on the commandline -dbhost -dbuser -dbname -dbpass");
 }
 
-if(!$stable_id && !$db_id){
-  die "need to specify to use either stable_id or dbId for the header line";
+if(!$stable_id && !$db_id && !$protein_stable_id ) {
+  die ("need to specify to use either stable_id, db_id or protein_stable_id for the header line");
 }elsif($stable_id && $db_id){
   print STDERR "you have defined both stable_id and db_id your identifier will have the format db_id.stable_id\n";
 }
@@ -124,6 +127,9 @@ foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
     if($db_id){
       $identifier = $trans->translation->dbID;
     }
+    if($protein_stable_id) {
+      $identifier = $trans->translation->stable_id ;
+    }
     if($stable_id){
       if(!$db_id){
         $identifier = $trans->stable_id;
@@ -139,7 +145,7 @@ foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
     }
 
     $tseq->display_id($identifier);
-    $tseq->desc("Translation id $identifier gene $gene_id");
+    $tseq->desc("Translation id $identifier gene $gene_id") unless $no_description ; 
     $seqio->write_seq($tseq);
   }
 }
