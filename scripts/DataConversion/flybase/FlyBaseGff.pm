@@ -156,21 +156,25 @@ sub get_spec_child_of_id{
   my ($self,$parent_id,$spec_type) = @_;
   my @matching_ids;
 
-    print "trying to get child of parent $parent_id ($spec_type)\n" ; 
+#    print "get_spec_child_of_id: Trying to get child of parent -$parent_id- (-$spec_type-)\n" ; 
 
   if ( ${ $self->parent2childs} {$parent_id} ) {
     my @poss_child_ids = @{${$self->parent2childs}{$parent_id}};
+    my $parent_has_no_child_of_type = 1 ;
     for my $child (@poss_child_ids) {
       for my $typ(@{ $self->get_type_of_id($child) } ) {
         if ($typ =~ m/$spec_type/) {
           push @matching_ids,$child;
+	  #print "CHILD $child\n" ;
+	  $parent_has_no_child_of_type = 0 ;
         }
       }
     }
-   return \@matching_ids;
+    #warn("no child for $parent_id of type $spec_type") if($parent_has_no_child_of_type);
+    return \@matching_ids;
   }else{
-    print "no entry in parent2childs for $parent_id found\n";
-    return undef;
+      warn("no child for parent $parent_id of type: $spec_type  found\n");
+      return \@matching_ids;
   }
 }
 
@@ -203,11 +207,12 @@ sub get_type_of_id{
 
 =head3 storing attributes, genes, SimpleFeatures
 
-=head2 store_genes
+=head2 store_as_gene_object
 
-  Title       : store_genes
-  Usage       :
-  Function    :
+  Title       :  store_as_gene_object
+  Usage       :  store_as_gene_object ('gene', 'mRNA','flybase_gene')
+  Function    :  looks in gff for entity of type 'gene' which has childs 'mRNA' and 'exon' and stores them 
+                 as gene of type 'flybase_gene' in the database
   Arguments   :
   Return-Val  :
 
@@ -215,8 +220,12 @@ sub get_type_of_id{
 
 
 sub store_as_gene_object{
-  my ($self,$target) = @_;
-  print "target $target\n";
+  my ($self,$target, $child_type, $ensembl_gene_type) = @_;
+  print "Target: =$target= -> =$child_type=\n";
+
+
+  print "Having gene_ids:\n" ; 
+  print join(" will be processed.\n", @{$self->get_ids_by_type($target)} ) . "\n" ;
 
   my %all_processed_exons;
 
@@ -228,45 +237,35 @@ sub store_as_gene_object{
 
 
 
+
   for my $gene_id ( @{$self->get_ids_by_type($target)} ) {
-    
+
     if($self->get_source_by_id($gene_id) ne "."){
-      print "$gene_id will be skipped because it has unrecognized source:" . $self->get_source_by_id($gene_id) . "\n";
+      print  "WARN: $gene_id will be skipped because it has unrecognized source:" . $self->get_source_by_id($gene_id) . "\n";
       next;
     }
 
 
-
-    my $def_gene_child = "mRNA" ; 
-    my $def_gene_type = "gene" ; 
-    # test if we're processing a pseudo-gene (CR-id)
-
-    if($gene_id =~m/CR/){
-	print "Gene $gene_id seems to be a pseudo-gene with no annotated mRNA...SKIPPING\n" ; 
-        $def_gene_type = "pseudogene" ; 
-	$def_gene_child = "pesudogene" ; 
-    }
- 
    my @all_nw_transcripts;
 
     #---- start processing the mRNA-childs (transcripts) ----
 
-    unless ($self->get_spec_child_of_id($gene_id,"$def_gene_child") ) {
-      print "ID=$gene_id has no defiend Transcript/mRNA, not processing $gene_id\n";
-      throw("no defiend transcript (type: mRNA of gene $gene_id"); 
-   }else{
-      print "trying to get child-type $def_gene_child of gene $gene_id \n";
-      for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"$def_gene_child")}) {
 
+#    print $self->get_spec_child_of_id($gene_id,"$child_type") . "\n" ;
+
+    if (scalar(@{$self->get_spec_child_of_id($gene_id,"$child_type")}) ==0){
+      #warn ("no child of category $child_type of gene $gene_id found");
+      next;
+    }else{
+
+      for my $trans_id (@{$self->get_spec_child_of_id($gene_id,"$child_type")}) {
 
         my $nw_transcript = new Bio::EnsEMBL::Transcript(
                                                        -STABLE_ID => $trans_id,
                                                        -VERSION => 3,
                                                       );
 
-        print "having transcr with stable-id $trans_id \n" ; 
-
-       my $db_entry = $self->get_dbxref($trans_id, "mRNA");
+       my $db_entry = $self->get_dbxref($trans_id, $child_type );
 
         if($db_entry){
           $self->db_entry($nw_transcript,$db_entry);
@@ -292,7 +291,7 @@ sub store_as_gene_object{
                                            -STABLE_ID => ${  ${ $attrib }{'ID'} }[0] ,
                                            -VERSION   => 3
                                           );
-	  print "having exon $ex_start\t$ex_end\n" ; 
+	  #print "having exon $ex_start\t$ex_end\n" ; 
 
           my $esid = ${  ${ $attrib }{'ID'} }[0] ;
           $nw_transcript->add_Exon($ex);
@@ -305,8 +304,11 @@ sub store_as_gene_object{
         my $cds_id = ${$self->get_spec_child_of_id($trans_id,"CDS")}[0];
 
         if ($cds_id) {
-          warn_inconsistency("There is a mRNA with more than one CDS\n") if exists ${$self->get_spec_child_of_id($trans_id,"CDS")}[1];
-          my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_all_attributes_by_id($cds_id)}[0]}[3,4,6];   # get 3,4 and 6th attribute of gff-line
+          warn_inconsistency("There is a mRNA with more than one CDS\n")
+           if exists ${$self->get_spec_child_of_id($trans_id,"CDS")}[1];
+
+          # get 3,4 and 6th attribute of gff-line
+          my ($cds_start,$cds_end,$cds_strand) =@{${$self->get_all_attributes_by_id($cds_id)}[0]}[3,4,6];
 
           # add Translatio to transcript
           $nw_transcript = add_TranslationObject($cds_id,$nw_transcript,$cds_start,$cds_end,$cds_strand);
@@ -315,7 +317,7 @@ sub store_as_gene_object{
           $nw_transcript =  $self->setExonPhases($nw_transcript);
 
       }else{
-         warn("mRNA $trans_id has no CDS\n") if ($target eq "gene");
+         warn("mRNA $trans_id has no CDS\n") if ($target eq "gene" && $child_type eq 'mRNA' );
       }
 
 #       add_DBEntry($nw_transcript);
@@ -428,7 +430,7 @@ foreach my $trans ( @all_nw_transcripts ) {
   # got all alternative transcripts and make genes
   my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @{$self->get_all_attributes_by_id($gene_id)};
 
-  print "processing gene with id : $gene_id    " ;
+  #  print "C-processing gene with id : $gene_id    " ;
  	
   my $gene = Bio::EnsEMBL::Gene->new(
                                      -START     => $start,
@@ -438,13 +440,17 @@ foreach my $trans ( @all_nw_transcripts ) {
                                      -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
                                      -STABLE_ID => $gene_id,
                                      -VERSION => 3,
-	                             -TYPE    =>$def_gene_type,
+	                             -TYPE    =>$ensembl_gene_type,
                                     );
 
    map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
-   print "trying to store gene....." ;
+
+   # check if we already have an exon-stable-id/gene-stable-id/translation-stable-id/transcript-stable-id for this gene
+
+
+   print "\nNow trying to store gene $gene_id....." ;
    my $gene_DB_id = $self->db->get_GeneAdaptor->store($gene);
-   print "STORED\n" ;
+   print "STORED\n\n\n" ;
    my $db_entry = $self->get_dbxref($gene_id, $target);
    $self->db->get_DBEntryAdaptor->store($db_entry,$gene_DB_id,'Gene');
 
@@ -699,10 +705,9 @@ my $cnt=0;
   open(GFF,$self->gff)|| die "Could not open ".$self->gff."\n";
   while(<GFF>) {
     chomp;
-    next if /\#/;
+    next if /^\#/;
     my @line = split/\t/;    # line consists of 9 tab-delimited fields in GFF Version v3.0
     my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$attrib) = @line;
-
 
     # ENSEMBL-STRAND-CONVERSION
     if ($strand eq '-') {
@@ -777,6 +782,8 @@ my $cnt=0;
     # store all attributes of a feature by the feature-id
     push @{$id2attributes{$semi_unique_id}}, [@line[0..7], \%tags ];
 
+#    print "-->SEMI-unique_id $semi_unique_id: " ;
+#    print join("\t",@line[0..7]) ."\n" ; 
     #    # store all IDs of gff-entryis of type "gene" in an array
     #    $self->genes($semi_unique_id) if ($type =~ m/^gene$/);
 
@@ -814,7 +821,6 @@ my $cnt=0;
 
   # make all attributes of a featureid accessible
   $self->id2attributes(\%id2attributes);
-
 
 } # end sub
 
