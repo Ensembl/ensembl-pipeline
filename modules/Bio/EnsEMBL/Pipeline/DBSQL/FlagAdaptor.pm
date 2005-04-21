@@ -168,7 +168,7 @@ sub fetch_all {
   Usage   : $self->fetch_by_dbID
   Function: Fetches object by its db identifier
   Returns : Bio::EnsEMBL::Pipeline::Flag
-  Args    : -
+  Args    : Scalar
 
 =cut
 
@@ -207,7 +207,7 @@ sub fetch_by_dbID {
   Usage   : $self->fetch_by_analysis( $analysis );
   Function: fetches flag objects based on analysis object
   Returns : Array ref of Flag objects
-  Args    : Bio::EnsEMBL::Pipeline::Flag
+  Args    : Bio::EnsEMBL::Analysis
 
 =cut
 
@@ -239,7 +239,7 @@ sub fetch_by_analysis{
   Function: fetches all flag objects with the specified  ensembl identifier 
             ie: a transcript dbid or gene dbid, not stable identifiers
   Returns : Array ref of Flag objects
-  Args    : Bio::EnsEMBL::Pipeline::Flag
+  Args    : Scalar
 
 =cut
 
@@ -257,17 +257,7 @@ sub fetch_by_ensembl_id{
   return \@flags;
 }
 
-=head2 check_flag
 
-  Title      : check_flag
-  Usage      : $self->check_flag($flag);
-  Function   : test to ensure flags values are valid
-  Returns    : Scalar
-  Args       : Bio::EnsEMBL::Pipeline::Flag
-  Exceptions : Throws if flag_type is not the name of a table in the database
-               Throws if the analysis object is not a Bio::EnsEMBL::Analysis object
-
-=cut
 
 sub check_flag{
   my ($self,$flag)=@_;
