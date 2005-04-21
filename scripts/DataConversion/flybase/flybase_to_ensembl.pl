@@ -64,17 +64,47 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   #
   # ###############################################################################
 
-  $gff->store_as_gene_object("gene");
+#  $gff->store_as_gene_object("gene");
+
+  $gff->store_as_gene_object("gene","mRNA","gene");
+
+
+  $gff->store_as_gene_object("gene","ncRNA","ncRNA-pseudogene");
+
+
+  $gff->store_as_gene_object("gene","snRNA","snRNA-pseudogene");
+
+
+  $gff->store_as_gene_object("gene","tRNA","tRNA-pseudogene");
+
+
+  $gff->store_as_gene_object("gene","rRNA","rRNA-pseudogene");
+
+  $gff->store_as_gene_object("gene","pseudogene","pseudogene");
+
+
+
+  # dump all loaded proteins
+  my $cmd = "perl /acari/work6a/jhv/project_droso/bdgp4.1/cvs_checkout/ensembl-pipeline/scripts/protein_pipeline/" .
+              "dump_translations.pl -dbn $FB_DBNAME -dbh $FB_DBHOST -dbp $FB_DBPORT -dbu ensro" .
+		"-pr -no_ -f/acari/work6a/jhv/project_droso/bdgp4.1/dump_seqs.fasta"; 
+
+
+  print "CMD is:\n$cmd\n";
+
+  system ("$cmd") ;
+
 
 
   #
   # store ncRNA, snRNA, rRNA
   #
 
+  # pseudogenes are now gene-objects
 
-  my @ftr =qw( ncRNA rRNA snRNA snoRNA tRNA pseudogene);
 
-  map ( $gff->store_as_gene_object($_) ,@ftr);
+#  my @ftr =qw( ncRNA rRNA snRNA snoRNA tRNA );
+#  map ( $gff->store_as_gene_object($_) ,@ftr);
 
 
 
