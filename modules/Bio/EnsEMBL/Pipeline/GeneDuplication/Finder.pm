@@ -20,6 +20,10 @@ my $DEFAULT_DISTANCE_CUTOFF  = 1.000;
 
 @ISA = qw(Bio::EnsEMBL::Root Bio::EnsEMBL::Pipeline::RunnableI);
 
+###
+open (LOG, ">>/ecs4/work4/dta/core_gene_dupl/logfile.$$.txt") or die "Can't write to logfile.$$.txt\n";
+###
+
 ### Constructor ###
 
 =head2 new
@@ -150,64 +154,55 @@ sub run {
   # Derive a list of sequences that look like duplications of 
   # the query sequence.
 
-  my $seq_ids = $self->_find_recent_duplications($self->_query_seq);
+  my $accepted_hits 
+    = $self->_find_recent_duplications($self->_query_seq);
 
-  # Add the id of our query seq, or it will be omitted.
-
-  push (@$seq_ids, $self->_query_seq->display_id);
-
-  unless (scalar @$seq_ids > 1) {
+  unless (scalar @$accepted_hits > 1) {
     print "No homologous matches were found that satisfied the match criteria.\n";
     return 0
   }
 
-  # Perform a codon based alignment of our sequences.
-
-  my $seqs = $self->_fetch_seqs($seq_ids);
-
-  my $cba = 
-    Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
-       -genetic_code => $self->_genetic_code);
-
-  $cba->sequences($seqs);
-
-  my $aligned_seqs = $cba->run_alignment;
-
-  $self->alignment($aligned_seqs);
-
-  # Run PAML with these aligned sequences.
-
-  my $parser = $self->_run_pairwise_paml($aligned_seqs);
-
-  my @results;
-
-  eval {
-    # This is a bit stupid, but we dont know until here
-    # whether our run has been successful.
-    while (my $result = $parser->next_result()) {
-      push (@results, $result)
-    }
-  };
-
-  throw ("PAML run was unsuccessful.\n$@") 
-    if $@;
-
-  unless (@results) {
-    print "Duplications not found for this gene.\n";
-    return 0
-  }
-
-  throw ("There are more than two sets of results returned from\n" .
-	       "the PAML parser.  This was not expected.") 
-    if scalar @results > 1;
-
-  return $self->_extract_results($results[0])  
+  return $accepted_hits;
 }
 
 
 ### Hit Chooser Methods ###
 
 =head2 _find_recent_duplications
+
+  Args[1]    : Bio::Seq query sequence
+  Example    : none
+  Description: This is the implementation of the main algorithm of 
+               this module.
+  Returntype :
+  Exceptions :
+  Caller     : General
+
+=cut
+
+sub _find_recent_duplications {
+  my ($self, $query) = @_;
+
+  # Perform blast search with this query sequence.
+  my $bplite_report = $self->_run_blast($query);
+
+  # Take blast report and filter for hits with good coverage
+  # and sufficiently high identity.
+  my $good_hits = $self->_preliminary_filter($bplite_report);
+
+  # From the set of promising hits, which will possibly include
+  # hits to other species, filter using outgroup sequences (if
+  # any) and the genetic distance between each hit and the query
+  # sequence.
+  my $recent_duplications = $self->_phylogenetic_filter($good_hits);
+
+  # Return a complex data object that contains the pairwise
+  # match details for each final accepted hit.
+  return $recent_duplications;
+}
+
+
+=head2 _run_blast
 
   Args[1]    : Bio::Seq query sequence
   Example    : none
@@ -218,7 +213,7 @@ sub run {
 
 =cut
 
-sub _find_recent_duplications {
+sub _run_blast {
   my ($self, $query) = @_;
 
   # We are looking for duplicates of the query gene
@@ -239,42 +234,37 @@ sub _find_recent_duplications {
   throw ("Blast process did not return a report.")
     unless ($bplite_report->isa("Bio::Tools::BPlite"));
 
-  return $self->_process_for_same_species_duplicates($bplite_report);
+  return $bplite_report
 }
 
 
-=head2 _process_for_same_species_duplicates
+=head2 _preliminary_filter
 
   Args[1]    :
-  Example    :
-  Description: This is the main algorithmic implementation.  See the 
-               docs (yeah, right) for an explanation of what is going 
-               on here.
+  Example    : none
+  Description:
   Returntype :
   Exceptions :
-  Caller     :
+  Caller     : General
 
 =cut
 
-sub _process_for_same_species_duplicates {
+sub _preliminary_filter {
   my ($self, $bplite_report) = @_;
 
-  # Process our blast report.  For each blast hit to our query sequence:
+  # Process our blast report.  
+  #
+  # For each blast hit:
   #   * throw away self matches (if any)
-  #   * filter by identity
-  #   * filter by coverage
+  #   * filter hits by identity and coverage
+  #   * align WHOLE genes of promising hits, re-filter by 
+  #       identity and coverage
   #   * calculate genetic distance between each subject and the query
-  #   * add subject sequence to correct species hash
 
-  my %species_hash;
-  my %hit_distance;
-  my $have_an_outgroup = 0;
-  my $report_empty = 1;
+  my %good_hits;
 
- PARTITION_HITS:
+ DISTINCT_HIT:
   while (my $sbjct = $bplite_report->nextSbjct){
-
-    $report_empty = 0; # Hits have been found.
 
     # Mangle the BPLite::Sbjct object for its own good.  Quite 
     # often the hit ids parsed by BPLite include the whole 
@@ -297,73 +287,155 @@ sub _process_for_same_species_duplicates {
     }
 
     # Skip hit if it is a match to self.
-
-    next PARTITION_HITS
+###
+print LOG "COMPARING :  [".$self->_query_seq->display_id."] with [".$sbjct->name."]\n";
+###
+###
+print LOG "\tCHUCK : Self match [".$sbjct->name."]\n"
+  if ($self->_query_seq->display_id eq $sbjct->name);
+###
+    next DISTINCT_HIT
       if ($self->_query_seq->display_id eq $sbjct->name);
 
-    # First, filter by identity
+    # First, filter hits by identity
 
     my $hit_identity = $self->_hit_identity(\@hsps);
-
-    next PARTITION_HITS
+###
+print LOG "\tHIT IDENTITY : $hit_identity\tIDENTITY CUTOFF : " .$self->_identity_cutoff . "\n";
+###
+###
+print LOG "\tCHUCK : Missed identity cutoff [".$sbjct->name."]\n"
+  unless ($hit_identity >= $self->_identity_cutoff);
+###
+    next DISTINCT_HIT
       unless ($hit_identity >= $self->_identity_cutoff);
 
-    # Second, filter by coverage
+    # Second, filter hits by coverage
 
-    next PARTITION_HITS
+###
+print LOG "\tCHUCK : Missed coverage cutoff [".$sbjct->name."]\n"
+  unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
+###
+    next DISTINCT_HIT
       unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
+###
+print LOG "\tGOOD LOOKING HIT\n";
+###
 
-    # Third, filter by genetic distance.
+    # Third, this has become a serious hit.  Make a pairwise 
+    # alignment of the query and hit.
 
-    $hit_distance{$sbjct->name} 
-      = $self->_calculate_pairwise_distance(
-            $self->_query_seq->display_id, 
-	    $sbjct->name,
-	    'synonymous');
+    my @seqs = ($self->_fetch_seq($self->_query_seq->display_id),
+		$self->_fetch_seq($sbjct->name));
 
-    # Third, partition hits according to their species.  The species
+    throw ("Didnt correctly obtain two sequences for alignment.")
+      unless scalar @seqs == 2;
+
+    my $align = $self->_pairwise_align(\@seqs);
+
+#print ">" . $align->[0]->display_id . "\n" . $align->[0]->seq . "\n";
+#print ">" . $align->[1]->display_id . "\n" . $align->[1]->seq . "\n";
+
+      # and filter by coverage and identity for the whole 
+      # aligned sequences.
+
+    my ($min_coverage, $identity) 
+      = $self->_calculate_coverage_and_identity($align);
+
+    unless ($min_coverage >= $self->_coverage_cutoff &&
+	    $identity     >= $self->_identity_cutoff) {
+###
+print LOG "\tCHUCK: Didn't pass second round of coverage and identity filters.\n";
+###
+      next DISTINCT_HIT;
+    }
+###
+print LOG "\tACCEPT HIT\n";
+###
+    # Forth, calculate the genetic distance while we are here.
+
+    my ($ka, $ks) 
+      = $self->_calculate_pairwise_distance($align);
+
+    # Finally, store all this useful information.  Perhaps a proper
+    # object would make this easier to access later?
+
+    $good_hits{$sbjct->name} = {'ka'       => $ka,
+				'ks'       => $ks,
+				'coverage' => $min_coverage,
+				'identity' => $identity,
+				'alignment'=> $align};
+###
+print LOG "\tHIT DISTANCE : Ks = " . $good_hits{$sbjct->name}->{ks} . "\n";
+###
+  }
+
+    return \%good_hits
+}
+
+
+=head2 _phylogenetic_filter
+
+  Args[1]    : 
+  Example    : none
+  Description:
+  Returntype :
+  Exceptions :
+  Caller     : General
+
+=cut
+
+sub _phylogenetic_filter {
+  my ($self, $good_hits) = @_;
+
+  # Make a comment and return if the blast report contained no hits.
+
+  unless (scalar(keys(%$good_hits))){
+    print "Did not find hits to query sequence.\n";
+    return {}
+  }
+
+  my %hits_by_species;
+
+ HIT:
+  foreach my $hit_id (keys %$good_hits) {
+
+    # Now, partition hits according to their species.  The species
     # from which the subject is derived is determined by a
     # regular expression match to the sequence id.
 
     my $query_regex = $self->_regex_query_species;
 
-    if ($sbjct->name =~ /$query_regex/) {
+    if ($hit_id =~ /$query_regex/) {
 
-      push(@{$species_hash{$self->_regex_query_species}}, $sbjct);
+      push(@{$hits_by_species{$self->_regex_query_species}}, $hit_id);
 
-      next PARTITION_HITS;
+      next HIT;
+
     } else {
 
       foreach my $regex (@{$self->{_regex_outgroup_species}}) {
-	if ($sbjct->name =~ /$regex/){
-	  $have_an_outgroup = 1;
-	  push (@{$species_hash{$regex}}, $sbjct);
-	  next PARTITION_HITS;
+	if ($hit_id =~ /$regex/){
+	  push (@{$hits_by_species{$regex}}, $hit_id);
+	  next HIT;
 	}
       }
 
     }
 
-    warning ("Didnt match hit id to any regex [".$sbjct->name."].");
-  }
-
-
-  # Make a comment and return if the blast report contained no hits. 
-  if ($report_empty) {
-    print "Did not find hits to query sequence.\n";
-    return [] 
+    warning("Didnt match hit id to any regex [". $hit_id ."].");
   }
 
   # Sort our hits by their distance to the query sequence.
 
-  my %sorted_species_hits;
+  my %sorted_hits_by_species;
 
-  foreach my $species (keys %species_hash) {
+  foreach my $species (keys %hits_by_species) {
 
     my @sorted_hits 
-      = sort {$hit_distance{$a->name} <=> $hit_distance{$b->name}} 
-	@{$species_hash{$species}};
-    $sorted_species_hits{$species} = \@sorted_hits;
+      = sort {$good_hits->{$a}->{ks} <=> $good_hits->{$b}->{ks}} 
+	@{$hits_by_species{$species}};
+    $sorted_hits_by_species{$species} = \@sorted_hits;
   }
 
   # Accept all query species hits with a distance less than
@@ -373,32 +445,50 @@ sub _process_for_same_species_duplicates {
   my $closest_outgroup_distance = $self->_distance_cutoff;
 
   foreach my $regex (@{$self->_regex_outgroup_species}){
-      next
-        unless $sorted_species_hits{$regex};
+    next
+      unless $sorted_hits_by_species{$regex};
 
-    if ((defined $sorted_species_hits{$regex}->[0]->name) && 
-	(defined $hit_distance{$sorted_species_hits{$regex}->[0]->name}) &&
-	($hit_distance{$sorted_species_hits{$regex}->[0]->name} < $closest_outgroup_distance) && 
-	($hit_distance{$sorted_species_hits{$regex}->[0]->name} > 0)) {
+    my $closest_hit_id       = $sorted_hits_by_species{$regex}->[0];
 
-      $closest_outgroup_distance = $hit_distance{$sorted_species_hits{$regex}->[0]->name};
+    throw("Missing distance value")
+      unless defined $good_hits->{$closest_hit_id}->{ks} ||
+	$good_hits->{$closest_hit_id}->{ks} == 0;
+
+    my $closest_hit_distance = $good_hits->{$closest_hit_id}->{ks};
+
+    if (($closest_hit_distance < $closest_outgroup_distance) && 
+	($closest_hit_distance > 0)) {
+
+      $closest_outgroup_distance = $closest_hit_distance;
     }
   }
   $self->outgroup_distance($closest_outgroup_distance);
 
-  my @accepted_ids;
+  my @accepted_hits;
 
-  foreach my $sbjct (@{$sorted_species_hits{$self->_regex_query_species}}) {
-    if ($hit_distance{$sbjct->name} <= $closest_outgroup_distance &&
-	$hit_distance{$sbjct->name} >= 0) {
-      push (@accepted_ids, $sbjct->name);
-    } elsif ($hit_distance{$sbjct->name} >= 0) {
+  my @query_species_hits = @{$sorted_hits_by_species{$self->_regex_query_species}};
+
+  foreach my $hit_id (@query_species_hits) {
+    if ($good_hits->{$hit_id}->{ks} <= $closest_outgroup_distance &&
+	$good_hits->{$hit_id}->{ks} >= 0) {
+
+      push (@accepted_hits, $good_hits->{$hit_id});
+
+###
+print LOG "KEEPING HITS : " . $hit_id . 
+  "\tKa = " . $good_hits->{$hit_id}->{ka} . 
+  "\tKs = " . $good_hits->{$hit_id}->{ks} . 
+  "\tCoverage = " . $good_hits->{$hit_id}->{coverage} . 
+  "\tIdentity = " . $good_hits->{$hit_id}->{identity} ."\n";
+###
+    } elsif ($good_hits->{$hit_id}->{ks} >= 0) {
       last;
     }
   }
 
-  return \@accepted_ids;
+  return \@accepted_hits
 }
+
 
 
 ### Utility Methods ###
@@ -464,26 +554,14 @@ sub _run_pairwise_paml {
   Args[1]    :
   Example    :
   Description:
-  Returntype :
+  Returntype : Array (Ka, Ks)
   Exceptions :
   Caller     :
 
 =cut
 
 sub _calculate_pairwise_distance {
-  my ($self, $input_id_1, $input_id_2, $distance_measure) = @_;
-
-  # Default to using the synonymous genetic distance, unless the
-  # user has deliberately set this.
-  $distance_measure = 'synonymous' unless $distance_measure;
-
-  my @seqs = ($self->_fetch_seq($input_id_1), 
-	      $self->_fetch_seq($input_id_2));
-
-  throw ("Didnt correctly obtain two sequences for alignment.")
-    unless scalar @seqs == 2;
-
-  my $align = $self->_pairwise_align(\@seqs);
+  my ($self, $align) = @_;
 
   my $paml_parser;
 
@@ -492,26 +570,29 @@ sub _calculate_pairwise_distance {
   };
 
   if ($@){
-    throw ("Pairwise use of PAML failed [$input_id_1]vs[$input_id_2].\n$@");
+    throw ("Pairwise use of PAML failed.\n$@");
     return 0
   }
 
   my $result;
-  my $NGmatrix;
+  my $matrix;
 
   eval {
     $result = $paml_parser->next_result();
-    $NGmatrix = $result->get_NGmatrix();
+    if ($self->_distance_method eq 'NeiGojobori') {
+      $matrix = $result->get_NGmatrix()
+    } else { 
+      $matrix = $result->get_MLmatrix()
+    }
   };
 
   if ($@){
-    warning ("PAML failed to give a file that could be parsed.  No doubt PAML threw an error!\n$@");
+    warning ("PAML failed to give a file that could be parsed.  " .
+	     "No doubt PAML threw an error!\n$@");
     return 0
   }
 
-  return $NGmatrix->[0]->[1]->{dN} if $distance_measure eq 'nonsynonymous';
-  return $NGmatrix->[0]->[1]->{dS} if $distance_measure eq 'synonymous';
-  return 0;
+  return ($matrix->[0]->[1]->{dN}, $matrix->[0]->[1]->{dS})
 }
 
 
@@ -543,6 +624,70 @@ sub _pairwise_align {
   return $aligned_seqs
 }
 
+=head2 _calculate_coverage_and_identity
+
+  Args[1]    :
+  Example    :
+  Description:
+  Returntype : Array (min_coverage, identity)
+  Exceptions :
+  Caller     :
+
+=cut
+
+
+sub _calculate_coverage_and_identity {
+  my ($self, $align) = @_;
+
+  my $seq1 = $align->[0]->seq;
+  my $seq2 = $align->[1]->seq;
+
+  my $align_len = length($seq1);
+  my $seq_length1 = 0;
+  my $seq_length2 = 0;
+  my $matches     = 0;
+  my $identical   = 0;
+
+  for (my $i = 0; $i < $align_len; $i++) {
+    my $base1 = substr($seq1, $i, 1);
+    my $base2 = substr($seq2, $i, 1);
+
+    if ($base1 ne '-') {
+      $seq_length1++;
+    }
+
+    if ($base2 ne '-') {
+      $seq_length2++;
+    }
+
+    if ($base1 ne '-' && $base2 ne '-'){
+      $matches++;
+    }
+
+    if ($base1 eq $base2 && $base1 ne '-'){
+      $identical++;
+    }
+  }
+
+  my $coverage1 = $matches/$seq_length1;
+  my $coverage2 = $matches/$seq_length2;
+
+  my ($min_coverage) = sort {$a <=> $b} ($coverage1, $coverage2);
+
+  my $identity  = $identical/$matches;
+###
+print LOG "\tFULL PW ALIGNMENT : Coverage1 : $coverage1\tCoverage2 : $coverage2\tMinCov : $min_coverage\tIdentity : $identity\n";
+###
+#  if ($min_coverage >= $self->_coverage_cutoff &&
+#     $identity >= $self->_identity_cutoff) {
+#    return 1
+#  } else {
+#    return 0
+#  }
+
+  return ($min_coverage, $identity)
+}
+
 
 =head2 _appraise_hit_coverage
 
@@ -558,17 +703,16 @@ sub _pairwise_align {
 sub _appraise_hit_coverage{
   my ($self, $sbjct, $hsps) = @_;
 
-  # First, throw out hits that are way longer than
-  # the query.
+  # Select our sequence length as being that of the 
+  # longer sequence.
 
   my $sbjct_length 
     = $self->_fetch_seq($sbjct->name)->length;
 
-  return 0 
-    if ($sbjct_length > 
-	((2 - $self->_coverage_cutoff) * $self->_query_seq->length));
+  my ($longest_length) = sort {$a <=> $b} ($self->_query_seq->length, $sbjct_length);
 
-  # If still here, look at all the hits along the length of the 
+
+  # Look at all the hits along the length of the 
   # query and tally the collective coverage of the hits.
 
   my @query_coverage;
@@ -590,7 +734,7 @@ sub _appraise_hit_coverage{
 
   # Return true if good coverage exists.
 
-  return 1 if ($covered_bases >= $self->_coverage_cutoff * $self->_query_seq->length);
+  return 1 if ($covered_bases >= $self->_coverage_cutoff * $longest_length);
 
   # Otherwise return false.
   return 0;
@@ -672,7 +816,7 @@ sub _fix_sbjct {
 
   my $sbjct_name = $sbjct->name;
 
-  $sbjct_name =~ s/\W*(\w+).*/$1/;
+  $sbjct_name =~ s/\W*(\S+).*/$1/;
 
   # BAD!
   $sbjct->{NAME} = $sbjct_name;
@@ -708,28 +852,6 @@ sub _hit_identity{
   }
 
   return 0
-}
-
-
-=head2 alignment
-
-  Args[1]    :
-  Example    :
-  Description:
-  Returntype :
-  Exceptions :
-  Caller     :
-
-=cut
-
-sub alignment {
-  my $self = shift; 
-
-  if (@_) {
-    $self->{_alignment} = shift;
-  }
-
-  return $self->{_alignment};
 }
 
 

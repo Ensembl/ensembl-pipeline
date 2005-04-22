@@ -439,86 +439,57 @@ sub _write_output_as_text {
   unless (defined $result) {
     print OUT $self->input_id . " : No homologous matches were " .
       "found that satisfied the match criteria.";
+###
+print STDOUT $self->input_id . " : No homologous matches were " . "found that satisfied the match criteria.";
+###
     return 1
   }
 
   # Work though our results, generating vital stats where necessary.
 
-  my %alignment;
-
-  foreach my $aligned_seq (@{$runnable->alignment}){
-    $alignment{$aligned_seq->display_id} = $aligned_seq;
-  }
-
-  foreach my $match (@{$result->matches}){
+  foreach my $match (@{$result}) {
 
     if ($GD_OUTPUT_TYPE eq 'nucleotide') {
 
-      my $pair_align = 
-	$self->_alignment_vitals_nt($alignment{$match->{query_id}}, 
-				    $alignment{$match->{match_id}});
+### Must put pair align stuff back in here!!!!
+# Need similarity, cigars, starts, ends
 
       print OUT join("\t",
-		     $match->{dN},
-		     $match->{dS},
+		     $match->{ka},
+		     $match->{ks},
 		     $self->_distance_cutoff,
-		     $match->{query_id},
-		     $match->{match_id},
-		     $pair_align->{_query_identity},
-		     $pair_align->{_query_coverage}) .
-		       "\n";
+		     $match->{alignment}->[0]->display_id,
+		     $self->_build_cigar($match->{alignment}->[0]),
+		     $match->{alignment}->[1]->display_id,
+		     $self->_build_cigar($match->{alignment}->[1]),
+		     $match->{identity},
+		     $match->{coverage}) . "\n";
     } else {
-
-      my $pair_align = 
-	$self->_alignment_vitals_aa($alignment{$match->{query_id}}, 
-				    $alignment{$match->{match_id}});
-
 
       my $transl_regex = $self->_transl_regex;
 
-      ($alignment{$match->{query_id}})->desc =~ /($transl_regex\w*)/;
+      $match->{alignment}->[0]->desc =~ /($transl_regex\w*)/;
       my $query_translation_id = $1;
-      ($alignment{$match->{match_id}})->desc =~ /($transl_regex\w*)/;
+      $match->{alignment}->[1]->desc =~ /($transl_regex\w*)/;
       my $match_translation_id = $1;
 
       unless ($query_translation_id ne '' && $match_translation_id ne '') {
 	warning("Unable to determine translation stable ids.\n" . 
 		"Translation stable id regex is [" . $transl_regex . "]\n" . 
-		"Query seq desc line is [" .($alignment{$match->{query_id}})->desc . "]\n" .
-		"Match seq desc line is [" .($alignment{$match->{match_id}})->desc . "]")
+		"Query seq desc line is [" . $match->{alignment}->[0]->desc . "]\n" .
+		"Match seq desc line is [" . $match->{alignment}->[1]->desc . "]")
       }
 
-# dn
-# ds
-# n
-# s
-# lnl
-# threshold_on_ds
-# gene_stable_id
-# translation_stable_id
-# cigar_line
-# cigar_start
-# cigar_end
-# perc_cov
-# perc_id
-# perc_pos
-# gene_stable_id
-# translation_stable_id
-# cigar_line
-# cigar_start
-# cigar_end
-# perc_cov
-# perc_id
-# perc_pos
+      my $pair_align = $self->_alignment_vitals_aa(@{$match->{alignment}});
 
       print OUT join ("\t",
-		      $match->{dN},
-		      $match->{dS},
-		      $match->{N},
-		      $match->{S},
-		      $match->{lnL},
+		      $match->{ka},
+		      $match->{ks},
+		      0, #$match->{N},
+		      0, #$match->{S},
+		      0, #$match->{lnL},
 		      $self->_distance_cutoff,
-		      $match->{query_id},
+		      $match->{alignment}->[0]->display_id,
 		      $query_translation_id,
 		      $pair_align->{_query_cigar},
 		      $pair_align->{_query_start},
@@ -526,7 +497,7 @@ sub _write_output_as_text {
 		      $pair_align->{_query_coverage},
 		      $pair_align->{_query_identity},
 		      $pair_align->{_query_similarity},
-		      $match->{match_id},
+		      $match->{alignment}->[1]->display_id,
 		      $match_translation_id,
 		      $pair_align->{_match_cigar},
 		      $pair_align->{_match_start},
@@ -549,41 +520,6 @@ sub _write_output_to_database {
   my $self = shift;
 
   throw("Output to database mode is not yet implemented.");
-}
-
-sub _alignment_vitals_nt {
-  my ($self, $query, $match) = @_;
-
-  my @query = split //, $query->seq;
-  my @match = split //, $match->seq;
-
-  die "Aligned sequences are not the same length"
-    if (scalar @query != scalar @match);
-
-  my $query_length = 0;
-  my $match_length = 0;
-  my $identical_nt = 0;
-  my $covered_nt   = 0;
-
-  for (my $i = 0; $i < scalar @query; $i++){
-    $query_length++ if $query[$i] ne 'N';
-    $match_length++ if $match[$i] ne 'N';
-
-    $covered_nt++ if (($query[$i] ne 'N') and ($match[$i] ne 'N'));
-
-    if (($query[$i] eq $match[$i]) and
-	($query[$i] ne 'N')){
-      $identical_nt++;
-    }
-  }
-
-  my %aligned_pair = 
-    ('_query_identity' => (sprintf "%3.2f", ($identical_nt/$covered_nt)*100),
-     '_match_identity' => (sprintf "%3.2f", ($identical_nt/$covered_nt)*100),
-     '_query_coverage' => (sprintf "%3.2f", ($covered_nt/$query_length)*100),
-     '_match_coverage' => (sprintf "%3.2f", ($covered_nt/$match_length)*100));
-
-  return \%aligned_pair;
 }
 
 sub _alignment_vitals_aa {
@@ -617,21 +553,21 @@ sub _alignment_vitals_aa {
   $match->alphabet('DNA');
 
   my $query_protein 
-    = $query->translate(undef, undef, undef, $self->_genetic_code)->seq;
+    = $query->translate(undef, undef, undef, $self->_genetic_code);
 
   my $match_protein 
-    = $match->translate(undef, undef, undef, $self->_genetic_code)->seq;
+    = $match->translate(undef, undef, undef, $self->_genetic_code);
 
   my %aligned_pair;
 
-  $aligned_pair{_query_cigar} = $self->_build_cigar($query);
-  $aligned_pair{_match_cigar} = $self->_build_cigar($match);
+  $aligned_pair{_query_cigar} = $self->_build_cigar($query_protein);
+  $aligned_pair{_match_cigar} = $self->_build_cigar($match_protein);
 
   $aligned_pair{_query_start} = 1;
   $aligned_pair{_match_start} = 1;
 
-  my @query = split //, $query_protein;
-  my @match = split //, $match_protein;
+  my @query = split //, $query_protein->seq;
+  my @match = split //, $match_protein->seq;
 
   if (scalar @query != scalar @match) {
     throw("Aligned sequences are not the same length")
@@ -674,20 +610,17 @@ sub _alignment_vitals_aa {
 sub _build_cigar {
   my ($self, $gapped_seq) = @_;
 
-  throw('The CIGAR building code is producing AA coords ONLY!')
-    if $GD_OUTPUT_TYPE ne 'aminoacid';
-
-  my @aas = split //, $gapped_seq->translate->seq;
+  my @seq = split //, $gapped_seq->seq;
 
   my @cigar;
   my $mode = 'M';
   $mode = 'D' 
-    if $aas[0] eq 'X';
+    if ($seq[0] eq 'X' || $seq[0] eq '-');
   my $prev_mode = $mode;
   my $pointer_pusher = 0;
 
-  foreach my $aa (@aas){
-    if ($aa eq 'X'){
+  foreach my $unit (@seq){
+    if ($unit eq 'X' || $unit eq '-'){
       $mode = 'D'
     } else {
       $mode = 'M'
