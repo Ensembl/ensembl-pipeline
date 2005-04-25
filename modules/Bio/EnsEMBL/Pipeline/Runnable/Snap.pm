@@ -31,6 +31,9 @@ resulting output is parsed to produce a set of Bio::SeqFeatures.
 
 snap is a gene predictor written by Ian Korf (ik1@sanger.ac.uk) part the Zoe software library.
 
+For running Snap, the environment variable $ZOE has to be set to '/usr/local/ensembl/Zoe'. 
+
+
 =head2 Methods:
 
 =over 4
@@ -86,7 +89,7 @@ use Bio::EnsEMBL::PredictionTranscript;
 use Bio::EnsEMBL::TranscriptFactory;
 use Bio::EnsEMBL::PredictionExon;
 use Bio::EnsEMBL::Root;
-
+use Bio::EnsEMBL::Utils::Exception ;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -115,6 +118,18 @@ sub new {
     $self->{'_protected'} = [];    # a list of file suffixes protected from deletion
     $self->{'_parameters'} =undef; #location of parameters for Snap
     $self->{'_hmmfile'} = undef;
+
+   my $zoe_dir = "/usr/local/ensembl/Zoe/";
+   
+    unless ($ENV{'ZOE'}) {
+         print STDERR " There is no environment-variable \$ZOE set. \nI'll set it to $zoe_dir\n" ; 
+      if(-e $zoe_dir) { 
+         $ENV{'ZOE'} = $zoe_dir;  
+       }else{
+         warn( "ERROR ! $zoe_dir doens not exist !\n") ; 
+         throw("you have to set the environment-variable \$ZOE to the dir where ./HMM/parameter.hmm lives \nYou can also modify Snap.pm (\$zoe_dir) ") ; 
+       }
+    }
 
     my($query, $snap, $parameters, $matrix) = 
         $self->_rearrange([qw(QUERY SNAP PARAM HMMFILE)], @args);
