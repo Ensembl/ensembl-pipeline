@@ -63,7 +63,19 @@ this script allows input_ids to be generated and written to the input_id_analysi
      the database this may produce ids which are a mixture of different
      coordinate systems, if -coord_system_version is specified it will
      be ignored
+
+
 =head1 EXAMPLES
+
+perl  make_input_ids -dbhost ia64g -dbname jhv_droso_test -dbport 3306 -dbuser 
+      -dbpass **** -slice -slice_size 150000 -coord_system chromosome -logic_name SubmitSlice150k 
+      -input_id_type Slice150k
+
+This will create input-id's in the format  'chromosome:BDGP4.1:2L:1:149386:1' of size 150k
+Remember to create an analysis 'SubmitSlice150k'(module 'Dummy') and an entry in input_id_type_analysis
+as well !
+
+
 
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306 
   -dbname my_database -contig
