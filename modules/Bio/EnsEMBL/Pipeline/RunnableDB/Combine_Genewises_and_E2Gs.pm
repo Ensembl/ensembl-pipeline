@@ -399,6 +399,14 @@ print STDERR "Have " . scalar ($self->output) . "genes to write\n";
     # double check gene coordinates
     $gene->recalculate_coordinates;
 
+    #As all genes/exons are stored as new in the target db
+    #it's save to remove the old adaptor & old dbID here,
+    #to avoid warnings from the store function.
+    foreach my $exon (@{$gene->get_all_Exons}) {
+      $exon->adaptor(undef);
+      $exon->dbID(undef);
+    }
+
     eval {
       $gene_adaptor->store($gene);
       print STDERR "wrote gene dbID " . $gene->dbID . "\n";
