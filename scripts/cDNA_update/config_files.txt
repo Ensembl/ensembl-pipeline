@@ -44,7 +44,8 @@ use vars qw(%Config);
       logic_name => 'Exonerate_cDNA_update',
       batch_size => 1,
       resource   => 'model=IBMBC2800',
-                     # or 'select[mem>1000] rusage[mem=1000]'
+			#'model=IBMBC2800',
+                     	# or 'select[mem>2000] rusage[mem=2000]'
       retries    => 1,
       sub_args   => '',
       runner     => '',
@@ -86,6 +87,7 @@ use vars qw(%Config);
                FILTER              => undef,
                COVERAGE_BY_ALIGNED => undef,
                OPTIONS             => undef,
+	       NONREF_REGIONS      => 1,
              },
              Exonerate_cDNA_update => {
 	       GENOMICSEQS         => '<masked_genome>',
@@ -106,7 +108,7 @@ use vars qw(%Config);
                                                            -reject_processed_pseudos => 1,
                                                       },
                                        },
-               OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14 --percent 80",
+               OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14",
              }
            }
 );
