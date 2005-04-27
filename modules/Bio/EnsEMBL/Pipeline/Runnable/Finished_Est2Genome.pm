@@ -85,8 +85,8 @@ sub run{
                     or $self->throw("Can't create new Bio::SeqIO from $estfile '$' : $!");
 
         #fill inputs
-        $genOutput->write_seq($self->{'_genomic_sequence'}); 
-        $estOutput->write_seq($self->{'_est_sequence'});
+        $genOutput->write_seq($genomicseq); 
+        $estOutput->write_seq($estseq);
     }
 
     my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
@@ -96,72 +96,73 @@ sub run{
     print STDERR "\nRunning command $est_genome_command\n\n";
 
     eval{
-	open (ESTGENOME, $est_genome_command) || $self->throw("Can't open pipe from '$est_genome_command' : $!");
-	my $firstline = <ESTGENOME>;
-	print STDERR "firstline: \t$firstline" if $verbose;
-	if ( $firstline =~ m/Align EST and genomic DNA sequences/ ){ 
-	    # Catch 'Align EST and genomic DNA sequences'. This comes from STDERR!! [ 2>&1 ]
-	    $firstline = <ESTGENOME>;
-	    print STDERR "\$firstline (secondline!): \t$firstline" if $verbose;	    
-	}elsif($firstline =~ /error/i){
-            close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-            $self->throw("There was an error.  Here is the first line of est2genomes output:\n" .
-                         $firstline);
-            return (0);
-        }
+	    open (ESTGENOME, $est_genome_command) || $self->throw("Can't open pipe from '$est_genome_command' : $!");
+	    my $firstline = <ESTGENOME>;
+	    print STDERR "firstline: \t$firstline" if $verbose;
+	    if ( $firstline =~ m/Align EST and genomic DNA sequences/ ){ 
+	        # Catch 'Align EST and genomic DNA sequences'. This comes from STDERR!! [ 2>&1 ]
+	        $firstline = <ESTGENOME>;
+	        print STDERR "\$firstline (secondline!): \t$firstline" if $verbose;	    
+	    }elsif($firstline =~ /error/i){
+                close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
+                $self->throw("There was an error.  Here is the first line of est2genomes output:\n" .
+                             $firstline);
+                return (0);
+            }
 
-	if( $firstline =~ m/reversed\sest/ ){
-	    $self->est_strand(-1);
-	} else {
-	    $self->est_strand(1);
-	}
-
-	if( $firstline =~ m/forward\sgenome/ ){
-	    $self->gen_strand(1);
-	} else {
-	    $self->gen_strand(-1);
-	}
-
-	while (<ESTGENOME>) {
-	    print STDERR $_ if $verbose;
-	    if ($_ =~ /^Segment|^Exon/) {  # We only care about Segments in Exons
-
-		# "gen" = genomic sequence
-		my ($primary, $score, $percent_id,
-		    $gen_start, $gen_end, $gen_id,
-		    $est_start, $est_end, $est_id) = (split)[0,1,2,
-							     3,4,5,
-							     6,7,8];
-		$self->$primary(
-		    -score      => $score,
-		    -percent_id => $percent_id,
-		    -gen_start  => $gen_start,
-		    -gen_end    => $gen_end,
-		    -gen_id     => $gen_id,
-		    -est_start  => $est_start,
-		    -est_end    => $est_end,
-		    -est_id     => $est_id,
-		    -primary    => $primary
-		    );
-	    }elsif ($_ =~ /Segmentation fault/) {
-		close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-		$self->throw("Segmentation fault from est_genome\n");
-		return(0);
-	    }elsif ($_ =~ /(ERROR:.+)/) {
-		close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
-		$self->throw("Error from est_genome: \n<$1>\n");
-		return(0);
+	    if( $firstline =~ m/reversed\sest/ ){
+	        $self->est_strand(-1);
+	    } else {
+	        $self->est_strand(1);
 	    }
-	}
 
-	foreach my $seg_array( keys(%{$self->{'_exons'}}) ){
-	    my $dnafp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => $self->{'_exons'}->{$seg_array});
-	    $self->add_output($dnafp);
-	}
-	if(!close(ESTGENOME)){
-	    $self->throw("Problems running est_genome when closing pipe: $!\n");
-	    return (0);
-	}
+	    if( $firstline =~ m/forward\sgenome/ ){
+	        $self->gen_strand(1);
+	    } else {
+	        $self->gen_strand(-1);
+	    }
+
+        my $gen_id = $genomicseq->display_id;
+	    while (<ESTGENOME>) {
+	        print STDERR $_ if $verbose;
+	        if ($_ =~ /^Segment|^Exon/) {  # We only care about Segments in Exons
+
+		    # "gen" = genomic sequence
+		    my ($primary, $score, $percent_id,
+		        $gen_start, $gen_end,
+		        $est_start, $est_end, $est_id) = (split)[0,1,2,
+							                             3,4,
+							                             6,7,8];
+		    $self->$primary(
+		        -score      => $score,
+		        -percent_id => $percent_id,
+		        -gen_start  => $gen_start,
+		        -gen_end    => $gen_end,
+		        -gen_id     => $gen_id,
+		        -est_start  => $est_start,
+		        -est_end    => $est_end,
+		        -est_id     => $est_id,
+		        -primary    => $primary
+		        );
+	        }elsif ($_ =~ /Segmentation fault/) {
+		    close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
+		    $self->throw("Segmentation fault from est_genome\n");
+		    return(0);
+	        }elsif ($_ =~ /(ERROR:.+)/) {
+		    close (ESTGENOME) or $self->warn("problem closing est_genome: $!\n");
+		    $self->throw("Error from est_genome: \n<$1>\n");
+		    return(0);
+	        }
+	    }
+
+	    foreach my $seg_array( keys(%{$self->{'_exons'}}) ){
+	        my $dnafp = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => $self->{'_exons'}->{$seg_array});
+	        $self->add_output($dnafp);
+	    }
+	    if(!close(ESTGENOME)){
+	        $self->throw("Problems running est_genome when closing pipe: $!\n");
+	        return (0);
+	    }
     };
     $self->_deletefiles($genfile, $estfile);
 

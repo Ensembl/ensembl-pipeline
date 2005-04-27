@@ -11,6 +11,7 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_MiniEst2Genome;
 use Bio::EnsEMBL::Pipeline::Runnable::Finished_Blast;
 use Bio::EnsEMBL::Pipeline::Config::Blast;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Data::Dumper;
 
 use vars qw(@ISA $verbose);

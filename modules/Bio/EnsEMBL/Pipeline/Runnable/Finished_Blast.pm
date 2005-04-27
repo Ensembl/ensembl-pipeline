@@ -77,6 +77,7 @@ sub get_analysis {
     }
     return $ana;
 }
+
 sub parse_results {
     my ( $self, $fh ) = @_;
     print "*** PARSING OUTPUT ***\n";

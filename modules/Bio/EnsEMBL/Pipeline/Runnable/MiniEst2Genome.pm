@@ -364,8 +364,8 @@ sub make_miniseq {
     my $miniseq = new Bio::EnsEMBL::Pipeline::MiniSeq(-id        => $seqname,
 						      -pairalign => $pairaln);
 
-    my $newgenomic = $miniseq->get_cDNA_sequence->seq;
-    $newgenomic =~ s/(.{72})/$1\n/g;
+#    my $newgenomic = $miniseq->get_cDNA_sequence->seq;
+#    $newgenomic =~ s/(.{72})/$1\n/g;
 #    print ("New genomic sequence is " . $newgenomic. "\n");
     return $miniseq;
 

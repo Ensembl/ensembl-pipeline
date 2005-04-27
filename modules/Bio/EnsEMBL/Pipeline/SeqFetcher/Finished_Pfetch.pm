@@ -302,7 +302,7 @@ sub fetch_descriptions_by_accession {
             if (my $sv = $embl_parser->sequence_version) {
                 unshift @$all_accs, $sv;
             }
-            warn "Expecting '$full_name' but got (@$all_accs)";
+            warn "Expecting '$full_name' but got (@$all_accs)\n";
 		    push @$failed, $full_name;
         }
     }
