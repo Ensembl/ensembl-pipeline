@@ -460,6 +460,7 @@ sub get_Sequence {
     eval {
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
+    warn $@ if $@;
 
     # if we didn't get it by accession, try by id
     if(!defined $seq){

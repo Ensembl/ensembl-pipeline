@@ -454,7 +454,7 @@ sub find_file {
   my ($self,$name) = @_;
 
   my $datadir = $DATA_DIR || undef;
-  my $libdir  = $LIB_DIR  || undef;
+  my $libdir  = $LIB_DIR  || undef; 
 
   my $full_name;
 

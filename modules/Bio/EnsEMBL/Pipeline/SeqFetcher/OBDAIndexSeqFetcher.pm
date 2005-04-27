@@ -245,7 +245,8 @@ sub  get_Seq_by_acc {
 
 
 sub  get_Seq_by_id {
-  my $self = @_;
+  my ($self) = @_;
+
   $self->warn("cannot call  get_Seq_by_id on OBDAIndexSeqFetcher, use get_Seq_by_acc instead");
   return undef;
 }
