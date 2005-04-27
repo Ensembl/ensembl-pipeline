@@ -152,7 +152,7 @@ sub fetch_all {
   my  $flag = Bio::EnsEMBL::Pipeline::Flag->new
       ( '-dbid'    => $dbID,
 	'-type'    => $type,
-	'-id'      => $id,
+	'-ensembl_id'      => $id,
 	'-goalAnalysis'    => $analysis,
         '-adaptor' => $self );
     $flags{$dbID} = $flag;
