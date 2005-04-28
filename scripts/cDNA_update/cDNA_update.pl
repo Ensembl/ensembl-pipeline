@@ -84,8 +84,8 @@ $sourceDIR          = ".../blastdb";
 $masked_genome      = ".../blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
 
 # external programs needed:
-$fastasplit         = "~/fastasplit";
-$polyA_clipping     = "~/clip_polyA.pl";
+$fastasplit         = "/nfs/acari/searle/progs/fastasplit/fastasplit";
+$polyA_clipping     = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl";
 
 # db parameters
 #admin rights required
@@ -108,6 +108,8 @@ $WB_EST_DBNAME      = $ENV{'USER'}."_EST";
 $WB_EST_DBHOST      = "";
 $WB_EST_DBPORT      = "";
 
+#use & adjust assembly exception sequences (DR52 & DR53)
+$adjust_assembly   = 1;
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -143,6 +145,10 @@ if($option eq "run"){
   config_setup();
 
   if(! fastafiles() ){ unclean_exit(); }
+
+  if($adjust_assembly){
+    adjust_assembly();
+  }
 
   if(! DB_setup()   ){ unclean_exit(); }
 
@@ -431,6 +437,36 @@ sub fastafiles{
     return 0;
   }
   return 1;
+}
+
+
+#adjust sequence files for assembly-exceptions
+#currently looks for DR*.fa files
+
+sub adjust_assembly{
+  my $filename;
+  #get the correct location of DR-assembly pieces
+  my $db     = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, 'ensro');
+  my $sql = 'select s.name, s.seq_region_id, ae.seq_region_start, ae.seq_region_end '.
+            'from seq_region s, assembly_exception ae where s.seq_region_id=ae.seq_region_id '.
+	    'and s.name like "DR%";';
+  my $sth = $db->prepare($sql) or die "sql error!";
+  $sth->execute();
+  while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
+    $filename = $masked_genome."/".$name.".fa";
+    open(FASTAFILE, "<$filename") or die("cant open fasta file $filename.");
+    my $headerline = <FASTAFILE>;
+    $headerline =~ s/^\>(\w+)\:([\w\d]*)\:([\w\d]*)\:(\d+)\:(\d+)\:(.+)//;
+    $headerline = ">".$1.":".$2.":".$3.":".$seq_region_start.":".$seq_region_end.":".$6;
+    local $/ = '';
+    my $seq = <FASTAFILE>;
+    local $/ = '\n';
+    close(FASTAFILE);
+    open(FASTAFILE, ">$filename") or die("cant open fasta file $filename for writing.");
+    print FASTAFILE $headerline."\n";
+    print FASTAFILE $seq;
+    close(FASTAFILE);
+  }
 }
 
 
