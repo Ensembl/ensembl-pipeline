@@ -93,7 +93,7 @@ GetOptions(
            'mark_awol!'            => \$mark_awol,
            'rename_on_retry'       => \$rename_on_retry,
            'starts_from=s@'        => \@starts_from,
-           'analysis=s@'           => \@analyses_to_run,
+           'analysis|logic_name=s@' => \@analyses_to_run,
            'skip_analysis=s@'      => \@analyses_to_skip,
            'input_id_type=s@'      => \@types_to_run,
            'skip_input_id_type=s@' => \@types_to_skip,

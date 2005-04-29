@@ -40,6 +40,7 @@ use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -115,10 +116,11 @@ sub new {
     $self->output_dir($dir);
     $self->make_filenames;
   }
-
   $self->runner($runner);
   if(!$self->runner){
-    $self->runner($DEFAULT_RUNNER);
+    my $queue = $BATCH_QUEUES{$self->analysis->logic_name};
+    my $runner = $queue->{'runner'};
+    $self->runner($runner);
   }
   return $self;
 }
@@ -304,9 +306,9 @@ sub flush_runs {
     }
 
     my $this_runner = $queue->{'runner'};
-
+    #print "This runner is ".$this_runner."\n";
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
-   
+    
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
     
     if ( ! $lastjob) {
@@ -354,7 +356,7 @@ sub flush_runs {
 
     eval {
       # SMJS LSF Specific for debugging
-      # print STDERR "Submitting: ", $batch_job->bsub, "\n";
+      #print STDERR "Submitting: ", $batch_job->bsub, "\n";
       $batch_job->open_command_line();
     };
 
@@ -510,8 +512,10 @@ sub run_module {
     #print STDERR "Module contains path info already\n";
     $module =~ s/::/\//g;
     $perl_path = $module;
-  } else {
+  } elsif($runnable_db_path) {
     $perl_path = $runnable_db_path."/".$module;
+  }else{
+    $perl_path = $module;
   }
 
   #print STDERR "have perlpath ".$perl_path."\n";
@@ -735,8 +739,16 @@ sub make_filenames {
   my $num = int(rand(10));
   
   my $dir = $self->output_dir . "/$num/";
+  #print "MY dir ".$dir."\n";
   if ( ! -e $dir) {
-    system( "mkdir $dir" );
+    eval{
+      my $command  = "mkdir $dir";
+      #print "Command ".$command."\n";
+      system( $command );
+    };
+    if($@){
+      throw("Failed to make dir ".$dir." $@");
+    }
   }
 
   my $stub = $self->input_id.".";

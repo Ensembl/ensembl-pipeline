@@ -67,7 +67,7 @@ sub run_analysis{
   my ($self) = @_;
 
   
-  my $command = $self->program." -D ".$self->protein_file." ".$self->filename." > ".$self->results;
+  my $command = $self->program." -D ".$self->options." ".$self->protein_file." ".$self->filename." > ".$self->results;
   print STDERR $command."\n";
   $self->throw("Error running pmatch on " . $self->filename) if system($command);
 }
@@ -234,7 +234,7 @@ sub options{
   my($self, $arg) = @_;
 
   if(!$self->{'_options'}){
-    $self->{'_options'} = undef;
+    $self->{'_options'} = '';
   }
 
   if($arg){

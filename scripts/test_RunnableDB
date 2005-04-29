@@ -77,6 +77,7 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
 die "No input id entered" unless defined ($input_id);
 
 my $aa = $db->get_AnalysisAdaptor;
+print "Fetching ".$logic_name." from ".$db->dbname."\n";
 $analysis = $aa->fetch_by_logic_name($logic_name);
 
 
@@ -102,7 +103,13 @@ if($analysis->module =~ "Bio::"){
   ($file = $runnable) =~ s/::/\//g;
   
 }else{
-  $file = $perl_path."/".$analysis->module; 
+  if($perl_path){
+    $file = $perl_path."/".$analysis->module; 
+  }else{
+    $file = $analysis->module;
+  }
+  #print "Analysis ".$analysis->logic_name." has module ".$analysis->module.
+  #  " and file ".$file."\n";
   ($runnable = $file) =~ s/\//::/g;
 }
 eval{

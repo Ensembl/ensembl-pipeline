@@ -75,7 +75,7 @@ GetOptions(
            'config_sanity!'         => \$config_sanity,
            'utils_verbosity=s'      => \$utils_verbosity,
            'perldoc!'               => \$perldoc,
-           'logic_name=s'           => \$logic_name,
+           'logic_name|analysis=s'           => \$logic_name,
            'force!'                 => \$force,
            'input_id_file=s'        => \$ids_to_run,
            'make_input_ids!'        => \$make_input_ids,
