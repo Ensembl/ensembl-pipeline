@@ -132,7 +132,8 @@ my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update re
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT WB_EST_DBNAME 
                      WB_EST_DBHOST WB_EST_DBPORT);
-
+my $chunknum       = 1000;   #(<300 sequences / file)
+my $maxseqlenght   = 10000;
 
 my $option = $ARGV[0];
 if(!$option or ($option ne "run" and $option ne "clean" and $option ne "compare")){
@@ -429,7 +430,11 @@ sub fastafiles{
       if(system($cmd)){
 	die("couldn t split file.$@\n");
       }
-      print "chopped up file.\n";
+
+      #pick out biggest sequences
+      check_chunksizes();
+
+      print "chopped up, clipped and size-checked files.\n";
     }
   };
   if($@){
@@ -437,6 +442,58 @@ sub fastafiles{
     return 0;
   }
   return 1;
+}
+
+
+#find the really big sequences & put them into seperate chunks
+#to avoid awol jobs
+
+sub check_chunksizes{
+  local $/ = '>';
+  my $allseqs;
+  my $file;
+  my $toolongs;
+  my $seqname;
+  my $newfile;
+
+  unless ( opendir( DIR, $chunkDIR ) ) {
+    die "can t read $chunkDIR";
+  }
+  foreach( readdir(DIR) ){
+    if(($_ =~ /^\.+$/) or ($_ =~ /^newchunk.+$/)){ next; }
+    $file = $chunkDIR.$_;
+    $toolongs = 0;
+    $allseqs = "";
+
+    open(CHUNKFILE, "<$file") or die("can t open file $file.");
+    while(my $seq = <CHUNKFILE>){
+      $seq =~ m/(.+)\n/;
+      $seq =~ s/\>//;
+      $seqname = $1;
+      if(length($seq) > $maxseqlenght){
+	print "Storing large sequence in se. file: $seqname.\n";
+	if(!$toolongs){
+	  $toolongs = 1;
+	}
+	$newfile = $chunkDIR."/newchunk_".$seqname;
+	open(NEWFILE, ">$newfile") or die "cant create new fasta file $newfile!";
+	print NEWFILE ">".$seq;
+	close(NEWFILE);
+      }
+      else{
+	$allseqs .= ">".$seq;
+      }
+    }
+    close(CHUNKFILE);
+
+    if($toolongs){
+      open(CHUNKFILE, ">$file") or die("can t open file $file.");
+      print CHUNKFILE $allseqs;
+      close(CHUNKFILE);
+    }
+  }
+  closedir(DIR);
+  local $/ = "\n";
 }
 
 
