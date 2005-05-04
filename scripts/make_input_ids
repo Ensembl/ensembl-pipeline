@@ -53,7 +53,7 @@ this script allows input_ids to be generated and written to the input_id_analysi
     whole proteome this must be proteome
     -translation_ids if you want your input ids to be translation ids
     -verbose if you want more information about what the script is doing
-    -input_type if you want to specific an input_id_type not already
+    -input_id_type if you want to specific an input_id_type not already
      used by the analysis object
     -insert_analysis if you want to insert an analysis object if it doesn't
      already exist in the database'
