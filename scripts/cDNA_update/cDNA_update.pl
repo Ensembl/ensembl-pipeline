@@ -132,8 +132,8 @@ my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update re
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT WB_EST_DBNAME 
                      WB_EST_DBHOST WB_EST_DBPORT);
-my $chunknum       = 1000;   #(<300 sequences / file)
-my $maxseqlenght   = 10000;
+my $chunknum       = 800;   #(<300 sequences / file)
+my $maxseqlenght   = 20000;
 
 my $option = $ARGV[0];
 if(!$option or ($option ne "run" and $option ne "clean" and $option ne "compare")){
@@ -461,17 +461,18 @@ sub check_chunksizes{
   }
   foreach( readdir(DIR) ){
     if(($_ =~ /^\.+$/) or ($_ =~ /^newchunk.+$/)){ next; }
-    $file = $chunkDIR.$_;
+    $file = $chunkDIR."/".$_;
     $toolongs = 0;
     $allseqs = "";
 
     open(CHUNKFILE, "<$file") or die("can t open file $file.");
+    <CHUNKFILE>;
     while(my $seq = <CHUNKFILE>){
-      $seq =~ m/(.+)\n/;
       $seq =~ s/\>//;
+      $seq =~ m/(.+)\n/;
       $seqname = $1;
       if(length($seq) > $maxseqlenght){
-	print "Storing large sequence in se. file: $seqname.\n";
+	print "\nTOO LONG: $seqname";
 	if(!$toolongs){
 	  $toolongs = 1;
 	}
