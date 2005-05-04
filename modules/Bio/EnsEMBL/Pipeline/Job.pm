@@ -488,7 +488,6 @@ sub run_module {
   my $self = shift;
 
   my $module     = $self->analysis->module;
-  my $autoupdate = $AUTO_JOB_UPDATE;
   my $hash_key   = $self->analysis->logic_name;
   my $rdb;
   my ($err, $res);
@@ -604,27 +603,25 @@ sub run_module {
   }    
   
   # update job in StateInfoContainer
-  if ($autoupdate) {
+  eval {
+    my $sic = $self->adaptor->db->get_StateInfoContainer;
+    $sic->store_input_id_analysis(
+                                  $self->input_id,
+                                  $self->analysis,
+                                  $self->execution_host,
+                                  $SAVE_RUNTIME_INFO
+                                 );
+  };
+  if ($err = $@) {
+    my $error_msg = "Job finished successfully, but could not be ".
+      "recorded as finished.  Job : [" . $self->input_id . "]\n[$err]";
     eval {
-      my $sic = $self->adaptor->db->get_StateInfoContainer;
-      $sic->store_input_id_analysis(
-                                    $self->input_id,
-                                    $self->analysis,
-                                    $self->execution_host,
-                                    $SAVE_RUNTIME_INFO
-                                   );
+      $self->set_status("FAIL_NO_RETRY");
     };
-    if ($err = $@) {
-      my $error_msg = "Job finished successfully, but could not be ".
-        "recorded as finished.  Job : [" . $self->input_id . "]\n[$err]";
-      eval {
-        $self->set_status("FAIL_NO_RETRY");
-      };
-      $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
-      $self->throw($error_msg);
-    } else {
-      print STDERR "Updated successful job ".$self->dbID."\n";
-    }
+    $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
+    $self->throw($error_msg);
+  } else {
+    print STDERR "Updated successful job ".$self->dbID."\n";
   }
 }
 

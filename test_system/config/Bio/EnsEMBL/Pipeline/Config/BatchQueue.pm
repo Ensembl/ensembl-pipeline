@@ -48,8 +48,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-  DEFAULT_OUTPUT_DIR  => '/ecs2/scratch6/lec/test_out/',
-  DEFAULT_CLEANUP     => 'no',	
+  DEFAULT_OUTPUT_DIR  => '',	
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
                       # a certain period of time if you effectively want this never to run set 
