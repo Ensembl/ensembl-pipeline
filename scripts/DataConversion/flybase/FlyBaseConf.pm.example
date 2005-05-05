@@ -4,32 +4,82 @@ use strict;
 use vars qw( %FlyBaseConf );
 
 
+
 %FlyBaseConf = (
 		 #location of gff files
 		 FB_CHR_INFO => [
 				 {
 				  chr_name => '2L',
-				  gff_file => 'short.gff',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2L-r4.1.gff",
+				 },
+				 {
+				  chr_name => '2R',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2R-r4.1.gff",
+				 },
+	                         {
+				  chr_name => '3L',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3L-r4.1.gff",
+				 },
+	                         {
+				  chr_name => '3R',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3R-r4.1.gff",
+				 },
+	                         {
+				  chr_name => '4',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-4-r4.1.gff",
+				 },
+	                         {
+				  chr_name => 'X',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-X-r4.1.gff",
+				 },
+	                         {
+				  chr_name => '2h',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2h-hetr32b2.gff",
+				 },
+	                         {
+				  chr_name => '3h',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3h-hetr32b2.gff",
+				 },
+	                         {
+				  chr_name => '4h',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-4h-hetr32b2.gff",
+				 },
+	                         {                                 
+				  chr_name => 'Xh',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-Xh-hetr32b2.gff",
+				 },
+	                         {                                 
+				  chr_name => 'Yh',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-Yh-hetr32b2.gff",
+				 },
+	                         {                                 
+				  chr_name => 'U',
+				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-U-hetr32b2.gff.modified",
 				 },
 			       ],
 
-
+                LOGIC_NAME_EXON=>'bla',
                 # details for db-connection are stored in registry-file
-                FB_DBNAME => 'jhv_droso_3_2',
-                FB_DBHOST => 'ecs4',
+                FB_DBNAME => 'jhv_droso_test',
+                FB_DBHOST => 'ia64g',
                 FB_DBUSER => 'ensadmin',
                 FB_DBPASS => 'ensembl',
-                FB_DBPORT => '3351',
+                FB_DBPORT => '3306',
+
+
+                #files for proteindumps
+                FB_DUMPED_SELENOCYSTEINE_FILE => "gff_load_dumped_selenocysteines.fasta",
+                FB_DUMPED_TRANSLATIONS_FILE => "gff_load_dumped_translations.fasta",
 
 
                 # parameters for analysis object (logic_name is set in flybase_to_ensembl.pl
                 ANA_DB => 'Flybase',
-                ANA_DB_VERSION => '3.2',
+                ANA_DB_VERSION => '4.1',
                 ANA_DB_FILE => '',
                 ANA_PROGRAM => '',
                 ANA_PROGRAM_VERSION => '',
                 ANA_PROGRAM_FILE => '',
-                ANA_GFF_SOURCE => 'Flybase-GFF v3.0',
+                ANA_GFF_SOURCE => 'Flybase-GFF v4.1',
                 ANA_GFF_FEATURE => '',
                 ANA_MODULE => '',
                 ANA_MODULE_VERSION => '',
