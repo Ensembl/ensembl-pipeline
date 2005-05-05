@@ -83,6 +83,8 @@ gff_source=RepeatMasker
 gff_feature=Repeat
 input_id_type=CONTIG
 
+There is an example file in this directory called example_analysis.conf
+
 =cut
 
 use strict;

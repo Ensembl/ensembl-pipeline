@@ -22,7 +22,7 @@ my $info; #prints out more info if true
             'dbuser:s'          => \$dbuser,
             'dbpass:s'          => \$pass,	    
             'dbport:s'          => \$port,
-            'info!' => \$info,
+            'verbose!' => \$info,
            );
 
 
