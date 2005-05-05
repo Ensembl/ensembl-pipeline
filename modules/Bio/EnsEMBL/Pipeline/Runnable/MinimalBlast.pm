@@ -46,6 +46,7 @@ sub new {
   $self->program($program)   if defined($program);
   $self->blastdb($blastdb)   if defined($blastdb);
   $self->queryseq($queryseq) if defined($queryseq);
+  $self->options($options)   if defined($options);
 
   $self->workdir($workdir) if defined($workdir);
   $self->identity($identity_cutoff) if defined($identity_cutoff);
