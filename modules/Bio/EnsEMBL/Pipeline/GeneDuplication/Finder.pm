@@ -20,10 +20,6 @@ my $DEFAULT_DISTANCE_CUTOFF  = 1.000;
 
 @ISA = qw(Bio::EnsEMBL::Root Bio::EnsEMBL::Pipeline::RunnableI);
 
-###
-open (LOG, ">>/ecs4/work4/dta/core_gene_dupl/logfile.$$.txt") or die "Can't write to logfile.$$.txt\n";
-###
-
 ### Constructor ###
 
 =head2 new
@@ -190,6 +186,12 @@ sub _find_recent_duplications {
   # and sufficiently high identity.
   my $good_hits = $self->_preliminary_filter($bplite_report);
 
+  # Check that good hits have been found.
+  unless (scalar(keys %$good_hits)){
+    print "Did not find hits to query sequence.\n";
+    return []
+  }
+
   # From the set of promising hits, which will possibly include
   # hits to other species, filter using outgroup sequences (if
   # any) and the genetic distance between each hit and the query
@@ -287,40 +289,21 @@ sub _preliminary_filter {
     }
 
     # Skip hit if it is a match to self.
-###
-print LOG "COMPARING :  [".$self->_query_seq->display_id."] with [".$sbjct->name."]\n";
-###
-###
-print LOG "\tCHUCK : Self match [".$sbjct->name."]\n"
-  if ($self->_query_seq->display_id eq $sbjct->name);
-###
+
     next DISTINCT_HIT
       if ($self->_query_seq->display_id eq $sbjct->name);
 
     # First, filter hits by identity
 
     my $hit_identity = $self->_hit_identity(\@hsps);
-###
-print LOG "\tHIT IDENTITY : $hit_identity\tIDENTITY CUTOFF : " .$self->_identity_cutoff . "\n";
-###
-###
-print LOG "\tCHUCK : Missed identity cutoff [".$sbjct->name."]\n"
-  unless ($hit_identity >= $self->_identity_cutoff);
-###
+
     next DISTINCT_HIT
       unless ($hit_identity >= $self->_identity_cutoff);
 
     # Second, filter hits by coverage
 
-###
-print LOG "\tCHUCK : Missed coverage cutoff [".$sbjct->name."]\n"
-  unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
-###
     next DISTINCT_HIT
       unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
-###
-print LOG "\tGOOD LOOKING HIT\n";
-###
 
     # Third, this has become a serious hit.  Make a pairwise 
     # alignment of the query and hit.
@@ -333,9 +316,6 @@ print LOG "\tGOOD LOOKING HIT\n";
 
     my $align = $self->_pairwise_align(\@seqs);
 
-#print ">" . $align->[0]->display_id . "\n" . $align->[0]->seq . "\n";
-#print ">" . $align->[1]->display_id . "\n" . $align->[1]->seq . "\n";
-
       # and filter by coverage and identity for the whole 
       # aligned sequences.
 
@@ -344,30 +324,28 @@ print LOG "\tGOOD LOOKING HIT\n";
 
     unless ($min_coverage >= $self->_coverage_cutoff &&
 	    $identity     >= $self->_identity_cutoff) {
-###
-print LOG "\tCHUCK: Didn't pass second round of coverage and identity filters.\n";
-###
+
       next DISTINCT_HIT;
     }
-###
-print LOG "\tACCEPT HIT\n";
-###
+
     # Forth, calculate the genetic distance while we are here.
 
-    my ($ka, $ks) 
-      = $self->_calculate_pairwise_distance($align);
+    my ($ka, $ks, $n, $s) 
+      = $self->_run_pairwise_paml($align);
 
     # Finally, store all this useful information.  Perhaps a proper
     # object would make this easier to access later?
 
-    $good_hits{$sbjct->name} = {'ka'       => $ka,
-				'ks'       => $ks,
+die "undefined N and S" unless defined $n and defined $s;
+
+    $good_hits{$sbjct->name} = {'Ka'       => $ka,
+				'Ks'       => $ks,
+				'N'        => $n,
+				'S'        => $s,
 				'coverage' => $min_coverage,
 				'identity' => $identity,
 				'alignment'=> $align};
-###
-print LOG "\tHIT DISTANCE : Ks = " . $good_hits{$sbjct->name}->{ks} . "\n";
-###
+
   }
 
     return \%good_hits
@@ -387,13 +365,6 @@ print LOG "\tHIT DISTANCE : Ks = " . $good_hits{$sbjct->name}->{ks} . "\n";
 
 sub _phylogenetic_filter {
   my ($self, $good_hits) = @_;
-
-  # Make a comment and return if the blast report contained no hits.
-
-  unless (scalar(keys(%$good_hits))){
-    print "Did not find hits to query sequence.\n";
-    return {}
-  }
 
   my %hits_by_species;
 
@@ -426,6 +397,13 @@ sub _phylogenetic_filter {
     warning("Didnt match hit id to any regex [". $hit_id ."].");
   }
 
+  # Return now if there are no intra-species hits.
+
+  unless (defined @{$hits_by_species{$self->_regex_query_species}} &&
+	 scalar @{$hits_by_species{$self->_regex_query_species}}) {
+    return []
+  }
+
   # Sort our hits by their distance to the query sequence.
 
   my %sorted_hits_by_species;
@@ -433,7 +411,7 @@ sub _phylogenetic_filter {
   foreach my $species (keys %hits_by_species) {
 
     my @sorted_hits 
-      = sort {$good_hits->{$a}->{ks} <=> $good_hits->{$b}->{ks}} 
+      = sort {$good_hits->{$a}->{Ks} <=> $good_hits->{$b}->{Ks}} 
 	@{$hits_by_species{$species}};
     $sorted_hits_by_species{$species} = \@sorted_hits;
   }
@@ -451,10 +429,10 @@ sub _phylogenetic_filter {
     my $closest_hit_id       = $sorted_hits_by_species{$regex}->[0];
 
     throw("Missing distance value")
-      unless defined $good_hits->{$closest_hit_id}->{ks} ||
-	$good_hits->{$closest_hit_id}->{ks} == 0;
+      unless defined $good_hits->{$closest_hit_id}->{Ks} ||
+	$good_hits->{$closest_hit_id}->{Ks} == 0;
 
-    my $closest_hit_distance = $good_hits->{$closest_hit_id}->{ks};
+    my $closest_hit_distance = $good_hits->{$closest_hit_id}->{Ks};
 
     if (($closest_hit_distance < $closest_outgroup_distance) && 
 	($closest_hit_distance > 0)) {
@@ -469,19 +447,11 @@ sub _phylogenetic_filter {
   my @query_species_hits = @{$sorted_hits_by_species{$self->_regex_query_species}};
 
   foreach my $hit_id (@query_species_hits) {
-    if ($good_hits->{$hit_id}->{ks} <= $closest_outgroup_distance &&
-	$good_hits->{$hit_id}->{ks} >= 0) {
+    if ($good_hits->{$hit_id}->{Ks} <= $closest_outgroup_distance &&
+	$good_hits->{$hit_id}->{Ks} >= 0) {
 
       push (@accepted_hits, $good_hits->{$hit_id});
-
-###
-print LOG "KEEPING HITS : " . $hit_id . 
-  "\tKa = " . $good_hits->{$hit_id}->{ka} . 
-  "\tKs = " . $good_hits->{$hit_id}->{ks} . 
-  "\tCoverage = " . $good_hits->{$hit_id}->{coverage} . 
-  "\tIdentity = " . $good_hits->{$hit_id}->{identity} ."\n";
-###
-    } elsif ($good_hits->{$hit_id}->{ks} >= 0) {
+    } elsif ($good_hits->{$hit_id}->{Ks} >= 0) {
       last;
     }
   }
@@ -506,9 +476,24 @@ print LOG "KEEPING HITS : " . $hit_id .
 =cut
 
 sub _run_pairwise_paml {
-  my ($self, $aligned_seqs, $dontretry) = @_;
+  my ($self, $aligned_seqs) = @_;
 
-  my $paml = Bio::EnsEMBL::Pipeline::GeneDuplication::PAML->new(
+  # Cope with a bloody PAML quirk.  Identical sequences
+  # cause a fatal error.
+
+  if ($aligned_seqs->[0]->seq eq $aligned_seqs->[1]->seq) {
+    return (0, 0, 0, 0)
+  }
+
+  # The business of running codeml.
+
+  my $retries = 0;
+  my $result;
+  my $paml; # Object must stay in scope until parsing is complete.
+
+  while (! defined $result && $retries < 3) {
+
+    $paml = Bio::EnsEMBL::Pipeline::GeneDuplication::PAML->new(
 			     '-work_dir'     => $self->_work_dir,
 			     '-executable'   => $self->_codeml,
 			     '-aligned_seqs' => $aligned_seqs,
@@ -519,80 +504,54 @@ sub _run_pairwise_paml {
 			     '-icode'        => ($self->_genetic_code) - 1
 			    );
 
-  my $parser;
+    my $parser = $paml->run_codeml;
 
-  eval{
-    $parser = $paml->run_codeml
-  };
+    # Often a codeml run might look successful, but the Bioperl parser
+    # will not be able to read the output created.  This is usually
+    # due to a silent codeml failure and a lack of output.  Hence,
+    # here an attempt is made to check the success of the parser.
 
-  # PAML execution frequently fails, but is successful on a retry.
-  # Hence, if PAML fails try several retries before giving up.  This
-  # failure is usually due to PAML estimating stochastic parameters
-  # that end in floating point exceptions.  Only an independent
-  # implementation of the NG distance algorithm separate from PAML
-  # is going to free us from this very annoying problem.
+    eval {
+      $result = $parser->next_result();
+    };
 
-  my $retry_count = 0;
-  if ($@){
-    warning ("Paml execution failed - attempting a retry.\n$@");
-    while (! $parser && $retry_count < 3){
-      $parser = $self->_run_pairwise_paml($aligned_seqs, 1);
-      $retry_count++
+    if ($@ || ! defined $result) {
+      warning("Problem deriving PAML result object.\n$@")
     }
-    unless ($parser){
-      throw ("Paml execution failed - even after three retries.\n$@")
-    }
+
+    $retries++
   }
 
-
-  return $parser;
-}
-
-
-=head2 _calculate_pairwise_distance
-
-  Args[1]    :
-  Example    :
-  Description:
-  Returntype : Array (Ka, Ks)
-  Exceptions :
-  Caller     :
-
-=cut
-
-sub _calculate_pairwise_distance {
-  my ($self, $align) = @_;
-
-  my $paml_parser;
-
-  eval {
-    $paml_parser = $self->_run_pairwise_paml($align);
-  };
-
-  if ($@){
-    throw ("Pairwise use of PAML failed.\n$@");
-    return 0
+  unless (defined $result) {
+    throw ("Result has become undefined.  This is probably a problem " .
+	   "with Bio::Tools::Phylo::PAML.")
   }
 
-  my $result;
   my $matrix;
 
   eval {
-    $result = $paml_parser->next_result();
     if ($self->_distance_method eq 'NeiGojobori') {
       $matrix = $result->get_NGmatrix()
-    } else { 
+    } else {
       $matrix = $result->get_MLmatrix()
     }
   };
 
   if ($@){
-    warning ("PAML failed to give a file that could be parsed.  " .
-	     "No doubt PAML threw an error!\n$@");
-    return 0
+    throw ("PAML failed to give a file that could be parsed.\n" .
+	     "This is a PAML/codeml error.\n" .
+	   "The offending aligned sequences are :\n>" . 
+	   $aligned_seqs->[0]->display_id . "\n" . $aligned_seqs->[0]->seq . "\n>" . 
+	   $aligned_seqs->[1]->display_id . "\n" . $aligned_seqs->[1]->seq . "\n$@");
   }
 
-  return ($matrix->[0]->[1]->{dN}, $matrix->[0]->[1]->{dS})
+  $matrix->[0]->[1]->{N} = 0 unless defined $matrix->[0]->[1]->{N};
+  $matrix->[0]->[1]->{S} = 0 unless defined $matrix->[0]->[1]->{S};
+
+  return ($matrix->[0]->[1]->{dN},
+	  $matrix->[0]->[1]->{dS},
+	  $matrix->[0]->[1]->{N},
+	  $matrix->[0]->[1]->{S})
 }
 
 
@@ -675,15 +634,6 @@ sub _calculate_coverage_and_identity {
   my ($min_coverage) = sort {$a <=> $b} ($coverage1, $coverage2);
 
   my $identity  = $identical/$matches;
-###
-print LOG "\tFULL PW ALIGNMENT : Coverage1 : $coverage1\tCoverage2 : $coverage2\tMinCov : $min_coverage\tIdentity : $identity\n";
-###
-#  if ($min_coverage >= $self->_coverage_cutoff &&
-#     $identity >= $self->_identity_cutoff) {
-#    return 1
-#  } else {
-#    return 0
-#  }
 
   return ($min_coverage, $identity)
 }
@@ -738,59 +688,6 @@ sub _appraise_hit_coverage{
 
   # Otherwise return false.
   return 0;
-}
-
-
-=head2 _extract_results
-
-  Args[1]    : Bio::Tools::Phylo::PAML::Result
-  Example    : none
-  Description: Derive the PAML result object (and output matrix) into 
-               the much simpler GeneDuplication::Result object.
-  Returntype : Bio::EnsEMBL::Pipeline::GeneDuplication::Result
-  Exceptions : none
-  Caller     : $self->run
-
-=cut
-
-sub _extract_results {
-  my ($self, $result) = @_;
-
-  my $query_id = $self->_query_seq->display_id;
-
-  my $matrix;
-
-  $matrix = $result->get_MLmatrix() 
-    if $self->_distance_method =~ /ML/;
-  $matrix = $result->get_NGmatrix() 
-    if $self->_distance_method =~ /NeiGojobori/;
-
-  throw ("Failed to retrieve a result matrix from ".
-	       "the PAML result.")
-    unless $matrix;
-
-  my @otus = $result->get_seqs();
-
-  my $result_obj = Bio::EnsEMBL::Pipeline::GeneDuplication::Result->new(
-		       -id              => $query_id,
-		       -distance_method => $self->_distance_method);
-
-  $result_obj->matrix($matrix);
-  $result_obj->otus(\@otus);
-
-  for(my $i = 0; $i < scalar @otus; $i++){
-    for (my $j = $i+1; $j < scalar @otus; $j++){
-      $result_obj->add_match($otus[$i]->display_id,
-			     $otus[$j]->display_id,
-			     $matrix->[$i]->[$j]->{'dN'},
-			     $matrix->[$i]->[$j]->{'dS'},
-			     $matrix->[$i]->[$j]->{'N'} ? $matrix->[$i]->[$j]->{'N'} : 0,
-			     $matrix->[$i]->[$j]->{'S'} ? $matrix->[$i]->[$j]->{'S'} : 0,
-			     $matrix->[$i]->[$j]->{'lnL'} ? $matrix->[$i]->[$j]->{'lnL'} : 0);
-    }
-  }
-
-  return $result_obj
 }
 
 
@@ -1046,7 +943,7 @@ sub _blast_obj {
 		 -program         => $self->_blast_program,
 		 -blastdb         => $self->_blastdb,
 		 -queryseq        => $self->_query_seq,
-		 -options         => '',
+		 -options         => '-hspmax 200',
 		 -workdir         => $self->_work_dir,
 		 -identity_cutoff => $self->_identity_cutoff);
   }
@@ -1146,7 +1043,7 @@ sub _blast_index_type {
   Description: Holds the query sequence for which we are searching for duplicates.
   Returntype : Bio::Seq
   Exceptions : none
-  Caller     : $self->run, $self->_extract_results
+  Caller     : $self->run
 
 =cut
 
