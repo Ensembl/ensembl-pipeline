@@ -19,8 +19,9 @@ Bio::EnsEMBL::Pipeline::RunnableDB::DuplicationFinder;
 
 =head1 DESCRIPTION
 
-RunnableDB used to drive the identification of putative gene paralogues.  The
-matching Runnable module is Bio::EnsEMBL::Pipeline::GeneDuplication::Finder.
+This is the RunnableDB used to drive the identification of putative gene 
+paralogues.  The matching Runnable module is
+Bio::EnsEMBL::Pipeline::GeneDuplication::Finder.
 
 =head1 CONTACT
 
@@ -34,6 +35,11 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::Finder;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastDB;
+use Bio::EnsEMBL::Pipeline::DBSQL::PairwiseTrack;
+use Bio::EnsEMBL::Registry;
+use Bio::EnsEMBL::Compara::Attribute;
+use Bio::EnsEMBL::Compara::MethodLinkSpeciesSet;
+use Bio::EnsEMBL::Compara::Homology;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_OPTIONS
@@ -43,12 +49,13 @@ use Bio::EnsEMBL::Pipeline::Config::GeneDupl qw(GD_OPTIONS
 						GD_WORK_DIR
 						GD_DISTANCE_METHOD
 						GD_OUTPUT_METHOD
-						GD_OUTPUT_DBNAME
-						GD_OUTPUT_DBHOST
-						GD_OUTPUT_DBUSER
-						GD_OUTPUT_DBPASS
-						GD_OUTPUT_DBPORT
-						GD_OUTPUT_TYPE);
+						GD_OUTPUT_TYPE
+						GD_REGISTRY_CONF
+						GD_COMPARA_DBNAME
+						GD_COMPARA_TYPE
+						GD_COMPARA_DESCRIPTION
+						GD_COMPARA_PEP_SOURCE
+						GD_COMPARA_GENE_SOURCE);
 
 use vars qw(@ISA);
 
@@ -136,31 +143,10 @@ sub run{
 
   my $runnable = ($self->runnable)[0];
 
-  my $result;
-
-### Annoying loop added to retry paml runs if they fail. Remove once paml is replaced.
- RETRY:
-  for (my $i = 0; $i < 3; $i++) {
-###
-
-  eval {
-    $result = $runnable->run($self->_input_seq);
-  };
-
-  if ($@){
-    next RETRY
-  }
-
-  last
-}
+  my $result = $runnable->run($self->_input_seq);
 
   if ($@) {
-    # Trying to work around a bloody PAML bug:
-    if ($self->_identical_seqs_bug($runnable->alignment)){
-      warning("Identical sequences causing mayhem with PAML run.")
-    } else {
-      throw ("Problem running PAML :\n$@")
-    }
+    throw ("Problem running PAML :\n$@")
   }
 
   if ($result){
@@ -176,7 +162,7 @@ sub write_output{
   if ($GD_OUTPUT_METHOD eq 'files') {
     $self->_write_output_as_text;
   } elsif ($GD_OUTPUT_METHOD eq 'db') {
-    $self->_write_output_to_database;
+    $self->_write_output_to_database
   } else {
     throw("Unrecognised output option in Config : " . 
       "GD_OUTPUT_METHOD = [$GD_OUTPUT_METHOD]")
@@ -201,7 +187,7 @@ sub _set_options {
   my $id_prefix;
 
   foreach my $prefix (keys %$GD_OPTIONS){
-print STDERR "Input id : " .$self->input_id . " Prefix : " . $prefix . "\n";
+
     if ($self->input_id =~ /^$prefix/) {
       $id_prefix = $prefix;
       last
@@ -239,37 +225,47 @@ sub _verify_options {
 	    "to exist or is inaccessible.")
     }	
   } elsif ($GD_OUTPUT_METHOD eq 'db') {
-    unless (defined $GD_OUTPUT_DBNAME && 
-	    defined $GD_OUTPUT_DBHOST && 
-	    defined $GD_OUTPUT_DBUSER) {
-      throw("Details of output database need to be provided " .
-	    "in order for output to be written to it.")
+
+    # Check the registry file exists.
+
+    unless (-e $GD_REGISTRY_CONF){
+      warning("Registry file does not exist at [$GD_REGISTRY_CONF]")
     }
 
-    my $outdb = 
-      Bio::EnsEMBL::Compara::DBSQL::DBAdaptor->new(
-        -host   => $GD_OUTPUT_DBHOST,
-	-dbname => $GD_OUTPUT_DBNAME,
-	-port   => $GD_OUTPUT_DBPORT,
-	-user   => $GD_OUTPUT_DBUSER,
-	-pass   => $GD_OUTPUT_DBPASS);
+    # Check that compara database in registry exists.
 
-    unless (defined $outdb && 
-	    $outdb->isa("Bio::EnsEMBL::Compara::DBSQL::DBAdaptor")){
-      throw("Unable to connect to output database using options " .
-	    "specified in config ")
+
+    my $registry = "Bio::EnsEMBL::Registry";
+    my $test_adaptor;
+
+    eval {
+      $registry->load_all($GD_REGISTRY_CONF);
+      $test_adaptor = $registry->get_adaptor($GD_COMPARA_DBNAME,
+					     'compara',
+					     'Homology')
+    };
+
+    if ($@) {
+      throw("Problem accessing compara database configured in registry.\n$@");
     }
+
+    # Check that the pairwise_track table exists in this database.
+
+    my $test_pt = 
+      Bio::EnsEMBL::Pipeline::DBSQL::PairwiseTrack->new(
+        -db => $test_adaptor->db);
+
+    unless ($test_pt->table_exists){
+      throw("The accessory table \'pairwise_track\' is missing from the " .
+	    "compara database configured in the registry config.")
+    }
+
   } else {
     throw("Unrecognized output method [$GD_OUTPUT_METHOD].  " .
 	  "Accepted options are \'files\' or \'db\'.")
   }
 
     # Check BLAST-related options.
-
-#  unless (defined $self->_blastdb_file && -e $self->_blastdb_file) {
-#    throw("Input BLAST database is either not specified or does " . 
-#	  "not exist [" . $self->_blastdb_file . "].")
-#  }
 
   if (defined $GD_BLAST_EXE && $GD_BLAST_EXE ne '' && 
       ! -x $GD_BLAST_EXE) {
@@ -398,6 +394,7 @@ sub _output_dir {
   return $self->{_output_dir}
 }
 
+
 sub _build_runnable {
   my $self = shift;
 
@@ -420,6 +417,7 @@ sub _build_runnable {
   $self->runnable($gene_dupl);
 }
 
+
 sub _write_output_as_text {
   my $self = shift;
 
@@ -436,12 +434,10 @@ sub _write_output_as_text {
 
 
   # Return early if there were no accepted matches.
-  unless (defined $result) {
+  unless (defined $result && scalar @$result) {
     print OUT $self->input_id . " : No homologous matches were " .
-      "found that satisfied the match criteria.";
-###
-print STDOUT $self->input_id . " : No homologous matches were " . "found that satisfied the match criteria.";
-###
+      "found that satisfied the match criteria.\n";
+
     return 1
   }
 
@@ -450,9 +446,6 @@ print STDOUT $self->input_id . " : No homologous matches were " . "found that sa
   foreach my $match (@{$result}) {
 
     if ($GD_OUTPUT_TYPE eq 'nucleotide') {
-
-### Must put pair align stuff back in here!!!!
-# Need similarity, cigars, starts, ends
 
       print OUT join("\t",
 		     $match->{ka},
@@ -466,28 +459,17 @@ print STDOUT $self->input_id . " : No homologous matches were " . "found that sa
 		     $match->{coverage}) . "\n";
     } else {
 
-      my $transl_regex = $self->_transl_regex;
-
-      $match->{alignment}->[0]->desc =~ /($transl_regex\w*)/;
-      my $query_translation_id = $1;
-      $match->{alignment}->[1]->desc =~ /($transl_regex\w*)/;
-      my $match_translation_id = $1;
-
-      unless ($query_translation_id ne '' && $match_translation_id ne '') {
-	warning("Unable to determine translation stable ids.\n" . 
-		"Translation stable id regex is [" . $transl_regex . "]\n" . 
-		"Query seq desc line is [" . $match->{alignment}->[0]->desc . "]\n" .
-		"Match seq desc line is [" . $match->{alignment}->[1]->desc . "]")
-      }
+      my ($query_translation_id, $match_translation_id)
+	= $self->_translation_ids($match);
 
       my $pair_align = $self->_alignment_vitals_aa(@{$match->{alignment}});
 
       print OUT join ("\t",
-		      $match->{ka},
-		      $match->{ks},
-		      0, #$match->{N},
-		      0, #$match->{S},
-		      0, #$match->{lnL},
+		      $match->{Ka},
+		      $match->{Ks},
+		      $match->{N},
+		      $match->{S},
+		      0,
 		      $self->_distance_cutoff,
 		      $match->{alignment}->[0]->display_id,
 		      $query_translation_id,
@@ -495,18 +477,17 @@ print STDOUT $self->input_id . " : No homologous matches were " . "found that sa
 		      $pair_align->{_query_start},
 		      $pair_align->{_query_end},
 		      $pair_align->{_query_coverage},
-		      $pair_align->{_query_identity},
-		      $pair_align->{_query_similarity},
+		      $pair_align->{_identity},
+		      $pair_align->{_similarity},
 		      $match->{alignment}->[1]->display_id,
 		      $match_translation_id,
 		      $pair_align->{_match_cigar},
 		      $pair_align->{_match_start},
 		      $pair_align->{_match_end},
 		      $pair_align->{_match_coverage},
-		      $pair_align->{_match_identity},
-		      $pair_align->{_match_similarity})
+		      $pair_align->{_identity},
+		      $pair_align->{_similarity}) 
 	. "\n";
-
     }
 
   }
@@ -516,11 +497,254 @@ print STDOUT $self->input_id . " : No homologous matches were " . "found that sa
   return 1
 }
 
+
 sub _write_output_to_database {
   my $self = shift;
 
-  throw("Output to database mode is not yet implemented.");
+  # This method writes output directly to the compara 
+  # All homology objects in compara work with amino
+  # acid sequences and translation ids.  Hence there
+  # is no nucleotide output from this method.
+
+  # Get output from runnable
+
+  my $runnable = ($self->runnable)[0];
+  my $result = $self->output;
+
+  # Determine our species name.
+
+  my $species;
+  foreach my $id_regex (keys %{$GD_OPTIONS}) {
+    if ($self->input_id =~ /$id_regex/){
+      $species = $GD_OPTIONS->{$id_regex}->{GD_SPECIES};
+      last
+    }
+  }
+
+  unless (defined $species && $species ne '') {
+    throw("Unable to identify species name for correctly writing " . 
+	  "output to database.")
+  }
+
+  # Grab a few adaptors - the registry was initialised in the
+  # _verify_options method.
+
+  my $registry = "Bio::EnsEMBL::Registry";
+
+  my $homology_adaptor = $registry->get_adaptor($GD_COMPARA_DBNAME,
+			 			'compara',
+						'Homology');
+
+  my $member_adaptor   = $registry->get_adaptor($GD_COMPARA_DBNAME,
+						'compara',
+						'Member');
+
+  my $genomedb_adaptor = $registry->get_adaptor($GD_COMPARA_DBNAME,
+						'compara',
+						'GenomeDB');
+
+  my $mlss_adaptor     = $registry->get_adaptor($GD_COMPARA_DBNAME,
+						'compara',
+						'MethodLinkSpeciesSet');
+
+  my $mc_adaptor       = $registry->get_adaptor($species,
+						'core',
+						'MetaContainer');
+
+  # Filter result matches and keep only those which havent already
+  # been written to the database.  Use the Pairwise_Track module
+  # to keep tabs of what has and has not been written.  At this
+  # stage this is just a pre-emptive check, none of the pairwise
+  # comparisons have yet been claimed for writing - this is done
+  # immediately prior to storing.
+
+  my $pairwise_track = 
+    Bio::EnsEMBL::Pipeline::DBSQL::PairwiseTrack->new(
+      -db => $homology_adaptor->db);
+
+  my @new_matches;
+
+  foreach my $match (@{$result}) {
+    unless ($pairwise_track->previously_inserted(
+              $match->{alignment}->[0]->display_id,
+	      $match->{alignment}->[1]->display_id)){
+      push @new_matches, $match
+    }
+  }
+
+  unless (scalar @new_matches) {
+    # No new matches that need being written to the database,
+    # so go home early.
+    warning("All matches have been written to the database previously.");
+    return 1
+  }
+
+  # Derive the genome db for this species
+
+  my $species_binomen = $mc_adaptor->get_Species->binomial;
+
+  my $genomedb = $genomedb_adaptor->fetch_by_name_assembly($species_binomen);
+
+  # Derive the method_link_species_set entry for this species,
+  # or otherwise create it.
+
+  my $mlss_by_type = 
+    $mlss_adaptor->fetch_all_by_method_link_type($GD_COMPARA_TYPE);
+
+  my $mlss;
+  foreach my $mlss_candidate (@$mlss_by_type) {
+
+    foreach my $candidate_genomedb (@{$mlss_candidate->species_set}) {
+      if ($candidate_genomedb->dbID == $genomedb->dbID) {
+	$mlss = $mlss_candidate;
+	last
+      }
+    }
+  }
+
+  unless (defined $mlss) {
+    throw("Compara database does not contain the correct " .
+	  "method_link_species_set entry for correctly " .
+	  "storing output.  Have these been pre-loaded?");
+  }
+
+  foreach my $match (@new_matches) {
+
+    # Fiddling with ids
+    my ($query_translation_id, $match_translation_id)
+      = $self->_translation_ids($match);
+
+    my $query_gene_id = $match->{alignment}->[0]->display_id;
+    my $match_gene_id = $match->{alignment}->[1]->display_id;
+
+    # Stable id.  Yuck, but the id will be both unique and stable.
+    my @ids = sort {$a cmp $b} ($query_gene_id, $match_gene_id);
+    my $stable_id = join('_', @ids);
+
+    # Derive a few things about the pairwise match
+    my $pair_align = $self->_alignment_vitals_aa(@{$match->{alignment}});
+
+    # Build and populate homology object
+    my $homology = new Bio::EnsEMBL::Compara::Homology;
+
+    $homology->method_link_species_set($mlss);
+    $homology->stable_id($stable_id);
+    $homology->method_link_type($GD_COMPARA_TYPE);
+    $homology->description($GD_COMPARA_DESCRIPTION);
+    $homology->dn($pair_align->{Ka}, 0);
+    $homology->ds($pair_align->{Ks}, 0);
+    $homology->n($pair_align->{N});
+    $homology->s($pair_align->{S});
+    $homology->lnl(0);
+    $homology->threshold_on_ds($self->_distance_cutoff);
+
+    $homology->add_Member_Attribute($self->_make_member_attribute(
+                                             $member_adaptor,
+					     $query_gene_id,
+				             $query_translation_id,
+					     $pair_align->{_query_cigar},
+					     $pair_align->{_query_start},
+					     $pair_align->{_query_end},
+					     $pair_align->{_query_coverage},
+					     $pair_align->{_identity},
+					     $pair_align->{_similarity}));
+
+    $homology->add_Member_Attribute($self->_make_member_attribute(
+                                             $member_adaptor,
+					     $match_gene_id,
+					     $match_translation_id,
+					     $pair_align->{_match_cigar},
+					     $pair_align->{_match_start},
+					     $pair_align->{_match_end},
+					     $pair_align->{_match_coverage},
+					     $pair_align->{_identity},
+					     $pair_align->{_similarity}));
+
+
+    # Store homology object, after checking that another parallel process
+    # hasnt done this first.
+
+    if ($pairwise_track->attempt_write_claim($query_gene_id, 
+					     $match_gene_id)){
+      # Have permission to write object, so lets do it.
+      $homology_adaptor->store($homology);
+
+      if (defined $homology->n) {
+	$homology_adaptor->update_genetic_distance($homology);
+      }
+    } else {
+      warning("While building homology object another process has snuck in " .
+	      "and written this pair.  This is somewhat unusual but should " .
+	      "be perfectly okay.");
+      next
+    }
+  }
+
+  return 1
 }
+
+
+sub _make_member_attribute {
+  my ($self,
+      $member_adaptor,
+      $gene_stable_id,
+      $translation_stable_id,
+      $cigar_line,
+      $cigar_start,
+      $cigar_end,
+      $coverage,
+      $identity,
+      $similarity) = @_;
+
+  my $gene_member =
+    $member_adaptor->fetch_by_source_stable_id($GD_COMPARA_GENE_SOURCE,
+					       $gene_stable_id);
+
+  my $peptide_member =
+    $member_adaptor->fetch_by_source_stable_id($GD_COMPARA_PEP_SOURCE,
+					       $translation_stable_id);
+
+  unless (defined  $gene_member && defined  $peptide_member) {
+    warning("Could not find gene [$gene_stable_id] or " .
+	    "translation [$translation_stable_id] in database.");
+    return 0
+  }
+
+  my $attribute = 
+    Bio::EnsEMBL::Compara::Attribute->new_fast
+	({'peptide_member_id' => $peptide_member->dbID});
+
+  $attribute->cigar_line($cigar_line);
+  $attribute->cigar_start($cigar_start);
+  $attribute->cigar_end($cigar_end);
+  $attribute->perc_cov($coverage);
+  $attribute->perc_id($identity);
+  $attribute->perc_pos($similarity);
+
+  return [$gene_member, $attribute];
+}
+
+
+sub _translation_ids {
+  my ($self, $match) = @_;
+
+  my $transl_regex = $self->_transl_regex;
+
+  $match->{alignment}->[0]->desc =~ /($transl_regex\w*)/;
+  my $query_translation_id = $1;
+  $match->{alignment}->[1]->desc =~ /($transl_regex\w*)/;
+  my $match_translation_id = $1;
+
+  unless ($query_translation_id ne '' && $match_translation_id ne '') {
+    warning("Unable to determine translation stable ids.\n" . 
+	    "Translation stable id regex is [" . $transl_regex . "]\n" . 
+	    "Query seq desc line is [" . $match->{alignment}->[0]->desc . "]\n" .
+	    "Match seq desc line is [" . $match->{alignment}->[1]->desc . "]")
+  }
+
+  return ($query_translation_id, $match_translation_id)
+}
+
 
 sub _alignment_vitals_aa {
   my ($self, $query, $match) = @_;
@@ -597,12 +821,10 @@ sub _alignment_vitals_aa {
 
   $aligned_pair{_query_end}        = $query_length;
   $aligned_pair{_match_end}        = $match_length;
-  $aligned_pair{_query_identity}   = sprintf "%3.2f", ($identical_aa/$covered_aa)*100;
-  $aligned_pair{_match_identity}   = sprintf "%3.2f", ($identical_aa/$covered_aa)*100;
-  $aligned_pair{_query_coverage}   = sprintf "%3.2f", ($covered_aa/$query_length)*100;
-  $aligned_pair{_match_coverage}   = sprintf "%3.2f", ($covered_aa/$match_length)*100;
-  $aligned_pair{_query_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$covered_aa)*100;
-  $aligned_pair{_match_similarity} = sprintf "%3.2f", (($similar_aa+$identical_aa)/$covered_aa)*100;
+  $aligned_pair{_query_coverage} = sprintf "%3.2f", ($covered_aa/$query_length)*100;
+  $aligned_pair{_match_coverage} = sprintf "%3.2f", ($covered_aa/$match_length)*100;
+  $aligned_pair{_identity}       = sprintf "%3.2f", ($identical_aa/$covered_aa)*100;
+  $aligned_pair{_similarity}     = sprintf "%3.2f", (($similar_aa+$identical_aa)/$covered_aa)*100;
 
   return \%aligned_pair;
 }
