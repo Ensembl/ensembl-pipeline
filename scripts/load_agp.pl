@@ -113,7 +113,7 @@ open(FH, $agpfile) or throw("Can't open $agpfile");
 
 my %assembled_ids;
 my %component_ids;
-
+my $mapping_delimiter = '|';
 LINE:while(<FH>){
   next if /^\#/;
 
@@ -157,6 +157,7 @@ LINE:while(<FH>){
   if($component_ids{$c_name}){
     warning("You are already using ".$c_name." in another place ".
          "in your assembly are you sure you want to\n");
+    $mapping_delimiter = '#';
     $c_id = $component_ids{$c_name};
   }else{
     my $c_piece = $sa->fetch_by_region($component_cs->name, $c_name,
@@ -179,7 +180,7 @@ LINE:while(<FH>){
 
 my $mapping_string = $assembled_cs->name;
 $mapping_string .= ":".$assembled_cs->version if($assembled_cs->version);
-$mapping_string .= "|".$component_cs->name;
+$mapping_string .= $mapping_delimiter.$component_cs->name;
 $mapping_string .= ":".$component_cs->version if($component_cs->version);
 
 my $mc = $db->get_MetaContainer();
