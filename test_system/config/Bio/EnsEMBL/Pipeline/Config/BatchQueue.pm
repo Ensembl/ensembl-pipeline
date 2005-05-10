@@ -49,7 +49,7 @@ use vars qw(%Config);
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
   DEFAULT_OUTPUT_DIR  => '',	
-  AUTO_JOB_UPDATE     => 1,
+  DEFAULT_CLEANUP     => 'yes',	
   JOB_LIMIT => 10000, # at this number of jobs RuleManager will sleep for 
                       # a certain period of time if you effectively want this never to run set 
                       # the value to very high ie 100000 for a certain period of time
