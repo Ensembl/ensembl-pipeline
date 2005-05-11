@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment
 =head1 SYNOPSIS
 
 This module allows a transcript to be displayed with its
-attached supporting evidence.  It re-dcreates an alignment
+attached supporting evidence.  It re-creates an alignment
 from the database which is returned as an array of 
 multiply-aligned sequences.  These can be printed as text 
 and used to display the alignment with an alignment 
@@ -26,7 +26,7 @@ Quick start - use the following code if you want the
 alignment of an ensembl transcript with the evidence 
 used to predict it:
 
-my $evidence_alignment = 
+my $evidence_alignment =
   Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment->new(
       -transcript          => $transcript,
       -dbadaptor           => $db,
@@ -113,7 +113,7 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 @ISA = qw();
 
 
-##### 'Public' methods #####
+### 'Public' methods ###
 
 
 =head2 new
@@ -279,7 +279,7 @@ sub retrieve_alignment {
 }
 
 
-##### Main Internal Methods #####
+### Main Internal Methods ###
 
 
 =head2 _align
@@ -711,7 +711,7 @@ sub _type {
 }
 
 
-##### Alignment information handling methods #####
+### Alignment information handling methods ###
 
 
 =head2 _working_alignment
@@ -921,14 +921,15 @@ sub _seq_fetcher {
 }
 
 
-##### Sequence handling methods #####
+### Sequence handling methods ###
 
 
 =head2 _corroborating_sequences
 
-  Arg [1]    :
+  Arg [1]    : 
   Example    : 
-  Description: 
+  Description: Uses all supporting features to generate a list of
+               unique evidence sequences.
   Returntype : 
   Exceptions : 
   Caller     : 
@@ -946,6 +947,7 @@ sub _corroborating_sequences {
  FEATURE:
   foreach my $base_align_feature (@{$self->_all_supporting_features}){
 
+    # Filter sequences by type, where necessary
     if ((($self->_type eq 'nucleotide')
 	 &&($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")))
 	||(($self->_type eq 'protein')
@@ -953,11 +955,13 @@ sub _corroborating_sequences {
       next FEATURE;
     }
 
+    # Filter by evidence identity, if required.
     if ((defined $base_align_feature->percent_id)
 	&&($base_align_feature->percent_id < $self->{'_evidence_identity_cutoff'})) {
       next FEATURE;
     }
 
+    # Keep a hash of sequence names versus sequence type.
     unless (defined $name_vs_type{$base_align_feature->hseqname}){
       if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
 	$name_vs_type{$base_align_feature->hseqname} = 'protein';
@@ -966,8 +970,18 @@ sub _corroborating_sequences {
       }
     }
 
+    # Hidden down here is the actual method call that constructs
+    # a sequence fragment from the evidence.  This is just a single
+    # ungapped feature sequence which will be merged with
+    # other fragments from the same sequence (ie. ungapped sequences
+    # to form a single gapped sequence).  The merging process is
+    # managed from the _build_evidence_seq method.
+
     $self->_build_evidence_seq($base_align_feature);
   }
+
+  # Retrieve all built evidence sequences and before returning
+  # attach the correct sequence type to each.
 
   my $corroborating_sequences = $self->_feature_sequences;
 
@@ -1014,8 +1028,9 @@ sub _build_evidence_seq {
   my $hstrand = $base_align_feature->hstrand;
   my @cigar_instructions = $self->_cigar_reader($cigar);
 
-
-  # Take care of unusual situation where genomic strand gets turned around.
+  # Take care of an unusual situation where the transcript
+  # strand and base_align_feature genomic strand get out
+  # of sync.
   if (($self->_strand != $base_align_feature->strand)){
       # Force the hstrand around
     $hstrand = $hstrand * -1;
@@ -1050,33 +1065,40 @@ sub _build_evidence_seq {
     return 0;
   }
 
-  # If this is a protein align feature, pad amino acids with gaps
-  # to make them comparable to nucleotide coords.  Then, make sure
-  # splice out our sequence of interest using hit coordinates that
-  # take account of the padding of our sequence.
+  # If this is a protein align feature, splice out the relevant 
+  # portion of the evidence sequence, then pad amino acids with gaps
+  # to make them comparable to nucleotide coords.
 
   if ($base_align_feature->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
-    my $padded_aa_seq;
-    if ($self->_three_letter_aa) {
-      ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$self->{_aa_names}{$1}/g;
-    } else {
-      ($padded_aa_seq = $fetched_seq->seq) =~ s/(.)/$1\-\-/g;
-    }
 
-    # Splice out the matched region of our feature sequence
-    my $first_aa = ($hstart - 1) * 3;
-    my $last_aa = ($hend * 3) - 1;
+    # Pop in a little sanity check here.  Protein features can not be
+    # reverse complimented, hence they must have the same strand as 
+    # the gene/slice (which is the same strand as the transcript).
 
-    my $length = $last_aa - $first_aa + 1;
-
-    if (($first_aa + 1 > length($padded_aa_seq))||
-	($length + $first_aa > length($padded_aa_seq))) {
-      warning("Evidence sequence coordinates lie outside " .
-	      "the bounds of that sequence.  Data problem.");
+    unless ($hstrand == $self->_strand) {
+      warning("Protein align feature [". $base_align_feature->hseqname . 
+	      "] is reversed with respect to transcript - and I cant reverse " . 
+	      "compliment an amino acid sequence.");
       return 0
     }
 
-    $fetched_seq = substr($padded_aa_seq, $first_aa, $length);
+    # Continue with sequence fiddling.
+
+    my $aa_seq = $fetched_seq->seq;
+
+    if (($hstart > length($aa_seq))||
+	($hend   > length($aa_seq))){
+      warning("Evidence sequence coordinates lie outside " .
+	      "the bounds of that sequence.  Data problem.");
+    }
+
+    $fetched_seq = substr($aa_seq, ($hstart - 1), ($hend - $hstart + 1));
+
+    if ($self->_three_letter_aa) {
+      $fetched_seq =~ s/(.)/$self->{_aa_names}{$1}/g;
+    } else {
+      $fetched_seq =~ s/(.)/$1\-\-/g;
+    }
   }
 
   # If we have a dna align feature, extracting the correct portion
@@ -1088,7 +1110,7 @@ sub _build_evidence_seq {
     $fetched_seq = $fetched_seq->seq;
 
     # Splice out the matched region of our feature sequence
-    $fetched_seq = substr($fetched_seq, ($hstart - 1), ($hend -$hstart + 1));
+    $fetched_seq = substr($fetched_seq, ($hstart - 1), ($hend - $hstart + 1));
 
     # The coordinates for dna_align_features are stored with reference
     # to the way the sequence is was found in dbEST or whatever.  Hence,
@@ -1747,7 +1769,7 @@ sub _remove_duplicate_features {
 }
 
 
-##### Methods that take care of sequence fetching and caching #####
+### Methods that take care of sequence fetching and caching ###
 
 =head2 _build_sequence_cache
 
@@ -2010,7 +2032,7 @@ sub _there_are_deletions {
 
 
 
-##### CIGAR string handlers #####
+### CIGAR string handlers ###
 
 
 =head2 _cigar_reader
