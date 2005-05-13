@@ -1028,17 +1028,6 @@ sub _build_evidence_seq {
   my $hstrand = $base_align_feature->hstrand;
   my @cigar_instructions = $self->_cigar_reader($cigar);
 
-  # Take care of an unusual situation where the transcript
-  # strand and base_align_feature genomic strand get out
-  # of sync.
-  if (($self->_strand != $base_align_feature->strand)){
-print STDERR "Transcript genomic strand [".$self->_strand."] and base align feature genomic strand [".$base_align_feature->strand."] are not the same.  Hit sequence strand is [".$base_align_feature->hstrand."]\n";
-      # Force the hstrand around
-#    $hstrand = $hstrand * -1;
-      # Reverse the order of things in the cigar
-#    @cigar_instructions = reverse @cigar_instructions;
-  }
-
   # Turn the cigar line around if the slice is on the
   # reverse strand.
   if ($self->_slice->strand == -1){
@@ -1620,6 +1609,11 @@ sub _exon_protein_translation {
 	$end_exon = 1;
       }
 
+      my $start_exon = 0;
+      if ($exon == $self->_transcript->start_Exon) {
+	$start_exon = 1;
+      }
+
       # Derive a translation of this exon peptide.
 
       my $seq     = $exon->peptide($self->_transcript);
@@ -1651,14 +1645,18 @@ sub _exon_protein_translation {
 
       # Determining where to stick our peptide.
 
-        # This odd method calculates the starting point of the 
-        # coding portion of the exon.  Need to work from the end
-        # as there is no other easy way to know where translation 
-        # actually begins.
+        # Here we calculate the starting point of the coding portion 
+        # of the exon. For all but the terminal exon it is possible 
+        # to use the end of the exon and work back.  A special treatment
+        # it required for single exon genes.
+
       my $peptide_genomic_start = $exon->end - length($peptide) + 1;
 
-      if ($end_exon) {
-print STDERR "End exon phase : ". $exon->phase . "\n";
+      if ($start_exon && $end_exon){ # Meaning, single exon gene.
+	my $utr = $self->_transcript->five_prime_utr;
+	my $utr_length = $utr ? length($utr->seq) : 0;
+	$peptide_genomic_start = $exon->start + $utr_length;
+      } elsif ($end_exon) {
 	my $start_offset = $exon->phase ? 3 - $exon->phase : 0;
         $start_offset -= 3 if $exon->phase == 1;
 	$peptide_genomic_start = $exon->start - $start_offset;
