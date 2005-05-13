@@ -1032,10 +1032,11 @@ sub _build_evidence_seq {
   # strand and base_align_feature genomic strand get out
   # of sync.
   if (($self->_strand != $base_align_feature->strand)){
+print STDERR "Transcript genomic strand [".$self->_strand."] and base align feature genomic strand [".$base_align_feature->strand."] are not the same.  Hit sequence strand is [".$base_align_feature->hstrand."]\n";
       # Force the hstrand around
-    $hstrand = $hstrand * -1;
+#    $hstrand = $hstrand * -1;
       # Reverse the order of things in the cigar
-    @cigar_instructions = reverse @cigar_instructions;
+#    @cigar_instructions = reverse @cigar_instructions;
   }
 
   # Turn the cigar line around if the slice is on the
@@ -1076,6 +1077,7 @@ sub _build_evidence_seq {
     # the gene/slice (which is the same strand as the transcript).
 
     unless ($hstrand == $self->_strand) {
+print STDERR "Strand : " . $self->_strand . "\tHstrand : " . $hstrand . "\n";
       warning("Protein align feature [". $base_align_feature->hseqname . 
 	      "] is reversed with respect to transcript - and I cant reverse " . 
 	      "compliment an amino acid sequence.");
@@ -1656,7 +1658,9 @@ sub _exon_protein_translation {
       my $peptide_genomic_start = $exon->end - length($peptide) + 1;
 
       if ($end_exon) {
+print STDERR "End exon phase : ". $exon->phase . "\n";
 	my $start_offset = $exon->phase ? 3 - $exon->phase : 0;
+        $start_offset -= 3 if $exon->phase == 1;
 	$peptide_genomic_start = $exon->start - $start_offset;
       }
 
