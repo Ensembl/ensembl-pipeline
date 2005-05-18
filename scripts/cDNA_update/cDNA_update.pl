@@ -11,8 +11,11 @@ in an automated fashion.
 
 =head1 SYNOPSIS / OPTIONS
 
-  A. Fill in config variables, start script with argument 'run':
-     "perl cDNA_setup.pl run"
+  A. Fill in config variables, start script with argument 'prepare':
+     "perl cDNA_setup.pl prepare".
+     After the preperation, the modified genome files will have to be pushed across
+     the farm. Please mail systems for this.
+  B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_setup.pl compare"
   C. Start script again with argument 'clean' after finnishing the pipeline
@@ -34,26 +37,33 @@ The steps the script performes:
   2. DB_setup: partly copy current db, insert analysis etc.,
      create TARGET database, synchronise
   3. fastafiles: get & read input files
-  4. run_analysis: run exonerate using the pipeline
+  4. chop off the polyA tails and chunk the fasta files into smaller pieces
+  5. copy & modify the softmasked genome files: thte coordinates of the DR fragments
+     need to be corrected according to the assembly table..
+  6. run_analysis: run exonerate using the pipeline
 
-  5. comparison: check some numbers by comparing the results to previsous alignments
-  6. cleanup: post-process result DB, restore config files, remove tmp files and dbs
+  7. comparison: check some numbers by comparing the results to previsous alignments
+  8. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
 What YOU need to do:
   1. Fill in the config variables in this script (just below this).
   2. Check for the existance of two additional programs needed:
 	fastasplit, splitting a fasta file into a number of chunks
- 	polyA_clipping, removing poly-A tails from sequences
-  3. Run it, check the set-up and re-run if there are errors.
-  4. Check the results directly and by running 'compare'.
-  5. Clean up any mess by running 'clean'.
-  6. Hand over target-database.
+ 	polyA_clipping, removing poly-A tails from sequences.
+  3. Ask systems to push the genome files across the farm.
+  4. Run it, check the set-up and re-run if there are errors.
+  5. Check the results directly and by running 'compare'.
+  6. Clean up any mess by running 'clean'.
+  7. Hand over target-database.
 
 If there is an error and the script dies, the original config files are restored
 without removing the data files and databases, allowing the re-run of the script.
 
-The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs 
-between 5 and 24 h, depending on farm usage.
+The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs
+around 12 h, depending on farm usage.
+Set resource => 'select[mem>2500] rusage[mem=2500]' in BatchQueue.pm and re-run
+the pipeline commandif jobs fail or take too long.
+
 
 =head1 CONTACT
 
@@ -80,10 +90,10 @@ $vertrna            = "embl_vertrna-1";
 $vertrna_update     = "emnew_vertrna-1";
 $refseq             = "hs.fna";
 $sourceHost         = "cbi1";
-$sourceDIR          = ".../blastdb";
-$masked_genome      = ".../blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
+$sourceDIR          = "../data/blastdb";
+$org_masked_genome  = "../data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
 
-# external programs needed:
+# external programs needed (absolute paths):
 $fastasplit         = "/nfs/acari/searle/progs/fastasplit/fastasplit";
 $polyA_clipping     = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl";
 
@@ -92,7 +102,7 @@ $polyA_clipping     = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl";
 $WB_DBUSER          = "";
 $WB_DBPASS          = "";
 # reference db (current build)
-$WB_REF_DBNAME      = "homo_sapiens_core_29_35b";
+$WB_REF_DBNAME      = "homo_sapiens_core_31_35d";
 $WB_REF_DBHOST      = "";
 $WB_REF_DBPORT      = "";
 # new source db (PIPELINE)
@@ -104,22 +114,24 @@ $WB_TARGET_DBNAME   = $ENV{'USER'}."_cDNA_update";
 $WB_TARGET_DBHOST   = "";
 $WB_TARGET_DBPORT   = "";
 # new EST db (might not be really necessary)
-$WB_EST_DBNAME      = $ENV{'USER'}."_EST";
-$WB_EST_DBHOST      = "";
-$WB_EST_DBPORT      = "";
+#$WB_EST_DBNAME      = $ENV{'USER'}."_EST";
+#$WB_EST_DBHOST      = "";
+#$WB_EST_DBPORT      = "";
 
 #use & adjust assembly exception sequences (DR52 & DR53)
 $adjust_assembly   = 1;
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#no changes should be nesessary below this
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
+use Net::SSH qw(sshopen2);
 
 my %saved_files;
 my $cmd;
 my $status;
-$config_file       = "config_files.txt";
+$config_file       = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
 $newfile           = "cdna_update";
 $configDIR         = $dataDIR."/configbackup";
 $chunkDIR          = $dataDIR."/chunks";
@@ -130,17 +142,17 @@ my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update re
 		     configDIR sourceDIR newfile config_file masked_genome fastasplit
                      polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
-                     WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT WB_EST_DBNAME 
-                     WB_EST_DBHOST WB_EST_DBPORT);
+                     WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
 my $chunknum       = 800;   #(<300 sequences / file)
 my $maxseqlenght   = 20000;
+$masked_genome      = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
 
 my $option = $ARGV[0];
-if(!$option or ($option ne "run" and $option ne "clean" and $option ne "compare")){
+if(!$option or ($option ne "prepare" and $option ne "run" and $option ne "clean" and $option ne "compare")){
    exec('perldoc', $0);
    exit 1;
 }
-if($option eq "run"){
+if($option eq "prepare"){
   print "\nstarting cDNA-update for current human build.\n";
 
   config_setup();
@@ -153,6 +165,12 @@ if($option eq "run"){
 
   if(! DB_setup()   ){ unclean_exit(); }
 
+  print "\n\nFinnished setting up the analysis.\n".
+        "The genome files will have to be distributed across the farm!\n".
+	"SOURCE PATH: ".$masked_genome."\n\n";
+}
+elsif($option eq "run"){
+
   run_analysis();
 
 }
@@ -162,8 +180,8 @@ elsif($option eq "clean"){
   clean_up(0);
 }
 elsif($option eq "compare"){
-  print "\nhealthchecking after cDNA-update.\n".
-        "checking through alignments & genes.";
+  print "\nrunning checks after cDNA-update.\n".
+        "checking through alignments & genes.\n";
 
   compare();
 }
@@ -180,6 +198,10 @@ sub config_setup{
   $status = 0;
   my $filecount = 0;
   my ($header, $filename, $path, $tempdir);
+  #set env var to avoid warnings
+  if(!defined $ENV{"OSTYPE"} ){
+    $ENV{"OSTYPE"} = "";
+  }
   #import function, to be included in all config files
   my $import_sub = '
   sub import {
@@ -243,14 +265,12 @@ sub config_setup{
 	die "could not backup config file $header.\n";
       }
     }
-    else{
-      $path = 0;
-    }
     #store file location
     $saved_files{$filecount} = $header;
     #write modified file
     $filename = $cvsDIR."/".$path.$filename;
     open(WP, ">", $filename) or die("can't create new config file.\n");
+    #print $filename.", ";
     print WP $content."\n".$import_sub;
     close WP;
     $filecount++;
@@ -276,7 +296,7 @@ sub checkdir{
   #go trough dirs recursively
   unless (opendir(DIR, $dirname)) {
     closedir(DIR);
-    print "NOPE";
+    print "\ncan't open $dirname.\n";
     return 0;
   }
   my @files = grep (!/^\.\.?$/, readdir(DIR));
@@ -299,15 +319,13 @@ sub checkdir{
 # fetch fasta files, combine them, chop them up
 
 sub fastafiles{
-  use Net::SSH qw(sshopen2);
-
   $status = 0;
   my %EMBL_ids;
   my $header;
   my $vertrna_ver     = 1;
   my $vertrna_upd_ver = 1;
   my $refseq_ver      = 1;
-  my $update          = 0;
+  my $update          = 1;
   my @filestamp;
 
   eval{
@@ -415,18 +433,16 @@ sub fastafiles{
 
     if($update){
       #clip ployA tails
-      my $newfile2 = $newfile.".clipped";
-      $cmd = "$polyA_clipping ".
-	     "-mRNA $newfile -out $newfile2 -clip";
+      my $newfile2 = $dataDIR."/".$newfile.".clipped";
+      $cmd = "$polyA_clipping -mRNA ".
+	     $dataDIR."/".$newfile." -out ".$newfile2." -clip";
       if(system($cmd)){
 	die("couldn t clip file.$@\n");
       }
       #split fasta files, store into CHUNKDIR
       print "splitting fasta file.\n";
-      my $newfasta = $dataDIR."/".$newfile;
       my $outdir   = $chunkDIR;
-      my $chunknum = 1000;   #(<300 sequences / file)
-      $cmd = "$fastasplit $newfasta $chunknum $outdir";
+      $cmd = "$fastasplit $newfile2 $chunknum $outdir";
       if(system($cmd)){
 	die("couldn t split file.$@\n");
       }
@@ -434,7 +450,7 @@ sub fastafiles{
       #pick out biggest sequences
       check_chunksizes();
 
-      print "chopped up, clipped and size-checked files.\n";
+      print "\nchopped up file.\n";
     }
   };
   if($@){
@@ -445,8 +461,42 @@ sub fastafiles{
 }
 
 
+#adjust sequence files for assembly-exceptions
+#currently looks for DR*.fa files
+
+sub adjust_assembly{
+  my $filename;
+  #move original genome files to defined location
+  $cmd = 'cp '.$org_masked_genome.'/* '.$masked_genome.'/';
+  if(system($cmd)){
+    die("couldn t copy masked genome files.$@\n");
+  }
+  #get the correct location of DR-assembly pieces
+  my $db  = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, 'ensro');
+  my $sql = 'select s.name, s.seq_region_id, ae.seq_region_start, ae.seq_region_end '.
+            'from seq_region s, assembly_exception ae where s.seq_region_id=ae.seq_region_id '.
+	    'and s.name like "DR%";';
+  my $sth = $db->prepare($sql) or die "sql error!";
+  $sth->execute();
+  while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
+    $filename = $masked_genome."/".$name.".fa";
+    open(FASTAFILE, "<$filename") or die("cant open fasta file $filename.");
+    my $headerline = <FASTAFILE>;
+    $headerline =~ s/^\>(\w+)\:([\w\d]*)\:([\w\d]*)\:(\d+)\:(\d+)\:(.+)//;
+    $headerline = ">".$1.":".$2.":".$3.":".$seq_region_start.":".$seq_region_end.":".$6;
+    local $/ = '';
+    my $seq = <FASTAFILE>;
+    local $/ = '\n';
+    close(FASTAFILE);
+    open(FASTAFILE, ">$filename") or die("cant open fasta file $filename for writing.");
+    print FASTAFILE $headerline."\n";
+    print FASTAFILE $seq;
+    close(FASTAFILE);
+  }
+}
+
+
 #find the really big sequences & put them into seperate chunks
-#to avoid awol jobs
 
 sub check_chunksizes{
   local $/ = '>';
@@ -498,41 +548,10 @@ sub check_chunksizes{
 }
 
 
-#adjust sequence files for assembly-exceptions
-#currently looks for DR*.fa files
-
-sub adjust_assembly{
-  my $filename;
-  #get the correct location of DR-assembly pieces
-  my $db     = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, 'ensro');
-  my $sql = 'select s.name, s.seq_region_id, ae.seq_region_start, ae.seq_region_end '.
-            'from seq_region s, assembly_exception ae where s.seq_region_id=ae.seq_region_id '.
-	    'and s.name like "DR%";';
-  my $sth = $db->prepare($sql) or die "sql error!";
-  $sth->execute();
-  while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
-    $filename = $masked_genome."/".$name.".fa";
-    open(FASTAFILE, "<$filename") or die("cant open fasta file $filename.");
-    my $headerline = <FASTAFILE>;
-    $headerline =~ s/^\>(\w+)\:([\w\d]*)\:([\w\d]*)\:(\d+)\:(\d+)\:(.+)//;
-    $headerline = ">".$1.":".$2.":".$3.":".$seq_region_start.":".$seq_region_end.":".$6;
-    local $/ = '';
-    my $seq = <FASTAFILE>;
-    local $/ = '\n';
-    close(FASTAFILE);
-    open(FASTAFILE, ">$filename") or die("cant open fasta file $filename for writing.");
-    print FASTAFILE $headerline."\n";
-    print FASTAFILE $seq;
-    close(FASTAFILE);
-  }
-}
-
-
 # prepare required databases: EST_DB, result DB,
 # fill required tables with data
 
 sub DB_setup{
-  #use strict;
   $status = 0;
 
   eval{
@@ -540,35 +559,46 @@ sub DB_setup{
     $status  = system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_PIPE_DBNAME;\"");
     if($status && $status != 256){ die("couldnt drop old database $WB_PIPE_DBNAME!\n"); }
     $status  = system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"CREATE DATABASE $WB_PIPE_DBNAME;\"");
-    $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
-    $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$cvsDIR."/ensembl-pipeline/sql/table.sql");
-
+    $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < "."/nfs/acari/fsk/cvs_checkout/ensembl/sql/table.sql");
+    $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < "."/nfs/acari/fsk/cvs_checkout/ensembl-pipeline/sql/table.sql");
+    print ".";
     $status  = system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_TARGET_DBNAME;\"");
     if($status && $status != 256){ die("couldnt drop old database $WB_TARGET_DBNAME!\n"); }
     $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"CREATE DATABASE $WB_TARGET_DBNAME;\"");
-    $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
-
-    $status  = system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_EST_DBNAME;\"");
-    if($status && $status != 256){ die("couldnt drop old database $WB_EST_DBNAME!\n"); }
-    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"create database $WB_EST_DBNAME;\"");
-    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_EST_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
-
+    $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < "."/nfs/acari/fsk/cvs_checkout/ensembl/sql/table.sql");
+    print ".";
+#    $status  = system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_EST_DBNAME;\"");
+#    if($status && $status != 256){ die("couldnt drop old database $WB_EST_DBNAME!\n"); }
+#    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"create database $WB_EST_DBNAME;\"");
+#    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_EST_DBNAME < "."/nfs/acari/fsk/cvs_checkout/ensembl/sql/table.sql");
+    print ".";
     #copy defined db tables from current build
-    $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT".
-      " --add-drop-table $WB_REF_DBNAME".
+    $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT -t $WB_REF_DBNAME".
       " analysis assembly attrib_type coord_system exon exon_stable_id exon_transcript gene gene_stable_id meta meta_coord".
-      " seq_region seq_region_attrib transcript transcript_stable_id translation translation_stable_id".
+      " assembly_exception seq_region seq_region_attrib transcript transcript_stable_id translation translation_stable_id".
       " > ".$dataDIR."/import_tables.sql";
     $status += system($cmd);
+    print ".";
+    $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e  '".
+	   "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system;" .
+           "DELETE FROM exon; DELETE FROM exon_stable_id; DELETE FROM exon_transcript; DELETE FROM gene; ".
+	   "DELETE FROM gene_stable_id; DELETE FROM meta; DELETE FROM meta_coord;  DELETE FROM assembly; ".
+           "DELETE FROM assembly_exception; DELETE FROM seq_region_attrib; DELETE FROM transcript; DELETE FROM transcript_stable_id; ".
+           "DELETE FROM translation; DELETE FROM translation_stable_id; DELETE FROM assembly_exception;' $WB_PIPE_DBNAME ";
+    $status += system($cmd);
+    print ".";
     $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$dataDIR."/import_tables.sql");
+    print ".";
     #copy dna table from current build
     $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT".
-           " --add-drop-table $WB_REF_DBNAME dna"." > ".$dataDIR."/import_tables2.sql";
+           " -t $WB_REF_DBNAME dna"." > ".$dataDIR."/import_tables2.sql";
     $status += system($cmd);
-    $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$dataDIR."/import_tables2.sql");
+    print ".";
+    $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".
+            $dataDIR."/import_tables2.sql";
+    $status += system($cmd);
     if($status){ die("couldnt create databases!\n"); }
     print "created databases.\n";
-
     #insert analysis entries
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/add_Analysis ".
            " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
@@ -586,18 +616,27 @@ sub DB_setup{
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/make_input_ids".
            " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
-	   " -file -dir $chunkDIR -logic_name SubmitcDNAChunk";
+           " -file -dir $chunkDIR -logic_name SubmitcDNAChunk";
     $status += system($cmd);
     if($status){ die("Error while setting up the database.\n") }
     print "database set up.\n";
-
     #copy analysis entries (and others, just to make sure)
-    $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT".
-           " --add-drop-table $WB_PIPE_DBNAME".
-           " analysis assembly attrib_type coord_system meta meta_coord seq_region seq_region_attrib ".
+    $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -t $WB_PIPE_DBNAME".
+           " analysis assembly assembly_exception attrib_type coord_system meta meta_coord seq_region seq_region_attrib ".
            "> ".$dataDIR."/import_tables3.sql";
     $status += system($cmd);
-    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_EST_DBNAME < ".$dataDIR."/import_tables3.sql");
+#    $cmd = "mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
+#           "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
+#           "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region; DELETE FROM seq_region_attrib; ".
+#           "DELETE FROM assembly_exception;' $WB_EST_DBNAME";
+#    $status += system($cmd);
+    $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
+           "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
+           "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region; DELETE FROM seq_region_attrib; ".
+           "DELETE FROM assembly_exception;' $WB_TARGET_DBNAME";
+    $status += system($cmd);
+
+#    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_EST_DBNAME < ".$dataDIR."/import_tables3.sql");
     $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$dataDIR."/import_tables3.sql");
     if($status){ die("Error while synchronising databases.\n") }
     print "databases in sync.\n";
@@ -608,7 +647,6 @@ sub DB_setup{
   }
   return 1;
 }
-
 
 # call rulemanager to start the exonerate run, leaving the set-up script
 
@@ -631,7 +669,10 @@ sub clean_up{
   if(!$status){
     undef $/;
     eval <RP>;
-    die "\ncant recreate data dump.\n$@\n" if $@;
+    if($@){
+      $/ = "\n";
+      die "\ncant recreate data dump.\n$@\n";
+    }
     close(RP);
     $/ = "\n";
   }
@@ -682,7 +723,7 @@ sub clean_up{
     if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
       $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_PIPE_DBNAME;\"");
     }
-    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_EST_DBNAME;\"");
+#    $status += system("mysql -h$WB_EST_DBHOST -P$WB_EST_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_EST_DBNAME;\"");
     if($status){ warn("Error deleting databases.\n"); $status = 0; }
 
     print "cleaned out databases, removed temporary files.\n";
@@ -721,14 +762,131 @@ sub unclean_exit{
 #bsubs a function call for every chromosome
 
 sub compare{
-  my @chromosomes = qw(1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 X Y);
+  my (%chromosomes_1, %chromosomes_2);
+  my ($sql, $sql2, $sth1, $sth2);
+  my $exclude_NT = 1;
+  my (%hits_per_chrom_1, %hits_per_chrom_2);
+  my $hitcount1 = 0;
+  my $hitcount2 = 0;
+  my (%chromosomes_1, %chromosomes_2);
+  my ($sql, $sql2, $sth1, $sth2);
+  my $exclude_NT = 1;
+  my (%hits_per_chrom_1, %hits_per_chrom_2);
+  my $hitcount1 = 0;
+  my $hitcount2 = 0;
 
-  foreach my $chomosome (@chromosomes){
-    $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl comparison.pl ".
-           $chomosome." ".$oldFeatureName." ".$newFeatureName." ".$dataDIR;
-    print $cmd."\n";
-    print `$cmd`;
+  #get db connectors
+  #old alignments
+  my $db1     = db_connector("ecs2", 3365, "homo_sapiens_cdna_30_35c", "ensro");
+  #new alignments
+  my $db2     = db_connector("ia64g", 3306, "fsk_cDNA_update", "ensro");
+
+  #get chromsome names / ids
+  $sql = 'select coord_system_id from coord_system where name="chromosome"';
+  $sth1 = $db1->prepare($sql) or die "sql error!";
+  $sth1->execute();
+  my ($coord_system_id) = $sth1->fetchrow_array;
+  $sql = 'select seq_region_id, name from seq_region where coord_system_id = '.$coord_system_id;
+  if ($exclude_NT) {
+    $sql .= ' and name not like "%NT%"';
   }
+  $sth1 = $db1->prepare($sql) or die "sql error!";
+  $sth1->execute();
+  while (my ($seq_region_id, $name) = $sth1->fetchrow_array) {
+    $chromosomes_1{$name} = $seq_region_id;
+  }
+  $sth2 = $db2->prepare($sql) or die "sql error!";
+  $sth2->execute();
+  while (my ($seq_region_id, $name) = $sth2->fetchrow_array) {
+    $chromosomes_2{$name} = $seq_region_id;
+  }
+
+#  #create LSF jobs for in-depth analysis
+#  foreach my $chomosome (keys %chromosomes_1){
+#    $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl ".$cvsDIR.
+#           "/ensembl-pipeline/scripts/cDNA_update/comparison.pl ".
+#           $chomosome." ".$oldFeatureName." ".$newFeatureName." ".$dataDIR;
+#    print $cmd."\n";
+#    `$cmd`;
+#  }
+
+  print "\nGetting hits per chromosome\n";
+  #check hits per chromosome
+  $sql = "select count(*) from  dna_align_feature dnaa, analysis a where a.logic_name='human_cDNA_update'".
+    "and a.analysis_id=dnaa.analysis_id and dnaa.seq_region_id=?";
+  #$sth1 = $db1->prepare($sql) or die "sql error!";
+  $sth2 = $db2->prepare($sql) or die "sql error!";
+  foreach my $chromosome (keys %chromosomes_1) {
+    #$sth1->execute($chromosomes_1{$chromosome});
+    $sth2->execute($chromosomes_2{$chromosome});
+    #$hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
+    $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
+  }
+
+  my @sorted_chromosomes = sort bychrnum keys %chromosomes_1;
+  foreach my $chromosome (@sorted_chromosomes) {
+    print "\n$chromosome:".
+      "\t".$hits_per_chrom_1{$chromosome}.
+      "\t".$hits_per_chrom_2{$chromosome};
+    $hitcount1 += $hits_per_chrom_1{$chromosome};
+    $hitcount2 += $hits_per_chrom_2{$chromosome};
+  }
+  print "\ntotal sum:".
+      "\t".$hitcount1.
+      "\t".$hitcount2;
+}
+
+#sort chroms by name.
+
+sub bychrnum {
+  my @awords = split /_/,$a;
+  my @bwords = split /_/,$b;
+
+  my $anum = $awords[0];
+  my $bnum = $bwords[0];
+
+  $anum =~ s/chr//;
+  $bnum =~ s/chr//;
+
+  if ($anum !~ /^[0-9]*$/) {
+    if ($bnum !~ /^[0-9]*$/) {
+      return $anum cmp $bnum;
+    } else {
+      return 1;
+    }
+  }
+  if ($bnum !~ /^[0-9]*$/) {
+    return -1;
+  }
+
+  if ($anum <=> $bnum) {
+    return $anum <=> $bnum;
+  } else {
+    if ($#awords == 0) {
+      return -1;
+    } elsif ($#bwords == 0) {
+      return 1;
+    } else {
+      return $awords[1] cmp $bwords[1];
+    }
+  }
+}
+
+#get a db connection
+
+sub db_connector{
+  my $host       = shift;
+  my $port       = shift;
+  my $dbname     = shift;
+  my $user       = shift;
+  my $dbCon      = new Bio::EnsEMBL::DBSQL::DBConnection(
+							-host    => $host,
+							-port    => $port,
+							-user    => $user,
+							-dbname  => $dbname
+						       );
+  if(!$dbCon){ die "\ncould not connect to \"$dbname\".\n"; }
+  return $dbCon;
 }
 
 
@@ -742,7 +900,7 @@ sub connect_db{
   my $pass       = shift;
   my $dnadb      = shift;
   my $dbObj;
-print "$host $port $dbname $user $pass\n";
+
   if($dnadb){
     $dbObj      = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host   => $host,
@@ -756,9 +914,9 @@ print "$host $port $dbname $user $pass\n";
   else{
     $dbObj      = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host    => $host,
-						     -port   => $port,
+						     -port    => $port,
 						     -user    => $user,
-						     -pass   => $pass,
+						     -pass    => $pass,
 						     -dbname  => $dbname
 						    );
   }
