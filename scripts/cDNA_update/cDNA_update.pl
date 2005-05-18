@@ -14,7 +14,8 @@ in an automated fashion.
   A. Fill in config variables, start script with argument 'prepare':
      "perl cDNA_setup.pl prepare".
      After the preperation, the modified genome files will have to be pushed across
-     the farm. Please mail systems for this.
+     the farm. The previous files should be removed before this! Please mail systems
+     about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_setup.pl compare"
@@ -91,7 +92,9 @@ $vertrna_update     = "emnew_vertrna-1";
 $refseq             = "hs.fna";
 $sourceHost         = "cbi1";
 $sourceDIR          = "../data/blastdb";
-$org_masked_genome  = "../data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted";
+$assembly_version   = "NCBI35";
+$org_masked_genome  = "../data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
+$target_masked_genome  = "../data/blastdb/Ensembl/Human/".$assembly_version."/modified/softmasked_dusted";
 
 # external programs needed (absolute paths):
 $fastasplit         = "/nfs/acari/searle/progs/fastasplit/fastasplit";
@@ -139,13 +142,13 @@ $outDIR            = $dataDIR."/output";
 my $oldFeatureName = "Exonerate_cDNA";
 my $newFeatureName = "Exonerate_cDNA_update";
 my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
-		     configDIR sourceDIR newfile config_file masked_genome fastasplit
+		     configDIR sourceDIR newfile config_file target_masked_genome fastasplit
                      polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
 my $chunknum       = 800;   #(<300 sequences / file)
 my $maxseqlenght   = 20000;
-$masked_genome      = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
+$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
 
 my $option = $ARGV[0];
 if(!$option or ($option ne "prepare" and $option ne "run" and $option ne "clean" and $option ne "compare")){
@@ -166,8 +169,8 @@ if($option eq "prepare"){
   if(! DB_setup()   ){ unclean_exit(); }
 
   print "\n\nFinnished setting up the analysis.\n".
-        "The genome files will have to be distributed across the farm!\n".
-	"SOURCE PATH: ".$masked_genome."\n\n";
+        "The genome files' directory will have to be distributed across the farm!\n".
+	"SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
 }
 elsif($option eq "run"){
 
@@ -466,8 +469,8 @@ sub fastafiles{
 
 sub adjust_assembly{
   my $filename;
-  #move original genome files to defined location
-  $cmd = 'cp '.$org_masked_genome.'/* '.$masked_genome.'/';
+  #move original genome files to defined temporary location
+  $cmd = 'ln -s '.$org_masked_genome.'/* '.$tmp_masked_genome.'/';
   if(system($cmd)){
     die("couldn t copy masked genome files.$@\n");
   }
@@ -479,7 +482,8 @@ sub adjust_assembly{
   my $sth = $db->prepare($sql) or die "sql error!";
   $sth->execute();
   while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
-    $filename = $masked_genome."/".$name.".fa";
+    #read original file (link)
+    $filename = $tmp_masked_genome."/".$name.".fa";
     open(FASTAFILE, "<$filename") or die("cant open fasta file $filename.");
     my $headerline = <FASTAFILE>;
     $headerline =~ s/^\>(\w+)\:([\w\d]*)\:([\w\d]*)\:(\d+)\:(\d+)\:(.+)//;
@@ -488,11 +492,29 @@ sub adjust_assembly{
     my $seq = <FASTAFILE>;
     local $/ = '\n';
     close(FASTAFILE);
+    #remove file (link)
+    $cmd = 'rm '.$filename;
+    if($cmd){ die 'can t remove link '.$filename.'!'; }
+    #write modified file
     open(FASTAFILE, ">$filename") or die("cant open fasta file $filename for writing.");
     print FASTAFILE $headerline."\n";
     print FASTAFILE $seq;
     close(FASTAFILE);
   }
+  #create README for new genome directory
+  my $date = "";
+  ($day, $month, $year) = (localtime)[3,4,5];
+  my $datestring = printf("%04d %02d %02d", $year+1900, $month+1, $day);
+  my $readme = $masked_genome."/README";
+  open(README, ">$readme") or die "can t create README file.";
+  print README "Directory ".$target_masked_genome."\n\n".
+        "These are the softmasked dusted genome files from human ".$assembly_version.
+	" assembly with two small modifications:\nThe coordinates of the DR52 & DR53 ".
+	"contigs were adjusted according to the assembly table of the database ".
+	$WB_REF_DBNAME.
+        ".\nThey are used for the cDNA-update procedure to produce an up-to-date cDNA track ".
+	"every month.\nCreated by ".$ENV{USER}." on ".$datestring.".\n\n";
+  close(README);
 }
 
 
@@ -950,4 +972,3 @@ CALLED BY: Pipeline/Utils/PipelineSanityChecks.pm  LINE: 73
 "MSG: Could not find fasta file for 'MT in '/data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted'"
 
 _________________________________________________________
-
