@@ -2,15 +2,53 @@
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
+# Handle command line options.
+
+my ($dbname,
+    $dbhost,
+    $dbpass,
+    $dbuser,
+    $dbport) = rearrange(['DBNAME',
+			  'DBHOST',
+			  'DBPASS',
+			  'DBUSER',
+			  'DBPORT',
+			 ], @ARGV);
+
+
+# Check command line options for, at least, minimal sanity.
+
+unless (@ARGV) {
+  print join("\n",
+	     "Options are : ",
+	     " -dbname :               Name of core ensembl database for the species",
+	     "                           in question.",
+	     " -dbhost :               Name of machine that hosts this database.",
+	     " -dbuser :               Username for database access.",
+	     " -dbpass :               (optional) Database password.",
+	     " -dbport :               (optional) Database access port number.",
+	    ) . "\n";
+  die
+}
+
+unless(defined $dbname &&
+       defined $dbhost &&
+       defined $dbuser){
+  die('Cannot connect to database without -dbname, -dbhost and ' .
+	'-dbuser specified.')
+}
+
+# Connect to database
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-                    -dbname => 'homo_sapiens_core_27_35a',
-#                    -dbname => 'mus_musculus_core_27_33c',
-#                    -dbname => 'rattus_norvegicus_core_27_3e',
-		    -host   => 'ecs2',
-		    -user   => 'ensro',
-		    -port   => 3365);
+                    -dbname => $dbname,
+		    -host   => $dbhost,
+		    -user   => $dbuser,
+		    -pass   => $dbpass,
+		    -port   => $dbport);
 
 my $slice_adaptor     = $db->get_SliceAdaptor;
 my $gene_adaptor      = $db->get_GeneAdaptor;
