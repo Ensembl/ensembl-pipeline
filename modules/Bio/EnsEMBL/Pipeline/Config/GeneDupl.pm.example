@@ -31,6 +31,10 @@ use vars qw( %GeneDupl );
    #
    # Explanation of these config options:
    #
+   # GD_SPECIES - 
+   #   Species name of sequences matching to id regex.  For Compara
+   #   database output this must be the same as that stored in the
+   #   Compara database genome table.
    # GD_BLASTDB_FILE -
    #   Location of the _formatted_ blast database - the formatted fasta file.
    # GD_INGROUP_REGEX -
