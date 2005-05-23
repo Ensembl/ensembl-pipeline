@@ -1030,9 +1030,9 @@ sub _build_evidence_seq {
 
   # Turn the cigar line around if the slice is on the
   # reverse strand.
-  if ($self->_slice->strand == -1){
-    @cigar_instructions = reverse @cigar_instructions;
-  }
+#  if ($self->_slice->strand == -1){
+#    @cigar_instructions = reverse @cigar_instructions;
+#  }
 
   # Fetch our sequence from the cache.  If the sequence
   # is missing it means that it could not be fetched and
@@ -1746,9 +1746,15 @@ sub _all_supporting_features {
   # these can be yanked from the gene/transcript.
 
   unless ($self->{_all_supporting_features}){
-    foreach my $exon (@{$self->_transcript->get_all_Exons}){
-      push @{$self->{_all_supporting_features}}, 
-	       @{$exon->get_all_supporting_features};
+    my $sfs = $self->_transcript->get_all_supporting_features;
+
+    if (@$sfs) {
+      push @{$self->{_all_supporting_features}}, @$sfs;
+    } else {
+      foreach my $exon (@{$self->_transcript->get_all_Exons}){
+	push @{$self->{_all_supporting_features}}, 
+	  @{$exon->get_all_supporting_features};
+      }
     }
 
     $self->{_all_supporting_features} =
