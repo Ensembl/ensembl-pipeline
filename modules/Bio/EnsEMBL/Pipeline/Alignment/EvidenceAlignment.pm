@@ -1066,7 +1066,7 @@ sub _build_evidence_seq {
     # the gene/slice (which is the same strand as the transcript).
 
     unless ($hstrand == $self->_strand) {
-print STDERR "Strand : " . $self->_strand . "\tHstrand : " . $hstrand . "\n";
+      print STDERR "Strand : " . $self->_strand . "\tHstrand : " . $hstrand . "\n";
       warning("Protein align feature [". $base_align_feature->hseqname . 
 	      "] is reversed with respect to transcript - and I cant reverse " . 
 	      "compliment an amino acid sequence.");
@@ -1084,6 +1084,12 @@ print STDERR "Strand : " . $self->_strand . "\tHstrand : " . $hstrand . "\n";
     }
 
     $fetched_seq = substr($aa_seq, ($hstart - 1), ($hend - $hstart + 1));
+
+    unless ($fetched_seq ne ''){
+      throw("Error building amino acid sequence [" . $base_align_feature->hseqname 
+	    . "].  Feature does not seem to lie within the bounds of the " . 
+	    "evidence sequence.");
+    }
 
     if ($self->_three_letter_aa) {
       $fetched_seq =~ s/(.)/$self->{_aa_names}{$1}/g;
@@ -1604,9 +1610,10 @@ sub _exon_protein_translation {
 
       # Worry about parts of the exon that dont translate,
       # but only if they are in the final exon.
-      my $end_exon = 0;
-      if ($exon == $self->_transcript->end_Exon) {
-	$end_exon = 1;
+      my $end_coding_exon = 0;
+      if (($exon->start < $self->_transcript->coding_region_end)&&
+	  ($exon->end  >= $self->_transcript->coding_region_end)) {
+	$end_coding_exon = 1;
       }
 
       my $start_exon = 0;
@@ -1619,6 +1626,8 @@ sub _exon_protein_translation {
       my $seq     = $exon->peptide($self->_transcript);
       my $peptide = $seq->seq;
 
+      next unless (length($peptide));
+
       $peptide =~ s/(.)/$1\-\-/g;
 
 
@@ -1627,10 +1636,9 @@ sub _exon_protein_translation {
 
         # Remove preceeding characters belonging to the previous exon.
 
-      if ($exon->phase == 2){
+      if ($exon->phase == 1){
 	$peptide = substr($peptide, 1);
-
-      } elsif ($exon->phase == 1){
+      } elsif ($exon->phase == 2){
 	$peptide = substr($peptide, 2);
       }
 
@@ -1645,21 +1653,18 @@ sub _exon_protein_translation {
 
       # Determining where to stick our peptide.
 
-        # Here we calculate the starting point of the coding portion 
-        # of the exon. For all but the terminal exon it is possible 
-        # to use the end of the exon and work back.  A special treatment
-        # it required for single exon genes.
-
       my $peptide_genomic_start = $exon->end - length($peptide) + 1;
 
-      if ($start_exon && $end_exon){ # Meaning, single exon gene.
+        # For all but the terminal exon it is possible to use the
+        # end of the exon and work back.  A special treatment
+        # it required for single exon genes.
+
+      if ($start_exon && $end_coding_exon){ # Meaning, single exon gene.
 	my $utr = $self->_transcript->five_prime_utr;
 	my $utr_length = $utr ? length($utr->seq) : 0;
 	$peptide_genomic_start = $exon->start + $utr_length;
-      } elsif ($end_exon) {
-	my $start_offset = $exon->phase ? 3 - $exon->phase : 0;
-        $start_offset -= 3 if $exon->phase == 1;
-	$peptide_genomic_start = $exon->start - $start_offset;
+      } elsif ($end_coding_exon) {
+	$peptide_genomic_start = $exon->start;
       }
 
       push @exon_list, [$peptide_genomic_start, $peptide];
