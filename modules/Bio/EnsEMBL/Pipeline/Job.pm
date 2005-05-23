@@ -735,8 +735,10 @@ sub make_filenames {
   my $num = int(rand(10));
   
   my $dir = $self->output_dir . "/$num/";
-  if ( ! -e $dir) {
-    system( "mkdir $dir" );
+  (my $dirtmp = $dir) =~s/\s+//g;
+  if ( ! -e $dirtmp ) {
+
+    system( "mkdir $dirtmp" );
   }
 
   my $stub = $self->input_id.".";
