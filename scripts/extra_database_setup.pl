@@ -80,6 +80,17 @@ seq_region -table_name analysis -target_info database1@host:3306:user:pass
  -target_info database2@host:3306:user:pass
  -target_info database3@host:3306:user:pass
 
+=head1 NOTES
+
+There are a couple of important notes to add to this. First it is a good
+idea to both run the script and have the output directory mounted on the
+same filesystem the mysqlinstance you are loading into is on to avoid
+nfs issues 
+
+Secondly this script runs mysqlimport with the -i option. This means if it
+finds any duplicated lines between your dumped files and the database you
+are loading into it will not load the duplicate lines but instead skip them
+
 =cut
 use strict;
 use Getopt::Long;
