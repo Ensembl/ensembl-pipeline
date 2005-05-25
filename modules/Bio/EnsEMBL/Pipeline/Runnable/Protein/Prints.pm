@@ -327,12 +327,34 @@ sub parse_results {
                 my $hash_substring;
 		my $end;
 
-                if($subsequence =~ /(\#+)$/){
-                  $hash_substring = $1;
-		  $end = $matchPosition + $motifLength - 1 - length($hash_substring);
-                }else{
+		if($subsequence =~ /(\#+)$/){
+
+		  $hash_substring = $1;
+		
+		  # deals with pattern match lies before start of a protein sequence, eg, the following FingerPRINTScan output
+		  # 3TBT MotifName       No.Mots   IdScore PfScore Pvalue    Sequence                  Len  low  pos  high
+		  # 3TBH GPCRRHODOPSN    2 of 7    20.29   236     2.31e-06  #########MYFFLSNLSLADI    22   38   -8   524
+
+		  # the corresponding protein_feature table output looks like
+		  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+		  #| protein_feature_id | translation_id | seq_start | seq_end | hit_start | hit_end | hit_id  | analysis_id | score | evalue   | perc_ident |
+		  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+		  #|              69359 |          13578 |        -8 |      13 |         0 |       0 | PR01099 |         203 |   223 | 0.000305 |      21.21 |
+		  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+
+		  if ( $start < 0){
+			$hash_substring = $1;
+			$start = $start + length($hash_substring);
+			$end   = $motifLength + $matchPosition;
+		  }
+
+		  if ( $start > 0 ){
+			$end = $matchPosition + $motifLength - 1 - length($hash_substring);
+		  }
+		}
+		else{
 		  $end = $matchPosition + $motifLength - 1;
-                }
+		}
 
 		my $print =  $printsac{$fingerprintName};
 						
@@ -348,7 +370,7 @@ sub parse_results {
 		@features = ();
 	    }
 	}
-    }   
+  }
 }
 
 
