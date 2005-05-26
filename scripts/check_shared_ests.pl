@@ -2,7 +2,7 @@
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Runnable::ESTDescriminator; 
+use Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator; 
 
 my @gene_stable_ids = @ARGV;
 
@@ -33,10 +33,10 @@ my $estdb = Bio::EnsEMBL::DBSQL::DBAdaptor->new(-dbname => 'vivek_homo_sapiens_2
 						-host   => 'ecs4',
 						-port   => 3353);
 
-my $est_descrim = 
-  Bio::EnsEMBL::Pipeline::Runnable::ESTDescriminator->new(
+my $est_discrim = 
+  Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator->new(
     -genes               => \@genes,
     -est_db              => $estdb,
     -est_coverage_cutoff => 0.8);
 
-$est_descrim->print_shared_ESTs;
+$est_discrim->print_shared_ESTs;
