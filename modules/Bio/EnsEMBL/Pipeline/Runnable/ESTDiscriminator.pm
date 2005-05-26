@@ -6,13 +6,26 @@ Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator;
 
 =head1 SYNOPSIS
 
-my $est_descrim = 
+my $est_discrim = 
   Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator->new(
     -genes               => \@genes,
     -est_db              => $estdb,
     -est_coverage_cutoff => 0.8);
 
-$est_descrim->print_shared_ESTs;
+my $list_of_appropriately_mapped_ests 
+  = $est_discrim->single_match_ESTs('ENSG00000349586');
+
+my $list_of_hard_to_map_ests 
+  = $est_discrim->single_match_ESTs('ENSG00000349586');
+
+my $list_of_ests_incorrectly_mapped_to_this_gene =
+  = $est_discrim->incorrect_match_ESTs('ENSG00000349586');
+
+my $behold_the_whole_unwieldy_data_structure
+  = $est_discrim->EST_vs_gene_hash;
+
+# Take the easy way out and just print to STDERR
+$est_discrim->print_shared_ESTs;
 
 
 =head1 DESCRIPTION
@@ -56,7 +69,8 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
                               share EST evidence.
   Arg [est_db]              : Bio::EnsEMBL::DBSQL::DBAdaptor - adaptor to the 
                               database with mapped ESTs.
-  Arg [est_coverage_cutoff] : 
+  Arg [est_coverage_cutoff] : Coverage cutoff applied in deciding if an
+                              EST actually properly overlaps a gene.
   Arg [seqfetcher]          : A Bio::EnsEMBL::Pipeline::Seqfetcher object that
                               will allow EST sequences to be retrieved.
   Arg [distance_twilight]   : The allowed error in genetic distance, within which
@@ -71,7 +85,8 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
                    -est_coverage_cutoff => 0.8);
   Description: Instantiates object and sets parameters
   Returntype : Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator
-  Exceptions : 
+  Exceptions : Throws without genes.  Throws without an adaptor to a database
+               containing ESTs.  Throws without a SeqFetcher.
   Caller     : General
 
 =cut
@@ -129,6 +144,19 @@ sub new {
   return $self
 }
 
+
+=head2 run
+
+  Args       : None
+  Example    : $est_discrim->run();
+  Description: Top level method that executes the analysis implemented in
+               this module.
+  Returntype : Hashref (which really should be a module of its own)
+  Exceptions : None
+  Caller     : General, print_shared_ESTs
+
+=cut
+
 sub run {
   my $self = shift;
 
@@ -138,11 +166,38 @@ sub run {
   return $self->EST_vs_gene_hash
 }
 
+=head2 single_match_ESTs
+
+  Args [1]   : gene stable id
+  Example    : $est_discrim->single_match_ESTs('ENSG00000239878');
+  Description: Returns a listref of EST ids that match this gene only.  Module
+               must be run first.
+  Returntype : Listref
+  Exceptions : None
+  Caller     : General
+
+=cut
+
 sub single_match_ESTs {
   my $self = shift;
 
   return $self->_matched_ests('single', @_)
 }
+
+
+=head2 multiple_match_ESTs
+
+  Args [1]   : gene stable id
+  Example    : $est_discrim->multiple_match_ESTs('ENSG00000239878');
+  Description: Returns a listref of EST ids that dont uniquely match 
+               this gene.  These ESTs cannot be more finely mapped due
+               to sequence vagaries or high gene similarity.  Module must be 
+               run first.
+  Returntype : Listref
+  Exceptions : None
+  Caller     : General
+
+=cut
 
 sub multiple_match_ESTs {
   my $self = shift;
@@ -150,11 +205,38 @@ sub multiple_match_ESTs {
   return $self->_matched_ests('multiple', @_)
 }
 
+=head2 incorrect_match_ESTs
+
+  Args [1]   : gene stable id
+  Example    : $est_discrim->incorrect_match_ESTs('ENSG00000239878');
+  Description: Returns a listref of EST ids that are incorrectly matched with 
+               this gene.  Hence, in the EST database, these ESTs have been 
+               incorrectly mapped.  Module must be run first.
+  Returntype : Listref
+  Exceptions : None
+  Caller     : General
+
+=cut
+
 sub incorrect_match_ESTs {
   my $self = shift;
 
   return $self->_matched_ests('incorrect', @_)
 }
+
+=head2 EST_vs_gene_hash
+
+  Args       : None
+  Example    : my $output= $est_discrim->EST_vs_gene_hash;
+  Description: Returns the (unwieldy) data structure that contains
+               information of which ESTs are mapped to which gene
+               (rightly, wrongly, multiply).  Module must be run
+               first.
+  Returntype : Hashref
+  Exceptions : None
+  Caller     : General
+
+=cut
 
 sub EST_vs_gene_hash {
   my $self = shift;
@@ -165,6 +247,18 @@ sub EST_vs_gene_hash {
 
   return $self->{_est_vs_gene_hash}
 }
+
+=head2 print_shared_ESTs
+
+  Argss      : None
+  Example    : $est_discrim->print_shared_ESTs;
+  Description: Utility method that runs the module and prints ESTs
+               that are incorrectly mapped..
+  Returntype : 1
+  Exceptions : None
+  Caller     : General
+
+=cut
 
 sub print_shared_ESTs {
   my $self = shift;
@@ -592,44 +686,6 @@ sub _compute_distances {
   return (\@distances, \@sequence_order);
 }
 
-#use Bio::Align::DNAStatistics;
-#use Bio::AlignIO;
-#use Bio::LocatableSeq;
-#
-#sub _compute_distances {
-#  my ($self, $align) = @_;
-#
-#  # Convert this alignment into a bioperl AlignI object.
-#  my $bp_align = Bio::SimpleAlign->new();
-#
-#  my @sequence_order;
-#  foreach my $align_seq (@{$align->fetch_AlignmentSeqs}){
-#
-#
-#    # Skip the genomic sequence in our alignment - use the exon
-#    # sequence for calculating distance
-#    next if $align_seq->name eq 'genomic_sequence';
-#
-#    my $locatable_seq = Bio::LocatableSeq->new(
-#			    -id       => $align_seq->name,
-#                            -seq      => $align_seq->seq,
-#                            -start    => 1,
-#                            -end      => length($align_seq->seq),
-#                            -alphabet => 'dna');
-#
-#    $bp_align->add_seq($locatable_seq);
-#
-#    push @sequence_order, $align_seq->name;
-#  }
-#
-#  # Use bioperl object to calculate our pairwise sequence distances.
-#  my $dna_stat = Bio::Align::DNAStatistics->new;
-#
-#  my $distances = $dna_stat->distance(-align  => $bp_align,
-#                                      -method => 'Kimura');
-#
-#  return ($distances, \@sequence_order);
-#}
 
 sub _evidence_alignment {
   my ($self, $gene_id) = @_;
