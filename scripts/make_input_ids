@@ -106,11 +106,19 @@ as input_ids
 
 this will use all the translation ids as input_ids
 
+
+this will use all seq_regions of coord_system_type 'chromosome' and version BDGP4.1 as input-ids:
+----------------------------------------------------------------------------------------------
 ./make_input_ids -dbhost host -dbuser user -dbpass *** -dbport 3306
 -logic_name SubmitChromosome -coord_system chromosome -coord_system_version BDGP4.1 -slice
 
-this will use all seq_regions of coord_system_type 'chromosome' and version BDGP4.1 as input
-ids
+
+Make one single input_id named 'my_single_inputid' : 
+------------------------------------------------------
+
+perl make_input_ids $dbconnection  -logic_name SubmitProteome -single -single_name my_single_input_id 
+
+
 
 
 =cut
