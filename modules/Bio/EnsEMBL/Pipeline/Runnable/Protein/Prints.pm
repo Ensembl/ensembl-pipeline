@@ -342,13 +342,13 @@ sub parse_results {
 		  #|              69359 |          13578 |        -8 |      13 |         0 |       0 | PR01099 |         203 |   223 | 0.000305 |      21.21 |
 		  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
 
-		  if ( $start < 0){
+		  if ( $start < 1 ){
 			$hash_substring = $1;
 			$start = $start + length($hash_substring);
-			$end   = $motifLength + $matchPosition;
+			$end   = $motifLength + $start - 1 ;
 		  }
 
-		  if ( $start > 0 ){
+		  elsif ( $start > 0 ){
 			$end = $matchPosition + $motifLength - 1 - length($hash_substring);
 		  }
 		}
@@ -370,7 +370,7 @@ sub parse_results {
 		@features = ();
 	    }
 	}
-  }
+    }
 }
 
 
