@@ -2,7 +2,7 @@
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Runnable::ESTDescriminator; 
+use Bio::EnsEMBL::Pipeline::Runnable::ESTDiscriminator; 
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 
 my @gene_stable_ids = @ARGV;
