@@ -39,7 +39,7 @@ requires the Alignment/EvidenceAlignment and Alignment/InformativeSites modules.
 
 A quick and easy way to run this module is to use the script that can be found at:
 
-ensembl-pipeline/scripts/check_shared_ests.pl
+ensembl-pipeline/scripts/est_discriminator.pl
 
 This script takes a list of related gene ids and prints lists of shared ESTs and
 which gene each EST should preferentially be associated with.
