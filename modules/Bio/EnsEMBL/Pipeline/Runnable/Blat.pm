@@ -207,8 +207,8 @@ sub run {
   
   #my $parameters = $self->analysis->parameters;
 
-  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
-  #my $command ="$blat -out=pslx ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
+  #my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
+  my $command ="$blat -out=pslx ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
   #my $command ="$blat ".$self->options." $parameters $target $query_file ".$self->results; 
 
   print STDERR "running blat: $command\n";
@@ -264,7 +264,7 @@ sub run {
             $matches,      $mismatches,    $rep_matches, $n_count,  $q_num_insert, $q_base_insert,
             $t_num_insert, $t_base_insert, $strand,      $q_name,   $q_length,     $q_start,
             $q_end,        $t_name,        $t_length,    $t_start,  $t_end,        $block_count,
-            $block_sizes,  $q_starts,      $t_starts
+            $block_sizes,  $q_starts,      $t_starts,    $q_seqs,   $t_seqs
           )
           = split;
 	        # print STDERR  "$matches,      $mismatches,    $rep_matches, $n_count, $q_num_insert, $q_base_insert,
@@ -275,10 +275,10 @@ sub run {
 		
 #    my $superfeature = Bio::EnsEMBL::SeqFeature->new();
     
-    # ignore any preceeding text
     
-    print STDOUT $_."\n";
+    #print STDOUT $_."\n";
 
+    # ignore any preceeding text
     unless ( defined($matches) and $matches =~/^\d+$/ ){
       next;
     }
@@ -303,7 +303,7 @@ sub run {
     #print STDERR "calculating percent_id and score:\n";
     #print STDERR "matches: $matches, rep_matches: $rep_matches, mismatches: $mismatches, q_length: $q_length\n";
     #print STDERR "percent_id = 100x".($matches + $rep_matches)."/".( $matches + $mismatches + $rep_matches )."\n";
-    my $percent_id = sprintf "%.2f", ( 100 * ($matches + $rep_matches)/( $matches + $mismatches + $rep_matches ) );
+    #my $percent_id = sprintf "%.2f", ( 100 * ($matches + $rep_matches)/( $matches + $mismatches + $rep_matches ) );
     
     # or is it ...?
     ## percentage identity =  ( matches not in repeats + matches in repeats ) / query length
@@ -324,6 +324,8 @@ sub run {
     # start position of each block (you must add 1 as psl output is off by one in the start coordinate)
     my @q_start_positions = split ",",$q_starts;
     my @t_start_positions = split ",",$t_starts;
+    my @q_sequences = split ",",$q_seqs;
+    my @t_sequences = split ",",$t_seqs;
     
 #    $superfeature->seqname($q_name);
 #    $superfeature->score( $score );
@@ -372,66 +374,60 @@ sub run {
     my @reversed_q_starts; my @reversed_t_starts;
 
 
-    if ($feat2{strand} eq '+') { #ie query
+    if ($feat2{strand} eq '+') { # query in the forward strand
 
-    	@query_starts= map {my $val=$_; $val+=1} (@q_start_positions);
-	
-    	if ($feat1{strand} eq '-') { #transform  feat1 (t) with blocksizes
-	    
-      	#start by changing sizes 
-			  #@reversed_t_starts=reverse(@t_start_positions);
-		
-    		for (my $i=0; $i<$block_count; $i++) {
-    			$query_ends[$i]=$q_start_positions[$i] + $block_sizes[$i];
-			
-    			$target_ends[$i]=$t_length-$t_start_positions[$i];
-    			$target_starts[$i]=($target_ends[$i]-$block_sizes[$i])+1;
-    		}
-  		} else { #normal
-    		@target_starts= map {my $val=$_; $val+=1} (@t_start_positions);
-		    for (my $i=0; $i<$block_count; $i++) {
-    			$query_ends[$i]=$q_start_positions[$i] + $block_sizes[$i];
-		    	$target_ends[$i]=$t_start_positions[$i] + $block_sizes[$i];
-  			}
-		
-  		}
-  	} else { 
-	    if ($feat1{strand} eq '-') {#
-    		for (my $i=0; $i<$block_count; $i++ ){
-    			$query_ends[$i]=$q_length-$q_start_positions[$i];
-	    		$query_starts[$i]=($query_ends[$i]-$block_sizes[$i])+1;
-  			
-    			$target_ends[$i]=$t_length-$t_start_positions[$i];
-    			$target_starts[$i]=($target_ends[$i]-$block_sizes[$i])+1;
-  			}
-  		} else { #transform query ie feat2 with the blocksizes.
-    		@target_starts= map {my $val=$_; $val+=1} (@t_start_positions);
-    		for (my $i=0; $i<$block_count; $i++ ) {
-          $query_ends[$i]=$q_length-$q_start_positions[$i];
-    			$query_starts[$i]=($query_ends[$i]-$block_sizes[$i])+1;
-			
-    			$target_ends[$i]=$t_start_positions[$i] + $block_sizes[$i];
-		  	}
-		
-  		}
+      @query_starts = map {my $val=$_; $val+=1} (@q_start_positions); # use inclusive coord
+      if ($feat1{strand} eq '-') { # target in the reverse strand
+        for (my $i=0; $i<$block_count; $i++) {
+          $query_ends[$i] = $q_start_positions[$i] + $block_sizes[$i];
+          $target_ends[$i] = $t_length - $t_start_positions[$i];
+          $target_starts[$i] = ($target_ends[$i] - $block_sizes[$i]) + 1;
+        }
+      } else { # target in the forward strand
+        @target_starts = map {my $val=$_; $val+=1} (@t_start_positions); # use inclusive coord
+        for (my $i=0; $i<$block_count; $i++) {
+          $query_ends[$i] = $q_start_positions[$i] + $block_sizes[$i];
+          $target_ends[$i] = $t_start_positions[$i] + $block_sizes[$i];
+        }
+      }
+
+    } else { # query in the reverse strand
+
+      if ($feat1{strand} eq '-') { 
+        for (my $i=0; $i<$block_count; $i++ ) { # target in the reverse strand
+          $query_ends[$i] = $q_length - $q_start_positions[$i];
+          $query_starts[$i] = ($query_ends[$i] - $block_sizes[$i]) + 1;
+          $target_ends[$i] = $t_length - $t_start_positions[$i];
+          $target_starts[$i] = ($target_ends[$i] - $block_sizes[$i]) + 1;
+        }
+      } else { # target in forward strand
+        @target_starts= map {my $val=$_; $val+=1} (@t_start_positions); # use inclusive coord
+        for (my $i=0; $i<$block_count; $i++ ) {
+          $query_ends[$i] = $q_length - $q_start_positions[$i];
+          $query_starts[$i] = ($query_ends[$i] - $block_sizes[$i]) + 1;
+          $target_ends[$i] = $t_start_positions[$i] + $block_sizes[$i];
+        }
+      }
+
     }
-		
-	
+
 
 
     for (my $i=0; $i<$block_count; $i++ ) {
 
-    	$feat2 {start} = $query_starts[$i];
-     	$feat2 {end}   = $query_ends[$i];
+      $feat2 {start} = $query_starts[$i];
+      $feat2 {end}   = $query_ends[$i];
       if ( $query_ends[$i] <  $query_starts[$i]) {
-      	warning("dodgy feature coordinates: end = $query_ends[$i], start = $query_starts[$i]. Reversing...");
-      	$feat2 {end}   = $query_starts[$i];
-      	$feat2 {start} = $query_ends[$i];
+        warning("dodgy feature coordinates: end = $query_ends[$i], start = $query_starts[$i]. Reversing...");
+        $feat2 {end}   = $query_starts[$i];
+        $feat2 {start} = $query_ends[$i];
       }
 
       $feat1 {start} = $target_starts[$i];
       $feat1 {end}   = $target_ends[$i];
-      
+
+      my ($score, $id, $frame) = get_best_score_in_all_frames($q_sequences[$i], $t_sequences[$i]);
+      my $percent_id = sprintf "%.2f", ( 100 * $id / length($q_sequences[$i]));
       # we put all the features with the same score and percent_id
       $feat2 {score}   = $score;
       $feat1 {score}   = $feat2 {score};
@@ -499,6 +495,58 @@ sub run {
 
   1;
 }
+
+sub get_best_score_in_all_frames {
+  my ($seq1, $seq2, $matrix) = @_;
+
+  my @aa_seq1_6fr = Bio::SeqUtils->translate_6frames($seq1);
+  my @aa_seq2_6fr = Bio::SeqUtils->translate_6frames($seq2);
+
+  my $score;
+  my $id = 0;
+  my $frame = 0;
+##  my $seqs;
+  for (my $i=0; $i<6; $i++) {
+    my $this_score = 0;
+    my $this_id = 0;
+    my $this_seq1 = $aa_seq1_6fr[$i]->seq;
+    my $this_seq2 = $aa_seq2_6fr[$i]->seq;
+    my $length = length($this_seq1);
+    $length = length($this_seq2) if (length($this_seq2) < $length);
+    my @this_seq1 = split("", $this_seq1);
+    my @this_seq2 = split("", $this_seq2);
+
+    if (defined($matrix)) {
+      for (my $j=0; $j<$length; $j++) {
+        my $aa1 = $this_seq1[$j];
+        my $aa2 = $this_seq2[$j];
+        $this_score += $matrix->{$aa1}->{$aa2};
+        $this_id++ if ($aa1 eq $aa2);
+      }
+    } else {
+      for (my $j=0; $j<$length; $j++) {
+        my $aa1 = $this_seq1[$j];
+        my $aa2 = $this_seq2[$j];
+        if ($aa1 eq $aa2) {
+          $this_score += 2;
+          $this_id++;
+        } else {
+          $this_score--;
+        }
+      }
+    }
+
+    if (!defined($score) or ($this_score > $score)) {
+      $score = $this_score;
+      $id = $this_id;
+      $frame = $i;
+##      $seqs = $this_seq1."\n".$this_seq2;
+    }
+  }
+
+  return ($score, $id, $frame);
+}
+
 
 ############################################################
 #
