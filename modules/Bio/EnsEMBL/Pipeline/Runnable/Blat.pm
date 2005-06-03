@@ -53,6 +53,7 @@ package Bio::EnsEMBL::Pipeline::Runnable::Blat;
 use vars qw(@ISA);
 use strict;
 
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -67,10 +68,12 @@ use Bio::SeqI;
 sub new {
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
-#added a parse clause to remove covered alignments, should work without it though  
-  my ($database, $query_seqs, $query_type, $target_type, $blat, $options, $parse) = $self->_rearrange([qw(
+  #added a parse clause to remove covered alignments, should work without it though
+  my ($database, $query_seqs, $query_file, $query_type, $target_type,
+      $blat, $options, $parse) = $self->_rearrange([qw(
 												  DATABASE
 												  QUERY_SEQS
+                          QUERY_FILE
 												  QUERY_TYPE
 												  TARGET_TYPE
 												  BLAT
@@ -81,16 +84,17 @@ sub new {
   
   # must have a target and a query sequences
   unless( $query_seqs ){
-#    $self->throw("Blat needs a query_seqs: $query_seqs");
+#    throw("Blat needs a query_seqs: $query_seqs");
   }
   $self->query_seqs(@{$query_seqs});
+  $self->query_file($query_file) if (defined($query_file));
   
   # you can pass a sequence object for the target or a database (multiple fasta file);
   if( $database ){
     $self->database( $database );
   }
   else{
-    $self->throw("Blat needs a target - database: $database");
+    throw("Blat needs a target - database: $database");
   }
   
   # Target type: dna  - DNA sequence
@@ -159,6 +163,8 @@ sub run {
   my $target_type = $self->target_type;
   my $parse	  = $self->parse;
   my @query_seqs  = $self->query_seqs;
+  my $query_file  = $self->query_file;
+  my $remove_file = undef;
 
   
   # set the working directory (usually /tmp)
@@ -177,7 +183,7 @@ sub run {
     
     # write the target sequence into a temporary file then
     $target = "$dir/target_seq.$$";
-    open( TARGET_SEQ,">$target") || $self->throw("Could not open $target $!");
+    open( TARGET_SEQ,">$target") || throw("Could not open $target $!");
     my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
 				 '-fh'     => \*TARGET_SEQ);
     $seqout->write_seq($self->target_seq);
@@ -185,22 +191,25 @@ sub run {
   }
   
   # write the query sequence into a temporary file then
-  my $query = "$dir/query_seqs.$$";
-  open( QUERY_SEQ,">$query") || $self->throw("Could not open $query $!");
-  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
-			       '-fh'     => \*QUERY_SEQ);
-  
-  # we write each Bio::Seq sequence in the fasta file $query
-  foreach my $query_seq ( @query_seqs ){
-    $seqout->write_seq($query_seq);
+  if (!defined($query_file)) {
+    $query_file = "$dir/query_seqs.$$";
+    open( QUERY_SEQ,">$query_file") || throw("Could not open $query_file $!");
+    my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
+  			       '-fh'     => \*QUERY_SEQ);
+
+    # we write each Bio::Seq sequence in the fasta file $query_file
+    foreach my $query_seq ( @query_seqs ){
+      $seqout->write_seq($query_seq);
+    }
+    close( QUERY_SEQ );
+    $remove_file = 1; # Request to remove file at the end of the process
   }
-  close( QUERY_SEQ );
   
   #my $parameters = $self->analysis->parameters;
 
-  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query stdout ";
-  #my $command ="$blat -out=pslx ".$self->options." -t=$target_type -q=$query_type $target $query stdout ";
-  #my $command ="$blat ".$self->options." $parameters $target $query ".$self->results; 
+  my $command ="$blat ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
+  #my $command ="$blat -out=pslx ".$self->options." -t=$target_type -q=$query_type $target $query_file stdout ";
+  #my $command ="$blat ".$self->options." $parameters $target $query_file ".$self->results; 
 
   print STDERR "running blat: $command\n";
   
@@ -304,7 +313,7 @@ sub run {
     #print STDERR "score = 100x".($matches + $mismatches + $rep_matches)."/".( $q_length )."\n";
     
     unless ( $q_length ){
-      $self->warn("length of query is zero, something is wrong!");
+      warning("length of query is zero, something is wrong!");
       next;
     }
     my $score   = sprintf "%.2f", ( 100 * ( $matches + $mismatches + $rep_matches ) / $q_length );
@@ -415,7 +424,7 @@ sub run {
     	$feat2 {start} = $query_starts[$i];
      	$feat2 {end}   = $query_ends[$i];
       if ( $query_ends[$i] <  $query_starts[$i]) {
-      	$self->warn("dodgy feature coordinates: end = $query_ends[$i], start = $query_starts[$i]. Reversing...");
+      	warning("dodgy feature coordinates: end = $query_ends[$i], start = $query_starts[$i]. Reversing...");
       	$feat2 {end}   = $query_starts[$i];
       	$feat2 {start} = $query_ends[$i];
       }
@@ -480,7 +489,7 @@ sub run {
  
   
   # remove interim files (but do not remove the database if you are using one)
-  unlink $query;
+  unlink $query_file if ($remove_file);
   
   
  
@@ -501,7 +510,7 @@ sub query_seqs {
   my ($self, @seqs) = @_;
   if (@seqs){
     unless ($seqs[0]->isa("Bio::PrimarySeqI") || $seqs[0]->isa("Bio::SeqI")){
-      $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
+      throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
     }
     push(@{$self->{_query_seqs}}, @seqs) ;
   }
@@ -510,11 +519,24 @@ sub query_seqs {
 
 ############################################################
 
+sub query_file {
+  my ($self, $file) = @_;
+  if ($file){
+    if (!-e $file or !-s $file) {
+      throw("Cannot find query file <$file>");
+    }
+    $self->{_query_file} = $file;
+  }
+  return $self->{_query_file};
+}
+
+############################################################
+
 sub genomic {
   my ($self, $seq) = @_;
   if ($seq){
     unless ($seq->isa("Bio::PrimarySeqI") || $seq->isa("Bio::SeqI")){
-      $self->throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
+      throw("query seq must be a Bio::SeqI or Bio::PrimarySeqI");
     }
     $self->{_genomic} = $seq ;
   }
@@ -526,7 +548,7 @@ sub genomic {
 sub blat {
   my ($self, $location) = @_;
   if ($location) {
-    $self->throw("Blat not found at $location: $!\n") unless (-e $location);
+    throw("Blat not found at $location: $!\n") unless (-e $location);
     $self->{_blat} = $location ;
   }
   return $self->{_blat};
@@ -539,7 +561,7 @@ sub query_type {
   if (defined($mytype) ){
     my $type = lc($mytype);
     unless( $type eq 'dna' || $type eq 'rna' || $type eq 'prot' || $type eq 'dnax' || $type eq 'rnax' ){
-      $self->throw("not the right query type: $type");
+      throw("not the right query type: $type");
     }
     $self->{_query_type} = $type;
   }
@@ -553,7 +575,7 @@ sub target_type {
   if (defined($mytype) ){
     my $type = lc($mytype);
     unless( $type eq 'dna' || $type eq 'prot' || $type eq 'dnax' ){
-      $self->throw("not the right target type: $type");
+      throw("not the right target type: $type");
     }
     $self->{_target_type} = $type ;
   }
