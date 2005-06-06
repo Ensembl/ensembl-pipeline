@@ -47,31 +47,31 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
 							     GB_GW_DBPASS
-                   GB_GW_DBPORT                                          
+							     GB_GW_DBPORT
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences
   qw (
       GB_PROTEIN_INDEX
       GB_PROTEIN_SEQFETCHER
      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General
   qw (
       GB_INPUTID_REGEX
      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts
   qw (
       GB_KILL_LIST
      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch    
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch
   qw (
       GB_FINAL_PMATCH_LOGICNAME
      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw 
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw
   (
    GB_TARGETTED_MASKING
    GB_TARGETTED_SOFTMASK
@@ -86,7 +86,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw
                            -INPUT_ID    => $id,
 			   -SEQFETCHER  => $sf,
                            -ANALYSIS    => $analysis);
-                           
+
     Function:   creates a Bio::EnsEMBL::Pipeline::RunnableDB::FPC_TargettedGeneWise object
     Returns :   A Bio::EnsEMBL::Pipeline::RunnableDB::Gene_Builder object
     Args    :   -db:      A Bio::EnsEMBL::DBSQL::DBAdaptor,
@@ -100,7 +100,7 @@ sub new {
   my ($class, @args) = @_;
   #print STDERR "args @args\n";
   my $self = $class->SUPER::new(@args);
-  
+
   # db, input_id, seqfetcher, and analysis objects are all set in
   # in superclass constructor (RunnableDB.pm)
 
@@ -266,7 +266,7 @@ sub targetted_runnable{
       }
   }
   
-  return @{$self->{'_targetted_runnables'}};  
+  return @{$self->{'_targetted_runnables'}};
 }
 
 =head2 run
@@ -285,13 +285,13 @@ sub run {
   my ($self) = @_;
   my $count = 0;
   #print STDERR "***Running targetted build***\n\n";
- TGE:   
+ TGE:
   foreach my $tge($self->targetted_runnable){
-    
+
     eval{
       $tge->fetch_input;
     };
-    
+
     if($@){
       $self->warn("problems fetching input for TargettedGenewise: [$@]\n");
       next TGE;
@@ -305,11 +305,9 @@ sub run {
       $self->warn("problems running TargettedGenewise: [$@]\n");
       next TGE;
     }
-    
-    
+
   }
-  
-  
+
 
 }
 
@@ -347,6 +345,7 @@ sub output{
 
 sub write_output {
   my ($self) = @_;
+ TGE:
   foreach my $tge($self->targetted_runnable){
     eval{
       my @genes = $tge->write_output;
@@ -368,7 +367,7 @@ sub convert_output {
 
 sub output_db {
     my( $self, $output_db ) = @_;
-    
+
     if ($output_db) 
     {
 	$output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
@@ -378,12 +377,12 @@ sub output_db {
     return $self->{_output_db};
 }
 
+
 =head2 fill_kill_list
 
  Title   : fill_kill_list
  Usage   : 
  Function: 
-           
  Returns : 
  Args    : 
 
