@@ -426,7 +426,17 @@ sub run {
       $feat1 {start} = $target_starts[$i];
       $feat1 {end}   = $target_ends[$i];
 
-      my ($score, $id, $frame) = get_best_score_in_all_frames($q_sequences[$i], $t_sequences[$i]);
+      my $this_q_bioseq = Bio::Seq->new(
+          -seq => $q_sequences[$i],
+          -moltype => "dna",
+          -alphabet => 'dna',
+          -id => "q_seq");
+      my $this_t_bioseq = Bio::Seq->new(
+          -seq => $t_sequences[$i],
+          -moltype => "dna",
+          -alphabet => 'dna',
+          -id => "t_seq");
+      my ($score, $id, $frame) = get_best_score_in_all_frames($this_q_bioseq, $this_t_bioseq);
       my $percent_id = sprintf "%.2f", ( 100 * $id / length($q_sequences[$i]));
       # we put all the features with the same score and percent_id
       $feat2 {score}   = $score;
