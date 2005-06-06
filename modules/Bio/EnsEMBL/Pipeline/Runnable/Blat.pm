@@ -436,8 +436,8 @@ sub run {
           -moltype => "dna",
           -alphabet => 'dna',
           -id => "t_seq");
-      my ($score, $id, $frame) = get_best_score_in_all_frames($this_q_bioseq, $this_t_bioseq);
-      my $percent_id = int(100 * $id / (length($q_sequences[$i]) / 3));
+      my ($score, $percent_id, $frame) =
+          get_best_score_in_all_frames($this_q_bioseq, $this_t_bioseq);
       # we put all the features with the same score and percent_id
       $feat2 {score}   = $score;
       $feat1 {score}   = $feat2 {score};
@@ -513,12 +513,12 @@ sub get_best_score_in_all_frames {
   my @aa_seq2_6fr = Bio::SeqUtils->translate_6frames($seq2);
 
   my $score;
-  my $id = 0;
+  my $perc_id = 0;
   my $frame = 0;
 ##  my $seqs;
   for (my $i=0; $i<6; $i++) {
     my $this_score = 0;
-    my $this_id = 0;
+    my $this_perc_id = 0;
     my $this_seq1 = $aa_seq1_6fr[$i]->seq;
     my $this_seq2 = $aa_seq2_6fr[$i]->seq;
     my $length = length($this_seq1);
@@ -531,7 +531,7 @@ sub get_best_score_in_all_frames {
         my $aa1 = $this_seq1[$j];
         my $aa2 = $this_seq2[$j];
         $this_score += $matrix->{$aa1}->{$aa2};
-        $this_id++ if ($aa1 eq $aa2);
+        $this_perc_id++ if ($aa1 eq $aa2);
       }
     } else {
       for (my $j=0; $j<$length; $j++) {
@@ -539,7 +539,7 @@ sub get_best_score_in_all_frames {
         my $aa2 = $this_seq2[$j];
         if ($aa1 eq $aa2) {
           $this_score += 2;
-          $this_id++;
+          $this_perc_id++;
         } else {
           $this_score--;
         }
@@ -548,13 +548,13 @@ sub get_best_score_in_all_frames {
 
     if (!defined($score) or ($this_score > $score)) {
       $score = $this_score;
-      $id = $this_id;
+      $perc_id = int(100 * $this_perc_id / $length);
       $frame = $i;
 ##      $seqs = $this_seq1."\n".$this_seq2;
     }
   }
 
-  return ($score, $id, $frame);
+  return ($score, $perc_id, $frame);
 }
 
 
