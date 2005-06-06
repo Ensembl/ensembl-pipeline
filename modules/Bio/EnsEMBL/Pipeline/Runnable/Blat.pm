@@ -437,7 +437,7 @@ sub run {
           -alphabet => 'dna',
           -id => "t_seq");
       my ($score, $id, $frame) = get_best_score_in_all_frames($this_q_bioseq, $this_t_bioseq);
-      my $percent_id = sprintf "%.2f", ( 100 * $id / length($q_sequences[$i]));
+      my $percent_id = int(100 * $id / (length($q_sequences[$i]) / 3));
       # we put all the features with the same score and percent_id
       $feat2 {score}   = $score;
       $feat1 {score}   = $feat2 {score};
