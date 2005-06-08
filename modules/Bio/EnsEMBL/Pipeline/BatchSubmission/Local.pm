@@ -33,17 +33,17 @@ sub construct_command_line{
   my $command_line = $command;
   $command .= " 1> ".$self->temp_stdout." ";
   $command .= "2> ".$self->temp_stderr." ";
-  $self->command_line($command);
+  $self->command($command);
 }
 
 
 sub open_command_line{
   my ($self, $verbose) = @_;
   if($verbose){
-    print STDERR "Opening ".$self->command_line."\n";
+    print STDERR "Opening ".$self->command."\n";
   }
   eval{
-    system($self->command_line);
+    system($self->command);
   };
   if($@){
     throw("FAILED to open commandline locally $@");
@@ -113,3 +113,12 @@ sub temp_stdout{
 }
 
 
+sub job_stats{
+  my ($self) = @_;
+  return 1;
+}
+
+sub temp_filename{
+  my ($self) = @_;
+  return '/tmp/';
+}
