@@ -180,7 +180,7 @@ if($dump){
     my $filename = $output_dir."/".$table.".".$dbname;
     my $dump_sql = "select * from $table into outfile '$filename'";
     print $dump_sql."\n" if($verbose);
-    my $dump_sth = $source_db->prepare($dump_sql);
+    my $dump_sth = $source_db->dbc->prepare($dump_sql);
     $dump_sth->execute;
   }
 }

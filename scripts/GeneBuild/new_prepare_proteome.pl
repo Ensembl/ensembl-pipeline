@@ -45,8 +45,8 @@ my %kill_list;
 my %ids;
 foreach my $file(@file_info){
   my $file_name = $file->{file_path};
-  open (IN, "<$file_name") or die "Can't open $file_name : $!";
-  open (OUT, ">>$protfile") or die "Can't open $protfile : $!";
+  open (IN, "<$file_name") or die "Can't open input file $file_name : $!";
+  open (OUT, ">>$protfile") or die "Can't open output file $protfile : $!";
   my $killing = 0;
   while(<IN>){
     #print STDERR "matching ".$_." with ".$file->{header_regex}."\n";
@@ -54,13 +54,13 @@ foreach my $file(@file_info){
       #print "have matched ".$_." with ".$file->{header_regex}."\n";
       $killing = 0;
       if($kill_list{$1}){
-	$killing = 1;
+        $killing = 1;
       }
       if(!$ids{$1}){
-	$ids{$1} = 1;
+        $ids{$1} = 1;
       }else{
-	print STDERR "skipping ".$1." it has already appeared\n";
-	$killing = 1;
+        print STDERR "skipping ".$1." it has already appeared\n";
+        $killing = 1;
       }
       if(!$killing){
 	print OUT ">$1\n";
