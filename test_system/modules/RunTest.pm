@@ -286,8 +286,8 @@ sub cleanup{
   if(!$testdb){
     $testdb = $self->testdb;
   }
-  $testdb->cleanup;
-  $self->environment->return_environment;
+  $testdb->cleanup if($testdb);
+  $self->environment->return_environment if($self->environment);
   return;
 }
 
