@@ -566,7 +566,7 @@ sub create_and_store_job{
 
   if ($@) {
     throw("Failed to store job ".$job->input_id." ".
-          $job->analysis->logic_name);
+          $job->analysis->logic_name." ".$@);
   } else {
     print "Stored ".$job->dbID." ".$job->input_id." ".
       $job->analysis->logic_name."\n" if ($self->be_verbose);
