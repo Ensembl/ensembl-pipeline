@@ -115,7 +115,9 @@ sub temp_stdout{
 
 sub job_stats{
   my ($self) = @_;
-  return 1;
+  my %hash;
+  $hash{'running'} = 1;
+  return \%hash;
 }
 
 sub temp_filename{
