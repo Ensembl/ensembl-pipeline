@@ -29,7 +29,7 @@ my $sa = $db->get_SimpleFeatureAdaptor();
 #
  ################################################################################
 
-my $store_simple_features = 0;
+my $store_simple_features = 1 ;
 
 # check if all files are there and readable
 for my $conf(@{$FB_CHR_INFO}){
@@ -64,53 +64,56 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   #
   # ###############################################################################
 
-
-  #     store_as_gene_object("MAIN_TYPE", "CHILD" , ENSEMBL_TYPE (source) )  
-  $gff->store_as_gene_object("gene","mRNA","gene");
-
-
-  $gff->store_as_gene_object("gene","ncRNA","ncRNA-pseudogene");
-
-
-  $gff->store_as_gene_object("gene","snRNA","snRNA-pseudogene");
+#  $gff->store_as_gene_object("gene");
+#  $gff->store_as_gene_object("gene","mRNA","gene");
+#  $gff->store_as_gene_object("gene","ncRNA","ncRNA-pseudogene");
+#  $gff->store_as_gene_object("gene","snRNA","snRNA-pseudogene");
+#  $gff->store_as_gene_object("gene","tRNA","tRNA-pseudogene");
+#  $gff->store_as_gene_object("gene","rRNA","rRNA-pseudogene");
+#  $gff->store_as_gene_object("gene","pseudogene","pseudogene");
 
 
-  $gff->store_as_gene_object("gene","tRNA","tRNA-pseudogene");
-
-
-  $gff->store_as_gene_object("gene","rRNA","rRNA-pseudogene");
-
-  $gff->store_as_gene_object("gene","pseudogene","pseudogene");
-
-
+#####   $gff->store_as_gene_object("gene","snoRNA","snoRNA-pseudogene");
 
   # dump all loaded proteins
   my $cmd = "perl /acari/work6a/jhv/project_droso/bdgp4.1/cvs_checkout/ensembl-pipeline/scripts/protein_pipeline/" .
-              "dump_translations.pl -dbn $FB_DBNAME -dbh $FB_DBHOST -dbp $FB_DBPORT -dbu ensro" .
+              "dump_translations.pl -dbn $FB_DBNAME -dbh $FB_DBHOST -dbpo $FB_DBPORT -dbu ensro" .
 		"-pr -no_ -f/acari/work6a/jhv/project_droso/bdgp4.1/dump_seqs.fasta"; 
 
 
   print "CMD is:\n$cmd\n";
 
-  system ("$cmd") ;
+  #### system ("$cmd") ;
 
 
 
+  #
+  # store other stuff 
+  # ncRNA, snRNA, snoRNA, tRNA etc are now child of parent 'gene', they're not stored here anymore
+  #
 
 
   #
   # store all simplefeatures as referenced in the FlyBaseConf.pm
   #
   # ###############################################################################
-#  if($store_simple_features){
-#    foreach my $feat (@{$SIMPLE_FEATURES}) {
-#      my $feature_type = $feat->{type};
-#      my $feature_label = $feat->{label};
-#      my $logic_name = $feat->{logic_name};
-#      print "searching for simple features of type $feature_type ... ";
-#      my $sf_num = $gff->store_as_simple_feature($sa, $feature_type,  $logic_name, $feature_label);
-#      print "$sf_num features found and stored in db.\n";
-#    }
-#  }
+
+  if ($store_simple_features) {
+
+    foreach my $feat (@{$SIMPLE_FEATURES}) {
+      my $feature_type = $feat->{type};
+      my $feature_label = $feat->{label};
+      my $logic_name = $feat->{logic_name};
+      print "searching for simple features of type $feature_type ... ";
+      my $sf_num = $gff->store_as_simple_feature($sa, $feature_type,  $logic_name, $feature_label);
+      
+      if ($sf_num > 0 ) { 
+        print "number found + stored in db: $sf_num \n";
+      }else { 
+        print " NOTHING found\n" ; 
+      }
+
+    }
+  }
 
 }
