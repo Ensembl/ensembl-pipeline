@@ -60,10 +60,10 @@ use vars qw( %FlyBaseConf );
 
                 LOGIC_NAME_EXON=>'bla',
                 # details for db-connection are stored in registry-file
-                FB_DBNAME => 'jhv_droso_test',
+                FB_DBNAME => 'jhv_drosophila_testcore_2',
                 FB_DBHOST => 'ia64g',
                 FB_DBUSER => 'ensadmin',
-                FB_DBPASS => 'ensembl',
+                FB_DBPASS => '',
                 FB_DBPORT => '3306',
 
 
@@ -95,36 +95,77 @@ use vars qw( %FlyBaseConf );
                 SIMPLE_FEATURES => [
                                     {
                                      type => 'oligo' ,
-                                     label => 'oligo' ,
-                                     logic_name => 'oligo_annotation'
+                                     label => 'use_gff_id' ,
+                                     logic_name => 'oligo'
                                     },
                                     {
                                      type => 'aberration_junction',
-                                     label => 'aberration_junction',
-                                     logic_name => 'abberation_annotation'
+                                     label => 'use_gff_id',
+                                     logic_name => 'abberation_junction',
                                     },
                                     {
                                      type => 'enhancer',
-                                     label => 'enhancer',
-                                     logic_name => 'enhancer_annotation'
+                                     label => 'use_gff_id',
+                                     logic_name => 'enhancer'
                                     },
                                     {
-                                     type => 'ncRNA',
-                                     label => 'ncRNA',
-                                     logic_name => 'ncRNA_annotation'
+                                     type => 'transcription_start_site',
+                                     label => 'use_gff_id',
+                                     logic_name => 'transcription_start_site',
                                     },
                                     {
                                      type => 'regulatory_region',
-                                     label => 'regulatory_region',
-                                     logic_name => 'regulatory_region_annotation'
+                                     label => 'use_gff_id',
+                                     logic_name => 'regulatory_region',
                                     },
-                                   ],
+                                    {
+                                     type => 'mature_peptide',
+                                     label => 'use_gff_id',
+                                     logic_name => 'mature_peptide'
+                                    },
+                                    {
+                                     type => 'signal_peptide',
+                                     label => 'use_gff_id',
+                                     logic_name => 'signal_peptide',
+                                    },
+                                    {
+                                     type => 'insertion_site',
+                                     label => 'use_gff_id',
+                                     logic_name => 'insertion_site',
+                                    },
+                                    {
+                                     type => 'protein_binding_site',
+                                     label => 'use_gff_id',
+                                     logic_name => 'protein_binding_site',
+                                    },
+                                    {
+                                     type => 'scaffold',
+                                     label => 'use_gff_id',
+                                     logic_name => 'scaffold',
+                                    },
+                                    {
+                                     type => 'sequence_variant',
+                                     label => 'use_gff_id',
+                                     logic_name => 'allele',
+                                    },
+                                    {
+                                     type => 'transposable_element_insertion_site',
+                                     label => 'use_gff_id',
+                                     logic_name => 'transposable_element_insertion_site',
+                                    },
+                                    {
+                                     type => 'transposable_element',
+                                     label => 'use_gff_id',
+                                     logic_name => 'transposable_element',
+                                    },
+                                    {
+                                     type => 'rescue_fragment',
+                                     label => 'use_gff_id',
+                                     logic_name => 'rescue_fragment',
+                                    },
 
-               );
-
-
-
-
+                                   ], 
+		                );	
 
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
