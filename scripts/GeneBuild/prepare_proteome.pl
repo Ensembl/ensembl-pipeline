@@ -24,118 +24,61 @@ use strict;
 =head1 OPTIONS
   
   Options are to be set in GeneBuild config files
-  The important ones for this script are:
-     GB_REFSEQ      location of refseq file in fasta format
-     GB_SPTR        location of swissprot file in fasta format
-     GB_PFASTA      where to write the clean fasta file
-     GB_PMATCH      location of the pmatch executable
+
      GB_KILL_LIST   location of text file listing Swissprot IDs to ignore
 
 =cut
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
-                                                           GB_REFSEQ
-                                                           GB_SPTR
-					                   GB_KILL_LIST
-                                                          );
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch qw (
-                                                           GB_PFASTA
-					                   GB_PMATCH
-                                                          );
 
-my $refseq    = $GB_REFSEQ;
-my $sptr      = $GB_SPTR;
-my $protfile  = $GB_PFASTA;
-my $kill_list = $GB_KILL_LIST;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts;
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch;
+
+
+
+
+my @file_info = @$GB_PROTEOME_FILES;
+my $protfile = $GB_PFASTA;
 my $pmatch    = $GB_PMATCH;
 
-if( defined $refseq && -e $refseq ) { &parse_refseq; }
-if( defined $sptr   && -e $sptr )   { &parse_sptr; }
-
-&test_protfile;
-
-### END MAIN
-
-sub get_kill_list {
-  my @kill_list = ();
-  open KILL_LIST_FH, $kill_list or die "can't open $kill_list";
-  while (<KILL_LIST_FH>) {
-    my @element = split;
-    if (scalar(@element) == 0) {	# blank or empty line
-      next;
-    }
-    push @kill_list, $element[0];
-  }
-  close KILL_LIST_FH or die "file error for $kill_list";
-  return \@kill_list;
-}
-
-sub parse_sptr {
-print STDERR "here\n";
-
-  my $kill_list = get_kill_list();
-  open (IN, "<$sptr") or die "Can't open $sptr\n";
-  open (OUT, ">>$protfile") or die "Can't open $protfile\n";
-  
-  my $killing = 0;	# nonzero if we're killing the current entry
+my %kill_list;
+%kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
+my %ids;
+foreach my $file(@file_info){
+  my $file_name = $file->{file_path};
+  open (IN, "<$file_name") or die "Can't open input file $file_name : $!";
+  open (OUT, ">>$protfile") or die "Can't open output file $protfile : $!";
+  my $killing = 0;
   while(<IN>){
-    # eg >143G_HUMAN (Q9UN99) 14-3-3 protein gamma
-    if(/^>\S+\s+\((\S+)\)/){
+    #print STDERR "matching ".$_." with ".$file->{header_regex}."\n";
+    if(/$file->{header_regex}/){
+      #print "have matched ".$_." with ".$file->{header_regex}."\n";
       $killing = 0;
-      foreach my $id_to_kill (@$kill_list) {
-        if ($1 eq $id_to_kill){
-          print STDERR "INFO: ignoring kill list entry $1\n";
-	  $killing = 1;
-	}
+      if($kill_list{$1}){
+        $killing = 1;
       }
-      if(! $killing){
-        if($1 eq 'P17013'){
-  	  die("DYING: $sptr still contains P17013. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
-        }
-        if($1 eq 'Q99784'){
-	  die("DYING: $sptr still contains Q99784. \nThis will probably cause problems with pmatch.\nYou should REMOVE IT AND RERUN prepare_proteome!\n");
-        }
-        print OUT ">$1\n";
+      if(!$ids{$1}){
+        $ids{$1} = 1;
+      }else{
+        print STDERR "skipping ".$1." it has already appeared\n";
+        $killing = 1;
       }
-    }
-    else{	# not a header line
-      if (! $killing) {
-        print OUT $_;
-      }
-    }
-  }
-  
-  close IN;
-  close OUT;
-
-}
-
-sub parse_refseq {
-
-  open (IN, "<$refseq") or die "Can't open $refseq\n";
-  open (OUT, ">$protfile") or die "Can't open $protfile\n";
-
-  while(<IN>){
-    # eg >gi|4501893|ref|NP_001094.1| actinin, alpha 2 [Homo sapiens]
-    #>AC3.2 CE05132	 UDP-glucuronosyltransferase status:Partially_confirmed
-    if(/^>/){
-      if(/if(/^>\w+\|\w+\|\w+\|(\S+)\|/)){
+      if(!$killing){
 	print OUT ">$1\n";
       }
-      else {
+    }else{
+      if(!$killing){
+	s/U/X/g;
 	print OUT $_;
       }
     }
-    else {
-      # sequence - sub U by X
-      s/U/X/g;
-      print OUT $_;
-    }
   }
   close IN;
   close OUT;
-
 }
+
+
+&test_protfile;
+
 
 sub test_protfile {
 
@@ -150,7 +93,7 @@ sub test_protfile {
 
   # do a pmatch test run
   print "starting pmatch test ... \n";
-  open(PM, "$pmatch -D $protfile $tmpfile | ") or die "Can't run $pmatch\n";
+  open(PM, "$GB_PMATCH -D $protfile $tmpfile | ") or die "Can't run $GB_PMATCH\n";
   while(<PM>) {
     print $_;
   }
@@ -160,3 +103,24 @@ sub test_protfile {
   unlink $tmpfile;
 
 }
+
+
+
+
+sub get_kill_list {
+  my ($kill_list) = @_;
+  my %kill_list = ();
+  open KILL_LIST_FH, $kill_list or die "can't open $kill_list";
+  while (<KILL_LIST_FH>) {
+    my @element = split;
+    if (scalar(@element) == 0) {	# blank or empty line
+      next;
+    }
+    $kill_list{$element[0]} = 1;
+  }
+  close KILL_LIST_FH or die "file error for $kill_list";
+  return \%kill_list;
+}
+
+
+
