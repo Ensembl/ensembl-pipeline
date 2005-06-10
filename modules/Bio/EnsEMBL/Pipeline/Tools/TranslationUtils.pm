@@ -159,9 +159,49 @@ sub compute_translation{
       print STDERR "problem making the translation\n";
     }
   $trans->flush_Exons;
+
   foreach my $exon ( @exons ){
     $trans->add_Exon($exon);
   }
+
+   # Finally the phase
+  if ($exons[0]->strand == 1) {
+    @exons = sort { $a->start <=> $b->start } @exons;
+  } else {
+    @exons = sort { $b->start <=> $a->start } @exons;
+  }
+  my $found_start = 0;
+  my $found_end   = 0;
+  my $phase       = $newtranslation->start_Exon->phase;
+
+  foreach my $exon (@exons) {
+    if ($found_start && !$found_end) {
+      $exon->phase($phase);
+      $exon->end_phase(($exon->length + $exon->phase) % 3);
+      $phase = $exon->end_phase;
+    }
+    if ($newtranslation->start_Exon == $exon) {
+      if ($exon == $exons[0]) { 
+        $exon->phase($phase);
+      } else {
+        $exon->phase(-1);
+      }
+
+      $exon->end_phase((($exon->length-$newtranslation->start+1) + $exon->phase) % 3);
+
+      $phase       = $exon->end_phase;
+      $found_start = 1;
+    }
+    if ($newtranslation->end_Exon == $exon) {
+      $found_end = 1;
+      if ($exon != $exons[-1]) {
+        $exon->end_phase(-1);
+      }
+    }
+    #print "Exon " . $exon->start . " " . $exon->end . " " . $exon->strand . " " . $exon->phase . " " . $exon->end_phase . "\n";
+  }
+
+  #print "Translation = " . $trans->translate->seq . "\n";
   return $trans;
 }
 
