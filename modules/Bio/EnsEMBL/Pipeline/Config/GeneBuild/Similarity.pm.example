@@ -52,10 +52,10 @@ use vars qw( %Similarity );
 	       # features are to be retrieved
 	       GB_SIMILARITY_DATABASES => [
 					  {				  
-					    'type'       => 'Swall',
+					    'type'       => 'Uniprot',
 					    'threshold'  => '200',
 					    'upper_threshold' => '',
-					    'index'      => '/data/blastdb/Ensembl/swall_index',
+					    'index'      => '/data/blastdb/Ensembl/uniprot',
 					    'seqfetcher' => 'Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher'
 					   },
 					   ],
@@ -69,8 +69,10 @@ use vars qw( %Similarity );
 	       # maximum allowed size of intron 
 	       GB_SIMILARITY_MAX_INTRON         => 100000,
 
-	       # minimum coverage required to prevent splitting on long introns - keep it high!
-	       GB_SIMILARITY_MIN_SPLIT_COVERAGE => 90,
+	       # minimum coverage required to prevent splitting on long introns 
+         # set to more than 100 for most species but for human you need to 
+         #set it to around 90
+	       GB_SIMILARITY_MIN_SPLIT_COVERAGE => 200,
 
 	       # low complexity threshold - transcripts whose translations have low
 	       # complexity % higher than GB_MAX_LOW_COMPLEXITY will be discarded
