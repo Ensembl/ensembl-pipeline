@@ -248,6 +248,9 @@ sub convert_PepFeaturePair {
     # replace protein coordinates
     $tmp[0]->hstart($feature->hstart);
     $tmp[0]->hend($feature->hend);
+# SMJS strand of peptide should be positive?
+    $tmp[0]->hstrand(1);
+
     push(@newfeatures,@tmp);
 
     return @newfeatures;
