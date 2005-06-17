@@ -10,106 +10,130 @@ use Getopt::Long;
 
 my $dbhost;
 my $dbname;
-my $chr_name;
+my $dbport;
+my $region;
 my $outfile;
-
+my $v;
 
 my $max_length = 100000;
 my $max_feature_count = 200;
 
 
+
 &GetOptions(
-	    'chr_name:s'      => \$chr_name,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
-	    'outfile:s'       => \$outfile,
-	    'max_length:s'    => \$max_length,
+	    'region:s'          => \$region,
+	    'dbhost:s'          => \$dbhost,
+	    'dbname:s'          => \$dbname,
+	    'dbport:s'          => \$dbport,
+	    'max_length:s'      => \$max_length,
 	    'max_feature_count' => \$max_feature_count,
+	    'v!'                => \$v,
 	   );
 
 
-unless ( $dbhost && $dbname && $chr_name && $outfile ){
+unless ( $dbhost && $dbname){
   print STDERR  "script to calculate the cut points for the slices to run jobs\n";
   print STDERR  "based on the genes in the database\n";
-  print STDERR  "Usage: $0 [-dbname -dbhost -outfile -chr_name]\n";
+  print STDERR  "Usage: $0 [-dbname -dbhost -outfile -region]\n";
   exit(0);
 }
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					    '-host'   => $dbhost,
-					    '-user'   => 'ensro',
-					    '-dbname' => $dbname,
+					    -host   => $dbhost,
+					    -user   => 'ensro',
+					    -dbname => $dbname,
+					    -port => $dbport,
 					    );
 
 
-my $slice = $db->get_SliceAdaptor->fetch_by_chr_name( $chr_name );
-#my $slice = $db->get_SliceAdaptor->fetch_by_chr_start_end( $chr_name, 84000000,191610523 );
-my $chr_length = $slice->length;
-print STDERR "got slice $chr_name.1-$chr_length\n";
+my $slices; 
 
-my @all_genes = $slice->get_all_Genes;
-unless ( @all_genes ){
-  print STDERR "No genes found - exiting\n";
-  exit(0);
+if (not defined $region){
+   $slices = $db->get_SliceAdaptor->fetch_all('toplevel');
+}
+else{
+    $slices = [$db->get_SliceAdaptor->fetch_by_region('toplevel',$region)];
 }
 
-my ($clusters,$feature_count) = &cluster_Genes(@all_genes);
-print STDERR scalar(@$clusters)." clusters found\n";
 
-my @clusters = sort { $a->start <=> $b->start } @$clusters;
+if (!@$slices){
+    print STDERR "cannot find slices -- bye.";
+    exit(0); 
+}
 
-open ( OUTPUT, ">$outfile" ) or die("cannot open $outfile");
+foreach my $slice (@$slices){
 
-my $current_start = 1;
-my $current_end   = $clusters[0]->end + int( ( $clusters[1]->start - $clusters[0]->end )/2 );
+    my $length = $slice->length;
 
-my $extra_features = $feature_count->{$clusters[0]};
-my $this_start  = $current_start;
-my $this_end    = $current_end;
-my $this_length = $this_end - $this_start + 1;
-my $count = $extra_features;
+    my $slice_id = $slice->id;
+    print STDERR "got slice $slice_id \n";
 
-print STDERR "   this range:$chr_name.$this_start-$this_end\tlength:".
-    "$this_length\tfeature_count:$extra_features\n";
+    my $all_genes = $slice->get_all_Genes;
 
-CLUSTER:
-for (my $i=1; $i<=$#clusters; $i++ ){
+    print STDERR scalar(@$all_genes)," genes found\n";
     
-    $extra_features = $feature_count->{$clusters[$i]};
+    next if ( ! (@$all_genes) );
 
-    $this_end = $chr_length;
-    if ( $i<$#clusters ){
-	$this_end = $clusters[$i]->end + int( ( $clusters[$i+1]->start - $clusters[$i]->end )/2 );
-    }
-    $this_start  = $current_end + 1;
-    $this_length = $this_end - $this_start + 1;
-    print STDERR "   this range:$chr_name.$this_start-$this_end\tlength:".
-	"$this_length\tfeature_count:$extra_features\n";
-  
-    my $new_length = $this_end - $current_start + 1;
-    my $new_count  = $count + $extra_features;
-    if ( $new_length > $max_length ||  $new_count > $max_feature_count ){
-	print OUTPUT "$chr_name.$current_start-$current_end\tlength:".
-	    ($current_end-$current_start +1)."\tfeature_count:$count\n";
+    my ($clusters,$feature_count) = &cluster_Genes($all_genes); #cluster genes if they overlap over the genomic regions ('gene' refers to 'ensembl api gene')
+
+    print STDERR scalar(@$clusters)." clusters found\n";
+
+    my @clusters = sort { $a->start <=> $b->start } @$clusters;
+
+
+    #group clusters if they satisfy the criteria ($max_length $max_feature_count)
+    
+    my $current_start = 1;
+    my $current_end;
+
+    my $this_cluster = shift (@clusters);
+
+    my $count_feat = $feature_count->{$this_cluster};
+
+    my ($this_start,$this_end);
+ 
+    while (my $next_cluster = shift @clusters){
+	 
+	$this_start =  $this_cluster->start;
+	$this_end   =  $this_cluster->end;	
+
+	$current_end   = $this_cluster->end + int( ( $next_cluster->start - $this_cluster->end )/2 );
 	
-	print STDERR "SLICE $chr_name.$current_start-$current_end\tlength:".
-	    ($current_end-$current_start +1)."\tfeature_count:$count\n";
+	print STDERR "\tslice:$slice_id st-ed:$this_start-$this_end feature_count:",$feature_count->{$this_cluster},"\n" if $v;
+	 
 	
-	$current_start = $current_end + 1;
-	$current_end   = $this_end;
-	$count = $extra_features;
+	if (@clusters){
+	    
+	    my $after_next_cluster=$clusters[0];
+	    
+	    my $new_end = $next_cluster->end + int( ( $after_next_cluster->start - $next_cluster->end )/2 );
+	    my $new_length = $new_end-$current_start+1;	
+	    my $new_count = $count_feat + $feature_count->{$next_cluster};
+
+	    if ( $new_length > $max_length ||  $new_count > $max_feature_count ){
+		#print out group
+		my $slice_to_print = $slice->sub_Slice($current_start,$current_end,1);
+
+		print  $slice_to_print->name(),"\tlength:",($current_end-$current_start +1),"\tfeature_count:$count_feat\n";
+		
+		print STDERR "->GROUP:",$slice_to_print->name(),"\tlength:",($current_end-$current_start +1),"\tfeature_count:$count_feat\n" if $v; 
+	    
+		$current_start = $current_end + 1;       
+		$count_feat=0;
+	    }
+	    
+	}
+	
+	$this_cluster=$next_cluster;
+	$count_feat += $feature_count->{$this_cluster};
+	
     }
-    else{
-	$count = $new_count;
-	$current_end = $this_end;
-    }
-    if ( $i==$#clusters ){
-	print OUTPUT "$chr_name.$current_start-$chr_length\tlength:".( $chr_length - $current_start + 1 )."\tfeature_count:$count\n";
-	print STDERR "SLICE $chr_name.$current_start-$chr_length\tlength:".( $chr_length - $current_start + 1 )."\tfeature_count:$count\n";
-    }
+    print STDERR "\tslice:$slice_id st-ed:$this_start-$this_end feature_count:",$feature_count->{$this_cluster},"\n" if $v;
+    $current_end = $length;
+    my $slice_to_print = $slice->sub_Slice($current_start,$current_end,1);
+    print  $slice_to_print->name(),"\tlength:",($current_end-$current_start +1),"\tfeature_count:$count_feat\n";
 }
 
-close(OUTPUT);
 
 ############################################################
 
@@ -135,7 +159,10 @@ sub by_lower_coordinate {
 
 sub get_feature_count{
     my $gene = shift;
-    return scalar(@{$gene->get_all_Exons} );
+
+    my @exons = (@{$gene->get_all_Exons});
+    return scalar(@exons);
+    #return scalar(@{$gene->get_all_Exons} );
 }
 
 #####################################################################
@@ -158,7 +185,9 @@ sub cluster_Genes{
   
   $cluster->start( $start );
   $cluster->end($end);
-  $features{$cluster} += &get_feature_count($genes[0]);
+
+  $features{$cluster} += &get_feature_count($first_gene); 
+
   # store the list of clusters
   push( @clusters, $cluster );
   
