@@ -304,3 +304,22 @@ NP_112232 Tiny protein that has been removed from RefSeq.  Formed the basis 51 h
 Q91VY0 56 Q91VY0_MOUSE Q91VY0 Similar to L1 repeat, Tf subfamily, member 30. 
 Q06666 T2_MOUSE Q06666 Octapeptide-repeat protein T2.
 Q658T9 63 Q658T9_HUMAN Q658T9 Hypothetical protein DKFZp666K083. hits rmacaque that many times who knows how many on human
+Q8NGN9 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q8NH14 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q8NH24 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q7Z5M5 TMC3 protein. (smjs TO MANY X)
+Q8IXD9 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q8NH25 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q8NH15 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q8NGV8 Seven transmembrane helix receptor. (smjs TO MANY X)
+Q6ZVX2 Similar to several ALUs (smjs)
+Q8N9E1 Similar to several ALUs (smjs)
+Q6Q3U3 Similar to several ALUs (smjs)
+Q9UJZ4 similar to Line-1s (smjs)
+Q6ZWA1 similar to Line-1s (smjs)
+Q6RGF7 similar to Line-1s (smjs)
+Q7KZ41 similar to Line-1s (smjs)
+O97916 reverse transcriptase like (smjs)
+O88912 Mus musculus domesticus L1 retrotransposon, Tf subfamily L1Md-Tf8, partial sequence (smjs)
+Q12880 Retrotransposable L1 element LRE2 from chromosome 1q. (smjs)
+
