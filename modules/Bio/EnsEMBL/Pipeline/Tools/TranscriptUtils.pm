@@ -89,7 +89,7 @@ sub _check_Transcript{
       $valid = 0;
     }
     elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-      #print STDERR "check: transcript $id falls off the slice by its lower end\n";
+      print STDERR "check: transcript $id falls off the slice by its lower end\n";
       $valid = 0;
     }
   }
@@ -122,7 +122,7 @@ sub _check_Transcript{
 
 	# check phase consistency:
 	if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-	  #print STDERR "check: transcript $id has phase inconsistency\n";
+	  print STDERR "check: transcript $id has phase inconsistency\n";
 	  $valid = 0;
 	  last EXON;
 	}
@@ -2025,6 +2025,160 @@ sub feature_info{
   my ($name, $feature) = @_;
 
   return $name." ".$feature->start." ".$feature->end." ".$feature->strand."\n";
+}
+
+############################################################
+
+sub replace_stops_with_introns {
+  my ($self, $tran) = @_;
+
+  my @exons = @{$tran->get_all_Exons};
+  my $pep = $tran->translate->seq;
+
+  while($pep =~ /\*/g) {
+    my $position = pos($pep);
+
+    my @coords = $tran->pep2genomic($position, $position);
+
+    if (@coords > 1) {
+      # the codon is split by an intron. Messy. Leave these for now
+      print STDERR "Stop is interruped by intron. Returning undef;\n";
+      return undef;
+    } 
+    my ($stop) = @coords;
+
+    # locate the exon that this stop lies in
+    my @new_exons;
+    foreach my $exon (@exons) {
+      if ($stop->start >= $exon->start and $stop->end <= $exon->end) {
+        # this stop lies completely within an exon. We split the exon
+        # into two
+        my $exon_left = Bio::EnsEMBL::Exon->
+            new(-slice     => $exon->slice,
+                -start     => $exon->start,
+                -end       => $stop->start - 1,
+                -strand    => $exon->strand,
+                -phase     => $exon->strand < 0 ? 0 : $exon->phase,
+                -end_phase => $exon->strand < 0 ? $exon->end_phase  :0);
+        my $exon_right = Bio::EnsEMBL::Exon->
+            new(-slice     => $exon->slice,
+                -start     => $stop->end + 1,
+                -end       => $exon->end,
+                -strand    => $exon->strand,
+                -phase     => $exon->strand < 0 ? $exon->phase : 0,
+                -end_phase => $exon->strand < 0 ? 0 : $exon->end_phase);
+        # need to split the supporting features between the two
+        my @sfs = @{$exon->get_all_supporting_features};
+        my (@ug_left, @ug_right);
+        foreach my $f (@sfs) {
+          foreach my $ug ($f->ungapped_features) {
+            if ($ug->start >= $exon_left->start and 
+                $ug->end <= $exon_left->end) {
+              #completely within the left-side of the split
+              push @ug_left, $ug;
+            } elsif ($ug->start >= $exon_right->start and 
+                     $ug->end <= $exon_right->end) {
+              #completely within the right-side of the split
+              push @ug_right, $ug;
+            } else {
+              # this ug must span the split
+              my $fp_left = Bio::EnsEMBL::FeaturePair->new();
+              $fp_left->seqname   ($ug->seqname);
+              $fp_left->strand    ($ug->strand);
+              $fp_left->hseqname  ($ug->hseqname);
+              $fp_left->score     ($ug->score);
+              $fp_left->percent_id($ug->percent_id);
+              $fp_left->start     ($ug->start);
+              $fp_left->end       ($stop->start - 1);
+              
+              my $fp_right = Bio::EnsEMBL::FeaturePair->new();
+              $fp_right->seqname   ($ug->seqname);
+              $fp_right->strand    ($ug->strand);
+              $fp_right->hseqname  ($ug->hseqname);
+              $fp_right->score     ($ug->score);
+              $fp_right->percent_id($ug->percent_id);
+              $fp_right->start     ($stop->end + 1);
+              $fp_right->end       ($ug->end);
+              
+              if ($exon->strand > 0) {
+                $fp_left->hstart($ug->hstart);
+                $fp_left->hend($fp_left->hstart +
+                               ($fp_left->length / 3) - 
+                               1);
+                
+                $fp_right->hend ($ug->hend);
+                $fp_right->hstart($ug->hend - 
+                                  ($fp_right->length / 3) + 
+                                  1);
+              } else {
+                $fp_left->hend ($ug->hend);
+                $fp_left->hstart($ug->hend - 
+                                 ($fp_left->length / 3) + 
+                                 1);
+                
+                $fp_right->hstart($ug->hstart);
+                $fp_right->hend($fp_right->hstart +
+                                ($fp_right->length / 3) - 
+                                1);
+              }
+
+              if ($fp_left->end >= $fp_left->start) { 
+                push @ug_left, $fp_left;
+              }
+              if ($fp_right->end >= $fp_right->start) {
+                push @ug_right, $fp_right;
+              }
+            }
+          }
+        }
+
+        if (@ug_left) {
+          my $f = Bio::EnsEMBL::DnaPepAlignFeature->
+              new(-features => \@ug_left);
+          $exon_left->add_supporting_features($f);
+        }
+        if (@ug_right) {
+          my $f = Bio::EnsEMBL::DnaPepAlignFeature->
+              new(-features => \@ug_right);
+          $exon_right->add_supporting_features($f);
+        }
+        
+        if ($exon->strand < 0) {
+          if ($exon_right->end >= $exon_right->start) {
+            push @new_exons, $exon_right;
+          }
+          if ($exon_left->end >= $exon_left->start) {
+            push @new_exons, $exon_left;
+          }
+        } else {
+          if ($exon_left->end >= $exon_left->start) {
+            push @new_exons, $exon_left;
+          }
+          if ($exon_right->end >= $exon_right->start) {
+            push @new_exons, $exon_right;
+          } 
+        }
+      } else {
+        # this exon is unaffected by this stop
+        push @new_exons, $exon;
+      }
+    }
+    
+    @exons = @new_exons;
+  }
+  
+  $tran->flush_Exons;
+  foreach my $exon (@exons) {
+    $tran->add_Exon($exon);
+  }
+  my $translation = Bio::EnsEMBL::Translation->new();
+  $translation->start_Exon($exons[0]);
+  $translation->end_Exon($exons[-1]);
+  $translation->start(1);
+  $translation->end($exons[-1]->end - $exons[-1]->start + 1);
+  $tran->translation($translation);
+
+  return $tran;
 }
 
 
