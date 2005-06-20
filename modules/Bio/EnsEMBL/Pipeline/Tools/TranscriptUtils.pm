@@ -2083,6 +2083,9 @@ sub replace_stops_with_introns {
             } else {
               # this ug must span the split
               my $fp_left = Bio::EnsEMBL::FeaturePair->new();
+              if ($ug->slice) {
+                $fp_left->slice($ug->slice);
+              }
               $fp_left->seqname   ($ug->seqname);
               $fp_left->strand    ($ug->strand);
               $fp_left->hseqname  ($ug->hseqname);
@@ -2090,8 +2093,11 @@ sub replace_stops_with_introns {
               $fp_left->percent_id($ug->percent_id);
               $fp_left->start     ($ug->start);
               $fp_left->end       ($stop->start - 1);
-              
+
               my $fp_right = Bio::EnsEMBL::FeaturePair->new();
+              if ($ug->slice) {
+                $fp_right->slice($ug->slice);
+              }
               $fp_right->seqname   ($ug->seqname);
               $fp_right->strand    ($ug->strand);
               $fp_right->hseqname  ($ug->hseqname);
