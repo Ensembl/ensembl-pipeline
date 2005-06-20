@@ -123,11 +123,21 @@ sub fetch_input{
   # get genewise genes
   my $similarity_genes = $self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE);
   my $targetted_genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
-  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
+
+  # temp hack klh: add my own type in. This needs to be made more generic!
+  #my $projected_genes = $self->query->get_all_Genes_by_type('WGA2Genes');
+  #my $exonerate_genes = $self->query->get_all_Genes_by_type('Exonerate_Protein');
+
   print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes\n";
+  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
+  #print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes genes\n";
+  #print STDERR "got " . scalar(@{$exonerate_genes}) . " Exonerate genes\n";
+
 
   $self->gw_genes( $similarity_genes);
   $self->gw_genes( $targetted_genes );
+  #$self->gw_genes( $projected_genes );
+  #$self->gw_genes( $exonerate_genes );
 
   # get blessed genes
   my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if ($self->blessed_db);
@@ -757,8 +767,13 @@ sub _merge_genes {
 	  # which gets expanded and the other exons are added into it
 	  #print STDERR "merging $exon into $previous_exon\n";
 	  #print STDERR $exon->start."-".$exon->end." into ".$previous_exon->start."-".$previous_exon->end."\n";
-	
-	  $previous_exon->end($exon->end);
+
+          if ($strand == 1) {
+            $previous_exon->end($exon->end);
+          } else {
+            $previous_exon->start($exon->start);
+          }
+
 	  $previous_exon->add_sub_SeqFeature($exon,'');
 	
 	  # if this is end of translation, keep that info:
@@ -829,7 +844,7 @@ sub _merge_genes {
   if (scalar(@support)) {
     $merged_transcript->add_supporting_features(@support);
   }
-
+  $merged_transcript->add_Attributes(@{$trans[0]->get_all_Attributes});
     
     #print STDERR "merged_transcript:\n";
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
@@ -871,6 +886,7 @@ sub combine_genes{
   if (scalar(@support)) {
     $newtranscript->add_supporting_features(@support);
   }
+  $newtranscript->add_Attributes(@{$gw_tran[0]->get_all_Attributes});
 
   my $translation   = new Bio::EnsEMBL::Translation;
   $translation->start($gw_tran[0]->translation->start);
@@ -956,7 +972,8 @@ sub combine_genes{
       foreach my $ex (@{$newtranscript->get_all_Exons}){
 
         if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
-          my @sf    = $ex->sub_SeqFeature;
+          my @sf    = sort {$a->start <=> $b->start} $ex->sub_SeqFeature;
+
           my $first = shift(@sf);
 
           $ex->end($first->end);
@@ -2074,6 +2091,7 @@ sub blessed_genes {
   if (scalar(@support)) {
     $newtranscript->add_supporting_features(@support);
   }
+  $newtranscript->add_Attributes(@{$transcript->get_all_Attributes});
 
 	$newtranscript->translation($newtranslation);
 
