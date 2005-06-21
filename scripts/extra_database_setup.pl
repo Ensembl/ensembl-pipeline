@@ -45,6 +45,10 @@ database and loading tables to a new database
 
   -genebuild_database use a predefined list of tables as needed by a
                       non sequence genebuild database
+ 
+  -genes uses a predefined list of tables for genes
+
+  -sequence uses a predefined list of tables for sequence
 
   -table_name the name of a table to dump or load
 
@@ -112,6 +116,8 @@ my $output_dir;
 my @command_args = @ARGV;
 my $verbose;
 my $local;
+my $genes;
+my $sequence;
 
 &GetOptions(
             'dbhost=s'            => \$dbhost,
@@ -128,6 +134,8 @@ my $local;
             'output_dir=s'        => \$output_dir,
             'verbose!'            => \$verbose,
             'local!'              => \$local,
+            'genes!'              => \$genes,
+            'sequence!'           => \$sequence,
            ) or perldocs("Couldnt get your options");
 
 my $error_msg;
@@ -150,7 +158,23 @@ if($genebuild_database){
        'attrib_type', 'coord_system', 'meta', 'meta_coord', 'seq_region',
        'seq_region_attrib');
 }
-
+if($genes){
+  push(@table_names, 'gene', 'transcript', 'transcript_supporting_feature',
+       'translation', 'exon_transcript', 'exon', 'supporting_feature',
+       'protein_align_feature', 'dna_align_feature', 'gene_stable_id',
+       'transcript_stable_id', 'translation_stable_id', 'exon_stable_id',
+       'analysis', 'meta_coord');
+}
+if($sequence){
+  push(@table_names, 'dna', 'assembly', 'assembly_exception', 'analysis', 
+       'attrib_type', 'coord_system', 'meta', 'meta_coord', 'seq_region',
+       'seq_region_attrib');
+}
+my %tables;
+foreach my $table(@table_names){
+  $tables{$table} = 1;
+}
+@table_names = keys(%tables);
 if(!(@table_names  >= 1)){
   $help = 1;
   $error_msg .= "If you want to load or dump tables you must provide a ".
