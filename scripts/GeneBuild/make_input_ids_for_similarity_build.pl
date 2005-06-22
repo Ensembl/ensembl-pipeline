@@ -274,7 +274,7 @@ sub get_iids_from_slice {
     $num_seeds += scalar( keys %features );
   }
 
-  next if $num_seeds == 0;
+  return if($num_seeds == 0);
 
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
