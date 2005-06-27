@@ -1,8 +1,5 @@
 # Perl module for Bio::EnsEMBL::Pipeline::DBSQL::Flag
-#
-# Creator: Simon White 18/2/2005
-# Last modified : 18/2/2005 by Simon White
-#
+
 # You may distribute this module under the same terms as perl itself
 
 # POD documentation - main docs before the code
@@ -28,7 +25,7 @@ pass the object to.
 
 =head1 CONTACT
 
-Simon White sw4@sanger.ac.uk
+Post general queries to ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
