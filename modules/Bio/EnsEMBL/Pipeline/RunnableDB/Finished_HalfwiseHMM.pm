@@ -183,12 +183,15 @@ sub getPfamDB{
 
 sub check_db_versions{
     my ($self) = @_;
-    my $my_pfam = $self->db_version_searched();
+    warn my $my_pfam = $self->db_version_searched();
     my $pfam_ls = $self->pfam_ls_version();
+	warn $pfam_ls;
 
-    unless($pfam_ls eq $my_pfam){
-       # $self->throw("VERSION MISMATCH : $pfam_ls not equal to $my_pfam\n");
-    }
+   # unless($pfam_ls eq $my_pfam){
+	  # should be commented out. This does not work, 
+	  # as the Pfam_ls version is not in the blastdb tracking db
+	  #$self->throw("VERSION MISMATCH : $pfam_ls not equal to $my_pfam\n");
+   # }
 }
 
 sub db_version_searched{
@@ -210,18 +213,19 @@ sub pfam_ls_version{
     my $force_dbi  = 0; # this will force a dbi call SLOW!!!!!!
     unless($self->{'_pfam_ls_version'}){
         my $db = $self->analysis->db_file;
+
         $BlastableVersion::debug = $debug_this;            
         warn "BlastableVersion is cvs revision $BlastableVersion::revision \n" if $debug_this;
-            
+
         my $ver = eval { 
 		    my $blast_ver = BlastableVersion->new();
-            $blast_ver->force_dbi($force_dbi); # if set will be SLOW.
+			$blast_ver->force_dbi($force_dbi); # if set will be SLOW.
             $blast_ver->get_version($db);
             $blast_ver;
         };
 
         $self->throw("I failed to get a BlastableVersion for $db") if $@;
-        
+
         my $dbv = $ver->version();
         my $sgv = $ver->sanger_version();
         my $name = $ver->name();
