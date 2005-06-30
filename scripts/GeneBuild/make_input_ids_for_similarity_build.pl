@@ -147,8 +147,11 @@ if ( not $ana_type ) {
 
 $max_slice_size = 5000000 if not $max_slice_size;
 
-my @slice_names;
 
+
+$verbose and print STDERR "Generating Initial input ids...\n";
+
+my @slice_names;
 if ($slice_name_file) {
   open( SLICES, "<$slice_name_file" ) or die "could not open file with slice $slice_name_file";
   while (<SLICES>) {
@@ -156,17 +159,21 @@ if ($slice_name_file) {
     my ($name) = split;
     push @slice_names, $name;
   }
+} else {
+  my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(
+                                                                         -db           => $db,
+                                                                         -slice        => 1,
+                                                                         -slice_size   => $max_slice_size,
+                                                                         -coord_system => $coord_system,
+                                                                         -logic_name   => $logic_name
+                                                                         );
+  @slice_names = @{ $inputIDFactory->generate_input_ids }
 }
+
+
 
 my $sl_adp = $db->get_SliceAdaptor;
 
-my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(
-                                                                        -db           => $db,
-                                                                        -slice        => 1,
-                                                                        -slice_size   => $max_slice_size,
-                                                                        -coord_system => $coord_system,
-                                                                        -logic_name   => $logic_name
-);
 my %kill_list = %{&fill_kill_list};
 my @iids_to_write;
 
@@ -174,18 +181,34 @@ my @iids_to_write;
 # version, slices will be generated according to the most appropriate split point
 # (determined by examining the protein/cDNA hits to the genome)
 
-$verbose and print STDERR "Generating Initial input ids...\n";
+$verbose and print STDERR "Retrieved " . @slice_names . " slice names; now working...\n";
 
-if ( !@slice_names ) {
-  foreach my $slice_id ( @{ $inputIDFactory->generate_input_ids } ) {
-    push @iids_to_write, get_iids_from_slice($slice_id);
-  }
-} else {
-  print STDERR "Retrieved " . @slice_names . " slice names\n";
-  foreach my $slice_id (@slice_names) {
-    push @iids_to_write, get_iids_from_slice($slice_id);
+my @generated_iids;
+foreach my $slice_id ( @slice_names ) {
+  push @generated_iids, get_iids_from_slice($slice_id);
+}
+
+foreach my $iid (@generated_iids) {
+
+  if ($write) {
+    my $s_inf_cont = $db->get_StateInfoContainer;
+
+    eval { 
+      $db->get_StateInfoContainer->
+               store_input_id_analysis( $iid, $analysis, '' ); 
+    };
+    if ($@) {
+      print STDERR "Input id $iid already present\n";
+    } else {
+      print STDERR "Stored input id $iid\n";
+    }
+  } else {
+    print "INSERT into input_id_analysis values ('$iid', '$ana_type', $ana_id, now(), '', '', 0);\n";
   }
 }
+
+#######################################
+
 
 sub get_iids_from_slice {
   my ($slice_id) = @_;
@@ -274,36 +297,22 @@ sub get_iids_from_slice {
     $num_seeds += scalar( keys %features );
   }
 
-  return if($num_seeds == 0);
+  return () if $num_seeds == 0;
 
+  my @iids;
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
   my $num_chunks = int( $num_seeds / 20 ) + 1;
   for ( my $x = 1 ; $x <= $num_chunks ; $x++ ) {
-
+    
     # generate input id : $chr_name.1-$chr_length:$num_chunks:$x
     my $new_iid = $slice_id . ":$num_chunks:$x";
-    if ( not $write ) {
-      print "INSERT into input_id_analysis values ('$new_iid', '$ana_type', $ana_id, now(), '', '', 0);\n";
-    } else {
-      push @iids_to_write, $new_iid;
-    }
-  }
-}
-
-if ($write) {
-  my $s_inf_cont = $db->get_StateInfoContainer;
-
-  foreach my $iid (@iids_to_write) {
-    eval { $s_inf_cont->store_input_id_analysis( $iid, $analysis, '' ); };
-    if ($@) {
-      print STDERR "Input id $iid already present\n";
-    } else {
-      print STDERR "Stored input id $iid\n";
-    }
+    push @iids, $new_iid;
   }
 
+  return @iids;
 }
+
 
 sub fill_kill_list {
   my %kill_list;
