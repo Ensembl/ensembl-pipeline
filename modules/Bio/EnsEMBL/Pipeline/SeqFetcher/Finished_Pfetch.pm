@@ -109,6 +109,8 @@ sub get_server {
     if ($server) {
         $server->autoflush(1);
         return $server;
+    } else {
+        $self->throw("Can't connect to '$host:$port' : $@");
     }
 }
 
