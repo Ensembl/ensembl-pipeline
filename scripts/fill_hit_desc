@@ -83,7 +83,7 @@ use Data::Dumper;
         );
     
     my $chunk_size = 200;
-    for (my $i = 0; $i < @$ids; $i++) {
+    for (my $i = 0; $i < @$ids; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         $j = $#$ids if $j > $#$ids;
         my $chunk = [@$ids[$i..$j]];
