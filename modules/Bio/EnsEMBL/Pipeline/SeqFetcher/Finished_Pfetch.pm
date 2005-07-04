@@ -102,7 +102,8 @@ sub get_server {
     my $server = IO::Socket::INET->new(
         PeerAddr => $host,
         PeerPort => $port,
-        Proto    => 'tcp',
+        #Proto    => 'tcp',
+	    Proto    => 6,
         Type     => SOCK_STREAM,
         Timeout  => 10,
     );
@@ -123,7 +124,8 @@ sub get_archive_server {
     my $server = IO::Socket::INET->new(
         PeerAddr => $host,
         PeerPort => $port,
-        Proto    => 'tcp',
+        #Proto    => 'tcp',
+		Proto    => 6,
         Type     => SOCK_STREAM,
         Timeout  => 10,
     );
