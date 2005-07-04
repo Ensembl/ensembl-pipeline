@@ -66,12 +66,12 @@ foreach my $chr(@{$FB_CHR_INFO}) {
 
   $gff->store_as_gene_object("gene");
   $gff->store_as_gene_object("gene","mRNA","gene");
-  $gff->store_as_gene_object("gene","ncRNA","ncRNA-pseudogene");
-  $gff->store_as_gene_object("gene","snRNA","snRNA-pseudogene");
-  $gff->store_as_gene_object("gene","tRNA","tRNA-pseudogene");
-  $gff->store_as_gene_object("gene","rRNA","rRNA-pseudogene");
+  $gff->store_as_gene_object("gene","ncRNA","ncRNA");
+  $gff->store_as_gene_object("gene","snRNA","snRNA");
+  $gff->store_as_gene_object("gene","tRNA","tRNA");
+  $gff->store_as_gene_object("gene","rRNA","rRNA");
   $gff->store_as_gene_object("gene","pseudogene","pseudogene");
-  $gff->store_as_gene_object("gene","snoRNA","snoRNA-pseudogene");
+  $gff->store_as_gene_object("gene","snoRNA","snoRNA");
 
 
 
