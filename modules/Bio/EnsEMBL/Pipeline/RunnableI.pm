@@ -454,16 +454,21 @@ sub find_file {
   my ($self,$name) = @_;
 
   my $datadir = $DATA_DIR || undef;
-  my $libdir  = $LIB_DIR  || undef; 
+  my $libdir  = $LIB_DIR  || undef;
+
+  # files for genescan and fgenesh
+  my $ensdir  = $ENS_DIR  || undef;
 
   my $full_name;
 
   if (-e $name) {
     return $name;
-    
+
   } elsif ($datadir && -e ($full_name = "$datadir/$name")) {
     return $full_name;
   } elsif ($libdir && -e ($full_name = "$libdir/$name")) {
+    return $full_name;
+  } elsif ($ensdir && -e ($full_name = "$ensdir/$name")) {
     return $full_name;
   } else {
     $self->throw("Can't find file [$name]");
