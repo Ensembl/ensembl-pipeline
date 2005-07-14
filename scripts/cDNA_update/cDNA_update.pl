@@ -13,13 +13,14 @@ in an automated fashion.
 
   A. Fill in config variables, start script with argument 'prepare':
      "perl cDNA_setup.pl prepare".
-     After the preperation, the modified genome files will have to be pushed across
+     If the assembly has changed:
+     After the preparation, the modified genome files will have to be pushed across
      the farm. The previous files should be removed before this! Please mail systems
      about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_setup.pl compare"
-  C. Start script again with argument 'clean' after finnishing the pipeline
+  C. Start script again with argument 'clean' after finnishing the pipeline-
      run to clean up: "perl cDNA_setup.pl clean", removing tmp files
 
 =head1 DESCRIPTION
@@ -80,10 +81,10 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-$cvsDIR               = "/ecs2/scratch1/fsk/cDNA_update";
+$cvsDIR               = "/scratch/fsk/cDNA_update";
 
 # personal data dir (for temporaty & result/error files)
-$dataDIR              = "/ecs2/scratch1/fsk/cDNA_update/data";
+$dataDIR              = "/scratch/fsk/cDNA_update/data";
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans
@@ -138,6 +139,7 @@ $configDIR         = $dataDIR."/configbackup";
 $chunkDIR          = $dataDIR."/chunks";
 $outDIR            = $dataDIR."/output";
 $masked_genome     = $target_masked_genome;
+$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
 my $oldFeatureName = "Exonerate_cDNA";
 my $newFeatureName = "Exonerate_cDNA_update"; #also used as analysis name
 my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
@@ -146,9 +148,8 @@ my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update re
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
 #fasta chunk specifications:
-my $chunknum       = 1000;   #(<300 sequences / file)
-my $maxseqlenght   = 20000;
-$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
+my $chunknum       = 1000;   #<300 sequences / file
+my $maxseqlenght   = 20000;  #isolate biggest chunks
 #program specifications:
 my $program_name    = "exonerate";
 my $program_version = "0.9.0";
