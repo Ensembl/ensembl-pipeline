@@ -431,7 +431,12 @@ sub writefile {
       or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
 
     # This is bad.  The subclass has the query method not this interface.
-    $clone_out->write_seq($self->query)  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+    eval{
+      $clone_out->write_seq($self->query); #  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+    };
+    if($@){
+      throw("Failed to write file ".$self->filename." $@");
+    }
     $self->file($self->filename);
   }
 }
