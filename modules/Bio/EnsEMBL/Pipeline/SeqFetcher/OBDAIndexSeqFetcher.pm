@@ -52,25 +52,26 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 use Bio::DB::Flat::OBDAIndex;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root Bio::DB::RandomAccessI);
+@ISA = qw(Bio::DB::RandomAccessI);
 
 sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
   
-  my ($db, $format) = $self->_rearrange(['DB', 'FORMAT'], @args);
+  my ($db, $format) = rearrange(['DB', 'FORMAT'], @args);
   
   # expect an array of dbs
-    $self->throw("Sorry, you must specify a database") unless defined($db);
+    throw("Sorry, you must specify a database") unless defined($db);
   #print STDERR "You passed a " . ref($db) . "\n";
-  $self->throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
+  throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
   
   $self->db($db);
 
@@ -94,11 +95,11 @@ sub new {
       $db_name = $1;
     }
     
-    $self->throw("Cannot define db_name") unless ( $db_name );
+    throw("Cannot define db_name") unless ( $db_name );
 
     # the index_dir is the directory path where the db sits
     my $index_dir = join '/', @path;
-    $self->throw("Cannot define index_dir") unless ( $index_dir );
+    throw("Cannot define index_dir") unless ( $index_dir );
     $self->index_name( $index_dir );
 
     # we take as default format = 'FASTA';
@@ -171,20 +172,20 @@ sub  get_Seq_by_acc {
   my ($self, $acc) = @_;
 
   if (!defined($acc)) {
-    $self->throw("No accession input");
+    throw("No accession input");
   }  
   
   my $seq;
   my @seqfetchers = $self->_seqfetcher;
-
+  my $have_secondary;
   foreach my $seqfetcher (@seqfetchers){
-    
+    $have_secondary = 1 if($seqfetcher->secondary_namespaces);
     eval{
       # note that this only works for OBDAIndex.pm
       $seq = $seqfetcher->get_Seq_by_id($acc);
     };
     if ( $@ ){
-      $self->warn("problem fetching sequence for $acc");
+      warning("problem fetching sequence for $acc");
     }
     
     if ( defined $seq ){
@@ -197,14 +198,14 @@ sub  get_Seq_by_acc {
 
   if(!defined $seq){
     my ($p, $f, $l) = caller;
-    $self->warn("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name." $f:$l\n");
+    warning("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name." $f:$l\n") if(!$have_secondary);
     
   FETCHER:
     foreach my $seqfetcher ( $self->_seqfetcher ){
       
       my @secondary_namespaces = $seqfetcher->secondary_namespaces;
       foreach my $name ( @secondary_namespaces ){
-	$self->warn("seqfetcher $seqfetcher is looking in namespace $name for secondary key $acc\n");
+	#warning("seqfetcher $seqfetcher is looking in namespace $name for secondary key $acc\n");
 	
 	my @seqs;
 	eval{
@@ -212,10 +213,10 @@ sub  get_Seq_by_acc {
 	  @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
 	};
 	if ( $@ ){
-	  $self->warn("problem fetching sequence for secondary key $acc");
+	  warning("problem fetching sequence for secondary key $acc $@");
 	}
 	if ( @seqs > 1 ){
-	  $self->warn("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
+	  warning("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
 	  next;
 	}
 	
@@ -229,7 +230,7 @@ sub  get_Seq_by_acc {
       }
     }
     unless ($seq){
-      $self->warn("could not find sequence for secondary key $acc");
+      warning("could not find sequence for secondary key $acc");
     }
   }
 
@@ -250,7 +251,7 @@ sub  get_Seq_by_acc {
 
 sub  get_Seq_by_id {
   my $self = @_;
-  $self->warn("cannot call  get_Seq_by_id on OBDAIndexSeqFetcher, use get_Seq_by_acc instead");
+  warning("cannot call  get_Seq_by_id on OBDAIndexSeqFetcher, use get_Seq_by_acc instead");
   return undef;
 }
 
@@ -266,10 +267,10 @@ sub  get_Seq_by_secondary {
   my ($self, $name, $acc) = @_;
 
   if (!defined($acc)) {
-    $self->throw("No secondary key input");
+    throw("No secondary key input");
   }  
   if (!defined($name)){
-    $self->throw("No name space for the secondary key");
+    throw("No name space for the secondary key");
   }
 
   my @seqs;
@@ -282,11 +283,11 @@ sub  get_Seq_by_secondary {
       @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
     };
     if ( $@ ){
-      $self->warn("problem fetching sequence for $acc");
+      warning("problem fetching sequence for $acc");
     }
     
     if ( @seqs > 1 ){
-      $self->warn("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
+      warning("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
       next;
     }
     if ( defined $seqs[0] ){
@@ -298,7 +299,7 @@ sub  get_Seq_by_secondary {
   }
   
   unless (@seqs){
-    $self->warn("OBDAIndexSeqFetcher: could not find sequence for $acc");
+    warning("OBDAIndexSeqFetcher: could not find sequence for $acc");
   }
   
   ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
