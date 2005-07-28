@@ -141,10 +141,20 @@ sub run {
   if (! -e $seqfile) {
     $self->throw("Database [$seqfile] doesn't exist. Can't index");
   }
- 
+
   my $command = $self->format_command . " " . $seqfile;
-  print STDERR "Doing $command\n";
+
+  # make STDERR and STERR silent
+  open SAVEOUT, ">&STDOUT";
+  open SAVEERR, ">&STDERR";
+  open STDOUT, "/dev/null";
+  open STDERR, "/dev/null";
+
   my $exit_status = system($command);
+
+  # restore STDOUT and STDERR
+  open STDOUT, ">&SAVEOUT";
+  open STDERR, ">&SAVEERR";
 
   if ($exit_status) {
     return 0 
@@ -496,5 +506,6 @@ sub blastdb_dir {
 
   return $self->{_blastdb_dir};
 }
+
 
 1;
