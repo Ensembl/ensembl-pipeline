@@ -1,5 +1,9 @@
 #
 #
+# THIS MODULE IS NOT CURATED ANYMORE - PLEASE USE REPEATMASKING
+# OUT OF ensembl-analysis !
+#
+#
 # Cared for by Michele Clamp  <michele@sanger.ac.uk>
 #
 # Copyright Michele Clamp
