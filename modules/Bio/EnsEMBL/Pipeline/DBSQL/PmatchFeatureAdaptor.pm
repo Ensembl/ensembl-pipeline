@@ -153,9 +153,20 @@ sub delete_protein {
     
 
 sub get_PmatchFeatures_by_protein_id {
-  my ($self,$prot_id) = @_;
+  my ($self, $prot_id, $logic_name) = @_;
 
   my $query = "select * from pmatch_feature,protein where protein.protein_internal_id = pmatch_feature.protein_internal_id and protein.protein_id = '$prot_id'";
+
+  if (defined $logic_name) {
+    my $ana_id;
+    eval {
+      my $ana = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+      $ana_id = $ana->dbID;
+    };
+    $@ and $self->throw("No analysis with logic_name '$logic_name' exists");
+    
+    $query .= " and analysis_id = $ana_id";
+  }
 
   my $sth = $self->prepare($query);
 
