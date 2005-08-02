@@ -115,7 +115,7 @@ sub temp_stdout{
 
 sub job_stats{
   my ($self) = @_;
-  $hash = {};
+  my $hash = {};
   $hash->{1} = 1;
   return $hash;
 }
