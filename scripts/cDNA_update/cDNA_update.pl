@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/ensembl/bin/perl
 
 =pod
 
@@ -13,14 +13,13 @@ in an automated fashion.
 
   A. Fill in config variables, start script with argument 'prepare':
      "perl cDNA_setup.pl prepare".
-     If the assembly has changed:
-     After the preparation, the modified genome files will have to be pushed across
+     After the preperation, the modified genome files will have to be pushed across
      the farm. The previous files should be removed before this! Please mail systems
      about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_setup.pl compare"
-  C. Start script again with argument 'clean' after finnishing the pipeline-
+  C. Start script again with argument 'clean' after finnishing the pipeline
      run to clean up: "perl cDNA_setup.pl clean", removing tmp files
 
 =head1 DESCRIPTION
@@ -81,10 +80,10 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-$cvsDIR               = "/scratch/fsk/cDNA_update";
+$cvsDIR               = "";
 
 # personal data dir (for temporaty & result/error files)
-$dataDIR              = "/scratch/fsk/cDNA_update/data";
+$dataDIR              = "";
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans
@@ -94,7 +93,7 @@ $refseq               = "hs.fna";
 $sourceHost           = "cbi1";
 $sourceDIR            = "/data/blastdb";
 $assembly_version     = "NCBI35";
-$org_masked_genome    = "/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
+$org_masked_genome    = ""; #"/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
 $target_masked_genome = "/data/blastdb/Ensembl/Human/".$assembly_version."/modified/softmasked_dusted";
 
 # external programs needed (absolute paths):
@@ -106,7 +105,7 @@ $polyA_clipping       = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl
 $WB_DBUSER            = "ensadmin";
 $WB_DBPASS            = "ensembl";
 # reference db (current build)
-$WB_REF_DBNAME        = "homo_sapiens_core_32_35e";
+$WB_REF_DBNAME        = "homo_sapiens_core_33_35f";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
@@ -119,15 +118,15 @@ $WB_TARGET_DBHOST     = "ia64g";
 $WB_TARGET_DBPORT     = "3306";
 
 #use & adjust assembly exception sequences (DR52 & DR53)
-$adjust_assembly       = 0;
+$adjust_assembly      = 0;
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be nesessary below this
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
+use lib '~fsk/perls/';
 use Net::SSH qw(sshopen2);
-use Term::ReadKey;
 
 my %saved_files;
 my $cmd;
@@ -139,17 +138,18 @@ $configDIR         = $dataDIR."/configbackup";
 $chunkDIR          = $dataDIR."/chunks";
 $outDIR            = $dataDIR."/output";
 $masked_genome     = $target_masked_genome;
-$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
 my $oldFeatureName = "Exonerate_cDNA";
 my $newFeatureName = "Exonerate_cDNA_update"; #also used as analysis name
+my $submitName     = "SubmitcDNAChunk";
 my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
 		     configDIR sourceDIR newfile config_file masked_genome fastasplit
                      polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
 #fasta chunk specifications:
-my $chunknum       = 1000;   #<300 sequences / file
-my $maxseqlenght   = 20000;  #isolate biggest chunks
+my $chunknum       = 1000;   #(<300 sequences / file)
+my $maxseqlenght   = 20000;
+$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
 #program specifications:
 my $program_name    = "exonerate";
 my $program_version = "0.9.0";
@@ -175,9 +175,11 @@ if($option eq "prepare"){
 
   if(! DB_setup()   ){ unclean_exit(); }
 
-  print "\n\nFinnished setting up the analysis.\n".
-        "The genome files' directory will have to be distributed across the farm!\n".
-	"SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
+  print "\n\nFinnished setting up the analysis.\n";
+  if($adjust_assembly){
+    print "The genome files' directory will have to be distributed across the farm!\n".
+	  "SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
+  }
 }
 elsif($option eq "run"){
 
@@ -674,31 +676,37 @@ sub DB_setup{
 
 sub run_analysis{
   #running a test first
-  print "\nRunning the test-RunnablDB first.\nPlease monitor the output.\n";
-  #get one input id for testing
-  my $db = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, "ensro");
-  my $sql = 'SELECT input_id FROM input_id_analysis i, analysis a WHERE i.analysis_id=a.analysis_id '.
-            'AND a.logic_name="'.$newFeatureName.'" LIMIT 1;';
-  my $sth = $db->prepare($sql) or die "sql error getting an input-id!";
-  $sth->execute();
-  my ($input_id) = $sth->fetchrow_array;
-  $cmd = "perl ".$cvsDIR."/ensembl-analysis/scripts/test_RunnableDB ".
-         "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME ".
-	 "-input_id $input_id -logic_name $newFeatureName -verbose -write";
-  system($cmd);
-
+  print "\nRunning the test-RunnablDB first.\nPlease monitor the output.\nShould we start? (y/n)";
+  my $ant = "";
+  chomp($ant = <STDIN>);
+  if($ant eq "y" or $ant eq "Y"){
+    #get one input id for testing
+    my $db = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, "ensro");
+    my $sql = 'SELECT input_id FROM input_id_analysis i, analysis a WHERE i.analysis_id=a.analysis_id '.
+              'AND a.logic_name="'.$submitName.'" LIMIT 1;';
+    my $sth = $db->prepare($sql) or die "sql error getting an input-id!";
+    $sth->execute();
+    my ($input_id) = $sth->fetchrow_array;
+    if(!$input_id){
+      die "\nCould not get an input id from database!\nQuery used: $sql\n\n";
+    }
+    $cmd = "perl ".$cvsDIR."/ensembl-analysis/scripts/test_RunnableDB ".
+           "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME ".
+	   "-input_id $input_id -logic_name $newFeatureName -verbose -nowrite";
+    print $cmd."\n";
+    system($cmd);
+  }
+  #start the real process
   print "\n\nShould we start the actual analysis? (y/n)";
-  ReadMode 'cbreak';
-  $ant = ReadKey(0);
-  $cmd = "";
-  if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
+  chomp($ant = <STDIN>);
+  if($ant eq "y" or $ant eq "Y"){
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/rulemanager.pl ".
            "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME";
     print "\nSTARTING PIPELINE.\nusing the command:\n".$cmd."\n\nPlease monitor results/errors of the pipeline.\n\n";
     exec($cmd);
   }
   else{
-    print "\nstopping.\n\n";
+    print "\nProcess interrupted. Not running pipeline.\n\n";
   }
 }
 
@@ -741,16 +749,13 @@ sub clean_up{
       $status += system($cmd);
     }
     print "\n\nshould we remove the clipped fasta file? (y/n)   ";
-    ReadMode 'cbreak';
-    $ant = ReadKey(0);
-    $cmd = "";
+    my $ant = <>;
     if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
       if(-e $dataDIR."/".$newfile){
 	$cmd = "rm " . $dataDIR."/".$newfile;
+	$status += system($cmd);
       }
     }
-    ReadMode 'normal';
-    $status += system($cmd);
     if(-e $dataDIR."/import_tables.sql"){
       $cmd = "rm " . $dataDIR."/import_tables.sql";
       $status += system($cmd);
@@ -771,9 +776,7 @@ sub clean_up{
 
     #remove dbs
     print "\n\nshould we remove the pipeline database? (y/n)   ";
-    ReadMode 'cbreak';
-    $ant = ReadKey(0);
-    $cmd = "";
+    my $ant = <>;
     if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
       $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_PIPE_DBNAME;\"");
     }
@@ -791,10 +794,9 @@ sub clean_up{
       else{
 	$cmd = "rm ".$configDIR."/".$config_file;
       }
+      $status += system($cmd);
     }
   }
-  ReadMode 'normal';
-  $status += system($cmd);
   if($status){ warn("Error restoring config files.\n") }
   print "restored original config files.\n\n";
   if((-e config_paths.perldata) and (system("rm config_paths.perldata"))){
@@ -1007,3 +1009,15 @@ CALLED BY: Pipeline/Utils/PipelineSanityChecks.pm  LINE: 73
 
 _________________________________________________________
 
+
+---FIX DISPLAY PROBLEM---
+
+[features are not diplayed with exon/iontron structure.]
+
+mysql $READARGS -D$DBNAME -e'select daf.dna_align_feature_id from dna_align_feature daf, transcript_supporting_feature tsf, supporting_feature sf where daf.dna_align_feature_id=tsf.feature_id and daf.dna_align_feature_id!=sf.feature_id;' > cdnaupdate
+
+cat cdnaupdate | awk '{  print "delete from dna_align_feature where dna_align_feature_id="$1";" }' > cdnaupdate.fix
+
+cvs co -r branch-ensembl-32 ensembl
+cvs co -r branch-ensembl-32 ensembl-pipeline
+cvs co -r branch-ensembl-32 ensembl-analysis
