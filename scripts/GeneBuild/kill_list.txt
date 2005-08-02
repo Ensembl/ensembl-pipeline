@@ -322,4 +322,7 @@ Q7KZ41 similar to Line-1s (smjs)
 O97916 reverse transcriptase like (smjs)
 O88912 Mus musculus domesticus L1 retrotransposon, Tf subfamily L1Md-Tf8, partial sequence (smjs)
 Q12880 Retrotransposable L1 element LRE2 from chromosome 1q. (smjs)
-
+P22444 Bone morphogenetic protein 3 (klh TOO MANY X)
+P33672 Proteasome subunit beta type 3 (klh TOO MANY X)
+Q9TS87 Transgelin (klh TOO MANY X)
+Q28051 Amelogenin (klh TOO MANY X)
