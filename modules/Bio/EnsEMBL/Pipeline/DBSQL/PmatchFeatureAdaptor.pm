@@ -218,15 +218,18 @@ sub get_PmatchFeatures_by_chr_start_end {
   my ($self, $chr_name, $chrstart, $chrend, $logic_name) = @_;
   my $analysis;
   
-  if($logic_name){
+  if(defined $logic_name){
     $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+    if (not defined $analysis) {
+      $self->throw("No analysis with logic name '$logic_name' exists");
+    }
   }
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
               "AND pmf.chr_name = '$chr_name' " .
 	      "AND pmf.start >= $chrstart " .
 	      "AND pmf.start <= $chrend ";
-  if($analysis){
+  if(defined $analysis){
     $query .= " and analysis_id = ".$analysis->dbID;
   }
  
