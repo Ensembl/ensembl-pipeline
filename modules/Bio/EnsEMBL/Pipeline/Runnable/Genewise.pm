@@ -223,12 +223,19 @@ sub parse_genewise_output {
       my $start  = $l[1];
       my $end    = $l[2];
       my $phase  = $l[4];
-      my $strand = 1;
+      my $strand;
       
-      if($l[1] > $l[2]){
-        $strand = -1;
-        $start  = $l[2];
-        $end    = $l[1];
+      if ($l[1] == $l[2]) {
+        # can't determine strand; defer
+        $strand = 0;
+      } else {
+        if($l[1] > $l[2]){
+          $strand = -1;
+          $start  = $l[2];
+          $end    = $l[1];
+        } else {
+          $strand = 1;
+        }
       }
       
       my $exon_length = $end - $start + 1;
@@ -249,8 +256,7 @@ sub parse_genewise_output {
 
       push @exons_and_sfs, { exon => $exon,
                              sfs  => [],
-                           };
-      
+                           };      
     }    
     elsif($l[0] eq 'Supporting') {
       
@@ -291,8 +297,16 @@ sub parse_genewise_output {
     }
   }
 
+  my ($consensus_strand, @strandless_exons);
+
   foreach my $entry (@exons_and_sfs) {
     my ($exon, @sfs) = ($entry->{exon}, @{$entry->{sfs}});
+
+    if ($exon->strand != 0 and not defined $consensus_strand) {
+      $consensus_strand = $exon->strand;
+    } else {
+      push @strandless_exons, $exon;
+    }
           
     if (@sfs) {
       my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@sfs);
@@ -302,6 +316,8 @@ sub parse_genewise_output {
       $exon->add_supporting_features($align);    
     }
   }
+
+  map { $_->strand($consensus_strand) } @strandless_exons;
 
   return map { $_->{exon} } @exons_and_sfs;
 }
@@ -374,6 +390,7 @@ sub make_transcript{
       }
 
       $transcript->add_Exon($exon);
+
     }
 
     my $tsf = Bio::EnsEMBL::FeaturePair->new();
