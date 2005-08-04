@@ -90,7 +90,7 @@ sub new {
   $self->matrix($matrix);
   $options = $GB_GENEWISE_OPTIONS unless($options);
   $self->options($options);
-  #print STDERR "Have genomic of length ".$self->genomic->length."\n";
+  $verbose = $GB_GENEWISE_VERBOSE unless defined($verbose);
   $self->verbose($verbose);
 
   return $self;
@@ -199,7 +199,7 @@ sub parse_genewise_output {
 
   while(<$fh>) {
     $self->verbose and print;
-    chomp;
+    chomp;    
 
     my @l = split;
 
