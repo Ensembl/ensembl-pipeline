@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/ensembl/bin/perl
 
 =pod
 
@@ -13,26 +13,30 @@ in an automated fashion.
 
   A. Fill in config variables, start script with argument 'prepare':
      "perl cDNA_setup.pl prepare".
-     If the assembly has changed:
-     After the preparation, the modified genome files will have to be pushed across
-     the farm. The previous files should be removed before this! Please mail systems
+     If there is a new assembly, some sequence files might have to be adjusted
+     (automatically, of course) and they will have to be pushed across the farm.
+     The previous files should be removed before this! Please mail systems
      about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_setup.pl compare"
-  C. Start script again with argument 'clean' after finnishing the pipeline-
-     run to clean up: "perl cDNA_setup.pl clean", removing tmp files
+  C. Start script again after finnishing the pipeline run to clean up:
+     "perl cDNA_setup.pl clean", removing tmp files, etc.
 
 =head1 DESCRIPTION
 
 This is a set-up script for generating new cDNA alignments as an isolated step of the
-build process with the pipeline. We re using the current build as a basis to add the
-latest cDNA / EST information as an additional track. This is done using exonerate in
+build process with the Ensembl pipeline. We re using the current build as a basis to add
+the latest cDNA information as an additional track. This is done using exonerate in
 the pipeline, fasta files and repeat-masked chromosome files.
 The configuration variables at the beginning of the script must ALL be filled in.
 The whole process usually finishes in ~24h if there are no complications.
 The results are dna_align_features in an ESTGENE database.
 Use the clean-up option when finnished to leave the system in the original state.
+Check out the latest code to match the database to be updated, for example:
+   cvs co -r branch-ensembl-32 ensembl
+   cvs co -r branch-ensembl-32 ensembl-pipeline
+   cvs co -r branch-ensembl-32 ensembl-analysis
 
 The steps the script performes:
   1. config_setup: check config valiables & files
@@ -40,20 +44,20 @@ The steps the script performes:
      create TARGET database, synchronise
   3. fastafiles: get & read input files
   4. chop off the polyA tails and chunk the fasta files into smaller pieces
-  5. copy & modify the softmasked genome files: thte coordinates of the DR fragments
-     need to be corrected according to the assembly table..
+  5. copy & modify the softmasked genome files if necessary: the coordinates of the
+     DR fragments need to be corrected according to the assembly table..
   6. run_analysis: run exonerate using the pipeline
 
-  7. comparison: check some numbers by comparing the results to previsous alignments
+  7. comparison: health-check by comparing the results to previsous alignments
   8. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
-What YOU need to do:
+What YOU will need to do:
   1. Fill in the config variables in this script (just below this).
   2. Check for the existance of two additional programs needed:
-	fastasplit, splitting a fasta file into a number of chunks
- 	polyA_clipping, removing poly-A tails from sequences.
-  3. Ask systems to push the genome files across the farm.
-  4. Run it, check the set-up and re-run if there are errors.
+	fastasplit (splitting a fasta file into a number of chunks)
+ 	polyA_clipping (removing poly-A tails from sequences)
+  3. Ask systems to push the genome files across the farm (after the prepare step) if necessary.
+  4. Run it; check the set-up and re-run if there are errors.
   5. Check the results directly and by running 'compare'.
   6. Clean up any mess by running 'clean'.
   7. Hand over target-database (patch to new version if neccessary).
@@ -62,10 +66,12 @@ If there is an error and the script dies, the original config files are restored
 without removing the data files and databases, allowing the re-run of the script.
 
 The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs
-around 12 h, depending on farm usage.
+around 24 h, depending on farm usage.
 Set resource => 'select[mem>2500] rusage[mem=2500]' in BatchQueue.pm and re-run
 the pipeline commandif jobs fail or take too long.
 
+Run the healthchecks, even though most things do not really apply to this type of db:
+run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type estgene post_genebuild
 
 =head1 CONTACT
 
@@ -75,16 +81,15 @@ ensembl-dev@ebi.ac.uk
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-
 # configuration variables, adjust to your needs:
 # all directories without trailing '/'
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-$cvsDIR               = "/scratch/fsk/cDNA_update";
+$cvsDIR               = "";
 
 # personal data dir (for temporaty & result/error files)
-$dataDIR              = "/scratch/fsk/cDNA_update/data";
+$dataDIR              = "";
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans
@@ -106,7 +111,7 @@ $polyA_clipping       = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl
 $WB_DBUSER            = "ensadmin";
 $WB_DBPASS            = "ensembl";
 # reference db (current build)
-$WB_REF_DBNAME        = "homo_sapiens_core_32_35e";
+$WB_REF_DBNAME        = "homo_sapiens_core_33_35f";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
@@ -117,39 +122,50 @@ $WB_PIPE_DBPORT       = "3306";
 $WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update";
 $WB_TARGET_DBHOST     = "ia64g";
 $WB_TARGET_DBPORT     = "3306";
+# older cDNA db (needed for comparison only)
+$WB_LAST_DBNAME       = $ENV{'USER'}."_cDNA_update_old";
+$WB_LAST_DBHOST       = "ia64g";
+$WB_LAST_DBPORT       = "3306";
+# reference db (last build)
+$WB_LAST_DNADBNAME    = "homo_sapiens_core_33_35f";
+$WB_LAST_DNADBHOST    = "ecs2";
+$WB_LAST_DNADBPORT    = "3364";
 
 #use & adjust assembly exception sequences (DR52 & DR53)
-$adjust_assembly       = 0;
+#set to 1 if you're looking at a new sequence assembly
+$adjust_assembly      = 0;
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be nesessary below this
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
+#we need the Net::SSH module from somewhere:
+use lib '~fsk/perls/';
 use Net::SSH qw(sshopen2);
-use Term::ReadKey;
 
 my %saved_files;
 my $cmd;
 my $status;
 #temp. dirs & files:
-$config_file       = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
-$newfile           = "cdna_update";
-$configDIR         = $dataDIR."/configbackup";
-$chunkDIR          = $dataDIR."/chunks";
-$outDIR            = $dataDIR."/output";
-$masked_genome     = $target_masked_genome;
-$tmp_masked_genome = "/ecs2/scratch1/fsk/cDNA_update/data/genome";
-my $oldFeatureName = "Exonerate_cDNA";
-my $newFeatureName = "Exonerate_cDNA_update"; #also used as analysis name
-my @configvars     = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
-		     configDIR sourceDIR newfile config_file masked_genome fastasplit
-                     polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
-                     WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
-                     WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
+$config_file        = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
+$newfile            = "cdna_update";
+$configDIR          = $dataDIR."/configbackup";
+$chunkDIR           = $dataDIR."/chunks";
+$outDIR             = $dataDIR."/output";
+$masked_genome      = $target_masked_genome;
+my $oldFeatureName  = "Exonerate_cDNA_update";
+my $newFeatureName  = "Exonerate_cDNA_update"; #also used as analysis name
+my $submitName      = "SubmitcDNAChunk";
+my @configvars      = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
+		      configDIR sourceDIR newfile config_file masked_genome fastasplit
+                      polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
+                      WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
+                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
 #fasta chunk specifications:
-my $chunknum       = 1000;   #<300 sequences / file
-my $maxseqlenght   = 20000;  #isolate biggest chunks
+my $chunknum        = 1200;   #(<300 sequences / file)
+my $maxseqlenght    = 18000;
+$tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
 my $program_name    = "exonerate";
 my $program_version = "0.9.0";
@@ -175,9 +191,11 @@ if($option eq "prepare"){
 
   if(! DB_setup()   ){ unclean_exit(); }
 
-  print "\n\nFinnished setting up the analysis.\n".
-        "The genome files' directory will have to be distributed across the farm!\n".
-	"SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
+  print "\n\nFinnished setting up the analysis.\n";
+  if($adjust_assembly){
+    print "The genome files' directory will have to be distributed across the farm!\n".
+	  "SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
+  }
 }
 elsif($option eq "run"){
 
@@ -476,6 +494,9 @@ sub fastafiles{
 sub adjust_assembly{
   my $filename;
   #move original genome files to defined temporary location
+  if(! -e $tmp_masked_genome){
+    if(system("mkdir $tmp_masked_genome")){ die "could not create directory! [$tmp_masked_genome]\n"; }
+  }
   $cmd = 'ln -s '.$org_masked_genome.'/* '.$tmp_masked_genome.'/';
   if(system($cmd)){
     die("couldn t copy masked genome files.$@\n");
@@ -576,15 +597,11 @@ sub check_chunksizes{
 }
 
 
-# prepare required databases: EST_DB, result DB,
+# prepare required databases: pipe DB, result DB,
 # fill required tables with data
 
 sub DB_setup{
   $status = 0;
-  my $program_name    = "exonerate";
-  my $program_version = "0.9.0";
-  my $program_file    = "/usr/local/ensembl/bin/exonerate-0.9.0";
-  my $module_name     = "Exonerate2Genes";
 
   eval{
     #create dbs, deleting if existing
@@ -674,31 +691,37 @@ sub DB_setup{
 
 sub run_analysis{
   #running a test first
-  print "\nRunning the test-RunnablDB first.\nPlease monitor the output.\n";
-  #get one input id for testing
-  my $db = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, "ensro");
-  my $sql = 'SELECT input_id FROM input_id_analysis i, analysis a WHERE i.analysis_id=a.analysis_id '.
-            'AND a.logic_name="'.$newFeatureName.'" LIMIT 1;';
-  my $sth = $db->prepare($sql) or die "sql error getting an input-id!";
-  $sth->execute();
-  my ($input_id) = $sth->fetchrow_array;
-  $cmd = "perl ".$cvsDIR."/ensembl-analysis/scripts/test_RunnableDB ".
-         "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME ".
-	 "-input_id $input_id -logic_name $newFeatureName -verbose -write";
-  system($cmd);
-
+  print "\nRunning the test-RunnablDB first.\nPlease monitor the output.\nShould we start? (y/n)";
+  my $ant = "";
+  chomp($ant = <STDIN>);
+  if($ant eq "y" or $ant eq "Y"){
+    #get one input id for testing
+    my $db = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, "ensro");
+    my $sql = 'SELECT input_id FROM input_id_analysis i, analysis a WHERE i.analysis_id=a.analysis_id '.
+              'AND a.logic_name="'.$submitName.'" LIMIT 1;';
+    my $sth = $db->prepare($sql) or die "sql error getting an input-id!";
+    $sth->execute();
+    my ($input_id) = $sth->fetchrow_array;
+    if(!$input_id){
+      die "\nCould not get an input id from database!\nQuery used: $sql\n\n";
+    }
+    $cmd = "perl ".$cvsDIR."/ensembl-analysis/scripts/test_RunnableDB ".
+           "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME ".
+	   "-input_id $input_id -logic_name $newFeatureName -verbose -nowrite";
+    print $cmd."\n";
+    system($cmd);
+  }
+  #start the real process
   print "\n\nShould we start the actual analysis? (y/n)";
-  ReadMode 'cbreak';
-  $ant = ReadKey(0);
-  $cmd = "";
-  if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
+  chomp($ant = <STDIN>);
+  if($ant eq "y" or $ant eq "Y"){
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/rulemanager.pl ".
            "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME";
     print "\nSTARTING PIPELINE.\nusing the command:\n".$cmd."\n\nPlease monitor results/errors of the pipeline.\n\n";
     exec($cmd);
   }
   else{
-    print "\nstopping.\n\n";
+    print "\nProcess interrupted. Not running pipeline.\n\n";
   }
 }
 
@@ -708,6 +731,7 @@ sub run_analysis{
 
 sub clean_up{
   my $option = shift;
+  my $ant = "";
   $status = 0;
   #read data dump
   open(RP, "< config_paths.perldata") or $status = 1;
@@ -741,16 +765,13 @@ sub clean_up{
       $status += system($cmd);
     }
     print "\n\nshould we remove the clipped fasta file? (y/n)   ";
-    ReadMode 'cbreak';
-    $ant = ReadKey(0);
-    $cmd = "";
+    chomp($ant = <STDIN>);
     if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
       if(-e $dataDIR."/".$newfile){
 	$cmd = "rm " . $dataDIR."/".$newfile;
+	$status += system($cmd);
       }
     }
-    ReadMode 'normal';
-    $status += system($cmd);
     if(-e $dataDIR."/import_tables.sql"){
       $cmd = "rm " . $dataDIR."/import_tables.sql";
       $status += system($cmd);
@@ -771,9 +792,7 @@ sub clean_up{
 
     #remove dbs
     print "\n\nshould we remove the pipeline database? (y/n)   ";
-    ReadMode 'cbreak';
-    $ant = ReadKey(0);
-    $cmd = "";
+    chomp($ant = <STDIN>);
     if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
       $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_PIPE_DBNAME;\"");
     }
@@ -791,10 +810,9 @@ sub clean_up{
       else{
 	$cmd = "rm ".$configDIR."/".$config_file;
       }
+      $status += system($cmd);
     }
   }
-  ReadMode 'normal';
-  $status += system($cmd);
   if($status){ warn("Error restoring config files.\n") }
   print "restored original config files.\n\n";
   if((-e config_paths.perldata) and (system("rm config_paths.perldata"))){
@@ -813,7 +831,7 @@ sub unclean_exit{
 
 
 #compare results to previous data as a health-check
-#bsubs a function call for every chromosome
+#can also bsub a further function call for every chromosome
 
 sub compare{
   my (%chromosomes_1, %chromosomes_2);
@@ -824,23 +842,26 @@ sub compare{
   my $hitcount2 = 0;
   my (%chromosomes_1, %chromosomes_2);
   my ($sql, $sql2, $sth1, $sth2);
-  my $exclude_NT = 1;
   my (%hits_per_chrom_1, %hits_per_chrom_2);
   my $hitcount1 = 0;
   my $hitcount2 = 0;
+  my $ant = "";
+
+  #should we exclude all the NT_x-regions?
+  my $exclude_NT = 1;
 
   #get db connectors
   #old alignments
-  my $db1     = db_connector("ecs2", 3365, "homo_sapiens_cdna_30_35c", "ensro");
+  my $db1 = db_connector($WB_LAST_DBHOST, $WB_LAST_DBPORT, $WB_LAST_DBNAME, "ensro");
   #new alignments
-  my $db2     = db_connector($WB_TARGET_DBHOST,$WB_TARGET_DBPORT, $WB_TARGET_DBNAME , "ensro");
+  my $db2 = db_connector($WB_TARGET_DBHOST, $WB_TARGET_DBPORT, $WB_TARGET_DBNAME, "ensro");
 
   #get chromsome names / ids
-  $sql = 'select coord_system_id from coord_system where name="chromosome"';
+  $sql  = 'select coord_system_id from coord_system where name="chromosome"';
   $sth1 = $db1->prepare($sql) or die "sql error!";
   $sth1->execute();
   my ($coord_system_id) = $sth1->fetchrow_array;
-  $sql = 'select seq_region_id, name from seq_region where coord_system_id = '.$coord_system_id;
+  $sql  = 'select seq_region_id, name from seq_region where coord_system_id = '.$coord_system_id;
   if ($exclude_NT) {
     $sql .= ' and name not like "%NT%"';
   }
@@ -855,43 +876,54 @@ sub compare{
     $chromosomes_2{$name} = $seq_region_id;
   }
 
-#  #create LSF jobs for in-depth analysis
-#  foreach my $chomosome (keys %chromosomes_1){
-#    $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl ".$cvsDIR.
-#           "/ensembl-pipeline/scripts/cDNA_update/comparison.pl ".
-#           $chomosome." ".$oldFeatureName." ".$newFeatureName." ".$dataDIR;
-#    print $cmd."\n";
-#    `$cmd`;
-#  }
-
-  print "\nGetting hits per chromosome\n";
-  #check hits per chromosome
-  $sql = "select count(*) from  dna_align_feature dnaa, analysis a where a.logic_name='human_cDNA_update'".
-    "and a.analysis_id=dnaa.analysis_id and dnaa.seq_region_id=?";
-  #$sth1 = $db1->prepare($sql) or die "sql error!";
-  $sth2 = $db2->prepare($sql) or die "sql error!";
-  foreach my $chromosome (keys %chromosomes_1) {
-    #$sth1->execute($chromosomes_1{$chromosome});
-    $sth2->execute($chromosomes_2{$chromosome});
-    #$hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
-    $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
+  print "Do you wnat to start the detailed analysis? (y/n) ";
+  chomp($ant = <STDIN>);
+  if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
+    #create LSF jobs for in-depth analysis
+    print "\nSubmitting jobs for detailed analysis.\n\n";
+    foreach my $chomosome (keys %chromosomes_1){
+      $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl ".$cvsDIR.
+             "/ensembl-pipeline/scripts/cDNA_update/comparison.pl ".
+             "-chrom ".$chomosome." -oldname ".$oldFeatureName." -newname ".$newFeatureName." -dir ".$dataDIR.
+             " -olddbhost ".$WB_LAST_DBHOST." -olddbport ".$WB_LAST_DBPORT." -olddbname ".$WB_LAST_DBNAME.
+             " -newdbhost ".$WB_TARGET_DBHOST." -newdbport ".$WB_TARGET_DBPORT." -newdbname ".$WB_TARGET_DBNAME.
+             " -olddnadbhost ".$WB_LAST_DNADBHOST." -olddnadbport ".$WB_LAST_DNADBPORT." -olddnadbname ".$WB_LAST_DNADBNAME.
+	     " -newdnadbhost ".$WB_PIPE_DBHOST." -newdnadbport ".$WB_PIPE_DBPORT." -newdnadbname ".$WB_PIPE_DBNAME;
+      print $cmd."\n";
+      `$cmd`;
+    }
   }
+
+  print "\nGetting hits per chromosome\n".
+        "\told\tnew\n";
+  #check hits per chromosome
+  $sql = "select count(*) from  dna_align_feature daf, analysis a where a.logic_name='".
+         $oldFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
+  $sth1 = $db1->prepare($sql) or die "sql error!";
+  $sql = "select count(*) from  dna_align_feature daf, analysis a where a.logic_name='".
+         $newFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
+  $sth2 = $db2->prepare($sql) or die "sql error!";
 
   my @sorted_chromosomes = sort bychrnum keys %chromosomes_1;
   foreach my $chromosome (@sorted_chromosomes) {
+    $sth1->execute($chromosomes_1{$chromosome});
+    $sth2->execute($chromosomes_2{$chromosome});
+    $hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
+    $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
     print "\n$chromosome:".
       "\t".$hits_per_chrom_1{$chromosome}.
       "\t".$hits_per_chrom_2{$chromosome};
     $hitcount1 += $hits_per_chrom_1{$chromosome};
     $hitcount2 += $hits_per_chrom_2{$chromosome};
   }
-  print "\ntotal sum:".
+
+  print "\n\nsum:".
       "\t".$hitcount1.
-      "\t".$hitcount2;
+      "\t".$hitcount2."\n\n";
 }
 
 
-#sort chroms by name.
+#sort chroms by name
 
 sub bychrnum {
   my @awords = split /_/,$a;
