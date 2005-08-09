@@ -5,17 +5,20 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
+
 # Handle command line options.
 
 my ($dbname,
     $dbhost,
     $dbpass,
     $dbuser,
-    $dbport) = rearrange(['DBNAME',
+    $dbport,
+    $file) = rearrange(['DBNAME',
 			  'DBHOST',
 			  'DBPASS',
 			  'DBUSER',
 			  'DBPORT',
+			  'PEPFILE',
 			 ], @ARGV);
 
 
@@ -30,6 +33,7 @@ unless (@ARGV) {
 	     " -dbuser :               Username for database access.",
 	     " -dbpass :               (optional) Database password.",
 	     " -dbport :               (optional) Database access port number.",
+             " -pepfile:               (optional) File to write to",
 	    ) . "\n";
   die
 }
@@ -39,6 +43,14 @@ unless(defined $dbname &&
        defined $dbuser){
   die('Cannot connect to database without -dbname, -dbhost and ' .
 	'-dbuser specified.')
+}
+
+
+$| = 1;
+if (defined($file) && $file ne "stdout") {
+  open FP,">$file";
+} else {
+  open FP,">-";
 }
 
 # Connect to database
@@ -88,7 +100,7 @@ foreach my $gene (@genes) {
 			    $transcript->translation->stable_id)
 		    ) . "\n";
 
-  print STDOUT '>' . $gene->stable_id . "\t" . 
+  print FP '>' . $gene->stable_id . "\t" . 
     $transcript->stable_id . "\t" . $transcript->translation->stable_id . "\n";
 
 #  my $seq = $transcript->spliced_seq;
@@ -104,7 +116,7 @@ foreach my $gene (@genes) {
   # Add line breaks
   $seq =~ s/(.{60})/$1\n/g;
 
-  print STDOUT uc($seq) . "\n";
+  print FP uc($seq) . "\n";
 }
 
 sub longest_transcript ($) {
