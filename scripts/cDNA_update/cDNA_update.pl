@@ -68,7 +68,7 @@ without removing the data files and databases, allowing the re-run of the script
 The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs
 around 24 h, depending on farm usage.
 Set resource => 'select[mem>2500] rusage[mem=2500]' in BatchQueue.pm and re-run
-the pipeline commandif jobs fail or take too long.
+the pipeline command if jobs fail or take too long.
 
 Run the healthchecks, even though most things do not really apply to this type of db:
 run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type estgene post_genebuild
@@ -86,10 +86,10 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-$cvsDIR               = "";
+$cvsDIR               = "/ecs2/work3/fsk/CDNA";
 
 # personal data dir (for temporaty & result/error files)
-$dataDIR              = "";
+$dataDIR              = "/ecs2/work3/fsk/CDNA/data";
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans
@@ -108,22 +108,22 @@ $polyA_clipping       = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl
 
 # db parameters
 #admin rights required
-$WB_DBUSER            = "ensadmin";
-$WB_DBPASS            = "ensembl";
+$WB_DBUSER            = "";
+$WB_DBPASS            = "";
 # reference db (current build)
 $WB_REF_DBNAME        = "homo_sapiens_core_33_35f";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
-$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe";
+$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe_8";
 $WB_PIPE_DBHOST       = "ecs1a";
 $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update";
+$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update_8";
 $WB_TARGET_DBHOST     = "ia64g";
 $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only)
-$WB_LAST_DBNAME       = $ENV{'USER'}."_cDNA_update_old";
+$WB_LAST_DBNAME       = $ENV{'USER'}."_cDNA_update";
 $WB_LAST_DBHOST       = "ia64g";
 $WB_LAST_DBPORT       = "3306";
 # reference db (last build)
@@ -155,7 +155,7 @@ $chunkDIR           = $dataDIR."/chunks";
 $outDIR             = $dataDIR."/output";
 $masked_genome      = $target_masked_genome;
 my $oldFeatureName  = "Exonerate_cDNA_update";
-my $newFeatureName  = "Exonerate_cDNA_update"; #also used as analysis name
+my $newFeatureName  = "human_cDNA_update"; #also used as analysis name
 my $submitName      = "SubmitcDNAChunk";
 my @configvars      = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
 		      configDIR sourceDIR newfile config_file masked_genome fastasplit
@@ -211,6 +211,7 @@ elsif($option eq "compare"){
   print "\nrunning checks after cDNA-update.\n".
         "checking through alignments & genes.\n";
 
+  check_vars();
   compare();
 }
 
@@ -252,22 +253,13 @@ sub config_setup{
   1;
   ';
 
-  #check files & directories
-  foreach my $configvar (@configvars){
-    $configvarref = "$$configvar";
-    if(!$configvarref){ die "please define all configuration variables! [$configvarref]\n"; }
-    if($configvar =~ m/.+DIR.*/){
-      if(!-e $configvarref){
-	if(system("mkdir $configvarref")){ die "could not create directory! [$configvarref]\n"; }
-      }
-      if(!-r $configvarref){ die "directory not writeable! [$configvarref]";}
-    }
-  }
+  check_vars();
 
   #check existence of source databases
   if(!connect_db($WB_REF_DBHOST, $WB_REF_DBPORT, $WB_REF_DBNAME, $WB_DBUSER, $WB_DBPASS)){
     die "could not find $WB_REF_DBNAME.";
   }
+
   #go thru config info to create defined files,
   #back-up the original, write version with filled-in variables
   open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
@@ -311,6 +303,22 @@ sub config_setup{
   close(WP);
   $/ = "\n";
   print "created backup of current config files, new config files written.\n";
+}
+
+
+#check files & directories, create if necessary
+
+sub check_vars{
+  foreach my $configvar (@configvars){
+    $configvarref = "$$configvar";
+    if(!$configvarref){ die "please define all configuration variables! [$configvarref]\n"; }
+    if($configvar =~ m/.+DIR.*/){
+      if(!-e $configvarref){
+	if(system("mkdir $configvarref")){ die "could not create directory! [$configvarref]\n"; }
+      }
+      if(!-r $configvarref){ die "directory not accessible! [$configvarref]";}
+    }
+  }
 }
 
 
@@ -876,7 +884,7 @@ sub compare{
     $chromosomes_2{$name} = $seq_region_id;
   }
 
-  print "Do you wnat to start the detailed analysis? (y/n) ";
+  print "Do you want to start the detailed analysis? (y/n) ";
   chomp($ant = <STDIN>);
   if($ant eq "y" or $ant eq "Y" or $ant eq "yes"){
     #create LSF jobs for in-depth analysis
@@ -884,13 +892,13 @@ sub compare{
     foreach my $chomosome (keys %chromosomes_1){
       $cmd = "bsub -q normal -o ".$dataDIR."/".$chomosome.".out perl ".$cvsDIR.
              "/ensembl-pipeline/scripts/cDNA_update/comparison.pl ".
-             "-chrom ".$chomosome." -oldname ".$oldFeatureName." -newname ".$newFeatureName." -dir ".$dataDIR.
+             " -chrom ".$chomosome." -oldname ".$oldFeatureName." -newname ".$newFeatureName." -dir ".$dataDIR.
              " -olddbhost ".$WB_LAST_DBHOST." -olddbport ".$WB_LAST_DBPORT." -olddbname ".$WB_LAST_DBNAME.
              " -newdbhost ".$WB_TARGET_DBHOST." -newdbport ".$WB_TARGET_DBPORT." -newdbname ".$WB_TARGET_DBNAME.
              " -olddnadbhost ".$WB_LAST_DNADBHOST." -olddnadbport ".$WB_LAST_DNADBPORT." -olddnadbname ".$WB_LAST_DNADBNAME.
 	     " -newdnadbhost ".$WB_PIPE_DBHOST." -newdnadbport ".$WB_PIPE_DBPORT." -newdnadbname ".$WB_PIPE_DBNAME;
-      print $cmd."\n";
-      `$cmd`;
+      #print $cmd."\n";
+      if(system($cmd)){ warn " some error occured when submitting job!\n$cmd\n "; }
     }
   }
 
