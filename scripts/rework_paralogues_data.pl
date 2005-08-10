@@ -78,11 +78,14 @@ while (my $output_file = shift @output_files){
       next
 	if ($dn > 2) or ($ds > 2);
 
-      print $_ . "\n"
+#      print $_ . "\n"
+#	if (($query_identity < 60)or($match_identity < 60));
+
+      next
 	if (($query_identity < 60)or($match_identity < 60));
 
-#      next
-#	if (($query_cov < 80) or ($match_cov < 80));
+      next
+	if (($query_cov < 80) or ($match_cov < 80));
 
       next 
 	if ($tally{$query_gene_id . $match_gene_id} or 
@@ -91,6 +94,6 @@ while (my $output_file = shift @output_files){
       $tally{$query_gene_id . $match_gene_id}++;
       $tally{$match_gene_id . $query_gene_id}++;
 
-#      print $_
+      print $_
     }
 }

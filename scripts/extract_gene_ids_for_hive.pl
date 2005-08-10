@@ -34,7 +34,7 @@ open(IN, $filename) or die "Unable to find or open [$filename]";
 
 while (<IN>) {
   if (/>(\S+)/) {
-    print STDOUT join("\t", ('','',$analysis_id,$1,'','',$status,'','','')) . "\n";
+    print STDOUT join("\t", ('','',$analysis_id,$1,'','',$status,'','','','','')) . "\n";
   }
 }
 
