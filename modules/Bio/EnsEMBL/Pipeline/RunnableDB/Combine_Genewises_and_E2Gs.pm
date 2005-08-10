@@ -193,14 +193,13 @@ sub run_merging{
   print STDERR "got " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n";  
 
   # first of all, sort genewises by exonic length and genomic length  
-  @merged_genes = sort { my $result = ( $self->_transcript_length_in_gene($b) <=>
-					$self->_transcript_length_in_gene($a) );
+  @merged_genes = sort { my $result = (  $self->_transcript_length_in_gene($b) <=>
+					 $self->_transcript_length_in_gene($a) );
 			 unless ($result){
 			   return ( $self->_transcript_exonic_length_in_gene($b) <=>
 				    $self->_transcript_exonic_length_in_gene($a) );
 			 }
 			 return $result;
-
 		       } @merged_genes;
 
   print STDERR "now have " . scalar(@merged_genes) . " merged genes\n";
@@ -274,13 +273,13 @@ sub run_merging{
     } @list;
     
     #test:
-    #print STDERR "matching cdnas:\n";
-    #foreach my $overlap ( @list ){
-      #print STDERR "cdna: ".$$overlap[2]->dbID.
-      #", exon_overlap: ".$$overlap[0].
-      # ", extent_overlap: ".$$overlap[1].
-      #  ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
-    #}
+   # print STDERR "matching cdnas:\n";
+   # foreach my $overlap ( @list ){
+   #   print STDERR "cdna: ".$$overlap[2]->dbID.
+   #   ", exon_overlap: ".$$overlap[0].
+   #    ", extent_overlap: ".$$overlap[1].
+   #     ", extent_UTR: ".$utr_length_hash{$$overlap[2]}."\n";
+   # }
     
     my $count = 0;
     my $howmany = scalar(@list);
@@ -293,9 +292,9 @@ sub run_merging{
     } while($cdna_match && $used_cdna{$cdna_match} );
 
     unless ( $cdna_match){
-      #print STDERR "No cdna found for cds_gene".$cds->dbID." ";
+      print STDERR "No cdna found for cds_gene".$cds->dbID." ";
       if ( $howmany == 0 ){
-#	print STDERR "(no cdna matched this cds gene)\n";
+	print STDERR "(no cdna matched this cds gene)\n";
       }
       if ( ($count - 1) == $howmany && $howmany != 0 ){
         print STDERR "(all matching cdnas were already used)\n";
@@ -308,12 +307,18 @@ sub run_merging{
     $used_cdna{$cdna_match} = 1;
 
 
-    #print STDERR "combining cds gene : " . $cds->dbID.":\n";
-#    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cds);
-    #print STDERR "with cdna gene " . $cdna_match->dbID . ":\n";
-#    Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cdna_match);
+  #  print STDERR "combining cds gene : " . $cds->dbID.":\n";
+  #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cds);
+  #  print STDERR "with cdna gene " . $cdna_match->dbID . ":\n";
+  #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cdna_match);
     
     my $combined_transcript = $self->combine_genes($cds, $cdna_match);
+    # just check combined transcript works before throwing away the original  transcript
+    unless (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript,$self->query)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript,$self->query)){
+      $combined_transcript = undef;
+      $used_cdna{$cdna_match} = 0;
+    }
     if ( $combined_transcript ){
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
       $self->make_gene($combined_genetype, $combined_transcript);
@@ -988,9 +993,9 @@ sub combine_genes{
         }
       }
 
-      #unless($self->compare_translations($gw_tran[0], $newtranscript) ){
-      #  print STDERR "translation has been modified\n";
-      #}
+     # unless($self->compare_translations($gw_tran[0], $newtranscript) ){
+     #   print STDERR "translation has been modified\n";
+     # }
 
       # check that the result is fine
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query) ){
