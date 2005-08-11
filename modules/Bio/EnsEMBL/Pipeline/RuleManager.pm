@@ -1066,7 +1066,12 @@ sub logic_name2dbID {
     if ($ana =~ /^\d+$/) {
       $analyses{$ana} = 1;
     } else {
-      my $id = $self->analysis_adaptor->fetch_by_logic_name($ana)->dbID;
+      my $id ; 
+      eval {  $id = $self->analysis_adaptor->fetch_by_logic_name($ana)->dbID; }  ; 
+      if ($@){
+      	print STDERR "\n\nERROR: The analysis (logic_name) you've specified does not exist in the db\n"."\n"x10; 
+      	throw($@) ; 
+      }
       if ($id) {
         $analyses{$id} = 1;
       } else {
