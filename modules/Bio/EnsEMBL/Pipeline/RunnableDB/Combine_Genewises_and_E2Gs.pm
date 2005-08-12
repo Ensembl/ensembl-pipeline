@@ -758,7 +758,7 @@ sub _merge_genes {
 	    $separation = $exon->start - $previous_exon->end - 1;
 	  }
 	  elsif( $strand == -1 ){
-	    $separation = $previous_exon->end - $exon->start - 1;
+	    $separation = $previous_exon->start - $exon->end - 1;
 	  }
 	  if ($separation <=10){
 	    $merge_it = 1;
