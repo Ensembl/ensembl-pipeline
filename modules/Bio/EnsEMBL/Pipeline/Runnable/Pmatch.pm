@@ -1,5 +1,5 @@
 # this runnable will pmatch proteins against genomic both the commandline construction and the parsing assumes this is what
-# is being run for more information on how we run the code see running_pmatchs.txt in ensembl-docs
+# is being run for more information on how we run the code see the_genebuild_process.txt  in ensembl-doc/pipeline_docs
 
 package Bio::EnsEMBL::Pipeline::Runnable::Pmatch;
 
