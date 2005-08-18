@@ -179,6 +179,8 @@ if($verbose){
         $transcript_count++;
 	if($verbose){ print "translation " . $tran->translate->seq . "\n"; }
       }
+    } elsif ($out->isa("Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature")) {
+      print_gff($out, $out->chr_name );
     } else {
       print $out->slice;
       my @values = split /\:/, $out->slice;
@@ -200,7 +202,10 @@ sub print_gff{
   $str .= ($feature->start)    ?  $feature->start."\t":"\t";
   $str .= ($feature->end)      ?  $feature->end."\t":"\t";
   $str .= ($feature->score)    ?  $feature->score."\t" :"\t";
-  $str .= ($feature->strand)   ?  $feature->strand."\t":  ".\t";
+ 
+  unless ($feature->isa("Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature")) {
+     $str .= ($feature->strand)   ?  $feature->strand."\t":  ".\t";
+  }
   $str .= ($feature->hseqname) ?  $feature->hseqname()."\t": "\t" 
     if($feature->can('hseqname'));
   $str .=  ".\t"; #phase
