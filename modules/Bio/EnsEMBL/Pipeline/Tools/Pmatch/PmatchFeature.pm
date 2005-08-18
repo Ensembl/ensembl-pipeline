@@ -81,6 +81,12 @@ sub coverage {
   return $self->{_coverage};
 }
 
+sub score { 
+  my ($self) = @_ ; 
+  return $self->{_coverage};
+}
+
+
 sub protein_id {
   my ($self,$arg) = @_;
 
