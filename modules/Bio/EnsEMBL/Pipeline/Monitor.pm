@@ -62,22 +62,24 @@ sub show_current_status {
 
   #Show running/failed jobs grouped by status and analysis name.
 
-  my $sth = $self->dbobj->prepare("select count(*), js.status, a.logic_name from analysis a, job_status js, job j where j.job_id = js.job_id and a.analysis_id = j.analysis_id and js.is_current = 'y' group by a.logic_name, js.status");
+  my $sth = $self->dbobj->prepare("select count(*), js.status, a.logic_name ,a.analysis_id from analysis a, job_status js, job j where j.job_id = js.job_id and a.analysis_id = j.analysis_id and js.is_current = 'y' group by a.logic_name, js.status");
 
   my $res = $sth->execute;
 
   my $maxcount = undef;
   my $maxstatus;
   my $maxname;
-
+  my $maxaid;
   my @counts;
   my @status;
   my @names;
+  my @aid;
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $count  = $ref->{'count(*)'};
     my $status = $ref->{'status'};
     my $name   = $ref->{'logic_name'};
+    my $aid    = $ref->{'analysis_id'} ;  
 
     if (!defined($maxcount) || length($count) > $maxcount) {
       $maxcount = length($count);
@@ -88,10 +90,14 @@ sub show_current_status {
     if (!defined($maxname) || length($name) > $maxname) {
       $maxname = length($name);
     }
+    if (!defined($maxaid) || length($aid) > $maxaid) {
+      $maxaid = length($aid);
+    }
 
     push(@counts,$count);
     push(@status,$status);
     push(@names,$name);
+    push(@aid,$aid);
 
   }
     $maxcount++;
@@ -101,15 +107,15 @@ sub show_current_status {
   $self->print_header("Pipeline current status");
 
   
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","Name","Status","Count");
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n","----","------","-----");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n","Name","Status","Count","Analysis-id");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n","----","------","-----","-----------");
 
   while (my $count = shift(@counts)) {
     my $status = shift @status;
     my $name   = shift @names;
+    my $aid    = shift @aid; 
 
-
-    printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s\n",$name,$status,$count);
+    printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n",$name,$status,$count,$aid);
   }
 
   print("\n");
