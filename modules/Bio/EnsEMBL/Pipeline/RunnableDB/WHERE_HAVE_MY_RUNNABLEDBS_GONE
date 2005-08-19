@@ -8,6 +8,7 @@ Dust.pm
 EPCR.pm 
 EponineTSS.pm 
 FirstEF.pm 
+Genefinder.pm
 Genscan.pm 
 RepeatMasker.pm 
 TRF.pm
