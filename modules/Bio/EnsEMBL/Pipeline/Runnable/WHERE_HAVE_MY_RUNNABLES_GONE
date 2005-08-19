@@ -1,0 +1,27 @@
+
+Several Runnables have been remoeved from ensembl-pipeline including
+
+BlastGenscanPep.pm 
+BlastGenscanDNA.pm
+CPG.pm 
+Dust.pm 
+EPCR.pm 
+EponineTSS.pm 
+FirstEF.pm 
+Genscan.pm 
+RepeatMasker.pm 
+TRF.pm
+
+
+These runnables have been refactored and moved to the new code base
+ensembl-analysis
+
+This code can be checkout of the same cvs as ensembl-pipeline
+
+For more information about this code and out pipeline system
+look at the documentation which can be found in the pipeline_docs
+directory of ensembl-docs
+
+
+The old code can still be retrieved from branch-ensembl-32 branch of the
+code
