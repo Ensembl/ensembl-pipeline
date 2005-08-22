@@ -11,6 +11,7 @@ FirstEF.pm
 Genefinder.pm
 Genscan.pm 
 RepeatMasker.pm 
+Snap.pm
 TRF.pm
 
 

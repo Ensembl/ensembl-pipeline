@@ -390,7 +390,6 @@ sub find_executable {
   my ($self,$name) = @_;
 
   my $bindir = $BIN_DIR || undef;
-
   if (-x $name) {
     return $name;
   } elsif ($bindir && -x "$bindir/$name") {
