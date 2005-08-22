@@ -77,7 +77,7 @@ use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 sub new{
   my ($class, @args) = @_;
-  my $self = $class->SUPER::new(@args);    
+  my $self = bless {},$class;   
   $self->{'stdout'} = undef;
   $self->{'stderr'} = undef;
   $self->{'id'} = undef;
