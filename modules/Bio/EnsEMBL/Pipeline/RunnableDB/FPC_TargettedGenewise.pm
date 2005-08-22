@@ -40,6 +40,7 @@ use strict;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
+use Bio::EnsEMBL::Utils::Exception qw( throw ) ; 
 use Bio::EnsEMBL::Pipeline::RunnableDB::TargettedGenewise;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
@@ -126,6 +127,9 @@ sub make_seqfetcher {
   my $seqfetcher;
   
   (my $class = $seqfetcher_class) =~ s/::/\//g;
+
+  throw ("Configuration-error !! There's no entry for GB_PROTEIN_SEQFETCHER in Sequences.pm\n") if (length($class)==0)  ;
+
   require "$class.pm";
 
   if(defined $index && $index ne ''){
