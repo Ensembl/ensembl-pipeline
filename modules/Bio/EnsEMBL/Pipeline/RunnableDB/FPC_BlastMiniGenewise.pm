@@ -48,7 +48,7 @@ use strict;
 
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
+use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewxise;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
@@ -414,7 +414,7 @@ sub mask_gene_region_lists {
     my (@nr_mask_exon_regions, @nr_mask_gene_regions);
     
     foreach my $mask_exon_reg (sort {$a->{'start'} <=> $b->{'start'}} @mask_exon_regions) {
-      if (@nr_mask_exon_regions and $nr_mask_exon_regions[-1]->{'end'} > $mask_exon_reg->{'start'}) {
+      if (@nr_mask_exon_regions and $nr_mask_exon_regions[-1]->{'end'} > $mask_exon_reg->{'start'}) 
         if ($mask_exon_reg->{'end'} > $nr_mask_exon_regions[-1]->{'end'}) {
           $nr_mask_exon_regions[-1]->{'end'} = $mask_exon_reg->{'end'};
         }

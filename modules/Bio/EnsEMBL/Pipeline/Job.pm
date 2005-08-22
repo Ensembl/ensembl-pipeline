@@ -41,8 +41,9 @@ use strict;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 
 # dynamically load appropriate queue manager (e.g. LSF)
@@ -70,26 +71,26 @@ sub new {
   my ($p, $f, $l) = caller;
 
   my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
-	= $self->_rearrange([qw(ADAPTOR
-                                ID
-                                SUBMISSION_ID
-                                INPUT_ID
-                                ANALYSIS
-                                STDOUT
-                                STDERR
-                                RETRY_COUNT
-                                OUTPUT_DIR
-                                RUNNER
-                                )],@args);
+	= rearrange([qw(ADAPTOR
+                  ID
+                  SUBMISSION_ID
+                  INPUT_ID
+                  ANALYSIS
+                  STDOUT
+                  STDERR
+                  RETRY_COUNT
+                  OUTPUT_DIR
+                  RUNNER
+                 )],@args);
 
   $dbID            = -1 unless defined($dbID);
   $submission_id   = -1 unless defined($submission_id);
 
-  $input_id   || $self->throw("Can't create a job object without an input_id");
-  $analysis   || $self->throw("Can't create a job object without an analysis object");
+  $input_id   || throw("Can't create a job object without an input_id");
+  $analysis   || throw("Can't create a job object without an analysis object");
 
   $analysis->isa("Bio::EnsEMBL::Analysis") ||
-	$self->throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
+	throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
   
   $self->dbID($dbID);
   $self->adaptor($adaptor);
@@ -112,7 +113,7 @@ sub new {
       $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
     }
 
-    $self->throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
+    throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
     $self->output_dir($dir);
     $self->make_filenames;
   }
@@ -140,7 +141,7 @@ sub new {
 sub create_by_analysis_input_id {
   my ($dummy, $analysis, $inputId, $output_dir, $auto_update) = @_;
   
-  $dummy->warn("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ". (caller) .
+  warning("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ". (caller) .
                " should now call the constructor directly");
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
 					     -input_id    => $inputId,
@@ -236,7 +237,7 @@ sub analysis {
   my ($self, $arg) = @_;
 
   if (defined($arg)) {
-    $self->throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
+    throw("[$arg] is not a Bio::EnsEMBL::Analysis object" ) 
             unless $arg->isa("Bio::EnsEMBL::Analysis");
 
     $self->{'_analysis'} = $arg;
@@ -266,7 +267,7 @@ sub flush_runs {
   my @analyses = ($queue) || (keys %BATCH_QUEUES);
   
   if ( !defined $adaptor) {
-    $self->throw( "Cannot run remote without db connection" );
+    throw( "Cannot run remote without db connection" );
   }
   
   local *FILE;
@@ -288,7 +289,7 @@ sub flush_runs {
     $runner = __FILE__;
     $runner =~ s:/[^/]*$:/runner.pl:;
     my $caller = caller(0);
-    $self->throw("runner ".$runner." not found - needs to be set in ".
+    throw("runner ".$runner." not found - needs to be set in ".
                  "$caller\n") unless -x $runner;
   }
 
@@ -312,7 +313,7 @@ sub flush_runs {
     my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
     
     if ( ! $lastjob) {
-      $self->throw( "Last batch job not in db" );
+      throw( "Last batch job not in db" );
     }
     
     my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
@@ -531,7 +532,7 @@ sub run_module {
     if ($err = $@) {
       print (STDERR "CREATE: Lost the will to live Error\n");
       $self->set_status( "FAILED" );
-      $self->throw( "Problems creating runnable $module for " . 
+      throw( "Problems creating runnable $module for " . 
                     $self->input_id . " [$err]\n");
     }
     
@@ -543,7 +544,7 @@ sub run_module {
     if ($err = $@) {
       $self->set_status( "FAILED" );
       print (STDERR "READING: Lost the will to live Error\n");
-      $self->throw( "Problems with $module fetching input for " . 
+      throw( "Problems with $module fetching input for " . 
                     $self->input_id . " [$err]\n");
     }
     
@@ -568,7 +569,7 @@ sub run_module {
         }
 
         print (STDERR "RUNNING: Lost the will to live Error\n");
-        $self->throw("Problems running $module for " . 
+        throw("Problems running $module for " . 
                      $self->input_id . " [$err]\n");
       }
       
@@ -596,7 +597,7 @@ sub run_module {
       if ($err = $@) {
         $self->set_status( "FAILED" );
         print (STDERR "WRITING: Lost the will to live Error\n");
-        $self->throw("Problems for $module writing output for " . 
+        throw("Problems for $module writing output for " . 
         $self->input_id . " [$err]" );
       }
     }
@@ -619,7 +620,7 @@ sub run_module {
       $self->set_status("FAIL_NO_RETRY");
     };
     $error_msg .= ("(And furthermore) Encountered an error in updating the job to status failed_no_retry.\n[$@]") if $@;
-    $self->throw($error_msg);
+    throw($error_msg);
   } else {
     print STDERR "Updated successful job ".$self->dbID."\n";
   }
@@ -638,10 +639,10 @@ sub run_module {
 sub set_status {
   my ($self, $arg) = @_;
   
-  $self->throw("No status input" ) unless defined($arg);
+  throw("No status input" ) unless defined($arg);
   
   if (!$self->adaptor) {
-    $self->warn("No database connection.  Can't set status to $arg");
+    warning("No database connection.  Can't set status to $arg");
     return;
   }
   
@@ -672,7 +673,7 @@ sub current_status {
       
   };
   if ($@) {
-    $self->throw("Failed to get status for ".$self->dbID." ".$self->input_id.
+    throw("Failed to get status for ".$self->dbID." ".$self->input_id.
                  " ".$self->analysis->logic_name." error $@");
   }
 
@@ -793,7 +794,7 @@ sub stderr_file {
   if ($arg) {
     if ($arg !~ /err/){
       my ($p, $f, $l) = caller;
-      $self->throw("You can't set stderr file to ".$arg." $f:$l\n");
+      throw("You can't set stderr file to ".$arg." $f:$l\n");
     }
     $self->{'_stderr_file'} = $arg;
   }

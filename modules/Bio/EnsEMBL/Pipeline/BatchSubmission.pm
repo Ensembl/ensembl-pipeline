@@ -73,7 +73,7 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 sub new{
   my ($class, @args) = @_;

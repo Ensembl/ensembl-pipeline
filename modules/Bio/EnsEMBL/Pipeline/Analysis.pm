@@ -3,7 +3,8 @@ package Bio::EnsEMBL::Pipeline::Analysis;
 use  vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Analysis;
-
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
+use Bio::EnsEMBL::Utils::Exception qw( deprecate warning throw );
 
 @ISA = qw(Bio::EnsEMBL::Analysis);
 
@@ -16,7 +17,7 @@ sub new {
   
   my $self = $class->SUPER::new(@args);
   
-  my ($type) = $self->_rearrange([qw(INPUT_ID_TYPE)], @args);
+  my ($type) = rearrange([qw(INPUT_ID_TYPE)], @args);
 
   $self->input_id_type($type);
 

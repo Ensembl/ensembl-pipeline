@@ -145,7 +145,7 @@ sub open_command_line{
       if (/Job <(\d+)>/) {
 	      $lsf = $1;
       } else {
-	      $self->warn("DEBUG: unexpected from bsub: '$_'");
+	      warning("DEBUG: unexpected from bsub: '$_'");
       }	  
     }
     if (close $pipe) {
@@ -153,7 +153,7 @@ sub open_command_line{
 	      if ($lsf) {
           $self->id($lsf);
 	      } else {
-          $self->warn("Bsub worked but returned no job ID. Weird");
+          warning("Bsub worked but returned no job ID. Weird");
 	      }
       } else {
 	      throw("Bsub failed : exit status " . $? >> 8 . "\n");
@@ -411,7 +411,7 @@ sub copy_output {
 
     if (! $self->temp_filename) {
         my ($p, $f, $l) = caller;
-        $self->warn("The lsf environment variable LSB_JOBFILENAME is not defined".
+        warning("The lsf environment variable LSB_JOBFILENAME is not defined".
                     " we can't copy the output files which don't exist $f:$l");
         return;
     }

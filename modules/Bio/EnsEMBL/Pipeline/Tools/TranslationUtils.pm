@@ -47,6 +47,12 @@ use Bio::EnsEMBL::DBSQL::SliceAdaptor;
 
 
 
+sub return_translation{
+  my ($self, $trans) = @_;
+  $trans = $self->compute_translation($trans);
+  return $trans->translation;
+}
+
 ############################################################
 
 =head2
@@ -213,9 +219,11 @@ sub run_translate{
     my $verbose = 0;
 
     my $trans_id = $trans->stable_id || $trans->dbID;
+    #print "Have trans id ".$trans_id."\n";
     unless ( $trans_id ){
       if ( $trans->type ){
 	$trans_id = $trans->type;
+  #print "Have trans id ".$trans_id."\n";
       }
       else{
 	$trans_id = "transcript_".$$;

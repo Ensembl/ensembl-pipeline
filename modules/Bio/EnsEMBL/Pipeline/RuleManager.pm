@@ -37,9 +37,8 @@ use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::Job;
-use Bio::EnsEMBL::Root;
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 
 =head2 new
@@ -58,7 +57,7 @@ use Bio::EnsEMBL::Root;
 sub new{
   my ($class,@args) = @_;
 
-  my $self = $class->SUPER::new(@args);
+  my $self = bless {},$class;
 
   &verbose('WARNING');
 
@@ -1192,3 +1191,5 @@ sub check_if_done {
 
   return 0;
 }
+
+1;

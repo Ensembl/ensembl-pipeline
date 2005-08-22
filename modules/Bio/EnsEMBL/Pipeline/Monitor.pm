@@ -1,10 +1,11 @@
 package Bio::EnsEMBL::Pipeline::Monitor;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use strict;
 
 use vars qw(@ISA);
 
-@ISA = qw (Bio::EnsEMBL::Root);
+@ISA = qw ();
 
 =pod
 
@@ -22,14 +23,13 @@ use vars qw(@ISA);
 
 sub new {
     my ($class, @args) = @_;
-    my $self = $class->SUPER::new(@args);
-
-    my ($dbobj) =   $self->_rearrange([qw(DBOBJ)],@args);
+    my $self = bless {},$class;
+    my ($dbobj) =   rearrange([qw(DBOBJ)],@args);
 
     if ($dbobj) {
       $self->dbobj($dbobj);
     } else {
-      $self->throw("No database object input");
+      throw("No database object input");
     }
 
     return $self;
@@ -41,7 +41,7 @@ sub dbobj {
 
   if (defined($arg)) {
     if (! $arg->isa("Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor")) {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
+      throw("[$arg] is not a Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor");
     }
     $self->{_dbobj} = $arg;
   }
@@ -419,7 +419,7 @@ sub show_jobs_by_status_and_analysis {
   my ($self,$status,$analysis) = @_;
 
   if (!defined($status) || !defined($analysis)) {
-    $self->throw("No status and/or analysis input\n");
+    throw("No status and/or analysis input\n");
   }
 
 #  my $sth = $self->dbobj->prepare("select job.* from job_status js,job,analysis a where a.analysis_id = job.analysis_id and job.job_id = js.job_id and js.status = '$status' and a.logic_name = '$analysis'");
