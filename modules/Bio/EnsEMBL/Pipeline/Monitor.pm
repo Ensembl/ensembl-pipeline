@@ -103,19 +103,20 @@ sub show_current_status {
     $maxcount++;
     $maxstatus++;
     $maxname++;
+    $maxaid++;
 
   $self->print_header("Pipeline current status");
 
   
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n","Name","Status","Count","Analysis-id");
-  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n","----","------","-----","-----------");
-
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s   %-${maxaid}s\n","Name","Status","Count","Analysis-id");
+  printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s   %-${maxaid}s\n","----","------","-----","-----------");
+  
   while (my $count = shift(@counts)) {
     my $status = shift @status;
     my $name   = shift @names;
     my $aid    = shift @aid; 
 
-    printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s  %-${maxaid}s\n",$name,$status,$count,$aid);
+    printf("%-${maxname}s %-${maxstatus}s %-${maxcount}s     %-${maxaid}s \n",$name,$status,$count,$aid);
   }
 
   print("\n");
