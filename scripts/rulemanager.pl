@@ -63,6 +63,7 @@ my $rerun_sleep = 300; #how long to sleep for at the end of a loop if no
 my $utils_verbosity = 'WARNING'; #how verbose do you want the 
                                  #Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
                                  #WARNING as this gives warning and throws but not deprecates or infos
+my $unlock =0 ;    # deletes the lock of a pipeline (the entry in the meta table 'pipeline.lock'
 
 my $shuffle;
 my $accumulators = 1;
@@ -116,7 +117,8 @@ GetOptions(
            'once!'                 => \$once,
            'perldoc!'              => \$perldoc,
            'submission_limit!'     => \$submission_limit,
-           'submission_number=s'     => \$submission_number,
+           'submission_number=s'   => \$submission_number,
+           'unlock|delete_lock'    => \$unlock,
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -162,6 +164,7 @@ my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
    -RUNNER => $runner,
    -OUTPUT_DIR => $output_dir,
    -JOB_LIMIT => $job_limit,
+   -UNLOCK => $unlock,
    );
    
 
