@@ -939,7 +939,10 @@ sub is_locked{
                      "script can be run.\nIf the process does not exist, ".
                      "remove the lock by removing the lock from the ".
                      "pipeline database:\n\ndelete from meta where ".
-                     "meta_key = 'pipeline.lock';\n\n Thank you\n\n");
+                     "meta_key = 'pipeline.lock';\n\n\n\n" . 
+                     "\tYou could also use the -unlock option to remove the lock" . 
+                     "\n\n\n Thank you !\n\n");
+
     print STDERR $error_str;
     throw("Can't run RuleManager there may be another rulemanager ".
           "running look in ".$self->db->dbname." meta table ");
