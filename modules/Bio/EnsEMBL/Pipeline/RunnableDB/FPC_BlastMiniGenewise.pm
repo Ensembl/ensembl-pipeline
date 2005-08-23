@@ -358,14 +358,15 @@ sub fetch_input {
 
 sub run {
   my ($self) = @_;
-  
-  $self->genewise_db->dbc->disconnect_when_inactive(1);
+
+  $self->genewise_db->dbc->disconnect_when_inactive(1);  
   foreach my $runnable ($self->runnable) {
     $runnable->run;
   }
   $self->genewise_db->dbc->disconnect_when_inactive(0);
-  
+
   $self->convert_output;
+
 }
 
 =head2 mask_gene_region_lists
@@ -465,7 +466,6 @@ sub convert_output {
     }
 
     my $anaAdaptor = $self->db->get_AnalysisAdaptor;
-#    my $analysis_obj = $anaAdaptor->fetch_by_logic_name($genetype);
     my $analysis_obj = $self->analysis;
 
     if ( !defined $analysis_obj ){
@@ -487,7 +487,7 @@ sub convert_output {
     if ($GB_SIMILARITY_POST_GENEMASK or $GB_SIMILARITY_POST_EXONMASK) {
       my (@mask_regions, @filtered_results);
 
-      my ($exonmask_regions, $genemask_regions) = $self->mask_gene_region_lists;
+      my ($exonmask_regions, $genemask_regions) = $self->mask_gene_region_lists($self->query);
 
       if ($GB_SIMILARITY_POST_GENEMASK) {
         @mask_regions = @$genemask_regions;
@@ -518,7 +518,7 @@ sub convert_output {
             if ($mask_reg->{'start'} > $f->{'end'}) {
               # no mask regions will overlap this feature
               next FEAT;
-		    }
+            }
             elsif ( $mask_reg->{'end'} >= $f->{'start'}) {
               # overlap			
               $keep_gene = 0;
@@ -566,9 +566,7 @@ sub process_genes {
 
   PROCESS_GENE:
   foreach my $unprocessed_gene (@{$results}) {
-    print "VAC: $unprocessed_gene\n";
     foreach my $unchecked_transcript(@{$unprocessed_gene->get_all_Transcripts}){
-    print "VAC: $unchecked_transcript\n";
       my @exons = @{$unchecked_transcript->get_all_Exons};
       my @supp_feat =  @{$exons[0]->get_all_supporting_features};
       my ($first_supp_feat) = $supp_feat[0];
@@ -609,15 +607,14 @@ sub process_genes {
 	
 	# add terminal stop codon if appropriate
 	eval{
-	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
-      };
-	
+          $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
+        };	
 	if($@){
 	  print STDERR "problem with set_stop_codon\n";
 	}
 	
 	if (!defined $checked_transcript){
-	  print STDERR "No valid transcript retruned from set_stop_codon\n";
+	  print STDERR "No valid transcript returned from set_stop_codon\n";
 	  next;
 	}
 
