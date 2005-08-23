@@ -64,7 +64,7 @@ sub new{
   my ($db, $input_ids, $rules, $queue_manager,
       $awol_mark, $rename, $max_sleep,
       $min_sleep, $base_sleep, $verbose,
-      $runner, $output_dir, $job_limit) = rearrange (
+      $runner, $output_dir, $job_limit,$delete_lock) = rearrange (
          ['DB', 
           'INPUT_IDS', 
           'RULES', 
@@ -78,6 +78,7 @@ sub new{
           'RUNNER',
           'OUTPUT_DIR',
           'JOB_LIMIT',
+          'UNLOCK',
          ],@args);
 
   if(!$db){
@@ -85,6 +86,7 @@ sub new{
   }
 
   $self->db($db);
+  $self->delete_lock if $delete_lock ; 
   $self->is_locked;
   $self->create_lock;
 
@@ -863,7 +865,29 @@ sub create_lock{
 }
 
 
+=head2 delete_lock 
 
+  Arg [1]   : none
+  Function  : removes entry from meta-table of database 'pipeline.lock'  
+  Returntype: string
+  Exceptions: none
+  Example   : $lock_str = $self->delete_lock;
+
+=cut
+
+
+sub delete_lock {
+  my ($self) = @_;
+
+  my $host = $self->qualify_hostname(hostname());
+  my $user = scalar getpwuid($<);
+  my $lock_str = join ":", "$user\@$host", $$, time();
+
+  my $arg = $self->db->pipeline_unlock();
+  return $arg;
+}
+
+ 
 =head2 qualify_hostname
 
   Arg [1]   : string, output of Sys::Hostname::hostname
