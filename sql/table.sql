@@ -58,7 +58,7 @@ CREATE TABLE job_status (
 # rule_conditions.condition is an analysis logic_name
 
 CREATE TABLE rule_goal (
-  rule_id           smallint(5) unsigned not null auto_increment,
+  rule_id           smallint(10) unsigned not null auto_increment,
   goal              varchar(40),
 
   PRIMARY KEY (rule_id)
@@ -66,7 +66,9 @@ CREATE TABLE rule_goal (
 
 CREATE TABLE rule_conditions (
   rule_id           smallint(10) unsigned not null,
-  condition         varchar(40)
+  condition         varchar(40),
+  
+  KEY (rule_id)
 );
 
 # rule_id     - rule internal ID
