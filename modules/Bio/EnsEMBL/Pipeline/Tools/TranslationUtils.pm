@@ -73,7 +73,7 @@ sub compute_translation{
   my $verbose = 0;
   my @met_predictions   = $self->run_translate( $trans,1);
   my @nomet_predictions = $self->run_translate( $trans );
- 
+  
   my $count = 0;
   while ( $count < 2 && $met_predictions[$count] ){
     my @entry = @{$met_predictions[$count]};
@@ -84,130 +84,114 @@ sub compute_translation{
   while ( $count < 2 && $nomet_predictions[$count] ){
     my @entry = @{$nomet_predictions[$count]};
     #print STDERR "NO_MET length:$entry[0] start:$entry[1] end:$entry[2]\n";
-	$count++;
-    }
-    my $translation = $trans->translation;
-    my $length = $trans->seq->length;
-    my $best;
-    if ( @met_predictions && @nomet_predictions ){
-	my $met_best   = $met_predictions[0];
-	my $nomet_best = $nomet_predictions[0];
-	if ( $nomet_best->[0] > 2*$met_best->[0] ){
-	    $best = $nomet_best;
-	}
-	else{
-	    $best = $met_best;
-	}
-    }
-    elsif( @met_predictions ){
-	$best = $met_predictions[0];
-    }
-    elsif( @nomet_predictions ){
-	$best = $nomet_predictions[0];
-   }else{
-        # if there are no nomet_predictions and no met_predictions return to caller
-        verbose('DEPRECATE');
-        warning("No translation could be computed for transcript \n");
-	return $trans;
-   }
- 
-    my @entry = @{$best};
-    my $orf_start = $entry[1];
-  my $orf_end   = $entry[2];
-  print STDERR "BEST length:$entry[0] start:$entry[1] end:$entry[2]\n" if $verbose;
-    my @exons;
-    my $strand = $trans->start_Exon->strand;
-    if ( $strand == 1 ){
-	@exons = sort { $a->start <=> $b->start } @{$trans->get_all_Exons};
+    $count++;
+  }
+  my $translation = $trans->translation;
+  my $length = $trans->seq->length;
+  my $best;
+  if ( @met_predictions && @nomet_predictions ){
+    my $met_best   = $met_predictions[0];
+    my $nomet_best = $nomet_predictions[0];
+    if ( $nomet_best->[0] > 2*$met_best->[0] ){
+      $best = $nomet_best;
     }
     else{
-	@exons = sort { $b->start <=> $a->start } @{$trans->get_all_Exons};
+      $best = $met_best;
     }
-    my $transl_start;
-    my $transl_end;
-    my $transl_start_Exon;
-    my $transl_end_Exon;
-    my $exon_count = 0;
-    print STDERR "transcript length: $length\n" if $verbose;
-    my $pos = 1;
-    foreach my $exon ( @exons ){
-	$exon_count++;
-	print STDERR "exon:$exon_count exon_length:".$exon->length." pos:$pos orf_start:$orf_start orf_end:$orf_end pos+:".($pos + $exon->length - 1)."\n" if $verbose;
-	if ( $orf_start >= $pos && $orf_start <= $pos + $exon->length - 1 ){
-	    $transl_start_Exon = $exon;
-	    $transl_start      = $orf_start - $pos + 1;
-	    print STDERR "start found\n" if $verbose;
-	    $exon->phase(0);
-	}
-	if ( $orf_end >= $pos && $orf_end <= $pos + $exon->length - 1 ){
-	    $transl_end_Exon   = $exon;
-	    $transl_end        = $orf_end - $pos + 1;
-	    print STDERR "end found\n" if $verbose;
-	}
-	$pos += $exon->length;
-	#last if ( $pos > $length );
-    }
-  #print STDERR "original translation:\n";
-  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($trans);
+  }
+  elsif( @met_predictions ){
+    $best = $met_predictions[0];
+  }
+  elsif( @nomet_predictions ){
+    $best = $nomet_predictions[0];
+  } else{
+    # if there are no nomet_predictions and no met_predictions return to caller
+    verbose('DEPRECATE');
+    warning("No translation could be computed for transcript \n");
+    return $trans;
+  }
+  
+  my @entry = @{$best};
+  my $orf_start = $entry[1];
+  my $orf_end   = $entry[2];
+  print STDERR "BEST length:$entry[0] start:$entry[1] end:$entry[2]\n" if $verbose;
 
-    my $newtranslation;
-    if ( $transl_start && $transl_end &&  $transl_start_Exon && $transl_end_Exon ){
-	$newtranslation = Bio::EnsEMBL::Translation->new();
-	$newtranslation->start( $transl_start );
-	$newtranslation->end( $transl_end );
-	$newtranslation->start_Exon( $transl_start_Exon );
-	$newtranslation->end_Exon( $transl_end_Exon );
-	$trans->translation($newtranslation);
-	#print STDERR "modified translation:\n";
-	#Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($trans);
-      }
+  my @exons = @{$trans->get_all_Exons};
+
+  my $transl_start;
+  my $transl_end;
+  my $transl_start_Exon;
+  my $transl_end_Exon;
+  my $exon_count = 0;
+  print STDERR "transcript length: $length\n" if $verbose;
+  my $pos = 1;
+  foreach my $exon ( @exons ){
+    $exon_count++;
+    print STDERR "exon:$exon_count exon_length:".$exon->length." pos:$pos orf_start:$orf_start orf_end:$orf_end pos+:".($pos + $exon->length - 1)."\n" if $verbose;
+    if ( $orf_start >= $pos && $orf_start <= $pos + $exon->length - 1 ){
+      $transl_start_Exon = $exon;
+      $transl_start      = $orf_start - $pos + 1;
+      print STDERR "start found\n" if $verbose;
+    }
+    if ( $orf_end >= $pos && $orf_end <= $pos + $exon->length - 1 ){
+      $transl_end_Exon   = $exon;
+      $transl_end        = $orf_end - $pos + 1;
+      print STDERR "end found\n" if $verbose;
+    }
+    $pos += $exon->length;
+  }
+  
+  my $newtranslation;
+  if ( $transl_start && $transl_end &&  $transl_start_Exon && $transl_end_Exon ){
+    $newtranslation = Bio::EnsEMBL::Translation->new();
+    $newtranslation->start( $transl_start );
+    $newtranslation->end( $transl_end );
+    $newtranslation->start_Exon( $transl_start_Exon );
+    $newtranslation->end_Exon( $transl_end_Exon );
+    $trans->translation($newtranslation);
+  }
   else{
-      print STDERR "problem making the translation\n";
-    }
+    print STDERR "problem making the translation\n";
+  }
   $trans->flush_Exons;
-
+  
   foreach my $exon ( @exons ){
     $trans->add_Exon($exon);
   }
 
-   # Finally the phase
-  if ($exons[0]->strand == 1) {
-    @exons = sort { $a->start <=> $b->start } @exons;
-  } else {
-    @exons = sort { $b->start <=> $a->start } @exons;
-  }
+  @exons = @{$trans->get_all_Exons};
+
   my $found_start = 0;
   my $found_end   = 0;
-  my $phase       = $newtranslation->start_Exon->phase;
 
-  foreach my $exon (@exons) {
-    if ($found_start && !$found_end) {
-      $exon->phase($phase);
-      $exon->end_phase(($exon->length + $exon->phase) % 3);
-      $phase = $exon->end_phase;
-    }
+  my $last_end_phase;
+
+  foreach my $exon (@{$trans->get_all_Exons}) {
+    $exon->phase(-1);
+    $exon->end_phase(-1);
+
     if ($newtranslation->start_Exon == $exon) {
-      if ($exon == $exons[0]) { 
-        $exon->phase($phase);
-      } else {
-        $exon->phase(-1);
+      if ($newtranslation->start == 1) {
+        $exon->phase(0);
       }
-
-      $exon->end_phase((($exon->length-$newtranslation->start+1) + $exon->phase) % 3);
-
-      $phase       = $exon->end_phase;
       $found_start = 1;
+    } elsif ($found_start and not $found_end) {
+      $exon->phase($last_end_phase);
     }
-    if ($newtranslation->end_Exon == $exon) {
-      $found_end = 1;
-      if ($exon != $exons[-1]) {
-        $exon->end_phase(-1);
+
+
+    if ($newtranslation->end_Exon == $exon ) {
+      if ($newtranslation->end == $exon->length) {
+        $exon->end_phase(($exon->length + $exon->phase) % 3);
       }
+      $found_end = 1;
+    } elsif ($found_start and not $found_end) {
+      $exon->end_phase(($exon->length + $exon->phase) % 3);
     }
-    #print "Exon " . $exon->start . " " . $exon->end . " " . $exon->strand . " " . $exon->phase . " " . $exon->end_phase . "\n";
+
+    $last_end_phase = $exon->end_phase;
   }
 
-  #print "Translation = " . $trans->translate->seq . "\n";
   return $trans;
 }
 

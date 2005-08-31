@@ -1692,8 +1692,8 @@ sub _merge_Transcripts{
 	############################################################
 	# they should not have a translation
 	############################################################
-	$new_exon->phase(0);
-	$new_exon->end_phase(0);
+	$new_exon->phase(-1);
+	$new_exon->end_phase(-1);
 	
 	# set the strand to be the same as the exon_cluster
 	$new_exon->strand($exon_cluster->strand);
