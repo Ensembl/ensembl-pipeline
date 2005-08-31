@@ -364,8 +364,8 @@ sub load_data{
   my $pass = $db_conf->{'pass'};
   my $user = $db_conf->{'user'};
   my $dbname = $db_conf->{'dbname'};
-  my $cmd = "mysqlimport -h$host -u$user -p$pass -P$port ".
-            ( $self->islocal ? "--local " : "") . " $dbname $file";
+  my $cmd = "mysqlimport -i -h$host -u$user -p$pass -P$port ".
+    ( $self->islocal ? "--local " : "") . " $dbname $file";
   print $cmd."\n" if($self->verbosity);
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   return 1;

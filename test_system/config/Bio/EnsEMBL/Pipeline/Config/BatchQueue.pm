@@ -44,7 +44,7 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
-  QUEUE_MANAGER       => 'LSF',
+  QUEUE_MANAGER       => 'Local',
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
@@ -62,7 +62,7 @@ use vars qw(%Config);
   MIN_JOB_SLEEP      => 120, # the minium time to sleep for when job limit reached
   SLEEP_PER_JOB      => 30, # the amount of time to sleep per job when job limit 
                             # reached
-  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',      
 
   DEFAULT_RUNNER => '',
 
@@ -76,7 +76,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Genscan',        
@@ -87,7 +87,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Genefinder',        
@@ -98,7 +98,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Snap',        
@@ -109,7 +109,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Fgenesh',        
@@ -120,7 +120,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Swall',        
@@ -131,7 +131,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'long',
       cleanup    => 'no', 
-     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Vertrna',        
@@ -142,7 +142,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'long',
       cleanup    => 'no',  
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Unigene',        
@@ -153,7 +153,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'long',
       cleanup    => 'no',     
-     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'CpG',
@@ -164,7 +164,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',
- runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+ runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Dust',
@@ -186,7 +186,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',
-     runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'TRF',
@@ -197,7 +197,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Eponine',        
@@ -208,7 +208,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no', 
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',    
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',    
     },
     {
       logic_name => 'marker',        
@@ -219,7 +219,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'FirstEF',        
@@ -230,7 +230,7 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'Uniprot',        
