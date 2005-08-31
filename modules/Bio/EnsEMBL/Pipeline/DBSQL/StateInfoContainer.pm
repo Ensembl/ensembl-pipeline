@@ -328,7 +328,7 @@ sub get_all_input_id_analysis_sets {
   my @types;
 
   my $sth = $self->prepare( qq{
-    SELECT DISTINCT input_id_type FROM input_id_analysis } );
+    SELECT DISTINCT input_id_type FROM input_id_type_analysis } );
   $sth->execute();
 
   while( @row = $sth->fetchrow_array ) {
