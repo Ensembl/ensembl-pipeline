@@ -979,9 +979,13 @@ sub combine_genes{
         if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
           my @sf    = sort {$a->start <=> $b->start} $ex->sub_SeqFeature;
 
-          my $first = shift(@sf);
-
-          $ex->end($first->end);
+          if ($ex->strand < 0) {
+            my $first = pop(@sf);
+            $ex->start($first->start);
+          } else {
+            my $first = shift(@sf);
+            $ex->end($first->end);
+          }
 
           # add back the remaining component exons
           foreach my $s(@sf){
@@ -1050,101 +1054,108 @@ sub combine_genes{
 sub transcript_from_single_exon_genewise {
   my ($self, $eg_exon, $gw_exon, $transcript, $translation, $exoncount, @e2g_exons) = @_;
 
-    # save out current translation end - we will need this if we have to unmerge frameshifted exons later
-    my $orig_tend = $translation->end;
-
-    # stay with being strict about gw vs e2g coords - may change this later ...
-    # the overlapping e2g exon must at least cover the entire gw_exon
-    if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
-	
-      my $egstart = $eg_exon->start;
-      my $egend   = $eg_exon->end;
-      my $gwstart = $gw_exon->start;
-      my $gwend   = $gw_exon->end;
-
-      # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
-	
-      # modify the coordinates of the first exon in $newtranscript
-      my $ex = $transcript->start_Exon;
-	
-      $ex->start($eg_exon->start);
-      $ex->end($eg_exon->end);
-	
-      # need to explicitly set the translation start & end exons here.
-      $translation->start_Exon($ex);
-	
-      # end_exon may be adjusted by 3' coding exon frameshift expansion. Ouch.
-
-      $translation->end_Exon($ex);
-
-      # need to deal with translation start and end this time - varies depending on strand
-	
+  # save out current translation end - we will need this if we have to unmerge frameshifted exons later
+  my $orig_tend = $translation->end;
+  
+  # stay with being strict about gw vs e2g coords - may change this later ...
+  # the overlapping e2g exon must at least cover the entire gw_exon
+  if ($gw_exon->start >= $eg_exon->start && $gw_exon->end <= $eg_exon->end){
+    
+    my $egstart = $eg_exon->start;
+    my $egend   = $eg_exon->end;
+    my $gwstart = $gw_exon->start;
+    my $gwend   = $gw_exon->end;
+    
+    # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
+    
+    # modify the coordinates of the first exon in $newtranscript
+    my $ex = $transcript->start_Exon;
+    
+    $ex->start($eg_exon->start);
+    $ex->end($eg_exon->end);
+    
+    # need to explicitly set the translation start & end exons here.
+    $translation->start_Exon($ex);
+    
+    # end_exon may be adjusted by 3' coding exon frameshift expansion. Ouch.
+    
+    $translation->end_Exon($ex);
+    
+    # need to deal with translation start and end this time - varies depending on strand
+    
+    if($gw_exon->strand == 1){
       #FORWARD:
-      if($gw_exon->strand == 1){
-	my $diff = $gwstart - $egstart;
-	my $tstart = $translation->start;
-	my $tend = $translation->end;
-
-	#print STDERR "diff: ".$diff." translation start : ".$tstart." end: ".$tend."\n";
-	#print STDERR "setting new translation to start: ".($tstart+$diff)." end: ".($tend+$diff)."\n";
-	$translation->start($tstart + $diff);
-	$translation->end($tend + $diff);
-
-	$self->throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-	$self->throw("Forward strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
-	  }
-
+      my $diff = $gwstart - $egstart;
+      my $tstart = $translation->start;
+      my $tend = $translation->end;
+      
+      #print STDERR "diff: ".$diff." translation start : ".$tstart." end: ".$tend."\n";
+      #print STDERR "setting new translation to start: ".($tstart+$diff)." end: ".($tend+$diff)."\n";
+      $translation->start($tstart + $diff);
+      $translation->end($tend + $diff);
+      
+      $self->throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+      $self->throw("Forward strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
+    }   
+    elsif($gw_exon->strand == -1){
       #REVERSE:
-      elsif($gw_exon->strand == -1){
-	my $diff   = $egend - $gwend;
-	my $tstart = $translation->start;
-	my $tend   = $translation->end;
-	$translation->start($tstart+$diff);
-	$translation->end($tend + $diff);
-
-	$self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-	$self->throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
-	}
-	
-      # expand frameshifted single exon genewises back from one exon to multiple exons
-      if(scalar($ex->sub_SeqFeature) > 1){
-	#print STDERR "frameshift in a single exon genewise\n";
-	my @sf = $ex->sub_SeqFeature;
-	
-	# save current start and end of modified exon
-	my $cstart = $ex->start;
-	my $cend   = $ex->end;
-	my $exlength = $ex->length;
-	
-	# get first exon - this has same id as $ex
-	my $first = shift(@sf);
-	$ex->end($first->end); # NB end has changed!!!
-	# don't touch start.
-	# no need to modify translation start
-	
-	# get last exon
-	my $last = pop(@sf);
-	$last->end($cend);
-	$transcript->add_Exon($last);
-	# and adjust translation end - the end is still relative to the merged gw exon
-	$translation->end_Exon($last);
-	# put back the original end translation
-	$translation->end($orig_tend);
-	
-	# get any remaining exons
-	foreach my $s(@sf){
-	  $transcript->add_Exon($s);
-	}
-	$transcript->sort;
-	# flush the sub_SeqFeatures
-	$ex->flush_sub_SeqFeature;
-      }
-	
-      # need to add back exons, both 5' and 3'
-      $self->add_5prime_exons($transcript, $exoncount, @e2g_exons);
-      $self->add_3prime_exons($transcript, $exoncount, @e2g_exons);
-	
+      my $diff   = $egend - $gwend;
+      my $tstart = $translation->start;
+      my $tend   = $translation->end;
+      $translation->start($tstart+$diff);
+      $translation->end($tend + $diff);
+      
+      $self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+      $self->throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
     }
+    
+    # expand frameshifted single exon genewises back from one exon to multiple exons
+    if(scalar($ex->sub_SeqFeature) > 1){
+      #print STDERR "frameshift in a single exon genewise\n";
+      my @sf = sort { $a->start <=> $b->start } $ex->sub_SeqFeature;
+      
+      # save current start and end of modified exon
+      my $cstart = $ex->start;
+      my $cend   = $ex->end;
+      my $exlength = $ex->length;
+
+      my ($first, $last);
+      if ($ex->strand < 0) {
+        $first = pop(@sf);
+        $ex->start($first->start); 
+        # no need to modify translation start
+      
+        $last = shift(@sf);
+        $last->start($cstart);
+        $transcript->add_Exon($last);
+      } else {
+        $first = shift(@sf);
+        $ex->end($first->end); 
+        # no need to modify translation start
+      
+        $last = pop(@sf);
+        $last->end($cend);
+        $transcript->add_Exon($last);
+      }
+
+      $translation->end_Exon($last);
+      # put back the original end translation
+      $translation->end($orig_tend);
+      
+      # get any remaining exons
+      foreach my $s(@sf){
+        $transcript->add_Exon($s);
+      }
+      $transcript->sort;
+      # flush the sub_SeqFeatures
+      $ex->flush_sub_SeqFeature;
+    }
+    
+    # need to add back exons, both 5' and 3'
+    $self->add_5prime_exons($transcript, $exoncount, @e2g_exons);
+    $self->add_3prime_exons($transcript, $exoncount, @e2g_exons);
+    
+  }
   return ($transcript,0);
 }
 
@@ -1221,16 +1232,15 @@ sub transcript_from_multi_exon_genewise_forward{
 
     # this exon will be the start of translation, convention: phase = -1
     my $ex = $transcript->start_Exon;
-    $ex->phase(-1);
 
     # modify the coordinates of the first exon in $newtranscript if
     # e2g is larger on this end than gw.
     if ( $current_exon->start < $gwexons[0]->start ){
       $ex->start($current_exon->start);
+      $ex->phase(-1);
     }
     elsif( $current_exon->start == $gwexons[0]->start ){
       $ex->start($gwstart);
-      $ex->phase($gwexons[0]->phase);
     }
     # if the e2g exon starts after the gw exon,
     # modify the start only if this e2g exon is not the first of the transcript
@@ -1291,11 +1301,6 @@ sub transcript_from_multi_exon_genewise_forward{
 	$self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
       }
     }
-
-    else{
-      #print STDERR "gw exon starts: $gwstart > new start: $current_start";
-      #print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
-    }
     $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
 
   } # end 5' exon
@@ -1317,15 +1322,13 @@ sub transcript_from_multi_exon_genewise_forward{
     # e2g is larger on this end than gw.
     my $ex = $transcript->end_Exon;
 
-    # this exon is the end of translation, convention: end_phase = -1
-    $ex->end_phase(-1);
-
     if ( $current_exon->end > $gwexons[$#gwexons]->end ){
       $ex->end($current_exon->end);
+      # this exon is the end of translation, convention: end_phase = -1
+      $ex->end_phase(-1);
     }
     elsif( $current_exon->end == $gwexons[$#gwexons]->end ){
       $ex->end($gwexons[$#gwexons]->end);
-      $ex->end_phase($gwexons[$#gwexons]->end_phase);
     }
     # if the e2g exon ends before the gw exon,
     # modify the end only if this e2g exon is not the last of the transcript
@@ -1335,7 +1338,6 @@ sub transcript_from_multi_exon_genewise_forward{
       #print STDERR "SHORTENING GENEWISE TRANSLATION\n";
       ## fix translation end iff genewise has leaked over - will need truncating
       my $diff   = $gwexons[$#gwexons]->end - $current_exon->end;
-      #print STDERR "diff: $diff\n";
       my $tend   = $translation->end;
 
       my $gw_exon_length   = $gwexons[$#gwexons]->end - $gwexons[$#gwexons]->start + 1;
@@ -1343,28 +1345,25 @@ sub transcript_from_multi_exon_genewise_forward{
       #print STDERR "gw exon length  : $gw_exon_length\n";
       #print STDERR "cdna exon length: $cdna_exon_length\n";
 
-      my $length_diff = $gw_exon_length - $cdna_exon_length;
-      #print STDERR "length diff: ".$length_diff."\n"; # should be == diff
-
       $ex->end($current_exon->end);
 
       if($diff % 3 == 0) {
 	# we chop exactily N codons from the end of the translation
 	# so it can end where the cdna exon ends
 	$translation->end($cdna_exon_length);
-	$end_translation_shift = $length_diff;
+	$end_translation_shift = $diff;
       }
       elsif ($diff % 3 == 1) {
 	# we chop N codons plus one base
 	# it should end on a full codon, so we need to end translation 2 bases earlier:
 	$translation->end($cdna_exon_length - 2);
-	$end_translation_shift = $length_diff + 2;
+	$end_translation_shift = $diff + 2;
       }
       elsif ($diff % 3 == 2) {
 	# we chop N codons plus 2 bases
 	# it should end on a full codon, so we need to end translation 1 bases earlier:
 	$translation->end($cdna_exon_length - 1);
-	$end_translation_shift = $length_diff + 1;
+	$end_translation_shift = $diff + 1;
       }
       else {
 	# absolute genebuild paranoia 8-)
@@ -1384,7 +1383,6 @@ sub transcript_from_multi_exon_genewise_forward{
     if($expanded){
       # set translation end to what it originally was in the unmerged genewise gene
       # taking into account the diff
-      #print STDERR "Forward: expanded 3' exon, re-setting end of translation from ".$translation->end." to orig_end ($orig_tend)- ( length_diff + shift_due_to_phases ) ($end_translation_shift)".($orig_tend - $end_translation_shift)."\n";
       $translation->end($orig_tend - $end_translation_shift);
     }
 
@@ -1463,9 +1461,7 @@ sub transcript_from_multi_exon_genewise_reverse{
 
     $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
 
-    # this exon is the start of translation, convention: phase = -1
     my $ex = $transcript->start_Exon;
-    $ex->phase(-1);
 
     # modify the coordinates of the first exon in $newtranscript
     if ( $current_exon->end > $gwexons[0]->end){
@@ -1474,7 +1470,6 @@ sub transcript_from_multi_exon_genewise_reverse{
     }
     elsif (  $current_exon->end == $gwexons[0]->end){
       $ex->end($gwexons[0]->end);
-      $ex->phase($gwexons[0]->phase);
     }
     elsif (  $current_exon->end < $gwexons[0]->end && $current_exon != $egexons[0] ){
       $ex->end($current_exon->end);
@@ -1509,7 +1504,6 @@ sub transcript_from_multi_exon_genewise_reverse{
 
     # this exon is the end of translation, convention: end_phase = -1
     my $ex = $transcript->end_Exon;
-    $ex->end_phase(-1);
 
     # modify the coordinates of the last exon in $newtranscript
     if ( $current_exon->start < $gwexons[$#gwexons]->start ){
@@ -1519,11 +1513,7 @@ sub transcript_from_multi_exon_genewise_reverse{
     }
     elsif( $current_exon->start == $gwexons[$#gwexons]->start){
       $ex->start($gwexons[$#gwexons]->start);
-      $ex->end_phase($gwexons[$#gwexons]->end_phase);
     }
-
-    # if the e2g exon starts after the gw exon,
-    # modify the end only if this e2g exon is not the last of the transcript
     elsif ( $current_exon->start > $gwexons[$#gwexons]->start && $exoncount != $#egexons ){
 
       $modified_peptide = 1;
@@ -1533,15 +1523,11 @@ sub transcript_from_multi_exon_genewise_reverse{
 
       ## adjust translation
       my $diff   = $current_exon->start - $gwexons[$#gwexons]->start;
-      #print STDERR "diff: $diff\n";
       my $tend   = $translation->end;
 	
       my $gw_exon_length   = $gwexons[$#gwexons]->end - $gwexons[$#gwexons]->start + 1;
       my $cdna_exon_length = $current_exon->end - $current_exon->start + 1;
-      #print STDERR "gw exon length  : $gw_exon_length\n";
-      #print STDERR "cdna exon length: $cdna_exon_length\n";
-	
-      my $length_diff = $gw_exon_length - $cdna_exon_length;
+
 
       # modify the combined exon coordinate to be that of the cdna
       $ex->start($current_exon->start);
@@ -1550,19 +1536,19 @@ sub transcript_from_multi_exon_genewise_reverse{
 	# we chop exactily N codons from the end of the translation
 	# so it can end where the cdna exon ends
 	$translation->end($cdna_exon_length);
-	$end_translation_shift = $length_diff;
+	$end_translation_shift = $diff;
       }
       elsif ($diff % 3 == 1) {
 	# we chop N codons plus one base
 	# it should end on a full codon, so we need to end translation 2 bases earlier:
 	$translation->end($cdna_exon_length - 2);
-	$end_translation_shift = $length_diff + 2;
+	$end_translation_shift = $diff + 2;
       }
       elsif ($diff % 3 == 2) {
 	# we chop N codons plus 2 bases
 	# it should end on a full codon, so we need to end translation 1 bases earlier:
 	$translation->end($cdna_exon_length - 1);
-	$end_translation_shift = $length_diff + 1;
+	$end_translation_shift = $diff + 1;
       }
       else {
 	# absolute genebuild paranoia 8-)
@@ -1581,7 +1567,6 @@ sub transcript_from_multi_exon_genewise_reverse{
 
       if($expanded){
 	# set translation end to what it originally was in the unmerged genewise gene
-	#print STDERR "Reverse: expanded 3' exon, re-setting translation exon ".$translation->end." to original end( $orig_tend ) - shifts_due_to_phases_etc ( $end_translation_shift ) :".($orig_tend - $end_translation_shift)."\n";
 	$translation->end($orig_tend - $end_translation_shift);
       }
       Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
@@ -1633,29 +1618,35 @@ sub add_5prime_exons{
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
 # to expand any frameshifts we merged in the terminal genewise exon. 
-# The expansion is made by putting $exon to be the last (3' end) component, so we modify its
-# start but not its end. The rest of the components are added. The translation end will have to be modified,
-# this happens in the method _transcript_from_multi_exon....
+# We need to deal with the 5' exon especially, because merged exons are made
+# by "absorbing" the exons to be merged into the 5'-most exon; unmerging therefore
+# is performed by setting the 3'end of the merged exon back to what it was, and
+# re-adding the other exons involced in the merge to the transcript. We cannot
+# do this with the 3'exon however, because its 3'end may have been adjusted
+# (to accommodate UTR). We therefore have this custom-routine to expand the exon
+# which preserves the coords of the 3'-most end. 
 
 sub expand_3prime_exon{
   my ($self, $exon, $transcript, $strand) = @_;
 
   if(scalar($exon->sub_SeqFeature) > 1){
-    #print STDERR "expanding 3'prime frameshifted exon $exon in strand $strand: ".
-    #$exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
-    my @sf = $exon->sub_SeqFeature;
+    my @sf = sort { $a->start <=> $b->start } $exon->sub_SeqFeature;
 
-    my $last = pop(@sf);
-    #print STDERR "last component: ".$last->start."-".$last->end." phase ".$last->phase." end_phase ".$last->end_phase."\n";
 
-    #print STDERR "setting exon $exon start: ".$last->start." phase: ".$last->phase."\n";  
-    $exon->start($last->start); # but don't you dare touch the end!
-    $exon->dbID($last->dbID);
-    $exon->phase($last->phase);
+    if ($strand < 0) {
+      my $exon3 = shift(@sf);
+      $exon->end($exon3->end);
+      $exon->dbID($exon3->dbID);
+      $exon->phase($exon3->phase);
+    } else {
+      my $exon3 = pop(@sf);
+      $exon->start($exon3->start);
+      $exon->dbID($exon3->dbID);
+      $exon->phase($exon3->phase);
+    }
 
     # add back the remaining component exons
     foreach my $s(@sf){
-      #print STDERR "adding exon: ".$s->start."-".$s->end."\n";
       $transcript->add_Exon($s);
       $transcript->sort;
     }
