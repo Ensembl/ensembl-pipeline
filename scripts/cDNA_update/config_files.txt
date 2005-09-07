@@ -41,7 +41,7 @@ use vars qw(%Config);
   DEFAULT_RUNNER => '',
   QUEUE_CONFIG => [
     {
-      logic_name => 'Exonerate_cDNA_update',
+      logic_name => '<newFeatureName>',
       batch_size => 1,
       resource   => 'model=IBMBC2800',
 			#'model=IBMBC2800',
@@ -89,7 +89,7 @@ use vars qw(%Config);
                OPTIONS             => undef,
 	       NONREF_REGIONS      => 1,
              },
-             Exonerate_cDNA_update => {
+             <newFeatureName> => {
 	       GENOMICSEQS         => '<masked_genome>',
                QUERYTYPE           => 'dna',
                QUERYSEQS           => '<chunkDIR>',
