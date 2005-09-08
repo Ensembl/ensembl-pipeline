@@ -43,7 +43,7 @@ use vars qw(%Config);
     {
       logic_name => '<newFeatureName>',
       batch_size => 1,
-      resource   => 'model=IBMBC2800',
+      resource   => 'select[mem>2000] rusage[mem=2000]',
 			#'model=IBMBC2800',
                      	# or 'select[mem>2000] rusage[mem=2000]'
       retries    => 1,

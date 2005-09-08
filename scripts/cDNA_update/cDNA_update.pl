@@ -104,7 +104,7 @@ $target_masked_genome = "/data/blastdb/Ensembl/Human/".$assembly_version."/modif
 
 # external programs needed (absolute paths):
 $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
-$polyA_clipping       = "/nfs/acari/fsk/projects/cDNA_update/steve_clip_ployA.pl";
+$polyA_clipping       = "/nfs/acari/fsk/projects/cdna_update/steve_clip_ployA.pl";
 
 # db parameters
 #admin rights required
@@ -115,17 +115,17 @@ $WB_REF_DBNAME        = "homo_sapiens_core_33_35f";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
-$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe_8";
+$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe";
 $WB_PIPE_DBHOST       = "ecs1a";
 $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update_8";
+$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update";
 $WB_TARGET_DBHOST     = "ia64g";
 $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only)
-$WB_LAST_DBNAME       = $ENV{'USER'}."_cDNA_update";
-$WB_LAST_DBHOST       = "ia64g";
-$WB_LAST_DBPORT       = "3306";
+$WB_LAST_DBNAME       = "homo_sapiens_cdna_33_35f";
+$WB_LAST_DBHOST       = "ecs2";
+$WB_LAST_DBPORT       = "3364";
 # reference db (last build)
 $WB_LAST_DNADBNAME    = "homo_sapiens_core_33_35f";
 $WB_LAST_DNADBHOST    = "ecs2";
@@ -154,17 +154,17 @@ $configDIR          = $dataDIR."/configbackup";
 $chunkDIR           = $dataDIR."/chunks";
 $outDIR             = $dataDIR."/output";
 $masked_genome      = $target_masked_genome;
-my $oldFeatureName  = "Exonerate_cDNA_update";
-my $newFeatureName  = "human_cDNA_update"; #also used as analysis name
-my $submitName      = "SubmitcDNAChunk";
+$oldFeatureName     = "human_cDNA_update";
+$newFeatureName     = "human_cDNA_update"; #also used as analysis name
+$submitName         = "SubmitcDNAChunk";
 my @configvars      = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
 		      configDIR sourceDIR newfile config_file masked_genome fastasplit
                       polyA_clipping WB_DBUSER WB_DBPASS WB_REF_DBNAME WB_REF_DBHOST 
                       WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
-                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT);
+                      WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT newFeatureName);
 #fasta chunk specifications:
 my $chunknum        = 1200;   #(<300 sequences / file)
-my $maxseqlenght    = 18000;
+my $maxseqlenght    = 17000;
 $tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
 my $program_name    = "exonerate";
