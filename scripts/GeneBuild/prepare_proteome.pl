@@ -1,4 +1,3 @@
-#!/usr/local/bin/perl -w
 use strict;
 
 =head1 NAME
@@ -11,73 +10,98 @@ use strict;
 
 =head1 DESCRIPTION
 
-  prepare_proteome.pl prepares a fasta file of protein sequences from swissprot and refseq 
-  input files (also in fasta format). This file is needed for pmatch comparisons and its 
-  creation is the first part of the GeneBuild.
+  prepare_proteome.pl prepares a fasta file of protein sequences
+  input files (also in fasta format) specified in the Scripts.pm
+  config file. This file is needed for pmatch comparisons and 
+  its creation is the first part of the GeneBuild.
 
-  The file has a description line consisting solely of the accession number after the leading >
+  The file has a description line consisting solely of the 
+  accession number after the leading >
   All U are replaced by X to prevent pmatch complaining.
 
-  The final part of the script does a tiny pmatch test run to reveal any problems persisting in 
-  the file that would prevent later full scale pmatches from running smoothly.
+  The final part of the script does a tiny pmatch test run to 
+  reveal any problems persisting in the file that would prevent 
+  later full scale pmatches from running smoothly.
 
 =head1 OPTIONS
   
   Options are to be set in GeneBuild config files
 
      GB_KILL_LIST   location of text file listing Swissprot IDs to ignore
-
+     GB_PROTEOME_FILES the locations of the files to parse and 
+and the regex to parse them with
+     GB_PMATCH where to write the output file too
 =cut
 
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Pmatch;
-
-
+use Bio::SeqIO;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 
 my @file_info = @$GB_PROTEOME_FILES;
 my $protfile = $GB_PFASTA;
 my $pmatch    = $GB_PMATCH;
 
-my %kill_list;
-%kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
+my %kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
+
 my %ids;
-foreach my $file(@file_info){
-  my $file_name = $file->{file_path};
-  open (IN, "<$file_name") or die "Can't open input file $file_name : $!";
-  open (OUT, ">>$protfile") or die "Can't open output file $protfile : $!";
-  my $killing = 0;
-  while(<IN>){
-    #print STDERR "matching ".$_." with ".$file->{header_regex}."\n";
-    if(/$file->{header_regex}/){
-      #print "have matched ".$_." with ".$file->{header_regex}."\n";
-      $killing = 0;
-      if($kill_list{$1}){
-        $killing = 1;
-      }
-      if(!$ids{$1}){
-        $ids{$1} = 1;
-      }else{
-        print STDERR "skipping ".$1." it has already appeared\n";
-        $killing = 1;
-      }
-      if(!$killing){
-	print OUT ">$1\n";
-      }
-    }else{
-      if(!$killing){
-	s/U/X/g;
-	print OUT $_;
-      }
+
+foreach my $file_info(@file_info){
+  my $file = $file_info->{file_path};
+  my $regex = $file_info->{header_regex};
+  my $in = Bio::SeqIO->new(
+                           -format => 'fasta',
+                           -file => $file,
+                          );
+  my $out = Bio::SeqIO->new(
+                            -format => 'fasta',
+                            -file => ">>".$protfile,
+                           );
+ SEQ:while(my $seq = $in->next_seq){
+    my $parseable_string = $seq->id." ".$seq->desc;
+    my ($id) = $parseable_string =~ /$regex/;
+    if(!$id){
+      throw($regex." failed to parse an id out of ".
+            $parseable_string)
     }
+    if($kill_list{$id}){
+      print $id." on kill list\n";
+      next SEQ;
+    }
+    if($ids{$id}){
+      print $id." has already appeared\n";
+      next SEQ;
+    }
+    $seq->desc('');
+    $seq->id($id);
+    $ids{$id} = 1;
+    my $seq_string = $seq->seq;
+    $seq_string =~	s/U/X/g;
+    $seq->seq($seq_string);
+    $out->write_seq($seq);
   }
-  close IN;
-  close OUT;
 }
 
-
 &test_protfile;
+
+sub get_kill_list {
+  my ($kill_list) = @_;
+  my %kill_list = ();
+  die "kill list is not defined" if(!$kill_list);
+  open KILL_LIST_FH, $kill_list or die "can't open $kill_list";
+  while (<KILL_LIST_FH>) {
+    my @element = split;
+    if (scalar(@element) == 0) {	# blank or empty line
+      next;
+    }
+    $kill_list{$element[0]} = 1;
+  }
+  close KILL_LIST_FH or die "file error for $kill_list";
+  return \%kill_list;
+}
+
 
 
 sub test_protfile {
@@ -103,24 +127,3 @@ sub test_protfile {
   unlink $tmpfile;
 
 }
-
-
-
-
-sub get_kill_list {
-  my ($kill_list) = @_;
-  my %kill_list = ();
-  open KILL_LIST_FH, $kill_list or die "can't open $kill_list";
-  while (<KILL_LIST_FH>) {
-    my @element = split;
-    if (scalar(@element) == 0) {	# blank or empty line
-      next;
-    }
-    $kill_list{$element[0]} = 1;
-  }
-  close KILL_LIST_FH or die "file error for $kill_list";
-  return \%kill_list;
-}
-
-
-
