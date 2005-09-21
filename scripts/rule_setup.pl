@@ -146,6 +146,7 @@ if($read){
 
 if($write){
   my $analyses = &read_db($db);
+  $analyses = [sort {$a->goalAnalysis->dbID <=> $b->goalAnalysis->dbID} @{$analyses}];
   &write_file($file, $analyses);
 }
 

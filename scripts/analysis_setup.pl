@@ -173,6 +173,7 @@ if($read){
 
 if($write){
   my $analyses = &read_db($db);
+  $analyses = [sort {$a->dbID <=> $b->dbID} @$analyses];
   &write_file($file, $analyses);
 }
 
