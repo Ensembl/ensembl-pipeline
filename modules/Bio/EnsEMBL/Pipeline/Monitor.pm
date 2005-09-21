@@ -79,7 +79,7 @@ sub show_current_status {
     my $count  = $ref->{'count(*)'};
     my $status = $ref->{'status'};
     my $name   = $ref->{'logic_name'};
-    my $aid    = $ref->{'analysis_id'} ;  
+    my $aid    = $ref->{'analysis_id'};
 
     if (!defined($maxcount) || length($count) > $maxcount) {
       $maxcount = length($count);
@@ -182,16 +182,16 @@ sub show_current_status_summary {
 
 #show running/failed jobs grouped by status
 sub show_finished_summary {
-  my ($self, $no_submit) = @_;
+  my ($self, $no_submit, $show_percent) = @_;
 
   my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_id from input_id_analysis i, analysis  a where a.analysis_id = i.analysis_id group by a.analysis_id");
-  
+
   my $res = $sth->execute;
 
   my $maxcount = 0;
-  my $maxname = 0;
-  my $maxid = 0;
-
+  my $maxname  = 0;
+  my $maxid    = 0;
+  my $max_nums = undef;
   my @counts;
   my @names;
   my @ids;
@@ -226,21 +226,41 @@ sub show_finished_summary {
   $maxname++;
   $maxid++;
 
-  $self->print_header("Finished job summary");
+  if($show_percent){
+    $max_nums = percent_finished($self);
+    $self->print_header("Finished job summary");
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","Count","Name","Id","%Done");
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","-----","----","--","-----");
 
-  printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","Count","Name","Id");
-  printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","-----","----","--");
+    while (my $count = shift(@counts)) {
+      my $name  = shift @names;
+      my $id    = shift @ids;
+      my $total = " ";
+      my $add   = " ";
+      if($count && $max_nums->{$id}){
+	$total = (100*$count/($max_nums->{$id}));
+	$add = '%';
+      }
+      printf("%-${maxcount}s %-${maxname}s %-${maxid}s %3d%s\n",$count,$name,$id,$total,$add);
+    }
+  }
+  else{
+    $self->print_header("Finished job summary");
 
-  while (my $count = shift(@counts)) {
-    my $name = shift @names;
-    my $id   = shift @ids;
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","Count","Name","Id");
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n","-----","----","--");
 
-    printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n",$count,$name,$id);
+    while (my $count = shift(@counts)) {
+      my $name = shift @names;
+      my $id   = shift @ids;
+
+      printf("%-${maxcount}s %-${maxname}s %-${maxid}s\n",$count,$name,$id);
+    }
   }
   print "\n";
 
 }
-  
+
 # show analysis processes
 sub show_analysisprocess {
   my ($self) = @_;
@@ -504,7 +524,8 @@ sub rules_cache{
             my $rule_adaptor = $self->dbobj->get_RuleAdaptor();
             my @rules = $rule_adaptor->fetch_all;
             foreach my $rule (@rules)  {
-                $self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = $rule->goalAnalysis->logic_name if ($rule->list_conditions()->[0]);
+                $self->{'_rules_cache'}->{$rule->goalAnalysis->dbID} = 
+		  $rule->goalAnalysis->logic_name if ($rule->list_conditions()->[0]);
             }
     }
     return $self->{'_rules_cache'};
@@ -552,7 +573,8 @@ sub get_unfinished_analyses_for_input_id{
     my $rules_cache = $self->rules_cache();
     my $sth = $self->dbobj->prepare(qq{SELECT c.name, a.analysis_id AS a_id, a.logic_name 
                                                     FROM contig c STRAIGHT_JOIN analysis a 
-                                                    LEFT JOIN input_id_analysis i ON c.name = i.input_id && a.analysis_id = i.analysis_id 
+                                                    LEFT JOIN input_id_analysis i ON c.name = i.input_id 
+				                    && a.analysis_id = i.analysis_id 
                                                     WHERE i.input_id IS NULL && c.name = ?});
     $sth->execute($contig_name);
     while(my $row  = $sth->fetchrow_hashref){
@@ -562,6 +584,7 @@ sub get_unfinished_analyses_for_input_id{
     map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
     return $unfinished;
 }
+
 sub get_unfinished_analyses_for_assembly_type{
     my ($self, $assembly_type, $print, $unfinished) = @_;
     my $rules_cache = $self->rules_cache();
@@ -580,6 +603,7 @@ sub get_unfinished_analyses_for_assembly_type{
     map {print join("\t: ", @$_) . "\n"} @$unfinished if $print;
     return $unfinished || [];
 }
+
 sub get_unfinished_analyses{
     my ($self, $print, $unfinished) = @_;
     my $rules_cache = $self->rules_cache();
@@ -612,6 +636,7 @@ sub get_no_hit_contigs_for_analysis{
     map {print join("\t: ", @$_) . "\n"} @$no_hits if $print;
     return $no_hits;
 }
+
 sub lock_status{
     my ($self,$print) = @_;
     my $str = "Locked By USER: %s, HOST: %s, PID: %s, STARTED: %s (%s) \n";
@@ -621,7 +646,6 @@ sub lock_status{
                                                $self->dbobj->dbc->port,
                                                $self->dbobj->dbc->dbname);
     if (my $lock_str = $self->dbobj->pipeline_lock) {
- 
             my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\S+):(\d+):(\d+)/;
             $self->print_header("This pipeline is LOCKED") if $print;
             @a = ($user, $host, $pid, scalar(localtime($started)), $started);
@@ -631,4 +655,49 @@ sub lock_status{
     }
     return @a;
 }
+
+#get the maximum numbers of jobs for every analysis
+#for calculating the percent-done numbers
+sub percent_finished{
+  my ($self) = @_;
+  my $sql1 = "select a.analysis_id, a.logic_name, rc.condition ".
+             "from rule_conditions rc,rule_goal rg, analysis a ".
+	     "where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id;";
+  my $sth1 = $self->dbobj->prepare($sql1) or die "cant prepare: $sql1";
+  my $sql2 = "select count(*) from input_id_analysis iia, analysis a ".
+             "where a.analysis_id=iia.analysis_id and a.logic_name=?";
+  my $sth2 = $self->dbobj->prepare($sql2) or die "cant prepare: $sql2";
+  my $sql3 = "select analysis_id, logic_name from analysis;";
+  my $sth3 = $self->dbobj->prepare($sql3) or die "cant prepare: $sql3";
+  $sth1->execute();
+
+  my %analysis_name = ();
+  my %analysis_maxnum = ();
+  my %analysis_condition = ();
+
+  while (my $ref1 = $sth1->fetchrow_hashref) {
+    my $analysis_id = $ref1->{'analysis_id'};
+    $analysis_name{$analysis_id} = $ref1->{'logic_name'};
+    $sth2->execute($ref1->{'condition'});
+    my $ref2 = $sth2->fetchrow_hashref;
+    if(!defined($analysis_maxnum{$analysis_id})){
+      $analysis_maxnum{$analysis_id} = 0;
+    }
+    if($analysis_maxnum{$analysis_id} < $ref2->{'count(*)'}){
+      $analysis_condition{$analysis_id} = $ref1->{'condition'};
+      $analysis_maxnum{$analysis_id}    = $ref2->{'count(*)'};
+    }
+  }
+  $sth3->execute();
+  while (my $ref3 = $sth3->fetchrow_hashref) {
+    if(!defined($analysis_name{$ref3->{'analysis_id'}})){
+      $analysis_name{$ref3->{'analysis_id'}} = $ref3->{'logic_name'};
+      $sth2->execute($ref3->{'logic_name'});
+      my $ref4 = $sth2->fetchrow_hashref;
+      $analysis_maxnum{$ref3->{'analysis_id'}} = $ref4->{'count(*)'};
+    }
+  }
+  return(\%analysis_maxnum);
+}
+
 1;

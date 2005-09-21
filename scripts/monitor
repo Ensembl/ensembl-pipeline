@@ -4,32 +4,33 @@ $| = 1;
 
 use strict;
 use Getopt::Long;
-
+use lib '/nfs/acari/fsk/cvs_checkout/ensembl-pipeline/modules';
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 use Data::Dumper;
 
-my $dbhost   = '';
-my $dbport   = '';
-my $dbname = '';
-my $dbuser   = '';
-my $dbpass   = undef;
+my $dbhost          = '';
+my $dbport          = '';
+my $dbname          = '';
+my $dbuser          = '';
+my $dbpass          = undef;
 my $help            = 0;
 my $current         = 0;
 my $current_summary = 0;
 my $finished        = 0;
+my $finishedpercent = 0;
 my $analysis        = 0;
 my $rules           = 0;
 my $conditions      = 0;
 my $status_analysis = 0;
 my $unfin           = 0;     # shows the unfinished input_ids & analyses in the database.
 my $ft_ana_id       = undef; # shows clones with no hits in:with feature_table:analysis_id
-my $assembly_type   = undef; # shows unfinished input_ids & analyses in the assembly of type 
+my $assembly_type   = undef; # shows unfinished input_ids & analyses in the assembly of type
 my $input_id        = undef; # shows unfinished analyses for input_id
 my $lock            = 0;
-my $no_submit = 0;
+my $no_submit       = 0;
 
-&GetOptions( 
+&GetOptions(
 	    'dbhost:s'          => \$dbhost,
 	    'dbport:n'          => \$dbport,
 	    'dbuser:s'          => \$dbuser,
@@ -38,6 +39,7 @@ my $no_submit = 0;
 	    'current'           => \$current,
 	    'current_summary'   => \$current_summary,
 	    'finished'          => \$finished,
+	    'finishedpercent'   => \$finishedpercent,
 	    'analysis'          => \$analysis,
 	    'rules'             => \$rules,
 	    'conditions'        => \$conditions,
@@ -46,8 +48,8 @@ my $no_submit = 0;
 	    'nohits=s'          => \$ft_ana_id,
 	    'assembly=s'        => \$assembly_type,
 	    'input_id=s'        => \$input_id,
-            'no_submit!' => \$no_submit,
-	    'h|help'				=> \$help,
+            'no_submit!'        => \$no_submit,
+	    'h|help'		=> \$help,
 	    'lock'              => \$lock
 	   ) or useage();
 
@@ -59,25 +61,21 @@ if(!$dbhost || !$dbname){
 
 if(!$current && !$current_summary && !$finished && !$analysis && !$rules
    && !$conditions && !$status_analysis && !$unfin && !$ft_ana_id && 
-   !$assembly_type && !$input_id && !$lock){
+   !$assembly_type && !$input_id && !$lock && !$finishedpercent){
   print STDERR "you must provide at least one display option\n";
   $help = 1;
 }
 
 useage() if $help;
 
-
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
-   -host => $dbhost,
-   -user => $dbuser,
+   -host   => $dbhost,
+   -user   => $dbuser,
    -dbname => $dbname,
-   -pass  => $dbpass,
-   -port => $dbport,
+   -pass   => $dbpass,
+   -port   => $dbport,
   );
-
-
-
 
 my $ana_adaptor = $db->get_AnalysisAdaptor;
 
@@ -86,12 +84,12 @@ my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 $monitor->lock_status($lock);
 $monitor->show_current_status                 if ($current);
 $monitor->show_current_status_summary         if ($current_summary);
-$monitor->show_finished_summary($no_submit)   if ($finished);
+$monitor->show_finished_summary($no_submit,0) if ($finished);
 $monitor->show_analysisprocess                if ($analysis);
 $monitor->show_Rules                          if ($rules);
 $monitor->show_Rules_and_Conditions           if ($conditions);
 $monitor->get_unfinished_analyses(1)          if ($unfin);
-
+$monitor->show_finished_summary($no_submit,1) if ($finishedpercent);
 
 if ($status_analysis) {
   my ($status,$analysis)  = split(/:/,$status_analysis);
@@ -184,6 +182,7 @@ A Simple script using the Monitor.pm module to display information on the status
    -current_summary       shows the jobs in the database grouped by 
                           status
    -finished              shows the finished jobs summary
+   -finishedpercent       shows the finished jobs summary with calculated percentage
    -analysis              shows the analysis table
    -rules                 shows the rule_goal table
    -conditions            shows the rule_conditions table
