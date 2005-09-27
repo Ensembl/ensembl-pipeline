@@ -53,6 +53,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Analysis;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Sys::Hostname;
 use vars qw(@ISA);
 use strict;
@@ -128,13 +129,13 @@ the analysis object does not have a type.
 sub store_input_id_analysis {
   my ($self, $inputId, $analysis, $host, $save_runtime_info ) = @_;
 
-  $self->throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
+  throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
    unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-  $self->throw("Invalid inputId [$inputId]")
+  throw("Invalid inputId [$inputId]")
    unless $inputId;
 
-  $self->throw("No type defined in analysis obj") 
+  throw("No type defined in analysis obj") 
    unless defined($analysis->input_id_type);
 
   # do we want to use a default class here?
@@ -369,7 +370,7 @@ sub list_input_ids_by_analysis {
   my @ids;
   my @row;
   if(!$analysis_id){
-    $self->throw("need an analysis id list from");
+    throw("need an analysis id list from");
   }
   my $sth = $self->prepare( qq{
     SELECT distinct input_id FROM input_id_analysis where analysis_id=?
