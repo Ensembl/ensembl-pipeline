@@ -46,17 +46,17 @@ package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Job;
 use Bio::EnsEMBL::Pipeline::Status;
-use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Utils::Exception qw(stack_trace_dump);
+use Bio::EnsEMBL::Utils::Exception qw(stack_trace_dump 
+                                      verbose throw warning);
 
 use vars qw(@ISA);
 use strict;
 
-@ISA = qw( Bio::EnsEMBL::Root );
+@ISA = qw();
 
 sub new {
   my ($class,$dbobj) = @_;
-  my $self = $class->SUPER::new();
+  my $self = bless {}, $class;
 
   $self->db( $dbobj );
   return $self;
@@ -161,10 +161,10 @@ sub fetch_by_dbID_list {
 sub fetch_by_Status_Analysis {
     my ($self,$status, $analysis, $start, $end) = @_;
 
-    $self->throw("Require status and analysis id for fetch_by_Status_Analysis")
+    throw("Require status and analysis id for fetch_by_Status_Analysis")
                             unless ($analysis && $status);
     if( ! defined $analysis->dbID ){
-       $self->throw( "Analysis needs to be in database" );
+       throw( "Analysis needs to be in database" );
     }
     my $analysisId = $analysis->dbID;
 
@@ -198,7 +198,7 @@ sub fetch_by_Status_Analysis {
 sub fetch_by_Status {
     my ($self, $status, $start, $end) = @_;
 
-    $self->throw("Require status for fetch_by_Status")
+    throw("Require status for fetch_by_Status")
                             unless ($status);
     
 
@@ -287,7 +287,7 @@ sub fetch_all{
 sub fetch_by_age {
     my ($self,$age) = @_;
 
-    $self->throw("No input status for get_JobsByAge")
+    throw("No input status for get_JobsByAge")
         unless defined($age);
     #convert age from minutes to seconds
 
@@ -401,7 +401,7 @@ sub store {
   my $job = shift;
 
   if( ! defined( $job->analysis->dbID )) {
-    $self->throw( "Need to store analysis first" );
+    throw( "Need to store analysis first" );
   }
 
   my $sth = $self->prepare(q{
@@ -446,7 +446,7 @@ sub remove {
   my $job = shift;
 
   if( ! $job->dbID ) {
-    $self->throw( "Cant remove job without dbID" );
+    throw( "Cant remove job without dbID" );
   }
   my $dbID = $job->dbID;
 
@@ -599,7 +599,7 @@ sub set_status {
     my $jobId;
 
     if( ! defined ($jobId = $job->dbID)) {
-      $self->throw( "Job has to be in database" );
+      throw( "Job has to be in database" );
     }
 
 
@@ -641,7 +641,7 @@ sub set_status {
     if ($@) {
       print( " $@ " );
       
-      $self->throw("Error setting status to $stat_str");
+      throw("Error setting status to $stat_str");
     } else {
       return $status;
     }
@@ -663,13 +663,13 @@ sub current_status {
 
     if (defined($arg))
     {
-      $self->throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object")
+      throw("[$arg] is not a Bio::EnsEMBL::Pipeline::Status object")
         unless $arg->isa("Bio::EnsEMBL::Pipeline::Status");
       $job->{'_status'} = $arg;
     }
     else
       {
-        $self->throw("Can't get status if id not defined")
+        throw("Can't get status if id not defined")
           unless defined($job->dbID);
         my $id =$job->dbID;
         my $sth = $self->prepare(q{
@@ -692,7 +692,7 @@ sub current_status {
         }
         if(!$status){
           my ($p, $f, $l) = caller;
-          $self->warn("Have found no status for ".$job->dbID." ".
+          warning("Have found no status for ".$job->dbID." ".
                       $job->input_id." ".$job->analysis->dbID.
                       " assuming is sucessful $f:$l\n");
           my $std = stack_trace_dump();
@@ -724,7 +724,7 @@ sub get_all_status {
   my ($self, $job) = @_;
   my @status;
 
-  $self->throw("Can't get status if id not defined")
+  throw("Can't get status if id not defined")
     unless defined($job->dbID);
 
   my $sth = $self->prepare(q{
@@ -764,7 +764,7 @@ sub get_all_status {
 sub get_last_status {
   my ($self, $job) = @_;
 
-  $self->throw("Can't get status if id not defined")
+  throw("Can't get status if id not defined")
     unless defined($job->dbID);
 
   my $sth = $self->prepare (qq{

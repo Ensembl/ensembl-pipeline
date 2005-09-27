@@ -3,9 +3,10 @@
 # coverage and details of component CoordinatePairs
 
 package Bio::EnsEMBL::Pipeline::Tools::Pmatch::MergedHit;
-use Bio::Root::Object;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
-@ISA = qw(Bio::Root::Object);
+@ISA = qw();
 
 =head2 new
 
@@ -23,7 +24,7 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my ($query, $target, $strand,$coverage) = $self->_rearrange(['QUERY',
+  my ($query, $target, $strand,$coverage) = rearrange(['QUERY',
 							       'TARGET',
 							       'STRAND',
 							       'COVERAGE'],@args);
@@ -101,6 +102,9 @@ sub target {
 sub coverage {
   my ($self,$arg) = @_;
   if ($arg) {
+    #if($arg < 0 || $arg > 100){
+    #  throw("coverage is not between 0 and 100");
+    #}
     $self->{'coverage'} = $arg;
   }
   return $self->{'coverage'};

@@ -40,6 +40,8 @@ use Bio::EnsEMBL::Analysis::Programs;
 use Bio::EnsEMBL::Root;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -71,7 +73,7 @@ run (eg: C<Bio::EnsEMBL::FeaturePair> objects).
 sub run {
     my ($self) = @_;
 
-    $self->throw("run not implemented");
+    throw("run not implemented");
 }
 
 sub output {
@@ -183,7 +185,7 @@ sub workdir {
     if (!defined($self->{_workdir})) {
         if ($directory) {
             mkdir ($directory, 0777) unless (-d $directory);
-            $self->throw ("$directory doesn't exist\n") unless (-d $directory);
+            throw ("$directory doesn't exist\n") unless (-d $directory);
             $self->{_workdir} = $directory;
 }	elsif ($PIPELINE_WORK_DIR)	{
             $self->{_workdir}= $PIPELINE_WORK_DIR;
@@ -222,10 +224,10 @@ sub write_sequence_to_file {
     my ($self, $seqobj) = @_;
   
     if (!defined($seqobj)) {
-	$self->throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
+	throw("Must enter a Bio::Seq or a Bio::PrimarySeq object to the write_sequence_to_file");
     }
     if (!$seqobj->isa("Bio::Seq") && !$seqobj->isa("Bio::PrimarySeqI")) {
-        $self->throw("Must enter a Bio::Seq or a Bio::PrimarySeqI object to the write_sequence_to_file. Currently [$seqobj]");
+        throw("Must enter a Bio::Seq or a Bio::PrimarySeqI object to the write_sequence_to_file. Currently [$seqobj]");
     }
 
     my $file      = $self->get_tmp_file($self->workdir,"seq","fa");
@@ -263,7 +265,7 @@ sub deletefiles {
         }
         unless ($protected)
         {
-            unlink ($result) or $self->throw ("Couldn't delete $result :$!");
+            unlink ($result) or throw ("Couldn't delete $result :$!");
         }
     }
 }
@@ -275,10 +277,10 @@ sub checkdir {
 
     my $dir = $self->workdir;
 
-    $self->throw("Not enough disk space ($spacelimit required):$!\n") 
+    throw("Not enough disk space ($spacelimit required):$!\n") 
                         unless ($self->diskspace($dir, $spacelimit));
 
-    chdir ($dir) or $self->throw("Cannot change to directory $dir ($!)\n");
+    chdir ($dir) or throw("Cannot change to directory $dir ($!)\n");
 
 }
 
@@ -288,7 +290,7 @@ sub diskspace {
     my $Gb = 1024 ** 3;
     
 
-    open DF, "df $dir |" or $self->throw ("Can't open 'df' pipe ($!)\n");
+    open DF, "df $dir |" or throw ("Can't open 'df' pipe ($!)\n");
 
     while (<DF>) {
 			if ($block_size)  {
@@ -298,10 +300,10 @@ sub diskspace {
 				return 1;
 			} else {
 				($block_size) = /(\d+).+blocks/i
-					|| $self->throw ("Can't determine block size from:\n$_");
+					|| throw ("Can't determine block size from:\n$_");
 			}
     }
-    close DF || $self->throw("Error from 'df' : $!\n");
+    close DF || throw("Error from 'df' : $!\n");
 }
 
 
@@ -399,7 +401,7 @@ sub find_executable {
       $name = $self->locate_executable($name);
     };
     if ($@) {
-      $self->throw("Can't find executable [$name]");
+      throw("Can't find executable [$name]");
     }
     return $name;
   }
@@ -414,10 +416,10 @@ sub writefile {
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->$seqfilename(), '-format' => 'Fasta')
 
-      or $self->throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
+      or throw("Can't create new Bio::SeqIO from ".$self->$seqfilename().":$!\n");
 
     $clone_out->write_seq($seqobj)
-      or $self->throw("Couldn't write to file ".$self->$seqfilename().":$!");
+      or throw("Couldn't write to file ".$self->$seqfilename().":$!");
       $self->file($seqfilename);
 
 
@@ -427,11 +429,11 @@ sub writefile {
     #print "Writing sequence to ".$self->filename."\n";
     #create Bio::SeqIO object and save to file
     my $clone_out = Bio::SeqIO->new(-file => ">".$self->filename , '-format' => 'Fasta')
-      or $self->throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
+      or throw("Can't create new Bio::SeqIO from ".$self->filename.":$!\n");
 
     # This is bad.  The subclass has the query method not this interface.
     eval{
-      $clone_out->write_seq($self->query); #  or $self->throw("Couldn't write to file ".$self->filename.":$!");
+      $clone_out->write_seq($self->query); #  or throw("Couldn't write to file ".$self->filename.":$!");
     };
     if($@){
       throw("Failed to write file ".$self->filename." $@");
@@ -456,7 +458,7 @@ sub find_file {
   } elsif ($libdir && -e ($full_name = "$libdir/$name")) {
     return $full_name;
   } else {
-    $self->throw("Can't find file [$name]");
+    throw("Can't find file [$name]");
   }
 }
 

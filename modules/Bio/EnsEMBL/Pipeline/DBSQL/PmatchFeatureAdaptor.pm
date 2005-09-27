@@ -30,6 +30,7 @@ use Bio::EnsEMBL::DBSQL::BaseAdaptor;
 
 
 use Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 @ISA = qw(Bio::EnsEMBL::DBSQL::BaseAdaptor);
 
@@ -50,12 +51,12 @@ sub write_PmatchFeatures {
 	      $protein{$f->protein_id} =  $self->write_protein($f->protein_id,$f->cdna_id);
 	  }
 	  if(!$f->analysis){
-	      $self->throw("cant store ".$f." without an analysis\n");
+	      throw("cant store ".$f." without an analysis\n");
 	  }
 	  my $protein_internal_id = $protein{$f->protein_id};
 
 	  if (!defined($protein_internal_id)) {
-	      $self->throw("No internal id found for " . $f->protein_id . "\n");
+	      throw("No internal id found for " . $f->protein_id . "\n");
 	  }
 	  
 	  my $query = "insert into pmatch_feature values(null," . 
@@ -78,7 +79,7 @@ sub write_PmatchFeatures {
   $lock_st = $self->db->prepare($sql);
   $lock_st->execute;
 
-  $err and $self->throw("Had trouble putting Pmatch features into database: $err");
+  $err and throw("Had trouble putting Pmatch features into database: $err");
 }
 
 sub write_protein {
@@ -96,7 +97,7 @@ sub write_protein {
     }
 
     elsif ($tmpcdna ne $cdna_id) {
-      $self->throw("ERROR: Protein $protein_id already exists with different cdna $tmpcdna : $cdna_id\n");
+      throw("ERROR: Protein $protein_id already exists with different cdna $tmpcdna : $cdna_id\n");
     }
 
     return $self->get_protein_internal_id($protein_id);
@@ -110,7 +111,7 @@ sub write_protein {
     $sth = $self->prepare("select LAST_INSERT_ID()");
     $res = $sth->execute;
 
-    my ($id) = $sth->fetchrow  or $self->throw("Failed to get last insert id");
+    my ($id) = $sth->fetchrow  or throw("Failed to get last insert id");
     
     return $id;
   }
@@ -136,7 +137,7 @@ sub delete_protein {
   my $internal_id = $self->get_protein_internal_id($protein_id);
 
   if ($internal_id eq "") {
-    $self->throw("Protein $protein_id does not exist in the database");
+    throw("Protein $protein_id does not exist in the database");
   }
 
   my $query = "delete from protein where protein_id = '$protein_id'";
@@ -163,7 +164,7 @@ sub get_PmatchFeatures_by_protein_id {
       my $ana = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
       $ana_id = $ana->dbID;
     };
-    $@ and $self->throw("No analysis with logic_name '$logic_name' exists");
+    $@ and throw("No analysis with logic_name '$logic_name' exists");
     
     $query .= " and analysis_id = $ana_id";
   }
@@ -221,7 +222,7 @@ sub get_PmatchFeatures_by_chr_start_end {
   if(defined $logic_name){
     $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
     if (not defined $analysis) {
-      $self->throw("No analysis with logic name '$logic_name' exists");
+      throw("No analysis with logic name '$logic_name' exists");
     }
   }
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
@@ -251,7 +252,7 @@ sub get_PmatchFeatures_by_chr_start_end {
 
       my $protid = $self->get_protein_id($prot_internal_id);
       if (!defined($protid)){
-	$self->throw("no protein for internal_id $prot_internal_id\n");
+	throw("no protein for internal_id $prot_internal_id\n");
       }
 
       $proteins{$prot_internal_id}    = $protid;
@@ -289,11 +290,14 @@ sub get_PmatchFeatures_by_chr_start_end {
 
 sub fetch_by_logic_name {
   my ($self, $logic_name) = @_;
+  
   my $analysis = $self->db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
   my $query = "SELECT * FROM pmatch_feature pmf,protein " .
               "WHERE protein.protein_internal_id = pmf.protein_internal_id " .
 	       "AND pmf.analysis_id = ?";
-
+  if(!$analysis){
+    throw($logic_name." doesn't exist in ".$self->db->dbc->dbname);
+  }
   my $sth = $self->prepare($query);
   my $res = $sth->execute($analysis->dbID);
 
@@ -312,7 +316,7 @@ sub fetch_by_logic_name {
 
       my $protid = $self->get_protein_id($prot_internal_id);
       if (!defined($protid)){
-	$self->throw("no protein for internal_id $prot_internal_id\n");
+	throw("no protein for internal_id $prot_internal_id\n");
       }
 
       $proteins{$prot_internal_id}    = $protid;

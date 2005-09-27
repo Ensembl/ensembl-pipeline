@@ -98,7 +98,7 @@ Ensembl - ensembl-dev@ebi.ac.uk
 
 The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
-
+'
 =cut
 
 # Let the code begin...
@@ -107,7 +107,8 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Runnable::FeatureFilter;
 use vars qw(@ISA);
 use strict;
-
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 # Object preamble - inherits from Bio::EnsEMBL::Pipeline::RunnableI;
 
 use Bio::EnsEMBL::Pipeline::RunnableI;
@@ -120,7 +121,7 @@ sub new {
 
   my $self = $class->SUPER::new(@args);  
 
-  my($minscore,$maxevalue,$coverage,$prune, $hardprune) = $self->_rearrange(
+  my($minscore,$maxevalue,$coverage,$prune, $hardprune) = rearrange(
                                                                 [qw(MINSCORE
 								    MAXEVALUE
 								    COVERAGE
@@ -404,7 +405,7 @@ sub prune {
 
 sub prune_features {
   my ($self, @input) = @_;
-  $self->throw('interface fault') if @_ < 1;	# @input optional
+  throw('interface fault') if @_ < 1;	# @input optional
   #print STDERR "Prune:Have ".@input." features to prune\n";
   my @plus_strand_fs = $self->_prune_features_by_strand(+1, @input);
   my @minus_strand_fs = $self->_prune_features_by_strand(-1, @input);
@@ -429,7 +430,7 @@ sub prune_features {
 
 sub _prune_features_by_strand {
    my ($self, $strand, @in) = @_;
-   $self->throw('interface fault') if @_ < 2;	# @in optional
+   throw('interface fault') if @_ < 2;	# @in optional
 
    my @input_for_strand = ();
    foreach my $f (@in) {

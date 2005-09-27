@@ -41,22 +41,23 @@ methods. Internal methods are usually preceded with a _
 # Let the code begin...
 
 package Bio::EnsEMBL::Pipeline::Status;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 use vars qw(@ISA);
 use strict;
 
-use Bio::EnsEMBL::Root;
 
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 
 sub new {
   my($class,@args) = @_;
   
-  my $self = $class->SUPER::new(@args);
+   my $self = bless {},$class;
 
   my ($jobid,$status,$created)  =
-      $self->_rearrange([qw(JOBID
+      rearrange([qw(JOBID
 			    STATUS
 			    CREATED
 			    )],@args);

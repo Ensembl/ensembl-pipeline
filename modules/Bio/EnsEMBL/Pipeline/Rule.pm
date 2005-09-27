@@ -39,11 +39,11 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Rule;
 
 use vars qw(@ISA);
-use Bio::EnsEMBL::Root;
 use strict;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
-
-@ISA = qw( Bio::EnsEMBL::Root );
+@ISA = qw();
 
 =head2 Constructor
 
@@ -59,14 +59,14 @@ use strict;
 
 sub new {
   my ($class,@args) = @_;
-  my $self = $class->SUPER::new(@args);
+  my $self = bless {},$class;
 
   my ( $goal, $adaptor, $dbID ) =
-    $self->_rearrange( [ qw ( GOALANALYSIS
-			      ADAPTOR
-			      DBID
-			     ) ], @args );
-  $self->throw( "Wrong parameter" ) unless
+    rearrange( [ qw ( GOALANALYSIS
+                      ADAPTOR
+                      DBID
+                    ) ], @args );
+  throw( "Wrong parameter" ) unless
     $goal->isa( "Bio::EnsEMBL::Analysis" );
   $self->dbID( $dbID );
   $self->goalAnalysis( $goal );
@@ -115,7 +115,7 @@ sub list_conditions {
     @conditions = @{$self->{'_conditions'}};
   }
   if (! scalar (@conditions) ) {
-      $self->throw("No conditions found for this Rule");
+      throw("No conditions found for this Rule");
   }
   return \@conditions;
 }
@@ -127,7 +127,7 @@ sub has_condition_of_input_id_type {
   my $ana_adaptor = $self->goalAnalysis->adaptor;
 
   if (!scalar (@{$self->{'_conditions'}})) {
-      $self->throw("No conditions found for this Rule");
+      throw("No conditions found for this Rule");
   }
   
   return 1 if (exists($self->{'_condition_type_cache'}{$id_type}));

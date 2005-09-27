@@ -25,20 +25,17 @@ package Bio::EnsEMBL::Pipeline::Tools::Pmatch::PmatchFeature;
 
 use vars qw(@ISA);
 use strict;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
-use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Exon;
-
-@ISA = qw(Bio::EnsEMBL::Root);
+@ISA = qw();
 
 sub new {
   my($class,@args) = @_;
 
-  my $self = $class->SUPER::new(@args);
-
-  my ($protein_id,$cdna_id,$chr_name,$start,$end,$coverage,$analysis) = $self->_rearrange([qw(PROTEIN_ID
-										 CDNA_ID
-										 CHR_NAME
+  my $self = bless {},$class;
+  my ($protein_id,$cdna_id,$chr_name,$start,$end,$coverage,$analysis) = rearrange([qw(PROTEIN_ID 
+                       CDNA_ID                                                               CHR_NAME
 										 START
 										 END
 										 COVERAGE
@@ -72,7 +69,7 @@ sub coverage {
   if (defined($arg)) {
 
     if ($arg < 0 || $arg > 100) {
-      $self->throw("Coverage must be betwee 0 and 100.  Trying to set it to $arg");
+      throw("Coverage must be betwee 0 and 100.  Trying to set it to $arg");
     }
     
     $self->{_coverage} = $arg;
@@ -132,7 +129,7 @@ sub analysis {
    }
    if ($value) {
      unless($value->isa('Bio::EnsEMBL::Analysis')) {
-       $self->throw("Analysis is not a Bio::EnsEMBL::Analysis object "
+       throw("Analysis is not a Bio::EnsEMBL::Analysis object "
 		    . "but a $value object");
      }
 
