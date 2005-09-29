@@ -5,7 +5,7 @@ use strict;
   prepare_proteome.pl
 
 =head1 SYNOPSIS
- 
+
   prepare_proteome.pl
 
 =head1 DESCRIPTION
@@ -24,13 +24,13 @@ use strict;
   later full scale pmatches from running smoothly.
 
 =head1 OPTIONS
-  
+
   Options are to be set in GeneBuild config files
 
      GB_KILL_LIST   location of text file listing Swissprot IDs to ignore
-     GB_PROTEOME_FILES the locations of the files to parse and 
-and the regex to parse them with
-     GB_PMATCH where to write the output file too
+     GB_PROTEOME_FILES the locations of the files to parse and the regex to parse them with
+     GB_PMATCH location of pmatch executable
+     GB_PFASTA where to write the output file too
 =cut
 
 
@@ -41,7 +41,7 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 
 my @file_info = @$GB_PROTEOME_FILES;
-my $protfile = $GB_PFASTA;
+my $protfile  = $GB_PFASTA;
 my $pmatch    = $GB_PMATCH;
 
 my %kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
@@ -49,15 +49,15 @@ my %kill_list = %{&get_kill_list($GB_KILL_LIST)} if($GB_KILL_LIST);
 my %ids;
 
 foreach my $file_info(@file_info){
-  my $file = $file_info->{file_path};
+  my $file  = $file_info->{file_path};
   my $regex = $file_info->{header_regex};
-  my $in = Bio::SeqIO->new(
-                           -format => 'fasta',
-                           -file => $file,
+  my $in    = Bio::SeqIO->new(
+			      -format => 'fasta',
+			      -file   => $file,
                           );
   my $out = Bio::SeqIO->new(
                             -format => 'fasta',
-                            -file => ">>".$protfile,
+                            -file   => ">>".$protfile,
                            );
  SEQ:while(my $seq = $in->next_seq){
     my $parseable_string = $seq->id." ".$seq->desc;
