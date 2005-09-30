@@ -182,11 +182,21 @@ sub compute_translation{
 
     if ($newtranslation->end_Exon == $exon ) {
       if ($newtranslation->end == $exon->length) {
-        $exon->end_phase(($exon->length + $exon->phase) % 3);
+        if ($exon == $newtranslation->start_Exon) {
+          my $start_tln = $exon->start + $newtranslation->start - 1;
+          $exon->end_phase(($exon->end - $start_tln + 1) % 3);
+        } else {
+          $exon->end_phase(($exon->length + $exon->phase) % 3);
+        }
       }
       $found_end = 1;
     } elsif ($found_start and not $found_end) {
-      $exon->end_phase(($exon->length + $exon->phase) % 3);
+      if ($exon == $newtranslation->start_Exon) {
+        my $start_tln = $exon->start + $newtranslation->start - 1;
+        $exon->end_phase(($exon->end - $start_tln + 1) % 3);
+      } else {
+        $exon->end_phase(($exon->length + $exon->phase) % 3);
+      }
     }
 
     $last_end_phase = $exon->end_phase;
