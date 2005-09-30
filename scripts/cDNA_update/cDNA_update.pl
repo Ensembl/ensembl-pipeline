@@ -64,14 +64,15 @@ What YOU will need to do:
 
 If there is an error and the script dies, the original config files are restored
 without removing the data files and databases, allowing the re-run of the script.
+You might want to run only the config_setup function again, without having to re-build the db, etc.
 
 The setup of scripts and databases runs for ~ 10 min, the exonerate pipeline needs
-around 24 h, depending on farm usage.
+around 24 h for human cDNAs, depending on farm usage.
 Set resource => 'select[mem>2500] rusage[mem=2500]' in BatchQueue.pm and re-run
 the pipeline command if jobs fail or take too long.
 
-Run the healthchecks, even though most things do not really apply to this type of db:
-run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type estgene post_genebuild
+Run the healthchecks:
+run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type cdna post_genebuild
 
 =head1 CONTACT
 
@@ -92,19 +93,20 @@ $cvsDIR               = "/ecs2/work3/fsk/CDNA";
 $dataDIR              = "/ecs2/work3/fsk/CDNA/data";
 
 # sequence data files, which are used for the update
-# if in doubt, ask Hans
+# if in doubt, ask Hans where to find new files
 $vertrna              = "embl_vertrna-1";
 $vertrna_update       = "emnew_vertrna-1";
 $refseq               = "hs.fna";
 $sourceHost           = "cbi1";
 $sourceDIR            = "/data/blastdb";
 $assembly_version     = "NCBI35";
-$org_masked_genome    = "/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
 $target_masked_genome = "/data/blastdb/Ensembl/Human/".$assembly_version."/modified/softmasked_dusted";
+#only needed if assemly will be modified 
+$org_masked_genome    = "/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
 
 # external programs needed (absolute paths):
 $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
-$polyA_clipping       = "/nfs/acari/fsk/projects/cdna_update/steve_clip_ployA.pl";
+$polyA_clipping       = "/nfs/acari/fsk/projects/cdna_update/polyA_clipping.pl";
 
 # db parameters
 #admin rights required
@@ -126,7 +128,7 @@ $WB_TARGET_DBPORT     = "3306";
 $WB_LAST_DBNAME       = "homo_sapiens_cdna_33_35f";
 $WB_LAST_DBHOST       = "ecs2";
 $WB_LAST_DBPORT       = "3364";
-# reference db (last build)
+# reference db (last build, needed for comparison only)
 $WB_LAST_DNADBNAME    = "homo_sapiens_core_33_35f";
 $WB_LAST_DNADBHOST    = "ecs2";
 $WB_LAST_DNADBPORT    = "3364";
@@ -154,8 +156,8 @@ $configDIR          = $dataDIR."/configbackup";
 $chunkDIR           = $dataDIR."/chunks";
 $outDIR             = $dataDIR."/output";
 $masked_genome      = $target_masked_genome;
-$oldFeatureName     = "human_cDNA_update";
-$newFeatureName     = "human_cDNA_update"; #also used as analysis name
+$oldFeatureName     = "human_cDNA_update"; #for the comparison only
+$newFeatureName     = "cDNA_update";       #also used as analysis name!
 $submitName         = "SubmitcDNAChunk";
 my @configvars      = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update refseq 
 		      configDIR sourceDIR newfile config_file masked_genome fastasplit
@@ -179,7 +181,7 @@ if(!$option or ($option ne "prepare" and $option ne "run" and $option ne "clean"
    exit 1;
 }
 if($option eq "prepare"){
-  print "\nstarting cDNA-update for current human build.\n";
+  print "\nstarting cDNA-update procedure.\n";
 
   config_setup();
 
