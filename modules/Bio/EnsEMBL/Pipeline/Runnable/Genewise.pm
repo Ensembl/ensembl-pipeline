@@ -45,7 +45,8 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Exon;
-use Bio::EnsEMBL::DnaPepAlignFeature
+use Bio::EnsEMBL::DnaPepAlignFeature;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
