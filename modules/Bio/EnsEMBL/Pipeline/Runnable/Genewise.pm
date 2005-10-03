@@ -148,8 +148,9 @@ sub align_protein {
   if ($self->endbias == 1) {
     $command =~ s/-init endbias//;
     $command =~ s/-splice flat//;
+    $command =~ s/-splice_gtag flat//;
 
-    $command .= " -init endbias -splice flat ";
+    $command .= " -init endbias -splice_gtag ";
   }
 
   if (($self->reverse) && $self->reverse == 1) {
