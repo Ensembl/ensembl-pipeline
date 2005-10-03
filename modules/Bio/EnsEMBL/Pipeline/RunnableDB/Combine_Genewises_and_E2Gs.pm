@@ -119,25 +119,21 @@ sub fetch_input{
   
   $self->fetch_sequence([], $self->genewise_db);
   
-
   # get genewise genes
   my $similarity_genes = $self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE);
   my $targetted_genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
 
-  # temp hack klh: add my own type in. This needs to be made more generic!
-  #my $projected_genes = $self->query->get_all_Genes_by_type('WGA2Genes');
-  #my $exonerate_genes = $self->query->get_all_Genes_by_type('Exonerate_Protein');
-
   print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes\n";
   print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
-  #print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes genes\n";
-  #print STDERR "got " . scalar(@{$exonerate_genes}) . " Exonerate genes\n";
-
 
   $self->gw_genes( $similarity_genes);
   $self->gw_genes( $targetted_genes );
-  #$self->gw_genes( $projected_genes );
-  #$self->gw_genes( $exonerate_genes );
+
+  # To add your own genes type, add lines of the sort below; this obviously
+  # needs to be made more configurable
+  # my $projected_genes = $self->query->get_all_Genes_by_type('WGA2Genes');
+  # print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes gemes\n";
+  # $self->gw_genes( $projected_genes );
 
   # get blessed genes
   my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if ($self->blessed_db);
@@ -238,7 +234,7 @@ sub run_merging{
       #print STDERR "no matching cDNA for " . $gw->dbID ."\n";
       $self->unmatched_genes($cds);
       next CDS;
-  }
+    }
 
     # from the matching ones, take the best fit
 
@@ -787,15 +783,6 @@ sub _merge_genes {
 	    $cloned_translation->end($trans[0]->translation->end);
 	  }
 	
-	  my %evidence_hash;
-	  foreach my $sf( @{$exon->get_all_supporting_features}){
-	    if ( $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} ){
-	      next;
-	    }
-	    #print STDERR $sf->start."-".$sf->end."  ".$sf->hstart."-".$sf->hend."  ".$sf->hseqname."\n";
-	    $evidence_hash{$sf->hseqname}{$sf->hstart}{$sf->hend}{$sf->start}{$sf->end} = 1;
-	    $previous_exon->add_supporting_features($sf);
-	  }
 	  next EXON;
 	}
 	else{
@@ -828,28 +815,28 @@ sub _merge_genes {
     $merged_transcript->sort;
     $merged_transcript->translation($cloned_translation);
 
-  my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
-  if (scalar(@seqeds)) {
-    print "Copying sequence edits\n"; 
-    foreach my $se (@seqeds) {
-      my $new_se =
-              Bio::EnsEMBL::SeqEdit->new(
-                -CODE    => $se->code,
-                -NAME    => $se->name,
-                -DESC    => $se->description,
-                -START   => $se->start,
-                -END     => $se->end,
-                -ALT_SEQ => $se->alt_seq
-              );
-      my $attribute = $new_se->get_Attribute();
-      $cloned_translation->add_Attributes($attribute);
+    my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
+    if (scalar(@seqeds)) {
+      print "Copying sequence edits\n"; 
+      foreach my $se (@seqeds) {
+        my $new_se =
+            Bio::EnsEMBL::SeqEdit->new(
+                                       -CODE    => $se->code,
+                                       -NAME    => $se->name,
+                                       -DESC    => $se->description,
+                                       -START   => $se->start,
+                                       -END     => $se->end,
+                                       -ALT_SEQ => $se->alt_seq
+                                       );
+        my $attribute = $new_se->get_Attribute();
+        $cloned_translation->add_Attributes($attribute);
+      }
     }
-  }
-  my @support = @{$trans[0]->get_all_supporting_features};
-  if (scalar(@support)) {
-    $merged_transcript->add_supporting_features(@support);
-  }
-  $merged_transcript->add_Attributes(@{$trans[0]->get_all_Attributes});
+    my @support = @{$trans[0]->get_all_supporting_features};
+    if (scalar(@support)) {
+      $merged_transcript->add_supporting_features(@support);
+    }
+    $merged_transcript->add_Attributes(@{$trans[0]->get_all_Attributes});
     
     #print STDERR "merged_transcript:\n";
     #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
@@ -969,10 +956,10 @@ sub combine_genes{
   # check the transcript and expand frameshifts in all but original 3' gw_exon
   # (the sub_SeqFeatures have been flushed for this exon)
   if (defined($newtranscript)){
-
       # test
       #print STDERR "before expanding exons, newtranscript: $newtranscript\n"; 
       #$self->_print_Transcript($newtranscript);
+
 
       foreach my $ex (@{$newtranscript->get_all_Exons}){
 
@@ -1373,12 +1360,13 @@ sub transcript_from_multi_exon_genewise_forward{
       #print STDERR "Forward: translation end set to : ".$translation->end."\n";
 
     }
-    # need to explicitly set the translation end exon for translation to work out
-    my $end_ex = $transcript->end_Exon;
-    $translation->end_Exon($end_ex);
 
     # strand = 1
     my $expanded = $self->expand_3prime_exon($ex, $transcript, 1);
+
+    # need to explicitly set the translation end exon for translation to work out
+    my $end_ex = $transcript->end_Exon;
+    $translation->end_Exon($end_ex);
 
     if($expanded){
       # set translation end to what it originally was in the unmerged genewise gene
@@ -1618,10 +1606,10 @@ sub add_5prime_exons{
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
 # to expand any frameshifts we merged in the terminal genewise exon. 
-# We need to deal with the 5' exon especially, because merged exons are made
+# We need to deal with the 3' exon especially, because merged exons are made
 # by "absorbing" the exons to be merged into the 5'-most exon; unmerging therefore
 # is performed by setting the 3'end of the merged exon back to what it was, and
-# re-adding the other exons involced in the merge to the transcript. We cannot
+# re-adding the other exons involved in the merge to the transcript. We cannot
 # do this with the 3'exon however, because its 3'end may have been adjusted
 # (to accommodate UTR). We therefore have this custom-routine to expand the exon
 # which preserves the coords of the 3'-most end. 
@@ -1630,19 +1618,27 @@ sub expand_3prime_exon{
   my ($self, $exon, $transcript, $strand) = @_;
 
   if(scalar($exon->sub_SeqFeature) > 1){
+
     my @sf = sort { $a->start <=> $b->start } $exon->sub_SeqFeature;
 
+    # this exon was originally the 5'-most component of the merge. 
+    # The supporting features therefore belong to the 5' component
 
     if ($strand < 0) {
-      my $exon3 = shift(@sf);
-      $exon->end($exon3->end);
-      $exon->dbID($exon3->dbID);
-      $exon->phase($exon3->phase);
+      my $exon5 = pop(@sf);
+      my $exon3 = $sf[0];
+      $exon3->start($exon->start);
+      $exon->start($exon5->start);
+      $exon3->end_phase($exon->end_phase);
+      $exon->end_phase($exon5->end_phase);      
+
     } else {
-      my $exon3 = pop(@sf);
-      $exon->start($exon3->start);
-      $exon->dbID($exon3->dbID);
-      $exon->phase($exon3->phase);
+      my $exon5 = shift(@sf);
+      my $exon3 = $sf[-1];
+      $exon3->end($exon->end);
+      $exon->end($exon5->end);
+      $exon3->end_phase($exon->end_phase);
+      $exon->end_phase($exon5->end_phase);
     }
 
     # add back the remaining component exons
@@ -1650,6 +1646,7 @@ sub expand_3prime_exon{
       $transcript->add_Exon($s);
       $transcript->sort;
     }
+
     # flush the sub_SeqFeatures so we don't try to re-expand later
     $exon->flush_sub_SeqFeature;
     return 1;
