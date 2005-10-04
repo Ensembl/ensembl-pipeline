@@ -960,8 +960,7 @@ sub combine_genes{
       #print STDERR "before expanding exons, newtranscript: $newtranscript\n"; 
       #$self->_print_Transcript($newtranscript);
 
-
-      foreach my $ex (@{$newtranscript->get_all_Exons}){
+      foreach my $ex (@{$newtranscript->get_all_Exons}){            
 
         if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
           my @sf    = sort {$a->start <=> $b->start} $ex->sub_SeqFeature;
@@ -1057,7 +1056,14 @@ sub transcript_from_single_exon_genewise {
     
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_Exon;
-    
+
+    if ($eg_exon->start < $ex->start) {
+      $ex->phase(-1);
+    }
+    if ($eg_exon->end > $ex->end) {
+      $ex->end_phase(-1);
+    }
+
     $ex->start($eg_exon->start);
     $ex->end($eg_exon->end);
     
@@ -1143,6 +1149,7 @@ sub transcript_from_single_exon_genewise {
     $self->add_3prime_exons($transcript, $exoncount, @e2g_exons);
     
   }
+
   return ($transcript,0);
 }
 
@@ -1571,7 +1578,6 @@ sub add_5prime_exons{
   # add all the exons from the est2genome transcript, previous to this one
   # db handle will be screwed up, need to mak new exons from these
   my $c = 0;
-  my $modified = 0;
   while($c < $exoncount){
     my $newexon = new Bio::EnsEMBL::Exon;
     my $oldexon = $e2g_exons[$c];
@@ -1595,13 +1601,9 @@ sub add_5prime_exons{
     }
     #	print STDERR "Adding 5prime exon " . $newexon->start . " " . $newexon->end . "\n";
     $transcript->add_Exon($newexon);
-    $modified = 1;
     $c++;
   }
 
-  if ($modified == 1){
-    $transcript->translation->start_Exon->phase(-1);
-  }
 }
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
@@ -1668,7 +1670,6 @@ sub add_3prime_exons {
 
   # add all the exons from the est2genome transcript, subsequent to this one
   my $c = $#e2g_exons;
-  my $modified = 0;
   while($c > $exoncount){
     my $newexon = new Bio::EnsEMBL::Exon;
     my $oldexon = $e2g_exons[$c];
@@ -1692,12 +1693,7 @@ sub add_3prime_exons {
     }
     #	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
     $transcript->add_Exon($newexon);
-    $modified = 1;
     $c--;
-  }
-
-  if ($modified == 1){
-    $transcript->translation->end_Exon->end_phase(-1);
   }
 }
 
