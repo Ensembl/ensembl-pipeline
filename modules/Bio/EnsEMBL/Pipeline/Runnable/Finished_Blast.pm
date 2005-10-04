@@ -174,20 +174,31 @@ sub parse_results {
 }
 
 sub _apply_coverage_filter {
-    my ( $self, $query_length, $best_hits ) = @_;
+    my ($self, $query_length, $best_hits) = @_;
 
     my %id_list;
 
-    my $split_flag = defined($SPLIT_GAPPED_ALIGNMENTS{$self->database}) ? $SPLIT_GAPPED_ALIGNMENTS{$self->database} : 1;
-    my $max_coverage = ( defined($MAX_COVERAGE{$self->database}) ? $MAX_COVERAGE{$self->database} : 0 ) % 256;
-    my $discard_overlaps = $DISCARD_OVERLAPS{$self->database} || 0;
-    
-    print "SETTING [_apply_coverage_filter]: split_flag is <" . ( $split_flag ? "ON" : "OFF" ) . ">\n";
-    print "SETTING [_apply_coverage_filter]: max_coverage is <" . $max_coverage . ">\n";
-    $self->throw("Max coverage '$max_coverage' is beyond limit of method '255'") if $max_coverage > 255;
-    print "SETTING [_apply_coverage_filter]: discard_overlaps is <" . ( $discard_overlaps ? "ON" : "OFF" ) . ">\n";
+    my $split_flag =
+      defined($SPLIT_GAPPED_ALIGNMENTS{ $self->database })
+      ? $SPLIT_GAPPED_ALIGNMENTS{ $self->database }
+      : 1;
+    my $max_coverage = (
+        defined($MAX_COVERAGE{ $self->database })
+        ? $MAX_COVERAGE{ $self->database }
+        : 0) % 256;
+    my $discard_overlaps = $DISCARD_OVERLAPS{ $self->database } || 0;
+
+    print "SETTING [_apply_coverage_filter]: split_flag is <"
+      . ($split_flag ? "ON" : "OFF") . ">\n";
+    print "SETTING [_apply_coverage_filter]: max_coverage is <"
+      . $max_coverage . ">\n";
+    $self->throw("Max coverage '$max_coverage' is beyond limit of method '255'")
+      if $max_coverage > 255;
+    print "SETTING [_apply_coverage_filter]: discard_overlaps is <"
+      . ($discard_overlaps ? "ON" : "OFF") . ">\n";
+
     # Make a string of nulls (zeroes) the length of the query
-    my $coverage_map = "\0" x ( $query_length + 1 );
+    my $coverage_map = "\0" x ($query_length + 1);
 
     my $ana = $self->get_analysis;
 
@@ -195,80 +206,93 @@ sub _apply_coverage_filter {
     # to our threshold type.
     my (@bin_numbers);
     my $thresh_type = $self->threshold_type;
-    if ( $thresh_type eq 'PID' ) {
-	@bin_numbers = sort { $b <=> $a } keys %$best_hits;
+    if ($thresh_type eq 'PID') {
+        @bin_numbers = sort { $b <=> $a } keys %$best_hits;
     }
-    elsif ( $thresh_type eq 'PVALUE' ) {
-	@bin_numbers = sort { $a <=> $b } keys %$best_hits;
+    elsif ($thresh_type eq 'PVALUE') {
+        @bin_numbers = sort { $a <=> $b } keys %$best_hits;
     }
     else {
-	$self->throw("Unknown threshold type '$thresh_type'");
+        $self->throw("Unknown threshold type '$thresh_type'");
     }
 
     foreach my $bin_n (@bin_numbers) {
-	       
-	print STDERR "\nLooking at bin: $thresh_type $bin_n\n";
-	my $score_hits = $best_hits->{$bin_n};
 
-	# Loop through from best to worst according
-	# to score within threshold bin
-	foreach my $top_score ( sort { $b <=> $a } keys %$score_hits ) {
+        print STDERR "\nLooking at bin: $thresh_type $bin_n\n";
+        my $score_hits = $best_hits->{$bin_n};
 
-	    #print STDERR "  Looking at hits scoring $top_score\n";
-	    my $hits = $score_hits->{$top_score};
+        # Loop through from best to worst according
+        # to score within threshold bin
+        foreach my $top_score (sort { $b <=> $a } keys %$score_hits) {
 
-	    # Loop through each hit with this score
-	    foreach my $hit (@$hits) {
-                
-		my $keep_hit = 0;
-                
-		my ( $name, @hsps ) = @$hit;
+            #print STDERR "  Looking at hits scoring $top_score\n";
+            my $hits = $score_hits->{$top_score};
 
-		# Don't keep multiple matches to the same sequence
-		# at the same genomic location.
-		@hsps = $self->_discard_worst_overlapping(@hsps) if $discard_overlaps;
+            # Loop through each hit with this score
+            foreach my $hit (@$hits) {
 
-		unless ($max_coverage == 0){
-		print STDERR "    Looking at $name ";
+                my $keep_hit = 0;
 
-		    foreach my $hsp (@hsps) {
-			my $q = $hsp->query;
-			foreach my $i ( $q->start .. $q->end ) {
-			    my $depth = unpack( 'C', substr( $coverage_map, $i, 1 ) );
-			    if ( $depth < $max_coverage ) {
-				$keep_hit = 1;
-				$depth++;
-				# Increment depth at this position in the map
-				substr( $coverage_map, $i, 1 ) = pack( 'C', $depth );
-			    }
-			}
-		    }
-		}
-		# Make FeaturePairs if we want to keep this hit
-		if ($keep_hit || $max_coverage == 0) {
-		    if ($split_flag) {
-			# Split gapped HSPs into ungapped feature pairs
-			foreach my $hsp (@hsps) {                            
-			    $self->split_HSP( $hsp, $name, $ana );
-			}
-		    } else {
+                my ($name, @hsps) = @$hit;
+
+                # Don't keep multiple matches to the same sequence
+                # at the same genomic location.
+                @hsps = $self->_discard_worst_overlapping(@hsps)
+                  if $discard_overlaps;
+
+                unless ($max_coverage == 0) {
+                    print STDERR "    Looking at $name ";
+
+                    foreach my $hsp (@hsps) {
+                        my $q = $hsp->query;
+                        foreach my $i ($q->start .. $q->end) {
+                            my $depth =
+                              unpack('C', substr($coverage_map, $i, 1));
+                            if ($depth < $max_coverage) {
+                                $keep_hit = 1;
+                                $depth++;
+
+                                # Increment depth at this position in the map
+                                substr($coverage_map, $i, 1) =
+                                  pack('C', $depth);
+                            }
+                        }
+                    }
+                }
+
+                # Make FeaturePairs if we want to keep this hit
+                if ($keep_hit || $max_coverage == 0) {
+                    if ($split_flag) {
+
+                        # Split gapped HSPs into ungapped feature pairs
+                        foreach my $hsp (@hsps) {
+                            $self->split_HSP($hsp, $name, $ana);
+                        }
+                    }
+                    else {
+
                         # Don't bother splitting gapped alignments
-			my (@feat);
-			foreach my $hsp (@hsps) {
-			    my $q  = $hsp->query;
-			    my $s  = $hsp->subject;
-			    my $fp =
-				$self->_makeFeaturePair( $q->start, $q->end, $q->strand, $s->start, $s->end, $s->strand,
-							 $hsp->score, $hsp->percent, $hsp->P, $name, $ana, );
-			    $self->growfplist($fp);
-			}
-		    }
-		}
-	    }
-	}
+                        my (@feat);
+                        foreach my $hsp (@hsps) {
+                            my $q  = $hsp->query;
+                            my $s  = $hsp->subject;
+                            my $fp = $self->_makeFeaturePair(
+                                $q->start,   $q->end,       $q->strand,
+                                $s->start,   $s->end,       $s->strand,
+                                $hsp->score, $hsp->percent, $hsp->P,
+                                $name,       $ana,
+                            );
+                            $self->growfplist($fp);
+                        }
+                    }
+                }
+            }
+        }
     }
+
     print "*** FINISHED PARSING ***\n";
- }
+}
+
 
 
 sub _discard_worst_overlapping {
