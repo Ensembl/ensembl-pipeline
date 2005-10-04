@@ -136,7 +136,7 @@ sub strand{
   }
   my $strand;
   foreach my $gene (@genes){
-    foreach my $transcript (@{$gene->get_all_Transcript}){
+    foreach my $transcript (@{$gene->get_all_Transcripts}){
       unless (defined($strand)){
 	$strand = $transcript->start_Exon->strand;
 	next;
@@ -644,16 +644,18 @@ sub _translateable_exon_length {
 sub start{
   my ($self) = @_;
   my @genes = $self->get_Genes;
-  my $start;
+  my $start = $genes[0]->get_all_Exons->[0]->start;
+
   foreach my $gene ( @genes ) {
     my @exons = @{ $gene->get_all_Exons};
-    @exons = sort { $a->start <=> $b->start } @exons;
-    my $this_start = $exons[0]->start;
-    unless ( $start ){
-      $start = $this_start;
-    }
-    if ( $this_start < $start ){
-      $start = $this_start;
+    my $min_start = $exons[0]->start;
+    foreach my $exon(@exons){
+      if ($exon->start < $min_start){
+        $min_start = $exon->start;
+      }
+      if($min_start < $start){
+        $start = $min_start;
+      }
     }
   }
   return $start;
@@ -665,24 +667,24 @@ sub start{
 sub end{
   my ($self) = @_;
   my @genes = $self->get_Genes;
-  my $end;
+  my $end = $genes[0]->get_all_Exons->[0]->end;
+
   foreach my $gene ( @genes ) {
     my @exons = @{$gene->get_all_Exons};
-    @exons = sort { $b->end <=> $a->end } @exons;
-    
-    # this is the largest end of all exons
-    my $this_end = $exons[0]->end;
-    unless ( $end ){
-      $end = $this_end;
+    my $max_end = $exons[0]->end;
+
+    foreach my $exon(@exons){
+      if ($exon->end > $max_end){
+        $max_end = $exon->end;
+      }
     }
-    if ( $this_end > $end ){
-      $end = $this_end;
+
+    if ( $max_end > $end ){
+      $end = $max_end;
     }
   }
   return $end;
 }
-      
-
 
 
 1;
