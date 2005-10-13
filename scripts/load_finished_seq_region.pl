@@ -92,7 +92,7 @@ my $INPUT_TYPE;
             'dbpass:s'   => \$dbpass,
             'dataset_name:s' => \$ds_name,
             'chromosome_cs_version:s' => \$chromosome_cs_version,
-	    'chromosome_name:i' => \$chromosome_name,
+	    'chromosome_name:s' => \$chromosome_name,
             'chromosome_cs_rank:i' => \$chromosome_cs_rank,
             'agp_file:s' => \$agp,
             'verbose!' => \$verbose,
@@ -115,6 +115,10 @@ if(!$ds_name || !$chromosome_cs_version || !$chromosome_name || !$chromosome_cs_
 if ($help) {
     exec('perldoc', $0);
 }
+
+#change chromosome name from chr22 to 22 
+$chromosome_name =~ s/^chr//i;
+
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
