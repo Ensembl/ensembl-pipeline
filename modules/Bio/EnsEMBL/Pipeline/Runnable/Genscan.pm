@@ -523,8 +523,13 @@ sub calculate_and_set_phases_new {
 	    }
 	}
 	unless ($translation_found) {
-	    $self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
-			 " in a translation\n");
+
+	 # does it need to throw?
+	 #   $self->throw("[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
+	 #		 " in a translation\n");
+
+		warn "[Genscan.pm] Unable to match Genscan peptide ".$peptides[$i].
+			 " in a translation\n";
 	}
 	# print "\n";
 	$i++;
