@@ -8,4 +8,4 @@ delete from gene_stable_id;
 delete from transcript_stable_id;
 delete from exon_stable_id;
 delete from translation_stable_id;
-
+delete from transcript_supporting_feature;
