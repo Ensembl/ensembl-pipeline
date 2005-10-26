@@ -52,11 +52,12 @@ Internal methods are usually preceded by a _
 
 package Bio::EnsEMBL::Pipeline::Tools::Blastz;
 
-use vars qw(@ISA);
-use Bio::EnsEMBL::DnaDnaAlignFeature;
 use strict;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange); 
 
-@ISA = qw(Bio::EnsEMBL::Root);
+
+our @ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my ($class,@args) = @_;
@@ -72,7 +73,7 @@ sub new {
   $self->{'_alignment_reported_before'} = {};
   
   
-  my ($fh,$file) = $self->_rearrange([qw(FH FILE)], @args);
+  my ($fh,$file) = rearrange([qw(FH FILE)], @args);
 
   if ((defined $fh && defined $file) ||
       !(defined $fh || defined $file)){ 

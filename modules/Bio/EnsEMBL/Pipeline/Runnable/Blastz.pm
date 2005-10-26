@@ -67,6 +67,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::Blastz;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI);
 
@@ -104,11 +105,11 @@ sub new {
     $self->{'_verbose_debug'} = 0;
     
     # Now parse the input options and store them in the object
-    my($program,$query,$database,$options) = $self->_rearrange([qw(PROGRAM
-								   QUERY 
-								   DATABASE 
-								   OPTIONS)], 
-							       @args);
+    my($program,$query,$database,$options) = rearrange([qw(PROGRAM
+                                                           QUERY 
+                                                           DATABASE 
+                                                           OPTIONS)], 
+                                                       @args);
 
     if ($query) {
       $self->query($query);
