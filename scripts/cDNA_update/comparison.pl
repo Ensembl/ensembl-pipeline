@@ -162,7 +162,7 @@ sub _pursue_evidence{
 
   $sql = ("select distinct(hit_name), gene_id ".
 	  "from dna_align_feature, supporting_feature, ".
-	  "exon_transcript, exon, transcript ".
+	  "exon_transcript, transcript ".
 	  "where dna_align_feature_id = feature_id ".
 	  "and feature_type = 'dna_align_feature' ".
 	  "and supporting_feature.exon_id = exon_transcript.exon_id ".
