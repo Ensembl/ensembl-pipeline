@@ -54,6 +54,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::EnsEMBL::SeqFeature;
 use Bio::EnsEMBL::FeaturePair;
@@ -70,7 +71,7 @@ sub new {
   my $self = $class->SUPER::new(@args);
   #added a parse clause to remove covered alignments, should work without it though
   my ($database, $query_seqs, $query_file, $query_type, $target_type,
-      $blat, $options, $parse) = $self->_rearrange([qw(
+      $blat, $options, $parse) = rearrange([qw(
 												  DATABASE
 												  QUERY_SEQS
                           QUERY_FILE
@@ -414,6 +415,7 @@ sub run {
 
 
     for (my $i=0; $i<$block_count; $i++ ) {
+      #next if ($block_sizes[$i] < 15);
 
       $feat2 {start} = $query_starts[$i];
       $feat2 {end}   = $query_ends[$i];
@@ -548,7 +550,11 @@ sub get_best_score_in_all_frames {
 
     if (!defined($score) or ($this_score > $score)) {
       $score = $this_score;
-      $perc_id = int(100 * $this_perc_id / $length);
+      if ($length) {
+        $perc_id = int(100 * $this_perc_id / $length);
+      } else {
+        $perc_id = 0;
+      }
       $frame = $i;
 ##      $seqs = $this_seq1."\n".$this_seq2;
     }
