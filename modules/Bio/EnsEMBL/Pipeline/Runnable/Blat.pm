@@ -415,7 +415,7 @@ sub run {
 
 
     for (my $i=0; $i<$block_count; $i++ ) {
-      #next if ($block_sizes[$i] < 15);
+      next if ($block_sizes[$i] < 15);
 
       $feat2 {start} = $query_starts[$i];
       $feat2 {end}   = $query_ends[$i];
