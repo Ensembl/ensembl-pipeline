@@ -320,7 +320,7 @@ while (1) {
           if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name},$accumulator_jobs_hash)) {
             $submitted++;
             $submission_count++;
-            $naccum_submitted;
+            $naccum_submitted++;
           } elsif (exists($incomplete_accumulator_analyses{$logic_name})) {
             print "Accumulator type analysis $logic_name ".
                   "conditions unsatisfied\n" if $verbose;
