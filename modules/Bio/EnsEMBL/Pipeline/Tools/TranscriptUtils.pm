@@ -2027,7 +2027,19 @@ sub feature_info{
   return $name." ".$feature->start." ".$feature->end." ".$feature->strand."\n";
 }
 
-############################################################
+
+=head2 replace_stops_with_introns
+
+ Title   : replace_stops_with_introns
+ Usage   :$tran = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils
+    ->replace_stops_with_introns($tran);
+ Function: Edits out the in-frame stops in give transcript, 
+    replacing them with mini, 3-bp introns
+ Returns : The modified transcript
+ Notes   : This method only works with raw gene-build transcripts
+    (i.e. completely coding, no attributes, no protein features etc.)
+
+=cut
 
 sub replace_stops_with_introns {
   my ($self, $tran) = @_;
@@ -2048,7 +2060,7 @@ sub replace_stops_with_introns {
     my ($stop) = @coords;
 
     # locate the exon that this stop lies in
-    my @new_exons;
+    my (@new_exons);
     foreach my $exon (@exons) {
       if ($stop->start >= $exon->start and $stop->end <= $exon->end) {
         # this stop lies completely within an exon. We split the exon
@@ -2082,10 +2094,15 @@ sub replace_stops_with_introns {
               push @ug_right, $ug;
             } else {
               # this ug must span the split
+
               my $fp_left = Bio::EnsEMBL::FeaturePair->new();
               if ($ug->slice) {
                 $fp_left->slice($ug->slice);
               }
+              if ($ug->analysis) {
+                $fp_left->analysis($ug->analysis);
+              }
+
               $fp_left->seqname   ($ug->seqname);
               $fp_left->strand    ($ug->strand);
               $fp_left->hseqname  ($ug->hseqname);
@@ -2097,6 +2114,9 @@ sub replace_stops_with_introns {
               my $fp_right = Bio::EnsEMBL::FeaturePair->new();
               if ($ug->slice) {
                 $fp_right->slice($ug->slice);
+              }
+              if ($ug->analysis) {
+                $fp_right->analysis($ug->analysis);
               }
               $fp_right->seqname   ($ug->seqname);
               $fp_right->strand    ($ug->strand);
@@ -2172,7 +2192,7 @@ sub replace_stops_with_introns {
     
     @exons = @new_exons;
   }
-  
+
   $tran->flush_Exons;
   foreach my $exon (@exons) {
     $tran->add_Exon($exon);
