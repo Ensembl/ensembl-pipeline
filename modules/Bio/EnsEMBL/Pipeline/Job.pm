@@ -363,6 +363,7 @@ sub flush_runs {
 
     if ($@) {
       print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
+      print STDERR "Using ".$batch_job->bsub."\n";
       foreach my $job_id (@job_ids) {
         my $job = $adaptor->fetch_by_dbID($job_id);
         $job->set_status( "FAILED" );

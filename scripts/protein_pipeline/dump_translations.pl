@@ -31,6 +31,7 @@ my $dnadbhost    = '';
 my $dnadbuser    = '';
 my $dnadbname    = '';
 my $dnadbpass    = undef;
+my $dnadbport = 3306;
 my $dbport    = 3306;
 my $stable_id = 0;
 my $db_id = 0;
@@ -42,10 +43,11 @@ GetOptions(
 	   'dbuser=s'    => \$dbuser,
 	   'dbpass=s'    => \$dbpass,
 	   'dbport=s'    => \$dbport,
-	   'dnadbhost=s'    => \$dnadbhost,
-	   'dnadbname=s'    => \$dnadbname,
-	   'dnadbuser=s'    => \$dnadbuser,
-	   'dnadbpass=s'    => \$dnadbpass,
+           'dnadbhost=s'    => \$dnadbhost,
+           'dnadbname=s'    => \$dnadbname,
+           'dnadbuser=s'    => \$dnadbuser,
+           'dnadbpass=s'    => \$dnadbpass,
+           'dnadbport=s'    => \$dnadbport,
 	   'stable_id!' => \$stable_id,
 	   'db_id!' => \$db_id,
 	   'file=s' => \$file,
@@ -74,7 +76,7 @@ if ($dnadbname) {
                                                  '-user'   => $dnadbuser,
                                                  '-dbname' => $dnadbname,
                                                  '-pass'   => $dnadbpass,
-                                                 '-port'   => $dbport,
+                                                 '-port'   => $dnadbport,
                                               );
 
   $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(

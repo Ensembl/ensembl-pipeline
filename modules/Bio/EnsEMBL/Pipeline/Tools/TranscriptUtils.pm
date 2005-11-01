@@ -67,7 +67,8 @@ sub _check_Transcript{
   my $id = $self->transcript_id( $transcript );
   my $valid = 1;
   my $strand;
-
+  #my ($p, $f, $l) = caller;
+  #print "Checking transcript ".$id." ".$f.":".$l."\n";
   $transcript->sort;
   my @exons = @{$transcript->get_all_Exons};
   eval {
@@ -100,8 +101,8 @@ sub _check_Transcript{
 
       # check exon coords are valid
       if (! Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exons[$i])){
-	$valid = 0;
-	last EXON;
+        $valid = 0;;
+        last EXON;
       }
 
       # check exon length
@@ -167,6 +168,8 @@ sub _check_Transcript{
     $valid = 0;
   }
   if ($valid == 0 ){
+    #my ($p, $f, $l) = caller;
+    #print "***".$f.":".$l."***\n"
   }
   return $valid;
 }
@@ -372,7 +375,9 @@ sub _check_Translation{
 
     # check for internal stops
     if ( $peptide =~ /\*/ ){
-      print STDERR "translation of transcript $id has STOP codons\n";
+      my ($p, $f, $l) = caller;
+      print STDERR "translation of transcript $id has STOP codons $f:$l\n";
+      print $peptide."\n";
       $valid = 0;
     }
   }

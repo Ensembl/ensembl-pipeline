@@ -172,6 +172,7 @@ sub parse_files {
        -input_id_type   => $config->{$h}->{input_id_type},
        -description => $config->{$h}->{description},
        -display_label => $config->{$h}->{display_label},
+
     );
     push(@analyses, $analysis);
   }

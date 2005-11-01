@@ -29,12 +29,16 @@ package Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 
 use vars qw(@ISA);
 use strict;
-
-use Bio::EnsEMBL::Root;
-
-@ISA = qw(Bio::EnsEMBL::Root);
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 
+@ISA = qw();
+
+sub new {
+  my ($class, @args) = @_;
+  my $self = bless {},$class;
+  return $self;
+}
 
 =head2 _transfer_supporting_evidence
 
@@ -124,19 +128,20 @@ sub _validate_Exon{
 
   if($exon->start < 0 ){
     my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
-    $self->warn($msg);
+    #warning($msg);
     return 0;
   }
   elsif($exon->start > $exon->end){
-    my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . "\n";
-    $self->warn($msg);
+    my $msg = "rejecting exon, start > end : " . $exon->start . " > " . $exon->end . " ".$exon->dbID."\n";
+    warning($msg);
     return 0;
   }
-  elsif($exon->start == $exon->end){
-    my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - rejecting it\n";
-    $self->warn($msg);
-    return 0;
-  }
+  #elsif($exon->start == $exon->end){
+  #  my $msg = "naughty exon, start == end : " . $exon->start . " == " . $exon->end . " - rejecting it\n";
+  #  print "Exon ".$exon->dbID." ".$exon->slice->seq_region_name."\n";
+  #  warning($msg);
+  #  return 0;
+  #}
   return 1;
 }
 
