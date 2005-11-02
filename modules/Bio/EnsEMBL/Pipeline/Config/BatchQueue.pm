@@ -367,7 +367,7 @@ use vars qw(%Config);
 				    logic_name => 'SubmitTranscript',
 				    batch_size => 1,
 				    # pfhmm is a multithreaded code so need to specifically specify number of CPU to use
-				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]';
+				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]',
 				    #retries    => 3,
 				    sub_args   => '-n 2',
 				    cleanup    => 'yes',
@@ -379,7 +379,7 @@ use vars qw(%Config);
 				    logic_name => 'SubmitTranscriptChunk',
 				    batch_size => 1,
 				    #resource   => 'select[otterp1<500] rusage[otterp1=10:duration=2]',
-				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]';
+				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]',
 				    #retries    => 3,
 				    sub_args   => '-n 2',
 				    cleanup    => 'yes',
@@ -391,7 +391,7 @@ use vars qw(%Config);
 				    logic_name => 'SubmitProteome',
 				    batch_size => 1,
 				    #resource   => 'select[otterp1<500] rusage[otterp1=10:duration=2]',
-				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]';
+				    resourece  => 'select[otterp1<500 && ncpus<4] rusage[otterp1=10:duration=2] span [hosts=1]',
 				    #retries    => 3,
 				    sub_args   => '-n 2',
 				    cleanup    => 'yes',
