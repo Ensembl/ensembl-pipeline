@@ -103,19 +103,20 @@ my $write;
 my $file;
 my $help;
 my $pipeline = 1;
-
+my $update;
 
 &GetOptions( 
-	    'dbhost=s'      => \$dbhost,
-	    'dbname=s'      => \$dbname,
-	    'dbuser=s'      => \$dbuser,
-	    'dbpass=s'      => \$dbpass,
-	    'dbport=s'      => \$dbport,
-	    'read!'         => \$read,
-	    'write!'        => \$write,
-	    'pipeline_db!'  => \$pipeline,
-	    'file=s'        => \$file,
-	    'h|help!'       => \$help,
+            'dbhost=s'      => \$dbhost,
+            'dbname=s'      => \$dbname,
+            'dbuser=s'      => \$dbuser,
+            'dbpass=s'      => \$dbpass,
+            'dbport=s'      => \$dbport,
+            'read!'         => \$read,
+            'write!'        => \$write,
+            'pipeline_db!'  => \$pipeline,
+            'update!'       => \$update,
+            'file=s'        => \$file,
+            'h|help!'       => \$help,
 	    ) or useage();
 
 
@@ -174,7 +175,7 @@ if($read){
 if($write){
   my $analyses = &read_db($db);
   $analyses = [sort {$a->dbID <=> $b->dbID} @$analyses];
-  &write_file($file, $analyses);
+  &write_file($file, $analyses, $update);
 }
 
 

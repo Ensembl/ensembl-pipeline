@@ -187,6 +187,8 @@ sub parse_files {
 
   Arg [1]   : Bio::EnsEMBL::DBSQL::DBAdaptor
       [2]   : Ref to an array of analysis objects
+      [3]   : boolean to indicate if want to update if
+  object already exists
   Function  : Write the analysis objects into the database
   Returntype: N/A
   Exceptions: if dbadaptor is the wrong type of object
@@ -200,7 +202,8 @@ sub parse_files {
 sub write_into_db{
   my $db = shift;
   my $analyses = shift;
-  
+  my $update = shift;
+
   #print "have analysis adaptor ".$analysis_adaptor."\n";
   if(!($db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor'))){
     throw("need a Pipeline::DBAdaptor not ".$db);
@@ -214,23 +217,24 @@ sub write_into_db{
     my ($analysis_id)= $sth->fetchrow;
     if($analysis_id){
       if($a->input_id_type){
-	if($db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
-	  my $sql = "select input_id_type from input_id_type_analysis ".
-	    "where analysis_id = ?";
-	  my $sth = $db->prepare($sql);
-	  $sth->execute($analysis_id);
-	  my ($type) = $sth->fetchrow;
-	  if($type){
-	    throw("need ".$type." to be the same as ".$a->input_id_type) 
-	      unless($type eq $a->input_id_type);
-	  }else{
-	    my $stored_sql = "insert into input_id_type_analysis ".
-	      "(analysis_id, input_id_type) values(?, ?)";
-	    my $stored_sth = $db->prepare($stored_sql);
-	    $stored_sth->execute($analysis_id, $a->input_id_type);
-	  }
-	}
+        if($db->isa('Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor')){
+          my $sql = "select input_id_type from input_id_type_analysis ".
+            "where analysis_id = ?";
+          my $sth = $db->prepare($sql);
+          $sth->execute($analysis_id);
+          my ($type) = $sth->fetchrow;
+          if($type){
+            throw("need ".$type." to be the same as ".$a->input_id_type) 
+              unless($type eq $a->input_id_type);
+          }else{
+            my $stored_sql = "insert into input_id_type_analysis ".
+              "(analysis_id, input_id_type) values(?, ?)";
+            my $stored_sth = $db->prepare($stored_sql);
+            $stored_sth->execute($analysis_id, $a->input_id_type);
+          }
+        }
       }
+      $analysis_adaptor->update($a) if($update);
       next ANALYSIS;
     }else{
       $analysis_adaptor->store($a);
