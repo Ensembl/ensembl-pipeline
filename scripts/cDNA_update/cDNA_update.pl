@@ -122,7 +122,7 @@ $polyA_clipping       = "/nfs/acari/fsk/projects/cdna_update/polyA_clipping.pl";
 $WB_DBUSER            = "";
 $WB_DBPASS            = "";
 # reference db (current build)
-$WB_REF_DBNAME        = "homo_sapiens_core_33_35g";
+$WB_REF_DBNAME        = "homo_sapiens_core_35_35g";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
@@ -136,11 +136,11 @@ $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only)
 $WB_LAST_DBNAME       = "homo_sapiens_cdna_34_35g";
 $WB_LAST_DBHOST       = "ecs2";
-$WB_LAST_DBPORT       = "3364";
+$WB_LAST_DBPORT       = "3365";
 # reference db (last build, needed for comparison only)
 $WB_LAST_DNADBNAME    = "homo_sapiens_core_34_35g";
 $WB_LAST_DNADBHOST    = "ecs2";
-$WB_LAST_DNADBPORT    = "3364";
+$WB_LAST_DNADBPORT    = "3365";
 
 #use & adjust assembly exception sequences (DR52 & DR53)
 #set to 1 if you're looking at a new sequence assembly
@@ -769,6 +769,11 @@ sub clean_up{
   my $option = shift;
   my $ans = "";
   $status = 0;
+  #remove unnecessary analysis entries
+  my $db  = connect_db($WB_TARGET_DBHOST, $WB_TARGET_DBPORT, $WB_TARGET_DBNAME, $WB_DBUSER, $WB_DBPASS);
+  my $sql = 'delete from analysis where logic_name != "'.$newFeatureName.'"';
+  my $sth = $db->prepare($sql) or die "sql error!";
+  $sth->execute();
   #read data dump
   open(RP, "< config_paths.perldata") or $status = 1;
   if(!$status){
