@@ -90,6 +90,11 @@ sub parse_files {
   my @files = shift;
 
   my %headers;     # will store names of headers and number of keys for each
+  
+  my $hcounter = 0;
+  my %horder; # stores order in which entries were read
+
+
   my $config = {};
   # read each file
 
@@ -111,6 +116,7 @@ sub parse_files {
       if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
 	$header = $1;
 	$headers{$header} = 0;
+        $horder{$header} = $hcounter++;
 	#print "Reading stanza $header\n";
       }
 
@@ -145,7 +151,7 @@ sub parse_files {
 
   my @analyses;
   # add a blank key/value for any headers that have no keys
-  foreach my $h (keys (%headers)) {
+  foreach my $h (sort { $horder{$a} <=> $horder{$b} }  keys (%headers)) {
     if (!$config->{$h}->{'input_id_type'}) {
       throw("you seem to have no input_id_type for $h can't ".
             "create a an analysis object without an input_id_type");
