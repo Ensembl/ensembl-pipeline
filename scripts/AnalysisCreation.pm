@@ -308,8 +308,10 @@ sub write_file{
     print FH "gff_source=".$a->gff_source."\n" if($a->gff_source);
     print FH "gff_feature=".$a->gff_feature."\n" if($a->gff_feature);
     if($a->can("input_id_type")){
-      print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);
+      print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);   
     }
+    print FH "description ".$a->description."\n" if($a->description);
+    print FH "display_name".$a->display_name."\n" if($a->display_name);
     print FH "\n\n";
   }
   
