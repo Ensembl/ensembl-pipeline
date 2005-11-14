@@ -122,23 +122,23 @@ $polyA_clipping       = "/nfs/acari/fsk/projects/cdna_update/polyA_clipping.pl";
 $WB_DBUSER            = "";
 $WB_DBPASS            = "";
 # reference db (current build)
-$WB_REF_DBNAME        = "homo_sapiens_core_35_35g";
+$WB_REF_DBNAME        = "homo_sapiens_core_36_35i";
 $WB_REF_DBHOST        = "ecs2";
 $WB_REF_DBPORT        = "3364";
 # new source db (PIPELINE)
-$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe_t";
+$WB_PIPE_DBNAME       = $ENV{'USER'}."_cDNA_pipe";
 $WB_PIPE_DBHOST       = "ecs1a";
 $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update_t";
+$WB_TARGET_DBNAME     = $ENV{'USER'}."_cDNA_update";
 $WB_TARGET_DBHOST     = "ia64g";
 $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only)
-$WB_LAST_DBNAME       = "homo_sapiens_cdna_34_35g";
+$WB_LAST_DBNAME       = "homo_sapiens_cdna_36_35i";
 $WB_LAST_DBHOST       = "ecs2";
 $WB_LAST_DBPORT       = "3365";
 # reference db (last build, needed for comparison only)
-$WB_LAST_DNADBNAME    = "homo_sapiens_core_34_35g";
+$WB_LAST_DNADBNAME    = "homo_sapiens_core_36_35i";
 $WB_LAST_DNADBHOST    = "ecs2";
 $WB_LAST_DNADBPORT    = "3365";
 
@@ -654,7 +654,7 @@ sub DB_setup{
     print ".";
     #copy defined db tables from current build
     $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT -t $WB_REF_DBNAME".
-      " analysis assembly attrib_type coord_system exon exon_stable_id exon_transcript gene gene_stable_id meta meta_coord".
+      " assembly attrib_type coord_system exon exon_stable_id exon_transcript gene gene_stable_id meta meta_coord".
       " assembly_exception seq_region seq_region_attrib transcript transcript_stable_id translation translation_stable_id".
       " > ".$dataDIR."/import_tables.sql";
     $status += system($cmd);
@@ -663,8 +663,9 @@ sub DB_setup{
 	   "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system;" .
            "DELETE FROM exon; DELETE FROM exon_stable_id; DELETE FROM exon_transcript; DELETE FROM gene; ".
 	   "DELETE FROM gene_stable_id; DELETE FROM meta; DELETE FROM meta_coord;  DELETE FROM assembly; ".
-           "DELETE FROM assembly_exception; DELETE FROM seq_region_attrib; DELETE FROM transcript; DELETE FROM transcript_stable_id; ".
-           "DELETE FROM translation; DELETE FROM translation_stable_id; DELETE FROM assembly_exception;' $WB_PIPE_DBNAME ";
+           "DELETE FROM assembly_exception; DELETE FROM seq_region_attrib; DELETE FROM transcript; ".
+	   "DELETE FROM transcript_stable_id; DELETE FROM translation; DELETE FROM translation_stable_id; ".
+	   "DELETE FROM assembly_exception;' $WB_PIPE_DBNAME ";
     $status += system($cmd);
     print ".";
     $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$dataDIR."/import_tables.sql");
@@ -672,11 +673,11 @@ sub DB_setup{
     #copy dna table from current build
     $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT".
            " -t $WB_REF_DBNAME dna"." > ".$dataDIR."/import_tables2.sql";
-    $status += system($cmd);
+#    $status += system($cmd);
     print ".";
     $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".
             $dataDIR."/import_tables2.sql";
-    $status += system($cmd);
+#    $status += system($cmd);
     if($status){ die("couldnt create databases!\n"); }
     print "created databases.\n";
     #insert analysis entries
@@ -698,20 +699,32 @@ sub DB_setup{
            " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
            " -file -dir $chunkDIR -logic_name $submitName";
     $status += system($cmd);
+    $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
+           "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
+           "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region; DELETE FROM seq_region_attrib; ".
+           "DELETE FROM assembly_exception;' $WB_TARGET_DBNAME";
+    $status += system($cmd);
     if($status){ die("Error while setting up the database.\n") }
     print "database set up.\n";
     #copy analysis entries (and others, just to make sure)
     $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -t $WB_PIPE_DBNAME".
-           " analysis assembly assembly_exception attrib_type coord_system meta meta_coord seq_region seq_region_attrib ".
-           "> ".$dataDIR."/import_tables3.sql";
+           " analysis assembly assembly_exception attrib_type coord_system meta meta_coord seq_region ".
+	   "seq_region_attrib > ".$dataDIR."/import_tables3.sql";
     $status += system($cmd);
     $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
            "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
            "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region; DELETE FROM seq_region_attrib; ".
            "DELETE FROM assembly_exception;' $WB_TARGET_DBNAME";
     $status += system($cmd);
-
     $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$dataDIR."/import_tables3.sql");
+    $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
+           "insert into analysis_description set analysis_id=(select analysis_id from analysis ".
+	   "where logic_name=\"human_cDNA_update\"), description=\"The latest set of human ".
+	   "cDNAs from EMBL and RefSeq were aligned to the current homo sapiens genome using ".
+	   "Exonerate (http://www.ebi.ac.uk/~guy/exonerate/; G. Slater et al., ".
+	   "BMC Bioinformatics. 2005 6:31).\";' $WB_TARGET_DBNAME";
+    $status += system($cmd);
+
     if($status){ die("Error while synchronising databases.\n") }
     print "databases in sync.\n";
   };
