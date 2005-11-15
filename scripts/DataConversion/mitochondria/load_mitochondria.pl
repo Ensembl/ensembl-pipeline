@@ -167,6 +167,7 @@ if(!defined $ensembl_analysis){
 for (my $i=2; $i <= $#genbank; $i++){
   my $desc = $genbank[$i]{'product'};
   my $type = $genbank[$i]{'type'};
+  my $status = "KNOWN";
 
   my $acc;
   if ($genbank[$i]{'protein_id'}){
@@ -250,6 +251,8 @@ for (my $i=2; $i <= $#genbank; $i++){
   eval {
   $gene->type($type);
   $gene->analysis($analysis);
+  $gene->status($status);
+  $gene->description($desc);
   $gene->add_Transcript($transcript);
   $count++;
 };
