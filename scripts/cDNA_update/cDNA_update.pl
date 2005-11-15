@@ -150,9 +150,10 @@ $adjust_assembly      = 0;
 #no changes should be nesessary below this
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::SeqIO;
 use Data::Dumper;
 #we need the Net::SSH module from somewhere:
-use lib '~fsk/perls/';
+use lib '/nfs/acari/fsk/perls/';
 use Net::SSH qw(sshopen2);
 
 my %saved_files;
@@ -174,7 +175,7 @@ my @configvars      = qw(cvsDIR dataDIR chunkDIR outDIR vertrna vertrna_update r
                       WB_REF_DBPORT WB_PIPE_DBNAME WB_PIPE_DBHOST WB_PIPE_DBPORT 
                       WB_TARGET_DBNAME WB_TARGET_DBHOST WB_TARGET_DBPORT newFeatureName);
 #fasta chunk specifications:
-my $chunknum        = 1500;   #(<300 sequences / file)
+my $chunknum;   #(<300 sequences / file)
 my $maxseqlenght    = 17000;
 $tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
@@ -198,6 +199,12 @@ if($option eq "prepare"){
   chomp($ans = <STDIN>);
   if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
     if(! fastafiles() ){ unclean_exit(); }
+  }
+
+  print "\nProcess fasta file (clip and chunk)?(y/n) ";
+  chomp($ans = <STDIN>);
+  if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
+    if(! clipandchunk() ){ unclean_exit(); }
 
     if($adjust_assembly){
       adjust_assembly();
@@ -493,29 +500,43 @@ sub fastafiles{
       close(WP);
       local $/ = "\n";
     }
-
-    if($update){
-      #clip ployA tails
-      my $newfile2 = $dataDIR."/".$newfile.".clipped";
-      $cmd = "$polyA_clipping -mRNA ".
-	     $dataDIR."/".$newfile." -out ".$newfile2." -clip";
-      if(system($cmd)){
-	die("couldn t clip file.$@\n");
-      }
-      #split fasta files, store into CHUNKDIR
-      print "splitting fasta file.\n";
-      my $outdir   = $chunkDIR;
-      $cmd = "$fastasplit $newfile2 $chunknum $outdir";
-      if(system($cmd)){
-	die("couldn t split file.$@\n");
-      }
-
-      #isolate biggest sequences
-      check_chunksizes();
-
-      print "\nchopped up file.\n";
-    }
   };
+  if($@){
+    print STDERR "\nERROR: $@";
+    return 0;
+  }
+  return 1;
+}
+
+sub clipandchunk{
+  #clip ployA tails
+  print "Clipping your sequences, this may take a while\n";
+  my $newfile2 = $dataDIR."/".$newfile.".clipped";
+  $cmd = "$polyA_clipping -mRNA ".
+         $dataDIR."/".$newfile." -out ".$newfile2." -clip";
+  if(system($cmd)){
+    die("couldn t clip file.$@\n")
+  }
+  #split fasta files, store into CHUNKDIR
+  print "splitting fasta file.\n";
+  my $outdir   = $chunkDIR;
+  my $counter  = 0;
+  print "Calculating nukber of chunks\n";
+  my $in  = Bio::SeqIO->new(-file => $dataDIR."/".$newfile , '-format' => 'Fasta');
+  while ( my $seq = $in->next_seq() ) {
+      $counter++;
+    }
+  $chunknum=$counter/300;
+  $cmd = "$fastasplit $newfile2 $chunknum $outdir";
+  if(system($cmd)){
+    die("couldn t split file.$@\n");
+  }
+
+  #isolate biggest sequences
+  check_chunksizes();
+
+  print "\nchopped up file.\n";
+
   if($@){
     print STDERR "\nERROR: $@";
     return 0;
