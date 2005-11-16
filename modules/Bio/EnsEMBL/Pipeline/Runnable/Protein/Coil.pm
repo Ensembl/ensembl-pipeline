@@ -131,6 +131,14 @@ sub parse_results {
         $switch = 0;
       }
     }
+
+    if ($switch) {
+      $end = $count;
+      my $fp = $self->create_protein_feature($start, $end, 0, $id, 0, 0,
+                                             'ncoils', $self->analysis,
+                                             0, 0);
+      $self->add_to_output($fp);
+    }
   }
 }
 
