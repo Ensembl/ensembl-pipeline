@@ -43,7 +43,7 @@ use vars qw(%Config);
     {
       logic_name => '<newFeatureName>',
       batch_size => 1,
-      resource   => 'select[mem>2000] rusage[mem=2000]',
+      resource   => 'select[linux && mem>2000] rusage[mem=2000]',
 			#'model=IBMBC2800',
                      	# or 'select[mem>2000] rusage[mem=2000]'
       retries    => 1,
@@ -103,13 +103,13 @@ use vars qw(%Config);
                FILTER              => { OBJECT     => 'Bio::EnsEMBL::Analysis::Tools::ExonerateTranscriptFilter',
                                         PARAMETERS => {
                                                            -coverage => 90,
-                                                           -percent_id => 97,
+                                                           -percent_id => 95,
                                                            -best_in_genome => 1,
                                                            -reject_processed_pseudos => 1,
                                                       },
                                        },
                OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14",
-             }
+             },
            }
 );
 
