@@ -37,7 +37,7 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Flag;
 
 use vars qw(@ISA);
-use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use strict;
 
 
@@ -65,14 +65,13 @@ sub new {
   $self->{'_adaptor'} = {}; # Container for FlagAdaptor object
 
   my ( $goal,$type, $ensembl_id, $adaptor, $dbID ) =
-    $self->_rearrange( [ qw ( GOALANALYSIS
+    Bio::EnsEMBL::Utils::Argument->rearrange( [ qw ( GOALANALYSIS
 			      TYPE
 			      ENSEMBL_ID
 			      ADAPTOR
 			      DBID
 			     ) ], @args );
-  $self->throw( "Wrong parameter" ) unless
-    $goal->isa( "Bio::EnsEMBL::Analysis");
+  $self->throw( "Wrong parameter" ) unless $goal->isa( "Bio::EnsEMBL::Analysis");
   $self->type( $type );
   $self->goalAnalysis( $goal );
   $self->adaptor( $adaptor );
