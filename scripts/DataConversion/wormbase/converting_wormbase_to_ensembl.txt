@@ -1,28 +1,28 @@
-Converting wormbase to ensembl
-==============================
+======================================
+**  CONVERTING WORMBASE TO ENSEMBL  **
+======================================
 
 this is the first attempt at a read-me
 
-any questions email laura Clarke at lec@sanger.ac.uk
+any questions email Laura Clarke at lec@sanger.ac.uk
+
+wormbase_to_ensembl.pl (by Felix Kokocinski) will automate most steps - see
+'(iii) Converting WormBase to Ensembl using wormbase_to_ensembl.pl' below.
+
 
 ===============================
-What you need to do this
+(i) What you need to do this 
 ===============================
 
 code
-
-I am currently using ensembl and ensembl=pipeline main trunk and bioperl 0.7
+I am currently using ensembl and ensembl-pipeline main trunk and bioperl 0.7
 
 data
-
 the wormbase agp and gff files which can be found here
-
-
 ftp://ftp.sanger.ac.uk/pub/wormbase/current_release/CHROMOSOMES
 
 
 a fasta file of wormbase clones
-
 ftp://ftp.sanger.ac.uk/pub/wormbase/sequences/ALL_COSMIDS/allcmid.gz
 
 
@@ -42,10 +42,10 @@ and getseqs by james cuff which uses
 
 
 
-=================================
-How to run the process
-=================================
 
+=================================
+(ii) How to run the process
+=================================
 get the required files from the ftp site
 
 ---
@@ -73,7 +73,7 @@ agp_file, path to agp file
 length , length of chromosome
 gff_file, path to gff file
 
-WB_AGP_TYPE
+WB_NEW_COORD_SYSTEM_VERSION #used to be WB_AGP_TYPE
 
 this is the agp type to be used in the assembly table and loaded into the meta table
 
@@ -199,5 +199,137 @@ follow the ensembl-docs/post_genebuild_checks.txt to check the data
 
 
 
+================================================================
+(iii) Converting WormBase to Ensembl using wormbase_to_ensembl.pl
+================================================================
+
+1. Preparation
+--------------
+Check your PERL5LIB.
+
+Make sure that you have a large enough $workDIR and $scratchDIR.
+
+Set up your own CVS dir like $cvsDIR/ensembl-config/celegans/WB150/
+
+Check the variables in:
+-  wormbase_to_ensembl.pl 
+-  WormBaseConf.pm 
+-  $cvsDIR/ensembl-config/celegans/WB150/Bio/Ensembl/Pipeline/Config/BatchQueue.pm
+   etc
 
 
+2. Known problems
+------------------
+-  Wormbase team may change the format of their files, in which case parsing needs to be updated.
+
+-  Check that the .agp and .gff files are in sync or you will get genes with frameshifts (unable to translate)
+   Check that clone version is most recent
+
+-  There is one Selenocysteine (U) gene, C06G3.7. The script should handle this.   
+
+-  Manually change the information for SNAP in the analysis table:
+   eg. update analysis set db_file = '/usr/local/ensembl/Zoe/HMM/worm' where analysis.analysis_id = 20;
+
+-  clone:CEL150:AF067617.1:1:28678:1 -> the SNAP will not run as genscan and ensembl produce slightly
+   different peptides due to a run of N's. 
+   Genscan = CGVADVETVNDSDSEDKKDMAAVAAAQAQFLRLXXXXXXXXXXAAVAASSSASRKASRKRPNNDNDAKMRAMQQMLMGQG
+   Ensembl = CGVADVETVNDSDSEDKKDMAAVAAAQAQFLRXXXXXXXXXXAAAVAASSSASRKASRKRPNNDNDAKMRAMQQMLMGQG
+   This can be fixed by altering the subroutine in BaseAbInitio.pm, subsitute_x_codes().
+   Also, the terminal * is not removed from the genscan model in this case. 
+   
+-  xrefs may need to be run manually
+   
+   
+3. FYI : Notes on WormBase
+----------------------------
+
+Below is a list of the $status and $type columns in CHROMOSOME_I.gff file
+(Most are not used in wormbase_to_ensembl.pl)
+
+
+.	ALLELE
+.	oligo
+.	intron
+.	Clone_left_end
+.	Clone_right_end
+.	Sequence
+Allele	complex_change_in_nucleotide_sequence
+Allele 	deletion
+Allele 	SNP
+Allele	transposable_element_insertion_site
+assembly_tag	ambiguous
+assembly_tag	annotation
+assembly_tag	Clone
+assembly_tag	CLone
+assembly_tag	comment
+assembly_tag	compression
+assembly_tag	cosmid
+assembly_tag	CpG
+assembly_tag	Finished
+assembly_tag	oligo
+assembly_tag	Polymorphism
+assembly_tag	repeat
+assembly_tag	Stolen
+assembly_tag	stop
+assembly_tag	Warning
+binding_site	misc_feature
+BLAT.*	(BLAT_OST_OTHER, BLAT_EST_BEST, BLAT_OST_BEST, BLAT_NEMATODE)
+cDNA_for_RNAi	experimental_result_region
+Coding_transcript	exon
+Coding_transcript	five_prime_UTR	
+Coding_transcript	intron
+Coding_transcript	protein_coding_primary_transcript
+Coding_transcript	three_prime_UTR
+curated	CDS	
+curated	intron	
+Expr_profile	experimental_result_region
+Genefinder
+gene	gene
+GenePair_STS
+Genomic_canonical	region
+history	CDS
+history	exon
+history	intron
+history	Pseudogene
+history	Transcript
+inverted	inverted_repeat 
+landmark	gene
+Link	region
+miRNA	exon
+miRNA	miRNA_primary_transcript
+Mos_insertion_allele    transposable_element_insertion_site
+Oligo_set	reagent
+operon	operon
+Orfeome	PCR_product
+polyA_signal_sequence	polyA_signal_sequence
+polyA_site	polyA_site
+Pseudogene	exon
+Pseudogene	intron
+Pseudogene	Pseudogene
+RepeatMasker	repeat_region
+RNAi_primary	RNAi_reagent
+RNAi_secondary	RNAi_reagent
+rRNA	exon
+rRNA	rRNA_primary_transcript 
+SAGE_transcript	transcript
+SL1     SL1_acceptor_site
+SL2	SL2_acceptor_site
+snoRNA	exon
+snoRNA	snoRNA_primary_transcript
+snRNA	exon
+snRNA	snRNA_primary_transcript
+tandem	tandem_repeat
+TEC_RED	nucleotide_match 
+Transposon_CDS  exon
+Transposon_CDS  coding_exon
+Transposon_CDS  transposable_element
+Transposon_CDS 	intron
+Transposon      transposable_element
+tRNAscan-SE-1.23	tRNA_primary_transcript
+RNAscan-SE-1.23	exon
+twinscan	CDS
+twinscan	intron
+waba_coding	nucleotide_match
+waba_strong	nucleotide_match
+waba_weak	nucleotide_match
+wublastx	protein_match
