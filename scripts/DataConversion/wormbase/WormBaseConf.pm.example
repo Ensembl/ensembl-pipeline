@@ -8,67 +8,81 @@ use vars qw( %WormBaseConf );
 		 #location of agp and gff files
 		 WB_CHR_INFO => [
 				 { 
-				  chr_name => 'I',
-				  agp_file => 'CHROMOSOME_I.agp',
-				  length => '15080552',
-				  gff_file => 'CHROMOSOME_I.gff',
+				  chr_name 	=> 'I',
+				  agp_file 	=> 'CHROMOSOME_I.agp',
+				  length 	=> '15373867',#lengths can be found at top of *.gff file
+				  gff_file 	=> 'CHROMOSOME_I.gff',
+				  dna_file 	=> 'CHROMOSOME_I.dna',
 				 },
 				 { 
-				  chr_name => 'II',
-				  agp_file => 'CHROMOSOME_II.agp',
-				  length => '15279311',
-				  gff_file => 'CHROMOSOME_II.gff',
+				  chr_name 	=> 'II',
+				  agp_file 	=> 'CHROMOSOME_II.agp',
+				  length 	=> '15279313',
+				  gff_file 	=> 'CHROMOSOME_II.gff',
+				  dna_file 	=> 'CHROMOSOME_II.dna',
 				 },
 				 { 
-				  chr_name => 'III',
-				  agp_file => 'CHROMOSOME_III.agp',
-				  length => '13783317',
-				  gff_file => 'CHROMOSOME_III.gff',
+				  chr_name 	=> 'III',
+				  agp_file 	=> 'CHROMOSOME_III.agp',
+				  length 	=> '13783317',
+				  gff_file 	=> 'CHROMOSOME_III.gff',
+				  dna_file 	=> 'CHROMOSOME_III.dna',
 				 },
 				 { 
-				  chr_name => 'IV',
-				  agp_file => 'CHROMOSOME_IV.agp',
-				  length => '17493785',
-				  gff_file => 'CHROMOSOME_IV.gff',
+				  chr_name 	=> 'IV',
+				  agp_file 	=> 'CHROMOSOME_IV.agp',
+				  length 	=> '17493785',
+				  gff_file 	=> 'CHROMOSOME_IV.gff',
+				  dna_file 	=> 'CHROMOSOME_IV.dna',
 				 },
 				 { 
-				  chr_name => 'V',
-				  agp_file => 'CHROMOSOME_V.agp',
-				  length => '20922231',
-				  gff_file => 'CHROMOSOME_V.gff',
+				  chr_name 	=> 'V',
+				  agp_file 	=> 'CHROMOSOME_V.agp',
+				  length 	=> '20922233',
+				  gff_file 	=> 'CHROMOSOME_V.gff',
+				  dna_file 	=> 'CHROMOSOME_V.dna',
 				 },
 				 { 
-				  chr_name => 'X',
-				  agp_file => 'CHROMOSOME_X.agp',
-				  length => '17718850',
-				  gff_file => 'CHROMOSOME_X.gff',
+				  chr_name 	=> 'X',
+				  agp_file 	=> 'CHROMOSOME_X.agp',
+				  length 	=> '17718851',
+				  gff_file 	=> 'CHROMOSOME_X.gff',
+				  dna_file 	=> 'CHROMOSOME_X.dna',
 				 },
 				 { 
-				  chr_name => 'MtDNA',
-				  agp_file => 'CHROMOSOME_MtDNA.agp',
-				  length => '14088',
-				  gff_file => '',  #need to be constructed!
+				  chr_name 	=> 'MtDNA',
+				  agp_file 	=> 'CHROMOSOME_MtDNA.agp',
+				  length 	=> '13794',	#sequence-region CHROMOSOME_MtDNA 1 13794
+				  gff_file 	=> 'CHROMOSOME_MtDNA.gff',  
 				 }
 			       ],
 
 		 # agp type which gets written to database meta
-		 WB_AGP_TYPE => '',
+		 WB_AGP_TYPE 			=> 'exon',
+		 WB_NEW_COORD_SYSTEM_VERSION 	=> '',  #CEL150 
+		 WB_workDIR 			=> '',  #/ecs/work/username/WormBase150/
+		 WB_cvsDIR  			=> '',  #/nfs/acari/user/cvsDIR/
+		 WB_scratchDIR			=> '',  #/ecs/scratch/user/WormBase150/
+		
+		 
+		 # date that this new version was made
+		 WB_DDAY    => '', #0511  ie.November 2005
 
 		 # database to put sequnece and genes into
 		 WB_DBNAME  => '',
-		 WB_DBHOST  => 'ecs1a',
-		 WB_DBUSER  => 'ensadmin',
-		 WB_DBPASS  => 'ensembl',
-		 WB_DBPORT  => '3306',
+		 WB_DBHOST  => '',
+		 WB_DBUSER  => '',
+		 WB_DBPASS  => '',
+		 WB_DBPORT  => '',
 
 		 # if want the debug statements in wormbase to ensembl scripts printed
 		 WB_DEBUG   => 1,
 
 		 # location to write file containing dodgy seq ids
-		 WB_SEQ_IDS => '',
+		 WB_SEQ_IDS => '',  #ecs/work/user/WormBase150/dodgy_seq_ids.txt
 
 		 # location to write ids of genes which don't translate
-		 WB_NON_TRANSLATE => '',
+		 WB_NON_TRANSLATE => '',  #/ecs/work/user/WormBase150/non_translateable.txt
 
 		 #coordinate-system / base feature names
 		 WB_CLONE_SYSTEM_NAME      => 'clone',
@@ -77,6 +91,7 @@ use vars qw( %WormBaseConf );
 		 # logic name of analysis objectsto be parsed out of the gff
 		 WB_LOGIC_NAME             => 'wormbase',
 		 WB_OPERON_LOGIC_NAME      => 'Operon',
+		 WB_rRNA_LOGIC_NAME	   => 'rRNA',
 		 WB_RNAI_LOGIC_NAME        => 'RNAi',
 		 WB_EXPR_LOGIC_NAME        => 'Expression_profile',
 		 WB_PSEUDO_LOGIC_NAME      => 'Pseudogene',
@@ -84,6 +99,7 @@ use vars qw( %WormBaseConf );
 		 #WB_SL1_LOGIC_NAME        => 'SL1',
 		 #WB_SL2_LOGIC_NAME        => 'SL2',
 		);
+
 
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
