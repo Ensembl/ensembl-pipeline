@@ -1,4 +1,4 @@
-#!/usr/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 =pod
 
@@ -37,7 +37,7 @@ data from the wormbase in an automated fashion.
  8-dump translations from wormbase genes
  9-run the rulemanager
  10-check the data with some sql
- 11-load the xrefs
+ 11-load the xrefs (by hand)
  12-clean-up the system
 
 =head1 CONTACT
@@ -45,7 +45,7 @@ data from the wormbase in an automated fashion.
 ensembl-dev@ebi.ac.uk
 
 =cut
-
+$|=1; #turns off buffering on STDOUT
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 ##  PREPARATION:  ##
@@ -58,31 +58,28 @@ ensembl-dev@ebi.ac.uk
 
 #necessary fixes
 # 1.
-# sequence_store.pl--$clone_cs and $chromosome_cs objects: 
-#			     need additional parameter RANK (1 for chromosome & 2 for clone)
-# WormBase.pm--store_coord_system function: additional Hash key RANK, remove Hash key TOP_LEVEL
-# 2.
 # defined resource=linux for the protein annotations to avoidsystem-specific differences
 # some machines dont have gawk installed: signalp fails!
 # Fix: copy signalp-bin and set AWK=awk; point entry in analysis-table to this bin
 
 #configuration variables:
-my $release       = "CEL140";
-my $workDIR       = "../wormbase140/";
-my $cvsDIR        = "../cvs_checkout/";
-my $analysisConf  = "./analysis.conf"; #to be created
-my $ruleConf      = "./rule.conf";     #to be created
+my $release       = "WS150";		
+my $workDIR       = "/ecs4/work3/ba1/WormBase150/";	
+my $cvsDIR        = "/nfs/acari/ba1/PerlCode/";	
+my $analysisConf  = "/nfs/acari/ba1/PerlCode/ensembl-config/celegans/WB150/pipe_conf/analysis.conf"; 
+my $ruleConf      = "/nfs/acari/ba1/PerlCode/ensembl-config/celegans/WB150/pipe_conf/rule.conf";     
 
-my $WB_DBHOST     = "";
-my $WB_DBPORT     = "";
+my $WB_DBHOST     = "ia64g";		
+my $WB_DBPORT     = "3306";		
 my $WB_DBNAME     = $ENV{'USER'}."_caenorhabditis_elegans_core_".$release;
-my $WB_DBUSER     = "";
-my $WB_DBPASS     = "";
+my $WB_DBUSER     = "ensadmin";		
+my $WB_DBPASS     = "ensembl";		
 
-##########################################
+use lib '~/PerlCode/ensembl-pipeline/scripts/DataConversion/wormbase';
 
-use lib '~/cvs_checkout/ensembl-pipeline/scripts/DataConversion/wormbase';
-
+###########################################
+# You should not need to change any settings below this line
+#-----------------------------------------------------------
 use warnings;
 use strict;
 use WormBaseConf;
@@ -97,10 +94,11 @@ my $blastbd;
 my $MtDNA_length = 0;
 my $cmd;
 my $comm = $ARGV[0];
-if(!$comm or ($comm ne "setup" or $comm ne "run" or $comm ne "xref" or $comm ne "sqlcheck")){
+if(!$comm or ($comm ne "setup" && $comm ne "run" && $comm ne "xref" && $comm ne "sqlcheck")){
   exec('perldoc', $0);
   exit 1;
-}
+
+} 
 
 print "\nbuilding the worm...\n";
 
@@ -134,15 +132,15 @@ if($comm eq "setup"){
 
   # 6-store other chromosomes
   my $script_path = $cvsDIR."ensembl-pipeline/scripts/DataConversion/wormbase/sequence_store.pl";
-  if( system("perl", $script_path) ){ die "could not store genomic sequence."; }
+  if( system("perl", $script_path) ){ die "could not store genomic sequence"; }
 
   # 7-insert meta data & toplevel
   insert_meta($db);
 
   # 8-insert other features
-  my @steps = ($WB_LOGIC_NAME, $WB_OPERON_LOGIC_NAME, $WB_RNAI_LOGIC_NAME, $WB_EXPR_LOGIC_NAME, $WB_TRNA_LOGIC_NAME);
+  my @steps = ($WB_LOGIC_NAME, $WB_OPERON_LOGIC_NAME, $WB_PSEUDO_LOGIC_NAME, $WB_EXPR_LOGIC_NAME, $WB_TRNA_LOGIC_NAME, $WB_RNAI_LOGIC_NAME, $WB_rRNA_LOGIC_NAME);
   foreach my $step (@steps){
-    run_scripts($step);
+    run_scripts($step); 
   }
 
   # 9-create dummy entries
@@ -153,19 +151,26 @@ if($comm eq "setup"){
   # 10-dump translations for protein analysis'
   dump_translations();
 
-  print "\n finnished first part.\n please check the setup.\n";
+  print "\n finished first part.\n please check the setup.\n";
 
 }
 elsif($comm eq "run"){
 
   print "\nhanding over to rulemanager.".
-        "\nPlease run 'perl set_wormbase.pl sqlcheck' after finnishing!\n";
+        "\nPlease check that the analysis table has program_file column filled in for Blast modules.".
+        "\nPlease run 'perl set_wormbase.pl sqlcheck' after finishing!\n";
 
   # 11-RUN RULEMANAGER
   run();
 
 }
 elsif($comm eq "sqlcheck"){
+  $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $WB_DBHOST,
+					   -user   => $WB_DBUSER,
+					   -dbname => $WB_DBNAME,
+					   -pass   => $WB_DBPASS,
+					   -port   => $WB_DBPORT,
+					  ) or die "cannot access the database!";
 
   print "\nexecuting some basic sql health-checks\n".
         "the standard health-checks need to be run independently later!\n";
@@ -174,7 +179,9 @@ elsif($comm eq "sqlcheck"){
 
 }
 elsif($comm eq "xref"){
-
+   print "Have you checked that there is enough space in your workDIR, and copied your db?\n";
+   print "Please check that the BaseDir in /ensembl/misc-scripts/xref_mapping/BaseParser.pm is your workDIR/xrefs\n\n";
+  
   # 13-CREATE & LOAD XREFS
   X_mapping();
 
@@ -228,19 +235,25 @@ sub getfiles{
     my $basefile = $workDIR;
     my $file;
 
-    my @cromosomes = qw(I II III IV V X);
+    my @chromosomes =  qw(I II III IV V X);
 
-    foreach my $chomosome (@cromosomes){
-      #get agps
-      $file = "CHROMOSOME_".$chomosome.".agp";
+    foreach my $chromosome (@chromosomes){
+      #get agps - beware that some clone versions may be outdated     
+      $file = "CHROMOSOME_".$chromosome.".agp";
       print ">>getting file ".$file."\n";
       _fetchfile($baseurl, $basefile, $file);
-
+      
       #get gffs
-      $file = "CHROMOSOME_".$chomosome.".gff.gz";
+      $file = "CHROMOSOME_".$chromosome.".gff.gz";
       print ">>getting file ".$file."\n";
       _fetchfile($baseurl, $basefile, $file);
       _unzipfile($basefile, $file);
+      
+      #get dna
+      $file = "CHROMOSOME_".$chromosome.".dna.gz";
+      print ">>getting file ".$file."\n";
+      _fetchfile($baseurl, $basefile, $file);
+      _unzipfile($basefile, $file);      
     }
 
     #get mt-dna
@@ -248,10 +261,15 @@ sub getfiles{
     print ">>getting file ".$file."\n";
     _fetchfile($baseurl, $basefile, $file);
     _unzipfile($basefile, $file);
+    #get dna file for Mt-DNA 
+    $file = "CHROMOSOME_MtDNA.dna.gz";
+    print ">>getting file ".$file."\n";
+    _fetchfile($baseurl, $basefile, $file);
+    _unzipfile($basefile, $file);     
     #create agp file for Mt-DNA
     $file = "CHROMOSOME_MtDNA.agp";
-    open(MTDNA, "<", $basefile.$file) or die "cant create file ".$basefile.$file;
-    print MTDNA "MtDNA\t1\t$MtDNA_length\t1\tF\tMtDNA-Clone\t1\t$MtDNA_length\t+\n";
+    open(MTDNA, ">", $basefile.$file) or die "can't create file ".$basefile.$file;
+    print MTDNA "MtDNA\t1\t$MtDNA_length\t1\tF\tMtDNA-Clone\t1\t$MtDNA_length\t+\n";#make the agp file here
     close MTDNA;
 
     #get clones
@@ -296,7 +314,7 @@ sub insert_mtDNA{
   #fetching raw sequence string
   my $fh;
   my $newid = 1;
-  open(IN, "<$seqfile") or die("could not open file $seqfile.");
+  open(IN, "<$seqfile") or die("Could not open file $seqfile.");
   my $filecontent = <IN>;
   $filecontent = uc( join("", <IN>) );
   close(IN);
@@ -356,13 +374,11 @@ sub insert_mtDNA{
 sub insert_meta{
   my $db = shift;
   my $cmd;
-  my $dday;
-
   # adding assembly type to meta table
   my $meta_sql = "insert into meta(meta_key, meta_value) values(?,?)";
-  my $meta_sth = $db->prepare($meta_sql);
+  my $meta_sth = $db->dbc->prepare($meta_sql);
   my @meta = (
-	      'assembly.default', $release,
+	      'assembly.default', $WB_NEW_COORD_SYSTEM_VERSION,
 	      'species.taxonomy_id', '6239',
 	      'species.common_name', 'C.elegans',
               'species.classification', 'elegans',
@@ -375,8 +391,8 @@ sub insert_meta{
 	      'species.classification', 'Nematoda',
 	      'species.classification', 'Metazoa',
 	      'species.classification', 'Eukaryota',
-	      'genebuild.version', $dday.'Wormbase',
-	      'assembly.mapping', 'chromosome:|clone',
+	      'genebuild.version', $WB_DDAY."Wormbase",
+	      #'assembly.mapping', "chromosome:".$WB_NEW_COORD_SYSTEM_VERSION."|clone",
 	     );
   for(my $i=0; $i<scalar @meta-1; $i+=2){
     my $meta_key   = $meta[$i];
@@ -479,7 +495,7 @@ sub make_input_ids{
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."ensembl-pipeline/scripts/make_input_ids ".
         "-dbhost $WB_DBHOST -dbname $WB_DBNAME -dbuser $WB_DBUSER -dbpass ".
-	"$WB_DBPASS -dbport $WB_DBPORT -file -dir /ecs2/scratch1/fsk/wormbase140/peptide_chunks ".
+	"$WB_DBPASS -dbport $WB_DBPORT -file -dir $WB_workDIR/chunks/peptide_chunks ".
 	"-logic SubmitTranscriptChunk";
     $status += system($cmd);
   }
@@ -488,7 +504,7 @@ sub make_input_ids{
 
 
 sub run{
-  my $cmd= $cvsDIR."/ensembl-pipeline/scripts/rulemanager.pl -dbhost $WB_DBHOST -dbport ".
+  my $cmd= "perl ".$cvsDIR."ensembl-pipeline/scripts/rulemanager.pl -dbhost $WB_DBHOST -dbport ".
            "$WB_DBPORT -dbname $WB_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS";
   exec($cmd);
 }
@@ -508,25 +524,33 @@ sub dump_translations{
   print ">>chopping up translations.\n";
   $cmd = "perl ".$cvsDIR."ensembl-pipeline/scripts/protein_pipeline/chunk_protein_file.pl";
   $status += system($cmd);
-  if($status){ warn("Error dumping translations.") }
+  if($status){ warn("Error dumping translations") }
 }
 
 
 sub sql_checks{
   my $sql = "";
   my $res = 0;
-
+  
   sub query{
-    my $sql = shift;
+    my ($sql,$find_single_exons) = @_;
     my $sth;
-    $sth = $db->prepare($sql) or die "cant execute sql check.";
-    return $sth->execute();
+    my $answer;
+    $sth = $db->dbc->prepare($sql) or die "can't execute sql check.";
+    $sth->execute();    
+    if ($find_single_exons == 1){
+      $answer = $sth->rows;
+    } else {
+      $answer = $sth->fetchrow;
+    }
+    return $answer;
   }
-
+       
+    
   #1. all genes have transcript
   $sql = "select count(gene.gene_id) from gene left join transcript on gene.gene_id=transcript.gene_id ".
          "where transcript.gene_id is NULL;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res genes have no transcript!\n";
   }
@@ -534,7 +558,7 @@ sub sql_checks{
   #2. all transcripts have exons
   $sql = "select count(transcript.transcript_id) from transcript left join exon_transcript on ".
          "transcript.transcript_id=exon_transcript.transcript_id where exon_transcript.transcript_id is NULL;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res transcripts have no exons!\n";
   }
@@ -542,7 +566,7 @@ sub sql_checks{
   #3. all transcripts belong to a gene
   $sql = "select count(distinct t.transcript_id) from transcript t left join gene g on g.gene_id ".
          "= t.gene_id where g.gene_id is null;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res transcripts have no gene!\n";
   }
@@ -550,33 +574,35 @@ sub sql_checks{
   #4. all exons belong to a transcript
   $sql = "select count(distinct e.exon_id) from exon e left join exon_transcript et on e.exon_id ".
          "= et.exon_id where et.exon_id is null;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res exons have no transcript!\n";
   }
 
   #5.check the number of single exon genes
   $sql = "select count(*) as c,transcript_id from exon_transcript group by transcript_id having c=1;";
-  $res = query($sql);
+  $res = query($sql, 1);
   if($res){
     print "\nWarning: $res transcripts have only one exon!\n";
   }
 
   #6.check that start < end
   $sql = "select count(*) from translation where start_exon_id = end_exon_id and seq_start > seq_end;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError: $res translations with single exons have start > end!\n";
   }
 
-  #7.starts and ends
+  #7.starts and ends of simple_feature
   $sql = "SELECT count(*) FROM `simple_feature` where seq_region_start > seq_region_end;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res simple-feature have start > end!\n";
   }
+  
+  #8.starts and ends of dna_align_features
   $sql = "select count(*) FROM `dna_align_feature` where hit_start > hit_end;";
-  $res = query($sql);
+  $res = query($sql,0);
   if($res){
     print "\nError:$res dna_align_features have start > end!\n";
   }
@@ -585,39 +611,43 @@ sub sql_checks{
 
 }
 
-
 sub X_mapping{
-  my $XMAP_DIR    = $workDIR."xref_mapping";
-  my $XREF_DIR    = $workDIR."xref_refs";
-  my $xfile       = $workDIR."celegans.mapping";
+  my $XMAP_DIR    = $workDIR."xrefs/xref_mapped_spp";
+  my $XREF_DIR    = $workDIR."xrefs/xref_holding_db";
+  my $xfile       = $workDIR."xrefs/celegans.mapping"; #$workDIR."celegans.mapping
   my $XREF_DBNAME = $ENV{'USER'}."_caenorhabditis_elegans_core_xrefs";
 
-  #create mapping input file
-  open(XDEF , ">$xfile") or die("cant create mappinf input file");
+  
+  #create mapping input file (replaces /ensembl/misc-scripts/xref_mapping/xref_mapper.input)
+  open(XDEF , ">$xfile") or die("can't create mapping input file");
   print XDEF "xref\nhost=$WB_DBHOST\nport=$WB_DBPORT\ndbname=$XREF_DBNAME\n".
         "user=$WB_DBUSER\npassword=$WB_DBPASS\ndir=$XREF_DIR\n\n".
 	"species=caenorhabditis_elegans\n".
 	"host=$WB_DBHOST\nport=$WB_DBPORT\ndbname=$WB_DBNAME\n".
         "user=$WB_DBUSER\npassword=$WB_DBPASS\ndir=$XMAP_DIR\n\n";
   close XDEF;
+  
   #do the parsing
   print "\nparsing xrefs. This will take a while.\n";
-  $cmd = "perl ".$cvsDIR."/ensembl/misc-scripts/xref_mapping/xref_parser.pm ".
+  print "(xref_parser.pl may need to be run manually from /ensembl/misc-scripts/xref_mapping/)\n";
+  $cmd = "perl ".$cvsDIR."ensembl/misc-scripts/xref_mapping/xref_parser.pl ".
          "-host $WB_DBHOST -port $WB_DBPORT -user $WB_DBUSER -pass $WB_DBPASS ".
-         "-dbname $XREF_DBNAME species caenorhabditis_elegans -create";
+         "-dbname $XREF_DBNAME -species caenorhabditis_elegans -create";#source
   if(system($cmd)){
     print "\nERROR PARSING XREFS.\n";
     exit 1;
   }
   #do the mapping, write directly into db
   print "\nmapping xrefs. This will take a while, too.\n";
-  $cmd = "perl ".$cvsDIR."/ensembl/misc-scripts/xref_mapping/xref_mapper.pl ".
-         "-file $xfile -upload -deleteexisting";
+  print "(xref_mapping.pl may need to be run manually from /ensembl/misc-scripts/xref_mapping/)\n";
+  #-file option tells xref_mapping.pl to use celegans.mapping instead of xref_mapper.input
+  $cmd = "perl ".$cvsDIR."ensembl/misc-scripts/xref_mapping/xref_mapper.pl ".
+         "-file $xfile -upload -deleteexisting"; 
   if(system($cmd)){
     print "\nERROR MAPPING XREFS.\n";
     exit 1;
   }
-  print "\ndone with xrefs. you can delete the database ".$ENV{'USER'}.
+  print "\ndone with xrefs. You can delete the database ".$ENV{'USER'}.
         "_caenorhabditis_elegans_core_xrefs if you like.\n";
 
 }
