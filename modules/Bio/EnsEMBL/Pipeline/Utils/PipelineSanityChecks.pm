@@ -109,6 +109,7 @@ sub accumulator_sanity_check{
   
   my $sic = $self->db->get_StateInfoContainer;
   my $aa = $self->db->get_AnalysisAdaptor;
+
  RULE:foreach my $rule(@$rules){
     if($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR'){
       #print STDERR "dealing with rule ".$rule->goalAnalysis->logic_name."\n";
@@ -130,18 +131,20 @@ sub accumulator_sanity_check{
           my $logic_names = join(",", @{$input_id_type{$type}});
           print STDERR "can't run with accumulators on as ".
             $rule->goalAnalysis." depends on $logic_names with type ".
-              $type." which has no entries in the input_id_type_".
+              $type." which has no entries in the input_id_".
                 "analysis table\n";
           $accumulators = 0;
         }else{
           next TYPE;
         }
       }
-    }else{
+    }
+else{
       next RULE;
     }
-    return $accumulators;
+
   }
+    return $accumulators;
 }
 
 
