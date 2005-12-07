@@ -63,8 +63,11 @@ foreach my $file_info(@file_info){
     my $parseable_string = $seq->id." ".$seq->desc;
     my ($id) = $parseable_string =~ /$regex/;
     if(!$id){
-      throw($regex." failed to parse an id out of ".
-            $parseable_string)
+#      throw($regex." failed to parse an id out of ".
+#            $parseable_string)
+      warn($regex." failed to parse an id out of ".
+            $parseable_string);
+        next SEQ;
     }
     if($kill_list{$id}){
       print $id." on kill list\n";
