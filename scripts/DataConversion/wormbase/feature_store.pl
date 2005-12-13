@@ -30,21 +30,27 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
           " and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
 
     my $chr = $db->get_SliceAdaptor->fetch_by_region('Chromosome', $chromosome_info->{'chr_name'}, 1,
-						     ($chromosome_info->{'length'}, 1, $WB_AGP_TYPE));
-
+						     ($chromosome_info->{'length'}, 1, $WB_NEW_COORD_SYSTEM_VERSION));
+    
+    #MtDNA does not have Expr_profile, RNAi or Operon so may cause hassles for these
+    next if (($chromosome_info->{'chr_name'} eq 'MtDNA') 
+            && ($analysis_logic_name eq "Expression_profile" 
+	    or $analysis_logic_name eq "RNAi" 
+	    or $analysis_logic_name eq "Operon"));    
+    
     #read the features from gff file
     if($analysis_logic_name eq "Expression_profile" or $analysis_logic_name eq "RNAi" or
        $analysis_logic_name eq "Operon"){
 
       my $features;
       if($analysis_logic_name eq "Expression_profile"){
-	$features = parse_expr($chromosome_info->{'gff_file'}, $chr, $analysis);
+	$features = parse_expr($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       }
       elsif($analysis_logic_name eq "RNAi"){
-	$features = parse_rnai($chromosome_info->{'gff_file'}, $chr, $analysis);
+	$features = parse_rnai($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       }
       elsif($analysis_logic_name eq "Operon"){
-	$features = parse_operons($chromosome_info->{'gff_file'}, $chr, $analysis);
+	$features = parse_operons($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       }
       print "have ".scalar @$features." features ($analysis_logic_name).\n" if($WB_DEBUG);
 
@@ -53,7 +59,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
     }
     elsif($analysis_logic_name eq "Pseudogene"){
       #parse out pseudogenes
-      my $pseudogenes = parse_pseudo_gff($chromosome_info->{'gff_file'}, $chr, $analysis);
+      my $pseudogenes = parse_pseudo_gff($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       print "have ".scalar @$pseudogenes." pseudogenes / tRNA genes.\n" if($WB_DEBUG);
 
       #store pseudogenes
@@ -61,15 +67,24 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
     }
     elsif($analysis_logic_name eq "tRNA"){
       #parse out tRNA-genes
-      my $tRNAgenes = parse_tRNA_genes($chromosome_info->{'gff_file'}, $chr, $analysis);
+      #there only seem to be tRNA in MtDNA (tRNAscan in CHROMOSOMES)
+      my $tRNAgenes = parse_tRNA_genes($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       print "have ".scalar @$tRNAgenes." tRNA genes.\n" if($WB_DEBUG);
 
       #store tRNA-genes
       &write_genes($tRNAgenes, $db);
     }
+    elsif($analysis_logic_name eq "rRNA"){
+      #parse out rRNA-genes
+      my $rRNAgenes = parse_rRNA_genes($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
+      print "have ".scalar @$rRNAgenes." rRNA genes.\n" if($WB_DEBUG);
+
+      #store tRNA-genes
+      &write_genes($rRNAgenes, $db);
+    }       
     elsif($analysis_logic_name eq "wormbase"){
       #parse out real worm genes
-      my $genes = parse_gff($chromosome_info->{'gff_file'}, $chr, $analysis);
+      my $genes = parse_gff($WB_workDIR."".$chromosome_info->{'gff_file'}, $chr, $analysis);
       print "have ".scalar @$genes." genes.\n" if($WB_DEBUG);
 
       #store genes
