@@ -22,7 +22,7 @@ foreach my $chromosome_info(@{$WB_CHR_INFO}) {
   print "handling ".$chromosome_info->{'chr_name'}." with files ".$chromosome_info->{'agp_file'}." and ".$chromosome_info->{'gff_file'}."\n" if($WB_DEBUG);
   
 
- my $chr = $db->get_SliceAdaptor->fetch_by_region('Chromosome', $chromosome_info->{'chr_name'}, 1, ($chromosome_info->{'length'}, 1, $WB_AGP_TYPE));
+ my $chr = $db->get_SliceAdaptor->fetch_by_region('Chromosome', $chromosome_info->{'chr_name'}, 1, ($chromosome_info->{'length'}, 1, $WB_NEW_COORD_SYSTEM_VERSION));
 
   my $genes = &parse_pseudo_gff($chromosome_info->{'gff_file'}, $chr, $analysis);
   my $non_transforming =  &write_genes($genes, $db, 1);
