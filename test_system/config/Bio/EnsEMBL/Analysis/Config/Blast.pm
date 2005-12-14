@@ -173,7 +173,7 @@ use vars qw(%Config);
                               -type => 'wu',
                              },
             },
-            UniGene =>
+            Unigene =>
             {
              BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
              PARSER_PARAMS => {
