@@ -195,13 +195,13 @@ my $seqset_info     = {};
 		WHERE assembly_type = ?
 		}
 	);
-	foreach my $sequence_set (@seq_sets) {
+	SET:foreach my $sequence_set (@seq_sets) {
 		my $contig_number = 0;
 		my $chr_href;
 
 		# fetch all the contigs for this sequence set
 		$contigs_sth->execute($sequence_set);
-		while (
+		CONTIG:while (
 			my (
 				$chr_name,     $chr_start,  $chr_end,
 				$contig_start, $contig_end, $strand,
@@ -218,7 +218,7 @@ my $seqset_info     = {};
 					$end_value{$sequence_set} = $chr_end;
 				}
 			}
-			$contigs_hashref->{ $acc . $sv } = [
+			$contigs_hashref->{ $acc . $sv.$sequence_set } = [
 				$chr_name,     $chr_start,  $chr_end,
 				$contig_start, $contig_end, $strand,
 				$acc,          $sv,         $sequence_set
@@ -320,6 +320,8 @@ my $seqset_info     = {};
 		my $ver          = $values[7];
 		my $acc_ver      = $acc . "." . $ver;
 
+		#if($acc_ver ne 'AC004775.1') { next ; }
+		#if(!($acc_ver eq 'BX571961.11' || $acc_ver eq 'BX649427.7')) { next ; }
 
 		my $clone;
 		my $clone_seq_reg_id;
