@@ -12,27 +12,27 @@ load_from_otter_to_pipeline.pl
 
 This script is used to load either one or several sequence sets from an organisme specific Otter database into the seq_region, seq_region_attrib, attrib_type, assembly and dna tables of the Pipeline database (new schema). 
 Appropriate option like the coord_system version for the specific chromosome has to be given. The sequence that is loaded into the dna table is Pfetched.
-If no values are provided for the database connexion (login and password), the ~/.netrc file will be checked. See Net::Netrc module for more details.
+If no values are provided for the database connexion (login, password and port), the ~/.netrc file will be checked. See Net::Netrc module for more details.
 
 here is an example commandline
 
-./load_from_otter_to_pipeline.pl -set chr11 -chromosome_cs_version Otter -ohost ecs4 -oport 3352 -oname otter_human -ouser pipuser -opass ***** -phost otterpipe2 -pport 3352 -pname pipe_human -puser pipuser -ppass *****
+./load_from_otter_to_pipeline.pl -set chr11 -o_host ecs4 -o_port 3352 -o_name otter_human -o_user pipuser -o_pass ***** -p_host otterpipe2 -p_port 3352 -p_name pipe_human -p_user pipuser -p_pass *****
 
 
 =head1 OPTIONS
 
-    -ohost (default:humsrv1)   host name for the dataset specific Otter database (gets put as ohost= in locator)
-    -oname (default:otter_human)   For RDBs, what name to connect to (oname= in locator)
-    -ouser (check the ~/.netrc file) For RDBs, what username to connect as (ouser= in locator)
-    -opass (check the ~/.netrc file) For RDBs, what password to use (opass= in locator)
-    -oport (default:3306)   For RDBs, what port to use (oport= in locator)
-    -phost (default:otterpipe1)   host name for the Pipeline database (gets put as phost= in locator)
-    -pname (no default)  For RDBs, what name to connect to (pname= in locator)
-    -puser (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
-    -ppass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
-    -pport (default:3302)   For RDBs, what port to use (pport= in locator)
+    -o_host (default:humsrv1)   host name for the dataset specific Otter database (gets put as ohost= in locator)
+    -o_name (default:otter_human)   For RDBs, what name to connect to (oname= in locator)
+    -o_user (check the ~/.netrc file) For RDBs, what username to connect as (ouser= in locator)
+    -o_pass (check the ~/.netrc file) For RDBs, what password to use (opass= in locator)
+    -o_port (check the ~/.netrc file)   For RDBs, what port to use (oport= in locator)
+    -p_host (default:otterpipe1)   host name for the Pipeline database (gets put as phost= in locator)
+    -p_name (no default)  For RDBs, what name to connect to (pname= in locator)
+    -p_user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
+    -p_pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
+    -p_port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
-    -chromosome_cs_version the version of the coordinate system being stored
+    -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
     -set|chr the sequence set to load 
     -help|h      displays this documentation with PERLDOC
 
@@ -57,83 +57,108 @@ use Bio::EnsEMBL::Attribute;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 # Otter and Pipeline connexion parameters, default values.
-my $p_host = 'otterpipe1';
-my $p_port = '3302';
-my $p_name = '';
-my $p_user = '';
-my $p_pass = '';
-my $o_host = 'humsrv1';
-my $o_port = '3306';
-my $o_name = 'otter_human';
-my $o_user = '';
-my $o_pass = '';
+my $phost = 'otterpipe1';
+my $pport = '';
+my $pname = '';
+my $puser = '';
+my $ppass = '';
+my $ohost = 'humsrv1';
+my $oport = '';
+my $oname = 'otter_human';
+my $ouser = '';
+my $opass = '';
 
-my $chromosome_name;
-my $chromosome_cs_version;
+my $chromosome_cs_version = 'Otter';
 my @seq_sets;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
 &GetOptions(
-	'phost:s'                 => \$p_host,
-	'pport:n'                 => \$p_port,
-	'pname:s'                 => \$p_name,
-	'puser:s'                 => \$p_user,
-	'ppass:s'                 => \$p_pass,
-	'ohost:s'                 => \$o_host,
-	'oport:n'                 => \$o_port,
-	'oname:s'                 => \$o_name,
-	'ouser:s'                 => \$o_user,
-	'opass:s'                 => \$o_pass,
+	'p_host:s'                 => \$phost,
+	'p_port:n'                 => \$pport,
+	'p_name:s'                 => \$pname,
+	'p_user:s'                 => \$puser,
+	'p_pass:s'                 => \$ppass,
+	'o_host:s'                 => \$ohost,
+	'o_port:n'                 => \$oport,
+	'o_name:s'                 => \$oname,
+	'o_user:s'                 => \$ouser,
+	'o_pass:s'                 => \$opass,
 	'chromosome_cs_version:s' => \$chromosome_cs_version,
 	'chr|set=s'               => \@seq_sets,
 	'h|help!'                 => $usage
   )
   or $usage->();
 
-if ( !$p_user || !$p_pass ) {
-	my $ref = Net::Netrc->lookup($p_host);
+if ( !$puser || !$ppass || !$pport ) {
+	my $ref = Net::Netrc->lookup($phost);
 	throw(
-"Need to provide pipeline login ( -puser ) and pipeline password ( -ppass )."
+		"~/.netrc file unavailable; 
+			need to provide missing parameter: 
+			user [$puser]; password [$ppass]; port [$pport]"
 	  )
 	  unless ($ref);
-	$p_user = $ref->login;
-	$p_pass = $ref->password;
-}
-if ( !$o_user || !$o_pass ) {
-	my $ref = Net::Netrc->lookup($o_host);
+	$puser = $ref->login    unless $puser;
+	$ppass = $ref->password unless $ppass;
+	$pport = $ref->account  unless $pport;
 	throw(
-		"Need to provide otter login ( -ouser ) and otter password ( -opass ).")
-	  unless ($ref);
-	$o_user = $ref->login;
-	$o_pass = $ref->password;
+		"Missing parameter in the ~/.netrc file:\n
+			machine " .  ( $phost || 'missing' ) . "\n
+			login " .    ( $puser || 'missing' ) . "\n
+			password " . ( $ppass || 'missing' ) . "\n
+			account "
+		  . ( $pport || 'missing' ) . " (should be used to set the port number)"
+	  )
+	  unless ( $puser && $ppass && $pport );
 }
 
-if ( !$p_name ) {
+if ( !$ouser || !$opass || !$oport ) {
+	my $ref = Net::Netrc->lookup($ohost);
+	throw(
+		"~/.netrc file unavailable; 
+			need to provide missing parameter: 
+			user [$ouser]; password [$opass]; port [$oport]"
+	  )
+	  unless ($ref);
+	$ouser = $ref->login    unless $ouser;
+	$opass = $ref->password unless $opass;
+	$oport = $ref->account  unless $oport;
+	throw(
+		"Missing parameter in the ~/.netrc file:\n
+			machine " .  ( $ohost || 'missing' ) . "\n
+			login " .    ( $ouser || 'missing' ) . "\n
+			password " . ( $opass || 'missing' ) . "\n
+			account "
+		  . ( $oport || 'missing' ) . " (should be used to set the port number)"
+	  )
+	  unless ( $ouser && $opass && $oport );
+}
+
+if ( !$pname ) {
 	print STDERR
 	  "Can't load sequence set without a target pipeline database name\n";
-	print STDERR "-phost $p_host -puser $p_user -ppass $p_pass\n";
+	print STDERR "-p_host $phost -p_user $puser -p_pass $ppass\n";
 	$usage->();
 }
 
-if ( !$chromosome_cs_version || !scalar(@seq_sets) ) {
-	print STDERR "Need chr|set and chromosome_cs_version to be able to run\n";
+if ( !scalar(@seq_sets) ) {
+	print STDERR "Need chr|set to be able to run\n";
 	$usage->();
 }
 
 my $otter_dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
-	-user   => $o_user,
-	-dbname => $o_name,
-	-host   => $o_host,
-	-port   => $o_port,
-	-pass   => $o_pass
+	-user   => $ouser,
+	-dbname => $oname,
+	-host   => $ohost,
+	-port   => $oport,
+	-pass   => $opass
 );
 my $pipe_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-	-user   => $p_user,
-	-dbname => $p_name,
-	-host   => $p_host,
-	-port   => $p_port,
-	-pass   => $p_pass
+	-user   => $puser,
+	-dbname => $pname,
+	-host   => $phost,
+	-port   => $pport,
+	-pass   => $ppass
 );
 my $pipe_dbc = $pipe_dba->dbc();
 
@@ -146,7 +171,7 @@ my $seqset_info     = {};
 #
 {
 	print STDOUT
-"Getting Sequence set @seq_sets from Otter database: $o_name ($o_host:$o_port)\n";
+"Getting Sequence set @seq_sets from Otter database: $oname ($ohost:$oport)\n";
 	my $contigs_sth = $otter_dbc->prepare(
 		q{
         SELECT chr.name, a.chr_start, a.chr_end
@@ -208,7 +233,7 @@ my $seqset_info     = {};
 		my ($desc) = $description_sth->fetchrow;
 		$seqset_info->{$sequence_set} = [ $desc, keys %$chr_href ];
 
-		throw("No data for '$sequence_set' in $o_name")
+		throw("No data for '$sequence_set' in $oname")
 		  unless ($contig_number);
 		print STDOUT $contig_number
 		  . " contigs retrieved for $sequence_set sequence set\n";
@@ -220,7 +245,7 @@ my $seqset_info     = {};
 #
 {
 	print STDOUT
-	  "Writing data into Pipeline database: $p_name ($p_host:$p_port)\n";
+	  "Writing data into Pipeline database: $pname ($phost:$pport)\n";
 
 	my %asm_seq_reg_id;
 
@@ -257,7 +282,7 @@ my $seqset_info     = {};
 		};
 		if ($slice) {
 			warn(
-"Sequence set <$name> is already in pipeline database <$p_name>\n"
+"Sequence set <$name> is already in pipeline database <$pname>\n"
 			);
 			throw(  "There is a difference in size for $name: stored ["
 				  . $slice->length
