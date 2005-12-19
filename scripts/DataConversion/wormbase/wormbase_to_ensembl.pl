@@ -495,7 +495,7 @@ sub make_input_ids{
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."ensembl-pipeline/scripts/make_input_ids ".
         "-dbhost $WB_DBHOST -dbname $WB_DBNAME -dbuser $WB_DBUSER -dbpass ".
-	"$WB_DBPASS -dbport $WB_DBPORT -file -dir $WB_workDIR/chunks/peptide_chunks ".
+	"$WB_DBPASS -dbport $WB_DBPORT -file -dir $WB_workDIR/chunk/peptide_chunks ".
 	"-logic SubmitTranscriptChunk";
     $status += system($cmd);
   }
