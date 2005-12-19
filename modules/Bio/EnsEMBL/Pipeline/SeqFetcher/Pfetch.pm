@@ -33,13 +33,17 @@ Describe contact details here
 The rest of the documentation details each of the object methods. 
 Internal methods are usually preceded with a _
 
+Method Bio::EnsEMBL::Root::_rearrange is deprecated.
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
+rearrange(order, list); #instead
+
 =cut
 
 # Let the code begin...
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use strict;
-use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 
@@ -51,8 +55,8 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my ($exe, $options) = $self->_rearrange(['EXECUTABLE', 'OPTIONS'], @args);
-
+  my ($exe, $options) = rearrange(['EXECUTABLE', 'OPTIONS'], @args);
+  
   if (!defined $exe) {
     $exe = 'pfetch';
   }
