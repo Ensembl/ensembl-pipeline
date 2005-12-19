@@ -207,7 +207,7 @@ sub _clone_Exon{
   $newexon->end_phase  ($exon->end_phase);
   $newexon->strand     ($exon->strand);
   $newexon->dbID       ($exon->dbID);
-  $newexon->contig     ($exon->contig);
+  $newexon->slice      ($exon->slice);
   $newexon->seqname    ($exon->seqname);
   $newexon->analysis   ($exon->analysis);
 
