@@ -87,12 +87,12 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
   my $attrib_type_id = add_attrib_code($db);
 
   print STDERR "Deleting old toplevel attributes\n";
-  my $sth = $db->prepare('DELETE FROM seq_region_attrib ' .
+  my $sth = $db->dbc->prepare('DELETE FROM seq_region_attrib ' .
                          "WHERE attrib_type_id = ?");
   $sth->execute($attrib_type_id);
   $sth->finish();
 
-  $sth = $db->prepare('INSERT INTO seq_region_attrib ' .
+  $sth = $db->dbc->prepare('INSERT INTO seq_region_attrib ' .
                       'SET seq_region_id = ?,' .
                       '    attrib_type_id = ?,' .
                       '    value = ?');
@@ -136,7 +136,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
     # print out progress periodically
     $total_processed++;
     if($total_processed % $five_percent == 0) {
-      print STDERR ceil($total_processed/$total_number*100),"% complete\n";
+      print STDERR ceil($total_processed/$total_number*100)."% complete\n";
     }
   }
 
@@ -147,7 +147,7 @@ sub add_attrib_code {
   my $db = shift;
   # add a toplevel code to the attrib_type table if it is not there already
 
-  my $sth = $db->prepare("SELECT attrib_type_id " .
+  my $sth = $db->dbc->prepare("SELECT attrib_type_id " .
                          "FROM attrib_type " .
                          "WHERE code = 'toplevel'");
 
@@ -161,7 +161,7 @@ sub add_attrib_code {
   $sth->finish();
 
 
-  $sth = $db->prepare("INSERT INTO attrib_type " .
+  $sth = $db->dbc->prepare("INSERT INTO attrib_type " .
                     "SET code = 'toplevel', " .
                     "name = 'Top Level', " .
                     "description = 'Top Level Non-Redundant Sequence Region'");
