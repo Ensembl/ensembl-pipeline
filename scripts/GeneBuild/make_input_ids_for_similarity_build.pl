@@ -86,8 +86,8 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
 
 use strict;
 use Getopt::Long;
-
-my ( $write, $help, $verbose, $max_slice_size, $logic_name, $slice_name_file );
+use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
+my ( $write, $help, $verbose, $max_slice_size, $logic_name, $slice_name_file ,$number_of_prot_per_job);
 my $coord_system = 'toplevel';
 
 &GetOptions(
@@ -98,11 +98,17 @@ my $coord_system = 'toplevel';
              'verbose'           => \$verbose,
              'coord_system=s'    => \$coord_system,
              'slice_name_file:s' => \$slice_name_file,
+             'number_of_proteins_per_job:i' => \$number_of_prot_per_job , 
 );
 exec( 'perldoc', $0 ) if $help;
 
 die "Could must give a logic name with -logic_name\n" if not $logic_name;
 
+
+unless ( $number_of_prot_per_job ) { 
+  warning("you haven't used the\n\t-number_of_proteins_per_job - option\nto set the set the number of proteins per job - using default (20) ")  ;
+  $number_of_prot_per_job = 20 ; 
+}
 foreach my $arg ( $GB_DBNAME, $GB_DBHOST, $GB_DBUSER ) {
   if ( $arg eq '' ) {
     print STDERR "You need to set various parameters in GeneBuild config files\n"
@@ -300,9 +306,12 @@ sub get_iids_from_slice {
   return () if $num_seeds == 0;
 
   my @iids;
+
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
-  my $num_chunks = int( $num_seeds / 20 ) + 1;
+  #
+  
+  my $num_chunks = int( $num_seeds / $number_of_prot_per_job ) + 1;
   for ( my $x = 1 ; $x <= $num_chunks ; $x++ ) {
     
     # generate input id : $chr_name.1-$chr_length:$num_chunks:$x
