@@ -311,7 +311,7 @@ sub write_file{
       print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);   
     }
     print FH "description ".$a->description."\n" if($a->description);
-    print FH "display_name".$a->display_name."\n" if($a->display_name);
+    print FH "display_name".$a->display_label."\n" if($a->display_label);
     print FH "\n\n";
   }
   
