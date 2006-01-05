@@ -61,7 +61,11 @@ while(<FH>){
     my ($prefix,$suffix) = $tmp =~ /([a-zA-Z]*)([0-9]+)/;
     if($suffix){
       my $new_id = $suffix + $replace{$column};
-      $values[$column] = sprintf "%s%011d",$prefix,$new_id;
+      if ($prefix){
+        $values[$column] = sprintf "%s%011d",$prefix,$new_id;
+      }else{
+        $values[$column] = $new_id;
+      }
     }
   }
   print join("\t", @values), "\n";
