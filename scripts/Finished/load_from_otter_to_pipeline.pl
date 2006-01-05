@@ -33,8 +33,9 @@ here is an example commandline
     -p_port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
     -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
-    -set|chr the sequence set to load 
-    -help|h      displays this documentation with PERLDOC
+    -set|chr	the sequence set to load
+    -no_submit	Used to avoid the pipeline priming with the SubmitContig analysis 
+    -help|h		displays this documentation with PERLDOC
 
 =head1 CONTACT
 
@@ -48,9 +49,9 @@ use Getopt::Long;
 use Net::Netrc;
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBConnection;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::DBSQL::SequenceAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
 use Bio::EnsEMBL::Attribute;
@@ -70,6 +71,7 @@ my $opass = '';
 
 my $chromosome_cs_version = 'Otter';
 my @seq_sets;
+my $no_submit = 0;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -86,6 +88,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'o_pass:s'                 => \$opass,
 	'chromosome_cs_version:s' => \$chromosome_cs_version,
 	'chr|set=s'               => \@seq_sets,
+	'no_submit!'			  => \$no_submit,
 	'h|help!'                 => $usage
   )
   or $usage->();
@@ -153,7 +156,7 @@ my $otter_dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
 	-port   => $oport,
 	-pass   => $opass
 );
-my $pipe_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
 	-user   => $puser,
 	-dbname => $pname,
 	-host   => $phost,
@@ -249,10 +252,12 @@ my $seqset_info     = {};
 
 	my %asm_seq_reg_id;
 
-	my $attr_a  = $pipe_dba->get_AttributeAdaptor();
-	my $cs_a    = $pipe_dba->get_CoordSystemAdaptor();
-	my $slice_a = $pipe_dba->get_SliceAdaptor();
-	my $seq_a   = $pipe_dba->get_SequenceAdaptor();
+	my $attr_a		= $pipe_dba->get_AttributeAdaptor();
+	my $cs_a		= $pipe_dba->get_CoordSystemAdaptor();
+	my $slice_a		= $pipe_dba->get_SliceAdaptor();
+	my $seq_a		= $pipe_dba->get_SequenceAdaptor();
+	my $analysis_a	= $pipe_dba->get_AnalysisAdaptor;
+	my $state_info_container = $pipe_dba->get_StateInfoContainer;
 
 	my $chromosome_cs;
 	my $clone_cs;
@@ -271,6 +276,7 @@ my $seqset_info     = {};
 		);
 	}
 	my $slice;
+	my $ana = $analysis_a->fetch_by_logic_name('SubmitContig');
 
 # insert chromosome(s) in seq_region table and his attributes in seq_region_attrib & attrib_type tables
 	foreach my $name ( keys(%end_value) ) {
@@ -332,8 +338,9 @@ my $seqset_info     = {};
 		eval {
 			$clone  = $slice_a->fetch_by_region( 'clone', $acc_ver );
 			$seqlen = $clone->length;
+			$contig_name .= $seqlen;
 			$contig =
-			  $slice_a->fetch_by_region( 'contig', $contig_name . $seqlen );
+			  $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
 			warn "clone and contig <"
@@ -357,26 +364,21 @@ my $seqset_info     = {};
 			$contig_name .= $seqlen;
 
 			##make clone and insert clone to seq_region table
-			$slice = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
-			$clone_seq_reg_id = $slice_a->store($slice);
-			if ( !defined($clone_seq_reg_id) ) {
-				print
-"clone seq_region_id has not been returned for the accession $acc_ver";
-				exit;
-			}
+			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
+			$clone_seq_reg_id = $slice_a->store($clone);
+			throw(
+"clone seq_region_id has not been returned for the accession $acc_ver") unless $clone_seq_reg_id;
+			
 			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
-			$attr_a->store_on_Slice( $slice,
+			$attr_a->store_on_Slice( $clone,
 				&make_clone_attribute( $acc, $ver ) );
 
 			##make contig and insert contig, and associated dna sequence to seq_region & dna table
-			$slice =
+			$contig =
 			  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
-			$ctg_seq_reg_id = $slice_a->store( $slice, \$seq );
-			if ( !defined($ctg_seq_reg_id) ) {
-				print
-"contig seq_region_id has not been returned for the contig $contig_name";
-				exit;
-			}
+			$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
+			throw(
+"contig seq_region_id has not been returned for the contig $contig_name") unless $ctg_seq_reg_id;
 		}
 		##insert chromosome to contig assembly data into assembly table
 		$sth->execute( $asm_seq_reg_id{$sequence_set},
@@ -385,13 +387,17 @@ my $seqset_info     = {};
 		##insert clone to contig assembly data into assembly table
 		$sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
 			$seqlen, $ctg_ori );
+			
+		##prime the input_id_analysis table
+		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) unless($no_submit);
+		
 
 	}
 
 }
 
 #
-# Methods part
+# Methods 
 #
 sub make_clone_attribute {
 	my ( $acc, $ver ) = @_;
