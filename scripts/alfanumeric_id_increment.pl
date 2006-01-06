@@ -32,13 +32,14 @@ my $outfile;
             'file=s'           => \$file,
 	    'number_column:s' => \$numbers,
 	    'backup!'          => \$backup,
-            'outfile=s'        => \$outfile,
 	  ) or die("couldn't get opts");
 
 
 if($backup){
   system("cp ".$file." ".$file.".bak");
 }
+
+$outfile = $file.".tmp";
 
 open(FH, $file) or die "couldn't open $file";
 open(OUT, ">>$outfile");
