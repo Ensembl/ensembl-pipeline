@@ -46,6 +46,7 @@ use vars qw(%Config);
       resource   => 'select[linux && mem>2000] rusage[mem=2000]',
 			#'model=IBMBC2800',
                      	# or 'select[mem>2000] rusage[mem=2000]'
+						#to limit mysql 'select[linux && myia64g<800] rusage[myia64g=10:duration=20:decay=1]
       retries    => 1,
       sub_args   => '',
       runner     => '',
@@ -100,12 +101,13 @@ use vars qw(%Config);
                                         -pass   => '<WB_DBPASS>',
                                        },
                COVERAGE_BY_ALIGNED => 1,               
-               FILTER              => { OBJECT     => 'Bio::EnsEMBL::Analysis::Tools::ExonerateTranscriptFilter',
+               FILTER              => { OBJECT     => 'Bio::EnsEMBL::Analysis::Tools::CdnaUpdateTranscriptFilter',
                                         PARAMETERS => {
                                                            -coverage => 90,
-                                                           -percent_id => 95,
+                                                           -percent_id => 97,
                                                            -best_in_genome => 1,
                                                            -reject_processed_pseudos => 1,
+														   -verbosity => 0,
                                                       },
                                        },
                OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14",
