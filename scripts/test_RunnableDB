@@ -144,8 +144,12 @@ if($write){
     $sth->execute($input_id, $analysis->input_id_type, $analysis->dbID);
   }
 }
-
-print "There is ".$runobj->output." features output\n\n";
+my @output = $runobj->output;
+if(ref($output[0]) eq 'ARRAY'){
+  my $temp = $output[0];
+  @output = @$temp;
+}
+print "There is ".@output." features output\n\n";
 
 #$verbose = 1;
 if($verbose){
