@@ -82,6 +82,7 @@ while(<DATA>){
 		}elsif (($a_count < $t_count) && ($t_count > 4)){ #call the subroutine to trim the polyT head:
 			
 			$clipped_seq = clip_polya($seq, "head");
+
 		
 		}else{
 			if ($a_count > 4){ #only do for ones which appear to have a head/tail:
@@ -104,24 +105,30 @@ while(<DATA>){
 				}else{ #still can't tell, leave as original seq
 					$clipped_seq = $seq;
 				}
+			}else{
+				#not going to be clipped
+				$clipped_seq = $seq;
 			}
 		}
 	}
-	#else{
-	#	print "$seq too short to prune\n";
-	#}
-		
-	if (!defined $clipped_seq){
+	else{
+		#too short to clip
 		$clipped_seq = $seq;
 	}
-	
-	eval{
-		$cdna->seq($clipped_seq);
- 		$cdna->display_id($name);
-   		$cdna->desc("");
- 	};
-	$seqout->write_seq($cdna);
-	#print "$name: $seq\n$name: $clipped_seq\n\n";
+		
+	if (defined $clipped_seq){
+
+		eval{
+			$cdna->seq($clipped_seq);
+ 			$cdna->display_id($name);
+   			$cdna->desc("");
+ 		};
+		$seqout->write_seq($cdna);
+		#print "$name: $seq\n$name: $clipped_seq\n\n";
+	}else{
+		#the entire sequence seems to be polyA/T tail/head
+		print "WARNING sequence $name has been removed\n";
+	}
 
 }
 close DATA;
@@ -155,7 +162,6 @@ sub clip_polya{
 	
 	if($a_count > 4){
 		#looking only for polyA tail - use moving window looking for strings of 2/3 As:
-	
 		#moving through seq starting from end - allow for buffer region:
 		for (my $i = ($length - 1); $i > ($length - $buffer); $i--){
 
