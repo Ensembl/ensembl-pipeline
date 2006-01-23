@@ -112,7 +112,6 @@ while(<DATA>){
 		}
 	}
 	else{
-		#too short to clip
 		$clipped_seq = $seq;
 	}
 		
@@ -164,21 +163,18 @@ sub clip_polya{
 		#looking only for polyA tail - use moving window looking for strings of 2/3 As:
 		#moving through seq starting from end - allow for buffer region:
 		for (my $i = ($length - 1); $i > ($length - $buffer); $i--){
-
 			my $match = 0;
 			for (my $j = $i; $j > ($i - $window_size); $j--){ #check a window 
 				if ($seq[$j] eq 'A'){ 
 					$match++;
 				}
 			}
-
 			if ($match > 1){ #if (2+)/3 = A - looks like a polyA tail 	
 				
 				#in a polyA region - want to see how far this extends:
 				my $pos = $i;
-				
+
 				while($pos > ($window_size - 1)){
-					
 					#move the window one position:
 					if (ord($seq[$pos]) == 65){ #65 = decimal for 'A'
 						$match--;
@@ -192,7 +188,6 @@ sub clip_polya{
 						
 						#find length of polyA region: polya_len = (seq length - non-tail length - post-tail buffer length)
 						my $polya_len = $length - ($pos - ($window_size - 1)) - ($length  - ($i + 1)); 
-						
 						#test to see if polyA string > post polyA region:
 						if ($polya_len > ($length - $i)){ 
 						
@@ -218,6 +213,12 @@ sub clip_polya{
 					}
 					$pos--;						
 				}
+				
+				if ($match > 1){
+					#then the while loop was finished whilst still on a polyA-tail
+					$clipped_seq = undef;
+				}
+
 				last; #move onto a new sequence
 			}
 		}
@@ -280,6 +281,11 @@ sub clip_polya{
 						$pos = $length; #break out of while loop
 					}
 					$pos++;						
+				}
+				
+				if ($match > 1){
+					#then the while loop was finished whilst still on a polyA-tail
+					$clipped_seq = undef;
 				}
 				last; #move onto a new sequence
 			}
