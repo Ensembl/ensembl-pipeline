@@ -242,14 +242,14 @@ for (my $i=2; $i <= $#genbank; $i++){
     $transcript->translation($translation);
     $analysis = $ensembl_analysis;
     $type = $MIT_GENE_TYPE;
-  }
-
+   }
+  $transcript->biotype($type);
   #############
   # Make  genes
 
   my $gene = new Bio::EnsEMBL::Gene;
   eval {
-  $gene->type($type);
+  $gene->biotype($type);
   $gene->analysis($analysis);
   $gene->status($status);
   $gene->description($desc);

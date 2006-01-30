@@ -46,7 +46,7 @@ use vars qw( %MitConf );
 	    # Trematode Mitochondrial (21)
 	    MIT_CODON_TABLE  =>  '2',
 	    # Types
-	    MIT_GENE_TYPE => 'ensembl',
+	    MIT_GENE_TYPE => 'protein_coding',
 	    MIT_TRNA_TYPE => 'Mt-tRNA',
 	    MIT_RRNA_TYPE => 'Mt-rRNA',
 	   );
