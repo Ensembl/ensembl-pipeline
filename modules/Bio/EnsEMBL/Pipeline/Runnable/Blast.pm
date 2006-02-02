@@ -321,8 +321,8 @@ sub run_analysis {
           # print STDERR "$_";
           if(/FATAL:(.+)/){
             my $match = $1;
-	    # clean up before dying
-	    $self->delete_files;
+            # clean up before dying
+            $self->deletefiles;
             if($match =~ /There are no valid contexts in the requested search/){
               # $self->input_is_void(1); # not available to runnable only to runnabledb
               die qq{"VOID"\n}; # hack instead
