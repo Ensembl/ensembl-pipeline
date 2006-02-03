@@ -89,7 +89,11 @@ sub run{
         $estOutput->write_seq($estseq);
     }
 
-    my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
+    # est2genome is in /usr/local/bin on Debian deskpros, so changed line in
+    # order that PATH environment variable takes effect instead of BIN_DIR
+    my $est_genome_command = "est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
+
+    #my $est_genome_command = $BIN_DIR . "/est2genome -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
 #    my $est_genome_command = $self->est_genome . " -reverse -genome $genfile -est $estfile -space 500000 -out stdout 2>&1 |";
 #/nfs/disk100/pubseq/emboss/bin/
         # use -align to get alignment
