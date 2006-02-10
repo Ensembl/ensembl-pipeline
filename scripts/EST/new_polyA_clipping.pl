@@ -41,7 +41,7 @@ while(<DATA>){
 	s/>//g;
 	
 	my ($name, $seq);
-	$clipped_seq = undef;
+	$clipped_seq = "";
 	
 	if ($_=~/^([\w\.]+)\s+([\w\s]+)/m){
 		$name = $1;
@@ -127,6 +127,7 @@ while(<DATA>){
 	}else{
 		#the entire sequence seems to be polyA/T tail/head
 		print "WARNING sequence $name has been removed\n";
+		print "$seq\n";
 	}
 
 }
