@@ -152,9 +152,17 @@ sub fetch_input{
   my $cdna_vc= $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
   $self->cdna_vc($cdna_vc);
   
-  # get cdnas 
-  my @cdna = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
-  print STDERR "got " . scalar(@cdna) . " cdnas ($GB_cDNA_GENETYPE)\n";
+  # get cdnas
+  my @cdna ; 
+  if (ref ($GB_cDNA_GENETYPE)=~m/ARRAY/){
+    for my $bt (@$GB_cDNA_GENETYPE){ 
+      push @cdna, @{$self->cdna_vc->get_all_Genes_by_type($bt)}; 
+      print STDERR "got " . scalar(@cdna) . " cdnas ($bt)\n";
+    }
+  }else {
+   @cdna = @{$self->cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
+   print STDERR "got " . scalar(@cdna) . " cdnas ($GB_cDNA_GENETYPE)\n";
+  }
   
   # filter cdnas
   my $newcdna = $self->_filter_cdnas(\@cdna);
