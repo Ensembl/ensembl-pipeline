@@ -53,6 +53,7 @@ use vars qw( %Combined );
 	     GB_BLESSED_COMBINED_GENETYPE           => 'BlessedUTR',
 
 	     # gene type for genes built from cDNAs with exonerate & est2genome
+             # you may pass one single value as well as an arrayref ['type_1','type_2'] , 
 	     GB_cDNA_GENETYPE               => 'exonerate_e2g',
 	     
 	     # don't allow introns longer than this - transcripts are split
