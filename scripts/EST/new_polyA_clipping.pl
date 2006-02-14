@@ -27,7 +27,6 @@ my $cdna = new Bio::Seq;
 
 my $buffer = 10; #length of region allowed to mismatch at ends of sequence
 my $window_size = 3; 
-my $clipped_seq = "";
 
 my $end_region = $buffer + $window_size;
 
@@ -41,7 +40,7 @@ while(<DATA>){
 	s/>//g;
 	
 	my ($name, $seq);
-	$clipped_seq = "";
+	my $clipped_seq = "";
 	
 	if ($_=~/^([\w\.]+)\s+([\w\s]+)/m){
 		$name = $1;
@@ -76,11 +75,9 @@ while(<DATA>){
 		my $clip_end = "";
 
 		if (($a_count > $t_count) && ($a_count > 4)){ #call the subroutine to trim the polyA tail:
-			
 			$clipped_seq = clip_polya($seq, "tail");
-	
+
 		}elsif (($a_count < $t_count) && ($t_count > 4)){ #call the subroutine to trim the polyT head:
-			
 			$clipped_seq = clip_polya($seq, "head");
 
 		
@@ -88,14 +85,8 @@ while(<DATA>){
 			if ($a_count > 4){ #only do for ones which appear to have a head/tail:
 				#tied - not sure which to do -try both and choose afterwards
 				my $clipped_head = clip_polya($seq, "head");
-				if (!defined $clipped_head){
-					$clipped_head = $seq;
-				}
 			
 				my $clipped_tail = clip_polya($seq, "tail");
-				if (!defined $clipped_tail){
-					$clipped_tail = $seq;
-				}
 						
 				#choose one which clipped the most:
 				if (length $clipped_head < length $clipped_tail){
@@ -105,6 +96,7 @@ while(<DATA>){
 				}else{ #still can't tell, leave as original seq
 					$clipped_seq = $seq;
 				}
+			
 			}else{
 				#not going to be clipped
 				$clipped_seq = $seq;
@@ -116,7 +108,6 @@ while(<DATA>){
 	}
 		
 	if (defined $clipped_seq){
-
 		eval{
 			$cdna->seq($clipped_seq);
  			$cdna->display_id($name);
@@ -143,6 +134,7 @@ sub clip_polya{
 	my $a_count = 0;
 	my $t_count = 0;
 	
+	my $clipped_seq = $seq;
 	
 	if ($end eq "tail"){
 		my $tail = substr($seq, -$end_region); 
@@ -186,12 +178,10 @@ sub clip_polya{
 					
 					if ($match < 2){ 
 						#at end of the polyA region:
-						
 						#find length of polyA region: polya_len = (seq length - non-tail length - post-tail buffer length)
 						my $polya_len = $length - ($pos - ($window_size - 1)) - ($length  - ($i + 1)); 
 						#test to see if polyA string > post polyA region:
 						if ($polya_len > ($length - $i)){ 
-						
 							#we now want to clip end of sequence
 							#identify last non-A in this window:
 							my $len;
