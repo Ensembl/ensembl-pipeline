@@ -501,7 +501,7 @@ sub run_module {
   }
 
   my $runnable_db_path = $BATCH_QUEUES{$hash_key}{runnabledb_path};
-
+  my $verbosity =  $BATCH_QUEUES{$hash_key}{verbosity};
   if(!$runnable_db_path){
     $runnable_db_path = $DEFAULT_RUNNABLEDB_PATH;
   }
@@ -527,7 +527,9 @@ sub run_module {
       $perl_path =~ s/\//::/g;
       $rdb = $perl_path->new( -analysis => $self->analysis,
                               -input_id => $self->input_id,
-                              -db => $self->adaptor->db );
+                              -db => $self->adaptor->db
+                              -verbosity => $verbosity
+                            );
     };
     
     if ($err = $@) {
@@ -946,6 +948,7 @@ sub set_up_queues {
     $q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
     $q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
     $q{$ln}{runner}          ||= $DEFAULT_RUNNER;
+    $q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
   }
 
   # a default queue for everything else
@@ -961,7 +964,7 @@ sub set_up_queues {
   $q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
   $q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
   $q{default}{runner}          ||= $DEFAULT_RUNNER;
-  
+  $q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
   return %q;
 }
 
