@@ -527,7 +527,7 @@ sub run_module {
       $perl_path =~ s/\//::/g;
       $rdb = $perl_path->new( -analysis => $self->analysis,
                               -input_id => $self->input_id,
-                              -db => $self->adaptor->db
+                              -db => $self->adaptor->db,
                               -verbosity => $verbosity
                             );
     };
