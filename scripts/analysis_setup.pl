@@ -169,13 +169,13 @@ if($pipeline){
 
 if($read){
   my @analyses = @{&parse_files($file)};
-  &write_into_db($db, \@analyses);
+  &write_into_db($db, \@analyses, $update);
 }
 
 if($write){
   my $analyses = &read_db($db);
   $analyses = [sort {$a->dbID <=> $b->dbID} @$analyses];
-  &write_file($file, $analyses, $update);
+  &write_file($file, $analyses);
 }
 
 

@@ -240,6 +240,8 @@ sub write_into_db{
           }
         }
       }
+      $a->dbID($analysis_id);
+      $a->adaptor($analysis_adaptor);
       $analysis_adaptor->update($a) if($update);
       next ANALYSIS;
     }else{
