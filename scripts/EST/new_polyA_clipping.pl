@@ -38,11 +38,25 @@ while(<DATA>){
 	#have a sequence:
 	
 	s/>//g;
-	
+
 	my ($name, $seq);
 	my $clipped_seq = "";
 	
-	if ($_=~/^([\w\.]+)\s+([\w\s]+)/m){
+	my $entry = $_;
+	$entry =~ s/\>//g;
+
+    #just want the id on the first line:
+	if($entry =~ m/^gi.+ref\|(N[MR]_.+)\|/){
+		my $id = $1;
+		$entry =~ s/^gi.+\n{1}?/$id\n/g;
+	}
+	else{
+		$entry =~ s/^[\w\d]+\s([\w\.\d]+)\s.+\n{1}?/$1\n/;
+	}
+
+
+	if ($entry=~/^([\w\.]+)\s+([\w\s]+)/m){
+	
 		$name = $1;
 		my $tmp = $2;
 		($seq = $tmp)=~s/\s//g; 
@@ -108,6 +122,7 @@ while(<DATA>){
 	}
 		
 	if (defined $clipped_seq){
+		
 		eval{
 			$cdna->seq($clipped_seq);
  			$cdna->display_id($name);
