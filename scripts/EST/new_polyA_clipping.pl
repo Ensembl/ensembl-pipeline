@@ -50,13 +50,23 @@ while(<DATA>){
 		my $id = $1;
 		$entry =~ s/^gi.+\n{1}?/$id\n/g;
 	}
-	else{
+	elsif($entry =~ m/^[\w\d]+\s([\w\.\d]+)\s.+\n{1}?/){
 		$entry =~ s/^[\w\d]+\s([\w\.\d]+)\s.+\n{1}?/$1\n/;
+	}
+	elsif ($entry =~m/^[\w\.\d]+\s.+\n{1}?/){
+	    #already in correct format - do nothing 
+	}    
+	
+	else{
+		print "\nCannot extract the input id from: \n$entry\n";
+		print "exiting...\nTry making your file so that the first line of each entry\n".
+		       "only contains the id, eg: \n>BC000830.1\n";
+	    exit;
+		
 	}
 
 
 	if ($entry=~/^([\w\.]+)\s+([\w\s]+)/m){
-	
 		$name = $1;
 		my $tmp = $2;
 		($seq = $tmp)=~s/\s//g; 
