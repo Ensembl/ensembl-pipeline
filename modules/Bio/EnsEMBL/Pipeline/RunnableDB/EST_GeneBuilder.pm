@@ -595,18 +595,24 @@ sub _check_Transcripts {
     my @exons = sort { $a->start <=> $b->end } @{$transcript->get_all_Exons};
     my $exon_count = 0;
     my $previous_exon;
-    
+	
+ 
     ############################################################
     # for single exon ests, take only those that are >= 200bp and have coverage >= 95%
     if ( scalar(@exons) == 1 ){
       my $size =  $exons[0]->end - $exons[0]->start + 1;      
-      if ( $FILTER_ON_SINGLETON_SIZE && ( $size < $FILTER_ON_SINGLETON_SIZE )){
+	  if ( $FILTER_ON_SINGLETON_SIZE && ( $size < $FILTER_ON_SINGLETON_SIZE )){
         print STDERR "Failed FILTER_ON_SINGLETON_SIZE check ( $size < $FILTER_ON_SINGLETON_SIZE ) \n";
         next TRANSCRIPT;
       }
       if ( $RAISE_SINGLETON_COVERAGE ){
 	      my @evidence = @{$exons[0]->get_all_supporting_features};
-	      my $coverage = $evidence[0]->score;
+		  if (scalar(@evidence) == 0){
+		        print STDERR "SingleExonEST-check failed:  There are no supporting features for exon ".$exons[0]->dbID."\n";
+				next TRANSCRIPT;
+		  }		
+				
+		  my $coverage = $evidence[0]->score;
 	      if ( $coverage < $RAISE_SINGLETON_COVERAGE ){
                 print STDERR "SingleExonEST-check failed:  RAISE_SINGLETON_COVERAGE too low (coverage $coverage < $RAISE_SINGLETON_COVERAGE)\n";
                 next TRANSCRIPT;
@@ -621,7 +627,11 @@ sub _check_Transcripts {
       my $hend;
       # get the supporting_evidence for each exon
       my @sf = sort { $a->hstart <=> $b->hstart } @{$exon->get_all_supporting_features};
-      
+      if (scalar(@sf) == 0){
+		    print STDERR "Exon-check failed:  There are no supporting features for exon ".$exon->dbID."\n";
+			next TRANSCRIPT;
+	  }	
+
       ############################################################
       # reject transcripts with too-small exons:
       ############################################################
