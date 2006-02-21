@@ -11,8 +11,9 @@ Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise
 
 =head1 SYNOPSIS
 
-    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new(-genomic  => $genseq,
-																																	-features => $features)
+    my $obj = Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise->new(
+      -genomic  => $genseq,
+      -features => $features)
 
     $obj->run
 
@@ -54,7 +55,8 @@ sub new {
            
     $self->{'_features'} = [];
     
-    my( $genomic, $protein, $features,$endbias, $gap, $extension, $matrix, $minimum_intron, $terminal_padding, $exon_padding)
+    my( $genomic, $protein, $features,$endbias, $gap, $extension, $matrix, 
+        $minimum_intron, $terminal_padding, $exon_padding, $max_iterate_dist)
       = $self->_rearrange([qw(GENOMIC
 			      PROTEIN
 			      FEATURES
@@ -65,9 +67,9 @@ sub new {
 			      MINIMUM_INTRON
 			      TERMINAL_PADDING
 			      EXON_PADDING
+                              MAX_SPLIT_ITERATE_DIST
 			     )],
 			  @args);
-    
     
     $self->throw("No genomic sequence input")                     unless defined($genomic);
     $self->throw("No protein sequence input")                     unless defined($protein);
@@ -75,24 +77,28 @@ sub new {
     
     $self->throw("[$genomic] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
     $self->throw("[$protein] is not a Bio::PrimarySeqI")          unless $genomic->isa("Bio::PrimarySeqI");
+
+    $max_iterate_dist = 0 if not defined $max_iterate_dist;
     
     $self->genomic_sequence($genomic)             if defined($genomic);
     $self->protein_sequence($protein)             if defined($protein);
     $self->endbias($endbias)                      if defined($endbias);
-    $self->gap($gap)                          if defined($gap);
-    $self->extension($extension)                    if defined($extension);
-    $self->matrix($matrix)                       if defined($matrix);
+    $self->gap($gap)                              if defined($gap);
+    $self->extension($extension)                  if defined($extension);
+    $self->matrix($matrix)                        if defined($matrix);
     $self->features($features)                    if defined($features);
     $self->_minimum_intron($minimum_intron)       if defined($minimum_intron); 
     $self->_exon_padding($exon_padding)           if defined($exon_padding);
-    $self->_terminal_padding($terminal_padding)   if defined($terminal_padding);
+    $self->_terminal_padding($terminal_padding)     if defined($terminal_padding);
+    $self->_max_split_iterate_distance($max_iterate_dist);
+
     return $self;
   }
 
 
 
 sub make_MiniSeq {
-    my ($self) = @_;
+    my ($self, @features) = @_;
 
     my $pairaln  = new Bio::EnsEMBL::Analysis::PairAlign;
     
@@ -101,18 +107,16 @@ sub make_MiniSeq {
     my $prevend     = 0;
     my $count       = 0;
     my $mingap      = $self->_minimum_intron;
-    my @features    = @{$self->features};
     my $seqname     = $features[0]->seqname;
 
     @features = sort {$a->start <=> $b->start} @features;
     
   FEAT: foreach my $f (@features) {
-      #print STDERR "feature ".$f->start." ".$f->end."\n";
       my $start = $f->start - $self->_exon_padding;
       my $end   = $f->end   + $self->_exon_padding;
 
       if ($start < 1) { 
-				$start = 1;
+        $start = 1;
       }
       
       if ($end   > $self->genomic_sequence->length) {
@@ -137,11 +141,11 @@ sub make_MiniSeq {
 	
 	my $newfeature = new Bio::EnsEMBL::Feature;
 	
-        $newfeature->seqname   ($f->hseqname);
+        $newfeature->seqname   ($f->seqname);
         $newfeature->start     ($start);
-	$newfeature->end       ($end);
-	$newfeature->strand    (1);
-	$newfeature->slice($self->genomic_sequence);
+        $newfeature->end       ($end);
+        $newfeature->strand    (1);
+        $newfeature->slice($self->genomic_sequence);
 	
 	push(@genomic_features,$newfeature);
 	
@@ -214,79 +218,132 @@ sub make_MiniSeq {
 sub run {
   my ($self) = @_;
 
-  my $miniseq = $self->make_MiniSeq;
-  my $minigen = $miniseq->get_cDNA_sequence;
 
-  my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice    => $self->genomic_sequence,
-							    -genomic  => $minigen,
-							    -protein  => $self->protein_sequence,
-							    -reverse  => $self->_is_reversed,
-							    -gap      => $self->gap,
-							    -extension=> $self->extension,
-							    -matrix   => $self->matrix,
-							    -endbias  => $self->endbias);
+  my @features = @{$self->features};
+  my ($miniseq, $minigen, @gw_output, $must_try_again);
 
-  eval{
-    $gw->run;
-  };
 
-  # if this failed, no point in going on!
-  if($@){
-    $self->warn("Genewise run failed - getting out of here\n");
-    return;
-  }
+  do {
+    $must_try_again = 0;
 
-  # output is an array of genes in miniseq coordinates
-  my @f = $gw->output;
-  my $strand = 1;
+    $miniseq = $self->make_MiniSeq(@features);
+    $minigen = $miniseq->get_cDNA_sequence;
 
-  if ($self->_is_reversed == 1) {
-    $strand = -1;
-  }
+    my $gw = new Bio::EnsEMBL::Pipeline::Runnable::Genewise(  -slice    => $self->genomic_sequence,
+                                                              -genomic  => $minigen,
+                                                              -protein  => $self->protein_sequence,
+                                                              -reverse  => $self->_is_reversed,
+                                                              -gap      => $self->gap,
+                                                              -extension=> $self->extension,
+                                                              -matrix   => $self->matrix,
+                                                              -endbias  => $self->endbias);
+    
+    eval{
+      $gw->run;
+    };
 
-  my $ec = 0;
+    # if this failed, no point in going on!
+    if($@){
+      $self->warn("Genewise run failed - getting out of here\n");
+      return;
+    }
 
- FEAT:
-  foreach my $gene (@f) {
+    # output is an array of genes in miniseq coordinates
+    @gw_output = $gw->output;
+
+    if ($self->_max_split_iterate_distance) {
+      # check that we have no split feature
+      my (@bridge_features);
+      
+      foreach my $g (@gw_output) {
+        foreach my $e (@{$g->get_all_Exons}) {        
+          my @pieces = $miniseq->convert_SeqFeature($e);
+          
+          if (@pieces > 1) {
+            
+            @pieces = sort {$a->start <=> $b->start} @pieces;
+            
+            my $can_merge = 1;
+            for(my $i=1; $i < @pieces; $i++) {
+              my $dist = $pieces[$i]->start - $pieces[$i-1]->end - 1;
+              if ($dist > $self->_max_split_iterate_distance) {
+                $can_merge = 0;
+                last;
+              }
+            }
+            
+            if ($can_merge) {
+              push @bridge_features, Bio::EnsEMBL::Feature->
+                  new(-start => $pieces[0]->start,
+                      -end   => $pieces[-1]->end);
+            }                                                            
+          }
+        }
+      }
+      
+      if (@bridge_features) {
+        push @features, @bridge_features;
+        $must_try_again = 1;
+        print STDERR ("Warning : gene has feature that splits when mapped; trying again\n");
+      }
+    }
+
+  } while ($must_try_again);
+
+  my $strand = $self->_is_reversed ? -1 : 1;
+  
+  GENE:
+  foreach my $gene (@gw_output) {
     my $converted_gene = new Bio::EnsEMBL::Gene;
     $converted_gene->type($gene->type);
-
+    
     foreach my $transcript(@{$gene->get_all_Transcripts}){
       my @converted_exons;
       my @all_supp_features;
-
+        
       # need to convert all the exons and all the supporting features
-     
-      foreach my $exon(@{$transcript->get_all_Exons}){
-	$ec++;
-	$exon->strand($strand);
+      my @exons = @{$transcript->get_all_Exons};
+      my $nexon = scalar(@exons);
 
-	# need to convert whole exon back to genomic coordinates
-	my @genomics = $miniseq->convert_SeqFeature($exon);
-
-
-	if(!@genomics){
-	  print STDERR "Don't have anything returned by MiniSeq\n";
-	  next FEAT;
-	}
-	if ($#genomics > 0) {
-	  # all hell will break loose as the sub alignments will probably not map cheerfully
-	  # and we may start introducing in frame stops ...
-	  # for now, ignore this feature.
-	  print STDERR ("Warning : feature converts into > 1 features " . scalar(@genomics) . " Ignoring exon $ec\n");
-	  next FEAT;
-	}  else {
-	  my $genomic_exon = new Bio::EnsEMBL::Exon;
-	  $genomic_exon->start    ($genomics[0]->start);
-	  $genomic_exon->end      ($genomics[0]->end);
-	  $genomic_exon->strand   ($strand);
-	  $genomic_exon->seqname  ($self->genomic_sequence->seq_region_name);
-	  $genomic_exon->phase    ($exon->phase);
-	  $genomic_exon->end_phase($exon->end_phase);
-	  $genomic_exon->slice    ($self->genomic_sequence);
-	
-	  # also need to convert each of the sub alignments back to genomic coordinates
-	  foreach my $sf (@{$exon->get_all_supporting_features}) {
+      TEXON:
+      for(my $i=0; $i < $nexon; $i++) {
+        my $exon = $exons[$i];
+        $exon->strand($strand);
+        
+        # need to convert whole exon back to genomic coordinates
+        my @genomics = $miniseq->convert_SeqFeature($exon);
+                
+        if(!@genomics){
+          print STDERR "Don't have anything returned by MiniSeq\n";
+          next GENE;
+        }
+        if ($#genomics > 0) {
+          # all hell will break loose as the sub alignments will probably not map cheerfully
+          # and we may start introducing in frame stops ...
+          # for now, ignore this feature.
+          print STDERR ("Warning : feature converts into " . scalar(@genomics), " features; ");
+          if ($i == $nexon - 1) {
+            print STDERR "Skipping last exon $i\n";
+            next TEXON;
+          } elsif ($exon->phase == $exons[$i+1]->phase) {
+            print STDERR "Skipping compatible exon $i\n";
+            next TEXON;
+          } else {
+            print STDERR "Cannot skip exon without adjusting phase; skipping gene\n";
+            next GENE;
+          }
+        }  else {
+          my $genomic_exon = new Bio::EnsEMBL::Exon;
+          $genomic_exon->start    ($genomics[0]->start);
+          $genomic_exon->end      ($genomics[0]->end);
+          $genomic_exon->strand   ($strand);
+          $genomic_exon->seqname  ($self->genomic_sequence->seq_region_name);
+          $genomic_exon->phase    ($exon->phase);
+          $genomic_exon->end_phase($exon->end_phase);
+          $genomic_exon->slice    ($self->genomic_sequence);
+          
+          # also need to convert each of the sub alignments back to genomic coordinates
+          foreach my $sf (@{$exon->get_all_supporting_features}) {
             my @features;
             my @ungapped = $sf->ungapped_features;
             foreach my $aln (@ungapped) {
@@ -294,7 +351,7 @@ sub run {
               if ($#alns > 0) {
                 print STDERR "Warning : sub_align feature converts into > 1 features " . scalar(@alns) . "\n";
               }
-          
+              
               my $align = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@alns);
               $align->seqname($self->genomic_sequence->seq_region_name);
               $align->hseqname($self->protein_sequence->id);
@@ -306,37 +363,37 @@ sub run {
             push @all_supp_features,@features;
             my $gapped = new Bio::EnsEMBL::DnaPepAlignFeature(-features => \@features);
             $genomic_exon->add_supporting_features($gapped);
-	  }
-	
-	  push(@converted_exons,$genomic_exon);
-	}
+          }
+          
+          push(@converted_exons,$genomic_exon);
+        }
       }
-
+      
       # make a new transcript from @converted_exons
       my $converted_transcript  = new Bio::EnsEMBL::Transcript;
       my $converted_translation = new Bio::EnsEMBL::Translation;
       $converted_transcript->translation($converted_translation);
-
+      
       if (scalar(@all_supp_features)) {
         my $daf = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@all_supp_features);
         $converted_transcript->add_supporting_features($daf);
       }
-
+      
       if ($#converted_exons < 0) {
-	print STDERR "Odd.  No exons found\n";
-	return undef;
-
+        print STDERR "Odd.  No exons found\n";
+        return undef;
+        
       } else {
-
-	if ($converted_exons[0]->strand == -1) {
-	  @converted_exons = sort {$b->start <=> $a->start} @converted_exons;
+        
+        if ($converted_exons[0]->strand == -1) {
+          @converted_exons = sort {$b->start <=> $a->start} @converted_exons;
 	} else {
 	  @converted_exons = sort {$a->start <=> $b->start} @converted_exons;
 	}
 	
 	$converted_translation->start_Exon($converted_exons[0]);
 	$converted_translation->end_Exon  ($converted_exons[$#converted_exons]);
-
+        
 	# phase is relative to the 5' end of the transcript (start translation)
 	if ($converted_exons[0]->phase == 0) {
 	  $converted_translation->start(1);
@@ -443,6 +500,19 @@ sub _terminal_padding {
   return $self->{'_terminal_padding'} || 20000;
   
 }
+
+
+sub _max_split_iterate_distance {
+  my ($self,$arg) = @_;
+  
+  if (defined($arg)) {
+    $self->{'_iterate'} = $arg;
+  }
+
+  return $self->{'_iterate'};
+  
+}
+
 
 
 =head2 genomic_sequence
