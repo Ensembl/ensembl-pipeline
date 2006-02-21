@@ -49,16 +49,16 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::KnownUTRs;
 use vars qw(@ISA);
 use strict;
 use Storable qw(dclone);
-# Object preamble - inheriets from Bio::EnsEMBL::Root
 
-
-use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Gene;
+use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::Runnable::Blat;
+use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
@@ -136,7 +136,7 @@ sub make_seqfetcher{
     $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
   }
   else{
-    $self->throw("can't make seqfetcher\n");
+    throw("can't make seqfetcher\n");
   }
 
   return $seqfetcher;
@@ -168,50 +168,26 @@ sub make_runnables{
   my $protein_fetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
   my $cdna_fetcher = $self->make_seqfetcher($GB_CDNA_INDEX, $GB_CDNA_SEQFETCHER);
 
+  $self->fetch_sequence([], $self->genewise_db);
+
   my $pipeline_db = $self->db;
-
-  # Connect to our output database
-
-  my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						       '-host'   => $GB_GW_DBHOST,
-						       '-user'   => $GB_GW_DBUSER,
-						       '-pass'   => $GB_GW_DBPASS,
-						       '-port'	 => $GB_GW_DBPORT,
-						       '-dbname' => $GB_GW_DBNAME,
-						       '-dnadb'  => $self->db,
-						      );
-
-  $self->genewise_db($genewise_db);
 
   # for checking cdna_ids
   my $pmfa = $pipeline_db->get_PmatchFeatureAdaptor();
 
-  # Parse the input id and derive our genomic slice.
-
-  my $input_id = $self->input_id;
-  my $msg = "input_id $input_id has invalid format - expecting chr_name.start-end";
-  $self->throw($msg) unless $input_id =~ /$GB_INPUTID_REGEX/;
-
-  my $chr_name = $1;
-  my $start    = $2;
-  my $end      = $3;
-
-  my $genomic = $genewise_db->get_SliceAdaptor->fetch_by_chr_start_end($chr_name, $start, $end);
-  $self->query($genomic);
-
-  # write genomic seq to tmp file
-  my $tmpfilename = "/tmp/KUTR.genomic.$$";
-  open( TARGET_SEQ,">$tmpfilename") || $self->throw("Could not open $tmpfilename $!");
-  my $seqout = Bio::SeqIO->new('-format' => 'Fasta',
-			       '-fh'     => \*TARGET_SEQ);
-  $seqout->write_seq($genomic);
-  close( TARGET_SEQ );
-  $self->tmpfile($tmpfilename);
-
   # get all targetted genes in the given slice, from which the evidence for 
   # these genes can be derived.
+  my $genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);  
+  my $ftg  = $self->query->get_all_Genes_by_type('FullTargettedGenewise');
+  my $te = $self->query->get_all_Genes_by_type('TargettedExonerate');
+  my $xtg = $self->query->get_all_Genes_by_type('XrateTargettedGenewise');
+
+  push(@$genes, @$ftg);
+  push(@$genes, @$te);
+  push(@$genes, @$xtg);
+
  GENE:
- foreach my $gene(@{$genomic->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE)}){
+ foreach my $gene(@$genes){
     my $protein_id;
   EXON:
     foreach my $exon(@{$gene->get_all_Exons}){
@@ -244,7 +220,7 @@ sub make_runnables{
     };
 
     if($@) {
-      $self->throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
+      throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
     }
 
     # If the cdna cant be retrieved try decrementing the version number 
@@ -252,7 +228,7 @@ sub make_runnables{
 
     unless ($cdna) {
 
-      $self->warn("Unable to fetch cDNA sequence [$cdna_id].  Will increment\n" .
+      warning("Unable to fetch cDNA sequence [$cdna_id].  Will decrement\n" .
 		  "the cDNA version number and have another go.");
 
       if ($cdna_id =~ s/([\_\w]+)\.(\d+)/$1/){
@@ -266,28 +242,29 @@ sub make_runnables{
       };
 
       if($@) {
-	$self->throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
+	throw("problem fetching cdna sequence for [$cdna_id], will not be able to build UTR\n[$@]\n");
       }
 
       if ($cdna) {
 	$self->targetted_cdna_pairs($gene, $cdna_id);
       } else {
-	$self->throw("Unable to fetch cDNA sequence [$cdna_id] even after incrementing the version number.");
+	throw("Unable to fetch cDNA sequence [$cdna_id] even after incrementing the version number.");
       }
 
     }
 
-    my @seqs = ($cdna);
+    my @cdna_seqs = ($cdna);
+    my @genomic_seqs = ($self->query);
+    # make ExonerateTranscript
+    my $r = Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript->new(
+                                                                     -analysis => $self->analysis,
+                                                                     -target_seqs => \@genomic_seqs,
+                                                                     -query_type => 'dna',
+                                                                     -query_seqs => \@cdna_seqs,
+                                                                     -options      => '--model est2genome --score 200',
+                                                                    );
 
-    # make blat runnable - can't use blat to genes as it wants to run on entire genome. Grrrrr.
-    my $blat_runnable = new Bio::EnsEMBL::Pipeline::Runnable::Blat(
-								   -database    => $tmpfilename,
-								   -query_seqs    => \@seqs,
-								   -query_type  => 'rna',
-								   -target_type => 'dna',
-								   -blat        => '/usr/local/ensembl/bin/blat',
-								  );
-    $self->runnables($blat_runnable);
+    $self->runnables($r);
   }
 }
 
@@ -311,46 +288,38 @@ sub run {
  RUNNABLE:
   foreach my $runnable($self->runnables){
 
-    my @cdna_seq = $runnable->query_seqs;
+    my @cdna_seq = @{$runnable->query_seqs};
     if(scalar(@cdna_seq) != 1){
-      $self->throw("Something is wrong - trying to run blat with [" . scalar(@cdna_seq) . "] sequences\n");
+      throw("Something is wrong - trying to run exonerate with [" . scalar(@cdna_seq) . "] sequences\n");
     }
+
     my $cdna_id = $cdna_seq[0]->accession_number;
 
     $runnable->run;
 
-    # make gene(s) from blat output
-    my @blat_genes = $self->make_blat_genes($runnable->output);
+    # make gene(s) from exonerate output
+    my @exonerate_transcripts = @{$runnable->output};
 
-    next RUNNABLE unless defined (@blat_genes);
+    next RUNNABLE unless scalar(@exonerate_transcripts);
 
-    print STDERR "got " . scalar(@blat_genes) . " genes from blat\n";
+    print STDERR "got " . scalar(@exonerate_transcripts) . " genes from exonerate\n";
 
-    if(scalar(@blat_genes) != 1){
-      $self->warn("Complex situation - got [". scalar(@blat_genes) . "] for $cdna_id - skipping over it\n");
+    # filter by score & coverage, & find best fit
+
+    if(scalar(@exonerate_transcripts) != 1){
+      warning("Complex situation - got [". scalar(@exonerate_transcripts) . "] for $cdna_id - skipping over it\n");
       next RUNNABLE;
     }
 
 
-    # check blat gene coords
-    foreach my $transcript(@{$blat_genes[0]->get_all_Transcripts}){
-      foreach my $exon(@{$transcript->get_all_Exons}){
-      }
-    }
-
     # which targetted gene do we need to add UTRs to?
     my $targetted_gene = $self->get_targetted_gene_from_cdna($cdna_id);
-
-    # check targetted gene coords
-    foreach my $transcript(@{$targetted_gene->get_all_Transcripts}){
-      foreach my $exon(@{$transcript->get_all_Exons}){
-      }
-    }
+    
     # combine blat & targetted genes
-    my $combined_transcript = $self->combine_genes($targetted_gene, $blat_genes[0]);
+    my $combined_transcript = $self->combine_transcripts($targetted_gene->get_all_Transcripts->[0], $exonerate_transcripts[0]);
 
     if ( $combined_transcript ){
-      $combined_transcript = $self->_transfer_evidence($combined_transcript, $blat_genes[0]);
+      $combined_transcript = $self->_transfer_evidence($combined_transcript, $exonerate_transcripts[0]);
       $self->make_gene($combined_transcript);
     }
     else{
@@ -358,10 +327,6 @@ sub run {
       next RUNNABLE;
     }
   }
-
-    # unlink tmp genomic file
-    my $tmpfile = $self->tmpfile;
-    unlink $tmpfile;
 
   # remap to raw contig coords
   my @remapped = $self->remap_genes();
@@ -413,9 +378,6 @@ sub runnables{
   }
 
   if (defined($runnable) ){
-    unless( $runnable->isa("Bio::EnsEMBL::Pipeline::RunnableI") ){
-      $self->throw("$runnable is not a Bio::EnsEMBL::Pipeline::RunnableI");
-    }
     push( @{$self->{'_runnables'}}, $runnable);
   }
 
@@ -470,11 +432,11 @@ sub write_output {
 sub targetted_cdna_pairs {
   my ($self, $gene, $cdna) = @_;
   unless (defined $gene && defined $cdna){
-    $self->throw("Missing arguments to targetted_cdna_pairs: [$gene], [$cdna]\n");
+    throw("Missing arguments to targetted_cdna_pairs: [$gene], [$cdna]\n");
   }
 
   unless ($gene->isa("Bio::EnsEMBL::Gene")){
-    $self->throw("$gene is not a Bio:EnsEMBL::Gene\n");
+    throw("$gene is not a Bio:EnsEMBL::Gene\n");
   }
   $self->{_targetted_cdnas}{$cdna} = $gene;
 }
@@ -498,7 +460,7 @@ sub get_targetted_gene_from_cdna{
   foreach my $entry(keys %{$self->{_targetted_cdnas}}){
     if ($entry eq $cdna){
       if (defined $gene){
-	$self->throw("More than one gene for $cdna - skip for now\n");
+	throw("More than one gene for $cdna - skip for now\n");
       }
       $gene = $self->{_targetted_cdnas}{$entry};
       # losing the db in the hashing for some reason ...
@@ -506,23 +468,20 @@ sub get_targetted_gene_from_cdna{
     }
   }
 
-  $self->throw("Unable to find Targetted Gene from cDNA") 
+  throw("Unable to find Targetted Gene from cDNA") 
     unless $gene;
 
   return $gene;
 }
 
-sub combine_genes{
-  my ($self, $genewise_gene, $cdna_gene) = @_;
+sub combine_transcripts{
+  my ($self, $genewise_transcript, $cdna_transcript) = @_;
 
   my $modified_peptide = 0;
   my @combined_transcripts  = ();
 
-  # should be only 1 transcript
-  my @gw_tran  = @{$genewise_gene->get_all_Transcripts};
-  my @gw_exons = @{$gw_tran[0]->get_all_Exons}; # ordered array of exons
-  my @cdna_tran = @{$cdna_gene->get_all_Transcripts};
-  my @cdna_exons  = @{$cdna_tran[0]->get_all_Exons}; # ordered array of exons
+  my @gw_exons = @{$genewise_transcript->get_all_Exons}; # ordered array of exons
+  my @cdna_exons  = @{$cdna_transcript->get_all_Exons}; # ordered array of exons
 
   # OK, let's see if we need a new gene
   # base it on the existing genewise one
@@ -532,10 +491,10 @@ sub combine_genes{
   }
 
   my $translation   = new Bio::EnsEMBL::Translation;
-  $translation->start($gw_tran[0]->translation->start);
-  $translation->end($gw_tran[0]->translation->end);
-  $translation->start_Exon($gw_tran[0]->translation->start_Exon);
-  $translation->end_Exon($gw_tran[0]->translation->end_Exon);
+  $translation->start($genewise_transcript->translation->start);
+  $translation->end($genewise_transcript->translation->end);
+  $translation->start_Exon($genewise_transcript->translation->start_Exon);
+  $translation->end_Exon($genewise_transcript->translation->end_Exon);
 
   $newtranscript->translation($translation);
   $newtranscript->translation->start_Exon($newtranscript->start_Exon);
@@ -549,7 +508,7 @@ sub combine_genes{
 
       # check strands are consistent
       if ($ee->strand != $gw_exons[0]->strand){
-	  $self->warn("gw and e2g exons have different strands - can't combine genes\n") ;
+	  warning("gw and e2g exons have different strands - can't combine transcripts\n") ;
 	  return undef;
       }
 
@@ -568,8 +527,8 @@ sub combine_genes{
 											     $newtranscript,
 											     $translation,
 											     $eecount,
-											     $genewise_gene,
-											     $cdna_gene)
+											     $genewise_transcript,
+											     $cdna_transcript)
       }
 
       if ( $modified_peptide_flag ){
@@ -590,7 +549,7 @@ sub combine_genes{
   if (defined($newtranscript)){
     foreach my $ex (@{$newtranscript->get_all_Exons}){
 
-      if(scalar($ex->sub_SeqFeature) > 1 ){
+      if($ex->sub_Seqfeature && scalar($ex->sub_SeqFeature) > 1 ){
 	my @sf    = $ex->sub_SeqFeature;
 	my $first = shift(@sf);
 	
@@ -644,7 +603,7 @@ sub combine_genes{
     return $newtrans;
   }
   else{
-    $self->warn("No combination could be built\n");
+    warning("No combination could be built\n");
     return undef;
   }
 }
@@ -691,8 +650,8 @@ sub transcript_from_single_exon_genewise {
 	  $translation->start($tstart + $diff);
 	  $translation->end($tend + $diff);
 	
-	  $self->throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-	  $self->throw("Forward strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
+	  throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+	  throw("Forward strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
 	}
 	
 	############################################################
@@ -704,8 +663,8 @@ sub transcript_from_single_exon_genewise {
 	  $translation->start($tstart+$diff);
 	  $translation->end($tend + $diff);
 	
-	  $self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-	  $self->throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
+	  throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+	  throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
 	}
 	
 	# expand frameshifted single exon genewises back from one exon to multiple exons
@@ -760,18 +719,14 @@ sub transcript_from_single_exon_genewise {
 ############################################################
 
 sub transcript_from_multi_exon_genewise {
-  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_gene, $cdna_gene) = @_;
+  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_transcript, $cdna_transcript) = @_;
 
   # $current_exon is the exon one the cdna_transcript we are in at the moment
   # $exoncount is the position of the cdna exon in the array
 
-  my @genewise_tran  = @{$genewise_gene->get_all_Transcripts};
-  $genewise_tran[0]->sort;
-  my @genewise_exons = @{$genewise_tran[0]->get_all_Exons};
+  my @genewise_exons = @{$genewise_transcript->get_all_Exons};
 
-  my @cdna_tran  = @{$cdna_gene->get_all_Transcripts};
-  $cdna_tran[0]->sort;
-  my @cdna_exons = @{$cdna_tran[0]->get_all_Exons};
+  my @cdna_exons = @{$cdna_transcript->get_all_Exons};
 
   # in order to match a starting genewise exon with a cdna exon, we need to have
   # a. exactly coinciding exon ends
@@ -781,27 +736,23 @@ sub transcript_from_multi_exon_genewise {
 
   # compare to the first genewise exon
   if($genewise_exons[0]->strand == 1){
-    return $self->transcript_from_multi_exon_genewise_forward($current_exon, $transcript, $translation, $exoncount, $genewise_gene, $cdna_gene);
+    return $self->transcript_from_multi_exon_genewise_forward($current_exon, $transcript, $translation, $exoncount, $genewise_transcript, $cdna_transcript);
   }
   elsif( $genewise_exons[0]->strand == -1 ){
-    return $self->transcript_from_multi_exon_genewise_reverse($current_exon, $transcript, $translation, $exoncount, $genewise_gene, $cdna_gene);
+    return $self->transcript_from_multi_exon_genewise_reverse($current_exon, $transcript, $translation, $exoncount, $genewise_transcript, $cdna_transcript);
   }
 }
 
 ############################################################
 
 sub transcript_from_multi_exon_genewise_forward{
-  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_gene, $cdna_gene) = @_;
+  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_transcript, $cdna_transcript) = @_;
 
   my $modified_peptide = 0;
 
-  my @genewise_tran  = @{$genewise_gene->get_all_Transcripts};
-  $genewise_tran[0]->sort;
-  my @genewise_exons = @{$genewise_tran[0]->get_all_Exons};
+  my @genewise_exons = @{$genewise_transcript->get_all_Exons};
 
-  my @cdna_tran  = @{$cdna_gene->get_all_Transcripts};
-  $cdna_tran[0]->sort;
-  my @cdna_exons = @{$cdna_tran[0]->get_all_Exons};
+  my @cdna_exons = @{$cdna_transcript->get_all_Exons};
 
   # save out current translation->end - we'll need it if we have to expand 3prime exon later
   my $orig_tend = $translation->end;
@@ -874,7 +825,7 @@ sub transcript_from_multi_exon_genewise_forward{
       # $diff is the number of bases we chop from the genewise exon
       my $diff   = $current_start - $genewise_start;
       my $tstart = $translation->start;
-      $self->warn("this is a case where genewise translation starts at $tstart > 1") if ($tstart>1);
+      warning("this is a case where genewise translation starts at $tstart > 1") if ($tstart>1);
       print STDERR "genewise translation start: ".$tstart."\n";
       print STDERR "start_exon: " . $translation->start_Exon->start .
 	           "-" . $translation->start_Exon->end .
@@ -896,7 +847,7 @@ sub transcript_from_multi_exon_genewise_forward{
       }
       else {
 	$translation->start(1);
-	$self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
+	warning("very odd - $diff mod 3 = " . $diff % 3 . "\n");
       }
     }
 
@@ -904,7 +855,7 @@ sub transcript_from_multi_exon_genewise_forward{
       print STDERR "genewise exon starts: $genewise_start > new start: $current_start";
       print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
     }
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+    throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
 
   } # end 5' exon
 
@@ -979,7 +930,7 @@ sub transcript_from_multi_exon_genewise_forward{
 	  else {
 	    # absolute genebuild paranoia 8-)
 	    $translation->end($cdna_exon_length);
-	    $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
+	    warning("very odd - $diff mod 3 = " . $diff % 3 . "\n");
 	  }
 	  print STDERR "Forward: translation end set to : ".$translation->end."\n";
 
@@ -1009,17 +960,13 @@ sub transcript_from_multi_exon_genewise_forward{
 ##################################################
 
 sub transcript_from_multi_exon_genewise_reverse{
-  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_gene, $cdna_gene) = @_;
+  my ($self, $current_exon, $transcript, $translation, $exoncount, $genewise_transcript, $cdna_transcript) = @_;
 
   my $modified_peptide = 0;
 
-  my @genewise_tran  = @{$genewise_gene->get_all_Transcripts};
-  $genewise_tran[0]->sort;
-  my @genewise_exons = @{$genewise_tran[0]->get_all_Exons};
+  my @genewise_exons = @{$genewise_transcript->get_all_Exons};
 
-  my @cdna_tran  = @{$cdna_gene->get_all_Transcripts};
-  $cdna_tran[0]->sort;
-  my @cdna_exons = @{$cdna_tran[0]->get_all_Exons};
+  my @cdna_exons = @{$cdna_transcript->get_all_Exons};
 
   # save out current translation->end - we'll need it if we have to expand 3prime exon later
   my $orig_tend = $translation->end;
@@ -1062,10 +1009,10 @@ sub transcript_from_multi_exon_genewise_reverse{
       elsif ($diff % 3 == 2) { $translation->start(2); }
       else {
 	$translation->start(1);
-	$self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");}
+	warning("very odd - $diff mod 3 = " . $diff % 3 . "\n");}
     }
 
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+    throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
 
     # this exon is the start of translation, convention: phase = -1
     my $ex = $transcript->start_Exon;
@@ -1162,7 +1109,7 @@ sub transcript_from_multi_exon_genewise_reverse{
 	else {
 	  # absolute genebuild paranoia 8-)
 	  $translation->end($cdna_exon_length);
-	  $self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");
+	  warning("very odd - $diff mod 3 = " . $diff % 3 . "\n");
 	}
       }	
 
@@ -1244,7 +1191,7 @@ my ($self, $transcript, $exoncount, @cdna_exons) = @_;
 sub expand_3prime_exon{
   my ($self, $exon, $transcript, $strand) = @_;
 
-  if(scalar($exon->sub_SeqFeature) > 1){
+  if($exon->sub_SeqFeature && scalar($exon->sub_SeqFeature) > 1){
     print STDERR "expanding 3'prime frameshifted exon $exon in strand $strand: ".
       $exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
     my @sf = $exon->sub_SeqFeature;
@@ -1399,13 +1346,13 @@ sub make_gene{
 
   my $genetype = 'KnownUTR';
   unless ( $genetype ){
-    $self->throw("You must define GB_GENEWISE_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::Combined");
+    throw("You must define GB_GENEWISE_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::Combined");
   }
 
   # an analysis should be passed in via the RunnableDB.m parent class:
   my $analysis = $self->analysis;
   unless ($analysis){
-    $self->throw("You have to pass an analysis to this RunnableDB through new()");
+    throw("You have to pass an analysis to this RunnableDB through new()");
   }
 
   my @genes;
@@ -1475,7 +1422,7 @@ sub validate_gene{
   my @transcripts = @{$gene->get_all_Transcripts};
   if(scalar(@transcripts) != 1) {
     my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
-    $self->warn($msg);
+    warning($msg);
     return 0;
   }
 
@@ -1483,7 +1430,7 @@ sub validate_gene{
     foreach my $exon(@{$transcript->get_all_Exons}){
       unless ( Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exon)){
 	my $msg = "Rejecting gene because of invalid exon\n";
-	$self->warn($msg);
+	warning($msg);
 	return 0;
       }
     }
@@ -1492,7 +1439,7 @@ sub validate_gene{
   return 1;
 }
 
-sub make_blat_genes {
+sub make_blat_transcripts {
 
   my ($self, @blat_results) = @_;
 
@@ -1503,11 +1450,6 @@ sub make_blat_genes {
   @blat_results = sort { $b->score <=> $a->score  } @blat_results;
 
   my $transcript = Bio::EnsEMBL::Transcript->new();
-  my $gene       = Bio::EnsEMBL::Gene->new();
-  $gene->analysis($self->analysis);
-	
-  # the genetype is the logic name
-  $gene->type($self->analysis->logic_name);
 
   # get all the features
   my $prev_feature;
@@ -1542,7 +1484,7 @@ sub make_blat_genes {
       $supp_feature = Bio::EnsEMBL::DnaDnaAlignFeature->new( -features => \@supp_features);
     };
     if ( $@ || !defined $supp_feature ){
-      $self->warn("could not create supporting feature:\n$@");
+      warning("could not create supporting feature:\n$@");
       return undef;
     }
 
@@ -1577,9 +1519,9 @@ sub make_blat_genes {
   # to see if the transcript is in the correct strand
   my $checked_transcript = $self->check_splice_sites( $transcript );
 
-  $gene->add_Transcript($checked_transcript);
-  return $gene;
+  return $checked_transcript;
 }
+
 
 =head2 check_splice_sites
 
@@ -1602,7 +1544,6 @@ we need to do it ourselves. Exonerate will do this work for you.
 
 sub check_splice_sites{
   my ($self, $transcript) = @_;
-  print STDERR "VAC: checking spice sites\n";
   $transcript->sort;
 
   my $strand = $transcript->start_Exon->strand;
@@ -1768,7 +1709,7 @@ sub get_chr_subseq{
   my $chr_file = $GB_FPCDIR."/".$chr_name.".fa";
   my $command = "chr_subseq $chr_file $start $end |";
 
-  open( SEQ, $command ) || $self->throw("Error running chr_subseq within KnownUTRs");
+  open( SEQ, $command ) || throw("Error running chr_subseq within KnownUTRs");
   my $seq = uc <SEQ>;
   chomp $seq;
   close( SEQ );
@@ -1784,14 +1725,36 @@ sub tmpfile{
   return $self->{'_tmpfile'};
 }
 
-sub genewise_db{
-  my ($self, $db) = @_;
-  if(defined $db){
-    $self->throw("Can't set genewise_db to [$db]\n") unless $db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor");
-    $self->{'_genewise_db'} = $db;
-  }
-  return $self->{'_genewise_db'};
-  
+=head2 genewise_db
+  Arg [1]    : 
+  Description: get/set for db storing genewise alignments
+  Returntype : 
+  Exceptions : 
+  Example    : 
+ 
+=cut
+
+sub genewise_db {
+    my( $self, $genewise_db ) = @_;
+
+    if ($genewise_db){
+      $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || throw("Input [$genewise_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_genewise_db} = $genewise_db;
+    }
+    if(!$self->{_genewise_db}){
+      $self->{_genewise_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $GB_GW_DBHOST,
+         '-user'   => $GB_GW_DBUSER,
+         '-pass'   => $GB_GW_DBPASS,
+         '-port'   => $GB_GW_DBPORT,
+         '-dbname' => $GB_GW_DBNAME,
+         '-dnadb' => $self->db,
+        );
+    }
+    return $self->{_genewise_db};
 }
 
 ############################################################
@@ -1859,7 +1822,7 @@ sub _recalculate_translation{
   }
   my @trans = $runnable->output;
   unless ( scalar(@trans) == 1 ){
-      $self->warn("Something went wrong running Genomewise. Got ".scalar(@trans).
+      warning("Something went wrong running Genomewise. Got ".scalar(@trans).
 		  " transcripts. returning without modifying the translation\n");
       return $mytranscript;
   }
