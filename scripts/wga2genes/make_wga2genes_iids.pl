@@ -33,7 +33,7 @@ my (
     $compara_dbport,
     $compara_dbuser,
     $compara_dbpass,
-    $slice_name,
+    $seq_region_name,
     $source_type,
     $source_align_type,
     $logic_name,
@@ -77,14 +77,9 @@ $source_align_type = 'BLASTZ_NET';
             'logic=s' => \$logic_name,
             'aligntype=s'   => \$source_align_type,
             'genetype=s'    => \$source_type,
-            'slice=s'       => \$slice_name,
+            'seq_region_name=s' => \$seq_region_name,
             'write' => \$write,
             );
-
-
-if ($slice_name !~ /^[^:]+:/) {
-  die "You must give an Ensembl slice identifier\n";
-}
 
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
@@ -142,14 +137,25 @@ my $q_species =
 my $t_species =
     $target_db->get_MetaContainerAdaptor->get_Species->binomial;
 
-my ($coord_sys, $version, $seq_region_name) = split(/:/, $slice_name);
+my @tl_slices = @{$query_db->get_SliceAdaptor->fetch_all('toplevel')};
+
 
 my @slices;
-if (not $seq_region_name) {
-  @slices = @{$query_db->get_SliceAdaptor->fetch_all($coord_sys)}; 
+
+if (defined $seq_region_name) {
+  my $sl = $query_db->get_SliceAdaptor->fetch_by_name("toplevel::${seq_region_name}:::");
+  foreach my $tl_sl (@tl_slices) {
+    next if $sl->seq_region_name =~ /^MT$/;
+
+    if ($sl->coord_system->name eq $tl_sl->coord_system->name and
+        $sl->seq_region_name eq $tl_sl->seq_region_name) {
+      push @slices, $tl_sl
+    }
+  }
 } else {
-  @slices = ($query_db->get_SliceAdaptor->fetch_by_name($slice_name));
+  @slices = @tl_slices;
 }
+
 
 my ($gdb_adap, $q_gdb, $t_gdb, $mlss, $gaba);
 
@@ -164,9 +170,7 @@ if (defined $compara_db) {
   $gaba = $compara_db->get_GenomicAlignBlockAdaptor;
 }
 
-foreach my $sl (@slices) {
-  next if $sl->seq_region_name =~ /^MT$/;
- 
+foreach my $sl (@slices) { 
   my @genes = @{$sl->get_all_Genes};
   @genes = grep { $_->biotype eq $source_type } @genes;
 
