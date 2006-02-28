@@ -21,7 +21,7 @@ here is an example commandline
 
 =head1 OPTIONS
 
-    -o_host (default:humsrv1)   host name for the dataset specific Otter database (gets put as ohost= in locator)
+    -o_host (default:otterlive)   host name for the dataset specific Otter database (gets put as ohost= in locator)
     -o_name (default:otter_human)   For RDBs, what name to connect to (oname= in locator)
     -o_user (check the ~/.netrc file) For RDBs, what username to connect as (ouser= in locator)
     -o_pass (check the ~/.netrc file) For RDBs, what password to use (opass= in locator)
@@ -63,7 +63,7 @@ my $pport = '';
 my $pname = '';
 my $puser = '';
 my $ppass = '';
-my $ohost = 'humsrv1';
+my $ohost = 'otterlive';
 my $oport = '';
 my $oname = 'otter_human';
 my $ouser = '';
@@ -327,8 +327,9 @@ my $seqset_info     = {};
 		my $acc_ver      = $acc . "." . $ver;
 
 		#if($acc_ver ne 'AC004775.1') { next ; }
-		#if(!($acc_ver eq 'BX571961.11' || $acc_ver eq 'BX649427.7')) { next ; }
-
+		#if(!($acc_ver eq 'AC010680.10' || $acc_ver eq 'AC073046.7' || $acc_ver eq 'AC107084.5' || $acc_ver eq 'AC013269.10' || $acc_ver eq 'AC073195.5' )) { next ; }
+		#if(!($acc_ver eq 'AC062028.6' || $acc_ver eq 'AC104665.3' || $acc_ver eq 'AC112235.4' || $acc_ver eq 'AC013269.10' || $acc_ver eq 'AC073195.5' )) { next ; }
+		#if(!($acc_ver eq 'AC096948.2' || $acc_ver eq 'AC114487.2' || $acc_ver eq 'AL645608.30' || $acc_ver eq 'AL139244.21' || $acc_ver eq 'AC138392.2' )) { next ; }
 		my $clone;
 		my $clone_seq_reg_id;
 		my $contig;
@@ -407,9 +408,9 @@ sub make_clone_attribute {
 		'High Throughput Genome Sequencing Phase', '3'
 	);
 	push @attrib, $attrib;
-	push @attrib,
-	  &make_attribute( 'intl_clone_name', 'International Clone Name',
-		'', $acc . "." . $ver );
+#	push @attrib,
+#	  &make_attribute( 'intl_clone_name', 'International Clone Name',
+#		'', '' );
 	push @attrib,
 	  &make_attribute( 'embl_accession', 'EMBL Accession', '', $acc );
 	push @attrib, &make_attribute( 'embl_version', 'EMBL Version', '', $ver );
@@ -474,6 +475,7 @@ sub make_slice {
 
 	sub pfetch_acc_sv {
 		my ($acc_ver) = @_;
+		#$acc_ver =~ s/\.1//g;
 		print "Fetching '$acc_ver'\n";
 		$pfetch ||= Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
 		$pfetch_archive ||=
