@@ -34,7 +34,7 @@ here is an example commandline
 
     -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
     -set|chr	the sequence set to load
-    -no_submit	Used to avoid the pipeline priming with the SubmitContig analysis 
+    -nosubmit	Used to avoid the pipeline priming with the SubmitContig analysis 
     -help|h		displays this documentation with PERLDOC
 
 =head1 CONTACT
@@ -71,7 +71,7 @@ my $opass = '';
 
 my $chromosome_cs_version = 'Otter';
 my @seq_sets;
-my $no_submit = 0;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
+my $do_submit = 0;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -88,7 +88,8 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'o_pass:s'                 => \$opass,
 	'chromosome_cs_version:s' => \$chromosome_cs_version,
 	'chr|set=s'               => \@seq_sets,
-	'no_submit!'			  => \$no_submit,
+	'no_submit!'			  => sub{ $do_submit = 0 },
+	'submit!'			  	  => \$do_submit,
 	'h|help!'                 => $usage
   )
   or $usage->();
@@ -390,7 +391,7 @@ my $seqset_info     = {};
 			$seqlen, $ctg_ori );
 			
 		##prime the input_id_analysis table
-		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) unless($no_submit);
+		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) if($do_submit);
 		
 
 	}
