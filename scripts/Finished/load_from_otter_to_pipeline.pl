@@ -71,7 +71,7 @@ my $opass = '';
 
 my $chromosome_cs_version = 'Otter';
 my @seq_sets;
-my $do_submit = 0;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
+my $do_submit = 1;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
