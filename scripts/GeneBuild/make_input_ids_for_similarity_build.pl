@@ -161,18 +161,32 @@ my @slice_names;
 if ($slice_name_file) {
   open( SLICES, "<$slice_name_file" ) or die "could not open file with slice $slice_name_file";
   while (<SLICES>) {
-    chomp;
-    my ($name) = split;
-    push @slice_names, $name;
+    /^(\S+):(\S*):(\S+):(\d*):(\d*):/ and do {
+      my $inputIDFactory = Bio::EnsEMBL::Pipeline::Utils::InputIDFactory->
+          new(
+              -db                   => $db,
+              -slice                => 1,
+              -slice_size           => $max_slice_size,
+              -coord_system         => $1,
+              -coord_system_version => $2,
+              -seq_region_name      => $3,
+              -seq_region_start     => $4, 
+              -seq_region_end       => $5,
+              -logic_name    => $logic_name
+              );
+      
+      push @slice_names, @{$inputIDFactory->generate_input_ids};
+    }
   }
 } else {
-  my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory(
-                                                                         -db           => $db,
-                                                                         -slice        => 1,
-                                                                         -slice_size   => $max_slice_size,
-                                                                         -coord_system => $coord_system,
-                                                                         -logic_name   => $logic_name
-                                                                         );
+  my $inputIDFactory = Bio::EnsEMBL::Pipeline::Utils::InputIDFactory->
+      new(
+          -db           => $db,
+          -slice        => 1,
+          -slice_size   => $max_slice_size,
+          -coord_system => $coord_system,
+          -logic_name   => $logic_name
+          );
   @slice_names = @{ $inputIDFactory->generate_input_ids }
 }
 
@@ -190,7 +204,7 @@ my @iids_to_write;
 $verbose and print STDERR "Retrieved " . @slice_names . " slice names; now working...\n";
 
 my @generated_iids;
-foreach my $slice_id ( @slice_names ) {
+foreach my $slice_id (@slice_names) {
   push @generated_iids, get_iids_from_slice($slice_id);
 }
 
