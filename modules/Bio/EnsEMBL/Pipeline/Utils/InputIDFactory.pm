@@ -54,7 +54,10 @@ sub new{
       $input_id_type,
       $insert_analysis, 
       $coord_system,
-      $coord_system_version)=rearrange([qw(DB 
+      $coord_system_version,
+      $seq_region_name,
+      $seq_region_start,
+      $seq_region_end)  =    rearrange([qw(DB 
                                            SLICE 
                                            SINGLE 
                                            FILE
@@ -72,7 +75,11 @@ sub new{
                                            INSERT_ANALYSIS 
                                            COORD_SYSTEM
                                            COORD_SYSTEM_VERSION
+                                           SEQ_REGION_NAME
+                                           SEQ_REGION_START
+                                           SEQ_REGION_END
                                           )], @_);
+
   $slice = 0 unless ($slice);
   $single = 0 unless ($single);
   $file = 0 unless ($file);
@@ -98,7 +105,14 @@ sub new{
             "input ids created\n");
   }
   $self->coord_system_version($coord_system_version) 
-    if($coord_system_version);
+      if($coord_system_version);
+  $self->seq_region_name($seq_region_name)
+      if defined $seq_region_name;
+  $self->seq_region_start($seq_region_start)
+      if defined $seq_region_start;
+  $self->seq_region_end($seq_region_end)
+      if defined $seq_region_end;
+
   $self->file($file) if($file);
   $self->single($single) if($single);
   $self->translation_id($translation_id) if($translation_id);
@@ -221,6 +235,21 @@ sub coord_system_version{
   $self->{'coord_system_version'} = shift if(@_);
   return $self->{'coord_system_version'};
 }
+sub seq_region_name {
+  my $self = shift;
+  $self->{'seq_region_name'} = shift if(@_);
+  return $self->{'seq_region_name'};
+}
+sub seq_region_start {
+  my $self = shift;
+  $self->{'seq_region_start'} = shift if(@_);
+  return $self->{'seq_region_start'};
+}
+sub seq_region_end {
+  my $self = shift;
+  $self->{'seq_region_end'} = shift if(@_);
+  return $self->{'seq_region_end'};
+}
 sub top_level{
   my $self = shift;
   $self->{'top_level'} = shift if(@_);
@@ -320,25 +349,9 @@ sub generate_input_ids{
 
 
 
-
-=head2 get_slice_names
-
-  Arg [1]   : coord system name str
-  Arg [2]   : coord system version
-  Arg [3]   : size, int
-  Arg [4]   : overlap, int
-  Function  : produces a set of slice names based on the size and overlap
-  specified in the format chr_name.start-end
-  Returntype:  Bio::EnsEMBL::Pipeline::IDSet
-  Exceptions: throws if it has no core db connection
-  Caller    : 
-  Example   : 
-
-=cut
-
 sub get_slice_names{
   my ($self) = @_;
-  print STDERR "Getting slice names\n";
+
   $self->slice_size(0) if(!$self->slice_size);
   $self->slice_overlaps(0) if(!$self->slice_overlaps);
   $self->coord_system_version('') if(!$self->coord_system_version);
@@ -350,13 +363,25 @@ sub get_slice_names{
   my $csa = $self->db->get_CoordSystemAdaptor();
   my $sa = $self->db->get_SliceAdaptor();
   
-  my $slices = $sa->fetch_all($self->coord_system, 
-                              $self->coord_system_version);
-  
+  my $slices;
+  if ($self->seq_region_name) {
+    my $sname = sprintf("%s:%s:%s:%s:%s:",
+                        $self->coord_system,
+                        $self->coord_system_version,
+                        $self->seq_region_name,
+                        $self->seq_region_start,
+                        $self->seq_region_end);
+
+    $slices = [$sa->fetch_by_name($sname)];
+  } else {
+    $slices = $sa->fetch_all($self->coord_system, 
+                             $self->coord_system_version);
+  }  
+
   if($self->slice_size > 0){
     $slices = split_Slices($slices,$self->slice_size,$self->slice_overlaps);
   }
-  print STDERR "Have ".@$slices." slices\n";
+
   my @ids;
   foreach my $slice(@$slices){
     push(@ids, $slice->name);
@@ -364,6 +389,7 @@ sub get_slice_names{
 
   return \@ids;
 }
+
 
 
 sub get_filenames{
