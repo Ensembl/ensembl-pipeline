@@ -1,3 +1,20 @@
+Q8BRF5 Similar to Gag-Protein / Polyprotein (jhv)
+Q99KP9 Similar to Retrovirus-related Polyprotein (jhv)
+Q3TL09 Similar to Gag-protein (jhv) 
+Q61530 Retrovirus-related (jhv)
+NP_001013837 Novel protein / simlar to gag's (jhv)
+NP_001012326 Similar to Retrovirus-related POL pol (jhv)
+Q5SVZ4 Novel protein / simlar to gag's (jhv)
+Q3U4K5 simialar to Envelope protein (jhv) 
+Q80TD1 similar to Putative gag-pro-pol polyprotein (jhv) 
+Q8VE82 Hypothetical protein / Fragment similar proviral gag (jhv)
+NP_032607 similar to Evnelope pol. pro.  (jhv)
+NP_001013811 Hypothetical protein / rev. transcriptase (jhv) 
+Q8C1Z1 similar Retrovirus-related Pol polyprotein / L1 retrotrans. (jhv) 
+NP_001004189 similar Retrovirus-related Pol polyprotein jhv
+Q6T3U6 similar Reverse transcriptase / Gag-Pol polypro.  jhv 
+Q3UF90 similar Mus musculus domesticus L1 retrotrans.  jhv 
+Q8VCM6 similar Mus musculus domesticus L1 retrotrans jhv 
 Q8BM31 10 Q8BM31 Q8BM31 Similar to L1 repeat.
 Q63304 10 Q63304 Q63304 ORF2 protein.
 Q8BXC1 11 Q8BXC1 Q8BXC1 Weakly similar to PRO-1 protein.
