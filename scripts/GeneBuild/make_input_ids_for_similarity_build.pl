@@ -104,6 +104,13 @@ exec( 'perldoc', $0 ) if $help;
 
 die "Could must give a logic name with -logic_name\n" if not $logic_name;
 
+if($verbose) { 
+ print "Using protein_align_features of these analysis :\n" ; 
+ foreach my $href ( @{$GB_SIMILARITY_DATABASES} ) {
+   print "\t". $href->{type}."\n" ; 
+ }
+ print "\n\n" ; 
+} 
 
 unless ( $number_of_prot_per_job ) { 
   warning("you haven't used the\n\t-number_of_proteins_per_job - option\nto set the set the number of proteins per job - using default (20) ")  ;
@@ -205,7 +212,10 @@ $verbose and print STDERR "Retrieved " . @slice_names . " slice names; now worki
 
 my @generated_iids;
 foreach my $slice_id (@slice_names) {
-  push @generated_iids, get_iids_from_slice($slice_id);
+  my @ids =  get_iids_from_slice($slice_id);
+  print "have " . scalar(@ids) . " for slice $slice_id \n" if $verbose ; 
+
+  push @generated_iids, get_iids_from_slice($slice_id); 
 }
 
 foreach my $iid (@generated_iids) {
