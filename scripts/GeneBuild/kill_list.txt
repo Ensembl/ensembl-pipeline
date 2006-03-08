@@ -396,3 +396,13 @@ Q61784 Q61784_MOUSE L1Md-A13 repetitive sequence.  (jhv)
 Q60727 Q60727_MOUSE Mus musculus clone NCD46 LINE-1 element ORF1 (Fragment).  (jhv) 
 NP_035003 baculoviral IAP repeat-containing 1c [Mus musculus]  (jhv) 
 Q60728 Q60728_MOUSE Mus musculus clone NCD47 LINE-1 element ORF1 (Fragment).  (jhv) 
+NP_001014998.1 L1 transposable element jhv
+Q3UPG4 1755 Q3UPG4.1 Q3UPG4_MOUSE L1 transposable element containing protein jhv
+Q3U193 520 Q3U193.1 Q3U193_MOUSE Activated spleen  jhv
+Q3UT63 176 Q3UT63.1 Q3UT63_MOUSE similar to GAG Q7R6V2_PLAYO jhv
+Q61705 161 Q61705.1 Q61705_MOUSE similar probable Pol polyprotein reverse transcriptase jhv
+NP_035003.2 1024 gi|66348093|ref|NP_035003.2| baculoviral IAP repeat-containing 1c  jhv
+Q3UNK8 27 Q3UNK8.1 Q3UNK8_MOUSE retroviral-type family profile/F- MuLV receptor-binding/Peptidase aspartic
+Q3U193 520 Q3U193.1 Q3U193_MOUSE hypothetical protein
+Q3TZR4 41 Q3TZR4.1 Q3TZR4_MOUSE product:hypothetical L1 transposable element containing protein
+
