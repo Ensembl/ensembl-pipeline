@@ -124,6 +124,9 @@ GetOptions(
 perldoc() if $perldoc;
 verbose($utils_verbosity);
 
+
+@analyses_to_run = map {split/,/} @analyses_to_run ; 
+
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
     print STDERR "Currently have -dbhost $dbhost -dbname $dbname ".
