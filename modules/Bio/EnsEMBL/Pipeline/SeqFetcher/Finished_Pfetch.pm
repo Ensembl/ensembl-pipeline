@@ -102,13 +102,16 @@ sub get_server {
     my $server = IO::Socket::INET->new(
         PeerAddr => $host,
         PeerPort => $port,
-        Proto    => 'tcp',
+        #Proto    => 'tcp',
+	    Proto    => 6,
         Type     => SOCK_STREAM,
         Timeout  => 10,
     );
     if ($server) {
         $server->autoflush(1);
         return $server;
+    } else {
+        $self->throw("Can't connect to '$host:$port' : $@");
     }
 }
 
@@ -121,7 +124,8 @@ sub get_archive_server {
     my $server = IO::Socket::INET->new(
         PeerAddr => $host,
         PeerPort => $port,
-        Proto    => 'tcp',
+        #Proto    => 'tcp',
+		Proto    => 6,
         Type     => SOCK_STREAM,
         Timeout  => 10,
     );
@@ -188,6 +192,34 @@ sub get_Seq_by_acc {
     }
 }
 
+=head2 get_acc_by_id
+
+  Title   : get_acc_by_id
+  Usage   : $self->get_acc_by_id($secondary_id);
+  Function: Retrieve the sequence accession using the id
+  Returns : string
+  Args    : string
+
+=cut
+
+sub get_acc_by_id {
+	my ( $self, $id ) = @_;
+
+    #confess "No id provided" unless $id;
+    unless ($id) {
+        $self->throw("No secondary id input");
+    }
+    my $server = $self->get_server();
+    print $server "$id\n";
+    chomp( my $seq_string = <$server> );
+    my $sec_id;
+    if (defined $seq_string && $seq_string ne 'no match') {
+    	($sec_id) = $seq_string =~ />\S+\s+(\S+)\s+/;
+    }
+    return  $sec_id ? $sec_id:undef;
+}
+
+
 sub write_descriptions {
     my( $self, $dbobj, $id_list, $chunk_size ) = @_;
 
@@ -197,10 +229,19 @@ sub write_descriptions {
 
     my $sth = $self->prepare_hit_desc_sth($dbobj);
 	for my $accession (keys %$descriptions) {
-		$sth->execute(
-			$accession,
-			map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database')
-		);
+		my @desc = map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database');
+		#print "\nacc=$accession\tlength=",scalar(@desc),"\tdesc =@desc\n";
+		#print map {"content\t\'$_\'\n"} @desc;
+		eval{
+			#print "\'@desc\' => execute query\n";
+			$sth->execute(
+				$accession,
+				@desc
+			);
+		};
+		if ($@) {
+            print STDERR "Unable to fetch description for $accession [$@]\n";
+        } 
 	}
     return $failed;
 }
@@ -302,7 +343,7 @@ sub fetch_descriptions_by_accession {
             if (my $sv = $embl_parser->sequence_version) {
                 unshift @$all_accs, $sv;
             }
-            warn "Expecting '$full_name' but got (@$all_accs)";
+            warn "Expecting '$full_name' but got (@$all_accs)\n";
 		    push @$failed, $full_name;
         }
     }
