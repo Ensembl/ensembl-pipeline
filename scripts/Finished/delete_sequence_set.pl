@@ -47,7 +47,7 @@ my $host = 'otterpipe1';
 my $user;
 my $pass;
 my $port;
-my $p_name;
+my $pname;
 my $delete;
 my @sets;
 my $show;
@@ -58,7 +58,7 @@ my $help;
 	'p_port:n'   => \$port,
 	'p_user:s'   => \$user,
 	'p_pass:s'   => \$pass,
-	'p_name:s'   => \$p_name,
+	'p_name:s'   => \$pname,
 	'delete!'    => \$delete,
 	'show!'      => \$show,
 	'set|name:s' => \@sets,
@@ -91,7 +91,7 @@ if ( !$user || !$pass || !$port ) {
 	  unless ( $user && $pass && $port );
 }
 
-if ( !$p_name ) {
+if ( !$pname ) {
 	throw("You must specify a database name (-p_name)");
 }
 
@@ -100,7 +100,7 @@ my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
 	-user   => $user,
 	-pass   => $pass,
 	-port   => $port,
-	-dbname => $p_name
+	-dbname => $pname
 );
 
 if ($show) {
