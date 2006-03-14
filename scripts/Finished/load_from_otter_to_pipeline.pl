@@ -50,7 +50,7 @@ use Net::Netrc;
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 use Bio::EnsEMBL::DBSQL::SequenceAdaptor;
-use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
@@ -157,7 +157,7 @@ my $otter_dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
 	-port   => $oport,
 	-pass   => $opass
 );
-my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
 	-user   => $puser,
 	-dbname => $pname,
 	-host   => $phost,
@@ -308,12 +308,17 @@ my $seqset_info     = {};
 	}
 
 # insert clone & contig in seq_region, seq_region_attrib, dna and assembly tables
+	my $test_query = qq {
+				SELECT COUNT(*) FROM assembly 
+				WHERE CONCAT(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)  
+				= CONCAT(?,?,?,?,?,?,?)};
 	my $insert_query = qq {
-				INSERT INTO assembly 
+				INSERT IGNORE INTO assembly 
 				(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori) 
 				values 
 				(?,?,?,?,?,?,?)};
-	my $sth = $pipe_dbc->prepare($insert_query);
+	my $test_sth = $pipe_dbc->prepare($test_query);
+	my $insert_sth = $pipe_dbc->prepare($insert_query);
 	while ( my ( $k, $v ) = each %$contigs_hashref ) {
 		my @values       = @$v;
 		my $chr_name     = $values[0];
@@ -383,12 +388,18 @@ my $seqset_info     = {};
 "contig seq_region_id has not been returned for the contig $contig_name") unless $ctg_seq_reg_id;
 		}
 		##insert chromosome to contig assembly data into assembly table
-		$sth->execute( $asm_seq_reg_id{$sequence_set},
+		$test_sth->execute( $asm_seq_reg_id{$sequence_set},
 			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
 			$ctg_ori );
+		$insert_sth->execute( $asm_seq_reg_id{$sequence_set},
+			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
+			$ctg_ori ) unless ($test_sth->fetchrow_array);
 		##insert clone to contig assembly data into assembly table
-		$sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-			$seqlen, $ctg_ori );
+		$test_sth->execute( $asm_seq_reg_id{$sequence_set},
+			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
+			$ctg_ori );
+		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
+			$seqlen, $ctg_ori )  unless ($test_sth->fetchrow_array);
 			
 		##prime the input_id_analysis table
 		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) if($do_submit);
