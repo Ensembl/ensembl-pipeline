@@ -44,7 +44,7 @@ use strict;
 use Getopt::Long;
 use Net::Netrc;
 use Bio::EnsEMBL::Pipeline::Analysis;
-use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
@@ -112,7 +112,7 @@ if ( !@seqreg_name ) {
 	throw("You must at least specify one seq_region name (-set option)");
 }
 
-my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
+my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor(
 	-host   => $host,
 	-user   => $user,
 	-pass   => $pass,
