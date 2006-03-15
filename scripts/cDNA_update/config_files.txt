@@ -30,6 +30,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_QUEUE => 'normal',
   DEFAULT_OUTPUT_DIR  => '<outDIR>',
   DEFAULT_CLEANUP     => 'yes',
+  DEFAULT_VERBOSITY   => 'WARNING',
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT           => 10000,
   JOB_STATUSES_TO_COUNT => ['PEND'], # RUN, PEND, SSUSP, EXIT, DONE
