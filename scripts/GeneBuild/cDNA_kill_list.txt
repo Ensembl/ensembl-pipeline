@@ -1,0 +1,87 @@
+AB062077.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-7.	SINEs sd3
+AB062082.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-4.	SINEs sd3
+AB062083.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-5.	SINEs sd3
+AF147380.1 Homo sapiens full length insert cDNA clone YB67A06.	Requires too much memory sd3
+AF205194.1 Homo sapiens clone KC10, KC22, KC28, KC29 Alu repeat sequence.	Alu repeats sd3
+AF205195.1 Homo sapiens clone KC34 Alu repeat sequence.	Alu repeats sd3
+AF205196.1 Homo sapiens clone KC7 Alu repeat sequence.	Alu repeats sd3
+AF205197.1 Homo sapiens clone KC26 Alu repeat sequence.	Alu repeats sd3
+AF205198.1 Homo sapiens clone KC20 Alu repeat sequence.	Alu repeats sd3
+AF205200.1 Homo sapiens clone KC25 Alu repeat sequence.	Alu repeats sd3
+AF205201.1 Homo sapiens clone KC13 Alu repeat sequence.	Alu repeats sd3
+AF205204.1 Homo sapiens clone KC17 Alu repeat sequence.	Alu repeats sd3
+AF205206.1 Homo sapiens clone KC11 Alu repeat sequence.	Alu repeats sd3
+AF205207.1 Homo sapiens clone KC3 Alu repeat sequence.	Alu repeats sd3
+AF205210.1 Homo sapiens clone KC39 Alu repeat sequence.	Alu repeats sd3
+AJ409471.1 Mus musculus RNA binding site for Dazl protein, clone bh4	Hit too many times sd3
+AK012879.1 Mus musculus 10, 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2810038D20 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK019260.1 Mus musculus 10, 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2810410E17 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK041156.1 Mus musculus adult male aorta and vein cDNA, RIKEN full-length enriched library, clone:A530086G06 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK076884.1 Mus musculus adult male testis cDNA, RIKEN full-length enriched library, clone:4930534N17 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK138695.1 Mus musculus 0 day neonate thymus cDNA, RIKEN full-length enriched library, clone:A430014J06 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK178600.1 Mus musculus cDNA, clone:Y0G0107F02, strand:unspecified.	Hit too many times sd3
+AK179288.1 Mus musculus cDNA, clone:Y0G0109M10, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000068848, based on BLAT search.	Hit too many times sd3
+AK180275.1 Mus musculus cDNA, clone:Y0G0113J02, strand:unspecified.	Hit too many times sd3
+AK182090.1 Mus musculus cDNA, clone:Y0G0120M12, strand:unspecified.	Hit too many times sd3
+AK184820.1 Mus musculus cDNA, clone:Y0G0131K08, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000068848, based on BLAT search.	Hit too many times sd3
+AK188366.1 Mus musculus cDNA, clone:Y0G0144O14, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000070038, based on BLAT search.	Hit too many times sd3
+AK189223.1 Mus musculus cDNA, clone:Y0G0148F09, strand:minus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000051144, based on BLAT search.	Hit too many times sd3
+AK191632.1 Mus musculus cDNA, clone:Y1G0106H18, strand:minus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000032484, based on BLAT search.	Hit too many times sd3
+AK193910.1 Mus musculus cDNA, clone:Y1G0113L18, strand:unspecified.	Hit too many times sd3
+AK195128.1 Mus musculus cDNA, clone:Y1G0117H15, strand:unspecified.	Hit too many times sd3
+AK195934.1 Mus musculus cDNA, clone:Y1G0120C08, strand:unspecified.	Hit too many times sd3
+AK196760.1 Mus musculus cDNA, clone:Y1G0122N18, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000032484, based on BLAT search.	Hit too many times sd3
+AK199353.1 Mus musculus cDNA, clone:Y1G0130O20, strand:minus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000032484, based on BLAT search.	Hit too many times sd3
+AK203375.1 Mus musculus cDNA, clone:Y1G0144K22, strand:unspecified.	Hit too many times sd3
+AK205736.1 Mus musculus cDNA, clone:Y2G0102J24, strand:unspecified.	Hit too many times sd3
+AK210451.1 Mus musculus cDNA, clone:Y2G0118H11, strand:unspecified.	Hit too many times sd3
+AK212477.1 Mus musculus cDNA, clone:Y2G0125B10, strand:minus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000060153, based on BLAT search.	Hit too many times sd3
+AK215021.1 Mus musculus cDNA, clone:Y2G0133L07, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000070391, based on BLAT search.	Hit too many times sd3
+AY598346.1 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory sd3
+AY845701.1 Homo sapiens clone 14 satellite III mRNA sequence.	Requires too much memory sd3
+AY845703.1 Homo sapiens clone 16 satellite III mRNA sequence.	Requires too much memory sd3
+AY845704.1 Homo sapiens clone 17 satellite III mRNA sequence.	Requires too much memory sd3
+AY845705.1 Homo sapiens clone 18 satellite III mRNA sequence.	Requires too much memory sd3
+AY845706.1 Homo sapiens clone 19 satellite III mRNA sequence.	Requires too much memory sd3
+AY845708.1 Homo sapiens clone 20 satellite III mRNA sequence.	Requires too much memory sd3
+BC001368.1 Homo sapiens cDNA clone IMAGE:3050898, partial cds.	Hit too many times sd3
+BC002257.1 Mus musculus hypothetical protein LOC215866, mRNA (cDNA clone IMAGE:3493956), partial cds.	Hit too many times sd3
+BC016222.1 Mus musculus hypothetical protein LOC544988, mRNA (cDNA clone IMAGE:4486605), containing frame-shift errors.	Hit too many times sd3
+BC042410.1 Mus musculus, clone IMAGE:3672346, mRNA.	Hit too many times sd3
+BC055943.1 Mus musculus cDNA clone IMAGE:4018322, partial cds.	Hit too many times sd3
+BC086907.1 Mus musculus cDNA clone IMAGE:6766394.	Hit too many times sd3
+BC086920.1 Mus musculus cDNA clone IMAGE:30120473.	Hit too many times sd3
+BC099593.1 Mus musculus cDNA clone IMAGE:5683868.	Hit too many times sd3
+BC100411.1 Mus musculus cDNA clone MGC:118208 IMAGE:30916114, complete cds.	Hit too many times sd3
+BZ690815.2 W088A02 GGTC Gene Trap Library GV03C04 Mus musculus cDNA clone W088A02, mRNA sequence.	Hit too many times sd3
+BZ690866.2 W022H06 GGTC Gene Trap Library GV03C01 Mus musculus cDNA clone W022H06, mRNA sequence.	Hit too many times sd3
+CC326347.1 RRI488 BayGenomics Gene Trap Library pGT0Lxf Mus musculus cDNA, mRNA sequence.   Hit too many times sd3
+CC326349.1 RRI486 BayGenomics Gene Trap Library pGT0Lxf Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CC326367.1 RRI460 BayGenomics Gene Trap Library pGT0Lxf Mus musculus cDNA, mRNA sequence.   Hit too many times sd3
+CG786035.1 CMHD-GT_84B9-3 GTL_R1_pSD5 Mus musculus cDNA clone CMHD-GT_84B9-3 3', mRNA sequence.	Hit too many times sd3
+CL211194.1 W052F04 GGTC Gene Trap Library GV02C04 Mus musculus cDNA clone W052F04, mRNA sequence.	Hit too many times sd3
+CL211700.1 W080E05 GGTC Gene Trap Library GV03C04 Mus musculus cDNA clone W080E05, mRNA sequence.	Hit too many times sd3
+CL214298.1 G002D05 GGTC Gene Trap Library GV07C04 Mus musculus cDNA clone G002D05, mRNA sequence.	Hit too many times sd3
+CL525754.1 AL0617 Sanger Institute Gene Trap Library pGT0lxr Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CW020324.1 GC0582 TIGEM gene trap library Mus musculus cDNA clone 9075.124, mRNA sequence.    Hit too many times sd3
+CW020475.1 GC0742 TIGEM gene trap library Mus musculus cDNA clone A015.B10, mRNA sequence.	Hit too many times sd3
+CW882821.1 BGA538 BayGenomics Gene Trap Library pGT2Lxf Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CW989288.1 AJ0149 Sanger Institute Gene Trap Library pGT0lxr Mus musculus cDNA, mRNA sequence.  Hit too many times sd3
+CW990155.1 AX0511 Sanger Institute Gene Trap Library pGT0lxr Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CW990656.1 BA0689 Sanger Institute Gene Trap Library pGT2lxr Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CW991487.1 XR0298 Sanger Institute Gene Trap Library pGT0lxf Mus musculus cDNA, mRNA sequence.  Hit too many times sd3
+CW991567.1 XS0101 Sanger Institute Gene Trap Library pGT0lxf Mus musculus cDNA, mRNA sequence.	Hit too many times sd3
+CZ170285.1 PSTVUpb19b10 VU.pGTR2.1.1 Mus musculus cDNA clone b5p3c7, mRNA sequence.	Hit too many times sd3
+CZ293981.1 P025A08 GGTC Gene Trap Library GV09C05 Mus musculus cDNA clone P025A08, mRNA sequence.	Hit too many times sd3
+U16662.1 Mus musculus clone NCD33 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16663.1 Mus musculus clone NCD36 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16664.1 Mus musculus clone NCD39 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16665.1 Mus musculus clone NCD42 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16666.1 Mus musculus clone NCD46 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16667.1 Mus musculus clone NCD47 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16668.1 Mus musculus clone NCD3543 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16669.1 Mus musculus clone CCD39 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16670.1 Mus musculus clone CCD40 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16671.1 Mus musculus clone CCD43 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U16672.1 Mus musculus clone NCD40 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
+U47865.1 Mus musculus intracisternal A-particle U3 region mRNA.	Hit too many times sd3
