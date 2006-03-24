@@ -639,7 +639,16 @@ sub split_Transcript{
       push(@final_transcripts, $st);
     }
 
-    $st->add_supporting_features(@{$transcript->get_all_supporting_features})
+    foreach my $f (@{$transcript->get_all_supporting_features}) {
+      my @ugs;
+      foreach my $ug ($f->ungapped_features) {
+        if ($ug->start >= $st->start and $ug->end <= $st->end) {
+          push @ugs, $ug;
+        }
+      }
+      my $newf = $f->new(-features => \@ugs);
+      $st->add_supporting_features($newf);
+    }
   }
   
   return \@final_transcripts;
