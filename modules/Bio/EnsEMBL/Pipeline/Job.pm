@@ -40,6 +40,7 @@ use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Analysis::Tools::Logger;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
@@ -502,9 +503,6 @@ sub run_module {
 
   my $runnable_db_path = $BATCH_QUEUES{$hash_key}{runnabledb_path};
   my $verbosity =  $BATCH_QUEUES{$hash_key}{verbosity};
-  if(!$runnable_db_path){
-    $runnable_db_path = $DEFAULT_RUNNABLEDB_PATH;
-  }
 
   my $perl_path;
   #print STDERR "Getting ".$hash_key." batchqueue value\n";
@@ -518,6 +516,9 @@ sub run_module {
   }else{
     $perl_path = $module;
   }
+
+  my $current_verbosiry = logger_verbosity;
+  logger_verbosity($verbosity);
 
   #print STDERR "have perlpath ".$perl_path."\n";
  STATUS: 
@@ -605,6 +606,8 @@ sub run_module {
       }
     }
   }    
+
+  logger_verbosity($current_verbosity);
   
   # update job in StateInfoContainer
   eval {
