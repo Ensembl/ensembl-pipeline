@@ -4,24 +4,7 @@ use strict;
 
 #original version cDNA_update.pl for human cDNAs
 #adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
-#altered to run standard prog but with new polyAclipping 
-#and stop list for gene trap cdnas (gss) and cdnas which hit too many times (kill list)
-
-#then to change the parameters and run for those seqs with no hits in database
-
-#so this version runs the script as described below - first run with prepare then run
-#the intitial prepare sets the configs for the standard run and makes the database, gets the vertrna files etc
-#it also removes cdnas which are on the kill and gss lists
-#after run analysis() is called this prog makes a file containing those cdnas with no hits in the database
-#it then asks if you want to run with modified exonerate parameters
-#if so it resets the configs, makes new chunks and runs exonerate with maxintron 400000 and softmasktarget = false
-
-#then it should check for AWOL jobs and reports these, giving option to rerun them
-#chase_jobs() is then called which requires user input to select the chunk sizes. 
-#The configs are rewritten, database is updated and analysis is rerun. 
-#At end does not check for AWOL jobs again - but does warn you to check for yourself
-#then checks for cdnas which hit >20 times incase user wants to add these to the kill list
-#then makes the missing_cdna.txt file explaining why cdnas are not in the database
+#uses new polyAclipping, stop list for gene trap cdnas (gss) and cdnas which hit too many times (kill list)
 
 #will make three different logic names, eg mouse_cDNA_update, mouse_cDNA_update_2 and mouse_cDNA_update_3
 #mouse_cDNA_update_2 and mouse_cDNA_update_3 are the same 
@@ -40,16 +23,16 @@ in an automated fashion.
 =head1 SYNOPSIS / OPTIONS
 
   A. Fill in config variables, start script with argument 'prepare':
-     "perl cDNA_setup.pl prepare".
+     "perl cDNA_update.pl prepare".
      If there is a new assembly, some sequence files (for human: DR52/DR53)
      might have to be adjusted (automatically, of course) and they will have
      to be pushed across the farm. The previous files should be removed
      before this! Please mail systems about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
-     by calling "perl cDNA_setup.pl compare"
+     by calling "perl cDNA_update.pl compare"
   C. Start script again after finishing the pipeline run to clean up:
-     "perl cDNA_setup.pl clean", removing tmp files, etc.
+     "perl cDNA_update.pl clean", removing tmp files, etc.
 
 =head1 DESCRIPTION
 
@@ -76,12 +59,15 @@ The steps the script performs:
      the coordinates given in the fasta headers need to be adjusted 
      according to the assembly table..
   6. run_analysis: run exonerate using the pipeline
+  7. (optional) rerun cDNAs which did not align using different Exonerate parameters
+  8. find_many_hits: identify those cDNAs which aligned to many places in the genome
+  9. why_cdnas_missed: compile a list of reasons why hits were rejected
 
-  7. comparison: health-check by comparing the results to previous alignments
+ 10. comparison: health-check by comparing the results to previous alignments
      quicker version: get number of alignments for each chromosome from previous
      and new db version.
      extended version: look for new hits, track missing hits.
-  8. cleanup: post-process result DB, restore config files, remove tmp files and dbs
+ 11. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
 What YOU will need to do:
   1. Fill in the config variables in this script (just below this).
@@ -127,33 +113,30 @@ ensembl-dev@ebi.ac.uk
 my $cvsDIR               = "";
 
 # personal data dir (for temporary & result/error files)
-my $dataDIR              = "";
+my $dataDIR              = ""; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "hs.fna"; #"mouse.fna"; 
 my $sourceHost           = "cbi1";
 my $sourceDIR            = "/data/blastdb";
-my $assembly_version     = "NCBI35"; #"NCBIM35"; #NCBI35
-#my $target_masked_genome = "/data/blastdb/Ensembl/Human/".$assembly_version."/modified/softmasked_dusted"; # each file = a chromosome or bit
-my $target_masked_genome = "/data/blastdb/Ensembl/Human/".$assembly_version."/human_toplevel_seqs.fa";
-#my $target_masked_genome = "/data/blastdb/Ensembl/Large/Mus_musculus/NCBIM34/softmasked_dusted/mouse_toplevel_sequences.fa"; 
+my $assembly_version     = "NCBI36"; #"NCBIM35";
+my $target_masked_genome = "/data/blastdb/Ensembl/Human/$assembly_version/genome/softmasked_dusted.fa";
 #my $target_masked_genome = "/data/blastdb/Ensembl/Mouse/NCBIM35/genome/softmasked_dusted/toplevel_sequences.fa"; 
 my $user 				 = "sd3";
 my $host 				 = "cbi1";
 
-#only needed if assemly will be modified 
+#only needed if assembly will be modified 
 #my $org_masked_genome    = "/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
 my $org_masked_genome    = ""; #only used with adjust assembly()  - not necessary for mouse
 
-my $kill_list			 = "~/perl_code/ensembl-personal/sd3/mouse_cdna_update/kill_list.txt";
-my $gss				     = "~/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
+my $kill_list			 = $cvsDIR."/ensembl-pipeline/scripts/GeneBuild/cDNA_kill_list.txt";
+my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
-#my $polyA_clipping      = "/nfs/acari/fsk/projects/cdna_update/polyA_clipping.pl";
 my $polyA_clipping       = "/ecs4/work3/sd3/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog 			 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
 my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/why_cdnas_didnt_hit.pl";
@@ -163,35 +146,35 @@ my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/why_c
 my $WB_DBUSER            = "";
 my $WB_DBPASS            = "";
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_36_35i"; #"fsk_mouse_35_ref"; #"mus_musculus_core_35_34c"; 
-my $WB_REF_DBHOST        = "ecs2"; #"ecs4";
-my $WB_REF_DBPORT        = "3365"; #"3353"; 
+my $WB_REF_DBNAME        = "sd3_homo_sapiens_36_ref"; 
+my $WB_REF_DBHOST        = "ecs2"; 
+my $WB_REF_DBPORT        = "3362"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_cDNA_pipe";
-my $WB_PIPE_DBHOST       = "ecs1a";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_0306_cDNA_pipe";
+my $WB_PIPE_DBHOST       = "ecs1b";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_human_cDNA_update";
-my $WB_TARGET_DBHOST     = "ia64g";
-my $WB_TARGET_DBPORT     = "3306";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_human_0306_cDNA_update";
+my $WB_TARGET_DBHOST     = "ecs2";
+my $WB_TARGET_DBPORT     = "3362";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_36_35i"; #"sd3_mouse_34_cdna"; 	
+my $WB_LAST_DBNAME       = "sd3_homo_sapiens_cdna_38_35"; 
 my $WB_LAST_DBHOST       = "ecs2";
-my $WB_LAST_DBPORT       = "3365"; #"3366"; 
+my $WB_LAST_DBPORT       = "3362";  
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_36_35i"; #"fsk_mus_musculus_NCBIM34"; 
-my $WB_LAST_DNADBHOST    = "ecs2"; #"ecs4"; 
-my $WB_LAST_DNADBPORT    = "3365"; #"3353"; 
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_37_35j";
+my $WB_LAST_DNADBHOST    = "ecs2"; 
+my $WB_LAST_DNADBPORT    = "3365"; 
 
 #use & adjust assembly exception sequences (human DR52 & DR53)
 #set to 1 if you're looking at a new sequence assembly
 my $adjust_assembly      = 0;
 
 #set the species
-my $common_species_name  = "human"; #"mouse";
-my $species	      = "Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "human"; #"human"; #"mouse";
+my $species	      = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
 
-my $oldFeatureName     = $common_species_name."_cDNA_update"; #"cdna_exonerate"; #for the comparison only
+my $oldFeatureName     = "cDNA_update"; #for the comparison only
 
 
 
@@ -249,7 +232,7 @@ my %configvars      = (
 
 
 #fasta chunk specifications:
-my $chunknum        = 1500;   #(<300 sequences / file)
+my $chunknum        = 4300;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $maxseqlength    = 17000;
 my $tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
@@ -361,9 +344,9 @@ elsif($option eq "run"){
 
   }
   
-  print "you should now change the analysis_ids of the cdnas in your database so that they". 
+  print "you should now change the analysis_ids of the cdnas in your database so that they ". 
   		"all have the same logic name, otherwise the comparison script won't work;\n".
-		"you will need to change the gene and dna_align_feature tables\n";
+		"you will need to change both the gene and dna_align_feature tables\n";
 
 }
 elsif($option eq "clean"){
@@ -899,7 +882,16 @@ sub DB_setup{
     	$cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".
             	$dataDIR."/import_tables2.sql";
     	$status += system($cmd);
-    	if($status){ die("couldnt create databases!\n"); }
+    	print  ".";
+		$cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME -e \"LOAD DATA INFILE \'$cvsDIR".
+		       "/ensembl/misc-scripts/external_db/external_dbs.txt\' INTO TABLE external_db\"";
+		$status += system($cmd);
+		print  ".";
+		$cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME -e \"LOAD DATA INFILE \'$cvsDIR".
+		       "/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt\' INTO TABLE unmapped_reason\"";
+		$status += system($cmd);	   
+		
+		if($status){ die("couldnt create databases!\n"); }
     	print "created databases.\n";
 
 	}else{
@@ -1037,7 +1029,7 @@ sub find_missing_cdnas{
 	close OUT;
 	
 	$num_missing_cdnas = `grep ">" $dataDIR/missing_cdnas.fasta | wc -l`;
-	
+	chomp $num_missing_cdnas;
 	return $num_missing_cdnas;
 }
 
@@ -1214,8 +1206,7 @@ sub why_cdnas_missed{
 	}
 
 	#need to pass all the variables to the script:
-    $cmd = "perl ".$cvsDIR.
-           "$reasons_prog".
+    $cmd = "perl ".$reasons_prog.
            " -kill_list ".$kill_list." -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user ensro".
            " -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
            " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna." -refseq ".$dataDIR."/".$refseq.
