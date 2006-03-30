@@ -1,3 +1,5 @@
+AB046584.1 Homo sapiens mRNA, HERV-K LTR family, isolate:FB-4.	Hit too many times sd3
+AB059369.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-FB12.	Hit too many times sd3
 AB062077.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-7.	SINEs sd3
 AB062082.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-4.	SINEs sd3
 AB062083.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-5.	SINEs sd3
@@ -17,7 +19,10 @@ AJ409471.1 Mus musculus RNA binding site for Dazl protein, clone bh4	Hit too man
 AK012879.1 Mus musculus 10, 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2810038D20 product:unclassifiable, full insert sequence.	Hit too many times sd3
 AK019260.1 Mus musculus 10, 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2810410E17 product:unclassifiable, full insert sequence.	Hit too many times sd3
 AK041156.1 Mus musculus adult male aorta and vein cDNA, RIKEN full-length enriched library, clone:A530086G06 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK045941.1 Mus musculus adult male corpora quadrigemina cDNA, RIKEN full-length enriched library, clone:B230325I02 product:L1 repeat, Tf subfamily, member 29, full insert sequence. L1 Repeat sd3
 AK076884.1 Mus musculus adult male testis cDNA, RIKEN full-length enriched library, clone:4930534N17 product:unclassifiable, full insert sequence.	Hit too many times sd3
+AK128024.1 Homo sapiens cDNA FLJ46143 fis, clone TESTI2053561.	Requires too much memory sd3
+AK136594.1 Mus musculus adult male epididymis cDNA, RIKEN full-length enriched library, clone:9230002E17 product:L1 repeat (Fragment) homolog [Mus musculus], full insert sequence.	L1 Repeat sd3
 AK138695.1 Mus musculus 0 day neonate thymus cDNA, RIKEN full-length enriched library, clone:A430014J06 product:unclassifiable, full insert sequence.	Hit too many times sd3
 AK178600.1 Mus musculus cDNA, clone:Y0G0107F02, strand:unspecified.	Hit too many times sd3
 AK179288.1 Mus musculus cDNA, clone:Y0G0109M10, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000068848, based on BLAT search.	Hit too many times sd3
@@ -37,18 +42,33 @@ AK205736.1 Mus musculus cDNA, clone:Y2G0102J24, strand:unspecified.	Hit too many
 AK210451.1 Mus musculus cDNA, clone:Y2G0118H11, strand:unspecified.	Hit too many times sd3
 AK212477.1 Mus musculus cDNA, clone:Y2G0125B10, strand:minus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000060153, based on BLAT search.	Hit too many times sd3
 AK215021.1 Mus musculus cDNA, clone:Y2G0133L07, strand:plus, reference:ENSEMBL:Mouse-Transcript-ENST:ENSMUST00000070391, based on BLAT search.	Hit too many times sd3
+AY499135.1 Homo sapiens isolate 5 cell-line A-498 LINE-1 element p40-like mRNA, partial sequence.	Hit too many times sd3
+AY499137.1 Homo sapiens isolate 2 cell-line A-549 LINE-1 element p40-like mRNA, partial sequence.	Hit too many times sd3
+AY499142.1 Homo sapiens isolate 1 cell-line Jurkat LINE-1 element p40 mRNA, partial cds.	Hit too many times sd3
+AY499143.1 Homo sapiens isolate 2 cell-line Jurkat LINE-1 element p40 mRNA, partial cds.	Hit too many times sd3
+AY499144.1 Homo sapiens isolate 3 cell-line Jurkat LINE-1 element p40-like mRNA, partial sequence.	Hit too many times sd3
+AY499146.1 Homo sapiens isolate 5 cell-line Jurkat LINE-1 element p40 mRNA, partial cds.	Hit too many times sd3
+AY499149.1 Homo sapiens isolate 3 cell-line MIA-PaCa-2 LINE-1 element p40 mRNA, partial cds.	Hit too many times sd3
+AY499150.1 Homo sapiens isolate 4 cell-line MIA-PaCa-2 LINE-1 element p40 mRNA, partial cds.	Hit too many times sd3
 AY598346.1 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory sd3
+AY598347.1 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory sd3
+AY845698.1 Homo sapiens clone 11 satellite III mRNA sequence.	Requires too much memory sd3
+AY845700.1 Homo sapiens clone 13 satellite III mRNA sequence.	Requires too much memory sd3
 AY845701.1 Homo sapiens clone 14 satellite III mRNA sequence.	Requires too much memory sd3
+AY845702.1 Homo sapiens clone 15 satellite III mRNA sequence.	Requires too much memory sd3
 AY845703.1 Homo sapiens clone 16 satellite III mRNA sequence.	Requires too much memory sd3
 AY845704.1 Homo sapiens clone 17 satellite III mRNA sequence.	Requires too much memory sd3
 AY845705.1 Homo sapiens clone 18 satellite III mRNA sequence.	Requires too much memory sd3
 AY845706.1 Homo sapiens clone 19 satellite III mRNA sequence.	Requires too much memory sd3
+AY845707.1 Homo sapiens clone 20 satellite III mRNA sequence.	Requires too much memory sd3
 AY845708.1 Homo sapiens clone 20 satellite III mRNA sequence.	Requires too much memory sd3
 BC001368.1 Homo sapiens cDNA clone IMAGE:3050898, partial cds.	Hit too many times sd3
 BC002257.1 Mus musculus hypothetical protein LOC215866, mRNA (cDNA clone IMAGE:3493956), partial cds.	Hit too many times sd3
 BC016222.1 Mus musculus hypothetical protein LOC544988, mRNA (cDNA clone IMAGE:4486605), containing frame-shift errors.	Hit too many times sd3
 BC042410.1 Mus musculus, clone IMAGE:3672346, mRNA.	Hit too many times sd3
+BC048742.1 Mus musculus cDNA clone IMAGE:6774803. hit too many times sd3
 BC055943.1 Mus musculus cDNA clone IMAGE:4018322, partial cds.	Hit too many times sd3
+BC056263.1 Homo sapiens cDNA clone IMAGE:6618467, partial cds.	Requires too much memory sd3	
 BC086907.1 Mus musculus cDNA clone IMAGE:6766394.	Hit too many times sd3
 BC086920.1 Mus musculus cDNA clone IMAGE:30120473.	Hit too many times sd3
 BC099593.1 Mus musculus cDNA clone IMAGE:5683868.	Hit too many times sd3
