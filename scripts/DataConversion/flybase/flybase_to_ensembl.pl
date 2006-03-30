@@ -48,7 +48,6 @@ for my $conf(@{$FB_CHR_INFO}){
 foreach my $chr(@{$FB_CHR_INFO}) {
   print STDERR "handling ".$chr->{'chr_name'}." with file ".$chr->{'gff_file'}."\n" if($FB_DEBUG);
 
-
   my $slice= $db->get_SliceAdaptor()->fetch_by_region('chromosome',$chr->{chr_name});
 
   my $gff = FlyBaseGff->new(
@@ -64,27 +63,14 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   #
   # ###############################################################################
 
-  $gff->store_as_gene_object("gene");
-  $gff->store_as_gene_object("gene","mRNA","gene");
-  $gff->store_as_gene_object("gene","ncRNA","ncRNA");
+  #$gff->store_as_gene_object("gene");
+  $gff->store_as_gene_object("gene","mRNA","protein_coding");
+  $gff->store_as_gene_object("gene","ncRNA","misc_RNA");
   $gff->store_as_gene_object("gene","snRNA","snRNA");
   $gff->store_as_gene_object("gene","tRNA","tRNA");
   $gff->store_as_gene_object("gene","rRNA","rRNA");
   $gff->store_as_gene_object("gene","pseudogene","pseudogene");
   $gff->store_as_gene_object("gene","snoRNA","snoRNA");
-
-
-
-  # 
-  # dump all loaded proteins
-  #
-  my $cmd = "perl /acari/work6a/jhv/project_droso/bdgp4.1/cvs_checkout/ensembl-pipeline/scripts/protein_pipeline/" .
-              "dump_translations.pl -dbn $FB_DBNAME -dbh $FB_DBHOST -dbpo $FB_DBPORT -dbu ensro" .
-		"-pr -no_ -f/acari/work6a/jhv/project_droso/bdgp4.1/dump_seqs.fasta"; 
-
-
-  print "CMD is:\n$cmd\n";
-  system ("$cmd") ;
 
 
 
@@ -118,3 +104,18 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   }
 
 }
+
+
+
+# 
+# dump all loaded proteins
+#
+
+  my $cmd = "perl /ecs4/work1/sd3/drosophila4.2/ensembl-pipeline/scripts/protein_pipeline/" .
+              "dump_translations.pl -dbname $FB_DBNAME -dbhost $FB_DBHOST -dbport $FB_DBPORT -dbuser ensro " .
+		"-protein_stable_id -no_description -file /ecs4/work1/sd3/drosophila4.2/dump_seqs.fasta"; 
+
+
+  print "CMD is:\n$cmd\n";
+  system ("$cmd") ;
+
