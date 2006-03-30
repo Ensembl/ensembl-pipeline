@@ -223,10 +223,7 @@ sub store_as_gene_object{
   my ($self,$target, $child_type, $ensembl_gene_type) = @_;
   print "Target: =$target= -> =$child_type=\n";
 
-
-  print "Having gene_ids:\n" ; 
-  print join(" will be processed.\n", @{$self->get_ids_by_type($target)} ) . "\n" ;
-
+  
   my %all_processed_exons;
 
   # test if $target is annotated in gff
@@ -235,7 +232,8 @@ sub store_as_gene_object{
     return;
   }
 
-
+  print "Having gene_ids:\n" ; 
+  print join(" will be processed.\n", @{$self->get_ids_by_type($target)} ) . "\n" ;
 
 
   for my $gene_id ( @{$self->get_ids_by_type($target)} ) {
@@ -393,25 +391,25 @@ sub store_as_gene_object{
 
 # renaming exons which have different phases and which are shared by different genes
 
-foreach my $trans ( @all_nw_transcripts ) {
-  foreach my $e ( @{$trans->get_all_Exons} ) {
-    # rename exons which are shared by different genes
-    my @line = split /\-/,$e->hashkey; # get "root" of exon-hashkey without phase and strand-information
-    # get all unique genes which share this exon
-    my %genes_of_exon = %{$all_processed_exons{"$line[0]-$line[1]-$line[2]"} };
+   foreach my $trans ( @all_nw_transcripts ) {
+	 foreach my $e ( @{$trans->get_all_Exons} ) {
+       # rename exons which are shared by different genes
+       my @line = split /\-/,$e->hashkey; # get "root" of exon-hashkey without phase and strand-information
+       # get all unique genes which share this exon
+       my %genes_of_exon = %{$all_processed_exons{"$line[0]-$line[1]-$line[2]"} };
 
-    for my $gid (keys %genes_of_exon) {
-      if ($gid ne $gene_id) {
-        # if the exon is shared by another gene than the actual one rename the exon
-        # processed_gene : CG233
-        # name of exon CG100:4
-        # new name of exon: CG100:4
-        my $new_name = $e->stable_id . "--" . $gene_id ;
-        $e->stable_id ($new_name);
-      }
-    }
-  }
-}
+       for my $gid (keys %genes_of_exon) {
+    	 if ($gid ne $gene_id) {
+           # if the exon is shared by another gene than the actual one rename the exon
+           # processed_gene : CG233
+           # name of exon CG100:4
+           # new name of exon: CG100:4
+           my $new_name = $e->stable_id . "--" . $gene_id ;
+           $e->stable_id ($new_name);
+    	 }
+       }
+	 }
+   }
 
 
 
@@ -439,8 +437,9 @@ foreach my $trans ( @all_nw_transcripts ) {
                                      -SLICE     => $self->slice,
                                      -ANALYSIS  => $self->create_analysis($LOGIC_NAME_EXON),
                                      -STABLE_ID => $gene_id,
-                                     -VERSION => 3,
-	                             -TYPE    =>$ensembl_gene_type,
+                                     -VERSION   => 3,
+	                                 -TYPE      => $ensembl_gene_type,
+                                     -SOURCE    => "flybase",
                                     );
 
    map ($gene->add_Transcript($_) , @all_nw_transcripts) ;
@@ -452,17 +451,17 @@ foreach my $trans ( @all_nw_transcripts ) {
    my $gene_DB_id = $self->db->get_GeneAdaptor->store($gene);
    print "STORED\n\n\n" ;
    my $db_entry = $self->get_dbxref($gene_id, $target);
-   $self->db->get_DBEntryAdaptor->store($db_entry,$gene_DB_id,'Gene');
+   
+   $self->db->get_DBEntryAdaptor->store($db_entry,$gene,'Gene');
 
    # reprocess the db_entry for trs
 
    for my $tr (@all_nw_transcripts){
      my $dbe = $self->db_entry($tr);
      if($dbe){
-       $self->db->get_DBEntryAdaptor->store($dbe , $tr->dbID() ,'Transcript');
+       $self->db->get_DBEntryAdaptor->store($dbe , $tr,'Transcript');
      }
    }
-
 
   } #end foreach gene
  } #end unless...else
@@ -565,14 +564,15 @@ sub store_as_simple_feature{
       my @attributes = @{${$self->id2attributes}{$_}};    # get attributes of SimpleFeature
       warn_inconsistency("Featureid $_ of TYPE <$type> is not unique\n") if (scalar(@attributes) > 1);
 
-      # creation and storing of simpe-feature
+      # creation and storing of simple-feature
       my ($seqid,$source,$type,$start,$end,$score,$strand,$phase,$href) = @{$attributes[0]};
 
       # process attributes of the SimpleFeature to get the DisplayId if no $label is given
       my $display_label;
-      unless ($label) {   # use id as label if no label has been supplied
+      unless ($label){    # use id as label if no label has been supplied
         my %vals = %$href;
         $display_label = ${$vals{ID}}[0];
+ 
       }else{
        $display_label = $label;
       }
@@ -583,7 +583,7 @@ sub store_as_simple_feature{
                                                 -strand   => $strand,
                                                 -slice    => $self->slice,
                                                 -analysis => $analysis,
-                                                -score    => $score,
+                                                -score    => ($score eq '.' ? '0.0' : $score),
                                                 -display_label => $display_label,
                                                 -dbID     => undef,
                                                 -adaptor  => undef
