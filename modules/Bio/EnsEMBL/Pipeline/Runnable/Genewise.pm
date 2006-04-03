@@ -170,7 +170,7 @@ sub align_protein {
 
   if(defined $transcript){
     my $gene = new Bio::EnsEMBL::Gene;
-    $gene->type("genewise");
+    $gene->biotype("genewise");
     $gene->add_Transcript($transcript);
     
     $self->addGene($gene);
