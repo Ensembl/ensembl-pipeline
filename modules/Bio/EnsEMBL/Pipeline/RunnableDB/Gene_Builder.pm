@@ -183,7 +183,10 @@ sub write_output {
 	foreach my $gene (@genes) { 
 	    $gene->analysis($analysis);
 	    $gene->type($genetype);
-	    
+
+            # prevent lazy-loading of transcript supporting features 
+            map { $_->get_all_supporting_features} @{$gene->get_all_Transcripts};
+
 	    # store
 	    eval {
         $gene_adaptor->store($gene);
