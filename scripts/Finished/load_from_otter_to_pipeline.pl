@@ -416,15 +416,15 @@ sub make_clone_attribute {
 	my ( $acc, $ver ) = @_;
 	my @attrib;
 	my $attrib = &make_attribute(
-		'htgs_phase',                              'HTGS Phase',
-		'High Throughput Genome Sequencing Phase', '3'
+		'htg',                              'htg',
+		'High Throughput phase attribute', '3'
 	);
 	push @attrib, $attrib;
 #	push @attrib,
 #	  &make_attribute( 'intl_clone_name', 'International Clone Name',
 #		'', '' );
 	push @attrib,
-	  &make_attribute( 'embl_accession', 'EMBL Accession', '', $acc );
+	  &make_attribute( 'embl_acc', 'EMBL accession', '', $acc );
 	push @attrib, &make_attribute( 'embl_version', 'EMBL Version', '', $ver );
 	return \@attrib;
 }
@@ -435,9 +435,9 @@ sub make_seq_set_attribute {
 	my @attrib;
 	push @attrib,
 	  &make_attribute(
-		'desc',
-		'Assembly Description',
-		'Assembly Description for  this Sequence Set', $desc
+		'description',
+		'Description',
+		'A general descriptive text attribute', $desc
 	  );
 	foreach my $ch (@$arr_ref) {
 		push @attrib,
