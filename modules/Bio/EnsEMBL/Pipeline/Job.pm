@@ -517,7 +517,7 @@ sub run_module {
     $perl_path = $module;
   }
 
-  my $current_verbosiry = logger_verbosity;
+  my $current_verbosity = logger_verbosity;
   logger_verbosity($verbosity);
 
   #print STDERR "have perlpath ".$perl_path."\n";
