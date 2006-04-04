@@ -256,7 +256,7 @@ sub set_up_queues {
 
     next unless $ln;
 
-    delete $queue->{logic_name};
+    #delete $queue->{logic_name};
 
     while (my($k, $v) = each %$queue) {
       $q{$ln}{$k}     = $v;
