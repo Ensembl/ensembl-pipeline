@@ -48,7 +48,7 @@ sub new {
     my $self = $class->SUPER::new(@_);    
            
     my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, 
-        $endbias, $gap, $extension, $matrix, $minimum_feature_length, $cluster_start, $cluster_end) = 
+        $endbias, $gap, $extension, $matrix, $minimum_feature_length, $cluster_start, $cluster_end,$full_seq) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
@@ -62,6 +62,7 @@ sub new {
                             MINIMUM_FEATURE_LENGTH
                             CLUSTER_START
                             CLUSTER_END
+                            FULLSEQ
 			   )],
 			@args);
 
@@ -87,6 +88,7 @@ sub new {
 
     $self->cluster_start($cluster_start)    if defined($cluster_start);
     $self->cluster_end($cluster_end)        if defined($cluster_end);
+    $self->full_seq($full_seq)              if defined($full_seq);
 
     #print STDERR @$features." have be passed into MultiMiniGenewise\n";
     return $self;
@@ -326,6 +328,18 @@ sub run {
 
         #print STDERR "Number of features       = ".scalar(@forward)."\n";
         #print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+	@forward = sort {$a->start <=> $b->start } @forward;
+	
+	print "Range of 'forward' features = " . $forward[0]->start . " to " . $forward[-1]->end . "\n";
+	
+	my $rangefeat = new Bio::EnsEMBL::FeaturePair(-start => $forward[0]->start,
+						      -end   => $forward[-1]->end,
+						      -strand=> 1,
+						      -slice => $genomic_subseq);
+
+	@forward = ($rangefeat) if $self->full_seq;
+
+	print "Using full length sequence\n" if $self->full_seq;
 
         if (@extras) {
           my $runnable  = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
@@ -362,6 +376,18 @@ sub run {
 
 #        print STDERR "Number of features       = ".scalar(@reverse)."\n";
 #        print STDERR "Number of extra features = ".scalar(@extras)   ."\n";
+         @reverse = sort {$a->start <=> $b->start } @reverse;
+         print "Range of 'reverse' features = " . $reverse[0]->start . " to " . $reverse[-1]->end . "\n";
+
+         my $rangefeat = new Bio::EnsEMBL::FeaturePair(-start => $reverse[0]->start,
+						       -end   => $reverse[-1]->end,
+						       -strand=> -1,
+						       -slice => $genomic_subseq);
+
+ 	@reverse = ($rangefeat) if $self->full_seq;
+	
+	print "Using full length sequence\n" if $self->full_seq;
+	
 
         if (@extras) {
           my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::MiniGenewise(
@@ -603,5 +629,14 @@ sub cluster_end {
   return $self->{_cluster_end};
 }
 
+sub full_seq {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->{'_full_seq'} = $value;
+  }
+
+  return $self->{'_full_seq'};
+}
 1;
 
