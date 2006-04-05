@@ -82,6 +82,10 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_POST_GENEMASK
 							      GB_SIMILARITY_POST_EXONMASK
 							      GB_SIMILARITY_BLAST_FILTER
+							      GB_SIMILARITY_FULLSEQ
+							      GB_SIMILARITY_EXONERATE
+							      GB_SIMILARITY_EXONERATE_PATH
+							      GB_SIMILARITY_EXONERATE_OPTIONS
 							     );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted  qw (
@@ -332,11 +336,23 @@ sub fetch_input {
       
       if (@ids) {
         # only make a runnable if there are any ids to do
+	my $seq;
+#	if(@$GB_SIMILARITY_MASKING){
+#	  $seq = $self->query->get_repeatmasked_seq($GB_SIMILARITY_MASKING, $GB_SIMILARITY_SOFTMASK);
+#	}else{
+	  $seq = $self->query;
+#	}
         my $seqfetcher =  $self->get_seqfetcher_by_type($database->{'type'});
         my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
-        ('-genomic'  => $self->query,
-         '-ids'      => \@ids,
-         '-seqfetcher' => $seqfetcher);
+        ('-genomic'           => $self->query,
+         '-ids'               => \@ids,
+         '-seqfetcher'        => $seqfetcher,
+	 '-fullseq'           => $GB_SIMILARITY_FULLSEQ,
+	 '-exonerate'         => $GB_SIMILARITY_EXONERATE,
+	 '-exonerate_path'    => $GB_SIMILARITY_EXONERATE_PATH,
+	 '-exonerate_options' => $GB_SIMILARITY_EXONERATE_OPTIONS,
+	 '-analysis'          => $self->analysis,
+	);
         
         $self->runnable($runnable);	
         # at present, we'll only ever have one ...
