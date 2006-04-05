@@ -56,12 +56,17 @@ use Bio::EnsEMBL::Pipeline::RunnableI;
 use Bio::PrimarySeqI;
 use Bio::SeqIO;
 use Bio::DB::RandomAccessI;
-
+use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General qw (
 							   GB_INPUTID_REGEX
 							   GB_BMG_FILTER
 							   GB_BMG_SCORE_CUTOFF
 							  );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
+							      GB_SIMILARITY_SOFTMASK
+							      GB_SIMILARITY_EXONERATE
+							     );
+
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder);
@@ -71,7 +76,9 @@ sub new {
 
   my $self = $class->SUPER::new(@args);
   
-  my( $genomic, $ids, $seqfetcher, $endbias, $gap, $extension, $matrix, $terminal_padding, $exon_padding, $minimum_intron, $check_repeated) = 
+  my( $genomic, $ids, $seqfetcher, $endbias, $gap, $extension, $matrix, $terminal_padding,
+      $exon_padding, $minimum_intron, $check_repeated,$full_seq,$exonerate,$exonerate_path,
+      $exonerate_options,$analysis) = 
     $self->_rearrange([qw(GENOMIC
 			  IDS
 			  SEQFETCHER
@@ -82,7 +89,12 @@ sub new {
 			  TERMINAL_PADDING
 			  EXON_PADDING
 			  MINIMUM_INTRON
-			  CHECK_REPEATED)],
+			  CHECK_REPEATED
+			  FULLSEQ
+			  EXONERATE
+			  EXONERATE_PATH
+			  EXONERATE_OPTIONS
+			  ANALYSIS)],
 		      @args);
   
   $self->throw("No genomic sequence input")            unless defined($genomic);
@@ -95,14 +107,18 @@ sub new {
   $self->ids($ids)                                     if defined($ids);
   $self->genomic_sequence($genomic)                    if defined($genomic);
   $self->endbias($endbias)                             if defined($endbias);
-  $self->gap($gap)                                 if defined($gap);
-  $self->extension($extension)                           if defined($extension);
-  $self->matrix($matrix)                              if defined($matrix);
+  $self->gap($gap)                                     if defined($gap);
+  $self->extension($extension)                         if defined($extension);
+  $self->matrix($matrix)                               if defined($matrix);
   $self->terminal_padding($terminal_padding)           if defined($terminal_padding);
   $self->exon_padding($exon_padding)                   if defined($exon_padding);
   $self->minimum_intron($minimum_intron)               if defined($minimum_intron);
   $self->seqfetcher($seqfetcher)                       if defined($seqfetcher);
-
+  $self->full_seq($full_seq)                           if defined($full_seq);
+  $self->exonerate($exonerate)                         if defined($exonerate);
+  $self->exonerate_path($exonerate_path)               if defined($exonerate_path);
+  $self->exonerate_options($exonerate_options)         if defined($exonerate_options);
+  $self->analysis($analysis)                           if defined($analysis);
   # Repeated genes are checked by default.
   if (defined $check_repeated){
     $self->check_repeated($check_repeated);
@@ -337,6 +353,88 @@ sub seqfetcher {
   return $self->{'_seqfetcher'};
 }
 
+=head2 exonerate
+
+    Title   :   exonerate
+    Usage   :   $self->exonerate
+    Function:   Get/Set method for using exonerate rather than Blast
+    Returns :   0 (False) or 1 (True)
+    Args    :   0 (False) or 1 (True)
+
+=cut
+
+sub exonerate {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->{'_exonerate'} = $value;
+  }
+
+  return $self->{'_exonerate'};
+}
+
+=head2 exonerate_path
+
+    Title   :   exonerate_path
+    Usage   :   $path = $self->exonerate_path
+    Function:   Get/Set method for the path to the Exonerate executeable
+    Returns :   String
+    Args    :   String
+
+=cut
+
+sub exonerate_path {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->throw("Cannot find path to exonerate exceutable $value\n") 
+      unless $self->find_executable($value);
+    $self->{'_exonerate_path'} = $value;
+  }
+
+  return $self->{'_exonerate_path'};
+}
+
+=head2 exonerate_options
+
+    Title   :   exonerate_options
+    Usage   :   $options = $self->exonerate_options
+    Function:   Get/Set method for the options for running Exonerate
+    Returns :   String
+    Args    :   String
+
+=cut
+
+sub exonerate_options {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->{'_exonerate_options'} = $value;
+  }
+
+  return $self->{'_exonerate_options'};
+}
+
+=head2 full_seq
+
+    Title   :   full_seq
+    Usage   :   $self->full_seq
+    Function:   Get/Set method for using the full genomic
+            :   sequence rather than the mini seq
+    Returns :   0 (False) or 1 (True)
+    Args    :   0 (False) or 1 (True)
+
+=cut
+
+sub full_seq {
+  my( $self, $value ) = @_;    
+
+  if ($value) {
+    $self->{'_full_seq'} = $value;
+  }
+
+  return $self->{'_full_seq'};
+}
 
 =head2 check_repeated
 
@@ -358,41 +456,61 @@ sub check_repeated {
   return $self->{'_check_repeated'};
 }
 
+sub analysis  {
+
+  my $self = shift;
+  my $analysis = shift;
+  if($analysis){
+    throw("Must pass RunnableDB:analysis a Bio::EnsEMBL::Analysis".
+          "not a ".$analysis) unless($analysis->isa
+                                     ('Bio::EnsEMBL::Analysis'));
+    $self->{'analysis'} = $analysis;
+  }
+  return $self->{'analysis'};
+
+}
 
 =head2 run
 
   Title   : run
   Usage   : $self->run()
-  Function: 
+  Function: Performs a Blast search or an Exonerate search 
+          : with all the protiens, passes the resulting proteins
+          : into a Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise
+          : runnable
   Returns : none
-  Args    : 
+  Args    : none
 
 =cut
 
 sub run {
   my ($self) = @_;
   
-  my @blast_features = $self->run_blast;
+  my @features;
+
+  if ($self->exonerate){
+    @features = $self->run_exonerate;
+  } else {
+    @features = $self->run_blast;
+    foreach my $f (@features){
+      $f->invert($self->genomic_sequence);
+    }
+  }
   
-  unless (@blast_features) {
+  unless (@features) {
     print STDERR "Contig has no associated features.  Finishing run.\n";
     return;
   }
 
   my $mg_runnables;
-  
-  my @feature_pairs;
-  foreach my $f (@blast_features){
-    $f->invert($self->genomic_sequence);
-  }
 
-  @blast_features = sort{$a->start <=> $b->start  
-			   || $a->end <=> $b->end} @blast_features; 
+  @features = sort{$a->start <=> $b->start  
+			   || $a->end <=> $b->end} @features; 
 
   if ($self->check_repeated > 0){ 
-    $mg_runnables = $self->build_runnables(@blast_features);
+    $mg_runnables = $self->build_runnables(@features);
   } else {
-    my $runnable = $self->make_object($self->genomic_sequence, \@blast_features);
+    my $runnable = $self->make_object($self->genomic_sequence, \@features);
     push (@$mg_runnables, $runnable); 
   }
 
@@ -433,9 +551,10 @@ sub run_blast {
   my $dbname = $blastdb->dbfile;
   if($dbname =~/\/tmp\//){
     $dbname =~ s/\/tmp\///g;
-  } 
+  }
 
   my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seq;
+
   foreach my $seq (@sorted_seqs) {
     # First sort out the header parsing. Blergh! cb25.NA_057.31208-61441 Slice, no descrtipion 
      my $regex;
@@ -558,6 +677,7 @@ sub make_object {
                                 '-gap'              => $self->gap,
                                 '-extension'        => $self->extension,
                                 '-matrix'           => $self->matrix,
+				'-fullseq'          => $self->full_seq,
                                 %pars, 
 				);
 
@@ -652,5 +772,83 @@ sub get_Sequence {
 
     return $seq;
 	}
+
+=head2 run_exonerate
+
+  Title   : run_exonerate
+  Usage   : @features = $self->run_exonerate()
+  Function: Uses Bio::Ensembl::Analysis::ExonerateTranscript to align
+          : the proteins to the slice. The supoporting features of 
+          : the transcripts are returned
+  Returns : none
+  Args    : list of Bio::EnsEMBL::BaseAlignFeature objects
+
+=cut
+
+sub run_exonerate {
+  my ($self)= @_;
+  my @features;
+  my @seqs = $self->get_Sequences;
+  if (@seqs != $self->ids) {
+    $self->warn("Managed to get only " . scalar(@seqs) . "  of ".
+		scalar($self->ids) ."for Exonerate run; check indices\n");
+  }
+  my @valid_seqs   = $self->validate_sequence(@seqs);
+  my @sorted_seqs = sort {$a->id cmp $b->id} @valid_seqs;
+  foreach my $seq (@sorted_seqs) {
+
+    print "\nRunning Protein ".$seq->display_id."\n====================================================\n";
+    my $exonerate = new  Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript
+      (
+       -program     => $self->exonerate_path,
+       -analysis    => $self->analysis,
+       -query_seqs  => ([$seq]),
+       -query_type  => 'protein',
+       -target_seqs => ([$self->genomic_sequence]),
+       -target_type => 'dna',
+       -options     => "-W 7 ". $self->exonerate_options,
+      );
+    eval {
+      $exonerate->run;
+    };
+    if ($@){
+      $self->throw("Exonerate died on me$@\n");
+    }
+     my $transcripts = $exonerate->output;
+     unless (scalar(@$transcripts > 0)){
+      print "Didn't get a good exonerate alignment, trying again with a shorter word length\n";
+      $exonerate = new  Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript
+	(
+       -program     => $self->exonerate_path,
+       -analysis    => $self->analysis,
+       -query_seqs  => ([$seq]),
+       -query_type  => 'protein',
+       -target_seqs => ([$self->genomic_sequence]),
+       -target_type => 'dna',
+       -options     => "-W 5 ". $self->exonerate_options,
+	);
+      eval {
+	$exonerate->run;
+      };
+      if ($@){
+	$self->throw("Exonerate died on me$@\n");
+      }
+      $transcripts = $exonerate->output;
+    }
+     unless (scalar(@$transcripts > 0)){
+       print STDERR "Exonerate cannot align  ".$seq->display_id." \n";
+      next;
+    }
+  
+    my @transcripts = @{$exonerate->output};
+    foreach my $trans (@transcripts){
+      foreach my $exon (@{$trans->get_all_Exons}){
+	push @features, @{$exon->get_all_supporting_features};
+      }
+    }
+  }
+  return @features;
+}
+
 
 1;
