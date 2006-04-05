@@ -70,8 +70,8 @@ use vars qw( %Similarity );
 	       GB_SIMILARITY_MAX_INTRON         => 100000,
 
 	       # minimum coverage required to prevent splitting on long introns 
-         # set to more than 100 for most species but for human you need to 
-         #set it to around 90
+               # set to more than 100 for most species but for human you need to 
+               # set it to around 90
 	       GB_SIMILARITY_MIN_SPLIT_COVERAGE => 200,
 
 	       # low complexity threshold - transcripts whose translations have low
@@ -104,6 +104,15 @@ use vars qw( %Similarity );
 	       # set this to one if you want to filter the blast scores before sending to BlastMiningenewise. 
 	       # Currently used for anopheles. For Ano, speeds up the process by 10 folds
 	       GB_SIMILARITY_BLAST_FILTER => 0, 
+
+	       # set this to 1 to use the full genomic sequence for genewise rather than the miniseq (slows things down)
+	       GB_SIMILARITY_FULLSEQ => 0,
+
+	       # set this to 1 to use exonerate to build the miniseq rather than blast (speeds things up)
+	       GB_SIMILARITY_EXONERATE => 0,
+	       # options for using exonerate
+	       GB_SIMILARITY_EXONERATE_PATH     => '/usr/local/ensembl/bin/exonerate-0.9.0',
+	       GB_SIMILARITY_EXONERATE_OPTIONS  => '--maxintron 400000 --bestn 0 -m protein2genome',
 
 	   );
 
