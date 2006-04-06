@@ -53,6 +53,40 @@ use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer );
 
+=head2 fetch_db_version
+
+Fetches the db version of a specific input ID and analysis
+which have been completed.
+Takes one string - input ID
+and one analysis object - Bio::EnsEMBL::Analysis
+and returns the db version as a string.
+Throws an exception if the analysis object does not have a type.
+
+=cut
+
+sub fetch_db_version {
+	my ( $self, $inputId, $analysis) = @_;
+	my $db_version = '';
+	
+	throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
+	  unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
+	
+	my $sth = $self->prepare(
+	q {
+	    SELECT db_version
+    	FROM input_id_analysis
+    	WHERE input_id = ?
+    	AND analysis_id = ? }
+	);
+	$sth->execute($inputId,$analysis->dbID);
+	
+	while ( my $row = $sth->fetchrow_arrayref ) {
+		$db_version = $row->[0];
+	}
+	
+	return $db_version;
+}
+
 =head2 fetch_analysis_by_input_id
 
 Fetches all analyses on a specific input ID
