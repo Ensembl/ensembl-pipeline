@@ -399,7 +399,7 @@ my $seqset_info     = {};
 			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
 			1 );
 		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-			$seqlen, $ctg_ori )  unless ($test_sth->fetchrow_array);
+			$seqlen, 1 )  unless ($test_sth->fetchrow_array);
 			
 		##prime the input_id_analysis table
 		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) if($do_submit);
