@@ -397,7 +397,7 @@ my $seqset_info     = {};
 		##insert clone to contig assembly data into assembly table
 		$test_sth->execute( $asm_seq_reg_id{$sequence_set},
 			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
-			$ctg_ori );
+			1 );
 		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
 			$seqlen, $ctg_ori )  unless ($test_sth->fetchrow_array);
 			
