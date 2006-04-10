@@ -131,9 +131,10 @@ sub fetch_input{
 
   # To add your own genes type, add lines of the sort below; this obviously
   # needs to be made more configurable
-  # my $projected_genes = $self->query->get_all_Genes_by_type('WGA2Genes');
-  # print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes gemes\n";
-  # $self->gw_genes( $projected_genes );
+  # SMJS Hacked in UTR genes for monodelphis here
+  my $projected_genes = $self->query->get_all_Genes_by_type('UTR');
+  print STDERR "got " . scalar(@{$projected_genes}) . " UTR gemes\n";
+  $self->gw_genes( $projected_genes );
 
   # get blessed genes
   my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if ($self->blessed_db);
@@ -208,6 +209,10 @@ sub run_merging{
 
   print STDERR "now have " . scalar(@merged_genes) . " merged genes\n";
 
+  # SMJS Hack need to look at original gene to see if it has UTR
+  my %pairs = %{$self->merged_unmerged_pairs()};
+
+
   # keep track of the cdna genes that have been used already
   my %used_cdna;
 
@@ -225,6 +230,22 @@ sub run_merging{
       $self->unmatched_genes($cds);
       next CDS;
     }
+
+    # SMJS Hack need to look at original gene to see if it has UTR
+
+    my $unmerged = $pairs{$cds};
+    my $unmerged_tran = $unmerged->get_all_Transcripts()->[0];
+    my @unmerged_exons = @{$unmerged_tran->get_all_Exons};
+    if ($unmerged_tran->translation->start != 1 || $unmerged_tran->translation->start_Exon != $unmerged_exons[0] ||
+        $unmerged_tran->translation->end < ($unmerged_exons[-1]->length-2) || $unmerged_tran->translation->end_Exon != $unmerged_exons[-1]) {
+      $self->warn("Skipping gene " . $cds->dbID . " which appears to already have UTRs\n" .
+                  " trans start = " . $unmerged_tran->translation->start . " start exon " . $unmerged_tran->translation->start_Exon . " first exon " . $unmerged_exons[0] ."\n" .
+                  " trans end   = " . $unmerged_tran->translation->end . " end exon " . $unmerged_tran->translation->end_Exon . " last exon " . $unmerged_exons[-1] .
+                  " last exon length = " . $unmerged_exons[-1]->length . "\n");
+      $self->unmatched_genes($cds);
+      next CDS;
+    }
+
 
     # find the matching cdna
     my ($matching_cdnas, $utr_length_hash) = $self->match_protein_to_cdna($cds);
@@ -1105,6 +1126,7 @@ sub transcript_from_single_exon_genewise {
       my $tend   = $translation->end;
       $translation->start($tstart+$diff);
       $translation->end($tend + $diff);
+      print "Single exon " . $gw_exon->start . " " . $gw_exon->end . "\n";
       
       $self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
       $self->throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
@@ -1112,7 +1134,7 @@ sub transcript_from_single_exon_genewise {
     
     # expand frameshifted single exon genewises back from one exon to multiple exons
     if(scalar($ex->sub_SeqFeature) > 1){
-      #print STDERR "frameshift in a single exon genewise\n";
+      print STDERR "frameshift in a single exon genewise\n";
       my @sf = sort { $a->start <=> $b->start } $ex->sub_SeqFeature;
       
       # save current start and end of modified exon
@@ -1248,6 +1270,7 @@ sub transcript_from_multi_exon_genewise_forward{
     # modify the start only if this e2g exon is not the first of the transcript
     elsif(  $current_start > $gwstart && $exoncount != 0 ) {
       $ex->start($current_exon->start);
+      $ex->phase(-1);
     }
 
     # add all the exons from the est2genome transcript, previous to this one
@@ -1436,23 +1459,23 @@ sub transcript_from_multi_exon_genewise_reverse{
       # genewise has leaked over the start. Tougher call - we need to take into account the
       # frame here as well
       $modified_peptide = 1;
-      #print STDERR "SHORTENING GENEWISE TRANSLATION\n";
-      #print STDERR "In Reverse strand. gw exon ends: ".$gwexons[0]->end." > cdna exon end: ".$current_exon->end."\n";
-      #print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
+      print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+      print STDERR "In Reverse strand. gw exon ends: ".$gwexons[0]->end." > cdna exon end: ".$current_exon->end."\n";
+      print STDERR "modifying exon, as cdna exon is not the first of transcript-> exoncount = $exoncount\n";
 
       my $diff = $gwexons[0]->end - $current_exon->end;
       my $gwstart = $gwexons[0]->end;
       my $current_start = $current_exon->end;
       my $tstart = $translation->start;
 
-      #print STDERR "before the modification:\n";
-      #print STDERR "start_exon: ".$translation->start_Exon."\n";
-      #print STDERR "gw translation start: ".$tstart."\n";
-      #print STDERR "start_exon: ".$translation->start_Exon->start.
-      #  "-".$translation->start_Exon->end.
-      #    " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
-      #      " phase: ".$translation->start_Exon->phase.
-      #	" end_phase: ".$translation->start_Exon->end_phase."\n";
+      print STDERR "before the modification:\n";
+      print STDERR "start_exon: ".$translation->start_Exon."\n";
+      print STDERR "gw translation start: ".$tstart."\n";
+      print STDERR "start_exon: ".$translation->start_Exon->start.
+        "-".$translation->start_Exon->end.
+          " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
+            " phase: ".$translation->start_Exon->phase.
+      	" end_phase: ".$translation->start_Exon->end_phase."\n";
 
       if    ($diff % 3 == 0) { $translation->start(1); }
       elsif ($diff % 3 == 1) { $translation->start(3); }
@@ -1468,6 +1491,8 @@ sub transcript_from_multi_exon_genewise_reverse{
 
     # modify the coordinates of the first exon in $newtranscript
     if ( $current_exon->end > $gwexons[0]->end){
+      print "Setting end because cdna has longer first exon " . $current_exon->end . " gw exon end = " . $ex->end . "\n";
+
       $ex->end($current_exon->end);
       $ex->phase(-1);
     }
@@ -1475,20 +1500,22 @@ sub transcript_from_multi_exon_genewise_reverse{
       $ex->end($gwexons[0]->end);
     }
     elsif (  $current_exon->end < $gwexons[0]->end && $current_exon != $egexons[0] ){
+      print "Setting end because cdna has shorter first exon " . $current_exon->end . " gw exon end = " . $ex->end . "\n";
       $ex->end($current_exon->end);
+      $ex->phase(-1);
     }
 
     # need to explicitly set the translation start exon for translation to work out
     $translation->start_Exon($ex);
 
-    #print STDERR "after the modification:\n";
-    #print STDERR "start_Exon: ".$translation->start_Exon."\n";
-    #print STDERR "gw translation start: ".$translation->start."\n";
-    #print STDERR "start_exon: ".$translation->start_Exon->start.
-    #	"-".$translation->start_Exon->end.
-    #  " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
-    #  " phase: ".$translation->start_Exon->phase.
-    #      " end_phase: ".$translation->start_Exon->end_phase."\n";
+    print STDERR "after the modification:\n";
+    print STDERR "start_Exon: ".$translation->start_Exon."\n";
+    print STDERR "gw translation start: ".$translation->start."\n";
+    print STDERR "start_exon: ".$translation->start_Exon->start.
+    	"-".$translation->start_Exon->end.
+      " length: ".($translation->start_Exon->end - $translation->start_Exon->start + 1).
+      " phase: ".$translation->start_Exon->phase.
+          " end_phase: ".$translation->start_Exon->end_phase."\n";
 
     Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
     $self->add_5prime_exons($transcript, $exoncount, @egexons);
@@ -1612,6 +1639,9 @@ sub add_5prime_exons{
     $c++;
   }
 
+  if ($exoncount > 0) {
+    $transcript->translation->start_Exon->phase(-1);
+  }
 }
 
 # $exon is the terminal exon in the genewise transcript, $transcript. We need
@@ -1702,6 +1732,10 @@ sub add_3prime_exons {
     #	print STDERR "Adding 3prime exon " . $newexon->start . " " . $newexon->end . "\n";
     $transcript->add_Exon($newexon);
     $c--;
+  }
+
+  if ($#e2g_exons > $exoncount) {
+    $transcript->translation->end_Exon->end_phase(-1);
   }
 }
 
