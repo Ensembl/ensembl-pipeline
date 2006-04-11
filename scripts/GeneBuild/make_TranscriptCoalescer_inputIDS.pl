@@ -10,11 +10,15 @@ use Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster;
 use Bio::EnsEMBL::Analysis::Runnable::TranscriptCoalescer; 
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::TranscriptCoalescer; 
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases; 
+use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
+use Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Analysis::RunnableDB);
 
-
+$| = 1;
 
 # get a contig with a piece-of/entire  chromosome
 
@@ -98,6 +102,25 @@ if($name =~/all/i) {
 }
 
 
+my %database_hash;
+my %coalescer_hash = %{$TRANSCRIPT_COLAESCER_DB_CONFIG};
+my %databases = %{$DATABASES};
+for my $category (keys %databases ) {
+  
+  if(!$databases{$category}{-host} || !$databases{$category}{-dbname}){
+    print "Skipping category ".$category." no dbinfo ".
+      "defined\n";
+    next;
+  }
+  print "\n$category: $databases{$category}{-host} $databases{$category}{-dbname} :\n--------------------------------------\n" ;
+  my %constructor_args = %{$databases{$category}};
+  my $dba = new Bio::EnsEMBL::DBSQL::DBAdaptor
+    (
+     %constructor_args,
+    );
+  $database_hash{$category} = $dba;
+}
+
 foreach my $slice ( @slices) {
   my @all_genes ; 
 
@@ -115,82 +138,46 @@ foreach my $slice ( @slices) {
   # getting genes out of different databases defiend by config file 
   #
  
-
- 
-  my %databases = %{$DATABASES};
-  for my $category (keys %databases ) {
-    print "\n$category: $databases{$category}{DBHOST} $databases{$category}{DBNAME} :\n--------------------------------------\n" ;
-
-    my $dba = new Bio::EnsEMBL::DBSQL::DBAdaptor
-    (
-        '-host'   => $databases{$category}{DBHOST},
-        '-dbname' => $databases{$category}{DBNAME},
-        '-user'   => $databases{$category}{DBUSER},
-        '-pass'   => $databases{$category}{DBPASS},
-        '-port'   => $databases{$category}{DBPORT},
-    );
- 
-    # use slice out of different db   
-    my $tmp_slice = $dba->get_SliceAdaptor->fetch_by_name($slice->name) ;
   
+   for my $category (keys %coalescer_hash ) {
+      my $dba = $database_hash{$category};
+     # use slice out of different db   
+     my $tmp_slice = $dba->get_SliceAdaptor->fetch_by_name($slice->name) ;
+     
 
-   # getting simgw and est genes 
-    my $genes ; 
-    for my $biotype ( @{$databases{$category}{BIOTYPES} }) {
-      push @all_biotypes, $biotype ; 
-      my @genes =@{ $tmp_slice->get_all_Genes_by_type($biotype) } ; 
-      print "Have " . scalar(@genes) . " genes [$biotype]\n" ; 
-      push @all_genes , @genes ; 
-    }
-   
-   # PREDICTION  TRANSCRIPTS 
-   for my $logic_name_becomes_biotype ( @{$databases{$category}{AB_INITIO_LOGICNAMES} }) { 
-
-     push @all_biotypes, $logic_name_becomes_biotype ;
- 
-     my $pt = $tmp_slice->get_all_PredictionTranscripts( $logic_name_becomes_biotype ) ;
-     print "Have " . scalar(@$pt) . " genes [$logic_name_becomes_biotype]\n" ; 
-     my $ab_initio_genes = convert_prediction_transcripts_to_genes(
-                            $pt,$logic_name_becomes_biotype ) ;
-     push @all_genes, @$ab_initio_genes ; 
-   }
- }   
-
-  print "have " .scalar(@all_genes) . " genes for slice $slice \n" ; 
+     # getting simgw and est genes 
+     my $genes ; 
+     for my $biotype ( @{$coalescer_hash{$category}{BIOTYPES} }) {
+       push @all_biotypes, $biotype ; 
+       print "Fetching all genes from ".$tmp_slice->name." by ".
+         "biotype ".$biotype."from ".$tmp_slice->adaptor->dbc->dbname."\n";
+       my @genes =@{ $tmp_slice->get_all_Genes_by_type($biotype)} ; 
+       print "Have " . scalar(@genes) . " genes [$biotype]\n" ; 
+       push @all_genes , @genes ; 
+     }
+     
+     # PREDICTION  TRANSCRIPTS 
+     for my $logic_name_becomes_biotype ( @{$coalescer_hash{$category}{AB_INITIO_LOGICNAMES} }) { 
+       
+       push @all_biotypes, $logic_name_becomes_biotype ; 
+       
+       my $pt = $tmp_slice->get_all_PredictionTranscripts( $logic_name_becomes_biotype ) ;
+       print "Have " . scalar(@$pt) . " genes [$logic_name_becomes_biotype]\n" ; 
+       my $ab_initio_genes = convert_prediction_transcripts_to_genes(
+                                                                     $pt,$logic_name_becomes_biotype ) ;
+       push @all_genes, @$ab_initio_genes ; 
+     }
+   }   
+  throw("Slice ".$slice->name." has no genes ") if(@all_genes == 0);
+    print "have " .scalar(@all_genes) . " genes for slice ".$slice->name." \n" ; 
   print "having slice_size $slice_size\n" ; 
-
-
-  @all_genes = sort { $a->seq_region_start <=> $b->seq_region_start }  @all_genes ; 
-
-  my  @cluster  =  @{cluster_Genes(\@all_genes, \@all_biotypes)}  ;  
-  @cluster = sort {$a->start <=> $b->start } @cluster ;  
-
-   #for my $cluster (@cluster) { 
-   #  print $cluster->start . "---" . $cluster->end . "\n" ; 
-   #}
-
-
-  my $start = 1 ; 
-
-  for (my $i=0 ; $i<@cluster ; $i++) { 
-    my $c = $cluster[$i] ;  
-   
-    my $diff = $c->end - $start ; 
-    
-    if ($diff > $slice_size ) { 
-      my $end = $cluster[$i-1]->end ; 
-      
-      my $id = $coord_sys_name . ":" . $coord_sys_version .":".$seq_region_name .  ":" .  $start . ":" . $end . ":1" ; 
-      #print "$id\n" ;
-      push @input_ids , $id ;  
-      $start = $cluster[$i]->start ; 
-      next ;  
-    }
-    # recover last one 
+  
+  my $id = create_input_id(\@all_genes, \@all_biotypes, $coord_sys_name, $coord_sys_version, $seq_region_name);
+  my @values = split /\:/, $id;
+  if(!$values[0] || !$values[2]){
+    throw("created id ".$id." isn't right");
   }
-    my $end = $cluster[$#cluster]->end ;  
-    my $id = $coord_sys_name . ":" . $coord_sys_version . ":$seq_region_name:"   . $start . ":" . $end . ":1" ; 
-    push @input_ids , $id ;   
+  push @input_ids , $id if($id);   
 }
 
 
@@ -207,7 +194,42 @@ print "sql-statements written to $outfile - finished\n" ;
 
 
 
+sub create_input_id{
+  my ($genes, $biotypes, $coord_sys_name, $coord_sys_version, $seq_region_name) = @_;
+  my @all_genes = @$genes;
+  my @all_biotypes = @$biotypes;
+   @all_genes = sort { $a->seq_region_start <=> $b->seq_region_start }  @all_genes ; 
 
+  my  @cluster  =  @{cluster_Genes(\@all_genes, \@all_biotypes)}  ;  
+  @cluster = sort {$a->start <=> $b->start } @cluster ;  
+  print "Printing cluster info\n";
+   for my $cluster (@cluster) { 
+     print $cluster->start . "---" . $cluster->end . "\n" ; 
+   }
+
+
+  my $start = 1 ; 
+
+  for (my $i=0 ; $i<@cluster ; $i++) { 
+    my $c = $cluster[$i] ;  
+    print "Each element of cluster is ".$c."\n";
+    my $diff = $c->end - $start ; 
+    
+    if ($diff > $slice_size ) { 
+      my $end = $cluster[$i-1]->end ; 
+      
+      my $id = $coord_sys_name . ":" . $coord_sys_version .":".$seq_region_name .  ":" .  $start . ":" . $end . ":1" ; 
+      #print "$id\n" ;
+      push @input_ids , $id ;  
+      $start = $cluster[$i]->start ; 
+      next ;  
+    }
+    # recover last one 
+  }
+  my $end = $cluster[-1]->end if(@cluster > 0);  
+  my $id = $coord_sys_name . ":" . $coord_sys_version . ":$seq_region_name:"   . $start . ":" . $end . ":1" if(@cluster > 0); 
+  return $id;
+}
 
 
 
@@ -446,7 +468,6 @@ sub  convert_prediction_transcripts_to_genes {
       # converting Bio::EnsEMBL::PredictionExon into ExonExtened (ISA Bio::EnsEMBL::Exon)  
       my $pte =$pt_exons[$i] ;
       bless $pte,"Bio::EnsEMBL::Analysis::Runnable::Condense_EST::ExonExtended" ;
-      $pte->biotype($logic_name_becomes_biotype) ;
       $pte->end_phase(0);
       $pte->phase(0);
       $pte->next_exon($pt_exons[$i+1]) ;
