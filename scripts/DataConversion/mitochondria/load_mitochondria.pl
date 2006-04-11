@@ -28,15 +28,55 @@ use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
 use MitConf;
 use Getopt::Long;
-use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
+use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
 my $help;
 my @genes;;
 my $translation; # JUST INCASE
 my $count;
 
+my %opt; 
+
+
+ # options submitted with commandline override MitConf.pm 
+
 GetOptions(
-           '-h|help'    => \$help,
-           ) or &usage();
+           \%opt ,
+           '-h|help'    , 
+           'dbhost=s' , 
+           'dbuser=s' , 
+           'dbpass=s' , 
+           'dbport=i' , 
+           'dbname=s' , 
+           'contig=s',      # MIT_CONTIG_SEQNAME 
+           'chromosome=s',  # MIT_CHROMOSOME_SEQNAME 
+           'supercontig=s', # MIT_SUPERCONTIG_SEQNAME
+           'clone=s',       # MIT_CLONE_SEQNAME 
+           'toplevel=s',    # MIT_TOPLEVEL 
+           'gene_type=s', 
+           'trna_type=s',
+           'rrna_type=s', 
+           'codon_table=i', 
+           'name=s' , 
+           'genbank_file=s' , 
+           ) ; # or &usage();
+
+if ($opt{dbhost} && $opt{dbuser} && $opt{dbname} && $opt{dbpass} && $opt{dbport} ) {  
+  $MIT_DBHOST  = $opt{dbhost} ; 
+  $MIT_DBUSER = $opt{dbuser} ;  
+  $MIT_DBPASS = $opt{dbpass} ; 
+  $MIT_DBPORT = $opt{dbport} ; 
+  $MIT_DBNAME = $opt{dbname} ; 
+}
+
+$MIT_GENBANK_FILE = $opt{genbank_file} if $opt{genbank_file} ; 
+$MIT_LOGIC_NAME =  $opt{logic_name} if $opt{logic_name} ; 
+$MIT_NAME =  $opt{name} if $opt{name} ; 
+$MIT_TOPLEVEL =  $opt{toplevel} if $opt{toplevel} ; 
+$MIT_CODON_TABLE =  $opt{codon_table} if $opt{codon_table} ; 
+$MIT_GENE_TYPE =  $opt{gene_type} if $opt{gene_type} ; 
+$MIT_TRNA_TYPE =  $opt{trna_type} if $opt{trna_type} ; 
+$MIT_RRNA_TYPE =  $opt{rrna_type} if $opt{rrna_type} ; 
+
 
 unless ($MIT_DBHOST && $MIT_DBUSER && $MIT_DBNAME && $MIT_GENBANK_FILE && !$help){
   warn("Can't run without MitConf.pm values:
@@ -62,8 +102,66 @@ if ($help) {
 ############################
 #PARSE GENBANK FILE FIRST
 
-my ($genbank_ref,$assembly_ref)  = &_parse_coordinates;
-my @genbank = @{$genbank_ref};
+my ($genbank_ref,$assembly_ref)  = &_parse_coordinates; 
+
+# filter the genbank-entries in the file because the tRNA's are 
+# redundant ( ( some tRNA features are annotated by tRNAscan-SE 
+# which we don't want to load ) 
+
+my ($s,$e) ;  
+my %nonred_entries ; 
+
+my %why1 = %{ ${$genbank_ref}[0] } ;
+my %why2 = %{ ${$genbank_ref}[1] } ;
+
+
+for my $g (@$genbank_ref) {   
+
+   my %entry = %$g ;  
+
+   # 
+   #  filter / find entries :
+   #  kill all entries which have at leat 2 times the same start/end and an additional note 
+   #  "anotated by tRNA-scan-SE" 
+    
+   #  get start/end and note out of the entry   
+   my $start="" ; 
+   my $end = "" ; 
+   my $note ="";
+
+   foreach my $k (sort keys %entry) {  
+
+     if ($k=~/start/) {  
+       my @starts = @{$entry{$k}} ;    
+       throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
+       $start = join ("-", @starts)  ;  
+
+     } elsif ($k=~/end/) {  
+       my @starts = @{$entry{$k}} ;   
+       throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;   
+       $end = join ("-", @starts)  ;  
+
+     } elsif ($k=~m/note/){  
+       $note = $entry{$k} ;  
+     } 
+   }  
+
+     if (!exists $nonred_entries{"$start-$end"} && $start && $end ){   
+       if ( $note!~m/tRNAscan-SE/) {  
+         $nonred_entries{"$start-$end"}=\%entry;  
+       }else {  
+         print " feature with coords $start-$end will be skipped because $note\n" ; 
+       } 
+     } else{ 
+         print " feature with coords $start-$end will be skipped because $note\n" ; 
+     }
+}
+
+
+my @genbank =  values %nonred_entries ; 
+
+#my @genbank = @{$genbank_ref}; 
+
 my %assembly = %{$assembly_ref};
 
 ##########################
@@ -90,15 +188,28 @@ my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 # Check taxon is correct
 
 my $meta_container = $output_db->get_MetaContainer();
-my $db_taxon_id = $meta_container->get_taxonomy_id();
-my $gb_taxon_id = $genbank[1]{'db_xref'};
-$gb_taxon_id =~ s/^taxon://;
-if ($db_taxon_id  == $gb_taxon_id){
-print "Genbank taxon id $gb_taxon_id matches the taxon id in the meta table\n";
-}else {
-  croak "taxonomy id in the genbank file $gb_taxon_id is not equal to the id found in the meta table $db_taxon_id \n";
+my $db_taxon_id = $meta_container->get_taxonomy_id(); 
+my $gb_taxon_id ; 
+
+my %genome ; 
+
+foreach my $entry (@genbank ){ 
+     ##print "getting the source: $entry \n" ;
+     ## print join ("\n", keys %$entry) ; 
+  if ($$entry{source}){  
+     $gb_taxon_id = $$entry{'db_xref'};   
+     #  print "\n\n\n$gb_taxon_id \n\n\n" ; 
+      %genome = %{$entry} ; 
+  }
 }
 
+#$gb_taxon_id =~ s/^taxon://;
+#if ($db_taxon_id  == $gb_taxon_id){
+#  print "Genbank taxon id $gb_taxon_id matches the taxon id in the meta table\n";
+#}else {
+#  croak "taxonomy id in the genbank file $gb_taxon_id is not equal to the id found in the meta table $db_taxon_id \n";
+#}
+#
 ###########################################
 # write chromsome if it is not already there
 
@@ -157,6 +268,7 @@ if(!defined $ensembl_analysis){
   print "You have no ".$logic_name." defined creating new object\n";
 }
 
+
  #########################################################
  # Create gene objects from array of hashes
  # contining parsed coords
@@ -165,6 +277,7 @@ if(!defined $ensembl_analysis){
  # subsequent indecies contain all the other annotations
 
 for (my $i=2; $i <= $#genbank; $i++){
+
   my $desc = $genbank[$i]{'product'};
   my $type = $genbank[$i]{'type'};
   my $status = "KNOWN";
@@ -174,7 +287,7 @@ for (my $i=2; $i <= $#genbank; $i++){
     $acc =  $genbank[$i]{'protein_id'};
   }
   else{
-    $acc = $genbank[0]{'accession'}."  ".$genbank[$i]{'start'}."  ".$genbank[$i]{'end'};
+    $acc = $why1{'accession'}."  ".${$genbank[$i]{'start'}}[0]."  ".${$genbank[$i]{'end'}}[0]; 
   }
 
   my $strand =  $genbank[$i]{'strand'};
@@ -183,9 +296,6 @@ for (my $i=2; $i <= $#genbank; $i++){
   }
   if ($type eq 'rRNA'){
     $type = $MIT_RRNA_TYPE;
-  }
-  foreach my $key (keys %{$genbank[$i]}){
-    print "$key ".$genbank[$i]{$key}."\n" if $MIT_DEBUG;
   }
   print "\n***********************************************************\n" if $MIT_DEBUG;
   # By default analysis is set to ncRNA
@@ -249,13 +359,13 @@ for (my $i=2; $i <= $#genbank; $i++){
 
   my $gene = new Bio::EnsEMBL::Gene;
   eval {
-  $gene->biotype($type);
-  $gene->analysis($analysis);
-  $gene->status($status);
-  $gene->description($desc);
-  $gene->add_Transcript($transcript);
-  $count++;
-};
+    $gene->biotype($type);
+    $gene->analysis($analysis);
+    $gene->status($status);
+    $gene->description($desc);
+    $gene->add_Transcript($transcript);
+    $count++;
+  };
   if ($@){
     print "Error: $@\n";
     exit;
@@ -308,7 +418,7 @@ exit 0;
 
 sub load_db(){
   my ($output_db,$genes)=@_;
-
+  print "storing genes\n" ; 
   #############
   # STORE GENES
 
@@ -319,6 +429,8 @@ sub load_db(){
   }
   return 0;
 }
+
+
 
 #######################################
 # PARSE COORDINATES OUT OF GENBANK FILE
@@ -361,9 +473,16 @@ sub _parse_coordinates(){
 ####################################
 # Array of hashes holds genbank data
 
+my $first_entry = 0  ; 
+
+  # read all entries and than filter the predictions 
+
   for (@genbank_file){
     # ignore sequence data
-    next if $_ =~ /^\d+/; 
+    next if $_ =~ /^\d+/;  
+
+    my @sources = split/\s+/ ; 
+
     # make comma delimited
     $_ =~ s/\s+/,/g;
     # comment line holds contig name
@@ -383,17 +502,19 @@ sub _parse_coordinates(){
       $go = "stop";
     }
     # Types of entries to parse all others are ignored, could be extended if needed
-    if ($_ =~ /^tRNA/ || $_ =~ /^rRNA/ || $_ =~ /^CDS/ || $_ =~ /^ACCESSION/ || $_ =~ /^source/ ){
-      push(@entries,%entry);
+    if ($_ =~ /^tRNA/ || $_ =~ /^rRNA/ || $_ =~ /^CDS/ || $_ =~ /^ACCESSION/ || $_ =~ /^source/ ){ 
       $index++;
+      push(@entries,%entry);
       # splits the line into words and parses them into the hash
       $_ =~ s/^\,//;
       $_ =~ s/\,/\./g;
       $_ =~ s/\)//g;
-      my @string = split(/\./,$_);
-	if ($_ =~ /ACCESSION/){
-	  $entries[0]{'accession'}=$string[1];
-	}
+      my @string = split(/\./,$_); 
+
+        if ($_ =~ /ACCESSION/){
+	  $entries[$index]{'accession'}=$string[1]; 
+	} 
+
 	else{
 	  if  ($string[1]=~ 'complement'){
 	    $entries[$index]{'strand'}='-1';
@@ -474,9 +595,12 @@ sub _parse_coordinates(){
   if ($MIT_CONTIG_SEQNAME){
     $assembly{'contig'} = $MIT_CONTIG_SEQNAME
   }
-  else {
+  else { 
     if ($comment =~ /reference,sequence,was,derived,from,(\w+)./){
-      $assembly{'contig'} = "$1.".@{$entries[1]{'start'}}[0].".".@{$entries[1]{'end'}}[0];
+      $assembly{'contig'} = "$1.".@{$entries[1]{'start'}}[0].".".@{$entries[1]{'end'}}[0];  
+
+
+      $assembly{contig} ="AY172335" ; 
     }
   }
   return \@entries,\%assembly;
