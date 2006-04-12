@@ -1,0 +1,201 @@
+>>Bio/EnsEMBL/Analysis/Config/Blast.pm
+package  Bio::EnsEMBL::Analysis::Config::Blast;
+
+%Config = 
+  (
+   BLAST_CONFIG => 
+   {
+    DEFAULT => 
+    {
+     BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
+     PARSER_PARAMS => 
+     {
+      -regex => '^(\w+)',
+      -query_type => undef,
+      -database_type => undef,
+     },
+     BLAST_FILTER => undef,
+     FILTER_PARAMS => {},
+     BLAST_PARAMS => 
+     {
+      -unknown_error_string => 'FAILED',
+      -type => 'wu',
+     }
+    },
+    Rfam =>   
+    {	 
+     BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+     PARSER_PARAMS => 
+     {
+      -regex => '(\w+)\.\w+',
+      -query_type => undef,
+      -database_type => undef,
+     },
+     BLAST_FILTER => undef,
+	     FILTER_PARAMS => {},
+     BLAST_PARAMS => 
+     {
+      -unknown_error_string => 'FAILED',
+      -type => 'ncbi',
+     }
+    },
+    BlastmiRNA => 
+    {
+     BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
+     PARSER_PARAMS => 
+     {
+      -regex => '\w+\s+(\w+)',
+      -query_type => 'dna',
+      -database_type => 'dna',
+     },
+     BLAST_FILTER => undef,
+     FILTER_PARAMS => {},
+     BLAST_PARAMS => 
+     {
+      -unknown_error_string => 'FAILED',
+      -type => 'wu',
+     }
+    },
+   },
+   BLAST_AB_INITIO_LOGICNAME => 'Genscan'
+  );
+
+>>Bio/EnsEMBL/Pipeline/Config/General.pm
+package Bio::EnsEMBL::Pipeline::Config::General;
+
+use strict;
+use vars qw(%Config);
+%Config = (
+  BIN_DIR  => '/usr/local/ensembl/bin',
+  DATA_DIR => '/usr/local/ensembl/data',
+  LIB_DIR  => '/usr/local/ensembl/lib',
+  PIPELINE_WORK_DIR   => '/tmp',
+  PIPELINE_INPUT_DIR => '',
+  PIPELINE_TARGET_DIR =>'',
+  SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',
+  PIPELINE_REPEAT_MASKING => ['RepeatMask','Dust'],	
+  SNAP_MASKING => [],
+  MAX_JOB_TIME => 86400,
+  KILLED_INPUT_IDS => '',
+  RENAME_ON_RETRY => 1,
+);
+
+>>Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
+package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+
+use strict;
+use vars qw(%Config);
+%Config = (
+  QUEUE_MANAGER       => 'LSF',
+  DEFAULT_BATCH_SIZE  => 10,
+  DEFAULT_RETRIES     => 3,
+  DEFAULT_BATCH_QUEUE => 'normal',
+  DEFAULT_OUTPUT_DIR  => '/tmp',
+  DEFAULT_CLEANUP     => 'yes',
+  AUTO_JOB_UPDATE     => 1,
+  JOB_LIMIT           => 10000,
+  JOB_STATUSES_TO_COUNT => ['PEND'], # RUN, PEND, SSUSP, EXIT, DONE
+  MARK_AWOL_JOBS      => 1,
+  MAX_JOB_SLEEP       => 3600,
+  MIN_JOB_SLEEP => 120,
+  SLEEP_PER_JOB => 30,
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+  DEFAULT_RUNNER => '',
+  QUEUE_CONFIG => [
+    {
+      logic_name => 'BlastmiRNA',
+      batch_size => 500,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      retries    => 3,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      output_dir => '<OUTDIR>/Blast_miRNA',
+      cleanup    => 'no',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    },
+    {
+      logic_name => 'RfamBlast',
+      batch_size => 50,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      retries    => 3,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      output_dir => '<OUTDIR>/RfamBlast',
+      cleanup    => 'no',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    },
+    {
+      logic_name => 'miRNA',
+      batch_size => 1,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      retries    => 3,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      output_dir => '<OUTDIR>/miRNA',
+      cleanup    => 'no',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    }, 
+       {
+      logic_name => 'ncRNA',
+      batch_size => 50,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      retries    => 3,
+      sub_args   => '',
+      runner     => '',
+      queue      => 'long',
+      output_dir => '<OUTDIR>/ncRNA',
+      cleanup    => 'no',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    }, 
+    {
+    logic_name => 'BlastWait',
+    batch_size => 3,
+    resource   => 'linux',
+    retries    => 0,
+    queue => 'normal',
+    output_dir => '<OUTDIR>/BlastWait',
+    runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
+    cleanup => 'no',
+   },
+  ]
+);
+
+>>Bio/EnsEMBL/Analysis/Config/General.pm
+package Bio::EnsEMBL::Analysis::Config::General;
+
+use strict;
+use vars qw(%Config);
+%Config = (
+    BIN_DIR  => '/usr/local/ensembl/bin',
+    DATA_DIR => '/usr/local/ensembl/data',
+    LIB_DIR  => '/usr/local/ensembl/lib',
+
+    ANALYSIS_WORK_DIR => '/tmp',
+    ANALYSIS_REPEAT_MASKING => ['RepeatMask','Dust'],
+);
+
+>>Bio/EnsEMBL/Analysis/Config/Databases.pm
+package Bio::EnsEMBL::Analysis::Config::Databases;
+
+use strict;
+use vars qw( %Config );
+
+# Hash containing config info
+%Config = (
+	      
+	      # database containing sequence plus features from raw computes
+	      GB_DBHOST                  => '<DBHOST>',
+	      GB_DBNAME                  => '<DBNAME>',
+	      GB_DBUSER                  => 'ensro',
+	      GB_DBPASS                  => '',
+	      GB_DBPORT                  => '<DBPORT>',
+	      # this db needs to have clone & contig & static_golden_path tables populated
+	      GB_FINALDBHOST                  => '<WRITEHOST>',
+	      GB_FINALDBNAME                  => '<WRITENAME>',
+	      GB_FINALDBUSER                  => 'ensadmin',
+	      GB_FINALDBPASS                  => '<PASS>',
+              GB_FINALDBPORT                  => '<WRITEPORT>',
+	     );
