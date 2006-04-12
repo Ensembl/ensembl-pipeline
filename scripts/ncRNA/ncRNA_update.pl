@@ -1,7 +1,7 @@
 #!/usr/local/ensembl/bin/perl
 
 
-use Update::ncRNA_update_config;
+use ncRNA::ncRNA_update_config;
 use strict;
 use vars qw(%Config);
 use Getopt::Long;
@@ -112,6 +112,7 @@ foreach my $species (@speciess){
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
 	  "-dbuser ensadmin -dbpass $pass -current";
   print "$cmd\n";
+  print "Use the -run flag to run the pipeline" unless $run;
 };
 # set it back to previous
  $ENV{"PERL5LIB"}= $perlpath;

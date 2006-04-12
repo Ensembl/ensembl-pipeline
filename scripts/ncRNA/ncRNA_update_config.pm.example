@@ -1,4 +1,4 @@
-package Update::ncRNA_update_config;
+package ncRNA::ncRNA_update_config;
 
 use strict;
 use vars qw(%Config);
@@ -43,7 +43,7 @@ use vars qw(%Config);
 				 WRITEINS   => "myia64f",
 				 # lsf load for pipeline/output db
 				 WRITELOAD  => 800,
-				},
+				}
 	             # etc for however many species you want	 				 				 
 		     },
 	   DATADIR   => "/path/to/work/directory",
