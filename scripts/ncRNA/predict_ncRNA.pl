@@ -94,7 +94,7 @@ SPECIES:  foreach my $species (@speciess){
 print "reading RFAM family data...\n";
 # fetch them by familly!!!!!!!!!
 my %thr;
-open( T, "/data/blastdb/Rfam/Rfam.thr" ) or die("can't file the Rfam.thr file");
+open( T, "$BLASTDIR/Rfam.thr" ) or die("can't file the Rfam.thr file");
 while(<T>) {
   if( /^(RF\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s*$/ ) {
     $thr{ $1 } = { 'id' => $2, 'thr' => $3, 'win' => $4, 'mode' => $5 };
@@ -127,91 +127,94 @@ SPECIES :foreach my $species (@speciess){
   $sdb->dnadb($dna_db);
   
   my $fa = Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor->new($sdb);
-  my $aa = $sdb->get_AnalysisAdaptor;
-  my $sa = $sdb->get_SliceAdaptor;
-  my $analysis = $aa->fetch_by_logic_name($aln);
-  my $limit = 0;
-  my %rfam_blasts;
-  my %rfam_threshold;
-  my $dafa = $sdb->get_DnaAlignFeatureAdaptor;
-  my @dafs;
-
-  my $total = scalar(keys (%thr));
-  my $complete;
-  my $last;
+  # dont rerun the filtering if it has already been done
+  my @test_flags = @{$fa->fetch_all};
+  unless (scalar(@test_flags > 0)){
+    my $aa = $sdb->get_AnalysisAdaptor;
+    my $sa = $sdb->get_SliceAdaptor;
+    my $analysis = $aa->fetch_by_logic_name($aln);
+    my $limit = 0;
+    my %rfam_blasts;
+    my %rfam_threshold;
+    my $dafa = $sdb->get_DnaAlignFeatureAdaptor;
+    my @dafs;
+    
+    my $total = scalar(keys (%thr));
+    my $complete;
+    my $last;
     print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
-  foreach my $domain (keys %thr){
-    $count ++;
-    my @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\"")};
-    $complete = int($count/$total*100);
-    if ($complete > $last){
+    foreach my $domain (keys %thr){
+      $count ++;
+      my @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\"")};
+      $complete = int($count/$total*100);
+      if ($complete > $last){
       my $num = $complete -  $last;
-       foreach (my $i = 0; $i < $num; $i++){
-         print "=";
+      foreach (my $i = 0; $i < $num; $i++){
+	print "=";
        }
     }
-   $last = $complete;
-    @dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 2000 );
-  DAF:  foreach my $daf(@dafs){
-      next if ($daf->score < 20);
-      #    print $daf->p_value." ";
-      last DAF if ($rfam_blasts{$domain} &&  scalar(@{$rfam_blasts{$domain}}) >= 2000 );
-      push @{$rfam_blasts{$domain}},$daf;
+      $last = $complete;
+      @dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 2000 );
+    DAF:  foreach my $daf(@dafs){
+	next if ($daf->score < 20);
+	#    print $daf->p_value." ";
+	last DAF if ($rfam_blasts{$domain} &&  scalar(@{$rfam_blasts{$domain}}) >= 2000 );
+	push @{$rfam_blasts{$domain}},$daf;
+      }
     }
-  }
-  
-  print "\nGenerating Flags\n";
-  
-  foreach my $domain(keys %rfam_blasts){
-    my @hits = @{$rfam_blasts{$domain}};
-    foreach my $hit (@hits){
-      my $flag = Bio::EnsEMBL::Pipeline::Flag->new
-	(
-	 '-type'         => 'dna_align_feature',
-	 '-ensembl_id'   => $hit->dbID,
-	 '-goalAnalysis' => $analysis,
-	);
-      push @flags,$flag;
+    
+    print "\nGenerating Flags\n";
+    
+    foreach my $domain(keys %rfam_blasts){
+      my @hits = @{$rfam_blasts{$domain}};
+      foreach my $hit (@hits){
+	my $flag = Bio::EnsEMBL::Pipeline::Flag->new
+	  (
+	   '-type'         => 'dna_align_feature',
+	   '-ensembl_id'   => $hit->dbID,
+	   '-goalAnalysis' => $analysis,
+	  );
+	push @flags,$flag;
+      }
     }
+    
+    print "Storing and randomizing flags so the input ids dont run in families\n";
+    while (scalar(@flags >= 1)){
+      my $random =  rand($#flags);
+      # make sure you have an integer
+      $random = int $random;
+      $fa->store($flags[$random]);
+      splice(@flags,$random,1);
+    }
+    
+    $count =0;
+    print "Making input ids for $aln\n";
+    
+    die("analysis object not found $aln\n") unless ($analysis);
+    my @ids = @{$fa->fetch_by_analysis($analysis)};
+    @ids = sort {$a->dbID <=> $b->dbID} @ids;
+    foreach my $id (@ids){
+      push @input_ids,$id->dbID;
+    }
+    
+    my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
+      (
+       -db => $sdb,
+       -top_level => 'top_level',
+       -slice     => 1,
+       -logic_name => $dln,
+      );
+    $inputIDFactory->input_ids(\@input_ids);
+    $inputIDFactory->store_input_ids;
   }
-  
-  print "Storing and randomizing flags so the input ids dont run in families\n";
-  while (scalar(@flags >= 1)){
-    my $random =  rand($#flags);
-    # make sure you have an integer
-    $random = int $random;
-    $fa->store($flags[$random]);
-    splice(@flags,$random,1);
-  }
-  
-  $count =0;
-  print "Making input ids for $aln\n";
-  
-  die("analysis object not found $aln\n") unless ($analysis);
-  my @ids = @{$fa->fetch_by_analysis($analysis)};
-  @ids = sort {$a->dbID <=> $b->dbID} @ids;
-  foreach my $id (@ids){
-   push @input_ids,$id->dbID;
-  }
-  
-  my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
-    (
-     -db => $sdb,
-     -top_level => 'top_level',
-     -slice     => 1,
-     -logic_name => $dln,
-    );
-  $inputIDFactory->input_ids(\@input_ids);
-  $inputIDFactory->store_input_ids;
-  
-  print "Finished species $species\nStarting the rulemanager again...";
+  print "Finished species $species\nStarting the rulemanager again...\n" if $run;
   # do I want to start the rulemanager again at this point?
   my $perlpath = $ENV{"PERL5LIB"};
   # set perl5 lib
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
      "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-        "$BIOPERLPATH/bioperl-live-1-2-3:$BIOPERLPATH/Bioperl/bioperl-run";
+        "$BIOPERLPATH";
     print $ENV{"PERL5LIB"}."\n" if $verbose;
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
   # if all be well, run the rulemanager
@@ -229,7 +232,7 @@ SPECIES :foreach my $species (@speciess){
         "-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
           "-dbuser ensadmin -dbpass $pass -current";
   print "$cmd\n";
-  print "Use the -run flag to run the pipeline" unless $run;
+  print "Use the -run flag to run the pipeline\n" unless $run;
   # set it back to previous
   $ENV{"PERL5LIB"}= $perlpath;
 }

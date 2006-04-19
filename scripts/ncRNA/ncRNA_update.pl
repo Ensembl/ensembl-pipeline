@@ -12,7 +12,7 @@ use Bio::SeqIO;
 my $usage = "perl ncRNA_update.pl <options> *-pass  -verbose -config -dbsetup (create the dbs) -refresh (refresh RFAM files) -species (list of species to run on) -run run the rulemanager\n* = required\n";
 my $pass;
 my $verbose;
-my $config_file = "config_files.txt";
+my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
 my $dbsetup;
 my $refresh;
 my @species_list;
@@ -94,7 +94,7 @@ foreach my $species (@speciess){
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
     "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-	"$BIOPERLPATH/bioperl-live-1-2-3:$BIOPERLPATH/Bioperl/bioperl-run";
+	"$BIOPERLPATH";
     print $ENV{"PERL5LIB"}."\n" if $verbose;
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
   # if all be well, run the rulemanager
@@ -112,7 +112,7 @@ foreach my $species (@speciess){
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
 	  "-dbuser ensadmin -dbpass $pass -current";
   print "$cmd\n";
-  print "Use the -run flag to run the pipeline" unless $run;
+  print "Use the -run flag to run the pipeline\n" unless $run;
 };
 # set it back to previous
  $ENV{"PERL5LIB"}= $perlpath;
@@ -279,7 +279,7 @@ sub DB_setup{
      #insert analysis entries
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT -dbpass $pass".
-	" -logic_name ncRNA -program cmsearch -program_file cmsearch -database Rfam -database_version $RFAMVERSION -database_file /data/blastdb/Rfam/".
+	" -logic_name ncRNA -program cmsearch -program_file cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
 	  " -module Bio::EnsEMBL::Analysis::RunnableDB::Infernal".
 	    " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type FLAG";
     $status += system($cmd);
@@ -419,20 +419,34 @@ sub prepare_RFAM{
   my %families;
   
   # create Rfam.seed file
-  print "Updating RFAM descriptions file ...";
-  system ("mkdir $BLASTDIR") unless -e $BLASTDIR;  
-  open (DESC,">$BLASTDIR/Rfam.desc") or die "Cannot open description file $BLASTDIR/Rfam.desc\n";
-  system ("cat /pfam/db/Rfam/CURRENT/RF*/DESC >> $BLASTDIR/Rfam.desc");
+  my $exit;
+  print "Updating RFAM descriptions file ...\n";
+  system ("mkdir $BLASTDIR") unless -e $BLASTDIR;
+  system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.tar.gz  -O $BLASTDIR/Rfam.tar.gz");
+  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.tar.gz\n") if $exit > 0;
+  $exit =   system ("gzip -d  $BLASTDIR/Rfam.tar.gz");
+  die ("Error decompressing Rfam.tar.gz\n") if $exit > 0;
+  $exit =  system ("tar -xf $BLASTDIR/Rfam.tar -C $BLASTDIR");
+  die ("Error extracting Rfam covariance models  file from $BLASTDIR/Rfam.tar\n") if $exit > 0;
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
+  die ("Error with obtaining Rfam.seed file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz\n") if $exit > 0;
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
+  die ("Error with obtaining Rfam.fasta file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz\n") if $exit > 0;
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.thr.gz -O $BLASTDIR/Rfam.thr.gz");
+  die ("Error with obtaining Rfam.thr file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.thr.gz\n") if $exit > 0;
+  $exit =   system ("gzip -d  $BLASTDIR/Rfam.seed.gz");
+  die ("Error decompressing Rfam.seed.gz\n") if $exit > 0;
+  $exit =   system ("gzip -d  $BLASTDIR/Rfam.fasta.gz");
+  die ("Error decompressing Rfam.fasta.gz\n") if $exit > 0;   
+  $exit =   system ("gzip -d  $BLASTDIR/Rfam.thr.gz");
+  die ("Error decompressing Rfam.thr.gz\n") if $exit > 0; 
   print "done\nUpdating miRNA file...";
-  open (miRNA,">$BLASTDIR/all_mirnas.embl") or die "Cannot open mirna file $BLASTDIR/all_mirnas.embl\n";
-  my $dirs =  `ls /pfam/db/miRNA/CURRENT`;
-  my @list = split (/\n/,$dirs);
-  foreach my $dir (@list){
-    system ("cat /pfam/db/miRNA/CURRENT/$dir/MI* >> $BLASTDIR/all_mirnas.embl");
-  }
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat -O $BLASTDIR/all_mirnas.embl");
+  die ("Error with obtaining miRNA.dat  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat\n") if $exit > 0;
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa  -O $BLASTDIR/all_mirnas.fa");
+  die ("Error with obtaining hairpin.fa  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa\n") if $exit > 0;
   print "done\n";
-  close DESC;
-  close miRNA;
   # need to make a blast formatted file of miRNAs coz the one in /pfam/db/miRNA/BLASTDB/hairpin.fa seems to be out of date
   # use bioperl to parse it
     my $miRNA = Bio::SeqIO-> new
@@ -454,7 +468,7 @@ sub prepare_RFAM{
   print "Fetching all Rfam fasta sequences...";
   my $RFAM = Bio::SeqIO-> new
     (
-     -file => "/data/blastdb/Rfam/Rfam.fasta",
+     -file => "$BLASTDIR/Rfam.fasta",
      -format => "Fasta",
     );
   
@@ -473,15 +487,15 @@ sub prepare_RFAM{
   die ("Cannot open  $BLASTDIR/high_copy.fasta\n") unless $high_copy;
   die ("Cannot open  $BLASTDIR/low_copy.fasta\n") unless $low_copy;
   print "Done\n";
-  open (DESC,"$BLASTDIR/Rfam.desc") or die "Cannot open description file $BLASTDIR/Rfam.desc\n";
+  open (DESC,"$BLASTDIR/Rfam.seed") or die "Cannot open description file $BLASTDIR/Rfam.seed\n";
   
   # determine if the ncRNA is a gene or cis acting etc
   # if it is a gene we want it, if not we dont!
   my $domain;
   while (<DESC>){
     chomp;
-    $domain = $1 if ($_ =~ /^AC   (RF.+)/);
-    if ($_ =~ /^TP   Gene;/){
+    $domain = $1 if ($_ =~ /^\#=GF AC   (RF.+)/);
+    if ($_ =~ /^\#=GF TP   Gene;/){
       next if $_ =~ /miRNA/;
       next if $_ =~ /tRNA/;
       $families{$domain} = 1;
