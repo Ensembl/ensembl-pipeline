@@ -1,7 +1,7 @@
 #! /usr/local/bin/perl
 
 use strict;
-use Update::ncRNA_update_config;
+use ncRNA::ncRNA_update_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
