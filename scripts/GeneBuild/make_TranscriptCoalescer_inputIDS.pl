@@ -13,7 +13,6 @@ use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
-use Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster;
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Analysis::RunnableDB);
@@ -42,7 +41,6 @@ my ($name ,$slice_size, $analysis_id, $input_id_type )  ;
             'analysis_id=i' => \$analysis_id , 
             'input_id_type=s' => \$input_id_type , 
 	    );
-
 
 $slice_size = 100_000 unless $slice_size ; 
 @biotypes = split (/,/,join(',',@biotypes)) ; 
@@ -84,7 +82,7 @@ my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
                                            -user  => $dbuser,
                                            -port => $dbport,
                                            -dbname=> $dbname,
-                                           -dbpass => $dbpass,
+                                           -pass => $dbpass,
                                           );
 
 
@@ -212,7 +210,6 @@ sub create_input_id{
 
   for (my $i=0 ; $i<@cluster ; $i++) { 
     my $c = $cluster[$i] ;  
-    print "Each element of cluster is ".$c."\n";
     my $diff = $c->end - $start ; 
     
     if ($diff > $slice_size ) { 
@@ -328,7 +325,7 @@ sub cluster_Genes {
     # 
     
     if (scalar(@matching_clusters) == 0) {
-      my $newcluster = Bio::EnsEMBL::Analysis::Runnable::Condense_EST::GeneCluster->new();
+      my $newcluster = Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster->new();
 
       foreach my $set_name (keys %$types_hash) {
         $newcluster->gene_Types($set_name,$types_hash->{$set_name});
@@ -348,7 +345,7 @@ sub cluster_Genes {
     } else {
       # Merge the matching clusters into a single cluster
       my @new_clusters;
-      my $merged_cluster = Bio::EnsEMBL::Analysis::Runnable::Condense_EST::GeneCluster->new();
+      my $merged_cluster = Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster->new();
   
       foreach my $set_name (keys %$types_hash) {
         $merged_cluster->gene_Types($set_name,$types_hash->{$set_name});
@@ -456,7 +453,7 @@ sub  convert_prediction_transcripts_to_genes {
                        -analysis=>$pt->analysis,
                        ) ;
 
-    my $new_tr = Bio::EnsEMBL::Analysis::Runnable::Condense_EST::TranscriptExtended->new(
+    my $new_tr = Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended->new(
                     -BIOTYPE => $logic_name_becomes_biotype ,
                     -ANALYSIS => $pt->analysis ,
                  ) ;
@@ -467,7 +464,7 @@ sub  convert_prediction_transcripts_to_genes {
 
       # converting Bio::EnsEMBL::PredictionExon into ExonExtened (ISA Bio::EnsEMBL::Exon)  
       my $pte =$pt_exons[$i] ;
-      bless $pte,"Bio::EnsEMBL::Analysis::Runnable::Condense_EST::ExonExtended" ;
+      bless $pte,"Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended" ;
       $pte->end_phase(0);
       $pte->phase(0);
       $pte->next_exon($pt_exons[$i+1]) ;
