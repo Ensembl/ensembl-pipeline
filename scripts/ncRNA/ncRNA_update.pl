@@ -16,7 +16,8 @@ my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
 my $dbsetup;
 my $refresh;
 my @species_list;
-my $run;
+my $run; 
+my $no_bg ; 
 $| = 1;
 &GetOptions(
 	    'pass=s'       => \$pass,
@@ -26,9 +27,9 @@ $| = 1;
 	    'dbsetup!'     => \$dbsetup,
 	    'refresh!'     => \$refresh, 
             'species=s' => \@species_list,
+            'no_bg!'      => \$no_bg,       # don't run rulemanger in the background (only recommend if you analysis one speciees only ) 
 	   );
 die "$usage\n" unless ($config_file && $pass);
-
 
 if ($refresh){
   print "Updating RFAM and miRNA to latest version\n";
@@ -94,25 +95,28 @@ foreach my $species (@speciess){
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
     "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-	"$BIOPERLPATH";
+	"$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH:$BIOPERLPATH";
     print $ENV{"PERL5LIB"}."\n" if $verbose;
-  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
+  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
+
   # if all be well, run the rulemanager
-  my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
+  my $cmd_rulemanager = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass &";
-  print "$cmd\n";
-  system("$cmd") if $run;
+	  "-dbuser ensadmin -dbpass $pass "; 
+
+   $cmd_rulemanager.= " & " unless $no_bg ;  
+  print "$cmd_rulemanager\n";
   print "Monitor:\n";
-  $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
+  my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
 	  "-dbuser ensadmin -dbpass $pass -current";
   print "$cmd\n";
   print "Use the -run flag to run the pipeline\n" unless $run;
+  system("$cmd_rulemanager") if $run;
 };
 # set it back to previous
  $ENV{"PERL5LIB"}= $perlpath;
