@@ -49,7 +49,10 @@ use vars qw(%Config);
 	   DATADIR   => "/path/to/work/directory",
 	   CVSDIR    => "/path/to/cvs/directory",
 	   WRITEUSER => "mysql_admin_user",
-	   BIOPERLPATH => "/path/to/bioperl",
+	   BIOPERLPATH => "/path/to/bioperl", 
+           BIOPERL_LIVE_PATH => "/nfs/acari/jhv//cvs_checkout/bioperl-1.5.1/",
+           BIOPERL_RUN_PATH=> "/nfs/acari/jhv//cvs_checkout/bioperl-run-1.5.1/",
+
 	   MIRBASEVERSION => "7.1",
 	   RFAMVERSION => "7.0",
 	   # directory to make the blast databases in
