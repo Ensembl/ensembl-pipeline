@@ -38,19 +38,19 @@ my $db_id = 0;
 my $file;
 
 GetOptions(
-	   'dbhost=s'    => \$dbhost,
-	   'dbname=s'    => \$dbname,
-	   'dbuser=s'    => \$dbuser,
-	   'dbpass=s'    => \$dbpass,
-	   'dbport=s'    => \$dbport,
+		   'dbhost=s'    => \$dbhost,
+		   'dbname=s'    => \$dbname,
+		   'dbuser=s'    => \$dbuser,
+		   'dbpass=s'    => \$dbpass,
+		   'dbport=s'    => \$dbport,
            'dnadbhost=s'    => \$dnadbhost,
            'dnadbname=s'    => \$dnadbname,
            'dnadbuser=s'    => \$dnadbuser,
            'dnadbpass=s'    => \$dnadbpass,
            'dnadbport=s'    => \$dnadbport,
-	   'stable_id!' => \$stable_id,
-	   'db_id!' => \$db_id,
-	   'file=s' => \$file,
+		   'stable_id!' => \$stable_id,
+		   'db_id!' => \$db_id,
+		   'file=s' => \$file,
 )
 or die ("Couldn't get options");
 
@@ -120,12 +120,14 @@ foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
   my $gene_id = $gene->dbID();
 
   foreach my $trans ( @{$gene->get_all_Transcripts}) {
+ 
     next if (!$trans->translation);
 
     my $identifier;
     if($db_id){
       $identifier = $trans->translation->dbID;
     }
+
     if($stable_id){
       if(!$db_id){
         $identifier = $trans->stable_id;
@@ -134,15 +136,26 @@ foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
       }
     }
     my $tseq = $trans->translate();
-    if ( $tseq->seq =~ /\*/ ) {
-      print STDERR "Translation of $identifier has stop codons ",
-        "- Skipping! (in ",$trans->slice->name(),")\n";
-      next;
-    }
 
-    $tseq->display_id($identifier);
-    $tseq->desc("Translation id $identifier gene $gene_id");
-    $seqio->write_seq($tseq);
+    eval {      
+	    if ( $tseq->seq =~ /\*/ ) {
+
+	      print STDERR "Translation of $identifier has stop codons ",
+        	"- Skipping! (in ",$trans->slice->name(),")\n";
+	      next;
+	     }
+	 };
+	 
+    if ( $@ ){
+    	warn "Could not call method seq for transcript ", $trans->stable_id;
+	warn $trans->translation;
+    } 
+
+    else {		
+	    $tseq->display_id($identifier);
+	    $tseq->desc("Translation id $identifier gene $gene_id");
+	    $seqio->write_seq($tseq);
+    }
   }
 }
 close($fh);
