@@ -1,7 +1,7 @@
 #!/usr/local/ensembl/bin/perl
 
 
-use ncRNA::ncRNA_update_config;
+use ncRNA_update_config; 
 use strict;
 use vars qw(%Config);
 use Getopt::Long;

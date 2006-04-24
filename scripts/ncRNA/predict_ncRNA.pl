@@ -2,7 +2,6 @@
 
 use strict;
 use Getopt::Long;
-use ncRNA::ncRNA_update_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -11,7 +10,7 @@ use Bio::EnsEMBL::Pipeline::Flag;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::SeqIO;
-
+use ncRNA_update_config ; 
 my $dbhost;
 my $dbuser;
 my $pass;
@@ -32,20 +31,22 @@ my @multiexon_files;
 my @species_list;
 my $verbose;
 my $run;
-$| = 1;
+my $no_bg ;   
+
+$| = 1; 
+
 &GetOptions(
 	    'pass=s'    => \$pass,
 	    'verbose!'  => \$verbose, 
 	    'run!'      => \$run,
 	    'species=s' => \@species_list,
+            'no_bg!'    => \$no_bg , 
            );
 
 if(!$pass || $help){
   die ("perl predict_ncRNA.pl -pass *(password) -species (species list) -verbose -run run the rulemanager (* required)\n");
   $help = 1;
 }
-
-
 
 my @speciess;
 if (scalar(@species_list)) {
@@ -217,22 +218,25 @@ SPECIES :foreach my $species (@speciess){
         "$BIOPERLPATH";
     print $ENV{"PERL5LIB"}."\n" if $verbose;
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
-  # if all be well, run the rulemanager
-  my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
+  # if all be well, run the rulemanager 
+  #
+  my $cmd_rule = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
         "-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-          "-dbuser ensadmin -dbpass $pass &";
-  print "$cmd\n";
-  system("$cmd") if $run;
+          "-dbuser ensadmin -dbpass $pass ";  
+  $cmd_rule .=" & " unless $no_bg ; 
+  print "\n$cmd_rule\n";
   print "Monitor:\n";
-  $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
+  my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
         "-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
           "-dbuser ensadmin -dbpass $pass -current";
   print "$cmd\n";
-  print "Use the -run flag to run the pipeline\n" unless $run;
+  print "Use the -run flag to run the pipeline\n" unless $run; 
+
+  system("$cmd_rule") if $run;
   # set it back to previous
   $ENV{"PERL5LIB"}= $perlpath;
 }

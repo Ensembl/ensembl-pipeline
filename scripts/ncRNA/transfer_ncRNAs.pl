@@ -1,7 +1,7 @@
 #! /usr/local/bin/perl
 
 use strict;
-use ncRNA::ncRNA_update_config;
+use ncRNA_update_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -103,6 +103,8 @@ foreach my $species (@speciess) {
   my @duplicted;
   my $total;
   my %blacklist;
+
+  print "$species: Using data in $dbname\@$host:$port\n" ; 
     
   my $sdb = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
