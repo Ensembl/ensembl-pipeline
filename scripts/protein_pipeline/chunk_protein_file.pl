@@ -33,7 +33,15 @@ my $dbh = DBI->connect("DBI:mysql:$dbname:$dbhost:$dbport", $dbuser, $dbpass, {R
 $dbh->debug();
 
 my $last_chunk = get_last_chunk_file();
-warn "Last chunk file in input_id_analysis table is $last_chunk";
+
+if ( $last_chunk =~ /\d+/ ){
+  warn "\nLast chunk file in input_id_analysis table is $last_chunk: starting from ", $last_chunk+1, "\n";
+}
+else {
+  warn "\nNo last chunk file in input_id_analysis table: starting from 1\n";
+}
+
+&chunk_pepfile($PA_PEPTIDE_FILE, $PA_CHUNKS_DIR, $PA_CHUNK_SIZE, $last_chunk);
 
 sub get_last_chunk_file {
 
@@ -47,12 +55,15 @@ sub get_last_chunk_file {
   $sql->execute;
 
   my $file = $sql->fetchrow;
-  $file =~ /(\d+)/;
-  return $1;
+
+  if ( $file ) {
+	$file =~ /(\d+)/;
+	return $1;
+  }
+  else {
+	return "new";
+  }
 }
-
-&chunk_pepfile($PA_PEPTIDE_FILE, $PA_CHUNKS_DIR, $PA_CHUNK_SIZE, $last_chunk);
-
 
 sub chunk_pepfile {
   my ($pep_file, $scratchdir, $size) = @_;
