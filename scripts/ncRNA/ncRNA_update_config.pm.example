@@ -1,4 +1,4 @@
-package ncRNA::ncRNA_update_config;
+package ncRNA_update_config;
 
 use strict;
 use vars qw(%Config);
