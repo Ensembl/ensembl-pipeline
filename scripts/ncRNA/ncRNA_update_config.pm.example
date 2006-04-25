@@ -15,7 +15,6 @@ use vars qw(%Config);
 				  WRITEHOST  => "ia64f",
 				  WRITEPORT  => "3306",
 				  WRITENAME  => "chicken_ncRNA_update",
-				  OUTDIR     => "/path/to/output/directory",
 				  # mysql instance source db is on
 				  REFINS     => "ecs2my3365",
 				  # lsf load for source db
@@ -34,7 +33,6 @@ use vars qw(%Config);
 				 WRITEHOST  => "ia64f",
 				 WRITEPORT  => "3306",
 				 WRITENAME  => "human_ncRNA_update",
-				 OUTDIR     => "/path/to/output/directory",
 				 # mysql instance source db is on
 				 REFINS     => "ecs2my3365",
 				 # lsf load for source db
@@ -49,7 +47,6 @@ use vars qw(%Config);
 	   DATADIR   => "/path/to/work/directory",
 	   CVSDIR    => "/path/to/cvs/directory",
 	   WRITEUSER => "mysql_admin_user",
-	   BIOPERLPATH => "/path/to/bioperl", 
            BIOPERL_LIVE_PATH => "/nfs/acari/jhv//cvs_checkout/bioperl-1.5.1/",
            BIOPERL_RUN_PATH=> "/nfs/acari/jhv//cvs_checkout/bioperl-run-1.5.1/",
 
