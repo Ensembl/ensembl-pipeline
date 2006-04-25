@@ -72,7 +72,7 @@ foreach my $species (@speciess){
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline/Config";
   # set up batchqueue output dirs
   print "Checking config\n";
-  my @localconfigvars =qw(OUTDIR WRITEHOST WRITEPORT OUTDIR DBNAME DBPORT DBHOST
+  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST
 			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME);
   config_setup(\@localconfigvars,$species);
 }
@@ -177,7 +177,9 @@ sub config_setup{
     {
       die "could not find ".$CONFIG->{$species}->{"DBNAME"}."\n";
   }
-
+# add global variables
+  push @$vars,"DATADIR";
+  push @$vars,"species"; 
   #go thru config info to create defined files,
   #back-up the original, write version with filled-in variables
   open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
@@ -194,8 +196,15 @@ sub config_setup{
     #replace variables in config file
     foreach my $configvar (@$vars){
       my $configvarref;
-      $configvarref = $configvar unless $species;
-      $configvarref = $CONFIG->{$species}->{$configvar} if $species;
+      if ($configvar eq "DATADIR"){     
+      	$configvarref = $DATADIR;
+      } 
+      elsif ($configvar eq "species") {
+       	$configvarref = $species;     
+      }
+       else {
+        $configvarref = $CONFIG->{$species}->{$configvar};
+      }
       $content =~ s/\<PASS\>/$pass/g;
       $content =~ s/\<$configvar\>/$configvarref/g;
     }
