@@ -215,7 +215,7 @@ SPECIES :foreach my $species (@speciess){
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
      "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-        "$BIOPERLPATH";
+        "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH:$BIOPERLPATH";
     print $ENV{"PERL5LIB"}."\n" if $verbose;
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
   # if all be well, run the rulemanager 
