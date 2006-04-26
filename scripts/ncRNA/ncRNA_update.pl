@@ -9,13 +9,15 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
 use Bio::SeqIO;
 
-my $usage = "perl ncRNA_update.pl <options> *-pass  -verbose -config -dbsetup (create the dbs) -refresh (refresh RFAM files) -species (list of species to run on) -run run the rulemanager\n* = required\n";
+my $usage = "perl ncRNA_update.pl <options> *-pass  -verbose -config -dbsetup (create the dbs) -refresh (refresh RFAM/miRBasefiles) 
+-rfam (run the rfam/cmsearch analysis) -species (list of species to run on) -run run the rulemanager\n* = required\n";
 my $pass;
 my $verbose;
 my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
 my $dbsetup;
 my $refresh;
 my @species_list;
+my $rfam;
 my $run; 
 my $no_bg ; 
 $| = 1;
@@ -25,7 +27,8 @@ $| = 1;
 	    'verbose!'     => \$verbose,
 	    'config=s'     => \$config_file,
 	    'dbsetup!'     => \$dbsetup,
-	    'refresh!'     => \$refresh, 
+	    'refresh!'     => \$refresh,
+	    'rfam!'        => \$rfam,
             'species=s' => \@species_list,
             'no_bg!'      => \$no_bg,       # don't run rulemanger in the background (only recommend if you analysis one speciees only ) 
 	   );
@@ -230,7 +233,7 @@ sub check_vars{
     $configvarref = $configvar unless $species;
     $configvarref = $CONFIG->{$species}->{$configvar} if $species;
     print "$configvarref\n" if $verbose;
-    if(!$configvarref){ die "please define all configuration variables! [$configvarref]\n"; }
+    if(!$configvarref){ die "please define all configuration variables! [$configvar]\n"; }
     if($configvar =~ /\//){
       if(!-e $configvarref){
 	print "making directory $configvar\n" if $verbose;
@@ -290,6 +293,7 @@ sub DB_setup{
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < ".$DATADIR."/$species/import_tables.sql");
     print ".";
      #insert analysis entries
+    # dont automatically run rfam jobs uless specifically requested
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT -dbpass $pass".
 	" -logic_name ncRNA -program cmsearch -program_file cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
@@ -346,11 +350,11 @@ sub DB_setup{
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal RfamBlast -condition DummySlice";
-    $status += system($cmd);
+    $status += system($cmd) if $rfam;
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal ncRNA -condition DummyFlag";
-    $status += system($cmd);
+    $status += system($cmd) if $rfam;
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -insert -goal BlastWait -condition BlastmiRNA";
