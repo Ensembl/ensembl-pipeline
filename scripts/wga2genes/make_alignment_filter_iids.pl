@@ -1,11 +1,5 @@
 #!/usr/local/ensembl/bin/perl
 
-# Generation of input ids for WGA2Genes. Segments the
-# genome into regions that contain contain genes. 
-# Nominally, each iid wil be a slice that contains a single 
-# gene, but my contain more than one gene if genes overlap
-
-
 use strict;
 use Getopt::Long;
 
