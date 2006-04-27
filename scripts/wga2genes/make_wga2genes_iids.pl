@@ -1,10 +1,8 @@
 #!/usr/local/ensembl/bin/perl
 
 # Generation of input ids for WGA2Genes. Segments the
-# genome into regions that contain contain genes. 
-# Nominally, each iid wil be a slice that contains a single 
-# gene, but my contain more than one gene if genes overlap
-
+# genome into regions that (1) contain at least one gene,
+# and (2) do not interrupt a chain.
 
 use strict;
 use Getopt::Long;
@@ -38,6 +36,7 @@ my (
     $source_align_type,
     $logic_name,
     $write,
+    $verbose,
 );
 
 $dbuser = 'ensro';
@@ -79,6 +78,7 @@ $source_align_type = 'BLASTZ_NET';
             'genetype=s'    => \$source_type,
             'seq_region_name=s' => \$seq_region_name,
             'write' => \$write,
+            'verbose' => \$verbose,
             );
 
 
@@ -197,18 +197,18 @@ foreach my $sl (@slices) {
       my $gen_end = $gen_start + 1000000 - 1;
       $gen_end = $sl->end if $gen_end > $sl->end;
       
-      #printf(STDERR "Fetching blocks for $source_align_type %s %d %d...\n", 
-      #       $dnafrag->name, 
-      #       $gen_start,
-      #       $gen_end);
-
+      $verbose and printf(STDERR "Fetching blocks for $source_align_type %s %d %d...\n", 
+                          $dnafrag->name, 
+                          $gen_start,
+                          $gen_end);
+      
       my $gen_al_blocks =
           $gaba->fetch_all_by_MethodLinkSpeciesSet_DnaFrag($mlss,
                                                            $dnafrag,
                                                            $gen_start,
                                                            $gen_end);
       
-      # printf(STDERR "Extracting chain information...\n");
+      $verbose and printf(STDERR "Extracting chain information...\n");
       
       foreach my $block (@$gen_al_blocks) {
         my $qga = $block->reference_genomic_align;
