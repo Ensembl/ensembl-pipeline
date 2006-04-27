@@ -216,7 +216,7 @@ SPECIES :foreach my $species (@speciess){
      "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
         "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
-  print SPEC "setenv ".$ENV{"PERL5LIB"}."\n";
+  print SPEC "setenv PERL5LIB ".$ENV{"PERL5LIB"}."\n";
   
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
   # if all be well, run the rulemanager
