@@ -10,7 +10,8 @@ use Data::Dumper;
 use Bio::SeqIO;
 
 my $usage = "perl ncRNA_update.pl <options> *-pass  -verbose -config -dbsetup (create the dbs) -refresh (refresh RFAM/miRBasefiles) 
--rfam (run the rfam/cmsearch analysis) -species (list of species to run on) -run run the rulemanager\n* = required\n";
+-rfam (run the rfam/cmsearch analysis) -species (list of species to run on) -run run the rulemanager
+writes the rulemanager command and path to a shell script species.csh \n* = required\n";
 my $pass;
 my $verbose;
 my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
@@ -18,19 +19,15 @@ my $dbsetup;
 my $refresh;
 my @species_list;
 my $rfam;
-my $run; 
-my $no_bg ; 
 $| = 1;
 &GetOptions(
 	    'pass=s'       => \$pass,
-	    'run!'         => \$run,
 	    'verbose!'     => \$verbose,
 	    'config=s'     => \$config_file,
 	    'dbsetup!'     => \$dbsetup,
 	    'refresh!'     => \$refresh,
 	    'rfam!'        => \$rfam,
             'species=s' => \@species_list,
-            'no_bg!'      => \$no_bg,       # don't run rulemanger in the background (only recommend if you analysis one speciees only ) 
 	   );
 die "$usage\n" unless ($config_file && $pass);
 
@@ -80,7 +77,7 @@ foreach my $species (@speciess){
   config_setup(\@localconfigvars,$species);
 }
 # once all config files have been set up for all species, start the db set up
-foreach my $species (@speciess){
+foreach my $species (@speciess){	
   DB_setup($species,
 	   $CONFIG->{$species}->{"WRITEHOST"},
 	   $CONFIG->{$species}->{"WRITEPORT"},
@@ -94,33 +91,34 @@ foreach my $species (@speciess){
 # once thats all done sucessfully start the rule managers
 my $perlpath = $ENV{"PERL5LIB"};
 foreach my $species (@speciess){
-  # set perl5 lib
+  open (SPEC,">$species.csh") or die ("Cannot open file $species.csh");
+  print SPEC "#!/bin/csh\n\n";
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
-    "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
+     "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-	"$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
-    print $ENV{"PERL5LIB"}."\n" if $verbose;
+        "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
+  print SPEC "setenv ".$ENV{"PERL5LIB"}."\n";
+  
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
-
   # if all be well, run the rulemanager
   my $cmd_rulemanager = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass "; 
+	  "-dbuser ensadmin -dbpass $pass \n";
 
-   $cmd_rulemanager.= " & " unless $no_bg ;  
-  print "$cmd_rulemanager\n";
+  print SPEC "$cmd_rulemanager\n";
   print "Monitor:\n";
   my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
 	  "-dbuser ensadmin -dbpass $pass -current";
+  
   print "$cmd\n";
-  print "Use the -run flag to run the pipeline\n" unless $run;
-  system("$cmd_rulemanager") if $run;
+  close SPEC;
 };
+
 # set it back to previous
  $ENV{"PERL5LIB"}= $perlpath;
 # next need to make sure paths output directories and config files are set up correctly.

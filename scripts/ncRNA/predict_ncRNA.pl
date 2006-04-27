@@ -30,21 +30,19 @@ my $dln = 'DummyFlag';
 my @multiexon_files;
 my @species_list;
 my $verbose;
-my $run;
-my $no_bg ;   
+
 
 $| = 1; 
 
 &GetOptions(
 	    'pass=s'    => \$pass,
 	    'verbose!'  => \$verbose, 
-	    'run!'      => \$run,
 	    'species=s' => \@species_list,
-            'no_bg!'    => \$no_bg , 
            );
 
 if(!$pass || $help){
-  die ("perl predict_ncRNA.pl -pass *(password) -species (species list) -verbose -run run the rulemanager (* required)\n");
+  die ("perl predict_ncRNA.pl -pass *(password) -species (species list) -verbose 
+writes paths and rulemanager command lines to shell script species.csh(* required)\n");
   $help = 1;
 }
 
@@ -211,32 +209,32 @@ SPECIES :foreach my $species (@speciess){
   print "Finished species $species\nStarting the rulemanager again...\n" if $run;
   # do I want to start the rulemanager again at this point?
   my $perlpath = $ENV{"PERL5LIB"};
-  # set perl5 lib
+
+  open (SPEC,">$species.csh") or die ("Cannot open file $species.csh");
+  print SPEC "#!/bin/csh\n\n";
   $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
      "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
       "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
         "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
-    print $ENV{"PERL5LIB"}."\n" if $verbose;
-  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl");
-  # if all be well, run the rulemanager 
-  #
-  my $cmd_rule = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
+  print SPEC "setenv ".$ENV{"PERL5LIB"}."\n";
+  
+  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
+  # if all be well, run the rulemanager
+  my $cmd_rulemanager = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
-        "-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-          "-dbuser ensadmin -dbpass $pass ";  
-  $cmd_rule .=" & " unless $no_bg ; 
-  print "\n$cmd_rule\n";
+	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
+	  "-dbuser ensadmin -dbpass $pass \n";
+
+  print SPEC "$cmd_rulemanager\n";
   print "Monitor:\n";
   my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
-        "-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-          "-dbuser ensadmin -dbpass $pass -current";
+	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
+	  "-dbuser ensadmin -dbpass $pass -current";
+  
   print "$cmd\n";
-  print "Use the -run flag to run the pipeline\n" unless $run; 
-
-  system("$cmd_rule") if $run;
   # set it back to previous
   $ENV{"PERL5LIB"}= $perlpath;
 }
