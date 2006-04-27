@@ -174,6 +174,8 @@ foreach my $sl (@slices) {
   my @genes = @{$sl->get_all_Genes};
   @genes = grep { $_->biotype eq $source_type } @genes;
 
+  next if not @genes;
+  
   my @gene_regions;
 
   foreach my $g (@genes) {
