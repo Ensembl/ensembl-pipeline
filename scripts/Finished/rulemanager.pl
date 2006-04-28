@@ -8,7 +8,7 @@ use Bio::EnsEMBL::Pipeline::RuleManager;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use BlastableVersion;
 
-$ENV{BLASTDB} = '/data/blastdb/Ensembl';
+$ENV{BLASTDB} = '/data/blastdb/Finished';
 
 $| = 1;
 
@@ -76,6 +76,7 @@ my $reread_input_ids   = 0;    # toggle whether to reread input_id each time the
                                # script loops
 my $reread_rules = 0;      # toggle whether to reread rules each time the script
                            # loops
+my $reupdate_analysis = 1;                            
 my $perldoc      = 0;
 my @command_args = @ARGV;
 my $submission_limit;
@@ -118,6 +119,7 @@ GetOptions(
 	'force_accumulators!'    => \$force_accumulators,
 	'reread_input_ids!'      => \$reread_input_ids,
 	'reread_rules!'          => \$reread_rules,
+	'reupdate_analysis!'	 => \$reupdate_analysis,
 	'once!'                  => \$once,
 	'perldoc!'               => \$perldoc,
 	'submission_limit!'      => \$submission_limit,
@@ -243,34 +245,7 @@ setup_pipeline(
 	$rulemanager
 );
 
-# Update the db version for the Blast, EST and DepthFilter analysis in the analysis table.
-my $analysis_adaptor = $db->get_AnalysisAdaptor();
-my $analysis         = $analysis_adaptor->fetch_all();
-foreach my $ana (@$analysis) {
-	my $db;
-	my $db_version;
-	my $ln;
-	my $ana_df;
-	my $mod = $ana->module();
-	if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' ) ) {
-		$db         = fetch_databases( $ana->db_file );
-		$db_version = get_db_version( @$db[0] );
-		#print STDOUT "Analysis:\t".$ana->logic_name."\told version\t".$ana->db_version."\tnew version\t$db_version (".@$db[0] .")\n";
-		$ana->db_version($db_version);
-		$analysis_adaptor->update($ana);
-
-		#update the corresponding DepthFilter analysis
-		$ln = $ana->logic_name;
-		if ( $ln =~ s/_raw//g ) {
-			$ana_df = $analysis_adaptor->fetch_by_logic_name($ln);
-			#print STDOUT "Analysis:\t".$ana_df->logic_name."\told version\t".$ana_df->db_version."\tnew version\t$db_version (".@$db[0] .")\n";
-			$ana_df->db_version($db_version);
-			$analysis_adaptor->update($ana_df);
-		}
-	}
-}
-
-#exit 0;
+update_analysis_dbversion();
 
 my %completed_accumulator_analyses;
 my $submission_count = 0;
@@ -295,6 +270,8 @@ LOOP: while (1) {
 			$all_rules, \%accumulator_analyses,
 			\%always_incomplete_accumulators );
 	}
+	
+	update_analysis_dbversion() if($reupdate_analysis);
 
 	my $id_hash = $rulemanager->input_ids;
 
@@ -458,35 +435,58 @@ sub setup_pipeline {
 	);
 }
 
-sub fetch_databases {
+# Update the db version for the Blast, EST and DepthFilter analysis in the analysis table.
+my @analysis;
+sub update_analysis_dbversion {
+	my $analysis_adaptor = $db->get_AnalysisAdaptor();
+	@analysis         = @{$analysis_adaptor->fetch_all()} unless(@analysis);
+	foreach my $ana (@analysis) {
+		my $db;
+		my $db_version;
+		my $ln = $ana->logic_name;;
+		my $mod = $ana->module();
+		my $ana_df;
+		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Halfwise/ ) ) {
+			$db         = fetch_databases( $ana->db_file );
+			$db_version = get_db_version( $db );
+			print STDOUT "Analysis: ".$ana->logic_name." old version ".$ana->db_version." new version $db_version ($db)\n";
+			if($db_version ne $ana->db_version){
+				$ana->db_version($db_version);
+				$analysis_adaptor->update($ana);
+			}
+			#update the corresponding DepthFilter analysis
+			if ( $ln =~ s/_raw//g ) {
+				$ana_df = $analysis_adaptor->fetch_by_logic_name($ln);
+				print STDOUT "Analysis: ".$ana_df->logic_name." old version ".$ana_df->db_version." new version $db_version ($db)\n";
+				if($db_version ne $ana_df->db_version){
+					$ana_df->db_version($db_version);
+					$analysis_adaptor->update($ana_df);
+				}
+			}
+		}
+	}
+}
 
+my %db_filename = ();
+sub fetch_databases {
 	my ($db) = @_;
 	my @databases;
 	$db =~ s/\s//g;
-
+	my $path;
 	foreach my $dbname ( split( ",", $db ) ) {
+		return $db_filename{$dbname} if($db_filename{$dbname});
+		$path = $dbname;
 		unless ( $dbname =~ m!^/! ) {
-			$dbname = $ENV{BLASTDB} . "/" . $dbname;
+			$path = $ENV{BLASTDB} . "/" . $dbname;
 		}
-		if ( -f $dbname ) {
-			push( @databases, $dbname );
+		if ( -f $path ) {
+			$db_filename{$dbname} = $path;
+		} elsif( -f "${$path}-1") {
+			$db_filename{$dbname} = "${$path}-1";
 		}
-		else {
-			my $count = 1;
-			my $db_filename;
-			while ( -f ( $db_filename = "${dbname}-${count}" ) ) {
-				push( @databases, $db_filename );
-				$count++;
-			}
-			$! = undef;
-		}
+		return $db_filename{$dbname} if($db_filename{$dbname});
 	}
-	if ( scalar(@databases) == 0 ) {
-		throw( "No databases exist for " . $db );
-	}
-
-	return \@databases;
-
+	throw( "No databases exist for " . $db );
 }
 
 sub get_db_version {
@@ -494,18 +494,14 @@ sub get_db_version {
 	my $force_dbi = 1;    # force the module to get the information from the server
 	my $ver = eval {
 		my $blast_ver = BlastableVersion->new();
-		$blast_ver->force_dbi($force_dbi);    # if set will be SLOW.
+		$blast_ver->force_dbi($force_dbi);
 		$blast_ver->get_version($db);
 		$blast_ver;
 	};
 	throw("I failed to get a BlastableVersion for $db [$@]") if $@;
 	my $dbv  = $ver->version();
-	my $sgv  = $ver->sanger_version();
-	my $name = $ver->name();
-	my $date = $ver->date();
 
 	return $dbv;
-
 }
 
 sub shuffle {
@@ -600,6 +596,8 @@ Affecting the scripts behaviour
     table every loop
    -reread_input_ids, this will force the rulemanager to reread the input
     ids each and every loop
+   -reupdate_analysis, this flag will update the database version stored in 
+    the analysis table each and every loop, by default set to true.
    -accumulators, this is a flag to indicate if the accumulators are 
     running. By default it is on but it is turned off if you specify any
     flag which affects the rules or input_ids sets. You can switch
