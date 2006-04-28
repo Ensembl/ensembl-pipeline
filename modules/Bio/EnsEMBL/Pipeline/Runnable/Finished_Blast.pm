@@ -13,7 +13,7 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Blast);
 
-$ENV{BLASTDB} = '/data/blastdb/Ensembl';
+$ENV{BLASTDB} = '/data/blastdb/Finished';
 
 BEGIN {
     print "\nUSING " . __PACKAGE__ . "\n\n";

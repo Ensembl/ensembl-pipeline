@@ -109,7 +109,7 @@ sub new {
     if($hmmdb){
 	$self->hmmdb($hmmdb);
     } else {
-	$self->hmmdb('/data/blastdb/Ensembl/Pfam_ls');
+	$self->hmmdb('/data/blastdb/Finished/Pfam_ls');
 	
     }
     $self->memory ($memory)    if (defined($memory));

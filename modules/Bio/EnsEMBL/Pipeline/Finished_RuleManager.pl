@@ -5,7 +5,7 @@
 # You may distribute this code under the same terms as perl itself
 
 BEGIN{
-    $ENV{'BLASTDB'}     = '/data/blastdb/Ensembl';
+    $ENV{'BLASTDB'}     = '/data/blastdb/Finished';
     $ENV{'BLASTMAT'}    = '/usr/local/ensembl/data/blastmat';
     $ENV{'BLASTFILTER'} = '/usr/local/ensembl/bin';
 }
