@@ -34,6 +34,7 @@ my (
     $seq_region_name,
     $source_type,
     $source_align_type,
+    $kill_list,
     $logic_name,
     $write,
     $verbose,
@@ -76,6 +77,7 @@ $source_align_type = 'BLASTZ_NET';
             'logic=s' => \$logic_name,
             'aligntype=s'   => \$source_align_type,
             'genetype=s'    => \$source_type,
+            'kill=s'        => \$kill_list,
             'seq_region_name=s' => \$seq_region_name,
             'write' => \$write,
             'verbose' => \$verbose,
@@ -137,6 +139,20 @@ my $q_species =
 my $t_species =
     $target_db->get_MetaContainerAdaptor->get_Species->binomial;
 
+if (defined $kill_list) {
+  my $list = {};
+
+  open LIST, $kill_list or die "Could not open '$kill_list' for reading\n";
+  while(<LIST>) {
+    /^\#/ and next;
+    /^(\S+)/ and $list->{$1} = 1;
+  }
+
+  $kill_list = $list;
+} else {
+  $kill_list = {};
+}
+
 my @tl_slices = @{$query_db->get_SliceAdaptor->fetch_all('toplevel')};
 
 
@@ -179,10 +195,28 @@ foreach my $sl (@slices) {
   my @gene_regions;
 
   foreach my $g (@genes) {
-    push @gene_regions, {
-      qstart => $g->start + $sl->start - 1,
-      qend   => $g->end   + $sl->start - 1,
-    };
+    next if exists $kill_list->{$g->stable_id};
+    
+    my ($min_start, $max_end);
+    foreach my $t (@{$g->get_all_Transcripts}) {
+      next if exists $kill_list->{$t->stable_id};
+
+      foreach my $e (@{$t->get_all_translatable_Exons}) {
+        if (not defined $min_start or $e->start < $min_start) {
+          $min_start = $e->start;
+        }
+        if (not defined $max_end or $e->end > $max_end) {
+          $max_end = $e->start;
+        }
+      }
+    }
+
+    if (defined $min_start and defined $max_end) {
+      push @gene_regions, {
+        qstart => $min_start + $sl->start - 1,
+        qend   => $max_end   + $sl->start - 1,
+      };
+    }
   }
 
   @gene_regions = sort { $a->{qstart} <=> $b->{qstart} } @gene_regions;
