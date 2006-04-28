@@ -195,7 +195,7 @@ sub run_module {
 					my $old_db_version = $analysis->db_version();
 
 					$analysis->db_version($new_db_version);
-					$self->adaptor->db->get_AnalysisAdaptor->update($analysis);
+					#$self->adaptor->db->get_AnalysisAdaptor->update($analysis);
 					$is_dbversion_saved = 1;
 				}
 
