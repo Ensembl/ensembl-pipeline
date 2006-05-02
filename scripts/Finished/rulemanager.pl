@@ -437,36 +437,50 @@ sub setup_pipeline {
 
 # Update the db version for the Halfwise, Blast, EST and DepthFilter analysis in the analysis table.
 my @analysis;
+my $analysis_adaptor = $db->get_AnalysisAdaptor();
 sub update_analysis_dbversion {
-	my $analysis_adaptor = $db->get_AnalysisAdaptor();
 	@analysis         = @{$analysis_adaptor->fetch_all()} unless(@analysis);
+	my $anash;
+	my $uniprot_db_version;
+	my $pfam_db_version;
 	foreach my $ana (@analysis) {
 		my $db;
 		my $db_version;
-		my $ln = $ana->logic_name;;
+		my $ln = $ana->logic_name;
 		my $mod = $ana->module();
 		my $ana_df;
+		$anash->{$ln} = $ana;
 		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Halfwise/ ) ) {
 			$db         = fetch_databases( $ana->db_file );
 			$db_version = get_db_version( $db );
-			print STDOUT "Analysis: ".$ana->logic_name." old version ".$ana->db_version.
-						 " new version $db_version ($db)\n" if $verbose;
-			if($db_version ne $ana->db_version){
-				$ana->db_version($db_version);
-				$analysis_adaptor->update($ana);
-			}
-			#update the corresponding DepthFilter analysis
+			# save uniprot and pfam db versions
+			$uniprot_db_version = $db_version if $ana->logic_name =~ /Uniprot_raw/;
+			$pfam_db_version = $db_version if $mod =~ /Halfwise/;
+			save_db_version($ana,$db_version) unless $mod =~ /Halfwise/;
+			# update the corresponding DepthFilter analysis
 			if ( $ln =~ s/_raw//g ) {
 				$ana_df = $analysis_adaptor->fetch_by_logic_name($ln);
-				print STDOUT "Analysis: ".$ana_df->logic_name." old version ".$ana_df->db_version.
-							 " new version $db_version ($db)\n" if $verbose;
-				if($db_version ne $ana_df->db_version){
-					$ana_df->db_version($db_version);
-					$analysis_adaptor->update($ana_df);
-				}
+				save_db_version($ana_df,$db_version);
 			}
 		}
 	}
+	# update Halfwise db version
+	foreach my $a (keys %$anash) {
+		next unless $anash->{$a}->module =~ /Halfwise/;
+		my $new_db_version  = $uniprot_db_version.'_'.$pfam_db_version;
+		save_db_version($a,$new_db_version);
+	} 
+}
+
+sub save_db_version {
+	my ($ana,$db_version) = @_;
+	if($db_version ne $ana->db_version){
+		$ana->db_version($db_version);
+		$analysis_adaptor->update($ana);
+		print STDOUT "Analysis: ".$ana->logic_name." old version ".$ana->db_version.
+					 " new version $db_version ($db)\n" if $verbose;
+	}
+	
 }
 
 my %db_filename = ();
