@@ -479,7 +479,7 @@ sub fetch_databases {
 		unless ( $dbname =~ m!^/! ) {
 			$path = $ENV{BLASTDB} . "/" . $dbname;
 		}
-		if ( -f $path ) {
+		if ( -f "$path" ) {
 			$db_filename{$dbname} = $path;
 		} elsif( -f "${$path}-1") {
 			$db_filename{$dbname} = "${$path}-1";
