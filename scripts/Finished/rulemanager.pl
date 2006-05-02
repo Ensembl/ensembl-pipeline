@@ -435,7 +435,7 @@ sub setup_pipeline {
 	);
 }
 
-# Update the db version for the Blast, EST and DepthFilter analysis in the analysis table.
+# Update the db version for the Halfwise, Blast, EST and DepthFilter analysis in the analysis table.
 my @analysis;
 sub update_analysis_dbversion {
 	my $analysis_adaptor = $db->get_AnalysisAdaptor();
@@ -449,7 +449,8 @@ sub update_analysis_dbversion {
 		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Halfwise/ ) ) {
 			$db         = fetch_databases( $ana->db_file );
 			$db_version = get_db_version( $db );
-			print STDOUT "Analysis: ".$ana->logic_name." old version ".$ana->db_version." new version $db_version ($db)\n";
+			print STDOUT "Analysis: ".$ana->logic_name." old version ".$ana->db_version.
+						 " new version $db_version ($db)\n" if $verbose;
 			if($db_version ne $ana->db_version){
 				$ana->db_version($db_version);
 				$analysis_adaptor->update($ana);
@@ -457,7 +458,8 @@ sub update_analysis_dbversion {
 			#update the corresponding DepthFilter analysis
 			if ( $ln =~ s/_raw//g ) {
 				$ana_df = $analysis_adaptor->fetch_by_logic_name($ln);
-				print STDOUT "Analysis: ".$ana_df->logic_name." old version ".$ana_df->db_version." new version $db_version ($db)\n";
+				print STDOUT "Analysis: ".$ana_df->logic_name." old version ".$ana_df->db_version.
+							 " new version $db_version ($db)\n" if $verbose;
 				if($db_version ne $ana_df->db_version){
 					$ana_df->db_version($db_version);
 					$analysis_adaptor->update($ana_df);
@@ -479,10 +481,10 @@ sub fetch_databases {
 		unless ( $dbname =~ m!^/! ) {
 			$path = $ENV{BLASTDB} . "/" . $dbname;
 		}
-		if ( -f "$path" ) {
+		if ( -f "${path}" ) {
 			$db_filename{$dbname} = $path;
-		} elsif( -f "${$path}-1") {
-			$db_filename{$dbname} = "${$path}-1";
+		} elsif( -f "${path}-1") {
+			$db_filename{$dbname} = "${path}-1";
 		}
 		return $db_filename{$dbname} if($db_filename{$dbname});
 	}
