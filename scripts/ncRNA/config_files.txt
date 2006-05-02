@@ -130,11 +130,11 @@ use vars qw(%Config);
     {
       logic_name => 'miRNA',
       batch_size => 1,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD> && mem>3500] rusage[mem=3500:<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
+      queue      => 'bigmem',
       output_dir => '<DATADIR>/<species>/miRNA',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
