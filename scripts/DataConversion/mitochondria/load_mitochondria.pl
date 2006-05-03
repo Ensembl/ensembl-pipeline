@@ -115,7 +115,8 @@ my %why1 = %{ ${$genbank_ref}[0] } ;
 my %why2 = %{ ${$genbank_ref}[1] } ;
 
 
-for my $g (@$genbank_ref) {   
+my $save_entry ; 
+GENBANK_ENTRY: for my $g (@$genbank_ref) {   
 
    my %entry = %$g ;  
 
@@ -131,10 +132,10 @@ for my $g (@$genbank_ref) {
 
    foreach my $k (sort keys %entry) {  
 
-     if ($k=~/start/) {  
+     if ($k=~/start/) {   
        my @starts = @{$entry{$k}} ;    
        throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
-       $start = join ("-", @starts)  ;  
+       $start = join ("-", @starts)  ;   
 
      } elsif ($k=~/end/) {  
        my @starts = @{$entry{$k}} ;   
@@ -143,12 +144,15 @@ for my $g (@$genbank_ref) {
 
      } elsif ($k=~m/note/){  
        $note = $entry{$k} ;  
+     } elsif ($k=~m/organism/){      
+        $save_entry = $g ;
+        next GENBANK_ENTRY  ; 
      } 
-   }  
-
+   }   
+   
      if (!exists $nonred_entries{"$start-$end"} && $start && $end ){   
        if ( $note!~m/tRNAscan-SE/) {  
-         $nonred_entries{"$start-$end"}=\%entry;  
+         $nonred_entries{"$start-$end"}=\%entry;   
        }else {  
          print " feature with coords $start-$end will be skipped because $note\n" ; 
        } 
@@ -157,11 +161,11 @@ for my $g (@$genbank_ref) {
      }
 }
 
-
-my @genbank =  values %nonred_entries ; 
-
-#my @genbank = @{$genbank_ref}; 
-
+#my @genbank = @{$genbank_ref};  
+my @genbank ; 
+push @genbank , $save_entry ; 
+push @genbank , values %nonred_entries ;
+ 
 my %assembly = %{$assembly_ref};
 
 ##########################
@@ -194,8 +198,6 @@ my $gb_taxon_id ;
 my %genome ; 
 
 foreach my $entry (@genbank ){ 
-     ##print "getting the source: $entry \n" ;
-     ## print join ("\n", keys %$entry) ; 
   if ($$entry{source}){  
      $gb_taxon_id = $$entry{'db_xref'};   
      #  print "\n\n\n$gb_taxon_id \n\n\n" ; 
@@ -274,9 +276,27 @@ if(!defined $ensembl_analysis){
  # contining parsed coords
  # index 0 contains the accession 
  # index 1 contains source data (taxon and sequence file)
- # subsequent indecies contain all the other annotations
+ # subsequent indecies contain all the other annotations 
+ # 
 
-for (my $i=2; $i <= $#genbank; $i++){
+print " have " . scalar(@genbank) . " ENTRIES \n" ;  
+
+for (my $i=1; $i <= $#genbank; $i++){
+
+
+   
+   my %h = %{$genbank[$i]} ;  
+   print "ENTRY $i\n";  
+   foreach ( keys %h) { 
+     print "$_\t$h{$_}\n"  ;   
+     if ( /start/ || /end/) { 
+      my @tmp = @{$h{$_}}; 
+       print "STARTS :\n" ;  
+      print join ("\t" , @tmp ) . "\n" ;  
+     }
+   } 
+   print "\nXXXXXXXXXXXXXXXXXXXXXX\n" ; 
+
 
   my $desc = $genbank[$i]{'product'};
   my $type = $genbank[$i]{'type'};
@@ -297,7 +317,7 @@ for (my $i=2; $i <= $#genbank; $i++){
   if ($type eq 'rRNA'){
     $type = $MIT_RRNA_TYPE;
   }
-  print "\n***********************************************************\n" if $MIT_DEBUG;
+  print "\n***********************************************************\n" ; 
   # By default analysis is set to ncRNA
   my $analysis = $ncRNA_analysis;
   my $transcript = new Bio::EnsEMBL::Transcript;
@@ -321,7 +341,7 @@ for (my $i=2; $i <= $#genbank; $i++){
     # EXONS
 
     my $exon = new Bio::EnsEMBL::Exon;
-    $exon->start($start);
+    $exon->start($start); 
     $exon->end($end);
     $exon->strand($strand);
     $exon->slice($slice);
@@ -334,7 +354,7 @@ for (my $i=2; $i <= $#genbank; $i++){
     $transcript->add_Exon($exon);
     $start_exon = $exon if($exon_number == 0);
     $end_exon = $exon if($exon_number == $total_exons);
-  }
+  } 
 
   $transcript->start_Exon($start_exon);
   $transcript->end_Exon  ( $end_exon );
@@ -356,6 +376,7 @@ for (my $i=2; $i <= $#genbank; $i++){
   $transcript->biotype($type);
   #############
   # Make  genes
+   print "create new trans " . $transcript->seq_region_start."\n" ; 
 
   my $gene = new Bio::EnsEMBL::Gene;
   eval {
@@ -369,13 +390,21 @@ for (my $i=2; $i <= $#genbank; $i++){
   if ($@){
     print "Error: $@\n";
     exit;
-  }
-  push @genes,$gene;
+  } 
+  print " pushing " . $gene->seq_region_start . "\n" ; 
+  push @genes,$gene; 
 }
 
 
-print "Have ".scalar(@genes)." gene objects\n";
-print "Do you want to load them into the db ? (Y/N) ";
+print "Have ".scalar(@genes)." gene objects\n";   
+
+@genes = sort {$a->seq_region_start <=> $b->seq_region_start } @genes ;  
+
+foreach my $gene (@genes ) { 
+  print  $gene->seq_region_start . "\n" ;  
+}  
+exit(0) ;
+print " TESTING : Do you want to load them into the db ? (Y/N) ";
   my $answer = <>;
   chomp $answer;
   if ($answer eq "y" or $answer eq "Y"){
