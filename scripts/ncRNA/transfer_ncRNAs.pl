@@ -31,7 +31,7 @@ my %whitehash;
 my $xrefs;
 my $skipchecks;
 my $increment;
-
+my @new_ids;
 $| = 1;
 
 &GetOptions(
@@ -131,7 +131,25 @@ foreach my $species (@speciess) {
   my $total_ncRNAs;
   my @ncRNAs;
   my %failed;
-    
+  # test final db for external db table
+  
+  my $sth = $final_db->dbc->prepare( "
+     SELECT external_db_id
+       FROM external_db
+      WHERE db_name = 'RFAM'");
+  
+  $sth->execute();
+  my $db =  $sth->fetchrow;
+  die("Cannot find RFAM in external db table\n") unless $db == 4200;
+  my $sth = $final_db->dbc->prepare( "
+     SELECT external_db_id
+       FROM external_db
+      WHERE db_name = 'miRNA_Registry'");
+  
+  $sth->execute();
+  my $db =  $sth->fetchrow;
+  die("Cannot find miRBase in external db table\n") unless $db == 3300;
+
   print "Fetching Predicted Genes\n" if $verbose;
   my @predicted_genes = @{$sga->fetch_all};
     
@@ -150,27 +168,7 @@ foreach my $species (@speciess) {
 	$failed{$gene->dbID."\tdescription"} = $gene;
 	$desc++;
       }
-      # gene must have full length structure line
-      # miRNAs must have a mature coord attributes
-      foreach my $trans (@{$gene->get_all_Transcripts}) {
-	my $attributes = $trans->get_all_Attributes;
-	my $structure = &decode_str($attributes);
-	unless ($trans->length == length($structure)){
-	  $failed{$gene->dbID."\tstructure"} = $gene;
-	  $blacklist{$gene->dbID} =1;
-	  $str++;
-	}
-	if ($gene->analysis->logic_name eq 'miRNA') {
-	  my $mature = 0;
-	  foreach my $attrib (@{$attributes}) {
-	    $mature = 1 if $attrib->name eq 'Micro RNA';
-	  }
-	  unless ($mature){
-	    $failed{$gene->dbID."\tmature attribute"} = $gene;
-	    $mat++;
-	  }
-	}
-      }
+
       # duplicate genes
       my @duplications = @{$sga->fetch_all_by_Slice($gene->feature_Slice)};
       if (scalar(@duplications > 1)) {
@@ -323,6 +321,8 @@ foreach my $species (@speciess) {
     foreach my $gene (@genes_to_copy) {
       # lazyload
       foreach my $trans (@{$gene->get_all_Transcripts}) {
+	# copy the status
+	$trans->status($gene->status);
 	foreach my $exon (@{$trans->get_all_Exons}) {
 	}
 	foreach my $xref (@{$trans->get_all_DBEntries}) {
@@ -338,97 +338,37 @@ foreach my $species (@speciess) {
       print "Storing gene ".$gene->dbID."\t" if $verbose;;
       # store gene
       eval {
-	my $new_id = $final_ga->store($gene);
-	if ($xrefs) {
-	  # dump out all the xref info
-	  my $new_gene = $final_ga->fetch_by_dbID($new_id);
-	  unless ($new_gene){
-	    print "Warning newly written gene not found $new_id\n" if $verbose;;
-	  }
-	  next unless($gene->analysis->logic_name eq "ncRNA");
-	  print XREFS "$new_id\t";
-	  foreach my $trans (@{$new_gene->get_all_Transcripts}) {
-	    print XREFS $trans->dbID."\t";
-	    foreach my $xref (@{$trans->get_all_DBEntries}) {
-	      print XREFS $xref->dbname."\t"; 
-	      print XREFS $xref->primary_id."\t";
-	      print XREFS $xref->display_id."\t";
-	      print XREFS $new_gene->description."\n";
-	    }
-	  }
-	}
-	print   "wrote gene " . $gene->dbID . "\n" if $verbose;;
+	push @new_ids, $final_ga->store($gene);
       };
       if ( $@ ) {
 	die("UNABLE TO WRITE GENE:\n$@");
       }
+      print   "wrote gene " . $gene->dbID . "\n" if $verbose;;
     }
   } else {
     print "Not writing - write protect on!\n" if $verbose;;
   }
-}
-
-
-exit;
-
-# sub for decoding gene structure
-
-sub decode_str{
-  my ($attributes)= @_;
-  my $code;
-  my $offset = 0;
-  my $chr;
-  my $string;
-  my $start;
-  my $end;
-  my $num = 0;
-  my $str = "";
-  my $complete_str;
-  my %str_hash;
-  foreach my $attribute (@$attributes){
-    next unless $attribute->name eq "Structure";
-    my $value = $attribute->value;
-    # remove string header;
-    if ($value =~ /(\d+):\d+\t(.+)/){
-      $str_hash{$1} = $2;
-    } else {
-      throw("Cannot parse encoded string $attribute\n");
-    }
-  }
-  my @sorted_attributes = sort { $str_hash{$a} cmp $str_hash{$b} } keys %str_hash;
-  foreach my $order (@sorted_attributes){
-    $string = $str_hash{$order};
-    $num =0;
-    $str = "";
-    for (my $pos =0; $pos <= length($string) ; $pos++){
-      $chr =  substr($string,$pos,1);
-      if ($chr =~ /\D/){
-	$complete_str .= $str unless($num);
-	if ($num){
-	  for (my$i =1 ; $i <= $num ; $i++){
-	    $complete_str .= $str;
-	  }
+  if ($xrefs) {
+    # dump out all the xref info
+    foreach my $new_id (@new_ids){
+      my $new_gene = $final_ga->fetch_by_dbID($new_id);
+      unless ($new_gene){
+	print "Warning newly written gene not found $new_id\n" if $verbose;;
+      }
+      next unless($new_gene->analysis->logic_name eq "ncRNA");
+      print XREFS "$new_id\t";
+      foreach my $trans (@{$new_gene->get_all_Transcripts}) {
+	print XREFS $trans->dbID."\t";
+	foreach my $xref (@{$trans->get_all_DBEntries}) {
+	  print XREFS $xref->dbname."\t"; 
+	  print XREFS $xref->primary_id."\t";
+	  print XREFS $xref->display_id."\t";
+	  print XREFS $new_gene->description."\n";
 	}
-	$str = $chr;
-	$num = "";
-	next;
-      }
-      if ($chr =~ /\d/){
-	$num .= $chr;
       }
     }
-    # empty array 
-    if ($num){
-    for (my$i =1 ; $i <= $num ; $i++){
-      $complete_str .= $str;
-    }
   }
-    else{
-      $complete_str .= $str;
-    }
-  }
-return $complete_str;
-
 }
+exit;
 
 __END__
