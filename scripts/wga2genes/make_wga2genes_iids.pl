@@ -149,6 +149,8 @@ if (defined $kill_list) {
   }
 
   $kill_list = $list;
+
+  $verbose and printf "Read KILL list (%d items)\n", scalar(keys %$kill_list);
 } else {
   $kill_list = {};
 }
@@ -161,8 +163,6 @@ my @slices;
 if (defined $seq_region_name) {
   my $sl = $query_db->get_SliceAdaptor->fetch_by_name("toplevel::${seq_region_name}:::");
   foreach my $tl_sl (@tl_slices) {
-    next if $sl->seq_region_name =~ /^MT$/;
-
     if ($sl->coord_system->name eq $tl_sl->coord_system->name and
         $sl->seq_region_name eq $tl_sl->seq_region_name) {
       push @slices, $tl_sl
@@ -201,7 +201,7 @@ foreach my $sl (@slices) {
     foreach my $t (@{$g->get_all_Transcripts}) {
       next if exists $kill_list->{$t->stable_id};
 
-      foreach my $e (@{$t->get_all_translatable_Exons}) {
+      foreach my $e (@{$t->get_all_translateable_Exons}) {
         if (not defined $min_start or $e->start < $min_start) {
           $min_start = $e->start;
         }
