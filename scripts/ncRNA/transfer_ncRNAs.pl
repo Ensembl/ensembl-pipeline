@@ -31,7 +31,6 @@ my %whitehash;
 my $xrefs;
 my $skipchecks;
 my $increment;
-my @new_ids;
 $| = 1;
 
 &GetOptions(
@@ -141,13 +140,13 @@ foreach my $species (@speciess) {
   $sth->execute();
   my $db =  $sth->fetchrow;
   die("Cannot find RFAM in external db table\n") unless $db == 4200;
-  my $sth = $final_db->dbc->prepare( "
+  $sth = $final_db->dbc->prepare( "
      SELECT external_db_id
        FROM external_db
       WHERE db_name = 'miRNA_Registry'");
   
   $sth->execute();
-  my $db =  $sth->fetchrow;
+  $db =  $sth->fetchrow;
   die("Cannot find miRBase in external db table\n") unless $db == 3300;
 
   print "Fetching Predicted Genes\n" if $verbose;
@@ -338,7 +337,7 @@ foreach my $species (@speciess) {
       print "Storing gene ".$gene->dbID."\t" if $verbose;;
       # store gene
       eval {
-	push @new_ids, $final_ga->store($gene);
+        $final_ga->store($gene);
       };
       if ( $@ ) {
 	die("UNABLE TO WRITE GENE:\n$@");
@@ -350,20 +349,16 @@ foreach my $species (@speciess) {
   }
   if ($xrefs) {
     # dump out all the xref info
-    foreach my $new_id (@new_ids){
-      my $new_gene = $final_ga->fetch_by_dbID($new_id);
-      unless ($new_gene){
-	print "Warning newly written gene not found $new_id\n" if $verbose;;
-      }
-      next unless($new_gene->analysis->logic_name eq "ncRNA");
-      print XREFS "$new_id\t";
-      foreach my $trans (@{$new_gene->get_all_Transcripts}) {
+    foreach my $gene ($final_ga->generic_fetch("biotype like '%RNA'" )){
+      next unless($gene->analysis->logic_name eq "ncRNA");
+      print XREFS $gene->dbID."\t";
+      foreach my $trans (@{$gene->get_all_Transcripts}) {
 	print XREFS $trans->dbID."\t";
 	foreach my $xref (@{$trans->get_all_DBEntries}) {
 	  print XREFS $xref->dbname."\t"; 
 	  print XREFS $xref->primary_id."\t";
 	  print XREFS $xref->display_id."\t";
-	  print XREFS $new_gene->description."\n";
+	  print XREFS $gene->description."\n";
 	}
       }
     }
