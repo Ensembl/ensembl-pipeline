@@ -405,4 +405,4 @@ NP_035003.2 1024 gi|66348093|ref|NP_035003.2| baculoviral IAP repeat-containing 
 Q3UNK8 27 Q3UNK8.1 Q3UNK8_MOUSE retroviral-type family profile/F- MuLV receptor-binding/Peptidase aspartic
 Q3U193 520 Q3U193.1 Q3U193_MOUSE hypothetical protein
 Q3TZR4 41 Q3TZR4.1 Q3TZR4_MOUSE product:hypothetical L1 transposable element containing protein
-
+Q7LZ40.1 Q7LZ40_ORYLA Hyosophorin (Fragment).	(ba1)
