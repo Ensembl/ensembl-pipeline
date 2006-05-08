@@ -112,7 +112,7 @@ ensembl-dev@ebi.ac.uk
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
 my $cvsDIR               = "";
 
-# personal data dir (for temporary & result/error files)
+# personal data dir (for temporary & result/error files) eg. scratch DIR
 my $dataDIR              = ""; 
 
 # sequence data files, which are used for the update
@@ -146,8 +146,8 @@ my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/why_c
 my $WB_DBUSER            = "";
 my $WB_DBPASS            = "";
 # reference db (current build)
-my $WB_REF_DBNAME        = "sd3_homo_sapiens_36_ref"; 
-my $WB_REF_DBHOST        = "ecs2"; 
+my $WB_REF_DBNAME        = "sd3_homo_sapiens_36_ref";
+my $WB_REF_DBHOST        = "ecs2";
 my $WB_REF_DBPORT        = "3362"; 
 # new source db (PIPELINE)
 my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_0306_cDNA_pipe";
@@ -905,21 +905,21 @@ sub DB_setup{
 	
 	#insert analysis entries
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/add_Analysis ".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
+           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
            " -logic_name $newFeatureName -program $program_name -program_version $program_version".
 	   " -program_file $program_file -module $module_name".
 	   " module_version 1 -gff_source Exonerate -gff_feature similarity -input_id_type FILENAME";
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/add_Analysis ".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
+           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
            " -logic_name $submitName -module dummy -input_id_type FILENAME";
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/RuleHandler.pl".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
+           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
 	   " -insert -goal $newFeatureName -condition $submitName";
     $status += system($cmd);
     $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/make_input_ids".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS".
+           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
            " -file -dir $chunkDIR -logic_name $submitName";
     $status += system($cmd);
     if($status){ die("Error while setting up the database.\n") }
