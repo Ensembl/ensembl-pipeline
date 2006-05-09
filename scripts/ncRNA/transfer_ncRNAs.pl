@@ -122,6 +122,7 @@ foreach my $species (@speciess) {
      -dbname => $final_dbname,
      -pass   => $pass,
     );
+
   die ("Cannot find databases ") unless $final_db  && $sdb;
   my $final_ga = $final_db->get_GeneAdaptor;
   my $sga = $sdb->get_GeneAdaptor;
@@ -198,12 +199,19 @@ foreach my $species (@speciess) {
   if ($analysis && $delete) {
     my @old_ncRNAs = @{$final_ga->generic_fetch(" analysis_id = ".$analysis->dbID)};
     if (scalar(@old_ncRNAs) > 0) {
-      print "Found ".scalar(@old_ncRNAs)." genes of type ".$analysis->logic_name." from $final_dbname\nshall I delete them? (Y/N) ";
+      print STDERR "Found ".scalar(@old_ncRNAs)." genes of type ".$analysis->logic_name." from $final_dbname\nshall I delete them? (Y/N) ";
       my $reply = <>;
       chomp $reply;
       if ($reply eq "Y" or $reply eq "y") {
 	# do the delete
 	foreach my $old_ncRNA (@old_ncRNAs) {
+	  # lazyload
+	  foreach my $trans (@{$old_ncRNA->get_all_Transcripts}) {
+	    foreach my $exon (@{$trans->get_all_Exons}) {
+	    }
+	    foreach my $xref (@{$trans->get_all_DBEntries}) {
+	    }
+	  }
 	  eval {
 	    $final_ga->remove($old_ncRNA);
 	  };
@@ -214,9 +222,6 @@ foreach my $species (@speciess) {
       }
     }
   }
-
-  
-
   unless ($skipchecks){
     print "looking for overlaps with coding exons and ncRNAs\n" if $verbose;;
     # check for overlaps
@@ -237,13 +242,19 @@ foreach my $species (@speciess) {
 	die "HELP\n";
       }
       my @real_genes = @{$final_ga->fetch_all_by_Slice_constraint($slice)};
-      
     GENE:  foreach my $real_gene (@real_genes) {
 	# gene is a non coding gene already annotated - delete the old one
 	if ($merge or $increment) {
 	  if ($real_gene->analysis->logic_name eq "ncRNA" && $real_gene->strand == 1) {
 	    # delete the gene
 	    if ($merge){
+	    # lazyload
+	      foreach my $trans (@{$real_gene->get_all_Transcripts}) {
+		foreach my $exon (@{$trans->get_all_Exons}) {
+		}
+		foreach my $xref (@{$trans->get_all_DBEntries}) {
+		}
+	      }
 	      print "Replacing ".$real_gene->dbID."\t" if $verbose;
 	      $final_ga->remove($real_gene) if $merge;
 	    }
@@ -301,10 +312,6 @@ foreach my $species (@speciess) {
   print scalar(@genes_to_copy) if $verbose;;
   print " are therefore availible for copying\n" if $verbose;;
 
-# foreach my $g (@genes_to_copy){
-#    print $g->description."\n";
-#  }
-
   if ($write) {
     print "Copying genes to ".$final_dbname."\n" if $verbose;;
     my $ncRNA_analysis = $final_db->get_AnalysisAdaptor->fetch_by_logic_name("ncRNA");
@@ -318,21 +325,16 @@ foreach my $species (@speciess) {
       $final_db->get_AnalysisAdaptor->store($ncRNA_analysis);
     }
     foreach my $gene (@genes_to_copy) {
+      # adjust  analysis
+      $gene->analysis($ncRNA_analysis);
       # lazyload
       foreach my $trans (@{$gene->get_all_Transcripts}) {
 	# copy the status
 	$trans->status($gene->status);
-	foreach my $exon (@{$trans->get_all_Exons}) {
-	}
-	foreach my $xref (@{$trans->get_all_DBEntries}) {
-	  #	  print "$gene\t$trans\t$xref\n";
-	  #	  print  $xref->description."\n";
-	}
+	$trans->analysis($gene->analysis);
+	$trans->get_all_Exons;
+	$trans->get_all_DBEntries;
       }
-      # adjust  analysis
-      $gene->analysis($ncRNA_analysis);
-      $gene->dbID(undef);
-      $gene->adaptor(undef);
       #Biotypes
       print "Storing gene ".$gene->dbID."\t" if $verbose;;
       # store gene
@@ -349,16 +351,21 @@ foreach my $species (@speciess) {
   }
   if ($xrefs) {
     # dump out all the xref info
-    foreach my $gene ($final_ga->generic_fetch("biotype like '%RNA'" )){
+    foreach my $gene (@{$final_ga->generic_fetch("biotype like '%RNA%'" )}){
       next unless($gene->analysis->logic_name eq "ncRNA");
       print XREFS $gene->dbID."\t";
       foreach my $trans (@{$gene->get_all_Transcripts}) {
 	print XREFS $trans->dbID."\t";
-	foreach my $xref (@{$trans->get_all_DBEntries}) {
-	  print XREFS $xref->dbname."\t"; 
-	  print XREFS $xref->primary_id."\t";
-	  print XREFS $xref->display_id."\t";
-	  print XREFS $gene->description."\n";
+	my @xrefs = @{$trans->get_all_DBEntries};
+	if (@xrefs){
+	  foreach my $xref (@xrefs) {
+	    print XREFS $xref->dbname."\t"; 
+	    print XREFS $xref->primary_id."\t";
+	    print XREFS $xref->display_id."\t";
+	    print XREFS $gene->description."\n";
+	  }
+	} else {
+	  print XREFS "\n";
 	}
       }
     }
