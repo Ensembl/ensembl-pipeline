@@ -193,7 +193,7 @@ sub insert_agp_line{
     #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
     die "contig id must be defined for this to work\n";
   }
-  my $sql = "insert into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
+  my $sql = "insert ignore into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
   
   my $sth = $db->dbc->prepare($sql);
   $sth->execute($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori); 
