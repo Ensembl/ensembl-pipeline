@@ -262,10 +262,6 @@ sub fetch_input {
       
       foreach my $f (@all_feats) {
         my $name = $f->hseqname;
-        if ($name =~ /(\S+)\.\d+/) { 
-          $f->hseqname($1);
-        }
-        
         push @{$features{$f->hseqname}}, $f;
       }
       
@@ -657,6 +653,7 @@ sub process_genes {
 	my $gene = new Bio::EnsEMBL::Gene;
 	$gene->type($genetype);
 	$gene->analysis($analysis_obj);
+	$checked_transcript->analysis($analysis_obj);
 	$gene->add_Transcript($checked_transcript);
 	push (@genes, $gene);
       }
