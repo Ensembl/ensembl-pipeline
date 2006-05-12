@@ -206,7 +206,7 @@ foreach my $sl (@slices) {
           $min_start = $e->start;
         }
         if (not defined $max_end or $e->end > $max_end) {
-          $max_end = $e->start;
+          $max_end = $e->end;
         }
       }
     }
