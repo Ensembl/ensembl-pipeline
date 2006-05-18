@@ -119,12 +119,12 @@ my $dataDIR              = "";
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "hs.fna"; #"mouse.fna"; 
+my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi1";
 my $sourceDIR            = "/data/blastdb";
-my $assembly_version     = "NCBI36"; #"NCBIM35";
-my $target_masked_genome = "/data/blastdb/Ensembl/Human/$assembly_version/genome/softmasked_dusted.fa";
-#my $target_masked_genome = "/data/blastdb/Ensembl/Mouse/NCBIM35/genome/softmasked_dusted/toplevel_sequences.fa"; 
+my $assembly_version     = "NCBIM36"; #"NCBIM36"; #NCBI36
+#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
 my $user 				 = "sd3";
 my $host 				 = "cbi1";
 
@@ -146,23 +146,23 @@ my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/why_c
 my $WB_DBUSER            = "";
 my $WB_DBPASS            = "";
 # reference db (current build)
-my $WB_REF_DBNAME        = "sd3_homo_sapiens_36_ref";
-my $WB_REF_DBHOST        = "ecs2";
-my $WB_REF_DBPORT        = "3362"; 
+my $WB_REF_DBNAME        = "jhv_mus_37_refdb"; #is in schema 38
+my $WB_REF_DBHOST        = "ia64g"; 
+my $WB_REF_DBPORT        = "3306"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_0306_cDNA_pipe";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_mouse_0506_cDNA_pipe";
 my $WB_PIPE_DBHOST       = "ecs1b";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_human_0306_cDNA_update";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_mouse_0506_cDNA_update";
 my $WB_TARGET_DBHOST     = "ecs2";
 my $WB_TARGET_DBPORT     = "3362";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "sd3_homo_sapiens_cdna_38_35"; 
+my $WB_LAST_DBNAME       = "mus_musculus_cdna_38_35"; 
 my $WB_LAST_DBHOST       = "ecs2";
-my $WB_LAST_DBPORT       = "3362";  
+my $WB_LAST_DBPORT       = "3365";  
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_37_35j";
+my $WB_LAST_DNADBNAME    = "mus_musculus_core_38_35";
 my $WB_LAST_DNADBHOST    = "ecs2"; 
 my $WB_LAST_DNADBPORT    = "3365"; 
 
@@ -171,8 +171,8 @@ my $WB_LAST_DNADBPORT    = "3365";
 my $adjust_assembly      = 0;
 
 #set the species
-my $common_species_name  = "human"; #"human"; #"mouse";
-my $species	      = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "mouse"; #"human"; #"mouse";
+my $species	      = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
 
 my $oldFeatureName     = "cDNA_update"; #for the comparison only
 
@@ -198,8 +198,12 @@ my $newfile            = "cdna_update";
 my $configDIR          = $dataDIR."/configbackup";
 my $chunkDIR           = $dataDIR."/chunks";
 my $outDIR             = $dataDIR."/output";
-my $masked_genome      = $target_masked_genome;
+my @masked_genome      = @target_masked_genome;
 my $submitName         = "SubmitcDNAChunk";
+
+my $genomelist = join "\',\'", @masked_genome; 
+
+
 
 my %configvars      = (
 	 "cvsDIR" => $cvsDIR,
@@ -213,7 +217,7 @@ my %configvars      = (
 	 "sourceDIR" => $sourceDIR,
 	 "newfile" => $newfile,
 	 "config_file" => $config_file,
-	 "masked_genome" => $masked_genome,
+	 "masked_genome" => $genomelist,
 	 "fastasplit" => $fastasplit,
 	 "polyA_clipping" => $polyA_clipping,
 	 "WB_DBUSER" => $WB_DBUSER,
@@ -232,7 +236,7 @@ my %configvars      = (
 
 
 #fasta chunk specifications:
-my $chunknum        = 4300;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
+my $chunknum        = 1500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $maxseqlength    = 17000;
 my $tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
@@ -273,7 +277,7 @@ if($option eq "prepare"){
 
     if($adjust_assembly){
       print "The genome files' directory will have to be distributed across the farm!\n".
-	    "SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".$target_masked_genome."\n\n";
+	    "SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".@target_masked_genome."\n\n";
     }
 
   }
@@ -288,6 +292,7 @@ elsif($option eq "run"){
     config_setup()
   }
 
+ 
   run_analysis();
 
   find_missing_cdnas();
@@ -730,11 +735,12 @@ sub adjust_assembly{
   if(system($cmd)){
     die("couldn t copy masked genome files.$@\n");
   }
-  #get the correct location of DR-assembly pieces
+  #get the correct location of DR-assembly pieces #renamed now to c5_H2, c22_H2, c6_COX amd c6_QBL  
   my $db  = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, 'ensro');
+  my $pattern = 'c'; #previously was DR
   my $sql = 'select s.name, s.seq_region_id, ae.seq_region_start, ae.seq_region_end '.
             'from seq_region s, assembly_exception ae where s.seq_region_id=ae.seq_region_id '.
-	    'and s.name like "DR%";';
+	    'and s.name like "'.$pattern.'%";';
   my $sth = $db->prepare($sql) or die "sql error!";
   $sth->execute();
   while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
@@ -761,11 +767,11 @@ sub adjust_assembly{
   my $date = "";
   my ($day, $month, $year) = (localtime)[3,4,5];
   my $datestring = printf("%04d %02d %02d", $year+1900, $month+1, $day);
-  my $readme = $masked_genome."/README";
+  my $readme = $masked_genome[0]."/README";
   open(README, ">$readme") or die "can t create README file.";
   
         if ($common_species_name eq "human"){
-		print README "Directory ".$target_masked_genome."\n\n".
+		print README "Directory ".@target_masked_genome."\n\n".
 		"These are the softmasked dusted genome files from human ".$assembly_version.
 		" assembly with two small modifications:\nThe coordinates of the DR52 & DR53 ".
 		"contigs were adjusted according to the assembly table of the database ".
@@ -773,7 +779,7 @@ sub adjust_assembly{
 	        ".\nThey are used for the cDNA-update procedure to produce an up-to-date cDNA track ".
 		"every month.\nCreated by ".$ENV{USER}." on ".$datestring.".\n\n";
 	}else{
-		print README "Directory ".$target_masked_genome."\n\n".
+		print README "Directory ".@target_masked_genome."\n\n".
 		"These are the softmasked dusted genome files from " .$common_species_name. "  ".$assembly_version.
 		" assembly. \nThey are used for the cDNA-update procedure to produce an up-to-date cDNA track ".
 		"every month.\nCreated by ".$ENV{USER}." on ".$datestring.".\n\n";
@@ -1375,7 +1381,7 @@ sub compare{
   my $db2 = db_connector($WB_TARGET_DBHOST, $WB_TARGET_DBPORT, $WB_TARGET_DBNAME, "ensro");
 
   #get chromosome names / ids
-  $sql  = 'select coord_system_id from coord_system where name="chromosome"';
+  $sql  = 'select coord_system_id from coord_system where name="chromosome" && attrib="default_version"';
   $sth1 = $db1->prepare($sql) or die "sql error!";
   $sth1->execute();
   my ($coord_system_id1) = $sth1->fetchrow_array;
@@ -1426,10 +1432,10 @@ sub compare{
   print "\nGetting hits per chromosome\n".
         "\told\tnew\n";
   #check hits per chromosome
-  $sql = "select count(*) from  dna_align_feature daf, analysis a where a.logic_name='".
+  $sql = "select count(distinct hit_name) from  dna_align_feature daf, analysis a where a.logic_name='".
          $oldFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
   $sth1 = $db1->prepare($sql) or die "sql error!";
-  $sql = "select count(*) from  dna_align_feature daf, analysis a where a.logic_name='".
+  $sql = "select count(distinct hit_name) from  dna_align_feature daf, analysis a where a.logic_name='".
          $newFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
 
   $sth2 = $db2->prepare($sql) or die "sql error!";
