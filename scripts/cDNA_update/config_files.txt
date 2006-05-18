@@ -9,7 +9,7 @@ use vars qw(%Config);
   LIB_DIR  => '/usr/local/ensembl/lib',
   PIPELINE_WORK_DIR   => '/tmp',
   PIPELINE_INPUT_DIR => '<chunkDIR>',
-  PIPELINE_TARGET_DIR => '<masked_genome>',
+  PIPELINE_TARGET_DIR => ['<masked_genome>'],
   SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',
   PIPELINE_REPEAT_MASKING => ['RepeatMask'],	
   SNAP_MASKING => [],
@@ -81,7 +81,7 @@ use vars qw(%Config);
 %Config = (
            EXONERATE_CONFIG_BY_LOGIC => {
              DEFAULT => {
-               GENOMICSEQS         => '<masked_genome>',
+               GENOMICSEQS         => ['<masked_genome>'],
                QUERYTYPE           => undef,
                QUERYSEQS           => undef,
                IIDREGEXP           => undef,
@@ -92,7 +92,7 @@ use vars qw(%Config);
 	       NONREF_REGIONS      => 1,
              },
              <newFeatureName> => {
-	       GENOMICSEQS         => '<masked_genome>',
+	       GENOMICSEQS         => ['<masked_genome>'],
                QUERYTYPE           => 'dna',
                QUERYSEQS           => '<chunkDIR>',
                OUTDB               => { -dbname => '<WB_TARGET_DBNAME>',
