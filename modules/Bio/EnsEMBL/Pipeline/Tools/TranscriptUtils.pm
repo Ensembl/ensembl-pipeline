@@ -433,7 +433,7 @@ sub _check_low_complexity{
     print STDERR "Have low complexity ".$low_complexity.
       " and complexity threshold $complexity_threshold\n";
     if($low_complexity > $complexity_threshold){
-      warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
+      $self->warn("discarding transcript - translation has $low_complexity% low complexity sequence\n");
       $valid = 0;
     }
     
@@ -634,20 +634,25 @@ sub split_Transcript{
     my @ex = @{$st->get_all_Exons};
     
     if(scalar(@ex) > 1){
-      $st->{'temporary_id'} = $transcript->dbID . "." . $count;
-      $count++;
-      push(@final_transcripts, $st);
-    }
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count++;
 
-    foreach my $f (@{$transcript->get_all_supporting_features}) {
-      my @ugs;
-      foreach my $ug ($f->ungapped_features) {
-        if ($ug->start >= $st->start and $ug->end <= $st->end) {
-          push @ugs, $ug;
+      foreach my $f (@{$transcript->get_all_supporting_features}) {
+        my @ugs;
+        foreach my $ug ($f->ungapped_features) {
+          if ($ug->start >= $st->start and $ug->end <= $st->end) {
+            push @ugs, $ug;
+          }
+        }
+
+        if (@ugs) {
+          my $newf = $f->new(-features => \@ugs);
+          $st->add_supporting_features($newf);
+        } else {
+          $self->warn("Split transcript product was not assigned any support\n");
         }
       }
-      my $newf = $f->new(-features => \@ugs);
-      $st->add_supporting_features($newf);
+
+      push(@final_transcripts, $st);
     }
   }
   
