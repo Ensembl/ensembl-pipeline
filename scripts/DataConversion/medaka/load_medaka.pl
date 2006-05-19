@@ -1,21 +1,19 @@
 #!/usr/local/ensembl/bin/perl -w
 
-=head1 Synopsis
+=head1 NAME
 
 load_medaka.pl 
 
-=head1 Description
+=head1 DESCRIPTION
 
-Parses medaka genes out of the given GFF file and writes them to the database specified.
+Parses predicted medaka genes out of the given GFF file and writes them to the $output_db specified.
+- Fill in the necessary variables in the config file, MedakaConf.pm. 
+- It should not be necessary to change anything in load_medaka.pl unless the format of the gff file has changed, for example)
 
-=head1 Config
-
-All configuration is done through MedakaConf.pm
 
 =cut
 
 use strict;
-use Carp;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
@@ -27,7 +25,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
 use MedakaConf;
 use Getopt::Long;
-use Bio::EnsEMBL::Utils::Exception qw(stack_trace_dump throw warning);
+use Bio::EnsEMBL::Utils::Exception qw(warning);
 my $help;
 my %opt; 
 
@@ -107,18 +105,17 @@ my $dna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $MED_DNA_DBHOST,
 
 
 # Parse GFF file
-print STDERR "Parsing $MED_GFF_FILE.\n";
+print STDERR "Parsing $MED_GFF_FILE...\n";
 my (%gene)  = %{parse_gff()}; 
 
 
 
 # check that it's all working so far
-print STDERR "Done parsing. Now will print out.\n";
-#foreach my $g (sort keys %gene){
-#  foreach my $exon (sort {$a <=> $b} keys %{$gene{$g}}){
-#    print $g."\t".$exon."\t@{$gene{$g}{$exon}}\n";
-#  }
-#}
+foreach my $g (sort keys %gene){
+  foreach my $exon (sort {$a <=> $b} keys %{$gene{$g}}){
+    print $g."\t".$exon."\t@{$gene{$g}{$exon}}\n" if $MED_DEBUG;
+  }
+}
 
 
 
@@ -128,26 +125,27 @@ my $fixed_phases = fix_frames(\%gene);
 
 
 # get all the scaffolds in the dna_db
+print STDERR "Fetching all $MED_COORD_SYSTEM...\n";
 my $dna_sa = $dna_db->get_SliceAdaptor();
 my @scaffolds = @{$dna_sa->fetch_all($MED_COORD_SYSTEM,$MED_COORD_SYSTEM_VERSION)};
-#foreach my $scaff (@scaffolds){
-#  print STDERR "name = ".$scaff->name."\n";
-#}
+foreach my $scaff (@scaffolds){
+  print STDERR "name = ".$scaff->name."\n" if $MED_DEBUG;
+}
 
 
 # make gene objects
 my @gene_objs = @{make_gene_objs($fixed_phases, \@scaffolds, $output_db, $dna_sa)};
-print "Have ".scalar(@gene_objs)." gene objects\n";   
+print "Have ".scalar(@gene_objs)." gene objects.\n";   
 @gene_objs = sort {$a->seq_region_start <=> $b->seq_region_start } @gene_objs ;  
-
-
 foreach my $g (@gene_objs){
-  print "got gene_stable_id ".$g->stable_id."\n";
+  print "got gene_stable_id ".$g->stable_id."\n" if $MED_DEBUG;
 }
-exit 1;
-# load genes into db
-#load_genes($output_db, $gene_objs);
 
+
+
+# load genes into db
+&load_genes($output_db, \@gene_objs);
+print STDERR "Done!\n";
 
 
 
@@ -160,7 +158,6 @@ exit 1;
 # OuterKey = gene_stable_id
 # InnerKey = exon_number
 sub parse_gff {
-  print "Parsing gff file\n";
   # example of GFF file.
   #	scaffold1       UTOLAPRE05100100001     initial-exon    129489  129606  .       +       0
   #	scaffold1       UTOLAPRE05100100001     internal-exon   129920  130027  .       +       2
@@ -176,20 +173,20 @@ sub parse_gff {
   while (<GFF>){
     chomp;
     $line = $_;
-#    print STDERR "$line\n";
+    print STDERR "$line\n" if $MED_DEBUG;
     next if ($line =~ m/^\#/);
     my @fields = split/\s+/, $line;
-#    for (my $i=0; $i<scalar(@fields); $i++) {
-#      print STDERR $i."\t".$fields[$i]."\n";
-#    }
+    for (my $i=0; $i<scalar(@fields); $i++) {
+      print STDERR $i."\t".$fields[$i]."\n" if $MED_DEBUG;
+    }
     if ($fields[2] eq 'initial-exon' || $fields[2] eq 'single-exon') {
-#      print STDERR "Resetting count to 0, ".$fields[2]."\n";
+      print STDERR "Resetting count to 0, ".$fields[2]."\n" if $MED_DEBUG;
       $count = 0;      
     } else {
       $count++;
     }     
-    #gene_id -> exon_number = (start, end, strand, frame, scaffold)
-    @{$gff{$fields[1]}{$count}} = ($fields[3], $fields[4], $fields[6], $fields[7],$fields[0]);     
+    #gene_id -> exon_number = (start, end, strand, frame, scaffold, feature)
+    @{$gff{$fields[1]}{$count}} = ($fields[3], $fields[4], $fields[6], $fields[7], $fields[0], $fields[2]);     
   }
   $line = '';
   close GFF; 
@@ -199,10 +196,10 @@ sub parse_gff {
 sub load_genes(){
   my ($output_db,$genes) = @_;
   print "Storing genes...\n" ; 
-  foreach my $gene(@{$genes}){
-    print "Loading gene ",$gene,"\t";
+  foreach my $gene (@{$genes}){
+    print "Loading gene ".$gene->stable_id."\t" if $MED_DEBUG;
     my $dbid = $output_db->get_GeneAdaptor->store($gene);
-    print "dbID = $dbid\n";
+    print "dbID = $dbid\n" if $MED_DEBUG;
   }
   return 0;
 }
@@ -227,6 +224,7 @@ sub fix_frames {
 
 # create gene objects from hash %gene
 sub make_gene_objs {
+  print STDERR "Creating Gene objects...\n";
   my ($gene_ref, $scaffolds, $output_db, $dna_sa) = @_;
   my %gene_hash = %{$gene_ref};  
   my $analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($MED_LOGIC_NAME);
@@ -252,7 +250,7 @@ sub make_gene_objs {
     $total_exons = scalar(keys %{$gene_hash{$gff_gene}});
     EXON: foreach my $gff_exon (sort {$a <=> $b} keys %{$gene_hash{$gff_gene}}) {
       # make exon objects
-      # gene_id -> exon_number = (start, end, strand, frame, scaffold)
+      # gene_id -> exon_number = (start, end, strand, frame, scaffold, feature)
       $exon = new Bio::EnsEMBL::Exon;
       $exon->start(@{$gene_hash{$gff_gene}{$gff_exon}}[0]); 
       $exon->end(@{$gene_hash{$gff_gene}{$gff_exon}}[1]);
@@ -265,22 +263,24 @@ sub make_gene_objs {
       $exon->end_phase(($exon->end - $exon->start + 1)%3);
       $exon->analysis($analysis);
       foreach my $scaffold (@{$scaffolds}){
-        if ($scaffold->name =~ m/^($MED_COORD_SYSTEM\:$MED_COORD_SYSTEM_VERSION\:HdrR\_200510\_@{$gene_hash{$gff_gene}{$gff_exon}}[4]\:1\:.*)/){
+        if ($scaffold->name =~ m/^($MED_COORD_SYSTEM\:$MED_COORD_SYSTEM_VERSION\:$MED_PREFIX@{$gene_hash{$gff_gene}{$gff_exon}}[4]\:1\:.*)/){
 	  $scaffold_name = $1;
 	  #name = scaffold:MEDAKA1:HdrR_200510_scaffold980:1:63005:1 
-	  print STDERR "Match! ".$scaffold->name." with ".$scaffold_name."\n";
+	  print STDERR "Match! ".$scaffold->name." with ".$scaffold_name."\n" if $MED_DEBUG;
 	}
       }
       $exon->slice($dna_sa->fetch_by_name($scaffold_name));   
       $transcript->add_Exon($exon); 
-      if ($gff_exon == 0) {
+      if (@{$gene_hash{$gff_gene}{$gff_exon}}[5] eq 'initial-exon' || @{$gene_hash{$gff_gene}{$gff_exon}}[5] eq 'single-exon') {
         $start_exon = $exon;
-      } elsif ($gff_exon == $total_exons -1) { #check that this is right
-        $end_exon = $exon
+      }
+      if (@{$gene_hash{$gff_gene}{$gff_exon}}[5] eq 'final-exon' || @{$gene_hash{$gff_gene}{$gff_exon}}[5] eq 'single-exon') { 
+        $end_exon = $exon;
       }
     } #EXON
     $transcript->start_Exon($start_exon);
-    $transcript->end_Exon($end_exon);    
+    $transcript->end_Exon($end_exon);
+    $transcript->analysis($analysis);    
     $translation = new  Bio::EnsEMBL::Translation(
 						 -START_EXON => $start_exon,
 						 -END_EXON   => $end_exon,
@@ -295,19 +295,14 @@ sub make_gene_objs {
       $gene->biotype($MED_GENE_TYPE);
       $gene->analysis($analysis);
       $gene->stable_id($gff_gene);
-      $gene->status('');
-      $gene->description('');
       $gene->add_Transcript($transcript);
     };  
     if ($@){
       print "Error: $@\n";
       exit;
     }
-    print " pushing " . $gene->seq_region_start . "\n" ; 
+    print " pushing ".$gene->stable_id." @ ".$gene->seq_region_start."\n" if $MED_DEBUG; 
     push @genes,$gene;     						   
   } #GENE
   return \@genes;
-}                          
-
- 
-
+}                   
