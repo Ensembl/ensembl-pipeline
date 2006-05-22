@@ -13,6 +13,7 @@ use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
+use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor; 
 
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Analysis::RunnableDB);
@@ -22,10 +23,10 @@ $| = 1;
 # get a contig with a piece-of/entire  chromosome
 
 my ($outfile, $coord_system, $dbhost, $dbname, $dbpass  ) ; 
-my @biotypes ; 
+#my @biotypes ; 
 my $dbuser = 'ensro';
 my $dbport = 3306;
-my ($name ,$slice_size, $analysis_id, $input_id_type )  ;  
+my ($name ,$slice_size, $analysis_id, $input_id_type,$logic_name )  ;  
 
 &GetOptions(
             'seq_region_name:s' => \$name,  # use 'all' if you want all 
@@ -36,25 +37,27 @@ my ($name ,$slice_size, $analysis_id, $input_id_type )  ;
             'dbport:s' => \$dbport,
             'outfile:s'      => \$outfile,
             'coord_system:s' => \$coord_system,
-            'biotypes=s' => \@biotypes ,
+            #'biotypes=s' => \@biotypes ,
             'slice_size=i' => \$slice_size ,  
             'analysis_id=i' => \$analysis_id , 
-            'input_id_type=s' => \$input_id_type , 
+            #'input_id_type=s' => \$input_id_type , 
+            #'logic_name=s' => \$logic_name, 
 	    );
 
 $slice_size = 100_000 unless $slice_size ; 
-@biotypes = split (/,/,join(',',@biotypes)) ; 
+#@biotypes = split (/,/,join(',',@biotypes)) ; 
 
 my @all_biotypes ;  # array of all biotypes to cluster 
 
-unless ($input_id_type) { 
- print STDERR " YOU have to supply -input_id_type 1MSLICE or whatever type your analysis has\n" ; 
- exit(0) ; 
-}
-unless ($analysis_id) { 
- print STDERR " YOU have to supply -analysis_id 60  whatever the analysis_id of the Submit-analysis uses\n" ; 
- exit(0) ; 
-}
+#unless ($input_id_type) { 
+# print STDERR " YOU have to supply -input_id_type 1MSLICE or whatever type your analysis has\n" ; 
+# exit(0) ; 
+#}
+#unless ($analysis_id) { 
+# print STDERR " YOU have to supply -analysis_id 60  whatever the analysis_id of the Submit-analysis uses\n" ; 
+# exit(0) ; 
+#} 
+
 unless ($coord_system) {
   print STDERR "you haven't supplied a coord_system_name using   -coord_system --> I'll use 'chromosome' now\n" ; 
   $coord_system = 'chromosome' ; 
@@ -84,6 +87,13 @@ my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
                                            -dbname=> $dbname,
                                            -pass => $dbpass,
                                           );
+
+
+# new code 
+my $analysis  = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name) ; 
+$analysis_id = $analysis->dbID() ;  
+$input_id_type = $db->getAnalysisAdaptor->fetch_analysis_input_id_type($analysis_id) ; 
+
 
 
 my @slices; 
