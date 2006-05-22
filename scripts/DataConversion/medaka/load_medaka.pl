@@ -104,26 +104,6 @@ my $dna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor('-host'   => $MED_DNA_DBHOST,
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 
-# Parse GFF file
-print STDERR "Parsing $MED_GFF_FILE...\n";
-my (%gene)  = %{parse_gff()}; 
-
-
-
-# check that it's all working so far
-foreach my $g (sort keys %gene){
-  foreach my $exon (sort {$a <=> $b} keys %{$gene{$g}}){
-    print $g."\t".$exon."\t@{$gene{$g}{$exon}}\n" if $MED_DEBUG;
-  }
-}
-
-
-
-# fix the frame / phase
-my $fixed_phases = fix_frames(\%gene);
-
-
-
 # get all the scaffolds in the dna_db
 print STDERR "Fetching all $MED_COORD_SYSTEM...\n";
 my $dna_sa = $dna_db->get_SliceAdaptor();
@@ -133,18 +113,41 @@ foreach my $scaff (@scaffolds){
 }
 
 
-# make gene objects
-my @gene_objs = @{make_gene_objs($fixed_phases, \@scaffolds, $output_db, $dna_sa)};
-print "Have ".scalar(@gene_objs)." gene objects.\n";   
-@gene_objs = sort {$a->seq_region_start <=> $b->seq_region_start } @gene_objs ;  
-foreach my $g (@gene_objs){
-  print "got gene_stable_id ".$g->stable_id."\n" if $MED_DEBUG;
-}
+
+# Parse GFF file
+print STDERR "Parsing $MED_GFF_FILE...\n";
+parse_gff(\@scaffolds, $output_db, $dna_sa); 
 
 
 
-# load genes into db
-&load_genes($output_db, \@gene_objs);
+## check that it's all working so far
+#foreach my $g (sort keys %gene){
+#  foreach my $exon (sort {$a <=> $b} keys %{$gene{$g}}){
+#    print $g."\t".$exon."\t@{$gene{$g}{$exon}}\n" if $MED_DEBUG;
+#  }
+#}
+#
+#
+#
+## fix the frame / phase
+#my $fixed_phases = fix_frames(\%gene);
+#
+#
+#
+#
+#
+## make gene objects
+#my @gene_objs = @{make_gene_objs($fixed_phases, \@scaffolds, $output_db, $dna_sa)};
+#print "Have ".scalar(@gene_objs)." gene objects.\n";   
+#@gene_objs = sort {$a->seq_region_start <=> $b->seq_region_start } @gene_objs ;  
+#foreach my $g (@gene_objs){
+#  print "got gene_stable_id ".$g->stable_id."\n" if $MED_DEBUG;
+#}
+#
+#
+#
+## load genes into db
+#&load_genes($output_db, \@gene_objs);
 print STDERR "Done!\n";
 
 
@@ -158,6 +161,7 @@ print STDERR "Done!\n";
 # OuterKey = gene_stable_id
 # InnerKey = exon_number
 sub parse_gff {
+  my ($scaffolds, $output_db, $dna_sa) = @_;
   # example of GFF file.
   #	scaffold1       UTOLAPRE05100100001     initial-exon    129489  129606  .       +       0
   #	scaffold1       UTOLAPRE05100100001     internal-exon   129920  130027  .       +       2
@@ -187,17 +191,22 @@ sub parse_gff {
     }     
     #gene_id -> exon_number = (start, end, strand, frame, scaffold, feature)
     @{$gff{$fields[1]}{$count}} = ($fields[3], $fields[4], $fields[6], $fields[7], $fields[0], $fields[2]);     
-  }
-  $line = '';
+    if ($fields[2] eq 'final-exon' || $fields[2] eq 'single-exon') {
+      my $fixed_frames = fix_frames(\%gff);
+      my @gene_obj = @{make_gene_objs($fixed_frames, $scaffolds, $output_db, $dna_sa)};
+      load_genes($output_db, \@gene_obj);
+      %gff = ();
+    }
+    $line = '';
+  }    
   close GFF; 
-  return \%gff;
 }
 
 sub load_genes(){
   my ($output_db,$genes) = @_;
-  print "Storing genes...\n" ; 
+#  print "Storing genes...\n" ; 
   foreach my $gene (@{$genes}){
-    print "Loading gene ".$gene->stable_id."\t" if $MED_DEBUG;
+    print STDERR "Loading gene ".$gene->stable_id."\t" ;#if $MED_DEBUG;
     my $dbid = $output_db->get_GeneAdaptor->store($gene);
     print "dbID = $dbid\n" if $MED_DEBUG;
   }
@@ -224,7 +233,7 @@ sub fix_frames {
 
 # create gene objects from hash %gene
 sub make_gene_objs {
-  print STDERR "Creating Gene objects...\n";
+#  print STDERR "Creating Gene objects...\n";
   my ($gene_ref, $scaffolds, $output_db, $dna_sa) = @_;
   my %gene_hash = %{$gene_ref};  
   my $analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($MED_LOGIC_NAME);
@@ -301,7 +310,7 @@ sub make_gene_objs {
       print "Error: $@\n";
       exit;
     }
-    print " pushing ".$gene->stable_id." @ ".$gene->seq_region_start."\n" if $MED_DEBUG; 
+    print STDERR " Made Gene obj ".$gene->stable_id." @ ".$gene->seq_region_start."\n" if $MED_DEBUG; 
     push @genes,$gene;     						   
   } #GENE
   return \@genes;
