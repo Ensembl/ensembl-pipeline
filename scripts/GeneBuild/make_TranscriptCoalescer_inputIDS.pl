@@ -4,7 +4,6 @@
 use strict;
 
 use Bio::SeqIO;
-use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;
 use Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster; 
 use Bio::EnsEMBL::Analysis::Runnable::TranscriptCoalescer; 
@@ -13,6 +12,8 @@ use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor; 
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor; 
 
 use vars qw(@ISA);
@@ -39,9 +40,9 @@ my ($name ,$slice_size, $analysis_id, $input_id_type,$logic_name )  ;
             'coord_system:s' => \$coord_system,
             #'biotypes=s' => \@biotypes ,
             'slice_size=i' => \$slice_size ,  
-            'analysis_id=i' => \$analysis_id , 
+            #'analysis_id=i' => \$analysis_id , 
             #'input_id_type=s' => \$input_id_type , 
-            #'logic_name=s' => \$logic_name, 
+            'logic_name=s' => \$logic_name, 
 	    );
 
 $slice_size = 100_000 unless $slice_size ; 
@@ -89,13 +90,23 @@ my $db= new Bio::EnsEMBL::DBSQL::DBAdaptor(
                                           );
 
 
+my $dbp= new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
+                                           -host  => $dbhost,
+                                           -user  => $dbuser,
+                                           -port => $dbport,
+                                           -dbname=> $dbname,
+                                           -pass => $dbpass,
+                                          );
+
+
+
+
+
 # new code 
 my $analysis  = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name) ; 
-$analysis_id = $analysis->dbID() ;  
-$input_id_type = $db->getAnalysisAdaptor->fetch_analysis_input_id_type($analysis_id) ; 
+$analysis_id = $analysis->dbID() ;   
 
-
-
+$input_id_type = $dbp->get_AnalysisAdaptor->fetch_analysis_input_id_type($analysis) ; 
 my @slices; 
 my @input_ids ; 
 
