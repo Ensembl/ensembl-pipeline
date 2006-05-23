@@ -233,7 +233,13 @@ sub fetch_input {
     my $runnable = new Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise
         ('-genomic'  => $self->query,
          '-ids'      => [$single_pid],
-         '-seqfetcher' => $seqfetcher);	
+         '-seqfetcher' => $seqfetcher,
+	 '-fullseq'           => $GB_SIMILARITY_FULLSEQ,
+	 '-exonerate'         => $GB_SIMILARITY_EXONERATE,
+	 '-exonerate_path'    => $GB_SIMILARITY_EXONERATE_PATH,
+	 '-exonerate_options' => $GB_SIMILARITY_EXONERATE_OPTIONS,
+	 '-analysis'          => $self->analysis,
+    );	
     $self->runnable($runnable);
   } else {	
     # Features will be masked before using them as seeds to BlastMiniGenewise. 
