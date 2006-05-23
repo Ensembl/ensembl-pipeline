@@ -139,7 +139,9 @@ my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_upda
 my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
 my $polyA_clipping       = "/ecs4/work3/sd3/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog 			 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
-my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/why_cdnas_didnt_hit.pl";
+my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
+my $reasons_file		 = "/ecs4/work3/sd3/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
+
 
 # db parameters
 #admin rights required
@@ -341,7 +343,7 @@ elsif($option eq "run"){
 	  find_many_hits();
   }
 
-  print "Would you like to make the list of reasons why cDNAs have not aligned?(y/n)";
+  print "Would you like to store the cDNAs which have not aligned as unmapped_objects?(y/n)";
   chomp($ans = <STDIN>);
   if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
 
@@ -1212,18 +1214,20 @@ sub why_cdnas_missed{
 	}
 
 	#need to pass all the variables to the script:
+
     $cmd = "perl ".$reasons_prog.
-           " -kill_list ".$kill_list." -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user ensro".
-           " -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
+           " -kill_list ".$kill_list." -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user $WB_DBUSER".
+           " -pass $WB_DBPASS -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
            " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna." -refseq ".$dataDIR."/".$refseq.
-           " -vertrna_update ".$dataDIR."/".$vertrna_update." -infile ".$dataDIR."/failed_hits.out".
-		   " -outfile ".$dataDIR."/missing_cdnas.txt "."-findN_prog ".$findN_prog;
+           " -vertrna_update ".$dataDIR."/".$vertrna_update." -infile ".$file.
+		   " -findN_prog ".$findN_prog." -reasons_file ".$reasons_file;
+
 
 	#print "$cmd\n";
     if(system($cmd)){
-		 warn " some error occurred when running why_cdnas_didnt_hit.pl!\n$cmd\n "; 
+		 warn " some error occurred when running $reasons_prog!\n$cmd\n "; 
 	}else{
-		print "Reasons list made\n";
+		print "unmapped objects stored\n";
 	}
 }
 
