@@ -309,7 +309,7 @@ sub job_stats {
 
 	my @jobs;
 	if ( !$jobs ) {
-		@jobs = $self->job_adaptor->fetch_by_Status_not('CREATED');
+		@jobs = $self->job_adaptor->fetch_by_Status_not_like('CREATED');
 	}
 	else {
 		@jobs = @$jobs;
