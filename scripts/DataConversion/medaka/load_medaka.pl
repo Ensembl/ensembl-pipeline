@@ -145,6 +145,7 @@ sub parse_gff_and_load {
   open (GFF,$MED_GFF_FILE) or die "Cannot open gff file $MED_GFF_FILE\n";
   my $line;
   my $count;
+
   while (<GFF>){
     chomp;
     $line = $_;
@@ -234,7 +235,14 @@ sub make_gene_objs {
   GENE: foreach my $gff_gene (keys %gene_hash) {
     $transcript = new Bio::EnsEMBL::Transcript;
     $total_exons = scalar(keys %{$gene_hash{$gff_gene}});
-    EXON: foreach my $gff_exon (sort {$a <=> $b} keys %{$gene_hash{$gff_gene}}) {
+    
+    my @gff_exons;
+    if ($gene_hash{$gff_gene}{0}[2] == '+') {
+      @gff_exons = sort {$a <=> $b} keys %{$gene_hash{$gff_gene}};
+    } else {
+      @gff_exons = sort {$b <=> $a} keys %{$gene_hash{$gff_gene}};
+    }
+    EXON: foreach my $gff_exon (@gff_exons) {
       # make exon objects
       # gene_id -> exon_number = (start, end, strand, frame, scaffold, feature)
       $exon = new Bio::EnsEMBL::Exon;
