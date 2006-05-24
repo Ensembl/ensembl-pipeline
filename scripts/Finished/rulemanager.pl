@@ -4,7 +4,7 @@ use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
-use Bio::EnsEMBL::Pipeline::RuleManager;
+use Bio::EnsEMBL::Pipeline::Finished::RuleManager;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use BlastableVersion;
 
@@ -158,7 +158,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
 
 my $sanity =
   Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new( -DB => $db, );
-my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new(
+my $rulemanager = Bio::EnsEMBL::Pipeline::Finished::RuleManager->new(
 	-DB              => $db,
 	-QUEUE_MANAGER   => $queue_manager,
 	-MARK_AWOL       => $mark_awol,
@@ -223,8 +223,10 @@ if ($rules_sanity) {
 	$sanity->rule_type_sanity( $all_rules, $verbose );
 }
 
-$rulemanager->add_created_jobs_back;    # a method to ensure unsubmitted jobs
-                                        # are readded to the system
+$rulemanager->add_created_jobs_back_in_queue;    # a method to ensure created jobs
+                                        		 # are readded to the queue
+my $space = $rulemanager->job_stats($job_limit);
+$rulemanager->flush_queue($space);
 
 my %always_incomplete_accumulators;
 my %accumulator_analyses;
@@ -327,14 +329,13 @@ LOOP: while (1) {
 			  . " analyses which pass conditions\n"
 			  if ($verbose);
 			for my $anal ( values %analHash ) {
-				print "For " . $anal->logic_name . " ";
+				print  "For " . $anal->logic_name . ":\n" if $verbose;;
 				if (
 					$rulemanager->can_job_run(
 						$input_id, $anal, $current_jobs_hash
 					)
 				  )
 				{
-					print "can run\n";
 					$submitted++;
 					$submission_count++;
 					if (   $submission_limit
@@ -345,7 +346,7 @@ LOOP: while (1) {
 					}
 				}
 				else {
-					print "cannot run\n";
+					print  "cannot run\n" if $verbose;;
 				}
 			}
 		}
@@ -396,7 +397,8 @@ LOOP: while (1) {
 		}
 	}
 
-	$rulemanager->job_stats($job_limit);
+	$space = $rulemanager->job_stats($job_limit);
+	$rulemanager->flush_queue($space);
 
 	if ( !$done && !$naccum_submitted ) {
 		if ( !$rulemanager->check_if_done ) {
@@ -412,7 +414,7 @@ LOOP: while (1) {
 		$rulemanager->db->pipeline_unlock;
 		exit 0;
 	}
-	sleep($rerun_sleep)                if $submitted == 0;
+	sleep($rerun_sleep)                if ($submitted == 0 && $space == 0);
 	print "Waking up and run again!\n" if $verbose;
 }
 
