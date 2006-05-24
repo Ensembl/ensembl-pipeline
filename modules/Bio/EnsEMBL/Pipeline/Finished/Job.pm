@@ -73,6 +73,29 @@ Run the job
 
 =cut
 
+sub priority {
+	my ($self,$priority) = @_;
+	if ($priority) {
+    	$self->{priority} = $priority;
+  	}
+	if ( !$self->{priority} ) {
+		my $ln       = $self->analysis->logic_name;
+		my $p = $BATCH_QUEUES{$ln}{priority};
+		throw("Priority for $ln not set in BatchQueue file\n") unless $p;
+		if ( scalar(@$p) == 1 ) {
+			$self->{priority} = $p->[0];
+		}
+		else {
+			my $sic  = $self->adaptor->db->get_StateInfoContainer;
+			my $db_v =
+			  $sic->fetch_db_version( $self->input_id, $self->analysis );
+			$self->{priority} = $db_v ? $p->[1] : $p->[0];
+		}
+	}
+
+	return $self->{priority};
+}
+
 sub run_module {
 	my $self               = shift;
 	my $is_dbversion_saved = 0;
@@ -110,10 +133,10 @@ sub run_module {
 	else {
 		$perl_path = $module;
 	}
-	
+
 	my $current_verbosity = logger_verbosity;
-  	logger_verbosity($verbosity);
-  	
+	logger_verbosity($verbosity);
+
 	#print STDERR "have perlpath ".$perl_path."\n";
   STATUS:
 	{
@@ -195,6 +218,7 @@ sub run_module {
 					my $old_db_version = $analysis->db_version();
 
 					$analysis->db_version($new_db_version);
+
 					#$self->adaptor->db->get_AnalysisAdaptor->update($analysis);
 					$is_dbversion_saved = 1;
 				}
@@ -216,8 +240,9 @@ sub run_module {
 
 	# Run time in seconds
 	my $runtime = $end - $start;
-	
+
 	logger_verbosity($current_verbosity);
+
 	# update job in StateInfoContainer
 	eval {
 		my $sic = $self->adaptor->db->get_StateInfoContainer;
@@ -242,54 +267,243 @@ sub run_module {
 	}
 }
 
-=head2 set_up_queues
+=head2 batch_runRemote
+
+  Title   : batch_runRemote
+  Usage   : $job->batch_runRemote
+  Function: see parent class
+  Returns : 
+  Args    : Is static, private function, dont call with arrow notation.
 
 =cut
 
-# scp: set up package variable for queue config
-# i'm not sure this is the best way of doing this
-# should ideally have this stuff in object(s)
+sub batch_runRemote {
+	my ($self) = @_;
+
+	my $queue;
+
+	if ( !exists( $BATCH_QUEUES{ $self->analysis->logic_name } ) ) {
+		$queue = 'default';
+	}
+	else {
+		$queue = $self->analysis->logic_name;
+	}
+
+	push @{ $BATCH_QUEUES{$queue}{'jobs'} }, $self->dbID;
+
+	if (
+		scalar( @{ $BATCH_QUEUES{$queue}{'jobs'} } ) >=
+		$BATCH_QUEUES{$queue}{'batch_size'} )
+	{
+		$self->flush_runs( $self->adaptor, $queue );
+	}
+	else {
+	}
+}
+
+=head2 flush_runs
+
+  Title   : flush_runs
+  Usage   : $job->flush_runs( jobadaptor, [queue] );
+  Function: Methode extended to handle the failed 'out of memory' Jobs and use the big memory queue. 
+  Returns : 
+  Args    : 
+
+=cut
+
+sub flush_runs {
+	my ( $self, $adaptor, $queue ) = @_;
+	# flush_runs is optionally sent a queue to deal with
+	# @analyses is a list of logic_names (strings)
+
+	my @analyses = ($queue) || ( keys %BATCH_QUEUES );
+
+	if ( !defined $adaptor ) {
+		throw("Cannot run remote without db connection");
+	}
+
+	local *FILE;
+
+	my $dbc      = $adaptor->db->dbc;
+	my $host     = $dbc->host;
+	my $username = $dbc->username;
+	my $dbname   = $dbc->dbname;
+	my $pass     = $dbc->password;
+	my $port     = $dbc->port;
+
+	# runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
+	# then in same directory as Job.pm,
+	# and fail if not found
+
+	my $runner = $self->runner;
+
+	if ( !$runner || !-x $runner ) {
+		$runner = __FILE__;
+		$runner =~ s:/[^/]*$:/runner.pl:;
+		my $caller = caller(0);
+		throw(  "runner " . $runner
+			  . " not found - needs to be set in "
+			  . "$caller\n" )
+		  unless -x $runner;
+	}
+	
+  ANAL:
+	for my $anal (@analyses) {
+
+		my $queue = $BATCH_QUEUES{$anal};
+
+		my @job_ids = @{ $queue->{'jobs'} };
+		if ( !@job_ids ) {
+			next ANAL;
+		}
+
+		my $this_runner = $queue->{'runner'};
+		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
+
+		my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
+
+		if ( !$lastjob ) {
+			throw("Last batch job not in db");
+		}
+
+		my $pre_exec =
+		  $this_runner . " -check -output_dir " . $self->output_dir;
+		  
+		my $farm_queue = $queue->{'queue'};
+		my $farm_resource = $queue->{'resource'};
+		if($self->priority == $BIG_MEM_PRIORITY) {
+			$farm_queue = $BIG_MEM_QUEUE;
+			$farm_resource = $BIG_MEM_RESOURCE;
+		}
+
+		my $batch_job = $batch_q_module->new(
+			-STDOUT     => $lastjob->stdout_file,
+			-PARAMETERS => $queue->{'sub_args'},
+			-PRE_EXEC   => $pre_exec,
+			-QUEUE      => $farm_queue,
+			-JOBNAME    => $dbname . ':' . $anal,
+			-NODES      => $queue->{'nodes'},
+			-RESOURCE   => $farm_resource
+		);
+
+		my $cmd;
+
+		if ( !$self->cleanup ) {
+			$batch_job->stderr_file( $lastjob->stderr_file );
+		}
+
+		# check if the password has been defined, and write the
+		# "connect" command line accordingly otherwise -pass gets the
+		# first job id as password, instead of remaining undef
+
+		if ($pass) {
+			$cmd = $runner
+			  . " -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
+		}
+		else {
+			$cmd = $runner
+			  . " -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
+		}
+		$cmd .= " -output_dir " . $self->output_dir;
+		$cmd .= " -queue_manager $QUEUE_MANAGER  ";
+		if ( $self->cleanup ) {
+			$cmd .= " -cleanup ";
+		}
+		$cmd .= " @job_ids";
+
+		$batch_job->construct_command_line($cmd);
+
+		eval {
+
+			# SMJS LSF Specific for debugging
+			print "Submitting: ", $batch_job->bsub, "\n";
+			$batch_job->open_command_line();
+		};
+
+		if ($@) {
+			print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
+			print STDERR "Using " . $batch_job->bsub . "\n";
+			foreach my $job_id (@job_ids) {
+				my $job = $adaptor->fetch_by_dbID($job_id);
+				$job->set_status("FAILED");
+			}
+		}
+		else {
+			my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
+			foreach my $job (@jobs) {
+
+				if ( $job->retry_count > 0 ) {
+					for ( $job->stdout_file, $job->stderr_file ) {
+						open( FILE, ">" . $_ );
+						close(FILE);
+					}
+				}
+
+				if ( $batch_job->id ) {
+					$job->submission_id( $batch_job->id );
+				}
+				else {
+
+					# submission seems to have succeeded, but we didnt
+					# get a job ID. Safest NOT to raise an error here,
+					# (a warning would have already issued) but flag
+					print STDERR
+"Job: Null submission ID for the following, but continuing: @job_ids\n";
+					$job->submission_id(0);
+				}
+				$job->retry_count( $job->retry_count + 1 );
+				$job->set_status("SUBMITTED");
+				$job->stdout_file( $lastjob->stdout_file );
+				$job->stderr_file( $lastjob->stderr_file );
+			}
+			$adaptor->update(@jobs);
+		}
+		$queue->{'jobs'}         = [];
+		$queue->{'last_flushed'} = time;
+	}
+}
 
 sub set_up_queues {
-  my %q;
+	my %q;
 
-  foreach my $queue (@$QUEUE_CONFIG) {
-    my $ln = $queue->{logic_name};
+	foreach my $queue (@$QUEUE_CONFIG) {
+		my $ln = $queue->{logic_name};
 
-    next unless $ln;
+		next unless $ln;
 
-    #delete $queue->{logic_name};
+		#delete $queue->{logic_name};
 
-    while (my($k, $v) = each %$queue) {
-      $q{$ln}{$k}     = $v;
-    }
-    $q{$ln}{jobs} = [];
-    $q{$ln}{last_flushed} = undef;
-    $q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
-    $q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
-    $q{$ln}{retries}         ||= $DEFAULT_RETRIES;
-    $q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
-    $q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
-    $q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
-    $q{$ln}{runner}          ||= $DEFAULT_RUNNER;
-    $q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
-  }
+		while ( my ( $k, $v ) = each %$queue ) {
+			$q{$ln}{$k} = $v;
+		}
+		$q{$ln}{jobs}         = [];
+		$q{$ln}{last_flushed} = undef;
+		$q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+		$q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+		$q{$ln}{retries}         ||= $DEFAULT_RETRIES;
+		$q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
+		$q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+		$q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+		$q{$ln}{runner}          ||= $DEFAULT_RUNNER;
+		$q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
+	}
 
-  # a default queue for everything else
-  if ( ! exists($q{default})) {
-    $q{default}{jobs} = [];
-    $q{default}{last_flushed} = undef;
-  }
-  # Need these set, so do the ||= thing 
-  $q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
-  $q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
-  $q{default}{retries}         ||= $DEFAULT_RETRIES;
-  $q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
-  $q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
-  $q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
-  $q{default}{runner}          ||= $DEFAULT_RUNNER;
-  $q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
-  return %q;
+	# a default queue for everything else
+	if ( !exists( $q{default} ) ) {
+		$q{default}{jobs}         = [];
+		$q{default}{last_flushed} = undef;
+	}
+
+	# Need these set, so do the ||= thing
+	$q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+	$q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+	$q{default}{retries}         ||= $DEFAULT_RETRIES;
+	$q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
+	$q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+	$q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+	$q{default}{runner}          ||= $DEFAULT_RUNNER;
+	$q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
+	return %q;
 }
 
 1;
