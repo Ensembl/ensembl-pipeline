@@ -84,4 +84,37 @@ sub _objFromHashref {
   return $job;
 }
 
+sub fetch_by_Status_not_like {
+    my ($self, $status, $start, $end) = @_;
+
+    throw("Require status for fetch_by_Status")
+                            unless ($status);
+    
+
+    my $query = q{
+	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
+	         j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
+           j.exec_host
+	FROM     job j, job_status js
+        WHERE    j.job_id = js.job_id
+        AND      js.status != ?
+	AND      js.is_current = 'y'
+        ORDER BY time desc
+    };
+    
+    $query .= " LIMIT $start, $end" if ($start && $end);
+
+    my $sth = $self->prepare($query);
+    my $res = $sth->execute($status);
+
+    my @jobs;
+
+    while (my $row = $sth->fetchrow_hashref)
+    {
+	    my $job = $self->_objFromHashref($row);
+	    push(@jobs,$job);
+    }
+    return @jobs;
+}
+
 1;
