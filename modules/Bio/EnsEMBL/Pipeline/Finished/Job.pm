@@ -416,7 +416,7 @@ sub flush_runs {
 		eval {
 
 			# SMJS LSF Specific for debugging
-			print "Submitting: ", $batch_job->bsub, "\n";
+			#print "Submitting: ", $batch_job->bsub, "\n";
 			$batch_job->open_command_line();
 		};
 
