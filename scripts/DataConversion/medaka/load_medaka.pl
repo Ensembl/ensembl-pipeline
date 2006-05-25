@@ -235,9 +235,10 @@ sub make_gene_objs {
   GENE: foreach my $gff_gene (keys %gene_hash) {
     $transcript = new Bio::EnsEMBL::Transcript;
     $total_exons = scalar(keys %{$gene_hash{$gff_gene}});
+    my $phase = 0;
     
     my @gff_exons;
-    if ($gene_hash{$gff_gene}{0}[2] == '+') {
+    if ($gene_hash{$gff_gene}{0}[2] eq '+') {
       @gff_exons = sort {$a <=> $b} keys %{$gene_hash{$gff_gene}};
     } else {
       @gff_exons = sort {$b <=> $a} keys %{$gene_hash{$gff_gene}};
@@ -253,8 +254,11 @@ sub make_gene_objs {
       }else{
 	$exon->strand(-1);
       }
-      $exon->phase(@{$gene_hash{$gff_gene}{$gff_exon}}[3]);
-      $exon->end_phase(($exon->end - $exon->start + 1 + @{$gene_hash{$gff_gene}{$gff_exon}}[3])%3);
+      #$exon->phase(@{$gene_hash{$gff_gene}{$gff_exon}}[3]);
+      #$exon->end_phase(($exon->end - $exon->start + 1 + @{$gene_hash{$gff_gene}{$gff_exon}}[3])%3);
+      $exon->phase($phase);
+      $phase = ($exon->end - $exon->start + 1 + $phase)%3;
+      $exon->end_phase($phase);
       $exon->analysis($analysis);
       foreach my $scaffold (@{$scaffolds}){
         if ($scaffold->name =~ m/^($MED_COORD_SYSTEM\:$MED_COORD_SYSTEM_VERSION\:$MED_PREFIX@{$gene_hash{$gff_gene}{$gff_exon}}[4]\:1\:.*)/){
