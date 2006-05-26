@@ -13,9 +13,9 @@ use vars qw(@ISA);
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::Runnable::Blast);
 
-BEGIN {
-    print STDERR "\nUSING " . __PACKAGE__ . "\n\n";
-}
+#BEGIN {
+#    print STDERR "\nUSING " . __PACKAGE__ . "\n\n";
+#}
 
 my %FASTA_HEADER;
 my %BLAST_FLAVOUR;
