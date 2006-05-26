@@ -153,11 +153,14 @@ sub setExonPhases{
               $exon->end_phase("-1");
             }
           }
-          if ($exon->start > $lce->start) {
-            $exon->end_phase("-1");
-            $exon->phase("-1");
-          }
+          
         }
+		if ($exon->start > $lce->end) {
+          # 3'-complete UTR
+		  $exon->end_phase("-1");
+          $exon->phase("-1");
+        }
+		
       } else {
 
         ##### start processing reverse strand #####
