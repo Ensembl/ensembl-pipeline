@@ -24,10 +24,6 @@ in an automated fashion.
 
   A. Fill in config variables, start script with argument 'prepare':
      "perl cDNA_update.pl prepare".
-     If there is a new assembly, some sequence files (for human: DR52/DR53)
-     might have to be adjusted (automatically, of course) and they will have
-     to be pushed across the farm. The previous files should be removed
-     before this! Please mail systems about these two things.
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_update.pl compare"
@@ -48,6 +44,7 @@ Check out the latest code to match the database to be updated, for example:
    cvs co -r branch-ensembl-32 ensembl
    cvs co -r branch-ensembl-32 ensembl-pipeline
    cvs co -r branch-ensembl-32 ensembl-analysis
+   cvs co -r branch-ensembl-32 ensembl-compara
 
 The steps the script performs:
   1. config_setup: check config variables & files
@@ -55,19 +52,16 @@ The steps the script performs:
      insert analysis etc., create TARGET database, synchronise
   3. fastafiles: get & read input files
   4. chop off the polyA tails and chunk the fasta files into smaller pieces
-  5. copy & modify the softmasked genome files if necessary:
-     the coordinates given in the fasta headers need to be adjusted 
-     according to the assembly table..
-  6. run_analysis: run exonerate using the pipeline
-  7. (optional) rerun cDNAs which did not align using different Exonerate parameters
-  8. find_many_hits: identify those cDNAs which aligned to many places in the genome
-  9. why_cdnas_missed: compile a list of reasons why hits were rejected
+  5. run_analysis: run exonerate using the pipeline
+  6. (optional) rerun cDNAs which did not align using different Exonerate parameters
+  7. find_many_hits: identify those cDNAs which aligned to many places in the genome
+  8. why_cdnas_missed: compile a list of reasons why hits were rejected
 
- 10. comparison: health-check by comparing the results to previous alignments
+ 9. comparison: health-check by comparing the results to previous alignments
      quicker version: get number of alignments for each chromosome from previous
      and new db version.
      extended version: look for new hits, track missing hits.
- 11. cleanup: post-process result DB, restore config files, remove tmp files and dbs
+ 10. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
 What YOU will need to do:
   1. Fill in the config variables in this script (just below this).
@@ -110,71 +104,78 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = "";
+my $cvsDIR               = "/ecs4/work3/sd3";
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
-my $dataDIR              = ""; 
+my $dataDIR              = "/ecs2/scratch5/sd3/cdna_updates_0506/human_test"; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi1";
 my $sourceDIR            = "/data/blastdb";
-my $assembly_version     = "NCBIM36"; #"NCBIM36"; #NCBI36
-#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
-my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
+my $assembly_version     = "NCBI36"; #"NCBIM36"; #NCBI36
+
+#WARNING!!!
+#When using a new assembly containing haplotype regions eg Human DR sequences - 
+#make sure that the header contains chromosomal coordinates!!
+
+my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
+#my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
 my $user 				 = "sd3";
 my $host 				 = "cbi1";
+my $genebuild_id         = "3";
 
-#only needed if assembly will be modified 
-#my $org_masked_genome    = "/data/blastdb/Ensembl/Human/".$assembly_version."/softmasked_dusted";
-my $org_masked_genome    = ""; #only used with adjust assembly()  - not necessary for mouse
 
 my $kill_list			 = $cvsDIR."/ensembl-pipeline/scripts/GeneBuild/cDNA_kill_list.txt";
 my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
-my $polyA_clipping       = "/ecs4/work3/sd3/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
-my $findN_prog 			 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
-my $reasons_prog		 = "/ecs4/work3/sd3/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
-my $reasons_file		 = "/ecs4/work3/sd3/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
+my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
+my $findN_prog 			 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
+my $reasons_prog		 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
+my $reasons_file		 = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
+my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 
 
 # db parameters
 #admin rights required
-my $WB_DBUSER            = "";
-my $WB_DBPASS            = "";
+my $WB_DBUSER            = "ensadmin";
+my $WB_DBPASS            = "ensembl";
 # reference db (current build)
-my $WB_REF_DBNAME        = "jhv_mus_37_refdb"; #is in schema 38
-my $WB_REF_DBHOST        = "ia64g"; 
-my $WB_REF_DBPORT        = "3306"; 
+my $WB_REF_DBNAME        = "homo_sapiens_core_38_36"; #is in schema 38
+my $WB_REF_DBHOST        = "ecs2"; 
+my $WB_REF_DBPORT        = "3365"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_mouse_0506_cDNA_pipe";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_0506_cDNA_pipe_test";
 my $WB_PIPE_DBHOST       = "ecs1b";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_mouse_0506_cDNA_update";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_human_0506_cDNA_update";
 my $WB_TARGET_DBHOST     = "ecs2";
 my $WB_TARGET_DBPORT     = "3362";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "mus_musculus_cdna_38_35"; 
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_38_36"; 
 my $WB_LAST_DBHOST       = "ecs2";
 my $WB_LAST_DBPORT       = "3365";  
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "mus_musculus_core_38_35";
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_38_36";
 my $WB_LAST_DNADBHOST    = "ecs2"; 
 my $WB_LAST_DNADBPORT    = "3365"; 
 
-#use & adjust assembly exception sequences (human DR52 & DR53)
-#set to 1 if you're looking at a new sequence assembly
-my $adjust_assembly      = 0;
+#taxonomy db for loading meta_table - should not need to change:
+my $TAXONDBNAME          = "ncbi_taxonomy";       
+my $TAXONDBHOST          = "ecs2";
+my $TAXONDBPORT          = "3365";
+
+
 
 #set the species
-my $common_species_name  = "mouse"; #"human"; #"mouse";
-my $species	      = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "human"; #"human"; #"mouse";
+my $species	      = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
 
 my $oldFeatureName     = "cDNA_update"; #for the comparison only
 
@@ -184,6 +185,7 @@ my $oldFeatureName     = "cDNA_update"; #for the comparison only
 #no changes should be necessary below this
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::DBSQL::DBConnection;
 use Data::Dumper;
 #we need the Net::SSH module from somewhere:
 use lib '/nfs/acari/fsk/perls/';
@@ -265,10 +267,6 @@ if($option eq "prepare"){
   if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
     if(! fastafiles() ){ unclean_exit(); }
 
-    if($adjust_assembly){
-      adjust_assembly();
-    }
-
   }
 
   print "\nset-up the databases?(y/n) ";
@@ -277,17 +275,12 @@ if($option eq "prepare"){
     if(! DB_setup()   ){ unclean_exit(); }
     print "\n\nFinished setting up the analysis.\n";
 
-    if($adjust_assembly){
-      print "The genome files' directory will have to be distributed across the farm!\n".
-	    "SOURCE PATH: ".$tmp_masked_genome."\nTARGET PATH: ".@target_masked_genome."\n\n";
-    }
-
   }
 
 }
 elsif($option eq "run"){
-  
-  
+
+ 
   print "\nDo we need to set re-set the configs?(y/n) ";
   chomp($ans = <STDIN>);
   if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
@@ -350,6 +343,12 @@ elsif($option eq "run"){
 	  why_cdnas_missed();
 
   }
+  
+  print "updating meta_coord table...\n";
+  update_metacoord();
+  
+  print "sorting out the meta table...\n";
+  fix_metatable();
   
   print "you should now change the analysis_ids of the cdnas in your database so that they ". 
   		"all have the same logic name, otherwise the comparison script won't work;\n".
@@ -724,70 +723,7 @@ sub remake_fasta_files{
 }
 
 
-#adjust sequence files for assembly-exceptions
-#currently looks for DR*.fa files
 
-sub adjust_assembly{
-  my $filename;
-  #move original genome files to defined temporary location
-  if(! -e $tmp_masked_genome){
-    if(system("mkdir $tmp_masked_genome")){ die "could not create directory! [$tmp_masked_genome]\n"; }
-  }
-  $cmd = 'ln -s '.$org_masked_genome.'/* '.$tmp_masked_genome.'/';
-  if(system($cmd)){
-    die("couldn t copy masked genome files.$@\n");
-  }
-  #get the correct location of DR-assembly pieces #renamed now to c5_H2, c22_H2, c6_COX amd c6_QBL  
-  my $db  = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, 'ensro');
-  my $pattern = 'c'; #previously was DR
-  my $sql = 'select s.name, s.seq_region_id, ae.seq_region_start, ae.seq_region_end '.
-            'from seq_region s, assembly_exception ae where s.seq_region_id=ae.seq_region_id '.
-	    'and s.name like "'.$pattern.'%";';
-  my $sth = $db->prepare($sql) or die "sql error!";
-  $sth->execute();
-  while( my ($name, $seq_region_id, $seq_region_start, $seq_region_end) = $sth->fetchrow_array ){
-    #read original file (link)
-    $filename = $tmp_masked_genome."/".$name.".fa";
-    open(FASTAFILE, "<$filename") or die("cant open fasta file $filename.");
-    my $headerline = <FASTAFILE>;
-    $headerline =~ s/^\>(\w+)\:([\w\d]*)\:([\w\d]*)\:(\d+)\:(\d+)\:(.+)//;
-    $headerline = ">".$1.":".$2.":".$3.":".$seq_region_start.":".$seq_region_end.":".$6;
-    local $/ = '';
-    my $seq = <FASTAFILE>;
-    local $/ = '\n';
-    close(FASTAFILE);
-    #remove file (link)
-    $cmd = 'rm '.$filename;
-    if($cmd){ die 'can t remove link '.$filename.'!'; }
-    #write modified file
-    open(FASTAFILE, ">$filename") or die("cant open fasta file $filename for writing.");
-    print FASTAFILE $headerline."\n";
-    print FASTAFILE $seq;
-    close(FASTAFILE);
-  }
-  #create README for new genome directory
-  my $date = "";
-  my ($day, $month, $year) = (localtime)[3,4,5];
-  my $datestring = printf("%04d %02d %02d", $year+1900, $month+1, $day);
-  my $readme = $masked_genome[0]."/README";
-  open(README, ">$readme") or die "can t create README file.";
-  
-        if ($common_species_name eq "human"){
-		print README "Directory ".@target_masked_genome."\n\n".
-		"These are the softmasked dusted genome files from human ".$assembly_version.
-		" assembly with two small modifications:\nThe coordinates of the DR52 & DR53 ".
-		"contigs were adjusted according to the assembly table of the database ".
-		$WB_REF_DBNAME.
-	        ".\nThey are used for the cDNA-update procedure to produce an up-to-date cDNA track ".
-		"every month.\nCreated by ".$ENV{USER}." on ".$datestring.".\n\n";
-	}else{
-		print README "Directory ".@target_masked_genome."\n\n".
-		"These are the softmasked dusted genome files from " .$common_species_name. "  ".$assembly_version.
-		" assembly. \nThey are used for the cDNA-update procedure to produce an up-to-date cDNA track ".
-		"every month.\nCreated by ".$ENV{USER}." on ".$datestring.".\n\n";
-	}
-  close(README);
-}
 
 
 #find the really big sequences & put them into separate chunks
@@ -866,18 +802,17 @@ sub DB_setup{
     	$status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
     	print ".";
     	#copy defined db tables from current build #removed analysis table
-    	$cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT -t $WB_REF_DBNAME".
-    	  " assembly attrib_type coord_system exon exon_stable_id exon_transcript gene gene_stable_id meta meta_coord".
-    	  " assembly_exception seq_region seq_region_attrib transcript transcript_stable_id translation translation_stable_id".
+		  
+		$cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT -t $WB_REF_DBNAME".
+    	  " assembly assembly_exception attrib_type coord_system meta seq_region seq_region_attrib ".
     	  " > ".$dataDIR."/import_tables.sql";
+
     	$status += system($cmd);
     	print ".";
     	$cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e  '".
-		   "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system;" .
-        	   "DELETE FROM exon; DELETE FROM exon_stable_id; DELETE FROM exon_transcript; DELETE FROM gene; ".
-		   "DELETE FROM gene_stable_id; DELETE FROM meta; DELETE FROM meta_coord;  DELETE FROM assembly; ".
-        	   "DELETE FROM assembly_exception; DELETE FROM seq_region_attrib; DELETE FROM transcript; DELETE FROM transcript_stable_id; ".
-        	   "DELETE FROM translation; DELETE FROM translation_stable_id; DELETE FROM assembly_exception;' $WB_PIPE_DBNAME ";
+		   "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM assembly_exception; DELETE FROM attrib_type; DELETE FROM coord_system;" .
+		   "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region_attrib;' $WB_PIPE_DBNAME ";
+
     	$status += system($cmd);
     	print ".";
     	$status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$dataDIR."/import_tables.sql");
@@ -934,8 +869,9 @@ sub DB_setup{
     print "database set up.\n";
     #copy analysis entries (and others, just to make sure)
     $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -t $WB_PIPE_DBNAME".
-           " analysis assembly assembly_exception attrib_type coord_system meta meta_coord seq_region seq_region_attrib ".
+           " analysis assembly assembly_exception attrib_type coord_system meta seq_region seq_region_attrib ".
            "> ".$dataDIR."/import_tables3.sql";
+
     $status += system($cmd);
     $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
            "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
@@ -1229,6 +1165,92 @@ sub why_cdnas_missed{
 	}else{
 		print "unmapped objects stored\n";
 	}
+}
+
+#update the meta-coord table
+sub update_metacoord{
+  my @table_names = qw(gene
+                     exon
+                     dna_align_feature
+                     transcript);
+
+  my $dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
+						     -host    => $WB_TARGET_DBHOST,
+						     -port    => $WB_TARGET_DBPORT,
+						     -user    => $WB_DBUSER,
+							 -pass    => $WB_DBPASS,
+						     -dbname  => $WB_TARGET_DBNAME
+						    );
+
+  my $sql = "truncate meta_coord";
+  my $sth = $dbc->prepare($sql);
+  $sth->execute;
+  $sth->finish;
+  
+  foreach my $table_name (@table_names) {
+  
+	my $sql = "insert into meta_coord select '$table_name',s.coord_system_id, max(t.seq_region_end-t.seq_region_start+1) ".
+           "from $table_name t, seq_region s where t.seq_region_id=s.seq_region_id group by s.coord_system_id";
+	my $sth = $dbc->prepare($sql);
+	$sth->execute;
+	$sth->finish;
+	
+  }
+  
+  print STDERR "Finished updating meta_coord table\n";
+
+}
+
+
+#To fix various meta table entries
+sub fix_metatable{
+
+  my $dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
+						     -host    => $WB_TARGET_DBHOST,
+						     -port    => $WB_TARGET_DBPORT,
+						     -user    => $WB_DBUSER,
+							 -pass    => $WB_DBPASS,
+						     -dbname  => $WB_TARGET_DBNAME
+						    );
+
+#remove prev entries  
+  my $sql = "delete from meta where meta_key like 'genebuild%"."id'";
+  my $sth = $dbc->prepare($sql);
+  $sth->execute;
+  $sth->finish;
+
+#set the genebuild id:
+
+  $sql = "insert into meta (meta_key, meta_value) values ('genebuild_id', '$genebuild_id' )";
+  $sth = $dbc->prepare($sql);
+  $sth->execute;
+  $sth->finish;
+
+#set all gene and transcript statuses to putative:
+  $sql = "update gene set status = 'PUTATIVE'";
+  $sth = $dbc->prepare($sql);
+  $sth->execute;
+  $sth->finish;
+
+  $sql = "update transcript set status = 'PUTATIVE'";
+  $sth = $dbc->prepare($sql);
+  $sth->execute;
+  $sth->finish;
+
+
+ 
+#reload the taxonomy to make sure it's up to date:
+
+my $cmd = "perl $load_taxonomy_prog ".
+          "-name \"$species\" -taxondbhost $TAXONDBHOST -taxondbport $TAXONDBPORT ".
+		  "-taxondbname $TAXONDBNAME -lcdbhost $WB_TARGET_DBHOST -lcdbport $WB_TARGET_DBPORT ".
+		  "-lcdbname $WB_TARGET_DBNAME -lcdbuser $WB_DBUSER -lcdbpass $WB_DBPASS";
+
+if(system($cmd)){
+     warn " some error occurred when running $load_taxonomy_prog \n$cmd\n "; 
+  }else{
+     print "meta table fixed\n";
+  }
 }
 
 # remove files and database leftovers after analysis,
