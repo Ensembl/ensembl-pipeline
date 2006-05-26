@@ -8,8 +8,8 @@ use vars qw(%Config);
   DATA_DIR => '/usr/local/ensembl/data',
   LIB_DIR  => '/usr/local/ensembl/lib',
   PIPELINE_WORK_DIR   => '/tmp',
-  PIPELINE_INPUT_DIR => '<chunkDIR>',
-  PIPELINE_TARGET_DIR => ['<masked_genome>'],
+  PIPELINE_INPUT_DIR => '',
+  PIPELINE_TARGET_DIR => '',
   SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',
   PIPELINE_REPEAT_MASKING => ['RepeatMask'],	
   SNAP_MASKING => [],
@@ -114,70 +114,5 @@ use vars qw(%Config);
                OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14",
              },
            }
-);
-
->>ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/cDNAs_ESTs/EST_GeneBuilder_Conf.pm
-package Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf;
-
-use strict;
-use vars qw( %Config );
-%Config = (
-           EST_INPUTID_REGEX                => '(\S+)\.(\d+)-(\d+)',
-           EST_GENE_RUNNER                  => '<cvsDIR>/ensembl-pipeline/scripts/EST/run_EST_GeneBuilder.pl',
-           EST_TMPDIR                       => '/tmp',            
-           EST_QUEUE                        => 'acari',
-           EST_GENEBUILDER_BSUBS            => '<dataDIR>/EST_Genebuilder.jobs',           
-           EST_GENEBUILDER_RUNNABLE         => 'Bio::EnsEMBL::Pipeline::RunnableDB::EST_GeneBuilder',
-           EST_GENEBUILDER_ANALYSIS         => 'estgene',
-           EST_GENEBUILDER_CHUNKSIZE        => 1000000,
-           EST_GENEBUILDER_INPUT_GENETYPE   => 'exonerate',
-           ESTGENE_TYPE                     => 'estgene',
-           EST_GENOMIC                      => '<masked_genome>',
-           USE_GENOMEWISE                   => 0,
-           USE_EST_DEFAULT_FILTERING        => 1,
-           MAX_NUMBER_ESTS                  => 200,
-           CHECK_SPLICE_SITES               => 1,
-           FILTER_ON_SINGLETON_SIZE         => 200,
-           RAISE_SINGLETON_COVERAGE         => 99,
-           EST_GENEBUILDER_COMPARISON_LEVEL => 3,                      
-           EST_GENEBUILDER_SPLICE_MISMATCH  => 8,                        
-           EST_GENEBUILDER_INTRON_MISMATCH  => 10,
-           BRIDGE_OVER_SMALL_INTRONS        => 0,
-           EST_MIN_INTRON_SIZE              => 20,
-           EST_GENEBUILDER_EXON_MATCH       => 0,                    
-           EST_MAX_EVIDENCE_DISCONTINUITY   => 2,
-           REJECT_SINGLE_EXON_TRANSCRIPTS   => 1,
-           GENOMEWISE_SMELL                 => 0,                         
-           EST_MIN_EXON_SIZE                => 20,
-           EST_MAX_INTRON_SIZE              => 200000,                        
-           CLUSTERMERGE_MIN_EVIDENCE_NUMBER => 1,
-           MAX_TRANSCRIPTS_PER_GENE         => 100000,
-           EST_USE_DENORM_GENES             => 0,
-
-           EST_REFDBNAME                    => '<WB_PIPE_DBNAME>',
-           EST_REFDBHOST                    => '<WB_PIPE_DBHOST>',
-           EST_REFDBPORT                    => '<WB_PIPE_DBPORT>',
-           EST_REFDBUSER                    => '<WB_DBUSER>',
-           EST_REFDBPASS                    => '<WB_DBPASS>',
-
-           EST_DBNAME                       => '<WB_EST_DBNAME>',
-           EST_DBHOST                       => '<WB_EST_DBHOST>',
-           EST_DBPORT                       => '<WB_EST_DBPORT>',
-           EST_DBUSER                       => '<WB_DBUSER>',
-           EST_DBPASS                       => '<WB_DBPASS>',
-
-           EST_GENE_DBNAME                  => '<WB_TARGET_DBNAME>',
-           EST_GENE_DBHOST                  => '<WB_TARGET_DBHOST>',
-           EST_GENE_DBPORT                  => '<WB_TARGET_DBPORT>',
-           EST_GENE_DBUSER                  => '<WB_DBUSER>',
-           EST_GENE_DBPASS                  => '<WB_DBPASS>',
-            
-           USE_cDNA_DB                      => 0,
-           cDNA_DBNAME                      => '',
-           cDNA_DBHOST                      => '',
-           cDNA_DBPORT                      => '',
-           cDNA_DBUSER                      => '',
-           cDNA_DBPASS                      => '',
-           cDNA_GENETYPE                    => '',
 );
 
