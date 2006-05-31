@@ -64,8 +64,10 @@ ensembl-dev@ebi.ac.uk
 
 =cut
 
-#this program uses scripts from ensembl-personal - these scripts need moving before this program can be used outside
 
+#this program uses scripts from ensembl-personal - before cvs commiting this need to copy those scripts somewhere else and change the paths!
+
+#have added an automatic taxonomy update bit - have not tested or committed it yet!
 
 use strict;
 use warnings;
@@ -254,16 +256,21 @@ if ($comm eq "setup"){
 		"and run $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl\n"; #copy above command  
 
   #Load taxonomy and other info into meta table
-  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('assembly.default',$LC_DEFAULT)\"")
-           && warn "\nProblem with loading assembly default\n";
-  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.taxonomy_id',$LC_TAX_ID)\"")
-           && warn "\nProblem with loading taxonomy id\n";
-  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.common_name',$LC_COMMON)\"")
-           && warn "\nProblem with loading common name\n";		   	   
-  foreach my $meta_info (@{$LC_TAXONOMY}) {	
-  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.classification',$meta_info\"")
-           && warn "\nProblem with loading classification\n";       
-  }
+#  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('assembly.default',$LC_DEFAULT)\"")
+#           && warn "\nProblem with loading assembly default\n";
+#  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.taxonomy_id',$LC_TAX_ID)\"")
+#           && warn "\nProblem with loading taxonomy id\n";
+#  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.common_name',$LC_COMMON)\"")
+#           && warn "\nProblem with loading common name\n";		   	   
+#  foreach my $meta_info (@{$LC_TAXONOMY}) {	
+#  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.classification',$meta_info\"")
+#           && warn "\nProblem with loading classification\n";       
+#  }
+ 
+  #load taxonomy into meta table using local script:
+  system("perl load_taxonomy.pl -name $LC_NAME -taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME -lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
+
+  #load genebuild info into meta table:
   system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version',$LC_DATE\"")
            && warn "\nProblem with loading genebuild version\n";	   	   
   system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
