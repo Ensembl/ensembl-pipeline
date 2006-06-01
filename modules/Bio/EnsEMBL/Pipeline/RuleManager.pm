@@ -1129,7 +1129,7 @@ sub input_id_setup{
   my $id_hash;
 
   $self->empty_input_ids;
-
+  
   if ($ids_to_run) {
     $id_hash = $self->read_id_file($ids_to_run);
 
@@ -1142,6 +1142,16 @@ sub input_id_setup{
       push(@analyses, $analysis);
     }
     $id_hash = $self->starts_from_input_ids(\@analyses);
+  }elsif($types_to_run){
+    my %id_type_hash;
+    foreach my $type(@$types_to_run){
+      my $ids = $self->stateinfocontainer
+        ->list_input_ids_by_type($type);
+      foreach my $id  (@$ids) {
+        $id_type_hash{$type}{$id} = 1;
+      }
+    }
+    $id_hash = \%id_type_hash;
   } else {
     $id_hash = $self->input_ids;
   }
@@ -1152,15 +1162,6 @@ sub input_id_setup{
     foreach my $type (keys(%$skip_id_hash)){
       foreach my $id (keys(%{$skip_id_hash->{$type}})){
         delete($skip_id_hash->{$type}->{$id});
-      }
-    }
-  }
-
-  if (@$types_to_run) {
-    my %types_to_run = map{$_, 1} @$types_to_run;
-    foreach my $type (keys(%$id_hash)) {
-      if (!$types_to_run{$type}) {
-        delete($id_hash->{$type});
       }
     }
   }
