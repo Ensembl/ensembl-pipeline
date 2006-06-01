@@ -457,9 +457,11 @@ sub prepare_RFAM{
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.thr.gz");
   die ("Error decompressing Rfam.thr.gz\n") if $exit > 0; 
   print "done\nUpdating miRNA file...";
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat -O $BLASTDIR/all_mirnas.embl");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat.gz -O $BLASTDIR/all_mirnas.embl.gz");
+  $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.embl.gz");
   die ("Error with obtaining miRNA.dat  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa  -O $BLASTDIR/all_mirnas.fa");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa.gz  -O $BLASTDIR/all_mirnas.fa.gz");
+  $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.fa.gz");
   die ("Error with obtaining hairpin.fa  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa\n") if $exit > 0;
   print "done\n";
   # need to make a blast formatted file of miRNAs coz the one in /pfam/db/miRNA/BLASTDB/hairpin.fa seems to be out of date
