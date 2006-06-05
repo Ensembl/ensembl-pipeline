@@ -1144,7 +1144,6 @@ sub input_id_setup{
     }
     $id_hash = $self->starts_from_input_ids(\@analyses);
   }elsif(scalar(@$types_to_run)){
-    p
     my %id_type_hash;
     foreach my $type(@$types_to_run){
       my $ids = $self->stateinfocontainer
@@ -1161,7 +1160,6 @@ sub input_id_setup{
 
   if ($ids_to_skip) {
     my $skip_id_hash = $self->read_id_file($ids_to_skip);
-
     foreach my $type (keys(%$skip_id_hash)){
       foreach my $id (keys(%{$skip_id_hash->{$type}})){
         delete($skip_id_hash->{$type}->{$id});
