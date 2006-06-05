@@ -1131,9 +1131,10 @@ sub input_id_setup{
   $self->empty_input_ids;
   
   if ($ids_to_run) {
+    
     $id_hash = $self->read_id_file($ids_to_run);
-
   } elsif (@$starts_from) {
+    
     my @analyses;
 
     foreach my $logic_name(@$starts_from){
@@ -1142,7 +1143,8 @@ sub input_id_setup{
       push(@analyses, $analysis);
     }
     $id_hash = $self->starts_from_input_ids(\@analyses);
-  }elsif($types_to_run){
+  }elsif(scalar(@$types_to_run)){
+    p
     my %id_type_hash;
     foreach my $type(@$types_to_run){
       my $ids = $self->stateinfocontainer
@@ -1153,6 +1155,7 @@ sub input_id_setup{
     }
     $id_hash = \%id_type_hash;
   } else {
+    print "Getting standard set\n";
     $id_hash = $self->input_ids;
   }
 
