@@ -359,9 +359,10 @@ sub job_stats {
 			}
 		}
 	}
-	my $slots = $job_limit - $global_job_count;
+	my $free_slots = $job_limit - $local_job_count;			# number of free farm slots 
+	$free_slots = $free_slots > 0 ? $free_slots : 0;			# total nb. of jobs must not exceeds job limit 
 
-	return $slots > 0 ? $slots : 0;
+	return $free_slots;
 }
 
 =head2 urgent_input_id/read_input_file
