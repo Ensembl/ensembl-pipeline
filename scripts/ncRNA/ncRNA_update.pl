@@ -14,7 +14,6 @@ my $usage = "perl ncRNA_update.pl
 -verbose 
 -dbsetup (create the dbs) 
 -refresh (refresh/create the RFAM/miRBasefiles) 
--rfam (run the rfam/cmsearch analysis needs to be uses in conjunction with -dbsetup) 
 -species (list of species to run on) 
 writes the rulemanager command and path to a shell script species.csh 
 * = required\n";
@@ -24,7 +23,6 @@ my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
 my $dbsetup;
 my $refresh;
 my @species_list;
-my $rfam;
 $| = 1;
 &GetOptions(
 	    'pass=s'       => \$pass,
@@ -32,7 +30,6 @@ $| = 1;
 	    'config=s'     => \$config_file,
 	    'dbsetup!'     => \$dbsetup,
 	    'refresh!'     => \$refresh,
-	    'rfam!'        => \$rfam,
             'species=s' => \@species_list,
 	   );
 die "$usage\n" unless ($config_file && $pass);
@@ -354,11 +351,11 @@ sub DB_setup{
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal RfamBlast -condition DummySlice";
-    $status += system($cmd) if $rfam;
+    $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal ncRNA -condition DummyFlag";
-    $status += system($cmd) if $rfam;
+    $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -insert -goal BlastWait -condition BlastmiRNA";
