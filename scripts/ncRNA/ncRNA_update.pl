@@ -9,9 +9,15 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
 use Bio::SeqIO;
 
-my $usage = "perl ncRNA_update.pl <options> *-pass  -verbose -config -dbsetup (create the dbs) -refresh (refresh RFAM/miRBasefiles) 
--rfam (run the rfam/cmsearch analysis) -species (list of species to run on) -run run the rulemanager
-writes the rulemanager command and path to a shell script species.csh \n* = required\n";
+my $usage = "perl ncRNA_update.pl 
+-pass *  
+-verbose 
+-dbsetup (create the dbs) 
+-refresh (refresh/create the RFAM/miRBasefiles) 
+-rfam (run the rfam/cmsearch analysis needs to be uses in conjunction with -dbsetup) 
+-species (list of species to run on) 
+writes the rulemanager command and path to a shell script species.csh 
+* = required\n";
 my $pass;
 my $verbose;
 my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
