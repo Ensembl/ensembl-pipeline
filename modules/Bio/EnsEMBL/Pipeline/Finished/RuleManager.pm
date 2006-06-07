@@ -88,7 +88,9 @@ sub add_created_jobs_back_in_queue {
 	my ($self) = @_;
 	my @created_jobs = $self->job_adaptor->fetch_by_Status("CREATED");
 	foreach my $j (@created_jobs) {
-		$self->push_job($j);
+		my $input_id = $j->input_id;
+		my $priority = $URGENT_JOB_PRIORITY if($self->urgent_input_id->{$input_id});
+		$self->push_job($j,$priority);
 	}
 
 	return 1;
@@ -360,7 +362,7 @@ sub job_stats {
 		}
 	}
 	my $free_slots = $job_limit - $local_job_count;			# number of free farm slots 
-	$free_slots = $free_slots > 0 ? $free_slots : 0;			# total nb. of jobs must not exceeds job limit 
+	$free_slots = $free_slots > 0 ? $free_slots : 0;		# total nb. of jobs must not exceeds job limit 
 
 	return $free_slots;
 }
