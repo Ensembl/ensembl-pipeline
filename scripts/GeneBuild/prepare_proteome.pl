@@ -51,10 +51,22 @@ my %ids;
 foreach my $file_info(@file_info){
   my $file  = $file_info->{file_path};
   my $regex = $file_info->{header_regex};
+  my $refseq = $file_info->{refseq};
   my $in    = Bio::SeqIO->new(
 			      -format => 'fasta',
 			      -file   => $file,
                           );
+  if(-e $protfile){
+    print "Protfile ".$protfile." already exists, these ".
+      "entries will be appended to the end of the file\n";
+    print "Do you want this? answer y/n\n";
+    my $reply = <>;
+    chomp;
+    if($reply =~ /^n/i){
+      print "You need to delete or change the name of ".$protfile." before rerunning\n";
+      exit(0);
+    }
+  }
   my $out = Bio::SeqIO->new(
                             -format => 'fasta',
                             -file   => ">>".$protfile,
@@ -69,6 +81,16 @@ foreach my $file_info(@file_info){
             $parseable_string);
         next SEQ;
     }
+    if($seq->seq =~ /XXXXX/){
+      print "protein ".$id." has 5 or more consecutive Xs ".
+        "in the sequence skipping\n";
+      next SEQ;
+    }
+    if($refseq && !($id =~ /NP/)){
+      print "Refseq protein which is not an NM skipping $id\n";
+      next SEQ;
+    }
+    
     if($kill_list{$id}){
       print $id." on kill list\n";
       next SEQ;
@@ -79,6 +101,7 @@ foreach my $file_info(@file_info){
     }
     $seq->desc('');
     $seq->id($id);
+    print "Adding ".$id." to hash\n";
     $ids{$id} = 1;
     my $seq_string = $seq->seq;
     $seq_string =~	s/U/X/g;
