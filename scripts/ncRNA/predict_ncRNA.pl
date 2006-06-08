@@ -206,7 +206,7 @@ SPECIES :foreach my $species (@speciess){
     $inputIDFactory->input_ids(\@input_ids);
     $inputIDFactory->store_input_ids;
   }
-  print "Finished species $species\nStarting the rulemanager again...\n" if $run;
+  print "Finished species $species\nStarting the rulemanager again...\n";
   # do I want to start the rulemanager again at this point?
   my $perlpath = $ENV{"PERL5LIB"};
 
