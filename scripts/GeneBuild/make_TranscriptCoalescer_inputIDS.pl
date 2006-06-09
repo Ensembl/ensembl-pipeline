@@ -15,7 +15,6 @@ use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor; 
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor; 
-
 use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Analysis::RunnableDB);
 
@@ -40,8 +39,8 @@ my ($name ,$slice_size, $analysis_id, $input_id_type,$logic_name )  ;
             'coord_system:s' => \$coord_system,
             #'biotypes=s' => \@biotypes ,
             'slice_size=i' => \$slice_size ,  
-            #'analysis_id=i' => \$analysis_id , 
-            #'input_id_type=s' => \$input_id_type , 
+            'analysis_id=i' => \$analysis_id , 
+            'input_id_type=s' => \$input_id_type , 
             'logic_name=s' => \$logic_name, 
 	    );
 
@@ -103,26 +102,33 @@ my $dbp= new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
 
 
 # new code 
-my $analysis  = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name) ; 
-$analysis_id = $analysis->dbID() ;   
+my $analysis;
+if (!$analysis_id) {
+  $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name) ; 
+  $analysis_id = $analysis->dbID() ;   
+} else {
+  $analysis = $db->get_AnalysisAdaptor->fetch_by_dbID($analysis_id);
+}
 
-$input_id_type = $dbp->get_AnalysisAdaptor->fetch_analysis_input_id_type($analysis) ; 
+if (!$input_id_type) {
+  $input_id_type = $dbp->get_AnalysisAdaptor->fetch_analysis_input_id_type($analysis) ; 
+}
 my @slices; 
 my @input_ids ; 
 
 
-if($name =~/all/i) {
+if ($name =~ m/all/i) {
    @slices =  @{ $db->get_SliceAdaptor->fetch_all($coord_system) } ; 
    print STDERR "Having " . scalar ( @slices  ) . " regions to process\n" ;  
    print STDERR "sequences of all slices of type $coord_system will be used ( $outfile )\n" ; 
-} else{
+} else {
   my $slice = $db->get_SliceAdaptor->fetch_by_region($coord_system, $name );
   push @slices, $slice ; 
 }
 
 
 my %database_hash;
-my %coalescer_hash = %{$TRANSCRIPT_COLAESCER_DB_CONFIG};
+my %coalescer_hash = %{$TRANSCRIPT_COALESCER_DB_CONFIG};
 my %databases = %{$DATABASES};
 for my $category (keys %databases ) {
   
