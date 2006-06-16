@@ -217,7 +217,7 @@ if($load){
     $import_command .= "--local " if($local);
     $import_command .= " $target_dbname ";
     foreach my $table(@table_names){
-      my $filename = $output_dir."/".$table."*";
+      my $filename = $output_dir."/".$table.".*";
       my $cmd = $import_command." ".$filename;
       print $cmd."\n" if($verbose);
       system($cmd) == 0 or throw("Failed to run ".$cmd);
