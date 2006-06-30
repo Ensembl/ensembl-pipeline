@@ -4,7 +4,7 @@ $| = 1;
 
 use strict;
 use Getopt::Long;
-use lib '/nfs/acari/fsk/cvs_checkout/ensembl-pipeline/modules';
+
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Monitor;
 use Data::Dumper;
