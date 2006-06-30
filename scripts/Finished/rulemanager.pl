@@ -223,10 +223,8 @@ if ($rules_sanity) {
 	$sanity->rule_type_sanity( $all_rules, $verbose );
 }
 
-$rulemanager->add_created_jobs_back_in_queue;    # a method to ensure created jobs
-                                        		 # are readded to the queue
+
 my $space = $rulemanager->job_stats($job_limit);
-$rulemanager->flush_queue($space);
 
 my %always_incomplete_accumulators;
 my %accumulator_analyses;
@@ -398,7 +396,6 @@ LOOP: while (1) {
 	}
 
 	$space = $rulemanager->job_stats($job_limit);
-	$rulemanager->flush_queue($space);
 
 	if ( !$done && !$naccum_submitted ) {
 		if ( !$rulemanager->check_if_done ) {
@@ -409,12 +406,11 @@ LOOP: while (1) {
 		}
 	}
 
-	$rulemanager->cleanup_waiting_jobs();
 	if ( $done || $once ) {
 		$rulemanager->db->pipeline_unlock;
 		exit 0;
 	}
-	sleep($rerun_sleep)                if ($submitted == 0 && $space == 0);
+	sleep($rerun_sleep)                if ($submitted == 0);
 	print "Waking up and run again!\n" if $verbose;
 }
 

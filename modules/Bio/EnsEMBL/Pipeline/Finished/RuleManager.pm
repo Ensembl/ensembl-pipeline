@@ -48,6 +48,7 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::RuleManager;
 use Bio::EnsEMBL::Pipeline::Finished::Job;
+use IPC::DirQueue;
 use File::stat;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RuleManager);
@@ -74,79 +75,39 @@ sub _job_internal_queue {
 	return $self->{'queue'};
 }
 
-=head2 add_created_jobs_back_in_queue
-
-  Arg [1]   : none
-  Function  : ensures that created jobs get readded into the internal queue
-  Returntype: int
-  Exceptions: none
-  Example   : 
-
-=cut
-
-sub add_created_jobs_back_in_queue {
-	my ($self) = @_;
-	my @created_jobs = $self->job_adaptor->fetch_by_Status("CREATED");
-	foreach my $j (@created_jobs) {
-		my $input_id = $j->input_id;
-		my $priority = $URGENT_JOB_PRIORITY if($self->urgent_input_id->{$input_id});
-		$self->push_job($j,$priority);
+sub _job_dir_queue {
+	my ( $self, $dir_queue ) = @_;
+	
+	if ( !$self->{'dir_queue'} ) {
+		$dir_queue = $JOB_DIR_QUEUE unless($dir_queue);
+		$self->{'dir_queue'} = IPC::DirQueue->new({ dir => $dir_queue });
 	}
 
-	return 1;
+	return $self->{'dir_queue'};
 }
 
-=head2 push_job/shift_job/size/empty
 
-  Function  : queue management functions
+=head2 push_job
+  Function  : add a job in the queue
   Exceptions: none
 
 =cut
 
 sub push_job {
 	my ( $self, $job, $priority ) = @_;
+	my $dq = $self->_job_dir_queue();
 	my $job_id = $job->dbID;
+	my $dbc = $job->adaptor->db->dbc();
+	my $dbname = $dbc->dbname;
+	my $host = $dbc->host;
+	$priority = $URGENT_JOB_PRIORITY if($self->urgent_input_id->{$job->input_id});
 	$priority = $priority || $job->priority;
-	my $queue = $self->_job_internal_queue();
-	if ( $queue->{$priority} ) {
-		push @{ $queue->{$priority} }, $job_id;
-	}
-	else {
-		$queue->{$priority} = [$job_id];
-	}
-}
-
-sub shift_job {
-	my ($self) = @_;
-	my $queue = $self->_job_internal_queue();
-	my @priority = sort { $b <=> $a } keys %$queue;
-	foreach my $p (@priority) {
-		if ( scalar( @{ $queue->{$p} } ) ) {
-			my $job_id = shift @{ $queue->{$p} };
-			my $job = $self->job_adaptor->fetch_by_dbID($job_id);
-			$job->priority($p);
-			
-			return $job;
-		}
-	}
-
-	return undef;
-}
-
-sub size {
-	my ($self) = @_;
-	my $queue  = $self->_job_internal_queue();
-	my $size   = 0;
-	foreach my $p ( keys %$queue ) {
-		$size += scalar( @{ $queue->{$p} } );
-	}
-
-	return $size;
-}
-
-sub empty {
-	my ($self) = @_;
-	return $self->size() == 0;
+	
+	my $meta_data = { pipeline => $dbname,
+					  host => $host,
+					  priority => $priority,
+					  job_id => $job_id };
+	$dq->enqueue_string( '', $meta_data, $priority );
 }
 
 =head2 can_run_job
@@ -211,7 +172,6 @@ sub can_job_run {
 	if ($job) {
 		my $priority = 0;
 		$priority = $BIG_MEM_PRIORITY if($status && ($status eq 'OUT_OF_MEMORY'));
-		$priority = $URGENT_JOB_PRIORITY if($self->urgent_input_id->{$input_id});
 		$self->push_job($job,$priority);
 
 		return 1;
