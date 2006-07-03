@@ -113,25 +113,23 @@ sub parse_files {
       next if (/^\s$/ || /^\#/);
 
       # [HEADER]
-      if (/^\[(.*)\]$/) {         # $1 will be the header name, without the []
+      if (/^\[(.*)\]\s*$/) {         # $1 will be the header name, without the [] 
 	$header = $1;
 	$headers{$header} = 0;
         $horder{$header} = $hcounter++;
 	#print "Reading stanza $header\n";
-      }
+      } 
 
       # key=value
-      if (/^([^=\s]+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
+      if (/^([^=\s]+)\s*=\s*(.+?)\s*$/) {   # $1 = key, $2 = value
 
 	my $key = lc($1);           # keys stored as all lowercase, values have case preserved
 	my $value = $2;
-
 	if (length($header) == 0) {
 	  throw("Found key/value pair $key/$value outside stanza");
 	}
-
-	#print "Key: $key Value: $value\n";
-
+	#print "Key: $key Value: $value\n"; 
+      	
 	# Check if this header/key is already defined
 	if (exists($config->{$header}->{$key})) {
 	  throw("$key is already defined for [$header]; cannot be redefined");
@@ -230,7 +228,8 @@ sub write_into_db{
           $sth->execute($analysis_id);
           my ($type) = $sth->fetchrow;
           if($type){
-            throw("need ".$type." to be the same as ".$a->input_id_type) 
+            throw("need ".$type." to be the same as ".$a->input_id_type .
+             " ( " .   $a->logic_name . " ) " ) 
               unless($type eq $a->input_id_type);
           }else{
             my $stored_sql = "insert into input_id_type_analysis ".
