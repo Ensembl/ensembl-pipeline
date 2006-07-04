@@ -227,7 +227,7 @@ sub show_finished_summary {
   $maxid++;
 
   if($show_percent){
-    $max_nums = percent_finished($self);
+    $max_nums = percent_finished($self, 0);
     $self->print_header("Finished job summary");
     printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","Count","Name","Id","%Done");
     printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","-----","----","--","-----");
@@ -235,13 +235,15 @@ sub show_finished_summary {
     while (my $count = shift(@counts)) {
       my $name  = shift @names;
       my $id    = shift @ids;
-      my $total = " ";
+      my $total = 0;
       my $add   = " ";
       if($count && $max_nums->{$id}){
 	$total = (100*$count/($max_nums->{$id}));
+	#$total = $count."/".$max_nums->{$id};
 	$add = '%';
       }
       printf("%-${maxcount}s %-${maxname}s %-${maxid}s %3d%s\n",$count,$name,$id,$total,$add);
+      #printf("%-${maxcount}s %-${maxname}s %-${maxid}s %s%s\n",$count,$name,$id,$total,$add);
     }
   }
   else{
@@ -656,48 +658,88 @@ sub lock_status{
     return @a;
 }
 
+
 #get the maximum numbers of jobs for every analysis
 #for calculating the percent-done numbers
 sub percent_finished{
-  my ($self) = @_;
-  my $sql1 = "select a.analysis_id, a.logic_name, rc.condition ".
-             "from rule_conditions rc,rule_goal rg, analysis a ".
-	     "where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id;";
-  my $sth1 = $self->dbobj->prepare($sql1) or die "cant prepare: $sql1";
-  my $sql2 = "select count(*) from input_id_analysis iia, analysis a ".
-             "where a.analysis_id=iia.analysis_id and a.logic_name=?";
-  my $sth2 = $self->dbobj->prepare($sql2) or die "cant prepare: $sql2";
-  my $sql3 = "select analysis_id, logic_name from analysis;";
-  my $sth3 = $self->dbobj->prepare($sql3) or die "cant prepare: $sql3";
-  $sth1->execute();
+  my ($self, $print) = @_;
 
-  my %analysis_name = ();
-  my %analysis_maxnum = ();
+  my $sql0 = "select a.analysis_id, a.logic_name ".
+             "from analysis a;";
+  my $sth0 = $self->dbobj->prepare($sql0) or die "cant prepare: $sql0";
+  my $sql1 = "select rg.goal, rc.condition ".
+             "from rule_conditions rc,rule_goal rg ".
+	     "where rg.rule_id = rc.rule_id;";
+  my $sth1 = $self->dbobj->prepare($sql1) or die "cant prepare: $sql1";
+  my $sql2 = "select count(*) as count from input_id_analysis ".
+             "where analysis_id = ?;";
+  my $sth2 = $self->dbobj->prepare($sql2) or die "cant prepare: $sql2";
+
+  my %analysis_id        = ();
+  my %analysis_name      = ();
+  my %analysis_maxnum    = ();
   my %analysis_condition = ();
 
-  while (my $ref1 = $sth1->fetchrow_hashref) {
-    my $analysis_id = $ref1->{'analysis_id'};
-    $analysis_name{$analysis_id} = $ref1->{'logic_name'};
-    $sth2->execute($ref1->{'condition'});
-    my $ref2 = $sth2->fetchrow_hashref;
-    if(!defined($analysis_maxnum{$analysis_id})){
-      $analysis_maxnum{$analysis_id} = 0;
-    }
-    if($analysis_maxnum{$analysis_id} < $ref2->{'count(*)'}){
-      $analysis_condition{$analysis_id} = $ref1->{'condition'};
-      $analysis_maxnum{$analysis_id}    = $ref2->{'count(*)'};
-    }
+  $sth0->execute();
+  while (my $ref0 = $sth0->fetchrow_hashref) {
+    $analysis_name{$ref0->{'analysis_id'}}      = $ref0->{'logic_name'};
+    $analysis_id{$ref0->{'logic_name'}}         = $ref0->{'analysis_id'};
+    $analysis_maxnum{$ref0->{'analysis_id'}}    = 0;
   }
-  $sth3->execute();
-  while (my $ref3 = $sth3->fetchrow_hashref) {
-    if(!defined($analysis_name{$ref3->{'analysis_id'}})){
-      $analysis_name{$ref3->{'analysis_id'}} = $ref3->{'logic_name'};
-      $sth2->execute($ref3->{'logic_name'});
-      my $ref4 = $sth2->fetchrow_hashref;
-      $analysis_maxnum{$ref3->{'analysis_id'}} = $ref4->{'count(*)'};
+  $sth1->execute();
+  while (my $ref1 = $sth1->fetchrow_hashref) {
+    next if($ref1->{'goal'} =~ /Wait/i);
+    $analysis_condition{$ref1->{'goal'}} = $ref1->{'condition'};
+    $analysis_maxnum{$ref1->{'goal'}}    = 0;
+  }
+
+  foreach my $analysis_id (keys %analysis_name){
+    $sth2->execute($analysis_id);
+    my $ref2 = $sth2->fetchrow_hashref;
+    $analysis_maxnum{$analysis_id} = $ref2->{'count'};
+
+    if(defined($analysis_condition{$analysis_id})){
+      max_count($analysis_id, $analysis_condition{$analysis_id},
+		\%analysis_id, \%analysis_maxnum, \%analysis_condition, $sth2);
+    }
+
+  }
+
+  #recursively find the highes input-id number
+  sub max_count{
+    my ($initial_id, $condition_name, $analysis_id, $analysis_maxnum, $analysis_condition, $sth2) = @_;
+
+    if(defined $analysis_id->{ $condition_name }){
+      if( !defined ($analysis_maxnum->{ $analysis_id->{ $condition_name } }) ){
+	$sth2->execute($analysis_id->{ $condition_name });
+	my $ref2 = $sth2->fetchrow_hashref;
+	$analysis_maxnum->{ $analysis_id->{ $condition_name } } = $ref2->{'count'};
+      }
+
+      if(defined($analysis_id->{ $initial_id }) && defined($analysis_id->{ $condition_name }) &&
+	 ($analysis_maxnum->{ $analysis_id->{ $initial_id } } < $analysis_maxnum->{ $analysis_id->{ $condition_name } })){
+	$analysis_maxnum->{ $analysis_id->{ $initial_id }}  = $analysis_maxnum->{ $analysis_id->{ $condition_name } };
+      }
+
+      if(defined $analysis_condition->{ $analysis_id->{ $condition_name } }){
+	max_count($initial_id, $analysis_condition->{ $analysis_id->{ $condition_name } },
+		  $analysis_id, $analysis_maxnum, $analysis_condition, $sth2);
+      }
+    }
+
+  }
+
+  #print out for testing
+  if($print){
+    print "\n\n\nanalysis_id\tlogic_name\tmax_num\n";
+    foreach my $analysis_id (keys %analysis_name){
+      print $analysis_name{$analysis_id}."\t".
+	    $analysis_id."\t".
+	    $analysis_maxnum{$analysis_id}."\n";
     }
   }
   return(\%analysis_maxnum);
 }
+
 
 1;
