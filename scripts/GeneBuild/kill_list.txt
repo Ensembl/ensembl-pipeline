@@ -1,3 +1,5 @@
+BAA25253 Similar O62658_CANFA LINE-1 element ORF2 parent: AB012223.1 (jhv)
+AB012223 LINE-1 element (jhv)
 Q8BRF5 Similar to Gag-Protein / Polyprotein (jhv)
 Q99KP9 Similar to Retrovirus-related Polyprotein (jhv)
 Q3TL09 Similar to Gag-protein (jhv) 
