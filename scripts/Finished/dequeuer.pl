@@ -1,16 +1,53 @@
 #!/usr/local/ensembl/bin/perl 
 
-# this script is run as a background process that
-# dequeue and submit a limited number of jobs
-# (depending on JOB_LIMIT in BatchQueue) from
-# a directory based priority queue, DirQueue.
-# Jobs are added in this queue by the pipeline rule_manager
-# scripts.
+=pod
+
+=head1 NAME
+
+dequeuer.pl, a script that dequeue and submit 
+a limited number of jobs (depending on JOB_LIMIT in BatchQueue)
+from a MySQL based priority queue (QUEUE_HOST and QUEUE_NAME) into the farm.
+The jobs are added in the queue by the pipeline rulemanager scripts.
+
+=head1 SYNOPSIS
+
+The MySQL queue is a single table that orders the jobs, first through 'priority', 
+the job's priority, and then 'created', the job's creation date. 
+Each job can be recovered from the pipeline database with the parameters
+'job_id', 'host' and 'pipeline'. Note that, the pipeline database and queue connexion 
+parameters  (login, password and port) are fetched from the ~/.netrc file.
+See the Net::Netrc module for more details.
+
+=head1 OPTIONS
+
+	-help|h		displays this documentation with PERLDOC
+	-verbose	
+
+These arguments are optional
+Overridable Configurations options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
+
+	-queue_manager this specifies which 
+	 Bio::EnsEMBL::Pipeline::BatchSubmission module is used
+	-job_limit the maximun number of jobs of specified status allowed in
+	 system
+	-queue_name database name of the MySQL based priority queue
+	-queue_host host name of the queue
+
+=head1 SEE ALSO
+
+rulemanager.pl in ensembl-pipeline/scripts/Finished
+ 
+=head1 CONTACT
+
+Mustapha Larbaoui B<email> ml6@sanger.ac.uk
+
+=cut
 
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+use DBI;
 use IPC::DirQueue;
 use Net::Netrc;
 use Sys::Hostname;
@@ -19,13 +56,12 @@ use Getopt::Long;
 my $job_id;
 my $queue_manager;
 my $verbose = 0;
-my $job_limit;    # the maximum number of jobs of a perdefined status that are
-    # in the system. The predefined statuses are set in the BatchQueue.pm config
-    # module and currently refer to LSF
-
-my $dir_queue = $JOB_DIR_QUEUE;    # path to the DirQueue
-
+my $job_limit;
+my $queue_host;
+my $queue_name;
 my $db_adaptors;
+
+my $usage = sub { exec( 'perldoc', $0 ); };
 
 $SIG{TERM} = \&termhandler;
 $SIG{INT}  = \&termhandler;
@@ -34,16 +70,34 @@ GetOptions(
 	'verbose!'        => \$verbose,
 	'job_limit=s'     => \$job_limit,
 	'queue_manager=s' => \$queue_manager,
-	'dir_queue=s'     => \$dir_queue,
+	'queue_name=s'    => \$queue_name,
+	'queue_host=s'    => \$queue_host,
+	'h|help!'         => $usage
 
   )
   or die("Couldn't get options");
 
 $job_limit     = $JOB_LIMIT     unless ($job_limit);
 $queue_manager = $QUEUE_MANAGER unless ($queue_manager);
-my $options = { dir => $dir_queue, };
+$queue_host    = $QUEUE_HOST    unless ($queue_host);
+$queue_name    = $QUEUE_NAME    unless ($queue_name);
 
-my $dq = IPC::DirQueue->new($options);
+# Job fetch statement handle
+my $fetch = &get_dbi( $queue_name, $queue_host )->prepare(
+	qq{
+		SELECT id, created, priority, job_id, host, pipeline FROM queue
+		ORDER BY priority DESC, CREATED ASC
+		LIMIT 1
+	}
+);
+
+# Job delete statement handle
+my $delete = &get_dbi( $queue_name, $queue_host )->prepare(
+	qq{
+		DELETE FROM queue
+		WHERE id = ?
+	}
+);
 
 # Load the BatchSubmission module (LSF)
 my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
@@ -56,6 +110,7 @@ if ($@) {
 }
 my $batch_q_object = $batch_q_module->new();
 
+# The main loop
 while (1) {
 	my $free_slots = &job_stats;
 	&flush_queue($free_slots);
@@ -64,12 +119,15 @@ while (1) {
 	print "Waking up and run again!\n" if $verbose;
 }
 
+## methods
+
 sub termhandler {
 	&flush_batch();
 	print "Exit DQdequeuer ....\n" if $verbose;
 	exit 0;
 }
 
+# flush the batch jobs
 sub flush_batch {
 	foreach my $host ( keys %$db_adaptors ) {
 		foreach my $dbname ( keys %{ $db_adaptors->{$host} } ) {
@@ -83,30 +141,27 @@ sub flush_batch {
 	}
 }
 
+# remove a certain number of jobs from the queue
+# and submit them into the farm
 sub flush_queue {
 	my ($slots) = @_;
-	for ( ; $slots > 0 ; $slots-- ) {
-		my $queued_job = $dq->pickup_queued_job();
-		if ($queued_job) {
+	while ($slots) {
+		$fetch->execute();
+		if ( my @row = $fetch->fetchrow_array ) {
+			my ( $id, $created, $priority, $job_id, $host, $pipe_name ) =
+			  @row[ 0 .. 5 ];
 			my $submitted = 1;
-			my $md        = $queued_job->{metadata};
-			my $job_id    = $md->{job_id};
-			my $pipe_name = $md->{pipeline};
-			my $host      = $md->{host};
-			my $priority  = $md->{priority};
-			my $job       = &get_job_from_db( $job_id, $pipe_name, $host );
+			my $job = &get_job_from_db( $job_id, $pipe_name, $host );
 			if ($job) {
 				$job->priority($priority);
 				eval {
 					    print "\tBatch running job " . $job_id
-					  . " priority "
+					  . " ${host}/${pipe_name} priority "
 					  . $priority . "\n"
 					  if $verbose;
 					$submitted = $job->batch_runRemote;
 				};
 				if ($@) {
-
-					#$queued_job->return_to_queue();
 					$submitted = 0;
 					warn(   "ERROR running job "
 						  . $job->dbID . " "
@@ -115,27 +170,27 @@ sub flush_queue {
 						  . " [$@]" );
 				}
 				else {
-					$queued_job->finish();
+					&delete_job($id);
 				}
 			}
 			else {
-
-				#$queued_job->return_to_queue();
-				$submitted = 0;
 				warn(   "Job " . $job_id
 					  . " not in database "
 					  . $host . "/"
 					  . $pipe_name );
+				&delete_job($id);
+				$submitted = 0;
 			}
-			$slots++ unless $submitted;
+			$slots-- if $submitted;
 		}
 		else {
-			print "No job in DirQueue\n" if $verbose;
+			print "No job in queue\n" if $verbose;
 			last;
 		}
 	}
 }
 
+# Get some stats about farm jobs
 sub job_stats {
 
 	# Do job_stats call before getting jobs
@@ -174,10 +229,39 @@ sub get_job_from_db {
 
 sub get_db_adaptor {
 	my ( $dbname, $dbhost ) = @_;
-	my ( $dbuser, $dbpass, $dbport );
 	if ( $db_adaptors->{$dbhost}->{$dbname} ) {
 		return $db_adaptors->{$dbhost}->{$dbname};
 	}
+	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbname, $dbhost );
+
+	my $db = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
+		-host   => $dbhost,
+		-user   => $dbuser,
+		-dbname => $dbname,
+		-pass   => $dbpass,
+		-port   => $dbport
+	  )
+	  or die(
+"Failed to create Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor to db $dbname \n"
+	  );
+
+	$db_adaptors->{$dbhost}->{$dbname} = $db;
+
+	return $db;
+}
+
+sub get_dbi {
+	my ( $dbname, $dbhost ) = @_;
+	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbname, $dbhost );
+	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
+
+	return DBI->connect( $dsn, $dbuser, $dbpass );
+}
+
+sub get_db_param {
+	my ( $dbname, $dbhost ) = @_;
+	my ( $dbuser, $dbpass, $dbport );
+
 	my $ref = Net::Netrc->lookup($dbhost);
 	throw("$dbhost entry is missing from ~/.netrc") unless ($ref);
 	$dbuser = $ref->login;
@@ -194,19 +278,11 @@ sub get_db_adaptor {
 	  )
 	  unless ( $dbuser && $dbpass && $dbport );
 
-	my $db = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
-		-host   => $dbhost,
-		-user   => $dbuser,
-		-dbname => $dbname,
-		-pass   => $dbpass,
-		-port   => $dbport
-	  )
-	  or die(
-"Failed to create Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor to db $dbname \n"
-	  );
+	return ( $dbuser, $dbpass, $dbport );
+}
 
-	$db_adaptors->{$dbhost}->{$dbname} = $db;
-
-	return $db;
+sub delete_job {
+	my ($id) = @_;
+	return $delete->execute($id);
 }
 
