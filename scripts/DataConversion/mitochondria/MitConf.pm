@@ -47,8 +47,8 @@ use vars qw( %MitConf );
 	    MIT_CODON_TABLE  =>  '2',
 	    # Types
 	    MIT_GENE_TYPE => 'protein_coding',
-	    MIT_TRNA_TYPE => 'Mt-tRNA',
-	    MIT_RRNA_TYPE => 'Mt-rRNA',
+	    MIT_TRNA_TYPE => 'Mt_tRNA',
+	    MIT_RRNA_TYPE => 'Mt_rRNA',
 	   );
 
 sub import {
