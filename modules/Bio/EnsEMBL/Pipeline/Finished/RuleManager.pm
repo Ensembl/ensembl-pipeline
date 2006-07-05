@@ -15,7 +15,10 @@ Bio::EnsEMBL::Pipeline::Finished::RuleManager.pm
 
 Finished group specific RuleManager module. 
 Allow a better job submission handling through a priority queue 
-and limit the number of submitted jobs.
+and limit the number of submitted jobs. Note that a ~/.netrc 
+file is necessary to fetch the priority queue connexion parameters.
+See Net::Netrc module for more details. 
+
 
 =head1 FEEDBACK
 
@@ -48,44 +51,28 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::RuleManager;
 use Bio::EnsEMBL::Pipeline::Finished::Job;
-use IPC::DirQueue;
 use File::stat;
+use Net::Netrc;
+use DBI;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RuleManager);
 
 
-=head2 _job_internal_queue
+=head2 _job_db_queue
 
-  Function  : Gets the RuleManager internal queue. The data structure is a hashtable 
-  			  with job priority as key and a array ref. of job_id as value. 
+  Function  : Gets the database connection to the RuleManager queue. 
   Exceptions: none
 
 =cut
 
-sub _job_internal_queue {
-	my ( $self, $queue ) = @_;
-
-	if ($queue) {
-		$self->{'queue'} = $queue;
-	}
-	if ( !$self->{'queue'} ) {
-		$self->{'queue'} = {};
+sub _job_db_queue {
+	my ($self) = @_;
+	if ( !$self->{'db_queue'} ) {
+		$self->{'db_queue'} = &get_dbi( $QUEUE_NAME, $QUEUE_HOST );
 	}
 
-	return $self->{'queue'};
+	return $self->{'db_queue'};
 }
-
-sub _job_dir_queue {
-	my ( $self, $dir_queue ) = @_;
-	
-	if ( !$self->{'dir_queue'} ) {
-		$dir_queue = $JOB_DIR_QUEUE unless($dir_queue);
-		$self->{'dir_queue'} = IPC::DirQueue->new({ dir => $dir_queue });
-	}
-
-	return $self->{'dir_queue'};
-}
-
 
 =head2 push_job
   Function  : add a job in the queue
@@ -95,19 +82,23 @@ sub _job_dir_queue {
 
 sub push_job {
 	my ( $self, $job, $priority ) = @_;
-	my $dq = $self->_job_dir_queue();
+
+	my $dbq    = $self->_job_db_queue;
+	my $insert = $dbq->prepare(
+		qq {
+			INSERT INTO queue (created, priority, job_id, host, pipeline) 
+			VALUES ( NOW() , ? , ? , ? , ? )
+		}
+	);
 	my $job_id = $job->dbID;
-	my $dbc = $job->adaptor->db->dbc();
+	my $dbc    = $job->adaptor->db->dbc();
 	my $dbname = $dbc->dbname;
-	my $host = $dbc->host;
-	$priority = $URGENT_JOB_PRIORITY if($self->urgent_input_id->{$job->input_id});
+	my $host   = $dbc->host;
+	$priority = $URGENT_JOB_PRIORITY
+	  if ( $self->urgent_input_id->{ $job->input_id } );
 	$priority = $priority || $job->priority;
-	
-	my $meta_data = { pipeline => $dbname,
-					  host => $host,
-					  priority => $priority,
-					  job_id => $job_id };
-	$dq->enqueue_string( '', $meta_data, $priority );
+
+	return $insert->execute( $priority, $job_id, $host, $dbname );
 }
 
 =head2 can_run_job
@@ -141,7 +132,7 @@ sub can_job_run {
 	my $status;
 
 	if ( $current_jobs->{ $analysis->dbID } ) {
-		my $cj     = $current_jobs->{ $analysis->dbID };
+		my $cj = $current_jobs->{ $analysis->dbID };
 		$status = $cj->{_status}->status;
 
 		if (
@@ -160,7 +151,7 @@ sub can_job_run {
 			if ( $self->rename_on_retry ) {
 				$self->rename_files($cj);
 			}
-			$cj->set_status('CREATED') unless $status eq 'OUT_OF_MEMORY';
+			$cj->set_status('CREATED');
 			$job = $cj;
 		}
 	}
@@ -171,45 +162,14 @@ sub can_job_run {
 
 	if ($job) {
 		my $priority = 0;
-		$priority = $BIG_MEM_PRIORITY if($status && ($status eq 'OUT_OF_MEMORY'));
-		$self->push_job($job,$priority);
+		$priority = $BIG_MEM_PRIORITY
+		  if ( $status && ( $status eq 'OUT_OF_MEMORY' ) );
+		$self->push_job( $job, $priority );
 
 		return 1;
 	}
 
 	return 0;
-}
-
-=head2 flush_queue
-
-  Arg [1]   : int, number of jobs to submit 
-  Function  : Take a certain number of job out of the internal queue and submitting them into the farm.
-  Returntype: none
-
-=cut
-
-sub flush_queue {
-	my ( $self, $slots ) = @_;
-
-	for ( ; $slots > 0 ; $slots-- ) {
-		my $job = $self->shift_job;
-		if ($job) {
-			eval {
-				print "\tBatch running job " . $job->dbID ." priority ".$job->priority."\n"
-				  if $self->be_verbose;
-				$job->batch_runRemote;
-			};
-			if ($@) {
-				throw(  "ERROR running job "
-					  . $job->dbID . " "
-					  . $job->analysis->logic_name . " "
-					  . $job->stderr_file
-					  . " [$@]" );
-			}
-		}
-		else { last; }
-
-	}
 }
 
 sub create_and_store_job {
@@ -321,8 +281,11 @@ sub job_stats {
 			}
 		}
 	}
-	my $free_slots = $job_limit - $local_job_count;			# number of free farm slots 
-	$free_slots = $free_slots > 0 ? $free_slots : 0;		# total nb. of jobs must not exceeds job limit 
+	my $free_slots = $job_limit - $local_job_count;  # number of free farm slots
+	$free_slots =
+	    $free_slots > 0
+	  ? $free_slots
+	  : 0;    # total nb. of jobs must not exceeds job limit
 
 	return $free_slots;
 }
@@ -338,35 +301,37 @@ sub job_stats {
 
 =cut
 
-my $input_list = {};
+my $input_list      = {};
 my $s_last_modified = '';
 
 sub urgent_input_id {
 	my ($self) = @_;
 	my $file = $URGENT_INPUTID_FILE;
-	if( -e $file ) {
+	if ( -e $file ) {
 		my $c_last_modified = stat($file)->[9];
-		if($s_last_modified ne $c_last_modified) {
-			$s_last_modified = 	$c_last_modified;
-			$input_list = $self->read_input_file($file);
+		if ( $s_last_modified ne $c_last_modified ) {
+			$s_last_modified = $c_last_modified;
+			$input_list      = $self->read_input_file($file);
 		}
-	} else {
-		$input_list = {};	
 	}
-	
+	else {
+		$input_list = {};
+	}
+
 	return $input_list;
 }
 
 sub read_input_file {
-	my ($self,$file) = @_;
+	my ( $self, $file ) = @_;
 	my $list = {};
-	open(my $IN, "<$file") || throw("Unable to open input id file $file");
-	while(<$IN>) {
-		chomp;s/\s//g;
+	open( my $IN, "<$file" ) || throw("Unable to open input id file $file");
+	while (<$IN>) {
+		chomp;
+		s/\s//g;
 		$list->{$_} = 1;
 	}
 	close($IN);
-	
+
 	return $list;
 }
 
@@ -396,6 +361,38 @@ sub is_memory_error {
 	print STDERR "ERROR [$@]\n" if ( $@ && $self->be_verbose );
 
 	return $is_mem;
+}
+
+
+sub get_dbi {
+	my ( $dbname, $dbhost ) = @_;
+	my ($dbuser, $dbpass, $dbport) = &get_db_param( $dbname, $dbhost );
+	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
+
+	return DBI->connect( $dsn, $dbuser, $dbpass );
+}
+
+sub get_db_param {
+	my ( $dbname, $dbhost ) = @_;
+	my ( $dbuser, $dbpass, $dbport );
+
+	my $ref = Net::Netrc->lookup($dbhost);
+	throw("$dbhost entry is missing from ~/.netrc") unless ($ref);
+	$dbuser = $ref->login;
+	$dbpass = $ref->password;
+	$dbport = $ref->account;
+	throw(
+		"Missing parameter in the ~/.netrc file:\n
+			machine " .  ( $dbhost || 'missing' ) . "\n
+			login " .    ( $dbuser || 'missing' ) . "\n
+			password " . ( $dbpass || 'missing' ) . "\n
+			account "
+		  . ( $dbport || 'missing' )
+		  . " (should be used to set the port number)"
+	  )
+	  unless ( $dbuser && $dbpass && $dbport );
+	  
+	  return ($dbuser, $dbpass, $dbport);
 }
 
 1;
