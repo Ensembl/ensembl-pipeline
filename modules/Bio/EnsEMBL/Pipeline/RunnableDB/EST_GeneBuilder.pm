@@ -243,7 +243,9 @@ sub write_output {
 
    TRAN:
     foreach my $tran (@trans){
-      ############################################################
+      ############################################################ 
+      $tran->biotype($gene->biotype) ; 
+
       # put fake stable_ids to keep track of the scoring
       $self->_label(1);
       if ( $self->_label ) {
