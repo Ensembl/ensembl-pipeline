@@ -72,7 +72,7 @@ while(<DATA>){
 		($seq = $tmp)=~s/\s//g; 
 	}
 
-	
+        $seq =~ tr/a-z/A-Z/; #changes seq to uppercase (as pattern matching later on is case-sensitive)   	
 	if (length $seq >= $end_region){
 
 		#check for poly-A/T tails/heads - which should have mostly been removed...
