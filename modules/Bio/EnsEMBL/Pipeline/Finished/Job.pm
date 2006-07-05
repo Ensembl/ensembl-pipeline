@@ -359,7 +359,8 @@ sub flush_runs {
 
 			my $queue = $BATCH_QUEUES{$anal};
 			my @job_ids;
-			@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } if ($queue->{'jobs'}->{$host}->{$dbname});
+			@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } 
+				if ($queue->{'jobs'}->{$host}->{$dbname});
 		if ( !@job_ids ) {
 			next ANAL;
 		}
@@ -385,7 +386,7 @@ sub flush_runs {
 
 			my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
-			-PARAMETERS => $queue->{'sub_args'},
+			-PARAMETERS => $queue->{'sub_args'}.' -sp '.$self->priority.' ',
 			-PRE_EXEC   => $pre_exec,
 			-QUEUE      => $farm_queue,
 			-JOBNAME    => $dbname . ':' . $anal,
