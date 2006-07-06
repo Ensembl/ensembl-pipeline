@@ -384,6 +384,8 @@ for (my $i=1; $i <= $#genbank; $i++){
     $gene->analysis($analysis);
     $gene->status($status);
     $gene->description($desc);
+    $transcript->biotype($type);
+    $transcript->analysis($analysis);
     $gene->add_Transcript($transcript);
     $count++;
   };
