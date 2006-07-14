@@ -168,14 +168,55 @@ sub parse_results {
         # adjust the motif length accordingly, and only then derive the match end.
         my $hash_substring;
         my $end;
-        
+
+
+		if ( $subsequence =~ /^(\#+)/ ){
+
+		  # deals with pattern match lies before start of a protein sequence, eg, the following FingerPRINTScan output
+                  # 3TBT MotifName       No.Mots   IdScore PfScore Pvalue    Sequence                  Len  low  pos  high
+                  # 3TBH GPCRRHODOPSN    2 of 7    20.29   236     2.31e-06  #########MYFFLSNLSLADI    22   38   -8   524
+
+                  # the corresponding protein_feature table output looks like
+                  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+                  #| protein_feature_id | translation_id | seq_start | seq_end | hit_start | hit_end | hit_id  | analysis_id | score | evalue   | perc_ident |
+                  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+                  #|              69359 |          13578 |        -8 |      13 |         0 |       0 | PR01099 |         203 |   223 | 0.000305 |      21.21 |
+                  #+--------------------+----------------+-----------+---------+-----------+---------+---------+-------------+-------+----------+------------+
+
+                  if ( $start < 1 ){
+                     $hash_substring = $1;
+                     $start = $start + length($hash_substring);
+                     $end   = $motifLength + $start - 1 ;
+					 $matchPosition = $start  # redefine	
+                  }
+		}
+
+		if ( $subsequence =~ /(\#+)$/ ){
+
+		  # If the match to the pattern lies at the end of the protein we might get padding of the subsequence with #'s, and the
+                  # end position will be bigger than the actual end of the protein. So we'll strip the #'s off the end, adjust the
+                  # motif length accordingly, and only then derive the match end.
+
+                  # in the match scenario like #####PROTEINSEQUENCE####### 
+		  # the end position above will be longer, but will also be readjusted here, as the $matchPosition has been adjusted above
+		  # as If and not elsif is used
+
+                  $hash_substring = $1;
+                  $end = $matchPosition + $motifLength - 1 - length($hash_substring);
+		}
+
+		else{
+		  $end = $matchPosition + $motifLength - 1;
+		}
+
+# original ------
         if($subsequence =~ /(\#+)$/){
           $hash_substring = $1;
           $end = $matchPosition + $motifLength - 1 - length($hash_substring);
         }else{
           $end = $matchPosition + $motifLength - 1;
         }
-        
+#-------------------
         my $print =  $printsac{$fingerprintName};
         
     
