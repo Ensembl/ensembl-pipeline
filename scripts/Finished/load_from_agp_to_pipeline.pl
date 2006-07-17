@@ -112,7 +112,7 @@ if ( !$pname ) {
 	print STDERR "-p_host $phost -p_user $puser -p_pass $ppass\n";
 }
 
-my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
 	-user   => $puser,
 	-dbname => $pname,
 	-host   => $phost,
