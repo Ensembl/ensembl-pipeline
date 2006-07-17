@@ -4,18 +4,22 @@
 
 =head1 NAME
 
-dequeuer.pl, a script that dequeue and submit 
-a limited number of jobs (depending on JOB_LIMIT in BatchQueue)
-from a MySQL based priority queue (QUEUE_HOST and QUEUE_NAME) into the farm.
-The jobs are added in the queue by the pipeline rulemanager scripts.
+dequeuer.pl
+
+=head1 DESCRIPTION
+
+a script that dequeue and submit a limited number of jobs 
+(depending on JOB_LIMIT in BatchQueue) from a MySQL based priority queue
+(QUEUE_HOST and QUEUE_NAME) into the LSF farm queue. The jobs are progressively 
+added in the MySQL queue by the pipeline rulemanager scripts.
 
 =head1 SYNOPSIS
 
-The MySQL queue is a single table that orders the jobs, first through 'priority', 
-the job's priority, and then 'created', the job's creation date. 
-Each job can be recovered from the pipeline database with the parameters
-'job_id', 'host' and 'pipeline'. Note that, the pipeline database and queue connexion 
-parameters  (login, password and port) are fetched from the ~/.netrc file.
+The MySQL queue is a single table that orders the jobs by job's priority
+and by job's creation date. A job object can be recovered from the 
+pipeline database with the parameters 'job_id', 'host' and 'pipeline'. 
+Note that, the pipeline database and queue connexion parameters  
+(login, password and port) are fetched from the ~/.netrc file.
 See the Net::Netrc module for more details.
 
 =head1 OPTIONS
@@ -23,8 +27,8 @@ See the Net::Netrc module for more details.
 	-help|h		displays this documentation with PERLDOC
 	-verbose	
 
-These arguments are optional
-Overridable Configurations options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
+These arguments are overridable configurations 
+options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
 
 	-queue_manager this specifies which 
 	 Bio::EnsEMBL::Pipeline::BatchSubmission module is used
@@ -47,6 +51,7 @@ use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use DBI;
 use IPC::DirQueue;
 use Net::Netrc;
@@ -232,7 +237,7 @@ sub get_db_adaptor {
 	if ( $db_adaptors->{$dbhost}->{$dbname} ) {
 		return $db_adaptors->{$dbhost}->{$dbname};
 	}
-	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbname, $dbhost );
+	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbhost );
 
 	my $db = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
 		-host   => $dbhost,
@@ -252,14 +257,14 @@ sub get_db_adaptor {
 
 sub get_dbi {
 	my ( $dbname, $dbhost ) = @_;
-	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbname, $dbhost );
+	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbhost );
 	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
 
 	return DBI->connect( $dsn, $dbuser, $dbpass );
 }
 
 sub get_db_param {
-	my ( $dbname, $dbhost ) = @_;
+	my ( $dbhost ) = @_;
 	my ( $dbuser, $dbpass, $dbport );
 
 	my $ref = Net::Netrc->lookup($dbhost);

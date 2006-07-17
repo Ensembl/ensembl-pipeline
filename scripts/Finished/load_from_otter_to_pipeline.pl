@@ -10,13 +10,27 @@ load_from_otter_to_pipeline.pl
 
 =head1 DESCRIPTION
 
-This script is used to load either one or several sequence sets from an organisme specific Otter database into the seq_region, seq_region_attrib, attrib_type, assembly and dna tables of the Pipeline database (new schema). 
-Appropriate option like the coord_system version for the specific chromosome has to be given. The sequence that is loaded into the dna table is Pfetched.
-If no values are provided for the database connexion (login, password and port), the ~/.netrc file will be checked. See Net::Netrc module for more details.
+This script is used to load either one or several sequence sets from an organisme 
+specific Otter database into the following tables of a pipeline database (new schema):
+seq_region, seq_region_attrib, attrib_type, assembly and dna.
+The sequence that is loaded into the dna table is either Pfetched or fetched from a raw file.
+If the login, password and port parameters are not provided, they will be 
+recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 here is an example commandline
 
-./load_from_otter_to_pipeline.pl -set chr11 -o_host ecs4 -o_port 3352 -o_name otter_human -o_user pipuser -o_pass ***** -p_host otterpipe2 -p_port 3352 -p_name pipe_human -p_user pipuser -p_pass *****
+./load_from_otter_to_pipeline.pl \
+-set chr11-02 \
+-o_host ecs4 \
+-o_port 3352 \
+-o_name otter_human \
+-o_user pipuser \
+-o_pass ***** \
+-p_host otterpipe2 \
+-p_port 3352 \
+-p_name pipe_human \
+-p_user pipuser \
+-p_pass *****
 
 
 =head1 OPTIONS
@@ -71,7 +85,7 @@ my $opass = '';
 
 my $chromosome_cs_version = 'Otter';
 my @seq_sets;
-my $do_submit = 1;	  # Set if we don't want to prime the pipeline with the SubmitContig analysis 
+my $do_submit = 1;	  # Set if we want to prime the pipeline with the SubmitContig analysis 
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -95,59 +109,27 @@ my $usage = sub { exec( 'perldoc', $0 ); };
   or $usage->();
 
 if ( !$puser || !$ppass || !$pport ) {
-	my $ref = Net::Netrc->lookup($phost);
-	throw(
-		"~/.netrc file unavailable; 
-			need to provide missing parameter: 
-			user [$puser]; password [$ppass]; port [$pport]"
-	  )
-	  unless ($ref);
-	$puser = $ref->login    unless $puser;
-	$ppass = $ref->password unless $ppass;
-	$pport = $ref->account  unless $pport;
-	throw(
-		"Missing parameter in the ~/.netrc file:\n
-			machine " .  ( $phost || 'missing' ) . "\n
-			login " .    ( $puser || 'missing' ) . "\n
-			password " . ( $ppass || 'missing' ) . "\n
-			account "
-		  . ( $pport || 'missing' ) . " (should be used to set the port number)"
-	  )
-	  unless ( $puser && $ppass && $pport );
+	my @param = &get_db_param($phost);
+	$puser = $param[0] unless $puser;
+	$ppass = $param[1] unless $ppass;
+	$pport = $param[2] unless $pport;
 }
 
 if ( !$ouser || !$opass || !$oport ) {
-	my $ref = Net::Netrc->lookup($ohost);
-	throw(
-		"~/.netrc file unavailable; 
-			need to provide missing parameter: 
-			user [$ouser]; password [$opass]; port [$oport]"
-	  )
-	  unless ($ref);
-	$ouser = $ref->login    unless $ouser;
-	$opass = $ref->password unless $opass;
-	$oport = $ref->account  unless $oport;
-	throw(
-		"Missing parameter in the ~/.netrc file:\n
-			machine " .  ( $ohost || 'missing' ) . "\n
-			login " .    ( $ouser || 'missing' ) . "\n
-			password " . ( $opass || 'missing' ) . "\n
-			account "
-		  . ( $oport || 'missing' ) . " (should be used to set the port number)"
-	  )
-	  unless ( $ouser && $opass && $oport );
+	my @param = &get_db_param($ohost);
+	$ouser = $param[0] unless $ouser;
+	$opass = $param[1] unless $opass;
+	$oport = $param[2] unless $oport;
 }
 
 if ( !$pname ) {
 	print STDERR
 	  "Can't load sequence set without a target pipeline database name\n";
 	print STDERR "-p_host $phost -p_user $puser -p_pass $ppass\n";
-	$usage->();
 }
 
 if ( !scalar(@seq_sets) ) {
 	print STDERR "Need chr|set to be able to run\n";
-	$usage->();
 }
 
 my $otter_dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
@@ -235,12 +217,14 @@ my $seqset_info     = {};
 		# fetch the sequence set description from the sequence_set table
 		$description_sth->execute($sequence_set);
 		my ($desc) = $description_sth->fetchrow;
-		$seqset_info->{$sequence_set} = [ $desc, keys %$chr_href ];
+		my @chrs = keys %$chr_href;
+		$seqset_info->{$sequence_set} = [ $desc, @chrs ];
 
 		throw("No data for '$sequence_set' in $oname")
 		  unless ($contig_number);
-		print STDOUT $contig_number
-		  . " contigs retrieved for $sequence_set sequence set\n";
+		throw("Set $sequence_set should contains (only) one chromosome: [@chrs]")
+		  unless (scalar(@chrs) == 1);
+		print STDOUT $contig_number." contigs retrieved for $sequence_set\n";
 	}
 }
 
@@ -272,14 +256,18 @@ my $seqset_info     = {};
 
 	};
 	if ($@) {
-		throw(
-"A coord_system matching the arguments does not exsist in the cord_system table, please ensure you have the right coord_system entry in the database [$@]\n"
+		throw( 
+			qq{ 
+				A coord_system matching the arguments does not exsist in the cord_system table, 
+				please ensure you have the right coord_system entry in the database [$@]
+			}
 		);
 	}
 	my $slice;
 	my $ana = $analysis_a->fetch_by_logic_name('SubmitContig');
 
-# insert chromosome(s) in seq_region table and his attributes in seq_region_attrib & attrib_type tables
+	# insert the sequence sets as chromosomes in seq_region
+	# table and their attributes in seq_region_attrib & attrib_type tables
 	foreach my $name ( keys(%end_value) ) {
 		my $endv = $end_value{$name};
 		eval {
@@ -289,14 +277,11 @@ my $seqset_info     = {};
 		};
 		if ($slice) {
 			warn(
-"Sequence set <$name> is already in pipeline database <$pname>\n"
+				"Sequence set <$name> is already in pipeline database <$pname>\n"
 			);
 			throw(  "There is a difference in size for $name: stored ["
-				  . $slice->length
-				  . "] =! new ["
-				  . $endv
-				  . "]" )
-			  unless ( $slice->length eq $endv );
+				  . $slice->length. "] =! new [". $endv. "]" )
+			unless ( $slice->length eq $endv );
 			$asm_seq_reg_id{$name} = $slice->get_seq_region_id;
 		}
 		else {
@@ -307,7 +292,8 @@ my $seqset_info     = {};
 		}
 	}
 
-# insert clone & contig in seq_region, seq_region_attrib, dna and assembly tables
+	# insert clone & contig in seq_region, seq_region_attrib,
+	# dna and assembly tables
 	my $test_query = qq {
 				SELECT COUNT(*) FROM assembly 
 				WHERE CONCAT(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)  
@@ -319,23 +305,18 @@ my $seqset_info     = {};
 				(?,?,?,?,?,?,?)};
 	my $test_sth = $pipe_dbc->prepare($test_query);
 	my $insert_sth = $pipe_dbc->prepare($insert_query);
-	while ( my ( $k, $v ) = each %$contigs_hashref ) {
-		my @values       = @$v;
-		my $chr_name     = $values[0];
-		my $sequence_set = $values[8];
-		my $chr_start    = $values[1];
-		my $chr_end      = $values[2];
-		my $ctg_start    = $values[3];
-		my $ctg_end      = $values[4];
-		my $ctg_ori      = $values[5];
-		my $acc          = $values[6];
-		my $ver          = $values[7];
+	for ( values %$contigs_hashref ) {
+		my $chr_name     = $_->[0];
+		my $sequence_set = $_->[8];
+		my $chr_start    = $_->[1];
+		my $chr_end      = $_->[2];
+		my $ctg_start    = $_->[3];
+		my $ctg_end      = $_->[4];
+		my $ctg_ori      = $_->[5];
+		my $acc          = $_->[6];
+		my $ver          = $_->[7];
 		my $acc_ver      = $acc . "." . $ver;
 
-		#if($acc_ver ne 'AC004775.1') { next ; }
-		#if(!($acc_ver eq 'AC010680.10' || $acc_ver eq 'AC073046.7' || $acc_ver eq 'AC107084.5' || $acc_ver eq 'AC013269.10' || $acc_ver eq 'AC073195.5' )) { next ; }
-		#if(!($acc_ver eq 'AC062028.6' || $acc_ver eq 'AC104665.3' || $acc_ver eq 'AC112235.4' || $acc_ver eq 'AC013269.10' || $acc_ver eq 'AC073195.5' )) { next ; }
-		#if(!($acc_ver eq 'AC096948.2' || $acc_ver eq 'AC114487.2' || $acc_ver eq 'AL645608.30' || $acc_ver eq 'AL139244.21' || $acc_ver eq 'AC138392.2' )) { next ; }
 		my $clone;
 		my $clone_seq_reg_id;
 		my $contig;
@@ -346,22 +327,23 @@ my $seqset_info     = {};
 			$clone  = $slice_a->fetch_by_region( 'clone', $acc_ver );
 			$seqlen = $clone->length;
 			$contig_name .= $seqlen;
-			$contig =
-			  $slice_a->fetch_by_region( 'contig', $contig_name );
+			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
-			warn "clone and contig <"
-			  . $clone->name . " ; "
-			  . $contig->name
-			  . "> are already in the pipeline database\n";
+			warn(
+				qq{
+					clone and contig < ${acc_ver} ; ${contig_name} >
+					are already in the pipeline database
+				}
+			);
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
 		}
 		elsif ( $clone && !$contig ) {
 			### code to be added to create contigs related to the clone
-			throw(  "Missing contig entry in the database for clone <"
-				  . $clone->name
-				  . ">\n" );
+			throw(  
+				"Missing contig entry in the database for clone ${acc_ver}" 
+			);
 		}
 		else {
 			##fetch the dna sequence from pfetch server with acc_ver id
@@ -374,7 +356,8 @@ my $seqset_info     = {};
 			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
 			$clone_seq_reg_id = $slice_a->store($clone);
 			throw(
-"clone seq_region_id has not been returned for the accession $acc_ver") unless $clone_seq_reg_id;
+				"clone seq_region_id has not been returned for the accession $acc_ver"
+			) unless $clone_seq_reg_id;
 			
 			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
 			$attr_a->store_on_Slice( $clone,
@@ -385,23 +368,24 @@ my $seqset_info     = {};
 			  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
 			$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
 			throw(
-"contig seq_region_id has not been returned for the contig $contig_name") unless $ctg_seq_reg_id;
+				"contig seq_region_id has not been returned for the contig $contig_name"
+			) unless $ctg_seq_reg_id;
 		}
 		##insert chromosome to contig assembly data into assembly table
-		$test_sth->execute( $asm_seq_reg_id{$sequence_set},
-			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
-			$ctg_ori );
-		$insert_sth->execute( $asm_seq_reg_id{$sequence_set},
-			$ctg_seq_reg_id, $chr_start, $chr_end, $ctg_start, $ctg_end,
-			$ctg_ori ) unless ($test_sth->fetchrow_array);
+		$test_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id, 
+			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
+		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id, 
+			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori ) 
+			unless ($test_sth->fetchrow_array);
 		##insert clone to contig assembly data into assembly table
-		$test_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 
-			1, $seqlen, 1, $seqlen, 1 );
+		$test_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 
+			1, $seqlen, 1 );
 		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-			$seqlen, 1 )  unless ($test_sth->fetchrow_array);
+			$seqlen, 1 ) unless ($test_sth->fetchrow_array);
 			
 		##prime the input_id_analysis table
-		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) if($do_submit);
+		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) 
+			if($do_submit);
 		
 
 	}
@@ -475,6 +459,29 @@ sub make_slice {
 	return $slice;
 }
 
+sub get_db_param {
+	my ( $dbhost ) = @_;
+	my ( $dbuser, $dbpass, $dbport );
+
+	my $ref = Net::Netrc->lookup($dbhost);
+	throw("$dbhost entry is missing from ~/.netrc") unless ($ref);
+	$dbuser = $ref->login;
+	$dbpass = $ref->password;
+	$dbport = $ref->account;
+	throw(
+		"Missing parameter in the ~/.netrc file:\n
+			machine " .  ( $dbhost || 'missing' ) . "\n
+			login " .    ( $dbuser || 'missing' ) . "\n
+			password " . ( $dbpass || 'missing' ) . "\n
+			account "
+		  . ( $dbport || 'missing' )
+		  . " (should be used to set the port number)"
+	  )
+	  unless ( $dbuser && $dbpass && $dbport );
+
+	return ( $dbuser, $dbpass, $dbport );
+}
+
 #
 # Pfetch the sequences
 #-------------------------------------------------------------------------------
@@ -486,7 +493,6 @@ sub make_slice {
 
 	sub pfetch_acc_sv {
 		my ($acc_ver) = @_;
-		#$acc_ver =~ s/\.1//g;
 		print "Fetching '$acc_ver'\n";
 		$pfetch ||= Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
 		$pfetch_archive ||=
