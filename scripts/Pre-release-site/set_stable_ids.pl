@@ -46,7 +46,8 @@ my $pass;
 	     );
 
 my %proteins;
-
+my %transcript_proteins;
+my %exons;
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-host'   => $host,
 					    '-user'   => $user,
@@ -68,36 +69,47 @@ my $exon_query = "insert into exon_stable_id ".
 my $exon_sth = $db->dbc->prepare($exon_query);
 GENE:
 foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
-  print STDERR "gene id $gene_id\n";
+  #print STDERR "gene id $gene_id\n";
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
-  
-  my $protein_id = get_protein_id($gene);
-  print "Have protein id ".$protein_id."\n";
-  next GENE unless defined $protein_id;
-  $proteins{$protein_id}++;
-  $sth->execute($gene_id,$protein_id, $proteins{$protein_id});
-  foreach my $transcript(@{$gene->get_all_Transcripts}){
-    $trans_sth->execute($transcript->dbID, $protein_id, 
-                        $proteins{$protein_id});
-    my $translation = $transcript->translation;
-    $translation_sth->execute($translation->dbID, $protein_id,
-                       $proteins{$protein_id});
-    my $exon_count = 1;
-    foreach my $exon(@{$transcript->get_all_Exons}){
-      my $stable_id = $protein_id.".".$exon_count;
-      $exon_count++;
-      $exon_sth->execute($exon->dbID, $stable_id, 
-                         $proteins{$protein_id});
+  next GENE if $gene->stable_id;
+  my $gene_protein_id = get_gene_protein_id($gene);
+  #print "Have protein id ".$gene_protein_id."\n";
+  throw("Gene ".$gene_id." has no protein id") unless defined $gene_protein_id;
+  $proteins{$gene_protein_id}++;
+  eval{
+    $sth->execute($gene_id,$gene_protein_id."_".$proteins{$gene_protein_id}, $proteins{$gene_protein_id});
+    foreach my $transcript(@{$gene->get_all_Transcripts}){
+      my $transcript_protein_id = get_transcript_protein_id($transcript);
+      $transcript_proteins{$transcript_protein_id}++;
+      $trans_sth->execute($transcript->dbID, $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}, 
+                          $transcript_proteins{$transcript_protein_id});
+      my $translation = $transcript->translation;
+      $translation_sth->execute($translation->dbID, $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id},
+                                $transcript_proteins{$transcript_protein_id});
+      my $exon_count = 1;
+      EXON:foreach my $exon(@{$transcript->get_all_Exons}){
+        next EXON if($exons{$exon->dbID});
+        my $stable_id = $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}.".".$exon_count;
+        $exon_count++;
+        #print "Storing ".$exon->dbID." with ".$stable_id." ".$transcript_proteins{$transcript_protein_id}."\n";
+        $exon_sth->execute($exon->dbID, $stable_id, 
+                           $transcript_proteins{$transcript_protein_id});
+        $exons{$exon->dbID} = $stable_id;
+      }
     }
+  };
+  if($@){
+    throw("Stable id insertion for gene ".$gene_id." failed $@");
   }
 }
 
 
-sub get_protein_id{
+sub get_gene_protein_id{
   my ($gene) = @_;
  
   my @exons = @{$gene->get_all_Exons};
   my $protein_id;
+  
   foreach my $exon(@exons){
     foreach my $sf(@{$exon->get_all_supporting_features}){
       $protein_id = $sf->hseqname;
@@ -106,6 +118,18 @@ sub get_protein_id{
   }
   if(!$protein_id){
     throw("Found no protein id for ".$gene->dbID);
+  }
+}
+
+sub get_transcript_protein_id{
+  my ($transcript) = @_;
+  my $protein_id;
+  foreach my $sf(@{$transcript->get_all_supporting_features}){
+    $protein_id = $sf->hseqname;
+      return $protein_id if($protein_id);
+  }
+  if(!$protein_id){
+    throw("Found no protein id for ".$transcript->dbID);
   }
 }
 
