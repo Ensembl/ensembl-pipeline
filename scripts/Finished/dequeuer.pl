@@ -53,7 +53,6 @@ use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use DBI;
-use IPC::DirQueue;
 use Net::Netrc;
 use Sys::Hostname;
 use Getopt::Long;
