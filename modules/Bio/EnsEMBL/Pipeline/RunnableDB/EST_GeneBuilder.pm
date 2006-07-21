@@ -234,6 +234,7 @@ sub write_output {
   my $gene_count = 0; 
   GENE: 
   foreach my $gene ($self->output) {	
+    $gene->status("PUTATIVE") ; 
     $gene_count++;
     my @trans = @{ $gene->get_all_Transcripts};
     my $num = scalar(@trans);
@@ -243,9 +244,11 @@ sub write_output {
 
    TRAN:
     foreach my $tran (@trans){
-      ############################################################ 
+      ############################################################  
+      # set biotype to 'protein_coding' 
       $tran->biotype($gene->biotype) ; 
-
+      $tran->status("PUTATIVE") ; 
+ 
       # put fake stable_ids to keep track of the scoring
       $self->_label(1);
       if ( $self->_label ) {
