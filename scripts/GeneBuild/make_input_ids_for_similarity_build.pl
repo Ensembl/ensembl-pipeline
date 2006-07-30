@@ -89,7 +89,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
 my ( $write, $help, $verbose, $max_slice_size, $logic_name, $slice_name_file ,$number_of_prot_per_job);
 my $coord_system = 'toplevel';
-
+my @restrict_to_proteins ; 
 &GetOptions(
              'logic_name=s'      => \$logic_name,
              'write'             => \$write,
@@ -99,18 +99,30 @@ my $coord_system = 'toplevel';
              'coord_system=s'    => \$coord_system,
              'slice_name_file:s' => \$slice_name_file,
              'number_of_proteins_per_job:i' => \$number_of_prot_per_job , 
+             'restrict_to_proteins:s@' => \@restrict_to_proteins, 
 );
 exec( 'perldoc', $0 ) if $help;
 
 die "Could must give a logic name with -logic_name\n" if not $logic_name;
 
-if($verbose) { 
- print "Using protein_align_features of these analysis :\n" ; 
- foreach my $href ( @{$GB_SIMILARITY_DATABASES} ) {
-   print "\t". $href->{type}."\n" ; 
- }
- print "\n\n" ; 
-} 
+@restrict_to_proteins = map {split/\,/} @restrict_to_proteins ; 
+
+my %test_db;  
+@test_db{map {$_->{type}} @{$GB_SIMILARITY_DATABASES}}=1; 
+print "\n\n" ;
+if(scalar(@restrict_to_proteins!=0)) { 
+  foreach  my $db (@restrict_to_proteins) {  
+    throw("db does not exist : $db") unless (exists $test_db{$db});
+    print STDERR "\tRESTRICTING proteins to database : $db\n" ;
+  }    
+  sleep(2); 
+} else {  
+  print STDERR "You did not use the -restrict_to_proteins option so I'm using all databases...\n" ; 
+  foreach my $href ( @{$GB_SIMILARITY_DATABASES} ) { 
+    print "\t-". $href->{type}."\n" ; 
+  }
+  sleep(2);
+}
 
 unless ( $number_of_prot_per_job ) { 
   warning("you haven't used the\n\t-number_of_proteins_per_job - option\nto set the set the number of proteins per job - using default (20) ")  ;
@@ -152,15 +164,20 @@ my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if ( not $analysis ) {
   die "Could not find analysis for $logic_name\n";
 }
-
 my ( $ana_id, $ana_type ) = ( $analysis->dbID, $analysis->input_id_type );
 if ( not $ana_type ) {
   die "Could not find dbID/input_id_type for $logic_name\n";
 }
 
-$max_slice_size = 5000000 if not $max_slice_size;
-
-
+if (!$max_slice_size) { 
+   print "\n\n\tYou need to set the maximum slice size-value.\n".
+         "\tSuggestion for dog || rat is 1meg, the old default slice-size is 5meg\n".
+         "\tbut this maybe is too much (jobs might take really long\n" ;  
+   sleep(5) ;
+   $max_slice_size = 5000000 ; 
+ }
+         
+print "Using max_slice - size : $max_slice_size\n" ; 
 
 $verbose and print STDERR "Generating Initial input ids...\n";
 
@@ -213,9 +230,9 @@ $verbose and print STDERR "Retrieved " . @slice_names . " slice names; now worki
 my @generated_iids;
 foreach my $slice_id (@slice_names) {
   my @ids =  get_iids_from_slice($slice_id);
-  print "have " . scalar(@ids) . " for slice $slice_id \n" if $verbose ; 
+  # print "have " . scalar(@ids) . " for slice $slice_id \n" if $verbose ; 
 
-  push @generated_iids, get_iids_from_slice($slice_id); 
+  push @generated_iids,@ids ; # get_iids_from_slice($slice_id); 
 }
 
 foreach my $iid (@generated_iids) {
@@ -240,27 +257,27 @@ foreach my $iid (@generated_iids) {
 #######################################
 
 
-sub get_iids_from_slice {
+sub get_iids_from_slice { 
   my ($slice_id) = @_;
   my @iids_from_slice;
 
   my $chr_slice    = $sl_adp->fetch_by_name($slice_id);
   my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name($slice_id);
 
-  $verbose and print STDERR "Getting hits for $slice_id\n";
+  #$verbose and print STDERR "Getting hits for $slice_id\n";
 
   my @mask_exons;
 
   # remove masked and killed hits as will be done in the build itself
-  foreach my $type ( @{$GB_SIMILARITY_GENETYPEMASKED} ) {
-    foreach my $mask_genes ( @{ $chr_gw_slice->get_all_Genes_by_type($type) } ) {
-      foreach my $mask_exon ( @{ $mask_genes->get_all_Exons } ) {
-        if ( $mask_exon->seqname eq $chr_gw_slice->id ) {
-          push @mask_exons, $mask_exon;
+    foreach my $type ( @{$GB_SIMILARITY_GENETYPEMASKED} ) {
+      foreach my $mask_genes ( @{ $chr_gw_slice->get_all_Genes_by_type($type) } ) {
+        foreach my $mask_exon ( @{ $mask_genes->get_all_Exons } ) {
+          if ( $mask_exon->seqname eq $chr_gw_slice->id ) {
+            push @mask_exons, $mask_exon;
+          }
         }
       }
-    }
-  }
+    } 
 
   # make the mask list non-redundant. Much faster when checking against features
   my @mask_regions;
@@ -277,21 +294,37 @@ sub get_iids_from_slice {
 
   #printf STDERR "Mask region list is %d\n", scalar(@mask_regions);
 
-  my $num_seeds = 0;
-  foreach my $db ( @{$GB_SIMILARITY_DATABASES} ) {
-    my %features;
+  my $num_seeds = 0; 
+  my %features; 
 
-    foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {
-      if ( not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'} ) {
-        push @{ $features{ $f->hseqname } }, $f;
+  # hslice
+  my %pdb; @pdb{@restrict_to_proteins}=1; 
+
+  foreach my $db ( @{$GB_SIMILARITY_DATABASES} ) {   
+    if ( scalar(@restrict_to_proteins) > 0) { 
+      if (exists $pdb{$db->{type}}) {  
+        #print "\n\tUsing " . $db->{type}."\n";   
+        foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {  
+          if ( not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'} ) {
+            push @{ $features{ $f->hseqname } }, $f; 
+          }
+        }
+      } 
+    } else {  # don't restrict to any database, use all 
+      #print "\n\tAll dbs:" . $db->{type}."\n";   
+      foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {
+        if ( not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'} ) {
+          push @{ $features{ $f->hseqname } }, $f;
+        }
       }
-    }
-
+   }
+ }
+   # print "have " . scalar(keys %features ) . " features \n" ; 
     my @ids_to_ignore;
-  SEQID: foreach my $sid ( keys %features ) {
+   SEQID: foreach my $sid ( keys %features ) {
       my $ex_idx = 0;
       my $count  = 0;
-
+      # print $sid."\n" ; 
       #print STDERR "Looking at $sid\n";
     FEAT: foreach my $f ( sort { $a->start <=> $b->start } @{ $features{$sid} } ) {
 
@@ -309,7 +342,7 @@ sub get_iids_from_slice {
             # overlap
             push @ids_to_ignore, $f->hseqname;
 
-            #printf STDERR "Ignoring %s\n", $f->hseqname;
+            printf STDERR "Ignoring %s\n", $f->hseqname;
             next SEQID;
           } else {
             $ex_idx++;
@@ -325,7 +358,7 @@ sub get_iids_from_slice {
     }
 
     $num_seeds += scalar( keys %features );
-  }
+  # }
 
   return () if $num_seeds == 0;
 
@@ -333,7 +366,6 @@ sub get_iids_from_slice {
 
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
-  #
   
   my $num_chunks = int( $num_seeds / $number_of_prot_per_job ) + 1;
   for ( my $x = 1 ; $x <= $num_chunks ; $x++ ) {
