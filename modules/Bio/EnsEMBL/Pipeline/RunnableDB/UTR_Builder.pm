@@ -16,7 +16,7 @@ Bio::EnsEMBL::Pipeline::RunnableDB::UTR_Builder
 =head1 SYNOPSIS
 
 my $t_e2g = new Bio::EnsEMBL::Pipeline::RunnableDB::UTR_Builder(
-								 -db        => $db,   
+								 -db        => $db,
 							         -input_id  => $input_id
 								);
 
@@ -28,6 +28,13 @@ $t_e2g->write_output(); #writes to DB
 =head1 DESCRIPTION
 
 Combines predictions from proteins with predictions from cDNA alignments:
+
+
+TODO:
+>GB_UTR_BUILD_LEVEL 2 & 3
+>For EST-bases elongation:
+ filter for ESTs with best ditag coverage.
+
 
 
 =head1 CONTACT
@@ -65,7 +72,7 @@ use Bio::SeqIO;
 
 # all the parameters are read from GeneBuild config files
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
-							     GB_INPUTID_REGEX 	   
+							     GB_INPUTID_REGEX
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
@@ -89,6 +96,11 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_EST_DBNAME
 							     GB_EST_DBPASS
 							     GB_EST_DBPORT
+							     GB_DITAG_DBHOST
+							     GB_DITAG_DBUSER
+							     GB_DITAG_DBNAME
+							     GB_DITAG_DBPASS
+							     GB_DITAG_DBPORT
 							     GB_COMB_DBHOST
 							     GB_COMB_DBUSER
 							     GB_COMB_DBNAME
@@ -115,6 +127,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
 							    GB_GENEWISE_COMBINED_GENETYPE
 							    GB_BLESSED_COMBINED_GENETYPE
 							    GB_UTR_BUILD_LEVEL
+							    DITAG_LOGIC_NAME
 							   );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
@@ -125,11 +138,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
+
 sub fetch_input{
   my ($self,@args) = @_;
-  
+
   # do not proceed unless build level has been set
   if(!$GB_UTR_BUILD_LEVEL){
     $self->throw("No GB_UTR_BUILD_LEVEL set in UTR_Builder config. Cannot build UTRs\n");
@@ -147,7 +161,7 @@ sub fetch_input{
 
   print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes\n";
   print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
-  #print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes genes\n";
+  #print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes genes\n;"
   #print STDERR "got " . scalar(@{$exonerate_genes}) . " Exonerate genes\n";
 
 
@@ -172,6 +186,8 @@ sub fetch_input{
 
   # use GB_UTR_BUILD_LEVEL to determine which sequences to fetch
   my @cdna_genes;
+  my @ditags;
+
   if($GB_UTR_BUILD_LEVEL <=2){
     # cDNA build
     my $cdna_vc= $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
@@ -183,17 +199,23 @@ sub fetch_input{
     # EST build
     my $est_vc= $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
     @cdna_genes = @{$est_vc->get_all_Genes_by_type($GB_EST_GENETYPE)};
-    print STDERR "got " . scalar(@cdna_genes) . " cdnas ($GB_EST_GENETYPE)\n";
+    print STDERR "got " . scalar(@cdna_genes) . " ests ($GB_EST_GENETYPE)\n";
     $self->est_db->dbc->disconnect_when_inactive(1);
+
+    #get ditags for support
+    if($DITAG_LOGIC_NAME){
+      @ditags = @{$self->ditag_db->get_DitagAdaptor->fetch_all_by_slice($self, $DITAG_LOGIC_NAME)};
+      print STDERR "got " . scalar(@ditags) . " ditags\n";
+      $self->ditag_db->dbc->disconnect_when_inactive(1);
+    }
   }
 
-    # filter cdnas
+  # filter cdnas
   my $filtered_cdna = $self->_filter_cdnas(\@cdna_genes);
   $self->cdna_genes($filtered_cdna);
   print STDERR "got " . scalar(@{$filtered_cdna}) . " cdnas after filtering\n";
   $self->genewise_db->dbc->disconnect_when_inactive(1);
-  $self->blessed_db->dbc->disconnect_when_inactive(1)
-    if ($self->blessed_db);
+  $self->blessed_db->dbc->disconnect_when_inactive(1) if ($self->blessed_db);
 }
 
 =head2 run
@@ -202,8 +224,9 @@ sub fetch_input{
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
+
 sub run {
   my ($self,@args) = @_;
 
@@ -211,7 +234,7 @@ sub run {
   # the equation. Make sure we keep the fragments to let the
   # genebuilder do the final sorting out, but don't add UTRs to them.
   my $filtered_genes = $self->filter_genes($self->gw_genes);
-  
+
   if($GB_UTR_BUILD_LEVEL == 1){
     $self->run_basic_cdna_matching($self->blessed_genes, $GB_BLESSED_COMBINED_GENETYPE);
     $self->run_basic_cdna_matching($filtered_genes, $GB_GENEWISE_COMBINED_GENETYPE);
@@ -546,6 +569,7 @@ sub prune_CDS {
   Example    : 
  
 =cut
+
 sub run_basic_cdna_matching{
   my ($self, $genesref, $combined_genetype) = @_;
 
@@ -927,6 +951,7 @@ print STDERR "Have " . scalar ($self->output) . "genes to write\n";
   Example    : 
  
 =cut
+
 sub make_gene{
   my ($self, $genetype, @transcripts) = @_;
 
@@ -1163,6 +1188,7 @@ sub match_protein_to_cdna{
   Example    : 
  
 =cut
+
 sub _compute_UTRlength{
  my ($self, $transcript, $left_exon, $left_diff, $right_exon, $right_diff) = @_;
  my $strand = $transcript->start_Exon->strand;
@@ -1373,6 +1399,7 @@ sub _merge_genes {
   Example    :
 
 =cut
+
 sub combine_genes{
   my ($self, $gw, $e2g) = @_;
 
@@ -2197,7 +2224,7 @@ sub add_5prime_exons{
   Description: $exon is the terminal exon in the genewise transcript,
                $transcript. We need to expand any frameshifts we
                merged in the terminal genewise exon.  The expansion is
-               made by putting $exon to be the last (3' end)
+               made by putting $exon to be the last (3 end)
                component, so we modify its start but not its end. The
                rest of the components are added. The translation end
                will have to be modified, this happens in the method
@@ -2245,7 +2272,7 @@ sub expand_3prime_exon{
   Arg [1]    : 
   Description: $exoncount tells us which position in the array of e2g
                exons corresponds to the end of the genewise transcript
-               so we add back exons 3' to that position.  $exon and
+               so we add back exons 3 to that position.  $exon and
                $transcript are references to Exon and Transcript
                objects.
 
@@ -2983,10 +3010,45 @@ sub est_db {
          '-port'   => $GB_EST_DBPORT,
          '-dbname' => $GB_EST_DBNAME,
          '-dnadb' => $self->db,
-        ); 
+        );
     }
     return $self->{_est_db};
 }
+
+
+=head2 ditag_db
+  Arg [1]    : 
+  Description: get/set for db storing exonerate alignments of ditags
+  Returntype : 
+  Exceptions : 
+  Example    : 
+
+=cut
+
+sub ditag_db {
+    my( $self, $ditag_db ) = @_;
+
+    if ($ditag_db){
+      $ditag_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
+        || $self->throw("Input [$ditag_db] isn't a ".
+                        "Bio::EnsEMBL::DBSQL::DBAdaptor");
+      $self->{_ditag_db} = $ditag_db;
+    }
+    if(!$self->{_ditag_db}){
+      $self->{_ditag_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+        (
+         '-host'   => $GB_DITAG_DBHOST,
+         '-user'   => $GB_DITAG_DBUSER,
+         '-pass'   => $GB_DITAG_DBPASS,
+         '-port'   => $GB_DITAG_DBPORT,
+         '-dbname' => $GB_DITAG_DBNAME,
+         '-dnadb' => $self->db,
+        );
+    }
+    return $self->{_ditag_db};
+}
+
+
 =head2 genewise_db
   Arg [1]    : 
   Description: get/set for db storing genewise alignments
@@ -3038,8 +3100,8 @@ sub blessed_db {
       $self->{_blessed_db} = $blessed_db;
     }
     if(!$self->{_blessed_db}){
-      if ($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME) {
-        $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+      if($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME) {
+	$self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
           (
            '-host'   => $GB_BLESSED_DBHOST,
            '-user'   => $GB_BLESSED_DBUSER,

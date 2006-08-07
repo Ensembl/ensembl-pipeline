@@ -92,6 +92,10 @@ use vars qw( %UTR_Builder );
              # unblessed UTRs only
 
              GB_UTR_BUILD_LEVEL => 1,
+
+	     #GB_UTR_BUILD_LEVEL 3 can use ditags to filter ESTs
+	     DITAG_LOGIC_NAME   => '',
+
 	   );
 
 sub import {
