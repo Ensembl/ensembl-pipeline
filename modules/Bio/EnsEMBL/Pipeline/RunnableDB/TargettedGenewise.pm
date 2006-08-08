@@ -245,7 +245,9 @@ sub fetch_input{
 								    '-terminal_padding' => $GB_TARGETTED_TERMINAL_PADDING,
 								    '-exon_padding'     => $GB_TARGETTED_EXON_PADDING,
 								    '-minimum_intron'   => $GB_TARGETTED_MINIMUM_INTRON,
-								    '-check_repeated'   => 1);
+								    '-check_repeated'   => 1,
+                                                                    '-fullseq'           => $GB_TARGETTED_FULLSEQ, 
+                                                                     );
  
   $self->runnable($r);
 

@@ -74,7 +74,10 @@ use vars qw( %Targetted );
 
 	      # genetype for Targetted_GeneWise
 	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   
-	      GB_TARGETTED_MASKING => [],
+	      GB_TARGETTED_MASKING => [],  
+
+              GB_TARGETTED_FULLSEQ => 0, # run on fullseq (1) or miniseq (0) 
+
 	     #the above setting will lead no features being masked out, if [] is used no masking will take place, if [''] is used all repeats in the table will be masked out
 	     #if only some of the sets of repeats wants to be masked out put logic names of the analyses in the array e.g ['RepeatMask', 'Dust']
 	     GB_TARGETTED_SOFTMASK => 0, # set this to one if you want the repeats softmasked ie lower case rather than uppercase N's
