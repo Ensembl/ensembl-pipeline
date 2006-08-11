@@ -108,7 +108,7 @@ sub run {
       $self->align_protein;
     };
     if($@){
-      $self->warn("Genewise run failed caller = $f:$l $@");
+      warning("Genewise run failed caller = $f:$l $@");
     }
     return 1;
 }
@@ -217,7 +217,7 @@ sub parse_genewise_output {
           $last_geneid = $1;
         } 
         elsif ($1 ne $last_geneid) {
-          $self->warn("frameshift!\n");
+          warning("frameshift!\n");
         }
       }
     }    
@@ -276,12 +276,12 @@ sub parse_genewise_output {
       }
       
       if($strand != $exons_and_sfs[-1]->{exon}->strand){
-        $self->warn("incompatible strands between exon and supporting feature - cannot add suppfeat\n");
+        warning("incompatible strands between exon and supporting feature - cannot add suppfeat\n");
         return;
       }
       
       if($pstart > $pend){
-        $self->warn("Protein start greater than end! Skipping this suppfeat\n");
+        warning("Protein start greater than end! Skipping this suppfeat\n");
         return;
       }
       
