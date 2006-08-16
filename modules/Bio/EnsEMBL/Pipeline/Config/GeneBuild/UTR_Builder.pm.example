@@ -73,6 +73,10 @@ use vars qw( %UTR_Builder );
 				 ],
 	     
 	     GB_EST_GENETYPE => 'est2genome',
+
+	     # add other non-generic gene-types
+	     # format: ['exonerate_genes', 'other_great_genes']
+	     OTHER_GENETYPES => [],
 	     
              # GB_UTR_BUILD_LEVEL specifies how the CDS and cDNA/EST data are to be combined
              # Default is not to build UTRs
@@ -94,7 +98,8 @@ use vars qw( %UTR_Builder );
              GB_UTR_BUILD_LEVEL => 1,
 
 	     #GB_UTR_BUILD_LEVEL 3 can use ditags to filter ESTs
-	     DITAG_LOGIC_NAME   => '',
+             # format: ['ditagtype_1', 'ditagtype_2']
+	     DITAG_LOGIC_NAME   => [],
 
 	   );
 

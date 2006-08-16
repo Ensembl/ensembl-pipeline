@@ -44,7 +44,7 @@ Ensembl - ensembl-dev@ebi.ac.uk
 =head1 APPENDIX
 
 The rest of the documentation details each of the object methods. Internal methods are 
-usually preceded with a _
+usually preceded with a '_'
 
 =cut
 
@@ -69,66 +69,69 @@ use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::SeqIO;
+#use Bio::EnsEMBL::Map::DBSQL::DitagFeatureAdaptor;
+
 
 # all the parameters are read from GeneBuild config files
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
-							     GB_INPUTID_REGEX
-							    );
-
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-							     GB_GW_DBHOST
-							     GB_GW_DBUSER
-							     GB_GW_DBPASS
-							     GB_GW_DBNAME
-							     GB_GW_DBPORT
-							     GB_BLESSED_DBHOST
-							     GB_BLESSED_DBUSER
-							     GB_BLESSED_DBPASS
-							     GB_BLESSED_DBNAME
-							     GB_BLESSED_DBPORT
-							     GB_cDNA_DBHOST
-							     GB_cDNA_DBUSER
-							     GB_cDNA_DBNAME
-							     GB_cDNA_DBPASS
-							     GB_cDNA_DBPORT
-							     GB_EST_DBHOST
-							     GB_EST_DBUSER
-							     GB_EST_DBNAME
-							     GB_EST_DBPASS
-							     GB_EST_DBPORT
-							     GB_DITAG_DBHOST
-							     GB_DITAG_DBUSER
-							     GB_DITAG_DBNAME
-							     GB_DITAG_DBPASS
-							     GB_DITAG_DBPORT
-							     GB_COMB_DBHOST
-							     GB_COMB_DBUSER
-							     GB_COMB_DBNAME
-							     GB_COMB_DBPASS
-							     GB_COMB_DBPORT
-							    );
-
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw (
-							     GB_TARGETTED_GW_GENETYPE
-							    );
-
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
-							      GB_SIMILARITY_GENETYPE
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
+							      GB_INPUTID_REGEX
 							     );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Blessed   qw (
-							       GB_BLESSED_GENETYPES
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases  qw (
+							      GB_GW_DBHOST
+							      GB_GW_DBUSER
+							      GB_GW_DBPASS
+							      GB_GW_DBNAME
+							      GB_GW_DBPORT
+							      GB_BLESSED_DBHOST
+							      GB_BLESSED_DBUSER
+							      GB_BLESSED_DBPASS
+							      GB_BLESSED_DBNAME
+							      GB_BLESSED_DBPORT
+							      GB_cDNA_DBHOST
+							      GB_cDNA_DBUSER
+							      GB_cDNA_DBNAME
+							      GB_cDNA_DBPASS
+							      GB_cDNA_DBPORT
+							      GB_EST_DBHOST
+							      GB_EST_DBUSER
+							      GB_EST_DBNAME
+							      GB_EST_DBPASS
+							      GB_EST_DBPORT
+							      DITAG_DBHOST
+							      DITAG_DBUSER
+							      DITAG_DBNAME
+							      DITAG_DBPASS
+							      DITAG_DBPORT
+							      GB_COMB_DBHOST
+							      GB_COMB_DBUSER
+							      GB_COMB_DBNAME
+							      GB_COMB_DBPASS
+							      GB_COMB_DBPORT
+							     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Targetted qw  (
+							      GB_TARGETTED_GW_GENETYPE
+							     );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
+							      GB_SIMILARITY_GENETYPE
+							      );
+
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Blessed     qw (
+							      GB_BLESSED_GENETYPES
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
-							    GB_cDNA_GENETYPE
-							    GB_EST_GENETYPE
-							    GB_COMBINED_MAX_INTRON
-							    GB_GENEWISE_COMBINED_GENETYPE
-							    GB_BLESSED_COMBINED_GENETYPE
-							    GB_UTR_BUILD_LEVEL
-							    DITAG_LOGIC_NAME
-							   );
+							      GB_cDNA_GENETYPE
+							      GB_EST_GENETYPE
+							      GB_COMBINED_MAX_INTRON
+							      GB_GENEWISE_COMBINED_GENETYPE
+							      GB_BLESSED_COMBINED_GENETYPE
+							      GB_UTR_BUILD_LEVEL
+							      OTHER_GENETYPES
+							      DITAG_LOGIC_NAME
+							      );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -155,23 +158,22 @@ sub fetch_input{
   my $similarity_genes = $self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE);
   my $targetted_genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
 
-  # temp hack klh: add my own type in. This needs to be made more generic!
-  #my $projected_genes = $self->query->get_all_Genes_by_type('WGA2Genes');
-  #my $exonerate_genes = $self->query->get_all_Genes_by_type('Exonerate_Protein');
-
   print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes\n";
   print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
-  #print STDERR "got " . scalar(@{$projected_genes}) . " WGA2Genes genes\n;"
-  #print STDERR "got " . scalar(@{$exonerate_genes}) . " Exonerate genes\n";
-
 
   $self->gw_genes( $similarity_genes);
   $self->gw_genes( $targetted_genes );
-  #$self->gw_genes( $projected_genes );
-  #$self->gw_genes( $exonerate_genes );
+
+  # add user-defined gene-types in the same way
+  foreach my $other_genetype (@{$OTHER_GENETYPES}) {
+    my $other_genes = $self->query->get_all_Genes_by_type($other_genetype);
+    print STDERR "got " . scalar(@{$other_genes}) . " $other_genetype genes\n;";
+    $self->gw_genes( $other_genes );
+  }
 
   # get blessed genes
-  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id) if ($self->blessed_db);
+  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id)
+    if ($self->blessed_db);
 
   my @blessed_genes;
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
@@ -190,30 +192,39 @@ sub fetch_input{
 
   if($GB_UTR_BUILD_LEVEL <=2){
     # cDNA build
-    my $cdna_vc= $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+    my $cdna_vc = $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
     @cdna_genes = @{$cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
     print STDERR "got " . scalar(@cdna_genes) . " cdnas ($GB_cDNA_GENETYPE)\n";
     $self->cdna_db->dbc->disconnect_when_inactive(1);
   }
   else{
     # EST build
-    my $est_vc= $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+    my $est_vc  = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
     @cdna_genes = @{$est_vc->get_all_Genes_by_type($GB_EST_GENETYPE)};
     print STDERR "got " . scalar(@cdna_genes) . " ests ($GB_EST_GENETYPE)\n";
     $self->est_db->dbc->disconnect_when_inactive(1);
+  }
 
-    #get ditags for support
-    if($DITAG_LOGIC_NAME){
-      @ditags = @{$self->ditag_db->get_DitagAdaptor->fetch_all_by_slice($self, $DITAG_LOGIC_NAME)};
-      print STDERR "got " . scalar(@ditags) . " ditags\n";
-      $self->ditag_db->dbc->disconnect_when_inactive(1);
-    }
+  #get ditags for support [fsk]
+  foreach my $ditag_type (@{$DITAG_LOGIC_NAME}) {
+    #$self->throw($ditag_type);
+    my $ditag_vc = $self->ditag_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+    push(@ditags, @{$ditag_vc->get_all_DitagFeatures($ditag_type)});
+    print STDERR "got " . scalar(@ditags) . " ".$ditag_type." ditags\n";
+    $self->ditag_db->dbc->disconnect_when_inactive(1);
+  }
+  if(scalar @ditags){
+    @ditags = sort {$a->start <=> $b->start} @ditags;
+    $self->ditags(\@ditags);
+  }
+  else{
+    print STDERR "not using Ditags\n";
   }
 
   # filter cdnas
   my $filtered_cdna = $self->_filter_cdnas(\@cdna_genes);
   $self->cdna_genes($filtered_cdna);
-  print STDERR "got " . scalar(@{$filtered_cdna}) . " cdnas after filtering\n";
+  print STDERR "got " . scalar(@{$filtered_cdna}) . " cdnas or ESTs after filtering\n";
   $self->genewise_db->dbc->disconnect_when_inactive(1);
   $self->blessed_db->dbc->disconnect_when_inactive(1) if ($self->blessed_db);
 }
@@ -355,9 +366,9 @@ sub _cluster_CDS_by_genomic_range{
 
   # first sort the genes
 
-  my @genes = sort { $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
-                       ? $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
-                         : $b->get_all_Transcripts->[0]->end <=> $a->get_all_Transcripts->[0]->end } @genes;
+  @genes = sort { $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
+		    ? $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
+		      : $b->get_all_Transcripts->[0]->end <=> $a->get_all_Transcripts->[0]->end } @genes;
 
 
   # create a new cluster 
@@ -465,7 +476,7 @@ sub prune_CDS {
 
     if ($maxexon_number == 1){ # ie the longest transcript is a single exon one
       # take the longest:
-      push (@pruned_genes, @unpruned_genes[0]);
+      push (@pruned_genes, $unpruned_genes[0]);
       print STDERR "VAC: found single_exon_transcript: " .$unpruned_genes[0]->dbID. "\n";
       shift @unpruned_genes;
       $self->unmatched_genes(@unpruned_genes);
@@ -567,7 +578,7 @@ sub prune_CDS {
   Returntype : none
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub run_basic_cdna_matching{
@@ -595,7 +606,7 @@ sub run_basic_cdna_matching{
     # should be only 1 transcript
     my @cds_tran  = @{$cds->get_all_Transcripts};			
     my @cds_exons = @{$cds_tran[0]->get_all_Exons}; # ordered array of exons
-    my $strand   = $cds_exons[0]->strand;
+    my $strand    = $cds_exons[0]->strand;
 
     if($cds_exons[$#cds_exons]->strand != $strand){
       $self->warn("first and last cds exons have different strands - can't make a sensible combined gene\n");
@@ -632,17 +643,31 @@ sub run_basic_cdna_matching{
       my @cds_trans  = @{$cds->get_all_Transcripts};
       my @cdna_trans = @{$cdna->get_all_Transcripts};
       my ($exon_overlap, $extent_overlap) =
-	Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->_compare_Transcripts( $cds_trans[0], $cdna_trans[0] );
-      push (@list, [$exon_overlap, $extent_overlap, $cdna]);
+	Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->
+	    _compare_Transcripts( $cds_trans[0], $cdna_trans[0] );
+      #[fsk]
+      #use ditags if avaliable, find the ones matching the cDNA within X bases
+      my $ditag_verificaction = undef;
+      if(scalar @{$DITAG_LOGIC_NAME}){
+	$ditag_verificaction = $self->look_for_ditags($cdna_trans[0]);
+      }
+      push (@list, [$exon_overlap, $extent_overlap, $cdna, $ditag_verificaction]);
     }
 
     # sort them
-    @list = sort{ 
+    @list = sort{
       # by number of exon overlap
       my $result = ( $$b[0] <=> $$a[0] );
       unless ($result){
 	# else, by extent of the overlap
 	$result =  ( $$b[1] <=> $$a[1] );
+      }
+      if(scalar @{$DITAG_LOGIC_NAME}){
+	unless ($result){
+	  # else, by supporting ditags
+	  $result = ( $$b[3] <=> $$a[3] );
+	}
+	#print STDERR "\nditagfiltered $result";
       }
       unless ($result){
 	# else, by genomic length of the cdna
@@ -658,7 +683,7 @@ sub run_basic_cdna_matching{
 
     my $howmany = scalar(@list);
     my $cdna_match;
-    my $this = shift @list;
+    my $this    = shift @list;
     $cdna_match = $$this[2];
 
     unless ( $cdna_match){
@@ -676,13 +701,14 @@ sub run_basic_cdna_matching{
   #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cds);
   #  print STDERR "with cdna gene " . $cdna_match->dbID . ":\n";
   #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cdna_match);
-    
+
     my $combined_transcript = $self->combine_genes($cds, $cdna_match);
     # just check combined transcript works before throwing away the original  transcript
-    unless (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript,$self->query)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript,$self->query)){
+    unless (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	          _check_Transcript($combined_transcript,$self->query)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	           _check_introns($combined_transcript,$self->query)){
       $combined_transcript = undef;
-
     }
 
     # make sure combined transcript doesn't misjoin any genewise clusters
@@ -693,9 +719,9 @@ sub run_basic_cdna_matching{
           $combined_transcript = undef;
         }
       }
-    
 
     if ( $combined_transcript ){
+      #transfer evidence and make the new gene
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
       $self->make_gene($combined_genetype, $combined_transcript);
     }
@@ -706,11 +732,42 @@ sub run_basic_cdna_matching{
       next CDS;
     }
   }
-  
 }
 
 
-=head2 run stringent_cdna_matching 
+=head2 look_for_ditags
+  Arg [1]    : cdna_transcript
+  Description: look for ditags in the region of the transcripts
+               that might support it
+  Returntype : int score: high value indicates many/well matching ditags
+  Exceptions : none
+
+=cut
+
+sub look_for_ditags{
+  my ($self, $cdna_transcript) = @_;
+
+  my $ditag_score = 0;
+  my $cdna_start  = $cdna_transcript->start;
+  my $cdna_end    = $cdna_transcript->end;
+  my $ditag_distance = 5; #will need to go into CONFIG
+
+  foreach my $ditag ($self->ditags){
+    if((abs($ditag->start - $cdna_start) < $ditag_distance)
+       && (abs($ditag->end - $cdna_end) < $ditag_distance)){
+      #matching ditag; produce a score favoring those transcripts,
+      #that have many ditags &/| perfectly positioned ditags.
+      $ditag_score += $ditag_distance - (abs($ditag->start - $cdna_start)) +
+                      $ditag_distance - (abs($ditag->end - $cdna_end));
+    }
+    if($ditag->start > $cdna_end){ last; }
+  }
+
+  return $ditag_score;
+}
+
+
+=head2 run stringent_cdna_matching
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Arg [2]    : string representing genetype to be associated with UTR-modified genes
   Description: 
@@ -722,6 +779,7 @@ sub run_basic_cdna_matching{
 
 sub run_stringent_cdna_matching{
 
+  self->throw("UTR-BUILDING 2: not implemented yet!");
 
 }
 
@@ -737,6 +795,8 @@ sub run_stringent_cdna_matching{
 =cut
 
 sub run_stringent_est_matching{
+
+  self->throw("UTR-BUILDING 3: not implemented yet!");
 
 }
 
@@ -784,7 +844,9 @@ sub find_cluster_joiners{
   CLUSTER:
   foreach my $cluster(@clusters){
     print "\n" . $cluster->start . " - " . $cluster->end . "\n";
-    if($transcript_start <= $cluster->start && $transcript_end >= $cluster->start && $transcript_end <= $cluster->end){
+    if($transcript_start <= $cluster->start
+       && $transcript_end >= $cluster->start
+       && $transcript_end <= $cluster->end){
       print "transcript ends in this cluster\n";
       if($overlaps_previous_cluster){
         print "transcript joins clusters - discard it\n";
@@ -793,11 +855,14 @@ sub find_cluster_joiners{
       # else not a problem
       last CLUSTER;
     }
-    elsif($transcript_start <= $cluster->end && $transcript_start >= $cluster->start && $transcript_end >= $cluster->end){
+    elsif($transcript_start <= $cluster->end
+	  && $transcript_start >= $cluster->start
+	  && $transcript_end >= $cluster->end){
       print STDERR "VAC: transcript starts in this cluster\n";
       $overlaps_previous_cluster = 1;
     }
-    elsif($transcript_start <= $cluster->start && $transcript->end >= $cluster->end){
+    elsif($transcript_start <= $cluster->start
+	  && $transcript->end >= $cluster->end){
       print STDERR "VAC: transcript spans this cluster\n";
       $overlaps_previous_cluster = 1;
     }
@@ -830,9 +895,15 @@ sub _filter_cdnas{
   cDNA_TRANSCRIPT:
     foreach my $tran (@{$cdna->get_all_Transcripts}) {
 
-      # rejecting on basis of intron length may not be valid here - it may not be that simple in the same way as it isn;t that simple in Targetted & Similarity builds
+      # rejecting on basis of intron length may not be valid here
+      # - it may not be that simple in the same way as it isn;t that simple in Targetted & Similarity builds
 
-      next cDNA_TRANSCRIPT unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran,$self->query) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($tran,$self->query));
+      next cDNA_TRANSCRIPT unless (
+				   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+				   _check_Transcript($tran,$self->query)
+				   && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+				   _check_introns($tran,$self->query)
+				  );
 
       #print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
       push(@newcdna,$cdna);
@@ -1023,7 +1094,8 @@ sub match_protein_to_cdna{
   my @gw_exons = @{$gw_tran[0]->get_all_Exons};
   my $strand   = $gw_exons[0]->strand;
   if($gw_exons[$#gw_exons]->strand != $strand){
-    $self->warn("first and last gw exons have different strands - can't make a sensible combined gene\n with ".$gw_tran[0]->dbId );
+    $self->warn("first and last gw exons have different strands ".
+		"- can't make a sensible combined gene\n with ".$gw_tran[0]->dbId );
       return;
   }
   if ( @gw_exons ){
@@ -1085,7 +1157,7 @@ sub match_protein_to_cdna{
 	  $right_exon  = $current_exon; 
 	  $left_diff   = $gw_exons[0]->start - $current_exon->start;
 	  $right_diff  = $current_exon->end  - $gw_exons[0]->end;
-	}	
+	}
       }
       # can match either end, or both
       if($fiveprime_match || $threeprime_match){
@@ -1095,7 +1167,7 @@ sub match_protein_to_cdna{
       }
 
       # Now the multi exon genewises
-    } 
+    }
     else {
 
     cDNA_EXONS:
@@ -1130,7 +1202,7 @@ sub match_protein_to_cdna{
 	
 	    $threeprime_match = 1;
 	    $right_exon = $current_exon;
-	    $right_diff  = $current_exon->end  - $gw_exons[0]->end;
+	    $right_diff  = $current_exon->end - $gw_exons[0]->end;
 	  }
 	}
 	elsif($gw_exons[0]->strand == -1){
@@ -2704,6 +2776,30 @@ sub cdna_genes {
   return @{$self->{'_cdna_genes'}};
 }
 
+
+=head2 ditags
+  Arg [1]    : ref to array with ditags
+  Description: get/set ditags
+  Returntype : 
+  Exceptions : 
+  Example    : 
+=cut
+
+sub ditags {
+  my ($self, $ditags) = @_;
+
+  if (!defined($self->{'_ditags'})) {
+    $self->{'_ditags'} = [];
+  }
+
+  if (defined $ditags && scalar(@{$ditags})) {
+    push(@{$self->{'_ditags'}},@{$ditags});
+  }
+
+  return @{$self->{'_ditags'}};
+}
+
+
 =head2 gw_genes
   Arg [1]    : 
   Description: get/set for genewise gene array
@@ -3037,14 +3133,18 @@ sub ditag_db {
     if(!$self->{_ditag_db}){
       $self->{_ditag_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
-         '-host'   => $GB_DITAG_DBHOST,
-         '-user'   => $GB_DITAG_DBUSER,
-         '-pass'   => $GB_DITAG_DBPASS,
-         '-port'   => $GB_DITAG_DBPORT,
-         '-dbname' => $GB_DITAG_DBNAME,
-         '-dnadb' => $self->db,
+         '-host'   => $DITAG_DBHOST,
+         '-user'   => $DITAG_DBUSER,
+         '-pass'   => $DITAG_DBPASS,
+         '-port'   => $DITAG_DBPORT,
+         '-dbname' => $DITAG_DBNAME,
+         '-dnadb'  => $self->db,
         );
     }
+    if(!$self->{_ditag_db}){
+      $self->throw("Could not create DitagDB-Adaptor!\n");
+    }
+
     return $self->{_ditag_db};
 }
 
