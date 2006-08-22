@@ -143,8 +143,15 @@ sub new {
     $self->query($slice);
     $self->gene_types($GB_GENEWISE_COMBINED_GENETYPE );
     $self->gene_types($GB_BLESSED_COMBINED_GENETYPE);
-    $self->gene_types($GB_TARGETTED_GW_GENETYPE);
-    $self->gene_types($GB_SIMILARITY_GENETYPE);
+    $self->gene_types($GB_TARGETTED_GW_GENETYPE);  
+
+    if ( ref($GB_SIMILARITY_GENETYPE) =~m/ARRAY/){  
+      for my $gsb ( @{$GB_SIMILARITY_GENETYPE} ) {   
+        $self->gene_types($gsb); 
+      }  
+    } else {     
+      $self->gene_types($GB_SIMILARITY_GENETYPE);
+    }
 
     $self->gene_types("KnownUTR");
 
