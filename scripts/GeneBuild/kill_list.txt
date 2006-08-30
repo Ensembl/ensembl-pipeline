@@ -425,3 +425,42 @@ P39193  Alu subfamily SP sequence contamination warning entry (vac)
 P39194 Alu subfamily SQ sequence contamination warning entry. (vac)
 P39195 Alu subfamily SX sequence contamination warning entry. (vac)
 Q6XYC1 Q6XYC1_HUMAN LP3428 (vac multiple pmatch hits)
+Q96PI4 HERV-K_1q23.3 provirus ancestral Gag polyprotein (vac)
+P63123 HERV-K_1q23.3 provirus ancestral Pro protein
+O42043 HERV-K_1q23.3 provirus ancestral Env polyprotein
+O14749 	pol derived Reverse transcriptase [Fragment]
+O14750 pol derived Reverse transcriptase [Fragment]
+O14751 pol derived Reverse transcriptase [Fragment]
+O14752 pol derived Reverse transcriptase [Fragment]
+Q14272 Endogenous retroviral gene (HLM-2). [Fragment]
+Q1W5W7 Putative gag-pol protein
+Q330L6 Reverse transcriptase [Fragment]
+Q330L7 Reverse transcriptase [Fragment]
+Q330L8 Reverse transcriptase [Fragment]
+Q3UWB7 Gag protein homolog [Fragment]
+Q3UXZ8 GAG protein
+Q4JNY2 Pol [Fragment]
+Q330L9 Reverse transcriptase [Fragment]
+Q4JNY4 Gag [Fragment]
+Q330M0 	Reverse transcriptase [Fragment]
+Q60505 Chinese hamster provirus
+Q330M1 Reverse transcriptase [Fragment]
+Q61213 	Gag mouse
+Q04099 Pol protein [Fragment] 
+Q330M2 Reverse transcriptase [Fragment]
+Q330M3 	Reverse transcriptase [Fragment]
+Q61705 Integrase [Fragment]
+Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 106
+Q61708 	Gag protein
+Q61709 DNA for type IIB intracisternal A-particle element encoding integrase and gag
+Q7M6W3 	Pol protein [Fragment]
+Q6ZMV2 CDNA FLJ16646 fis, clone TESTI4032090
+Q6ZN85 CDNA FLJ16337 fis, clone TESTI1000266
+Q6ZQX8 	CDNA FLJ46816 fis, clone TRACH3036932
+Q71VD1 	Reverse transcriptase [Fragment]
+Q78E13 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 111. [Fragment]
+Q7M6U4 	Gag protein
+Q7M6U5 Pol protein [Fragment] 
+Q7M6W5 Gag protein
+Q7M6W6 Gag protein
+
