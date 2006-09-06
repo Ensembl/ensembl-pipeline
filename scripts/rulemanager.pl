@@ -237,7 +237,7 @@ my $submission_count = 0;
 while (1) {
   print "Reading IDs \n" if $verbose;
   my $submitted = 0;
-
+  my $done_something = 0;
   %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
   my %incomplete_accumulator_analyses = %always_incomplete_accumulators;
 
@@ -298,6 +298,7 @@ while (1) {
                                       $current_jobs_hash)) {
           $submitted++;
           $submission_count++;
+          $done_something = 1;
           if ($submission_limit && $submission_count 
               >= $submission_number) {
             $done = 1;
@@ -324,6 +325,7 @@ while (1) {
             $submitted++;
             $submission_count++;
             $naccum_submitted++;
+            $done_something = 1;
           } elsif (exists($incomplete_accumulator_analyses{$logic_name})) {
             print "Accumulator type analysis $logic_name ".
                   "conditions unsatisfied\n" if $verbose;
@@ -338,7 +340,7 @@ while (1) {
 
   $rulemanager->job_stats($job_limit);
   
-  if (!$done && !$naccum_submitted) {
+  if (!$done && !$naccum_submitted && !$done_something) {
     if (!$rulemanager->check_if_done) {
       $done = 1;
     }else{
