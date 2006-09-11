@@ -213,11 +213,11 @@ sub parse_agp{
     chomp;
     next if /^\#/;
     #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
-    #cb25.fpc4250	151062	152023	14	N	962	fragment	yes
+    #cb25.fpc4250	151062	152023	14	N	962	telomere	yes
     my @values = split;
-    if($values[4] eq 'N'){
-      next LINE; 
-    }
+    #if($values[4] eq 'N'){
+    #  next LINE; 
+    #}
     my $name = $values[0];
     my $end = $values[2];
     if(!$end_value{$name}){
