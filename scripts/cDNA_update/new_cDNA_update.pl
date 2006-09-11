@@ -104,10 +104,10 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = "/ecs4/work3/sd3";
+my $cvsDIR               = "/nfs/acari/ba1/PerlCode";
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
-my $dataDIR              = "/ecs2/scratch5/sd3/cdna_updates_0506/human_test"; 
+my $dataDIR              = "/ecs2/scratch3/ba1/hum_cdna_update_Sept06"; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
@@ -124,9 +124,9 @@ my $assembly_version     = "NCBI36"; #"NCBIM36"; #NCBI36
 
 my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
 #my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
-my $user 				 = "sd3";
-my $host 				 = "cbi1";
-my $genebuild_id         = "3";
+my $user 				 = "ba1";
+my $host 				 = "ecs2";
+my $genebuild_id         = "4";
 
 
 my $kill_list			 = $cvsDIR."/ensembl-pipeline/scripts/GeneBuild/cDNA_kill_list.txt";
@@ -134,6 +134,7 @@ my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_upda
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
+my $chunknum             = 4500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog 			 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
 my $reasons_prog		 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
@@ -146,23 +147,23 @@ my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_38_36"; #is in schema 38
+my $WB_REF_DBNAME        = "homo_sapiens_core_40_36b"; #is in schema 38
 my $WB_REF_DBHOST        = "ecs2"; 
 my $WB_REF_DBPORT        = "3365"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_human_0506_cDNA_pipe_test";
-my $WB_PIPE_DBHOST       = "ecs1b";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_hum_cdna0906_ref";
+my $WB_PIPE_DBHOST       = "genebuild4";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_human_0506_cDNA_update";
-my $WB_TARGET_DBHOST     = "ecs2";
-my $WB_TARGET_DBPORT     = "3362";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_hum_cdna0906_update";
+my $WB_TARGET_DBHOST     = "genebuild6";
+my $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_38_36"; 
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_39_36a"; 
 my $WB_LAST_DBHOST       = "ecs2";
 my $WB_LAST_DBPORT       = "3365";  
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_38_36";
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_39_36a";
 my $WB_LAST_DNADBHOST    = "ecs2"; 
 my $WB_LAST_DNADBPORT    = "3365"; 
 
@@ -240,7 +241,6 @@ my %configvars      = (
 
 
 #fasta chunk specifications:
-my $chunknum        = 1500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $maxseqlength    = 17000;
 my $tmp_masked_genome  = $dataDIR."/genome";
 #program specifications:
@@ -572,8 +572,9 @@ sub fastafiles{
         		$entry =~s/^>//; #need this to include the first record when using $/='\n>'
 				if($entry =~ m/$species/){
 					#extract & save id
-					$entry =~ s/^[\w\d]+\s([\w\.\d]+)\s.+\n{1}?/$1\n/;
+					$entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
 					if(!$1){ die "\n$vertrna_update: unmatched id pattern:\n$entry\n"; }
+                                        #else {print STDERR "$1\n$entry\n";}
 					$EMBL_ids{$1} = 1;
 					#re-write fasta entry
 					$entry =~ s/\>//g;
@@ -581,7 +582,7 @@ sub fastafiles{
 				}
     		}
     		close(RP);
-    		print "read update EMBL file.\n";
+    		print "read update $vertrna_update EMBL file.\n";
 
     	    #read base file
     		open(RP, "<", $dataDIR."/".$vertrna) or die("can t read $vertrna\n");
@@ -590,7 +591,7 @@ sub fastafiles{
         		$entry =~s/^>//; #need this to include the first record when using $/='\n>'
 				if($entry =~ m/$species/){
 					#extract & save id
-					$entry =~ s/^[\w\d]+\s([\w\.\d]+).+\n{1}?/$1\n/;
+					$entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
 					if(!$1){ die "\n$vertrna: unmatched id pattern:\n$entry\n"; }
 					if( !defined($EMBL_ids{$1}) ){
 	    				#add fasta entry for unchanged id
@@ -600,7 +601,7 @@ sub fastafiles{
 				}
     		}
     		close(RP);
-    		print "read base EMBL file.\n";
+    		print "read base $vertrna EMBL file.\n";
 
     		#read RefSeq file
     		open(RP, "<", $dataDIR."/".$refseq) or die("can t read $refseq.\n");
