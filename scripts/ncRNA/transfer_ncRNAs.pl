@@ -122,6 +122,7 @@ if ($dump){
 }
 # check that the final db has the external db table loaded
 check_exdb($final_db);
+check_meta($sdb,$final_db);
 
 print "fetching and lazy loading new predictions...\n";
 my $new_hash = fetch_genes($sga,$biotype,$fbs);
@@ -531,8 +532,24 @@ print "\n";
   return \%ncRNA_hash;
 }
 
+sub check_meta {
+  my ($db1,$db2) = @_;
+  my $m1 = $db1->get_MetaContainer;
+  my $m2 = $db2->get_MetaContainer;
+  my $c1 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db1)->[0];
+  my $c2 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db2)->[0];
 
-
+  unless ($m1->get_Species->common_name eq $m2->get_Species->common_name){
+    throw("Species do not agree ".$m1->get_Species->common_name." != ". $m2->get_Species->common_name."\n");
+  }
+  unless ($m1->get_taxonomy_id eq $m2->get_taxonomy_id ){
+    throw("Tax ids do not agree ".$m1->get_taxonomy_id." != ". $m2->get_taxonomy_id."\n");
+  }
+  unless ($c1 eq $c2){
+    throw("Coord systems do not agree $c1 != $c2 \n");
+  }
+  return;
+}
 
 
 __END__

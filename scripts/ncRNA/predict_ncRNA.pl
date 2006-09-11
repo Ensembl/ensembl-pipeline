@@ -224,7 +224,7 @@ SPECIES :foreach my $species (@speciess){
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass \n";
+	  "-dbuser ensadmin -dbpass $pass -once\n";
 
   print SPEC "$cmd_rulemanager\n";
   print "Monitor:\n";
