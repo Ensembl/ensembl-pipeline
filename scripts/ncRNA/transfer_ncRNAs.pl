@@ -252,6 +252,18 @@ sub overlaps {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
+	# catch problem where you have multiple overlapping ncRNAs, maybe you can manually delete one
+	# so that it transfers the correct stable_id
+	if ($noncoding{$gene->dbID}){
+	  warn("Something fishy is going on here I have more than one non coding overlap for this gene".
+	       $gene->dbID." ".$gene->seq_region_name." ".$gene->start.":".$gene->end.":".$gene->strand.
+	       " overlaps\nA: ".$noncoding{$gene->dbID}." ".$noncoding{$gene->dbID}->biotype."\nB: ".
+	       $overlap->dbID." ".$overlap->biotype."\n");
+	  print "Do you want to transfer the stable id of A or B?";
+	  my $reply = <>;
+	  chomp $reply;
+	  next GENE if $reply eq "A" or $reply eq "a";
+	}
 	$noncoding{$gene->dbID} = $overlap;
       } else {
 	# overlapping gene is coding
@@ -305,7 +317,7 @@ sub stable_id_mapping {
   my $old_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$sdb)->[0];
   my $new_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$final_db)->[0];
   print SIDS "INSERT INTO  mapping_session(mapping_session_id,old_db_name,new_db_name,old_release,new_release,old_assembly,new_assembly,created) ".
-    " VALUES($last_session,\'$dbname\',\'$final_dbname\',\'$new_release\',\'$old_release\',\'$old_assembly\',\'$new_assembly\',now());\n";
+    " VALUES($last_session,\'$dbname\',\'$final_dbname\',\'$old_release\',\'$new_release\',\'$old_assembly\',\'$new_assembly\',now());\n";
   # trasfer them where you have overlaps with non coding genes
   # put the appropriate entries in the stable id mapping table
   my %done;
