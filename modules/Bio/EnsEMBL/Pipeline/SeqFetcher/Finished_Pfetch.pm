@@ -230,10 +230,7 @@ sub write_descriptions {
     my $sth = $self->prepare_hit_desc_sth($dbobj);
 	for my $accession (keys %$descriptions) {
 		my @desc = map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database');
-		#print "\nacc=$accession\tlength=",scalar(@desc),"\tdesc =@desc\n";
-		#print map {"content\t\'$_\'\n"} @desc;
 		eval{
-			#print "\'@desc\' => execute query\n";
 			$sth->execute(
 				$accession,
 				@desc
@@ -255,15 +252,30 @@ sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
     
 	my $descriptions = {};	# results are stored here
-
+	
+	# split protein isoform ids and normal ids 
+	my $ids_iso = [];
+	my $ids_no_iso = [];
+	my %single_ids = {};
+	foreach (@$id_list) {
+		my $id = $_;
+		if(/\-\d+/) {
+			push @$ids_iso, $id ;
+			$id =~ s/\-\d+//g;
+		}
+		$single_ids{$id} = 1;
+	}
+	my @ids = keys %single_ids;
+	$ids_no_iso = \@ids;
+	
 	# first pass fails when the sequence version has changed:
     my $failed_first_pass = [];
-    for (my $i = 0; $i < @$id_list; $i += $chunk_size) {
+    for (my $i = 0; $i < @$ids_no_iso; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         # Set second index to last element if we're off the end of the array
-        $j = $#$id_list if $#$id_list < $j;
+        $j = $#$ids_no_iso if $#$ids_no_iso < $j;
         # Take a slice from the array
-        my $chunk = [@$id_list[$i..$j]];
+        my $chunk = [@$ids_no_iso[$i..$j]];
         push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
     }
     
@@ -279,8 +291,80 @@ sub fetch_descriptions {
         push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
     }
     
+    # get isoform ids descriptions
+	my $failed_isoforms = [];
+    for (my $i = 0; $i < @$ids_iso; $i += $chunk_size) {
+        my $j = $i + $chunk_size - 1;
+        # Set second index to last element if we're off the end of the array
+        $j = $#$ids_iso if $#$ids_iso < $j;
+        # Take a slice from the array
+        my $chunk = [@$ids_iso[$i..$j]];
+        push @$failed_isoforms, @{ $self->fetch_isoform_descriptions($chunk, $descriptions) };
+    }
+    
+    push @$failed_second_pass, @$failed_isoforms;
+    
     return ($descriptions, $failed_second_pass);
 }
+
+sub fetch_isoform_descriptions {
+	my( $self, $id_list, $descriptions ) = @_;
+	my $server = $self->get_server;
+	
+	# fetch isoform length 
+	print $server join(' ', '-l', @$id_list), "\n";
+	my $length_succeeded = [];
+	my $length_failed    = [];
+	my $i = 0;
+	while (<$server>) {
+		chomp;
+		my $full_name = $id_list->[$i];
+		if($_ ne 'no match') {
+			$descriptions->{$full_name}{length}	= $_;
+			push @$length_succeeded, $full_name;
+		} else {
+			warn "${full_name}'s length is not in pfetch server";
+			push @$length_failed, $full_name;
+		}
+		$i++;
+	}
+	
+	# fetch isoform description
+	$server = $self->get_server;
+	print $server join(' ', '-D', @$length_succeeded), "\n";
+	my $desc_succeeded = [];
+	my $desc_failed    = [];
+	$i = 0;
+	while (<$server>) {
+		chomp;
+		my $full_name = $id_list->[$i];
+		s/$full_name//g;
+		if($_ ne 'no match') {
+			$descriptions->{$full_name}{description}	= $_;
+			push @$desc_succeeded, $full_name;
+		} else {
+			warn "${full_name}'s description is not in pfetch server";
+			push @$desc_failed, $full_name;
+		}
+		$i++;
+	}
+	
+	# copy isoform taxonid and database
+	foreach my $iso (@$desc_succeeded) {
+		my $id = $iso;
+		$id =~	s/\-\d+//g;
+		$descriptions->{$iso}{taxonid} = $descriptions->{$id}{taxonid};
+		$descriptions->{$iso}{database} = $descriptions->{$id}{database};
+		if(!$descriptions->{$iso}{database} || !$descriptions->{$iso}{taxonid}){
+			delete	$descriptions->{$iso};
+			push @$desc_failed,$iso;
+		}
+	}
+	push @$length_failed,@$desc_failed;
+
+	return	$length_failed;
+}
+
 
 sub fetch_descriptions_by_accession {
     my( $self, $id_list, $descriptions, $trim_sv_flag ) = @_;
@@ -322,6 +406,7 @@ sub fetch_descriptions_by_accession {
 
         my $name_without_version = $full_name;
         $name_without_version =~ s/\.\d+$//;
+        
 
 	    my $found = 0;
 	    NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
