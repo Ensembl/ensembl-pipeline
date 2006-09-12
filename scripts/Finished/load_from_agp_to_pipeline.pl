@@ -258,16 +258,11 @@ my $seqset_info     = {};
 
 	# insert clone & contig in seq_region, seq_region_attrib, 
 	# dna and assembly tables
-	my $test_query = qq {
-			SELECT COUNT(*) FROM assembly 
-			WHERE CONCAT(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)  
-			= CONCAT(?,?,?,?,?,?,?)};
 	my $insert_query = qq {
 			INSERT IGNORE INTO assembly 
 			(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori) 
 			values 
 			(?,?,?,?,?,?,?)};
-	my $test_sth = $pipe_dba->prepare($test_query);	
 	my $insert_sth = $pipe_dba->prepare($insert_query);
 	for ( values %$contigs_hashref ) {
 		my $chr_name     = $_->[0];
@@ -336,16 +331,11 @@ my $seqset_info     = {};
 			) unless $ctg_seq_reg_id;
 		}
 		##insert chromosome to contig assembly data into assembly table
-		$test_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id, 
-			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
 		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id, 
-			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori )
-			unless ($test_sth->fetchrow_array);
+			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
 		##insert clone to contig assembly data into assembly table
-		$test_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 
-			1, $seqlen, 1 );
 		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-			$seqlen, 1 ) unless ($test_sth->fetchrow_array);
+			$seqlen, 1 );
 
 		##prime the input_id_analysis table
 		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' ) 
