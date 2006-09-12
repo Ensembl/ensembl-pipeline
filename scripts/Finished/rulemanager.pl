@@ -487,6 +487,8 @@ sub fetch_databases {
 	$db =~ s/\s//g;
 	my $path;
 	foreach my $dbname ( split( ",", $db ) ) {
+		# fetch the update file db version
+		$dbname =~ s/^embl_/emnew_/g;
 		return $db_filename{$dbname} if($db_filename{$dbname});
 		$path = $dbname;
 		unless ( $dbname =~ m!^/! ) {
