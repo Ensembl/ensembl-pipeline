@@ -124,9 +124,9 @@ if ($dump){
 check_exdb($final_db);
 check_meta($sdb,$final_db);
 
-print "fetching and lazy loading new predictions...\n";
+print "fetching and lazy-loading new predictions...\n";
 my $new_hash = fetch_genes($sga,$biotype,$fbs);
-print "\nfetching and lazy loading old predictions...\n";
+print "\nfetching and lazy-loading old predictions...\n";
 my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 
 print "\nFound ".scalar(keys %$new_hash)." new predictions\n";
@@ -134,7 +134,7 @@ print "Found ".scalar(keys %$old_hash)." old predictions\n";
 
 $analysis = $final_aa->fetch_by_logic_name("ncRNA");
 unless ($analysis){
-  print "$final_db needs a ncRNA analysis object, loading one\n";
+  print "$final_dbname needs a ncRNA analysis object, loading one\n";
   $analysis = $saa->fetch_by_logic_name("ncRNA");
   die ("ncRNA analysis not found\n") unless $analysis;
   $final_aa->store($analysis);
@@ -253,12 +253,16 @@ sub overlaps {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
+	if($biotype & $overlap->biotype ne $biotype){
+	  warn("The non coding gene overlapping yours is of a different type, so it won't get deleted: $biotype vs ".$overlap->biotype." not transferring this stable id \n");
+	  next GENE;
+	}
 	# catch problem where you have multiple overlapping ncRNAs, maybe you can manually delete one
 	# so that it transfers the correct stable_id
 	if ($noncoding{$gene->dbID}){
 	  warn("Something fishy is going on here I have more than one non coding overlap for this gene".
 	       $gene->dbID." ".$gene->seq_region_name." ".$gene->start.":".$gene->end.":".$gene->strand.
-	       " overlaps\nA: ".$noncoding{$gene->dbID}." ".$noncoding{$gene->dbID}->biotype."\nB: ".
+	       " overlaps\nA: ".$noncoding{$gene->dbID}->dbID." ".$noncoding{$gene->dbID}->biotype."\nB: ".
 	       $overlap->dbID." ".$overlap->biotype."\n");
 	  print "Do you want to transfer the stable id of A or B?";
 	  my $reply = <>;
@@ -367,19 +371,27 @@ sub stable_id_mapping {
 sub generate_new_ids{
   my ($ncRNAs,$ga,$list,$last_session) = @_;
   my ($gsp,$gsi,$tsp,$tsi,$esp,$esi);
-  if (sql("SELECT max(stable_id) from gene_stable_id;",$ga)->[0] =~ /^(\D+)(\d+)$/){
+  # ensembl_ids all have 11 numbers at the end and an indeterminate number of letters at the start
+  
+  if (sql("SELECT max(stable_id) from gene_stable_id ;",$ga)->[0] =~ /^(\D+)(\d+)$/){
     $gsp = $1;
     $gsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from transcript_stable_id;",$ga)->[0] =~ /^(\D+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from transcript_stable_id ;",$ga)->[0] =~ /^(\D+)(\d+)$/){
     $tsp = $1;
     $tsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from exon_stable_id;",$ga)->[0] =~ /^(\D+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from exon_stable_id ;",$ga)->[0] =~ /^(\D+)(\d+)$/){
     $esp = $1;
     $esi = $2;
   }
-  die("Cannot figure out how to make new stable ids\n") unless ($gsp && $gsi && $tsp && $tsi && $esp && $esi);
+    unless ($gsp && $gsi && $tsp && $tsi && $esp && $esi){
+    print "Cannot figure out how to make new stable ids\nHave got :";
+    print sql("SELECT max(stable_id) from gene_stable_id ;",$ga)->[0];
+    print " ".sql("SELECT max(stable_id) from transcript_stable_id ;",$ga)->[0];
+    print " ".sql("SELECT max(stable_id) from exon_stable_id ;",$ga)->[0]."\n";;
+    die();
+  }
   foreach my $ncRNA_id (keys %$ncRNAs){
     next if $list->{$ncRNA_id};
     my $gene = $ncRNAs->{$ncRNA_id};
@@ -406,7 +418,8 @@ sub generate_new_ids{
 
 sub delete_genes {
   my ($old_hash,$ga) = @_;
-  print STDERR "Warning you have not specified a biotype *ALL* ncRNAs will be deleted\n";
+  return if scalar(keys %$old_hash) == 0;
+  print STDERR "Warning you have not specified a biotype *ALL* ncRNAs will be deleted\n" unless ($biotype);
   print STDERR "Found ".scalar(keys %$old_hash)." genes  $final_dbname\nshall I delete them? (Y/N) ";
   my $reply = <>;
   chomp $reply;
@@ -439,6 +452,7 @@ sub write_genes {
     my $trans = $gene->get_all_Transcripts->[0];
     $trans->analysis($analysis);
     $trans->biotype($gene->biotype);
+    $trans->status($gene->status);
     print "Storing gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";
     $ga->store($gene);
   }
@@ -498,12 +512,12 @@ sub fetch_genes {
   if ($slice){
     my @slices = @{$final_sa->fetch_all('toplevel')};
     my $inc = scalar(@slices) / 20;
-    print "|------------------|\r|";
+    print STDERR "|------------------|\r|";
     foreach my $slice (@slices){
       $count++;
       if ($count >= $inc){
 	$count = 0;
-	print "=";
+	print STDERR "=";
       }
       if ($biotype) {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,"biotype = '".$biotype."'")};
@@ -528,7 +542,7 @@ sub fetch_genes {
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
       }
     }
-print "\n";
+  print STDERR  "\n";
   return \%ncRNA_hash;
 }
 
