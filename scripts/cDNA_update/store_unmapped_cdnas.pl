@@ -109,7 +109,7 @@ foreach my $file(@files){
 	while (my $entry = <IN>){
 		if($entry =~ m/$species/){
 			#extract & save id
-			$entry =~ /^>[\w\d]+\s([\w\.\d]+)\s.+/;
+                        $entry =~ s/^>([\w\.\d]+)\s.*\n{1}?/$1\n/;
 			if(!$1){ die "\n$file: unmatched id pattern:\n$entry\n"; }
 			$EMBL_ids{$1} = 1;
 		}
