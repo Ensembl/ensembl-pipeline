@@ -104,26 +104,26 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = "/ecs4/work3/ba1/september_co";
+my $cvsDIR               = "/nfs/acari/ba1/PerlCode/";
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
-my $dataDIR              = "/ecs2/scratch3/ba1/mus_cdna_update_Sept06"; 
+my $dataDIR              = "/ecs2/scratch3/ba1/hum_cdna_update_Sept06"; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi1";
 my $sourceDIR            = "/data/blastdb";
-my $assembly_version     = "NCBIM36"; #"NCBIM36"; #NCBI36
+my $assembly_version     = "NCBI36"; #"NCBIM36"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
-#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
-my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
+#my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
 my $user 				 = "ba1";
 my $host 				 = "ecs2";
 my $genebuild_id         = "4";
@@ -134,7 +134,7 @@ my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_upda
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
-my $chunknum             = 1500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
+my $chunknum             = 5000;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog 			 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
 my $reasons_prog		 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
@@ -147,23 +147,23 @@ my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 # reference db (current build)
-my $WB_REF_DBNAME        = "mus_musculus_core_40_36a"; #is in schema 38
+my $WB_REF_DBNAME        = "homo_sapiens_core_40_36b"; #is in schema 38
 my $WB_REF_DBHOST        = "ecs2"; 
 my $WB_REF_DBPORT        = "3365"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_mus_cdna0906_ref";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_hum_cdna0906_ref";
 my $WB_PIPE_DBHOST       = "genebuild4";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_mus_cdna0906_update";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_hum_cdna0906_update";
 my $WB_TARGET_DBHOST     = "genebuild6";
 my $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "mus_musculus_cdna_40_36a"; 
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_40_36b"; 
 my $WB_LAST_DBHOST       = "ecs2";
 my $WB_LAST_DBPORT       = "3365";  
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "mus_musculus_core_40_36a";
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_40_36b";
 my $WB_LAST_DNADBHOST    = "ecs2"; 
 my $WB_LAST_DNADBPORT    = "3365"; 
 
@@ -175,8 +175,8 @@ my $TAXONDBPORT          = "3365";
 
 
 #set the species
-my $common_species_name  = "mouse"; #"human"; #"mouse";
-my $species	      = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "human"; #"human"; #"mouse";
+my $species	      = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
 
 my $oldFeatureName     = "cDNA_update"; #for the comparison only
 
@@ -313,7 +313,7 @@ elsif($option eq "run"){
     remake_fasta_files();
 
 
-	print "\nreset the databases?(y/n) ";
+	print "\nset databases for next run?(y/n) ";
 	chomp($ans = <STDIN>);
 	if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
 		$rerun_flag = 1;
@@ -1072,7 +1072,7 @@ sub chase_jobs{
 
     			print "\nchopped up file.\n";
 	
-				print "\nreset the databases?(y/n) ";
+				print "\nset databases for next run?(y/n) ";
 				chomp($ans = <STDIN>);
 				if($ans eq "y" or $ans eq "Y" or $ans eq "yes"){
 					$rerun_flag = 1;
