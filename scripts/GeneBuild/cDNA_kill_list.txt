@@ -137,6 +137,5 @@ U16671.1 Mus musculus clone CCD43 LINE-1 element ORF1 mRNA, partial cds.	LINEs s
 U16672.1 Mus musculus clone NCD40 LINE-1 element ORF1 mRNA, partial cds.	LINEs sd3
 U47865.1 Mus musculus intracisternal A-particle U3 region mRNA.	Hit too many times sd3
 NR_003027.1	Mus musculus U6 small nuclear RNA (Rnu6)	Hit too many times (short) ba1	
-
-
-
+NM_001025085.1	Mus musculus hypothetical protein LOC545013 (LOC545013), mRNA	Hit too many times	ba1
+NM_001024706.1	us musculus hypothetical LOC432825 (LOC432825), mRNA	Hit too many times      ba1
