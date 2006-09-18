@@ -33,6 +33,8 @@ my $whitelist;
 my $count;
 my $fbs;
 my $dump;
+my $no_stable_ids;
+
 $| = 1;
 
 &GetOptions(
@@ -49,6 +51,7 @@ $| = 1;
 	    'stable:s'   => \$sids,
 	    'slice_fetch!'=> \$fbs,
 	    'dump!'      => \$dump,
+	    'no_ids!'    => \$no_stable_ids,
 	   );
 
 die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost * \n-dbport * \n-species *(1 at at time)
@@ -58,6 +61,7 @@ die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost 
 -stable* (file to put stable id mapping data in )
 -slice_fetch (fetch the genes slice at a time (quicker in some cases)
 -dump (skip all the rest and just dump the xrefs)
+-no_ids (do the load without any stable ids)
 * = essential\n")
   unless ($pass && $final_port && $final_host && $final_dbname && $sids );
 
@@ -157,12 +161,12 @@ print "Overlaps\n";
 # make blacklist of genes to drop
 my $blacklist = blacklist($overhangs,$duplications,$coding_overlaps);
 
-print "Transferring stable ids\n";
+print "Transferring stable ids\n" unless ($no_stable_ids);
 # transfer stable_ids
-my $mapping_session = stable_id_mapping($noncoding_overlaps,$old_hash,$new_hash,$blacklist);
+my $mapping_session = stable_id_mapping($noncoding_overlaps,$old_hash,$new_hash,$blacklist) unless ($no_stable_ids);
 
-print "Generating stable ids for new predictions\n";
-generate_new_ids($new_hash,$final_ga,$blacklist,$mapping_session);
+print "Generating stable ids for new predictions\n" unless ($no_stable_ids);
+generate_new_ids($new_hash,$final_ga,$blacklist,$mapping_session) unless ($no_stable_ids);
 
 # delete
 delete_genes($old_hash,$final_ga ) if $delete;
@@ -253,7 +257,7 @@ sub overlaps {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
-	if($biotype & $overlap->biotype ne $biotype){
+	if($biotype && $overlap->biotype ne $biotype){
 	  warn("The non coding gene overlapping yours is of a different type, so it won't get deleted: $biotype vs ".$overlap->biotype." not transferring this stable id \n");
 	  next GENE;
 	}
@@ -453,7 +457,7 @@ sub write_genes {
     $trans->analysis($analysis);
     $trans->biotype($gene->biotype);
     $trans->status($gene->status);
-    print "Storing gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";
+    print "Storing gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n" ;
     $ga->store($gene);
   }
   return;
