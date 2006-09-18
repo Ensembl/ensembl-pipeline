@@ -138,6 +138,8 @@ U16672.1 Mus musculus clone NCD40 LINE-1 element ORF1 mRNA, partial cds.	LINEs s
 U47865.1 Mus musculus intracisternal A-particle U3 region mRNA.	Hit too many times sd3
 NR_003027.1	Mus musculus U6 small nuclear RNA (Rnu6)	Hit too many times (short) ba1	
 NM_001025085.1	Mus musculus hypothetical protein LOC545013 (LOC545013), mRNA	Hit too many times	ba1
-NM_001024706.1	us musculus hypothetical LOC432825 (LOC432825), mRNA	Hit too many times      ba1
+NM_001024706.1	Mus musculus hypothetical LOC432825 (LOC432825), mRNA	Hit too many times      ba1
 AY598346.2 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory	ba1
 AY598347.3 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory	ba1
+NM_001040064.1 	Homo sapiens hypothetical LOC440264 (LOC440264), mRNA	Hit too many times      ba1
+NM_001025473.1 	Homo sapiens hypothetical protein LOC349196 (LOC349196), mRNA	Hit too many times      ba1
