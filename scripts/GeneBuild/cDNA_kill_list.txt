@@ -139,3 +139,5 @@ U47865.1 Mus musculus intracisternal A-particle U3 region mRNA.	Hit too many tim
 NR_003027.1	Mus musculus U6 small nuclear RNA (Rnu6)	Hit too many times (short) ba1	
 NM_001025085.1	Mus musculus hypothetical protein LOC545013 (LOC545013), mRNA	Hit too many times	ba1
 NM_001024706.1	us musculus hypothetical LOC432825 (LOC432825), mRNA	Hit too many times      ba1
+AY598346.2 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory	ba1
+AY598347.3 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory	ba1
