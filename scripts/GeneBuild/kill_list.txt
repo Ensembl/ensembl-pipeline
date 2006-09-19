@@ -34,8 +34,6 @@ Q8BZN1 17 Q8BZN1 Q8BZN1 Hypothetical tyrosine-rich region containing protein.
 Q8BNS2 19 Q8BNS2 Q8BNS2 Hypothetical protein.
 P97692 24 P97692 P97692 L1 retrotransposon ORF2 (Fragment).
 Q63778 26 Q63778 Q63778 Hypothetical 43.7 kDa protein.
-P10400 27 POL1_MOUSE P10400 Retrovirus-related POL polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease] (Fragment).
-P11369 38 POL2_MOUSE P11369 Retrovirus-related POL polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease].
 O08870 39 O08870 O08870 Putative RNA binding protein 1 (Fragment).
 P11260 40 YO11_MOUSE P11260 Hypothetical protein ORF-1137.
 Q8C1S6 88 Q8C1S6 Q8C1S6 Mouse endogenous murine leukemia virus modified polytropic provirus DNA (Fragment).
@@ -60,7 +58,6 @@ P11370 Retrovirus-related ENV polyprotein from Fv-4 locus. lec
 Q9R137 Cyclophilin A (Peptidyl-prolyl cis-trans isomerase) lec
 Q8K081 Hypothetical protein. lec
 Q9CST9 weakly similar to GAG PROTEIN (Fragment). lec
-P11367 Retrovirus-related POL polyprotein (Endonuclease) (Fragment). lec
 Q8R596 Hypothetical 4.4 kDa protein. lec
 Q8BNJ4 Transient receptor protein 7. lec
 Q60713 Reverse transcriptase. lec
@@ -133,10 +130,7 @@ Q8VIZ0 un-genewiseable - predominantly ACTG vac
 Q8VIZ1 un-genewiseable - predominantly ACTG vac
 P05790 un-genewiseable - predominantly ACTG vac
 AAN10358 crashes blast
-Q8BHB5 L1 repeat scp
 Q7TP96 Ab1-160 scp
-O08906 Reverse transcriptase (Fragment) scp
-Q9Z155 Reverse transcriptase (Fragment) scp
 Q64477 His2b protein (Histone H2B) (Fragment) scp
 Q9CTS6 9530057J20Rik protein (Fragment) scp
 Q9CRI0 ES cells cDNA, RIKEN full-length enriched library, clone:2410013L13, full insert sequence (Fragment) scp
@@ -148,18 +142,14 @@ P50709 Cryptdin-11 precursor (Fragment) scp
 O89059 QM protein (Fragment) scp
 O70416 Putative pheromone receptor V2R4 (Fragment) scp
 Q8C3Q3 Hypothetical protein (Fragment) scp
-Q7TQ37 Pol protein scp
-Q7TQ38 Gag protein scp
-O54850 Endonuclease/reverse transcriptase scp
 Q61787 ORF 2 scp
 Q61786 ORF 1 scp
 Q60712 ORF 1 protein scp
-O00172 doesnt look healthy eb
+O00172 Line element doesnt look healthy eb
 Q8TE30 HindIII repetitive element eb
 Q9Y443 HindIII repetitive element eb
 Q8N4M7 Hypothetical protein that is possibly based on a pseudogene
 NP_775848 Hypothetical protein that is possibly based on a pseudogene
-Q07826
 O60375 Hypothetical protein fragment 
 O95133 Partial protein, although now has a HUGO id
 Q8N7L3 Line element
@@ -169,7 +159,6 @@ Q14755 Line element
 Q8N281 Line element
 Q8N9G8 Line element
 Q8N212 Line element
-O00172 Line element
 Q8WY74 Line element
 Q8N929 Line element
 Q8N933 Line element
@@ -195,33 +184,19 @@ Q80SV3 Envelope polyprotein. - multiple pmatches vac
 O70313 VSAG protein. - multiple pmatches vac
 Q62460 (clone BALB3N) - multiple pmatches vac
 Q811N4 Envelope polyprotein. - multiple pmatches vac
-P10404 Retrovirus-related ENV polyprotein - multiple pmatches vac
-Q7M6U5 Pol protein (Fragment). - multiple pmatches vac
 Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase - multiple pmatches vac
-Q8C2B1 retrovirus-related pol polyprotein homolog. - multiple pmatches vac
 Q810S6 Hypothetical protein. - multiple pmatches vac
 Q62461 Q62461 (clone BALB10N). - multiple pmatches vac
 Q8R1L5 Similar to RIKEN cDNA 9030624G23 gene. - multiple pmatches vac
 Q61590 M.musculus p12 GAG gene homologue (Fragment). - multiple pmatches vac
-Q7TQ39 Gag protein. - multiple pmatches vac
 Q62458 (clone BALB14N). - multiple pmatches vac
 Q8CCG8 similar to retrovirus-related reverse transcriptase homolog. - multiple pmatches vac
 Q9D9T3 hypothetical Spindlin - multiple pmatches vac
-Q99K18 BC062922 protein (Fragment). - multiple pmatches vac
-Q8BMX1 GAG PROTEIN homolog (Fragment). - multiple pmatches vac
 Q63840 Fas antigen (Fragment). - multiple pmatches vac
 Q99JK9 0610011I04Rik protein. - multiple pmatches vac
-Q8BTS2 ANTIGEN LEC-A homolog (Fragment). - multiple pmatches vac
-Q8C4B3 hypothetical protein, full insert sequence. - multiple pmatches vac
-Q8R1U0 Hypothetical protein. - multiple pmatches vac
 Q8C0A8 hypothetical Metallo- dependent hydrolases structure containing protein - multiple pmatches vac
-Q61785 ORF2; 5' end undetermined. (Fragment). - multiple pmatches vac
-Q8CDH6 hypothetical protein - multiple pmatches vac
-Q9QUJ6 L1 element - multiple pmatches vac
-Q9R225 Mus musculus L1 retrotransposon - multiple pmatches vac
 Q9QUR4 Mus musculus L1 retrotransposon - multiple pmatches vac
 O75029 FUT1 (Fragment). - multiple pmatches vac
-Q8TE30 Hypothetical protein. - multiple pmatches vac
 O00361 P40. - multiple pmatches vac
 O00369 P40.
 Q15605 ORF1  - multiple pmatches vac
@@ -230,7 +205,6 @@ Q9BXE6 FKSG49. - multiple pmatches vac
 Q9BZ63 FKSG60. - multiple pmatches vac
 Q9BZ53 FKSG64. - multiple pmatches vac
 Q9BXE2 FKSG53. - multiple pmatches vac
-Q9P074 HSPC308 (Fragment). - multiple pmatches vac
 Q9BZ65 FKSG58. - multiple pmatches vac
 Q07826 X-linked retinopathy protein protein (Fragment). - multiple pmatches vac
 Q86YP3 Polymerase (Fragment). - multiple pmatches vac
@@ -255,7 +229,6 @@ P61575 HERV-K_8p23.1 provirus Rec protein  - multiple pmatches vac.
 P61579 HERV-K_11q22.1 provirus Rec protein.  - multiple pmatches vac.
 Q69383 HERV-K_7q22.1 provirus Rec protein   - multiple pmatches vac.
 Q9BV49 Hypothetical protein.  - multiple pmatches vac.
-Q8NF61 FLJ00326 protein (Fragment).  - multiple pmatches vac.
 Q9UBX2 Double homeobox protein DUX10.  - multiple pmatches vac.
 Q14546 Homeobox-like sequence. Part of tandem repeat (Fragment)  - multiple pmatches vac..
 Q8N747 Hypothetical protein.  - multiple pmatches vac.
@@ -270,15 +243,12 @@ Q7TPS2 15 Q7TPS2 Q7TPS2 Hypothetical protein. (for rat)
 Q80WC8 10 Q80WC8 Q80WC8 Hist1h4i protein (Fragment).(for rat)
 Q811M0 10 Q811M0 Q811M0 Hist1h4h protein (Fragment). (for rat)
 Q8BYP8 23 Q8BYP8 Q8BYP8 Mus musculus adult male hypothalamus cDNA, RIKEN full-length enriched library, clone:A230056F15 product:hypothetical Tyrosine-rich region containing protein, full insert sequence. (for rat)
-O08905 O08905 RNP particle component (Fragment). mouse transposon 
 Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
 Q63498 Q63498 Pot.ORF (Fragment). (for rat lec)
-Q61918 11 Q61918 Q61918 Pol protein (Fragment). (for rat lec)
 O70449 Putative retrovirus-related gag1 gene (matches rat - dta)
 Q8BLS1 RIKEN sequence very similar to O70449, which is a retrovirus-like gene (matches rat - dta)
 Q9CRM2 172 Q9CRM2_MOUSE Q9CRM2 Mus musculus 12 days embryo male wolffian duct includes surrounding region cDNA, RIKEN full-length enriched library, clone:6720473M11 product:weakly similar to RETROVIRUS-RELATED GAG POLYPROTEIN (Fragment). from rat retroviral protein
 Q6LCX0 1452 Q6LCX0_MOUSE Q6LCX0 Mus musculus clone CCD40 LINE-1 element ORF1 (Fragment).
-Q9QUR4 1487 Q9QUR4_MOUSE Q9QUR4 Mus musculus L1 retrotransposon, Tf subfamily L1Md-Tf19, partial sequence (Mus musculus L1 retrotransposon, Tf subfamily L1Md-Tf16, partial sequence) (Fragment).
 Q8BR13 1583 Q8BR13_MOUSE Q8BR13 Mus musculus adult male corpora quadrigemina cDNA, RIKEN full-length enriched library, clone:B230325I02 product:L1 repeat, Tf subfamily, member 29, full insert sequence. (Fragment).
 Q8BHB5 7314 Q8BHB5_MOUSE Q8BHB5 Mus musculus 12 days embryo embryonic body between diaphragm region and neck cDNA, RIKEN full-length enriched library, clone:9430076C16 product:L1 repeat, Tf subfamily, member 30, full insert sequence (Mus musculus 12 days embryo embryonic body between diaphragm region and neck cDNA, RIKEN full-length enriched library, clone:9430081H21 product:SIMILAR TO L1 REPEAT, TF SUBFAMILY, MEMBER 30 homolog).
 Q61785 103 Q61785_MOUSE Q61785 ORF2; 5' end undetermined. (Fragment).
@@ -291,7 +261,6 @@ Q8CDH6 491 Q8CDH6_MOUSE Q8CDH6 Mus musculus adult male testis cDNA, RIKEN full-l
 Q9Z155 506 Q9Z155_MOUSE Q9Z155 Reverse transcriptase (Fragment).
 NP_001005856.1 728 gi|54312064|ref|NP_001005856.1| reverse transcriptase [Mus musculus]
 P11369 898 POL2_MOUSE P11369 Retrovirus-related Pol polyprotein LINE-1 (Long interspersed element- 1) (L1) [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease].
-P11260 977 YO11_MOUSE P11260 Hypothetical protein ORF-1137.
 O08906 1222 O08906_MOUSE O08906 Reverse transcriptase (Fragment).
 O54849 1242 O54849_MOUSE O54849 Hypothetical protein.
 O54850 1304 O54850_MOUSE O54850 Endonuclease/reverse transcriptase.
@@ -304,12 +273,9 @@ P10404 13 ENV1_MOUSE P10404 Retrovirus-related Env polyprotein [Contains: Coat p
 Q80SV2 14 Q80SV2_MOUSE Q80SV2 Truncated envelope polyprotein.
 Q811J2 11 Q811J2_MOUSE Q811J2 Hypothetical protein (Fragment). like a gag pol protein (lec)
 Q8C2B1 18 Q8C2B1_MOUSE Q8C2B1 Mus musculus 2 days neonate thymus thymic cells cDNA, RIKEN full- length enriched library, clone:E430033N13 product:retrovirus-related pol polyprotein homolog.
-Q61590 21 Q61590_MOUSE Q61590 M.musculus p12 GAG gene homologue (Fragment)
 Q7TQ39 23 Q7TQ39_MOUSE Q7TQ39 Gag protein.
 Q8BMX1 24 Q8BMX1_MOUSE Q8BMX1 Mus musculus 11 days embryo whole body cDNA, RIKEN full-length enriched library, clone:2700079J08 product:GAG PROTEIN homolog (Fragment).
 P10400 31 POL1_MOUSE P10400 Retrovirus-related Pol polyprotein [Contains: Reverse transcriptase (EC 2.7.7.49); Endonuclease] (Fragment).
-Q811J2 11 Q811J2_MOUSE Q811J2 Hypothetical protein (Fragment). like gag proteins
-Q61706 14 Q61706_MOUSE Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 106. like a pol
 Q66JW8 19 Q66JW8_MOUSE Q66JW8 Hypothetical protein.
 ). like a Gag protein
 Q99K18 25 Q99K18_MOUSE Q99K18 BC005512 protein (Fragment). Pol protein
@@ -405,7 +371,6 @@ Q3UT63 176 Q3UT63.1 Q3UT63_MOUSE similar to GAG Q7R6V2_PLAYO jhv
 Q61705 161 Q61705.1 Q61705_MOUSE similar probable Pol polyprotein reverse transcriptase jhv
 NP_035003.2 1024 gi|66348093|ref|NP_035003.2| baculoviral IAP repeat-containing 1c  jhv
 Q3UNK8 27 Q3UNK8.1 Q3UNK8_MOUSE retroviral-type family profile/F- MuLV receptor-binding/Peptidase aspartic
-Q3U193 520 Q3U193.1 Q3U193_MOUSE hypothetical protein
 Q3TZR4 41 Q3TZR4.1 Q3TZR4_MOUSE product:hypothetical L1 transposable element containing protein
 Q7LZ40.1 Q7LZ40_ORYLA Hyosophorin (Fragment).	(ba1)
 Q15462 Cell surface glycoprotein (Fragment) (vac TOO MANY X)
@@ -426,41 +391,82 @@ P39194 Alu subfamily SQ sequence contamination warning entry. (vac)
 P39195 Alu subfamily SX sequence contamination warning entry. (vac)
 Q6XYC1 Q6XYC1_HUMAN LP3428 (vac multiple pmatch hits)
 Q96PI4 HERV-K_1q23.3 provirus ancestral Gag polyprotein (vac)
-P63123 HERV-K_1q23.3 provirus ancestral Pro protein
-O42043 HERV-K_1q23.3 provirus ancestral Env polyprotein
-O14749 	pol derived Reverse transcriptase [Fragment]
-O14750 pol derived Reverse transcriptase [Fragment]
-O14751 pol derived Reverse transcriptase [Fragment]
-O14752 pol derived Reverse transcriptase [Fragment]
-Q14272 Endogenous retroviral gene (HLM-2). [Fragment]
-Q1W5W7 Putative gag-pol protein
-Q330L6 Reverse transcriptase [Fragment]
-Q330L7 Reverse transcriptase [Fragment]
-Q330L8 Reverse transcriptase [Fragment]
-Q3UWB7 Gag protein homolog [Fragment]
-Q3UXZ8 GAG protein
-Q4JNY2 Pol [Fragment]
-Q330L9 Reverse transcriptase [Fragment]
-Q4JNY4 Gag [Fragment]
-Q330M0 	Reverse transcriptase [Fragment]
-Q60505 Chinese hamster provirus
-Q330M1 Reverse transcriptase [Fragment]
-Q61213 	Gag mouse
-Q04099 Pol protein [Fragment] 
-Q330M2 Reverse transcriptase [Fragment]
-Q330M3 	Reverse transcriptase [Fragment]
-Q61705 Integrase [Fragment]
-Q61706 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 106
-Q61708 	Gag protein
-Q61709 DNA for type IIB intracisternal A-particle element encoding integrase and gag
-Q7M6W3 	Pol protein [Fragment]
-Q6ZMV2 CDNA FLJ16646 fis, clone TESTI4032090
-Q6ZN85 CDNA FLJ16337 fis, clone TESTI1000266
-Q6ZQX8 	CDNA FLJ46816 fis, clone TRACH3036932
-Q71VD1 	Reverse transcriptase [Fragment]
-Q78E13 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 111. [Fragment]
-Q7M6U4 	Gag protein
-Q7M6U5 Pol protein [Fragment] 
-Q7M6W5 Gag protein
-Q7M6W6 Gag protein
-
+P63123 HERV-K_1q23.3 provirus ancestral Pro protein (vac)
+O42043 HERV-K_1q23.3 provirus ancestral Env polyprotein (vac)
+O14749 	pol derived Reverse transcriptase [Fragment] (vac)
+O14750 pol derived Reverse transcriptase [Fragment] (vac)
+O14751 pol derived Reverse transcriptase [Fragment] (vac)
+O14752 pol derived Reverse transcriptase [Fragment] (vac)
+Q14272 Endogenous retroviral gene (HLM-2). [Fragment] (vac)
+Q1W5W7 Putative gag-pol protein (vac)
+Q330L6 Reverse transcriptase [Fragment] (vac)
+Q330L7 Reverse transcriptase [Fragment] (vac)
+Q330L8 Reverse transcriptase [Fragment] (vac)
+Q3UWB7 Gag protein homolog [Fragment] (vac)
+Q4JNY2 Pol [Fragment] (vac)
+Q330L9 Reverse transcriptase [Fragment] (vac)
+Q4JNY4 Gag [Fragment] (vac)
+Q330M0 	Reverse transcriptase [Fragment] (vac)
+Q60505 Chinese hamster provirus (vac)
+Q330M1 Reverse transcriptase [Fragment] (vac)
+Q04099 Pol protein [Fragment]  (vac)
+Q330M2 Reverse transcriptase [Fragment] (vac)
+Q330M3 	Reverse transcriptase [Fragment] (vac)
+Q7M6W3 	Pol protein [Fragment] (vac)
+Q6ZMV2 CDNA FLJ16646 fis, clone TESTI4032090 (vac)
+Q6ZN85 CDNA FLJ16337 fis, clone TESTI1000266 (vac)
+Q6ZQX8 	CDNA FLJ46816 fis, clone TRACH3036932 (vac)
+Q71VD1 	Reverse transcriptase [Fragment] (vac)
+Q78E13 RNA for type IIB intracisternal A-particle (IAP) element encoding integrase, clone 111. [Fragment] (vac)
+Q7M6W6 Gag protein (vac)
+Q866Y8 Rabbit gag (fragment) (vac)
+Q8BV19 Mouse Riken, hypothetical gag protein (vac)
+Q8MJF4 Rabbit pol fragment (vac)
+Q8MJF6 Rabbit gag homologue (vac)
+Q8MJF7 Rabbit pol fragment (vac)
+Q8NB65 predicted from human cDNA, retroviral gag homologue (vac)
+Q8NFP1 Human pol fragment (vac)
+Q8NFP3 Human gag protein (vac)
+Q99J11 BC005685 protein [Fragment] - Mouse gag (vac)
+Q9ERJ1 Mouse gag fragment (vac)
+Q9GLF8 Possum pol fragment (vac)
+Q9N172 Possum pol fragment (vac)
+Q9N174 Possum gag polyprotein (vac)
+Q9N1R8 Sheep pol (vac)
+Q9N1S0 Sheep gag (vac)
+Q9QW50 Deer mouse reverse transcriptase fragment (vac)
+Q9TTD5 Sheep gag (vac)
+Q9TUZ2 Sheep reverse transcriptase fragment (vac)
+Q9TUZ4 Sheep reverse transcriptase fragment (vac)
+Q9TUZ6 Sheep reverse transcriptase fragment (vac)
+Q9XT38 Sheep reverse transcriptase fragment (vac)
+Q9XT40 Sheep reverse transcriptase fragment (vac)
+P10266 POK10_HUMAN Human HERV-K_5q33.3 provirus ancestral Pol protein I(vac)
+P10399 POL1_CHICK Chicken 	Retrovirus-related Pol polyprotein [Fragments] (vac)
+P62683 GAK1_HUMAN Human HERV-K_12q14.1 provirus ancestral Gag polyprotein (vac)
+P62684 GAK5_HUMAN Human HERV-K_19p13.11 provirus ancestral Gag polyprotein (vac)
+P62685 GAK6_HUMAN Human HERV-K_8p23.1 provirus ancestral Gag polyprotein (vac)
+P62686 GAK13_HUMAN Human HERV-K_1p13.3 provirus ancestral Gag polyprotein (vac)
+P62687 GAK14_HUMAN Human HERV-K_16p3.3 provirus ancestral Gag polyprotein (vac)
+P62688 GAK15_HUMAN Human HERV-K_3q21.2 provirus ancestral Gag polyprotein (vac)
+P62689 GAK17_HUMAN HERV-K_11q22.1 provirus ancestral Gag polyprotein (vac)
+P62690 GAK18_HUMAN HERV-K_22q11.23 provirus ancestral Gag polyprotein (vac)
+P62691 GAK19_HUMAN HERV-K_4p16.1 provirus ancestral Gag polyprotein (vac)
+P63126 GAK4_HUMAN HERV-K_6q14.1 provirus ancestral Gag polyprotein (vac)
+P63128 POK4_HUMAN HERV-K_6q14.1 provirus ancestral Pol protein (vac)
+P63130 GAK12_HUMAN HERV-K_1q22 provirus ancestral Gag polyprotein (vac)
+P63132 POK5_HUMAN HERV-K_19p13.11 provirus ancestral Pol protein (vac)
+P63133 POK6_HUMAN HERV-K_8p23.1 provirus ancestral Pol protein (vac)
+P63134 POK9_HUMAN HERV-K_5q13.3 provirus ancestral Pol protein (vac)
+P63136 POK17_HUMAN HERV-K_11q22.1 provirus ancestral Pol protein (vac)
+P63145 GAK11_HUMAN HERV-K_22q11.21 provirus ancestral Gag polyprotein (vac)
+P87889 GAK10_HUMAN HERV-K_5q33.3 provirus ancestral Gag polyprotein (vac)
+P87893 POK11_HUMAN HERV-K_22q11.21 provirus ancestral Pol protein (vac)
+Q7LDI9 GAK2_HUMAN HERV-K_7p22.1 provirus ancestral Gag polyprotein (vac)
+Q9BXR3 POK2_HUMAN HERV-K_7p22.1 provirus ancestral Pol protein (vac)
+Q9HDB9 GAK8_HUMAN HERV-K_3q12.3 provirus ancestral Gag polyprotein (vac)
+Q9QC07 POK7_HUMAN HERV-K_1q23.3 provirus ancestral Pol protein (vac)
+Q9UKH8 GAK9_HUMAN HERV-K_5q13.3 provirus ancestral Gag polyprotein (vac)
+Q9UQG0 POK20_HUMAN HERV-K_3q27.3 provirus ancestral Pol protein (vac)
+Q9WJR5 POK3_HUMAN HERV-K_19q12 provirus ancestral Pol protein (vac)
+Q9YNA8 GAK3_HUMAN HERV-K_19q12 provirus ancestral Gag polyprotein (vac)
