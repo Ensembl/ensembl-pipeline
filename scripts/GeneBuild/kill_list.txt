@@ -178,7 +178,6 @@ NP_899143.1 hypothetical protein - multiple pmatches vac
 Q8C0W2 Mus musculus adult male testis cDNA - multiple pmatches vac
 NP_035152.1 ovary testis transcribed - multiple pmatches vac
 Q62012 Ott protein. - multiple pmatches vac
-Q7M6U6 Pro protein (Fragment). - multiple pmatches vac
 Q62478 XMR protein (Hypothetical protein) - multiple pmatches vac
 Q80SV3 Envelope polyprotein. - multiple pmatches vac
 O70313 VSAG protein. - multiple pmatches vac
@@ -381,7 +380,6 @@ P39194 Alu subfamily SQ sequence contamination warning entry. (vac)
 P39195 Alu subfamily SX sequence contamination warning entry. (vac)
 Q6XYC1 Q6XYC1_HUMAN LP3428 (vac multiple pmatch hits)
 Q96PI4 HERV-K_1q23.3 provirus ancestral Gag polyprotein (vac)
-P63123 HERV-K_1q23.3 provirus ancestral Pro protein (vac)
 Q3UWB7 Gag protein homolog [Fragment] (vac)
 Q4JNY4 Gag [Fragment] (vac)
 Q60505 Chinese hamster provirus (vac)
@@ -511,3 +509,27 @@ Q9UKH3 ENK4_HUMAN HERV-K_6q14.1 provirus ancestral Env polyprotein precursor (va
 Q9UKH7 ENK9_HUMAN HERV-K_5q13.3 provirus ancestral Env polyprotein precursor (vac)
 Q9UQG0 POK20_HUMAN HERV-K_3q27.3 provirus ancestral Pol protein (vac)
 Q9WJR5 POK3_HUMAN HERV-K_19q12 provirus ancestral Pol protein (vac)
+Q6UDQ4 Q6UDQ4_CAPHI Gag-pro fusion (Fragment). (vac)
+Q7M6U6 Q7M6U6_MOUSE Pro protein (Fragment). (vac)
+Q7M6W4 Q7M6W4_MOUSE Pro protein (Fragment). (vac)
+Q866Y7 Q866Y7_RABIT Protease (Fragment). (vac)
+Q8MJF5 Q8MJF5_RABIT Pro protein. (vac)
+Q8MJF8 Q8MJF8_RABIT Pro protein (Fragment). (vac)
+Q8NFP2 Q8NFP2_HUMAN Pro protein (Fragment). (vac)
+Q9JIA4 Q9JIA4_MOUSE Protease (Fragment). (vac)
+Q9JIA5 Q9JIA5_MOUSE Protease (Fragment). (vac)
+Q9N173 Q9N173_TRIVU Protease (Fragment). (vac)
+Q9N1R9 Q9N1R9_SHEEP Pro. (vac)
+P10265 VPK10_HUMAN HERV-K_5q33.3 provirus ancestral Pro protein  (vac)
+P63119 VPK1_HUMAN HERV-K_12q14.1 provirus ancestral Pro protein  (vac)
+P63120 VPK3_HUMAN HERV-K_19q12 provirus ancestral Pro protein  (vac)
+P63121 VPK5_HUMAN HERV-K_19p13.11 provirus ancestral Pro protein  (vac)
+P63122 VPK6_HUMAN HERV-K_8p23.1 provirus ancestral Pro protein  (vac)
+P63123 VPK7_HUMAN HERV-K_1q23.3 provirus ancestral Pro protein  (vac)
+P63124 VPK9_HUMAN HERV-K_5q13.3 provirus ancestral Pro protein  (vac)
+P63125 VPK17_HUMAN HERV-K_11q22.1 provirus ancestral Pro protein  (vac)
+P63127 VPK4_HUMAN HERV-K_6q14.1 provirus ancestral Pro protein  (vac)
+P63129 VPK11_HUMAN HERV-K_22q11.21 provirus ancestral Pro protein (vac)
+P63131 VPK12_HUMAN HERV-K_1q22 provirus ancestral Pro protein  (vac)
+Q9Y6I0 VPK2_HUMAN HERV-K_7p22.1 provirus ancestral Pro protein  (vac)
+Q95K62 Q95K62_MACFA Hypothetical protein. (vac)
