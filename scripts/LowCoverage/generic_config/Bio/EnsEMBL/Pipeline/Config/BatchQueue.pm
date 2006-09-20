@@ -51,6 +51,8 @@ use vars qw(%Config);
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
   DEFAULT_OUTPUT_DIR  => $LC_scratchDIR."raw_computes",
   DEFAULT_CLEANUP     => 'no',	
+  DEFAULT_VERBOSITY   => 'WARNING',
+
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 100000, # at this number of jobs RuleManager will sleep for 
                       # a certain period of time if you effectively want this never to run set 
