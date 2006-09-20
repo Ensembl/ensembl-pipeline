@@ -10,7 +10,7 @@ Bio::EnsEMBL::Pipeline::DBSQL::Finished::StateinfoContainer
 
 =head1 SYNOPSIS
 
-my $dbobj = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+my $dbobj = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
 	-host   => $dbhost,
 	-dbname => $dbname,
 	-user   => $dbuser,
