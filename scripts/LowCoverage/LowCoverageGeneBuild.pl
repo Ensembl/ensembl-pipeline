@@ -92,202 +92,190 @@ if(!$comm or ($comm ne "setup" && $comm ne "check_seqs" && $comm ne "run_RepeatM
 set_env(1);
 
 if ($comm eq "setup"){
-#
-# 
-#  #Get files  
-#  print STDERR "\nPreparing for setup... Please check that you have:\n".
-#        "- updated your CVS\n".
-#	    "- Manually downloaded assembly and repeat data (see README)".
-#        "- modified LowCoverageGeneBuildConf.pm\n".
-#		"- ssh bc-dev-64\n";
-#
-#
-#  #Make config dir in ensembl-config:
-#  print STDERR "\n>> Making config dir in $LC_cvsDIR...\n";
-#  config_setup();  
-#  
-#  #Creating new db
-#  print STDERR "Would you like to DROP DATABASE -D $LC_DBNAME -h $LC_DBHOST -P $LC_DBPORT if it exists? \nyes or no:";
-#  my $drop = <STDIN>;  
-#  if ($drop =~ /yes/i){
-#    createDB();
-#  } else {
-#    print STDERR "You chose not to drop the database\n";
-#    exit 1;
-#  }
-#  
-#
-#   
-#  #Loading assembly
-#  #Firstly, load the sequence in the given file (assembly.bases) into the database under a coord system called contig
-#  print STDERR "\nLoading sequence in $LC_ASSEMBLY into $LC_DBNAME...\n";
-#  $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
-#         "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
-#         "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY";  
-#   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
-#                "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
-#                "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY\n";
-#  if(system($cmd)){
-#    die "\nError with first load_seq_region\n";
-#    exit 1;
-#  } else {
-#    print STDERR "First load_seq_region successful\n";
-#  }
-#   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
-#  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 1st seq_regions\n";
-#    
-#  
-#  #Secondly, load the assembled pieces from the agp file into the seq_region table
-#  print STDERR "\n>> Loading assembled pieces from agp file into seq_region table...\n";
-#   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
-#                "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
-#                "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";
-#  $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
-#         "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
-#         "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";  
-#  if(system($cmd)){
-#    die "\nError with second load_seq_region\n";
-#    exit 1;
-#  } else {
-#    print STDERR "Second load_seq_region successful\n";
-#  }  
-#   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
-#  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 2nd seq_regions\n";  
-#  
-#  #A couple of checks and changes:
-#  print STDERR "mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'\n";
-#  system("mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'") 
-#         && warn "\nError with SELECT * from coord_system\n- -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT\n";    
-#
-#  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"sequence_level,default_version\" WHERE coord_system_id=1'") 
-#         && warn "\nError with UPDATE coord_system\n";  
-#  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"default_version\" WHERE coord_system_id=2'") 
-#         && warn "\nError with UPDATE coord_system\n";    
-#  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET version=NULL WHERE coord_system_id=1'") 
-#         && warn "\nError with UPDATE coord_system\n";  
-#  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')\"") 
-#           && warn "\nError with INSERT INTO meta\n";
-#  
-#
-#  #Loading a standard agp file into the assembly table
-#  print STDERR "\n>> Loading agp file into the assembly table...\n";
-#  print STDERR "bsub -q normal -o $LC_workDIR/assembly/load_agp.log $LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
-#               "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
-#               "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP\n";
-#  $cmd = "bsub -q normal -o $LC_workDIR/assembly/load_agp.log ".
-#         "$LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl -dbhost $LC_DBHOST -dbuser ".
-#         "$LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
-#	 "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP"; 
-#  if(system($cmd)){
-#    die "\nError with load_agp.log\n";
-#    exit 1;
-#  } else {
-#    print STDERR "Submitted to bsub: load_agp.log\n\n";
-#  }  
-#
-# #insert a break or sleep here to wait for bsub
-#  print STDERR "You need to wait for the job on the farm to be completed before you can continue.\n".
-#                "To check if the job is finished, type 'bjobs' in another window.\n".
-#		"WHEN THE JOB IS FINISHED, type 'yes':";
-#  $input = <STDIN>;  
-#  while ($input !~ /yes/i){
-#    print STDERR "\nType yes when you are ready to continue...  : ";
-#    $input = <STDIN>;
-#  }		
-#
-#  print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'\n";
-#  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'") && warn "\nCan't count assembly\n";  
-#    	
-#	  
-#  #Flag the set of non-redundant seq_regions as 'toplevel'.  
-#  print STDERR "\n>> Setting toplevel...\n";
-#  print STDERR "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
-#               " -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS \n";
-#  $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
-#  "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
-#  if(system($cmd)){
-#    die "\nError submitting set_toplevel\n";
-#    exit 1;
-#  } else {
-#    print STDERR "Submitted to bsub: set_toplevel";
-#  }  
-#
-#  #insert a break or sleep here to wait for bsub
-#  print STDERR "You need to wait for the 2nd job on the farm to be completed before you can continue.\n".
-#                "To check if the job is finished, type 'bjobs' in another window.\n".
-#		"WHEN THE JOB IS FINISHED, type 'yes':";
-#  $input = <STDIN>;  
-#  while ($input !~ /yes/i){
-#    print STDERR "\nType yes when you are ready to continue...  : ";
-#    $input = <STDIN>;
-#  }
-#          
-#      
-#  
-#  #Setting up the analysis and rule tables
-#  print STDERR "\n>> Setting up the analysis and rule tables...\n";
-#  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/analysis_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/analysis.conf";
-#  if(system($cmd)){
-#    die "\nError with analysis_setup\n\n";
-#    exit 1;
-#  }    
-#  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/rule_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/rule.conf";
-#  if(system($cmd)){
-#    die "\nError with rule_setup\n\n";
-#    exit 1;
-#  }  
-#  
-#  
-#  #checking the setup of analysis, rule, rule_goal, rule_condition and meta tables
-#  print STDERR "\n>> Checking the setup of analysis, rule, rule_goal, rule_condition and meta tables...\n";
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis_id, logic_name, program_file FROM analysis'") 
-#         && warn "\nProblem with MySQL query (analysis table)\n";
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis.analysis_id, input_id_type_analysis.input_id_type, analysis.logic_name, analysis.program_file FROM analysis, input_id_type_analysis WHERE analysis.analysis_id=input_id_type_analysis.analysis_id'") 
-#         && warn "\nProblem with MySQL query (analysis & input_id_analysis table)\n";
-#  
-#  system("$LC_cvsDIR/ensembl-pipeline/scripts/RuleHandler.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBro -dbport $LC_DBPORT -rules") 
-#         && warn "\nProblem with RuleHandler\n";
-#  
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_goal'") 
-#         && warn "\nProblem with MySQL query (rule_goal table)\n";
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_conditions'") 
-#         && warn "\nProblem with MySQL query (rule_condition)\n";
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta'") 
-#         && warn "\nProblem with MySQL query (meta table)\n";
-#
-#  print STDERR "Now loading the analysis descriptions table\n";			  
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e ".
-#      "'select distinct(analysis.logic_name),analysis.analysis_id from repeat_feature, analysis where repeat_feature.analysis_id=analysis.analysis_id'");
-#
-#  #Load analysis descriptions
-#  print STDERR "\nLoading analysis_description...\n";
-#  system("perl $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl ".
-#        		 "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbhost $LC_DBHOST -dbport $LC_DBPORT ".
-#				 "-dbname $LC_DBNAME $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions");
-#
-#  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select logic_name, description from analysis left join analysis_description on analysis.analysis_id = analysis_description.analysis_id'") 
-#         && warn "\nProblem with MySQL query (analysis_description table)\n";
-#  print STDERR "All of your analyses should have descriptions (except for SubmitContig)-\n".
-#  		"if not, insert descriptions into $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions\n".
-#		"and run $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl\n"; #copy above command  
-#
-#  #Load taxonomy and other info into meta table
-##  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('assembly.default',$LC_DEFAULT)\"")
-##           && warn "\nProblem with loading assembly default\n";
-##  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.taxonomy_id',$LC_TAX_ID)\"")
-##           && warn "\nProblem with loading taxonomy id\n";
-##  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.common_name',$LC_COMMON)\"")
-##           && warn "\nProblem with loading common name\n";		   	   
-##  foreach my $meta_info (@{$LC_TAXONOMY}) {	
-##  system("mysql -h $LC_DBHOST -u $LC_DBUSER -P $LC_DBPORT -p $LC_DBPASS -D $LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('species.classification',$meta_info\"")
-##           && warn "\nProblem with loading classification\n";       
-##  }
-# 
-  #load taxonomy into meta table using local script:
+
+ 
+  #Get files  
+  print STDERR "\nPreparing for setup... Please check that you have:\n".
+        "- updated your CVS\n".
+	    "- Manually downloaded assembly and repeat data (see README)".
+        "- modified LowCoverageGeneBuildConf.pm\n".
+		"- ssh bc-dev-64\n";
+
+
+  #Make config dir in ensembl-config:
+  print STDERR "\n>> Making config dir in $LC_cvsDIR...\n";
+  config_setup();  
+  
+  #Creating new db
+  print STDERR "Would you like to DROP DATABASE -D $LC_DBNAME -h $LC_DBHOST -P $LC_DBPORT if it exists? \nyes or no:";
+  my $drop = <STDIN>;  
+  if ($drop =~ /yes/i){
+    createDB();
+  } else {
+    print STDERR "You chose not to drop the database\n";
+    exit 1;
+  }
+  
+
+   
+  #Loading assembly
+  #Firstly, load the sequence in the given file (assembly.bases) into the database under a coord system called contig
+  print STDERR "\nLoading sequence in $LC_ASSEMBLY into $LC_DBNAME...\n";
+  $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
+         "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
+         "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY";  
+   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
+                "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
+                "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY\n";
+  if(system($cmd)){
+    die "\nError with first load_seq_region\n";
+    exit 1;
+  } else {
+    print STDERR "First load_seq_region successful\n";
+  }
+   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 1st seq_regions\n";
+    
+  
+  #Secondly, load the assembled pieces from the agp file into the seq_region table
+  print STDERR "\n>> Loading assembled pieces from agp file into seq_region table...\n";
+   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
+                "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
+                "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";
+  $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
+         "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
+         "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";  
+  if(system($cmd)){
+    die "\nError with second load_seq_region\n";
+    exit 1;
+  } else {
+    print STDERR "Second load_seq_region successful\n";
+  }  
+   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 2nd seq_regions\n";  
+  
+  #A couple of checks and changes:
+  print STDERR "mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'\n";
+  system("mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'") 
+         && warn "\nError with SELECT * from coord_system\n- -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT\n";    
+
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"sequence_level,default_version\" WHERE coord_system_id=1'") 
+         && warn "\nError with UPDATE coord_system\n";  
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"default_version\" WHERE coord_system_id=2'") 
+         && warn "\nError with UPDATE coord_system\n";    
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET version=NULL WHERE coord_system_id=1'") 
+         && warn "\nError with UPDATE coord_system\n";  
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')\"") 
+           && warn "\nError with INSERT INTO meta\n";
+  
+
+  #Loading a standard agp file into the assembly table
+  print STDERR "\n>> Loading agp file into the assembly table...\n";
+  print STDERR "bsub -q normal -o $LC_workDIR/assembly/load_agp.log $LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
+               "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
+               "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP\n";
+  $cmd = "bsub -q normal -o $LC_workDIR/assembly/load_agp.log ".
+         "$LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl -dbhost $LC_DBHOST -dbuser ".
+         "$LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
+	 "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP"; 
+  if(system($cmd)){
+    die "\nError with load_agp.log\n";
+    exit 1;
+  } else {
+    print STDERR "Submitted to bsub: load_agp.log\n\n";
+  }  
+
+ #insert a break or sleep here to wait for bsub
+  print STDERR "You need to wait for the job on the farm to be completed before you can continue.\n".
+                "To check if the job is finished, type 'bjobs' in another window.\n".
+		"WHEN THE JOB IS FINISHED, type 'yes':";
+  $input = <STDIN>;  
+  while ($input !~ /yes/i){
+    print STDERR "\nType yes when you are ready to continue...  : ";
+    $input = <STDIN>;
+  }		
+
+  print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'") && warn "\nCan't count assembly\n";  
+    	
+	  
+  #Flag the set of non-redundant seq_regions as 'toplevel'.  
+  print STDERR "\n>> Setting toplevel...\n";
+  print STDERR "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
+               " -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS \n";
+  $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
+  "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
+  if(system($cmd)){
+    die "\nError submitting set_toplevel\n";
+    exit 1;
+  } else {
+    print STDERR "Submitted to bsub: set_toplevel";
+  }  
+
+  #insert a break or sleep here to wait for bsub
+  print STDERR "You need to wait for the 2nd job on the farm to be completed before you can continue.\n".
+                "To check if the job is finished, type 'bjobs' in another window.\n".
+		"WHEN THE JOB IS FINISHED, type 'yes':";
+  $input = <STDIN>;  
+  while ($input !~ /yes/i){
+    print STDERR "\nType yes when you are ready to continue...  : ";
+    $input = <STDIN>;
+  }
+          
+      
+  
+  #Setting up the analysis and rule tables
+  print STDERR "\n>> Setting up the analysis and rule tables...\n";
+  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/analysis_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/analysis.conf";
+  if(system($cmd)){
+    die "\nError with analysis_setup\n\n";
+    exit 1;
+  }    
+  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/rule_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/rule.conf";
+  if(system($cmd)){
+    die "\nError with rule_setup\n\n";
+    exit 1;
+  }  
+  
+  
+  #checking the setup of analysis, rule, rule_goal, rule_condition and meta tables
+  print STDERR "\n>> Checking the setup of analysis, rule, rule_goal, rule_condition and meta tables...\n";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis_id, logic_name, program_file FROM analysis'") 
+         && warn "\nProblem with MySQL query (analysis table)\n";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis.analysis_id, input_id_type_analysis.input_id_type, analysis.logic_name, analysis.program_file FROM analysis, input_id_type_analysis WHERE analysis.analysis_id=input_id_type_analysis.analysis_id'") 
+         && warn "\nProblem with MySQL query (analysis & input_id_analysis table)\n";
+  
+  system("$LC_cvsDIR/ensembl-pipeline/scripts/RuleHandler.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBro -dbport $LC_DBPORT -rules") 
+         && warn "\nProblem with RuleHandler\n";
+  
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_goal'") 
+         && warn "\nProblem with MySQL query (rule_goal table)\n";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_conditions'") 
+         && warn "\nProblem with MySQL query (rule_condition)\n";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta'") 
+         && warn "\nProblem with MySQL query (meta table)\n";
+
+  print STDERR "Now loading the analysis descriptions table\n";			  
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e ".
+      "'select distinct(analysis.logic_name),analysis.analysis_id from repeat_feature, analysis where repeat_feature.analysis_id=analysis.analysis_id'");
+
+  #Load analysis descriptions
+  print STDERR "\nLoading analysis_description...\n";
+  system("perl $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl ".
+        		 "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbhost $LC_DBHOST -dbport $LC_DBPORT ".
+				 "-dbname $LC_DBNAME $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions");
+
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select logic_name, description from analysis left join analysis_description on analysis.analysis_id = analysis_description.analysis_id'") 
+         && warn "\nProblem with MySQL query (analysis_description table)\n";
+  print STDERR "All of your analyses should have descriptions (except for SubmitContig)-\n".
+  		"if not, insert descriptions into $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions\n".
+		"and run $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl\n"; #copy above command  
+
+  #Load taxonomy and other info into meta table
   system("perl $LC_cvsDIR/ensembl-pipeline/scripts/load_taxonomy.pl -name '$LC_NAME' -taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME -lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
 
   #load genebuild info into meta table:
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version',$LC_DATE\"")
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE'\"")
            && warn "\nProblem with loading genebuild version\n";	   	   
   system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
            && warn "\nProblem with loading genebuild id\n";	   
@@ -711,16 +699,20 @@ sub config_setup{
            && warn "\nProblem with making Pipeline $dir in config setup\n";
    }	   
 
+   system("mkdir -p $ensconfDIR/Bio/EnsEMBL/Analysis/Config/")
+           && warn "\nProblem with making Analysis in config setup\n";
+
    system ("mkdir -p $ensconfDIR/pipe_conf")
    	   && warn "\nProblem with making pipe_conf in config setup\n";
 
-   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/* $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/");
+   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/*.pm $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/");
    
    foreach my $dir (@pipe_dirs){
-       system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/$dir/* $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/$dir/");
+       system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/$dir/*.pm $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/$dir/");
    }
 
-   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/pipe_conf/* $ensconfDIR/pipe_conf/");
+   system("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Analysis/Config/*.pm $ensconfDIR/Bio/EnsEMBL/Analysis/Config/");
+   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/pipe_conf/*.pm $ensconfDIR/pipe_conf/");
 
 	#have removed the warnings from "cp" because it warns you that it doesn't copy CVS - but that's a good thing 
 	
