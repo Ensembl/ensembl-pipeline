@@ -224,9 +224,7 @@ sub write_descriptions {
     my( $self, $dbobj, $id_list, $chunk_size ) = @_;
 
     $chunk_size ||= 200;
-
 	my ($descriptions,$failed) = $self->fetch_descriptions($id_list, $chunk_size);
-
     my $sth = $self->prepare_hit_desc_sth($dbobj);
 	for my $accession (keys %$descriptions) {
 		my @desc = map { $descriptions->{$accession}{$_}; } ('description','length','taxonid','database');
@@ -252,11 +250,10 @@ sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
     
 	my $descriptions = {};	# results are stored here
-	
 	# split protein isoform ids and normal ids 
 	my $ids_iso = [];
 	my $ids_no_iso = [];
-	my %single_ids = {};
+	my %single_ids;
 	foreach (@$id_list) {
 		my $id = $_;
 		if(/\-\d+/) {
@@ -290,7 +287,6 @@ sub fetch_descriptions {
         my $failed_desc = $self->fetch_descriptions_by_accession($succeeded_arch_len, $descriptions, 1);
         push @$failed_second_pass, @$failed_arch_len, @$failed_desc;
     }
-    
     # get isoform ids descriptions
 	my $failed_isoforms = [];
     for (my $i = 0; $i < @$ids_iso; $i += $chunk_size) {
