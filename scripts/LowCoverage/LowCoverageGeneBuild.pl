@@ -275,7 +275,7 @@ if ($comm eq "setup"){
   system("perl $LC_cvsDIR/ensembl-pipeline/scripts/load_taxonomy.pl -name '$LC_NAME' -taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME -lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
 
   #load genebuild info into meta table:
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE'\"")
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE')\"")
            && warn "\nProblem with loading genebuild version\n";	   	   
   system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
            && warn "\nProblem with loading genebuild id\n";	   
