@@ -126,6 +126,7 @@ while (1) {
 ## methods
 
 sub termhandler {
+	print "Flushing the batch queues ....\n" if $verbose;
 	&flush_batch();
 	print "Exit DQdequeuer ....\n" if $verbose;
 	exit 0;
@@ -135,11 +136,12 @@ sub termhandler {
 sub flush_batch {
 	foreach my $host ( keys %$db_adaptors ) {
 		foreach my $dbname ( keys %{ $db_adaptors->{$host} } ) {
+			print "\tpipeline $host -> $dbname\n" if $verbose;
 			my $job_adaptor =
 			  $db_adaptors->{$host}->{$dbname}->get_JobAdaptor();
-			my ($a_job) = $job_adaptor->fetch_by_Status("CREATED");
+			my ($a_job) = $job_adaptor->fetch_by_Status("CREATED",1,1);
 			if ($a_job) {
-				$a_job->flush_runs($job_adaptor);
+				$a_job->flush_runs($job_adaptor,'',$verbose);
 			}
 		}
 	}
@@ -159,11 +161,13 @@ sub flush_queue {
 			if ($job) {
 				$job->priority($priority);
 				eval {
-					    print "\tBatch running job " . $job_id
-					  . " ${host}/${pipe_name} priority "
+					$submitted = $job->batch_runRemote;
+					my $location = 'LSF';
+					$location = 'BATCH' unless $submitted;  
+					    print "\t$location\tsubmitted job " . $job_id
+					  . " ${host}/${pipe_name} ".$job->analysis->logic_name."\tpriority "
 					  . $priority . "\n"
 					  if $verbose;
-					$submitted = $job->batch_runRemote;
 				};
 				if ($@) {
 					$submitted = 0;
