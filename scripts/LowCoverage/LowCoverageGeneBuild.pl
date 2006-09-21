@@ -92,22 +92,26 @@ if(!$comm or ($comm ne "setup" && $comm ne "check_seqs" && $comm ne "run_RepeatM
 set_env(1);
 
 if ($comm eq "setup"){
-
+  print STDERR "\nset-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
+               "load_taxonomy, load_analysis_descriptions.\n\n";
  
   #Get files  
   print STDERR "\nPreparing for setup... Please check that you have:\n".
         "- updated your CVS\n".
-	    "- Manually downloaded assembly and repeat data (see README)".
+        "- Manually downloaded assembly and repeat data (see README)".
         "- modified LowCoverageGeneBuildConf.pm\n".
-		"- ssh bc-dev-64\n";
+	"- ssh bc-dev-64\n";
 
 
   #Make config dir in ensembl-config:
+  #---------------------------------
   print STDERR "\n>> Making config dir in $LC_cvsDIR...\n";
   config_setup();  
   
+
   #Creating new db
-  print STDERR "Would you like to DROP DATABASE -D $LC_DBNAME -h $LC_DBHOST -P $LC_DBPORT if it exists? \nyes or no:";
+  #---------------
+  print STDERR "\n** Would you like to DROP DATABASE -D $LC_DBNAME -h $LC_DBHOST -P $LC_DBPORT if it exists? \nyes or no:";
   my $drop = <STDIN>;  
   if ($drop =~ /yes/i){
     createDB();
@@ -116,30 +120,32 @@ if ($comm eq "setup"){
     exit 1;
   }
   
-
    
   #Loading assembly
+  #----------------
   #Firstly, load the sequence in the given file (assembly.bases) into the database under a coord system called contig
-  print STDERR "\nLoading sequence in $LC_ASSEMBLY into $LC_DBNAME...\n";
+  print STDERR "\n>> Loading sequence in $LC_ASSEMBLY into $LC_DBNAME...\n";
+  print STDERR "  perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
+               "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
+               "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY\n";
   $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
          "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
          "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY";  
-   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
-                "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
-                "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY\n";
   if(system($cmd)){
     die "\nError with first load_seq_region\n";
     exit 1;
   } else {
     print STDERR "First load_seq_region successful\n";
   }
-   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
-  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 1st seq_regions\n";
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") 
+         && warn "\nCan't count 1st seq_regions\n";
     
   
   #Secondly, load the assembled pieces from the agp file into the seq_region table
+  #-------------------------------------------------------------------------------
   print STDERR "\n>> Loading assembled pieces from agp file into seq_region table...\n";
-   print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
+  print STDERR "  perl $LC_cvsDIR/ensembl-pipeline/scripts/load_seq_region.pl -dbhost $LC_DBHOST ".
                 "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ".
                 "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";
   $cmd = "perl ".$LC_cvsDIR."/ensembl-pipeline/scripts/load_seq_region.pl ".
@@ -151,27 +157,46 @@ if ($comm eq "setup"){
   } else {
     print STDERR "Second load_seq_region successful\n";
   }  
-   print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
-  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") && warn "\nCan't count 2nd seq_regions\n";  
-  
+   print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") 
+         && warn "\nCan't count 2nd seq_regions\n";  
+ 
+ 
   #A couple of checks and changes:
-  print STDERR "mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'\n";
+  #------------------------------
+  print STDERR "  mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'\n";
   system("mysql -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT  -e 'SELECT * FROM coord_system'") 
          && warn "\nError with SELECT * from coord_system\n- -D $LC_DBNAME -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT\n";    
 
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"sequence_level,default_version\" WHERE coord_system_id=1'") 
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+               "'UPDATE coord_system SET attrib 'default_version,sequence_level' WHERE coord_system_id=1\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system ".
+         "SET attrib=\"default_version,sequence_level\" WHERE coord_system_id=1'") 
          && warn "\nError with UPDATE coord_system\n";  
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET attrib=\"default_version\" WHERE coord_system_id=2'") 
+
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+               "'UPDATE coord_system SET attrib= 'default_version' WHERE coord_system_id=2'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system ".
+         "SET attrib=\"default_version\" WHERE coord_system_id=2'") 
          && warn "\nError with UPDATE coord_system\n";    
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system SET version=NULL WHERE coord_system_id=1'") 
+
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+               "'UPDATE coord_system SET version=NULL WHERE coord_system_id=1'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e 'UPDATE coord_system ".
+         "SET version=NULL WHERE coord_system_id=1'") 
          && warn "\nError with UPDATE coord_system\n";  
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')\"") 
+
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+               "'INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+         "\"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')\"") 
            && warn "\nError with INSERT INTO meta\n";
   
 
   #Loading a standard agp file into the assembly table
+  #---------------------------------------------------
   print STDERR "\n>> Loading agp file into the assembly table...\n";
-  print STDERR "bsub -q normal -o $LC_workDIR/assembly/load_agp.log $LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
+  print STDERR "  bsub -q normal -o $LC_workDIR/assembly/load_agp.log $LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
                "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
                "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP\n";
   $cmd = "bsub -q normal -o $LC_workDIR/assembly/load_agp.log ".
@@ -185,26 +210,32 @@ if ($comm eq "setup"){
     print STDERR "Submitted to bsub: load_agp.log\n\n";
   }  
 
+
  #insert a break or sleep here to wait for bsub
+ #--------------------------------------------
   print STDERR "You need to wait for the job on the farm to be completed before you can continue.\n".
                 "To check if the job is finished, type 'bjobs' in another window.\n".
 		"WHEN THE JOB IS FINISHED, type 'yes':";
   $input = <STDIN>;  
   while ($input !~ /yes/i){
-    print STDERR "\nType yes when you are ready to continue...  : ";
+    print STDERR "\n** Type yes when you are ready to continue...  : ";
     $input = <STDIN>;
   }		
 
-  print STDERR "mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'\n";
-  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'") && warn "\nCan't count assembly\n";  
+
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM assembly'") 
+         && warn "\nCan't count assembly\n";  
     	
 	  
   #Flag the set of non-redundant seq_regions as 'toplevel'.  
+  #------------------------------------------------------
   print STDERR "\n>> Setting toplevel...\n";
-  print STDERR "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
+  print STDERR "  bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
                " -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS \n";
   $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
-  "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
+         "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER ".
+         "-dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
   if(system($cmd)){
     die "\nError submitting set_toplevel\n";
     exit 1;
@@ -212,26 +243,32 @@ if ($comm eq "setup"){
     print STDERR "Submitted to bsub: set_toplevel";
   }  
 
+
   #insert a break or sleep here to wait for bsub
+  #---------------------------------------------
   print STDERR "You need to wait for the 2nd job on the farm to be completed before you can continue.\n".
                 "To check if the job is finished, type 'bjobs' in another window.\n".
 		"WHEN THE JOB IS FINISHED, type 'yes':";
   $input = <STDIN>;  
   while ($input !~ /yes/i){
-    print STDERR "\nType yes when you are ready to continue...  : ";
+    print STDERR "\n** Type yes when you are ready to continue...  : ";
     $input = <STDIN>;
   }
-          
       
   
   #Setting up the analysis and rule tables
+  #---------------------------------------
   print STDERR "\n>> Setting up the analysis and rule tables...\n";
-  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/analysis_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/analysis.conf";
+  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/analysis_setup.pl -dbname $LC_DBNAME -dbhost ".
+         "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file ".
+	 "$LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/analysis.conf";
   if(system($cmd)){
     die "\nError with analysis_setup\n\n";
     exit 1;
   }    
-  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/rule_setup.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file $LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/rule.conf";
+  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/rule_setup.pl -dbname $LC_DBNAME -dbhost ".
+         "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file ".
+	 "$LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/rule.conf";
   if(system($cmd)){
     die "\nError with rule_setup\n\n";
     exit 1;
@@ -239,52 +276,86 @@ if ($comm eq "setup"){
   
   
   #checking the setup of analysis, rule, rule_goal, rule_condition and meta tables
+  #---------------------------------------------------------------------------------
   print STDERR "\n>> Checking the setup of analysis, rule, rule_goal, rule_condition and meta tables...\n";
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT ".
+               "analysis_id, logic_name, program_file FROM analysis'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis_id, logic_name, program_file FROM analysis'") 
          && warn "\nProblem with MySQL query (analysis table)\n";
-  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis.analysis_id, input_id_type_analysis.input_id_type, analysis.logic_name, analysis.program_file FROM analysis, input_id_type_analysis WHERE analysis.analysis_id=input_id_type_analysis.analysis_id'") 
+
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis.analysis_id, ".
+               "input_id_type_analysis.input_id_type, analysis.logic_name, analysis.program_file FROM analysis, input_id_type_analysis ".
+	       "WHERE analysis.analysis_id=input_id_type_analysis.analysis_id'\n" ;
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'SELECT analysis.analysis_id, ".
+         "input_id_type_analysis.input_id_type, analysis.logic_name, analysis.program_file FROM analysis, ".
+	 "input_id_type_analysis WHERE analysis.analysis_id=input_id_type_analysis.analysis_id'")
          && warn "\nProblem with MySQL query (analysis & input_id_analysis table)\n";
-  
-  system("$LC_cvsDIR/ensembl-pipeline/scripts/RuleHandler.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBro -dbport $LC_DBPORT -rules") 
+ 
+  print STDERR "  $LC_cvsDIR/ensembl-pipeline/scripts/RuleHandler.pl -dbname $LC_DBNAME -dbhost ".
+               "$LC_DBHOST -dbuser $LC_DBro -dbport $LC_DBPORT -rules\n";
+  system("$LC_cvsDIR/ensembl-pipeline/scripts/RuleHandler.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBro -dbport $LC_DBPORT -rules")
          && warn "\nProblem with RuleHandler\n";
-  
+ 
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_goal'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_goal'") 
          && warn "\nProblem with MySQL query (rule_goal table)\n";
+
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_conditions'\n";	 
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from rule_conditions'") 
          && warn "\nProblem with MySQL query (rule_condition)\n";
+	 
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta'\n";	 
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta'") 
          && warn "\nProblem with MySQL query (meta table)\n";
 
-  print STDERR "Now loading the analysis descriptions table\n";			  
+  print STDERR "  mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e ".
+               "'select distinct(analysis.logic_name),analysis.analysis_id from repeat_feature, analysis ".
+	       "where repeat_feature.analysis_id=analysis.analysis_id'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e ".
-      "'select distinct(analysis.logic_name),analysis.analysis_id from repeat_feature, analysis where repeat_feature.analysis_id=analysis.analysis_id'");
+      "'select distinct(analysis.logic_name),analysis.analysis_id from repeat_feature, ".
+      "analysis where repeat_feature.analysis_id=analysis.analysis_id'");
+
 
   #Load analysis descriptions
-  print STDERR "\nLoading analysis_description...\n";
+  #-------------------------
+  print STDERR ">> Now loading the analysis descriptions table...\n";			  
   system("perl $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl ".
-        		 "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbhost $LC_DBHOST -dbport $LC_DBPORT ".
-				 "-dbname $LC_DBNAME $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions");
+	 "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbhost $LC_DBHOST -dbport $LC_DBPORT ".
+	 "-dbname $LC_DBNAME $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions");
 
-  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select logic_name, description from analysis left join analysis_description on analysis.analysis_id = analysis_description.analysis_id'") 
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select logic_name, ".
+         "description from analysis left join analysis_description on analysis.analysis_id = analysis_description.analysis_id'") 
          && warn "\nProblem with MySQL query (analysis_description table)\n";
-  print STDERR "All of your analyses should have descriptions (except for SubmitContig)-\n".
+  
+  print STDERR "\nAll of your analyses should have descriptions (except for SubmitContig)-\n".
   		"if not, insert descriptions into $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions\n".
 		"and run $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl\n"; #copy above command  
 
   #Load taxonomy and other info into meta table
-  system("perl $LC_cvsDIR/ensembl-pipeline/scripts/load_taxonomy.pl -name '$LC_NAME' -taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME -lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
+  print STDERR ">> Loading taxonomy and meta table information...";
+  system("perl $LC_cvsDIR/ensembl-pipeline/scripts/load_taxonomy.pl -name '$LC_NAME' ".
+         "-taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME ".
+	 "-lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
 
   #load genebuild info into meta table:
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE')\"")
-           && warn "\nProblem with loading genebuild version\n";	   	   
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
-           && warn "\nProblem with loading genebuild id\n";	   
+  #-------------------------------------- 
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
+         "meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE')\"")
+          && warn "\nProblem with loading genebuild version\n";	   	   
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
+         "meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
+          && warn "\nProblem with loading genebuild id\n";	   
 	   	   
 		   
 
   #Make input_ids 
+  #-------------
   print STDERR "\n>> Making input_ids...\n"; 
-  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/make_input_ids -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS -seq_level -logic_name SubmitContig";
+  print STDERR "  perl $LC_cvsDIR/ensembl-pipeline/scripts/make_input_ids -dbhost $LC_DBHOST ".
+               "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
+	       "-seq_level -logic_name SubmitContig\n";
+  $cmd = "perl $LC_cvsDIR/ensembl-pipeline/scripts/make_input_ids -dbhost $LC_DBHOST ".
+         "-dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS -seq_level -logic_name SubmitContig";
   if(system($cmd)){
     die "\nError with making input ids\n";
     exit 1;
@@ -304,6 +375,7 @@ if ($comm eq "setup"){
 
 
 } elsif ($comm eq "check_seqs"){
+  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME  -e 'SELECT * FROM seq_region WHERE coord_system_id=2 limit 10'\n";
   $cmd = "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME  -e 'SELECT * FROM seq_region WHERE coord_system_id=2 limit 10'";
   if(system($cmd)){
     warn "\nError with checking seq_regions\n";
@@ -312,12 +384,13 @@ if ($comm eq "setup"){
   
 
   #Choose 2 random scaffolds, in this case 1 and 1054.
+  #--------------------------------------------------
   #Ideally these scaffolds should have more than one contig each.
-  #To look for a scaffold that has more than one contig: grep 1054 assembly.agp
-  print STDERR "\nThis will only work if headers in $LC_workDIR/assembly/assembly.agp are of the format '>scaffold_123'.".
-               "Headers of the format '>scaffold_100.1-945', for example, will not work\n";
-  print STDERR "\n\nPlease check manually for 2 scaffolds that have more than one contig each.\n".
-               "eg. To see if scaffold 1054 has more than one contig, do 'grep 1054 $LC_workDIR/assembly/assembly.agp | wc -l' in a separate window\n".
+  #To look for a scaffold that has more than one contig: grep -w scaffold_1054 assembly.agp
+  print STDERR "\n  You may need to adjust the parsing of headers $LC_workDIR/assembly/assembly.agp.\n".
+               "  Headers of the format '>scaffold_100.1-945' should work\n";
+  print STDERR "\n\n** Please check manually for 2 scaffolds that have more than one contig each.\n".
+               "eg. To see if scaffold 1054 has more than one contig, do 'grep -w scaffold_1054 $LC_workDIR/assembly/assembly.agp | wc -l' in a separate window\n".
 	       "* Now please enter the two chosen scaffold numbers...\n";
   print STDERR "Enter first scaffold number:  ";
   my $number1 = <STDIN>;
@@ -333,57 +406,72 @@ if ($comm eq "setup"){
   system("mkdir -p $LC_workDIR/seqdump");
     
   $status = 0;
-  print STDERR "\nDumping scaffold $number1 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number1\n";
-  $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user $LC_DBro -port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number1." -outfile $LC_workDIR/seqdump/toplevel::scaffold_".$number1;
+  print STDERR "\n>> Dumping scaffold $number1 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number1...\n";
+  $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user $LC_DBro ".
+         "-port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number1." -outfile ".
+	 "$LC_workDIR/seqdump/toplevel::scaffold_".$number1;
   print STDERR "$cmd\n";
   $status += system($cmd);
   if($status){ warn("\nError with fetch_slice_seq.pl, scaffold $number1") }
-  print STDERR "\nDumping scaffold $number2 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number2\n";
+  
+  print STDERR "\n>> Dumping scaffold $number2 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number2...\n";
   $status = 0;
-  $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user $LC_DBro -port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number2." -outfile $LC_workDIR/seqdump/toplevel::scaffold_".$number2;
+  $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user ".
+         "$LC_DBro -port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number2.
+	 " -outfile $LC_workDIR/seqdump/toplevel::scaffold_".$number2;
+  print STDERR "$cmd\n";
   $status += system($cmd);
   if($status){ warn("\nError with fetch_slice_seq.pl, scaffold $number2") }
 
   
   #Reformat sequence to 60 characters per row
-  print STDERR "Reformatting $LC_SCAFFOLDS to 60 characters per row...\n";
+  print STDERR ">> Reformatting $LC_SCAFFOLDS to 60 characters per row...\n";
   $status = 0;
   $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/reformat_fasta.pl $LC_SCAFFOLDS > $LC_workDIR/assembly/assembly.agp.fasta.60");
   if($status){ warn("\nError with reformatting $LC_SCAFFOLDS to 60 characters per row\n") }  
  
  
   #Find the id for scaffold:
+  #-------------------------
   my %scaff_hash;
   @{$scaff_hash{$number1}} = @{find_matching_headers($number1)}; 
   @{$scaff_hash{$number2}} = @{find_matching_headers($number2)};
  
 
   #Now find the seqs:   
+  #-----------------
   if (@{$scaff_hash{$number1}} != 1) {
     print "Problem with scaffold $number1 - no hits or more than 1 hit\n";
     exit 1;
   } 
-  print STDERR "Finding fasta $scaff_hash{$number1}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60\n";
+  print STDERR ">> Finding fasta $scaff_hash{$number1}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60...\n";
   $status = 0;
-  $status += system("$LC_cvsDIR/ensembl-personal/searle//scripts/find_seq_in_fasta.pl -id $scaff_hash{$number1}[0] -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number1.".fa");
+  $status += system("$LC_cvsDIR/ensembl-personal/searle//scripts/find_seq_in_fasta.pl -id $scaff_hash{$number1}[0] ".
+                    "-file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number1.".fa");
   if($status){ warn("\nError with finding $number1\n") }
-    if (@{$scaff_hash{$number2}} != 1) {
+
+  if (@{$scaff_hash{$number2}} != 1) {
         print "Problem with scaffold $number2 - no hits or more than 1 hit\n";
 	exit 1;
     }
-  print STDERR "Finding fasta $scaff_hash{$number2}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60\n";
+  print STDERR ">> Finding fasta $scaff_hash{$number2}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60...\n";
   $status = 0;
-  $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/find_seq_in_fasta.pl -id $scaff_hash{$number2}[0] -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number2.".fa");
+  $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/find_seq_in_fasta.pl -id $scaff_hash{$number2}[0] ".
+                    "-file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number2.".fa");
   if($status){ warn("\nError with finding $number2\n") }
 
+
   #Check whether the seq in the db and the seq in the fasta file are identical:
-  print STDERR "\nDiffing scaffold $number1:\n";
+  #---------------------------------------------------------------------------
+  print STDERR "\n>> Diffing scaffold $number1...\n";
   system("diff $LC_workDIR/seqdump/scaffold_$number1.fa $LC_workDIR/seqdump/toplevel::scaffold_$number1");
   
-  print STDERR "\nDiffing scaffold $number2:\n";
+  print STDERR "\n>> Diffing scaffold $number2...\n";
   system("diff $LC_workDIR/seqdump/scaffold_$number2.fa $LC_workDIR/seqdump/toplevel::scaffold_$number2");
 
-  print STDERR "\nThe scaffolds should only differ on the header lines, the sequences should be identical.\n\nCHECK_SEQS IS FINISHED. (Now check for enough diskspace on $LC_scratchDIR, ssh into bc-dev-64, and run 'run_RepeatMask_and_independent' from there)\n";
+  print STDERR "\nThe scaffolds should only differ on the header lines, the sequences should be identical.\n\n".
+               "CHECK_SEQS IS FINISHED. (Now check for enough diskspace on $LC_scratchDIR, ssh into bc-dev-64, ".
+	       "and run 'run_RepeatMask_and_independent' from there)\n";
   
   
 } elsif ($comm eq "run_RepeatMask_and_independent"){
@@ -391,38 +479,47 @@ if ($comm eq "setup"){
   print STDERR "It is recommended that you test each of the following analyses once to check for failures:\n".
                "RepeatMask, Ab_initio_RepeatMask, Supp_RepeatMask, CpG, Dust, Eponine, TRF, tRNAscan\n\n".
 	       "An example of the command to use is:\n".
-	       "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB  -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
+	       "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB  -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
+	       "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
 	       "-logic Supp_RepeatMask -input_id contig::contig_10030:1:5096:1\n";
 
-  print STDERR "Are you ready to run the RepeatMask_and_Independent analyses? \nyes or no:";
+  print STDERR "\n** Are you ready to run the RepeatMask_and_Independent analyses? \nyes or no:";
   my $ready = <STDIN>;  
   if ($ready =~ /yes/i){
 	
-	  print STDERR "\nRulemanager will now run RepeatMask, Ab_initio_RepeatMask, Supp_RepeatMask, CpG, Dust, Eponine, TRF, tRNAscan...\n".
-            	   "See file ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out for errors.\n".
-	    	   "Don't forget to monitor your scripts.\n";
-	  system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
-        	 "-analysis RepeatMask -analysis Supp_RepeatMask -analysis Ab_initio_RepeatMask ".
-        	 "-analysis Eponine -analysis CpG -analysis Dust -analysis TRF -analysis tRNAscan ".
-		 ">& ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out ");
+    print STDERR "\nRulemanager will now run RepeatMask, Ab_initio_RepeatMask, Supp_RepeatMask, CpG, Dust, Eponine, TRF, tRNAscan...\n".
+               "See file ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out for errors.\n".
+               "Don't forget to monitor your scripts.\n";
+    system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
+         "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
+         "-analysis RepeatMask -analysis Supp_RepeatMask -analysis Ab_initio_RepeatMask ".
+         "-analysis Eponine -analysis CpG -analysis Dust -analysis TRF -analysis tRNAscan ".
+	 ">& ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out ");
 
-	  print STDERR "\n\nrun_RepeatMask_and_independent appears to be finished\nHOWEVER it is a good idea to check the jobs table "
-	              ."to ensure that all of the jobs have run\nand check ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out too\n\n"
-				  ."If there are still jobs, *wait until those which are running are finished*\nthen empty the job and job_status tables," 
-				  ." remove the pipeline lock\nand rerun 'run_RepeatMask_and_independent'\n"
-				  ."Once all of the jobs have finished you are ready to run 'compare'\n";
+    print STDERR "\n\nrun_RepeatMask_and_independent appears to be finished\nHOWEVER it is a good idea to check the jobs table "
+	      ."to ensure that all of the jobs have run\nand check ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out too\n\n"
+	      ."If there are still jobs, *wait until those which are running are finished*\nthen empty the job and job_status tables," 
+	      ." remove the pipeline lock\nand rerun 'run_RepeatMask_and_independent'\n"
+              ."Once all of the jobs have finished you are ready to run 'compare'\n";
 	  #print STDERR "\n\nrun_RepeatMask_and_independent IS FINISHED. (Now run 'compare')\n";
-   }else{
-   	  print STDERR "RepeatMask_and_independent analyses have not been run\n\n";
-	  exit;
-   }
+  }else{
+    print STDERR "RepeatMask_and_independent analyses have not been run\n\n";
+    exit;
+  }
      
 } elsif ($comm eq "compare"){  
 
-  print STDERR "\nchecking repeat types...\n";
-  system("perl $LC_workDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user $LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME");
+  print STDERR "\n>> Checking repeat types...\n";
+  print STDERR "perl $LC_workDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
+               "$LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME\n";
+  system("perl $LC_workDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
+         "$LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME");
   
+  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select analysis_id, ".
+               "logic_name, program_file from analysis'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select analysis_id, logic_name, program_file from analysis'");
+
+  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord' ");
 
   system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/RepeatMask.out ".
@@ -460,66 +557,67 @@ if ($comm eq "setup"){
 		"WHEN THE JOBS ARE FINISHED, type 'yes':";
   $input = <STDIN>;  
   while ($input !~ /yes/i){
-    print STDERR "\nType yes when you are ready to continue...  : ";
+    print STDERR "\n** Type yes when you are ready to continue...  : ";
     $input = <STDIN>;
   }
   
-  print STDERR "\nPlease compare the 'Total masked' in the 7 out-files at $LC_workDIR/repeat_libraries/\n".
+  print STDERR "\n** Please compare the 'Total masked' in the 7 out-files at $LC_workDIR/repeat_libraries/\n".
                "(These are big files so 'tail RepeatMask.out')\n";
 	       
 	       
   print STDERR "\n\nCOMPARE IS FINISHED. You need to now: \n".
-               "- analyse results\n  (see the 7 *.out files at $LC_workDIR/repeat_libraries and $LC_workDIR/repeat_libraries/scaffolds.lowercase.out)\n".
+               "- analyse results\n  (see the 7 *.out files at $LC_workDIR/repeat_libraries ".
+	       "and $LC_workDIR/repeat_libraries/scaffolds.lowercase.out)\n".
                "- decide which combination of the 3 RepeatMasks to use (look at the 'total masked' number at end of *.out files)\n".
-	           "- fill in LC_REPMASK_CHOICE in LowCoverageGeneBuildConf.pm".
-	           "- and then run 'run_RepeatMask_dependent'\n";
+	       "- fill in LC_REPMASK_CHOICE in LowCoverageGeneBuildConf.pm".
+	       "- and then run 'run_RepeatMask_dependent'\n";
   
 } elsif ($comm eq "run_RepeatMask_dependent"){
-  print STDERR "\n\nBefore you run the rulemanager you should test each of the analyses (Genscan, Unigene, Uniprot and Vertrna) individually\n".
-			   "now, this is not straightforward as you can only test Uniprot, Unigene and Vertrna once some Genscans have finished\n".
-			   "so, test Genscan first like this:\n".
-			   "Use this command another window - make sure your Perl5Lib is pointing to the right place - \n".
-	           "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
-	           "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Genscan -input_id contig::contig_10030:1:5096:1\n".
-			   "\nThen set the rulemamager off like this *but kill it once some jobs have finished*:\n".
-			   "perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
+  print STDERR "\n\nBefore you run the rulemanager you should test each of the analyses ".
+               "(Genscan, Unigene, Uniprot and Vertrna) individually\n".
+	       "now, this is not straightforward as you can only test Uniprot, Unigene and Vertrna once some Genscans have finished\n".
+	       "so, test Genscan first like this:\n".
+               "Use this command another window - make sure your Perl5Lib is pointing to the right place - \n".
+	       "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
+	       "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Genscan -input_id contig::contig_10030:1:5096:1\n".
+               "\nThen set the rulemamager off like this *but kill it once some jobs have finished*:\n".
+               "perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
+	       "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
                "-analysis Genscan >& $LC_scratchDIR/".$LC_BUILD_VERSION."_repeatmask_dependents.out &\n".
-			   "\nThen you can test the other analyses in turn using a contig which has been run through Genscan eg:\n".
-			   "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
-	           "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Uniprot -input_id contig::contig_10030:1:5096:1\n".
-			   "\nWhen they have all been tested you can run the rulemanager...\n";
+               "\nThen you can test the other analyses in turn using a contig which has been run through Genscan eg:\n".
+               "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
+               "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Uniprot -input_id contig::contig_10030:1:5096:1\n".
+               "\nWhen they have all been tested you can run the rulemanager...\n";
 
-  print STDERR "\nAre you ready to run the rulemanager on all analyses? \n yes or no:";  
+  print STDERR "\n** Are you ready to run the rulemanager on all analyses? \n yes or no:";  
   if (<STDIN>=~/yes/i){
-  	  print STDERR "Rulemanager will now run Genscan, Uniprot, Unigene and Vertrna... don't forget to monitor your jobs\n".
-  
-	  system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
-        	 "-analysis Genscan -analysis Uniprot -analysis Unigene -analysis Vertrna >& $LC_scratchDIR/".$LC_BUILD_VERSION."_repeatmask_dependents.out ");
+    print STDERR "Rulemanager will now run Genscan, Uniprot, Unigene and Vertrna... don't forget to monitor your jobs\n".
+    system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
+           "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
+            "-analysis Genscan -analysis Uniprot -analysis Unigene -analysis Vertrna >& $LC_scratchDIR/".
+	    $LC_BUILD_VERSION."_repeatmask_dependents.out ");
 
-	  print STDERR "\n\nrun_RepeatMask_dependent appears to be finished\nHOWEVER it is a good idea to check the jobs table "
-	              ."to ensure that all of the jobs have run\nand check $LC_scratchDIR/".$LC_BUILD_VERSION."_repeatmask_dependents.out too\n\n"
-				  ."If there are still jobs, *wait until those which are running are finished*\nthen empty the job and job_status tables," 
-				  ." remove the pipeline lock\nand rerun 'run_RepeatMask_dependent'\n"
-				  ."Once all of the jobs have finished you are ready to run 'dump_RepeatMasked_sequence'\n";
+    print STDERR "\n\nrun_RepeatMask_dependent appears to be finished\nHOWEVER it is a good idea to check the jobs table "
+                ."to ensure that all of the jobs have run\nand check $LC_scratchDIR/".$LC_BUILD_VERSION."_repeatmask_dependents.out too\n\n"
+                ."If there are still jobs, *wait until those which are running are finished*\nthen empty the job and job_status tables," 
+                ." remove the pipeline lock\nand rerun 'run_RepeatMask_dependent'\n"
+                ."Once all of the jobs have finished you are ready to run 'dump_RepeatMasked_sequence'\n";
 				  
   }else{
   	  print STDERR "RepeatMask_dependent analyses have not been run\n";
   }  
   	
 } elsif ($comm eq "dump_RepeatMasked_sequence"){
-  print STDERR "\nNow going to dump RepeatMasked sequences.\nYou should have already filled in LC_REPMASK_CHOICE variable\n";
-
+  print STDERR "\n>> Now going to dump RepeatMasked sequences...\nYou should have already filled in LC_REPMASK_CHOICE variable\n";
   print STDERR "\nYou have the following amount of space on $LC_workDIR :\n";
-
   system("df -h $LC_workDIR | gawk '{print \$4}' | grep G");
   
-  print STDERR "\nAre you ready to dump the repeat-masked sequence used in the raw compute? yes or no:";
-  
+  print STDERR "\n** Are you ready to dump the repeat-masked sequence used in the raw compute? yes or no:";
   unless (<STDIN> =~/yes/i){
     exit 1;    
   }
   
-  print STDERR "Dumping repeat-masked sequence used in the raw compute:\n";
+  print STDERR ">> Dumping repeat-masked sequence used in the raw compute...\n";
   my $choice = '';	       
   foreach my $r (@$LC_REPMASK_CHOICE){
    print STDERR "$r\n";
@@ -530,8 +628,10 @@ if ($comm eq "setup"){
   # used bigmem because unsure of how much memory will need
   # Could probably go with 'normal' instead of 'bigmem'
   # MEM: 234 Mbytes;  SWAP: 245 Mbytes;  NTHREAD: 3 (for armadillo)
-  $cmd = "bsub -q bigmem -R 'select[mem>3399 && type==LINUX86] rusage[mem=3399]' -o $LC_workDIR/seqdata/all_".$LC_DBNAME."".$choice.".out ".
-         "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -path $LC_DEFAULT -port $LC_DBPORT -pass $LC_DBPASS -user $LC_DBUSER ".
+  $cmd = "bsub -q bigmem -R 'select[mem>3399] rusage[mem=3399]' -o $LC_workDIR/seqdata/all_".
+         $LC_DBNAME."".$choice.".out ".
+         "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST ".
+	 "-path $LC_DEFAULT -port $LC_DBPORT -pass $LC_DBPASS -user $LC_DBUSER ".
          "-dbname $LC_DBNAME -softmask";
   
   foreach my $r(@$LC_REPMASK_CHOICE){
@@ -557,7 +657,7 @@ if ($comm eq "setup"){
   print STDERR "cd $LC_workDIR/ensj-healthcheck\n".
                "./compile-healthcheck.sh\n".
                "./run-healthcheck.sh -output info -d $LC_DBNAME -type core -species $LC_SPECIES ".
-			   "post_genebuild >>& $LC_workDIR/healthchecks/firstrun.out \n";
+               "post_genebuild >>& $LC_workDIR/healthchecks/firstrun.out \n";
   print STDERR "\nyou can use 'backup' to backup your database, you should do this before making any changes.\n";
   
   # Fixes:
@@ -567,34 +667,30 @@ if ($comm eq "setup"){
   #'delete simple_feature.* from simple_feature, seq_region where simple_feature.seq_region_end > seq_region.length and seq_region.seq_region_id=simple_feature.seq_region_id'
   
 } elsif ($comm eq "backup") {
-
   print STDERR "\nYou have this amount of space on $LC_workDIR :\n";
-
   system("df -h $LC_workDIR | gawk '{print \$4}' | grep G ");
-
   print STDERR "Ready to make the backup? \nyes or no:";
   if (<STDIN> =~ /yes/i){
+    if (system("mkdir $LC_workDIR"."/".$LC_DBNAME."_db_backup")){
+      print STDERR "\ncannot create $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
+      exit;
+    }
 
-	  if (system("mkdir $LC_workDIR"."/".$LC_DBNAME."_db_backup")){
-  		 print STDERR "\ncannot create $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
-		 exit;
-	  }
-
-	  if (system("chmod a+w $LC_workDIR"."/".$LC_DBNAME."_db_backup")){
-    	 print STDERR "\ncannot chmod $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
-		 exit;
-	  }
-	  $cmd = "mysqldump -h".$LC_DBHOST." -u".$LC_DBUSER." -p".$LC_DBPASS." -P".$LC_DBPORT." ".$LC_DBNAME." -T $LC_workDIR"."/".$LC_DBNAME."_db_backup";
-	  if (system($cmd)){
-    	 print STDERR "Error backing up $LC_DBNAME in $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
-		 exit;
-	  }else{
-  		 print STDERR "$LC_DBNAME is backed up\n".
-		 	"you can tar and zip it to save space\n";
-		 
-	  }
+    if (system("chmod a+w $LC_workDIR"."/".$LC_DBNAME."_db_backup")){
+      print STDERR "\ncannot chmod $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
+      exit;
+    }
+    $cmd = "mysqldump -h".$LC_DBHOST." -u".$LC_DBUSER." -p".$LC_DBPASS." -P".$LC_DBPORT." ".
+           $LC_DBNAME." -T $LC_workDIR"."/".$LC_DBNAME."_db_backup";
+    if (system($cmd)){
+      print STDERR "Error backing up $LC_DBNAME in $LC_workDIR"."/".$LC_DBNAME."_db_backup\n";
+      exit;
+    }else{
+      print STDERR "$LC_DBNAME is backed up\n".
+      "you can tar and zip it to save space\n";
+    }
   }else{
-	  print STDERR "you chose not to make the backup\n";
+    print STDERR "you chose not to make the backup\n";
   }
    
   #Tar and zip afterwards to save lots of space!
@@ -613,17 +709,17 @@ if ($comm eq "setup"){
 } elsif ($comm eq "clean"){
 
   #have kept all of the config files
-  print STDERR "\n\nCleaning up...will empty assembly and repeat_libraries and remove seqdump directory from $LC_workDIR. Is this ok? yes or no:";
+  print STDERR "\n\n>> Cleaning up...will empty assembly and repeat_libraries and remove ".
+               "seqdump directory from $LC_workDIR. \n** Is this ok? yes or no:";
   if (<STDIN> =~ /yes/i){
- 
-	  #empty the assembly and repeat library directories - 
-	  if(!checkdir($LC_workDIR."/assembly", 1)){ warn "could not prepare directory! [".$LC_workDIR."/assembly"."]";}
-	  if(!checkdir($LC_workDIR."/seqdump", 0)){ warn "could not prepare directory! [".$LC_workDIR."/seqdump"."]";}
-	  if(!checkdir($LC_workDIR."/repeat_libraries", 1)){ warn "could not prepare directory! [".$LC_workDIR."/repeat_libraries"."]";}
-      print STDERR "assembly, seqdump and repeat_libraries directories have been emptied/removed\n";
+    #empty the assembly and repeat library directories - 
+    if(!checkdir($LC_workDIR."/assembly", 1)){ warn "could not prepare directory! [".$LC_workDIR."/assembly"."]";}
+    if(!checkdir($LC_workDIR."/seqdump", 0)){ warn "could not prepare directory! [".$LC_workDIR."/seqdump"."]";}
+    if(!checkdir($LC_workDIR."/repeat_libraries", 1)){ warn "could not prepare directory! [".$LC_workDIR."/repeat_libraries"."]";}
+    print STDERR "assembly, seqdump and repeat_libraries directories have been emptied/removed\n";
    
   }else{
-  	  print STDERR "assembly, seqdump and repeat_libraries directories have not been emptied\n";
+    print STDERR "assembly, seqdump and repeat_libraries directories have not been emptied\n";
   }
   
   print STDERR "\n\nemptying $LC_scratchDIR/raw_computes\n"; #this takes a while - lots of files
