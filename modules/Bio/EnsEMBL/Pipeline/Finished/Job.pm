@@ -319,7 +319,7 @@ sub batch_runRemote {
 =cut
 
 sub flush_runs {
-	my ( $self, $adaptor, $queue ) = @_;
+	my ( $self, $adaptor, $queue, $verbose ) = @_;
 	# flush_runs is optionally sent a queue to deal with
 	# @analyses is a list of logic_names (strings)
 
@@ -356,7 +356,6 @@ sub flush_runs {
 
 	  ANAL:
 	for my $anal (@analyses) {
-
 			my $queue = $BATCH_QUEUES{$anal};
 			my @job_ids;
 			@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } 
@@ -364,7 +363,7 @@ sub flush_runs {
 		if ( !@job_ids ) {
 			next ANAL;
 		}
-
+		print "\tqueue $anal job_id @job_ids\n" if $verbose;
 			my $this_runner = $queue->{'runner'};
 		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
 
