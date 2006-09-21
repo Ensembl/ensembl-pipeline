@@ -330,14 +330,15 @@ if ($comm eq "setup"){
   $number2 =~ s/\n//g;
   chomp($number2);
 
-  print STDERR "\nDumping scaffold $number1 and $number2 into $LC_workDIR/seqdump\n";
   system("mkdir -p $LC_workDIR/seqdump");
     
   $status = 0;
+  print STDERR "\nDumping scaffold $number1 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number1\n";
   $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user $LC_DBro -port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number1." -outfile $LC_workDIR/seqdump/toplevel::scaffold_".$number1;
   print STDERR "$cmd\n";
   $status += system($cmd);
   if($status){ warn("\nError with fetch_slice_seq.pl, scaffold $number1") }
+  print STDERR "\nDumping scaffold $number2 from db into $LC_workDIR/seqdump/toplevel::scaffold_$number2\n";
   $status = 0;
   $cmd = "$LC_cvsDIR/ensembl-personal/searle/scripts/fetch_slice_seq.pl -host $LC_DBHOST -user $LC_DBro -port $LC_DBPORT -dbname $LC_DBNAME -path $LC_DEFAULT toplevel::scaffold_".$number2." -outfile $LC_workDIR/seqdump/toplevel::scaffold_".$number2;
   $status += system($cmd);
@@ -345,42 +346,34 @@ if ($comm eq "setup"){
 
   
   #Reformat sequence to 60 characters per row
+  print STDERR "Reformatting $LC_SCAFFOLDS to 60 characters per row...\n";
   $status = 0;
   $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/reformat_fasta.pl $LC_SCAFFOLDS > $LC_workDIR/assembly/assembly.agp.fasta.60");
   if($status){ warn("\nError with reformatting $LC_SCAFFOLDS to 60 characters per row\n") }  
-  
+ 
+ 
   #Find the id for scaffold:
-  my %scaff_hash = (
-  	$number1 => 1,
-	$number2 => 1,                          
-  );
-  
-  for my $num (keys %scaff_hash){
-  
-	  $status = 0;
-	  $status += system( "grep $num $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/assembly/grep_".$num.".txt");
-	  if($status){ warn("\nError with grepping for $num\n") }
-
-	  # Usual way of doing this is
-	  open(FH, "$LC_workDIR/assembly/grep_".$num.".txt");
-	  my $line;
-	  while (<FH>) {
-		if ($_ =~/^>(.*$num)$/){
-			$scaff_hash{$num} = $1;
-			last;
-		}
-	  }
-	  close(FH);
-  }
-
-
+  my %scaff_hash;
+  @{$scaff_hash{$number1}} = @{find_matching_headers($number1)}; 
+  @{$scaff_hash{$number2}} = @{find_matching_headers($number2)};
+ 
 
   #Now find the seqs:   
+  if (@{$scaff_hash{$number1}} != 1) {
+    print "Problem with scaffold $number1 - no hits or more than 1 hit\n";
+    exit 1;
+  } 
+  print STDERR "Finding fasta $scaff_hash{$number1}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60\n";
   $status = 0;
-  $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/find_seq_in_fasta.pl -id $scaff_hash{$number1} -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number1.".fa");
+  $status += system("$LC_cvsDIR/ensembl-personal/searle//scripts/find_seq_in_fasta.pl -id $scaff_hash{$number1}[0] -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number1.".fa");
   if($status){ warn("\nError with finding $number1\n") }
+    if (@{$scaff_hash{$number2}} != 1) {
+        print "Problem with scaffold $number2 - no hits or more than 1 hit\n";
+	exit 1;
+    }
+  print STDERR "Finding fasta $scaff_hash{$number2}[0] in $LC_workDIR/assembly/assembly.agp.fasta.60\n";
   $status = 0;
-  $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/find_seq_in_fasta.pl -id $scaff_hash{$number2} -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number2.".fa");
+  $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/find_seq_in_fasta.pl -id $scaff_hash{$number2}[0] -file $LC_workDIR/assembly/assembly.agp.fasta.60 > $LC_workDIR/seqdump/scaffold_".$number2.".fa");
   if($status){ warn("\nError with finding $number2\n") }
 
   #Check whether the seq in the db and the seq in the fasta file are identical:
@@ -764,7 +757,22 @@ sub checkdir{
   return 1;
 }
 
-
+sub find_matching_headers {
+  my $num = shift;
+  my @matches;
+  open(FH, "$LC_workDIR/assembly/assembly.agp.fasta.60");
+  my $re = qr/^\>(scaffold\_$num[^0-9]+)\s+.*$/;
+  print STDERR "  Searching for $re in $LC_workDIR/assembly/assembly.agp.fasta.60\n";
+  while ($_ = <FH>) {
+    if ($_ =~ m/^\>(scaffold\_$num[^0-9]+\S+)/){
+      push  @matches, $1;
+      print STDERR "  Got $1\n";
+      #last;
+    }
+  }
+  close (FH);
+  return \@matches;
+}
 
 __END__
 
