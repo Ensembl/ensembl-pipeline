@@ -88,6 +88,7 @@ my $agp;
 my $fasta;
 my $rank;
 my $verbose = 0;
+my $regex;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -103,6 +104,7 @@ my $verbose = 0;
             'agp_file:s' => \$agp,
             'fasta_file:s' => \$fasta,
             'verbose!' => \$verbose,
+            'regex:s' => \$regex,
             'h|help'     => \$help,
            ) or ($help = 1);
 
@@ -165,7 +167,7 @@ my $sa  = $db->get_SliceAdaptor();
 
 
 if($fasta){
-  &parse_fasta($fasta, $cs, $sa, $sequence_level);
+  &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex);
 }
 
 if($agp){
@@ -173,7 +175,7 @@ if($agp){
 }
 
 sub parse_fasta{
-  my ($filename, $cs, $sa, $store_seq) = @_;
+  my ($filename, $cs, $sa, $store_seq,$regex) = @_;
 
   my $seqio = new Bio::SeqIO(
                              -format=>'Fasta',
@@ -192,6 +194,10 @@ sub parse_fasta{
     #print STDERR "id ".$seq->id." ".$seq->desc."\n";
     #my @values = split /\s+/, $seq->desc;
     my $name = $seq->id;
+
+    if ($regex) {
+      ($name) = $name =~ /$regex/;
+    }
     warning("You are going to store with name ".$name." are you sure ".
             "this is what you wanted") if($verbose);
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
