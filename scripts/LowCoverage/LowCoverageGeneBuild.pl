@@ -92,7 +92,7 @@ if(!$comm or ($comm ne "setup" && $comm ne "check_seqs" && $comm ne "run_RepeatM
 set_env(1);
 
 if ($comm eq "setup"){
-  print STDERR "\nset-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
+  print STDERR "\nSet-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
                "load_taxonomy, load_analysis_descriptions.\n\n";
  
   #Get files  
@@ -510,9 +510,9 @@ if ($comm eq "setup"){
 } elsif ($comm eq "compare"){  
 
   print STDERR "\n>> Checking repeat types...\n";
-  print STDERR "perl $LC_workDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
+  print STDERR "perl $LC_cvsDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
                "$LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME\n";
-  system("perl $LC_workDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
+  system("perl $LC_cvsDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
          "$LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME");
   
   print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select analysis_id, ".
@@ -522,31 +522,32 @@ if ($comm eq "setup"){
   print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord' ");
 
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/RepeatMask.out ".
+  print STDERR ">> Submitting jobs to check repeat coverage (output at $LC_workDIR/repeat_libraries/*.out)...\n";
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/Ab_initio_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_initio_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Ab_initio_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/Supp_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Supp_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Supp_RepeatMask -path $LC_DEFAULT");
 
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/Ab_and_supp_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_and_supp_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Ab_initio_RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/Supp_and_orig_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Supp_and_orig_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/Ab_and_orig_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_and_orig_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Ab_initio_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -R type=LINUX86 -o $LC_workDIR/repeat_libraries/all_three_RepeatMask.out ".
+  system("bsub -q normal -o $LC_workDIR/repeat_libraries/all_three_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Ab_initio_RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
     
@@ -554,7 +555,7 @@ if ($comm eq "setup"){
 
   print STDERR "You need to wait for the 7 jobs on the farm to be completed before you can continue.\n".
                 "To check if the jobs are finished, type 'bjobs' in another window.\n".
-		"WHEN THE JOBS ARE FINISHED, type 'yes':";
+		"** WHEN THE JOBS ARE FINISHED, type 'yes':";
   $input = <STDIN>;  
   while ($input !~ /yes/i){
     print STDERR "\n** Type yes when you are ready to continue...  : ";
