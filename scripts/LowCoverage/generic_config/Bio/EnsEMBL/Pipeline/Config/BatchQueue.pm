@@ -74,7 +74,7 @@ use vars qw(%Config);
     {
       logic_name => 'RepeatMask',
       batch_size => 100,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -85,7 +85,7 @@ use vars qw(%Config);
       logic_name => 'Supp_RepeatMask',
       batch_size => 100,
       # For running the tail
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -96,7 +96,7 @@ use vars qw(%Config);
       logic_name => 'Ab_initio_RepeatMask',
       batch_size => 100,
       # For running the tail      
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -106,7 +106,7 @@ use vars qw(%Config);
     {
       logic_name => 'Genscan',        
       batch_size => 200,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -117,8 +117,7 @@ use vars qw(%Config);
       logic_name => 'Uniprot',        
       batch_size => 200,
       # For finishing off      
-      #resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -129,8 +128,7 @@ use vars qw(%Config);
       logic_name => 'Vertrna',        
       batch_size => 200,
       # For finishing off      
-      #resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -141,8 +139,7 @@ use vars qw(%Config);
       logic_name => 'Unigene',        
       batch_size => 200,
       # For finishing off      
-      #resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -152,7 +149,7 @@ use vars qw(%Config);
     {
       logic_name => 'CpG',
       batch_size => 500,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -162,7 +159,7 @@ use vars qw(%Config);
     {
       logic_name => 'Dust',
       batch_size => 500,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -172,7 +169,7 @@ use vars qw(%Config);
     {
       logic_name => 'tRNAscan',
       batch_size => 500,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -182,7 +179,7 @@ use vars qw(%Config);
     {
       logic_name => 'TRF',
       batch_size => 500,
-      resource   => 'select[myia64g<800] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -192,7 +189,7 @@ use vars qw(%Config);
     {
       logic_name => 'Eponine',        
       batch_size => 200,
-      resource   => 'select[myia64g<800 && type==LINUX86] rusage[myia64g=10:duration=10:decay=1]',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 4,
       sub_args   => '',
       runner     => '',
@@ -327,7 +324,6 @@ use vars qw(%Config);
     {
       logic_name => 'TargettedGenewise',        
       batch_size => 4,
-      # Ran on new farm so didn't need this resource   => 'select[model==IBMBC2800 || model==RLXP800]',
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -340,8 +336,6 @@ use vars qw(%Config);
     {
       logic_name => 'SimilarityGenewise',        
       batch_size => 1,
-      # Ran on new farm so didn't need this resource   => 'select[model==IBMBC2800 || model==RLXP800]',
-      #resource   => 'model=IBMBC2800',
       resource   => '',
       retries    => 0,
       sub_args   => '',
@@ -355,7 +349,8 @@ use vars qw(%Config);
       logic_name => 'combined_gw_e2g',        
       batch_size => 100,
      # resource   => '',
-      resource   => 'select[myia64f<800 && ecs4my3350<2000 && myia64g<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1:myia64g=10:duration=10:decay=1]',
+     # resource   => 'select[myia64f<800 && ecs4my3350<2000 && my$LC_DBHOST<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1:my$LC_DBHOST=10:duration=10:decay=1]',
+      resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -367,7 +362,8 @@ use vars qw(%Config);
     {
       logic_name => 'ensembl',        
       batch_size => 100,
-      resource   => 'select[myia64f<800 && ecs4my3351<400] rusage[myia64f=10:duration=30:decay=1:ecs4my3351=10:duration=30:decay=1]',
+      #resource   => 'select[myia64f<800 && ecs4my3351<400] rusage[myia64f=10:duration=30:decay=1:ecs4my3351=10:duration=30:decay=1]',
+      resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -380,7 +376,8 @@ use vars qw(%Config);
       logic_name => 'pseudogene',        
       batch_size => 50,
      # resource   => '',
-      resource   => 'select[myia64f<800 && ecs4my3351<500 && myia64g<800] rusage[myia64f=10:duration=20:decay=1:ecs4my3351=10:duration=20:decay=1:myia64g=10:duration=20:decay=1]',
+      #resource   => 'select[myia64f<800 && ecs4my3351<500 && my$LC_DBHOST<800] rusage[myia64f=10:duration=20:decay=1:ecs4my3351=10:duration=20:decay=1:my$LC_DBHOST=10:duration=20:decay=1]',
+      resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -404,7 +401,7 @@ use vars qw(%Config);
     {
       logic_name => 'cdna_exonerate',        
       batch_size => 1,
-      resource   => 'model=IBMBC2800',
+      resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -416,7 +413,7 @@ use vars qw(%Config);
     {
       logic_name => 'hum_cdna_exonerate',        
       batch_size => 1,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -452,7 +449,8 @@ use vars qw(%Config);
     {
       logic_name => 'hum_cdna_genebuilder',        
       batch_size => 200,
-      resource   => 'select[myia64f<2000 && ecs4my3350<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1]',
+      #resource   => 'select[myia64f<2000 && ecs4my3350<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1]',
+      resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -476,7 +474,7 @@ use vars qw(%Config);
     {
       logic_name => 'tmhmm',        
       batch_size => 10,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -488,7 +486,7 @@ use vars qw(%Config);
     {
       logic_name => 'scanprosite',        
       batch_size => 1,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -499,7 +497,7 @@ use vars qw(%Config);
     {
       logic_name => 'ncoils',        
       batch_size => 10,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -510,7 +508,7 @@ use vars qw(%Config);
     {
       logic_name => 'pfscan',        
       batch_size => 1,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -521,7 +519,7 @@ use vars qw(%Config);
     {
       logic_name => 'Pfam',        
       batch_size => 1,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 0,
       sub_args   => '',
       runner     => '',
@@ -532,7 +530,7 @@ use vars qw(%Config);
     {
       logic_name => 'Signalp',        
       batch_size => 10,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -543,7 +541,7 @@ use vars qw(%Config);
     {
       logic_name => 'Seg',        
       batch_size => 1,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -554,7 +552,7 @@ use vars qw(%Config);
     {
       logic_name => 'Prints',        
       batch_size => 10,
-      resource   => 'type=LINUX86',
+      resource   => 'select[my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
