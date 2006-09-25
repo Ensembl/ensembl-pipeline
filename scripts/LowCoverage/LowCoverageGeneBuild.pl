@@ -515,6 +515,10 @@ if ($comm eq "setup"){
   system("perl $LC_cvsDIR/ensembl/misc-scripts/repeats/repeat-types.pl -user ".
          "$LC_DBUSER -pass $LC_DBPASS -host $LC_DBHOST -port $LC_DBPORT -dbpattern $LC_DBNAME");
   
+  print STDERR "mysql -uensro -hLC_DBHOST -D$LC_DBNAME -e 'select count(*), repeat_type from repeat_consensus group by repeat_type'";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select count(*), ".
+         "repeat_type from repeat_consensus group by repeat_type' ");
+
   print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select analysis_id, ".
                "logic_name, program_file from analysis'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select analysis_id, logic_name, program_file from analysis'");
@@ -562,16 +566,16 @@ if ($comm eq "setup"){
     $input = <STDIN>;
   }
   
-  print STDERR "\n** Please compare the 'Total masked' in the 7 out-files at $LC_workDIR/repeat_libraries/\n".
-               "(These are big files so 'tail RepeatMask.out')\n";
-	       
-	       
-  print STDERR "\n\nCOMPARE IS FINISHED. You need to now: \n".
-               "- analyse results\n  (see the 7 *.out files at $LC_workDIR/repeat_libraries ".
-	       "and $LC_workDIR/repeat_libraries/scaffolds.lowercase.out)\n".
-               "- decide which combination of the 3 RepeatMasks to use (look at the 'total masked' number at end of *.out files)\n".
-	       "- fill in LC_REPMASK_CHOICE in LowCoverageGeneBuildConf.pm".
-	       "- and then run 'run_RepeatMask_dependent'\n";
+  print STDERR "\n\nCOMPARE IS FINISHED. \nYou need to now: \n".
+               "(1) analyse results\n ". 
+	       "    This this done by seeing how many bases are masked out by the ".
+	       "different combinations of repeat masking compared to the total number of bases.\n".
+	       "    To see the total number of bases:\n    'more $LC_workDIR/repeat_libraries/scaffolds.lowercase.out'\n".
+	       "    To see how many bases are masked:\n    \'foreach file (`ls /ecs4/work3/ba1/bushbaby1//repeat_libraries/*.out`)\'\n".
+	       "      \'echo \$file\'\n      \'grep \^\"Total masked\" \$file\'\n    \'end\'\n".
+               "(2) decide which combination of the 3 RepeatMasks to use (look at the 'total masked' number at end of *.out files)\n".
+	       "(3) fill in LC_REPMASK_CHOICE in LowCoverageGeneBuildConf.pm".
+	       "(4) and then run 'run_RepeatMask_dependent'\n";
   
 } elsif ($comm eq "run_RepeatMask_dependent"){
   print STDERR "\n\nBefore you run the rulemanager you should test each of the analyses ".
