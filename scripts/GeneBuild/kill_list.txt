@@ -572,3 +572,4 @@ Q96L62 ENH4_HUMAN HERV-H_1q41 provirus ancestral Env polyprotein precursor  (vac
 Q9N2J8 ENH3_HUMAN HERV-H_2q24.1 provirus ancestral Env polyprotein precursor  (vac)
 Q9N2J9 ENH2_HUMAN HERV-H_3q26 provirus ancestral Env polyprotein precursor  (vac)
 Q9N2K0 ENH1_HUMAN HERV-H_2q24.3 provirus ancestral Env polyprotein precursor  (vac)
+Q1L836 Q1L836_BOVIN Transposase.
