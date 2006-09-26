@@ -191,7 +191,28 @@ if ($comm eq "setup"){
   system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
          "\"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.default','$LC_DEFAULT')\"") 
            && warn "\nError with INSERT INTO meta\n";
-  
+ 
+   print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+     "'INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.date','$LC_ASSEMBLY_DATE')'\n";
+   system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+     "\"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.date','$LC_ASSEMBLY_DATE')\"")
+     && warn "\nError with INSERT INTO meta\n";
+
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+    "'INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.name','$LC_ASSEMBLY_NAME')'\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e ".
+    "\"INSERT INTO meta(meta_key,meta_value) VALUES ('assembly.name','$LC_ASSEMBLY_NAME')\"")
+    && warn "\nError with INSERT INTO meta\n";
+
+  #load genebuild info into meta table:
+  #--------------------------------------
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
+         "meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE')\"")
+         && warn "\nProblem with loading genebuild version\n";
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
+         "meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
+         && warn "\nProblem with loading genebuild id\n";
+
 
   #Loading a standard agp file into the assembly table
   #---------------------------------------------------
@@ -337,16 +358,6 @@ if ($comm eq "setup"){
          "-taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME ".
 	 "-lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
 
-  #load genebuild info into meta table:
-  #-------------------------------------- 
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
-         "meta (meta_key, meta_value) VALUES ('genebuild.version','$LC_DATE')\"")
-          && warn "\nProblem with loading genebuild version\n";	   	   
-  system("mysql -h$LC_DBHOST -u$LC_DBUSER -P$LC_DBPORT -p$LC_DBPASS -D$LC_DBNAME -e \"INSERT INTO ".
-         "meta (meta_key, meta_value) VALUES ('genebuild.id',$LC_GeneBuilderID)\"")
-          && warn "\nProblem with loading genebuild id\n";	   
-	   	   
-		   
 
   #Make input_ids 
   #-------------
@@ -659,7 +670,7 @@ if ($comm eq "setup"){
   print STDERR "\nPost_genebuild healthcheck results are written to: $LC_workDIR/healthchecks/firstrun.out\n";
 
   print STDERR "\nTo run the healthcheck use these commands:\n";
-  print STDERR "cd $LC_workDIR/ensj-healthcheck\n".
+  print STDERR "cd $LC_cvsDIR/ensj-healthcheck\n".
                "./compile-healthcheck.sh\n".
                "./run-healthcheck.sh -output info -d $LC_DBNAME -type core -species $LC_SPECIES ".
                "post_genebuild >>& $LC_workDIR/healthchecks/firstrun.out \n";

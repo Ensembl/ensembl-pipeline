@@ -8,9 +8,11 @@ use vars qw( %LowCoverageGeneBuildConf );
 %LowCoverageGeneBuildConf = (
 			     
 	 	# User-specific configuration:
-		  LC_USER			    => '', #ba1
+		  LC_USER		        => '', #ba1
 		  LC_GeneBuilderID		=> '', #4
-		  LC_DATE			    => '', #MMYYEnsembl
+		  LC_DATE		        => '', #MMYYEnsembl
+                  LC_ASSEMBLY_NAME              => '', #otoGar1, what broad calls the assembly
+                  LC_ASSEMBLY_DATE              => '', #YYMM, when broad completed assembly
 		  #perl5lib - this is the path to be added (temporarily) to the front of your perl5lib, make sure ensembl-config goes first
 		  LC_PERL5LIB			=> '', #/ecs4/work1/sd3/rabbit1/ensembl-config/rabbit/rabbit_1.0:/ecs4/work1/sd3/rabbit1/ensembl/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/:/ecs4/work1/sd3/rabbit1/ensembl-analysis/modules:/ecs4/work1/sd3/rabbit1/ensembl-compara/modules
 		  LC_cvsDIR  			=> '',#/nfs/acari/ba1/PerlCode/
@@ -20,12 +22,12 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  
 		  
 		  # Species-specific configuration:
-		  LC_SPECIES 			=> '',#armadillo	
-		  LC_BUILD_VERSION		=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/	 
+		  LC_SPECIES 		=> '',#armadillo	
+		  LC_BUILD_VERSION	=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/	 
 		  LC_GENOMICSEQS        => '',#/data/blastdb/Ensembl/Large/Dasypus_novemcinctus/BROAD/Dasypus_novemcinctus.BROAD.stdrep.fa
-		  LC_CONFIG			    => '',#/nfs/acari/ba1/PerlCode/ensembl-config/
-		  LC_PMATCH 			=> '', #/ecs4/work3/ba1/armadillo1/seqdata/arma_proteome.fa  location of fasta file to be written by new_prepare_proteome.pl and used in pmatch analysis
-		  LC_KILL 			    => '',#/nfs/acari/ba1/PerlCode/ensembl-pipeline/scripts/GeneBuild/kill_list.txt	
+		  LC_CONFIG	        => '',#/nfs/acari/ba1/PerlCode/ensembl-config/
+		  LC_PMATCH 		=> '', #/ecs4/work3/ba1/armadillo1/seqdata/arma_proteome.fa  location of fasta file to be written by new_prepare_proteome.pl and used in pmatch analysis
+		  LC_KILL 	                => '',#/nfs/acari/ba1/PerlCode/ensembl-pipeline/scripts/GeneBuild/kill_list.txt	
 		  LC_PROTEOME 			=> '',#/ecs4/work3/ba1/armadillo1/seqdata/arma_pep_all_fixed_header.fa
 		  LC_PROT_INDEX 		=> '',#/ecs4/work3/ba1/armadillo1/seqdata/arma_proteome
 		  LC_PEPFILE 			=> '', #/ecs4/work3/ba1/armadillo1/seqdata/ensembl_peptides/arma_pep.fa     path to dumped peptides
@@ -35,14 +37,14 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  #data-specific cofiguration from BROAD and EBI
 		  LC_AB_INITIO_LIB      => '', #/ecs4/work1/sd3/rabbit1/repeat_libraries/ab_initio.lib
 		  LC_SUPP_LIB           => '', #/ecs4/work1/sd3/rabbit1/repeat_libraries/supplemental.lib
-		  LC_ASSEMBLY_AGP		=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.agp
-		  LC_ASSEMBLY			=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.bases #unzipped name
-		  LC_SCAFFOLDS			=> '', #/ecs4/work1/sd3/rabbit1/assembly/scaffolds.fasta #unzipped name
+		  LC_ASSEMBLY_AGP	=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.agp
+		  LC_ASSEMBLY		=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.bases #unzipped name
+		  LC_SCAFFOLDS		=> '', #/ecs4/work1/sd3/rabbit1/assembly/scaffolds.fasta #unzipped name
 		
 		# Taxonomy
 		  LC_DEFAULT	=> '', #RABBIT #use a short name - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
 		  LC_NAME       => '', #Oryctolagus cuniculus #scientific name
-          TAXON_DBNAME  => 'ncbi_taxonomy',
+                  TAXON_DBNAME  => 'ncbi_taxonomy',
 		  TAXON_DBHOST  => 'ecs2',
 		  TAXON_DBPORT  => '3365',
 
