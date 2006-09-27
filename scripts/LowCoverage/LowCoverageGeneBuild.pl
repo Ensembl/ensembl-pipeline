@@ -796,7 +796,7 @@ sub createDB{
 
 sub config_setup{
 
-	my @pipe_dirs = ("GeneBuild", "PseudoGenes", "Protein_Annotation", "cDNAs_ESTs");
+	my @pipe_dirs = ("GeneBuild", "Protein_Annotation", "cDNAs_ESTs");
 	my $ensconfDIR = $LC_cvsDIR."/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION";
 	
    foreach my $dir (@pipe_dirs){
@@ -817,7 +817,7 @@ sub config_setup{
    }
 
    system("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Analysis/Config/*.pm $ensconfDIR/Bio/EnsEMBL/Analysis/Config/");
-   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/pipe_conf/*.pm $ensconfDIR/pipe_conf/");
+   system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/pipe_conf/*.conf $ensconfDIR/pipe_conf/");
 
 	#have removed the warnings from "cp" because it warns you that it doesn't copy CVS - but that's a good thing 
 	
