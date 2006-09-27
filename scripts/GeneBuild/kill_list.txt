@@ -573,3 +573,4 @@ Q9N2J8 ENH3_HUMAN HERV-H_2q24.1 provirus ancestral Env polyprotein precursor  (v
 Q9N2J9 ENH2_HUMAN HERV-H_3q26 provirus ancestral Env polyprotein precursor  (vac)
 Q9N2K0 ENH1_HUMAN HERV-H_2q24.3 provirus ancestral Env polyprotein precursor  (vac)
 Q1L836 Q1L836_BOVIN Transposase.
+Q96DL5 Q96DL5_HUMAN Incorrect ORF from large scale cDNA sequencing project causing incorrect prediction of cox6b2 (steve)
