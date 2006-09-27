@@ -49,7 +49,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
-  DEFAULT_OUTPUT_DIR  => $LC_scratchDIR."raw_computes",
+  DEFAULT_OUTPUT_DIR  => $LC_scratchDIR."/raw_computes/",
   DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
 
