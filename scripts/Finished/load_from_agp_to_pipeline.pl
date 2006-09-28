@@ -199,6 +199,9 @@ my $seqset_info     = {};
 	print STDOUT
 	  "Writing data into Pipeline database: $pname ($phost:$pport)\n";
 
+	my $dbh = $pipe_dba->dbc->db_handle;
+	$dbh->begin_work;
+
 	my %asm_seq_reg_id;
 
 	my $attr_a               = $pipe_dba->get_AttributeAdaptor();
@@ -240,9 +243,7 @@ my $seqset_info     = {};
 				undef, $chromosome_cs_version );
 		};
 		if ($slice) {
-			warn(
-				"Sequence set <$name> is already in pipeline database <$pname>\n"
-			);
+			print STDOUT "Sequence set <$name> is already in pipeline database <$pname>\n";
 			throw(  "There is a difference in size for $name: stored ["
 				  . $slice->length. "] =! new [". $endv. "]" )
 			unless ( $slice->length eq $endv );
@@ -289,16 +290,12 @@ my $seqset_info     = {};
 			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
-			warn(
-				qq{
-					clone and contig < ${acc_ver} ; ${contig_name} >
-					are already in the pipeline database
-				}
-			);
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
 		}
 		elsif ( $clone && !$contig ) {
+			$dbh->rollback;
 			### code to be added to create contigs related to the clone
 			throw(  
 				"Missing contig entry in the database for clone ${acc_ver}" 
@@ -306,7 +303,14 @@ my $seqset_info     = {};
 		}
 		else {
 			##fetch the dna sequence from pfetch server with acc_ver id
-			my $seqobj ||= &pfetch_acc_sv($acc_ver);
+			my $seqobj;
+			eval {
+				$seqobj = &pfetch_acc_sv($acc_ver);
+			};
+			if($@) {
+				$dbh->rollback;
+				throw($@);	
+			}
 			my $seq = $seqobj->seq;
 			$seqlen = $seqobj->length;
 			$contig_name .= $seqlen;
@@ -314,9 +318,10 @@ my $seqset_info     = {};
 			##make clone and insert clone to seq_region table
 			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
 			$clone_seq_reg_id = $slice_a->store($clone);
-			throw(
-				"clone seq_region_id has not been returned for the accession $acc_ver"
-			) unless $clone_seq_reg_id;
+			if(!$clone_seq_reg_id) {
+				$dbh->rollback;
+				throw("clone seq_region_id has not been returned for the accession $acc_ver");
+			}
 
 			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
 			$attr_a->store_on_Slice( $clone,
@@ -326,9 +331,10 @@ my $seqset_info     = {};
 			$contig =
 			  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
 			$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
-			throw(
-				"contig seq_region_id has not been returned for the contig $contig_name"
-			) unless $ctg_seq_reg_id;
+			if(!$ctg_seq_reg_id){
+				$dbh->rollback;
+				throw("contig seq_region_id has not been returned for the contig $contig_name");
+			}
 		}
 		##insert chromosome to contig assembly data into assembly table
 		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id, 
@@ -342,6 +348,7 @@ my $seqset_info     = {};
 			if($do_submit);
 
 	}
+	$dbh->commit;
 
 }
 
