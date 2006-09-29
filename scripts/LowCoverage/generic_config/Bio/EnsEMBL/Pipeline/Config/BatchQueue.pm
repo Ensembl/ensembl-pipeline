@@ -27,9 +27,51 @@ C<%Config> hash is asked to be set.
 The variables can also be references to arrays or hashes.
 
 Edit C<%Config> to add or alter variables.
+All the variables are in capitals, so that they resemble environment variables.
 
-All the variables are in capitals, so that they resemble environment
-variables.
+To run a job only on a certain host, you have to add specific resource-requirements. This
+can be useful if you have special memory-requirements, if you like to run the job only on
+linux 64bit machines or if you want to run the job only on a specific host group.
+The commands bmgroups and lsinfo show you certain host-types / host-groups.
+
+Here are some example resource-statements / sub_args statements:
+
+ sub_args => '-m bc_hosts',                 # only use hosts of host-group 'bc_hosts' (see bmgroup)
+ sub_args => '-m bc1_1',                    # only use hosts of host-group 'bc1_1'
+
+ resource => '-R "select[type=LINUX64]" ',  # use Linux 64 bit machines only
+ resource => '"select[type=LINUX64]" ',     # same as above
+ resource => '"select[model=IBMBC2800]" ',  # only run on IBMBC2800 hosts
+
+ resource => 'alpha',                       # only run on DEC alpha
+ resource => 'linux',                       # only run on linux machines
+
+
+Database throtteling :
+This runs a job on a linux host, throttles ecs4:3350 to not have more than 300 cative connections, 10 connections per
+job in the duration of the first 10 minutes when the job is running (means 30 hosts * 10 connections = 300 connections):
+
+    resource =>'select[linux && ecs4my3350 <=300] rusage[ecs4my3350=10:duration=10]',
+
+
+Running on 'linux' hosts with not more than 200 active connections for myia64f and myia64g, 10 connections per job to each
+db-instance for the first 10 minutes :
+
+    resource =>'select[linux && myia64f <=200 && myia64g <=200] rusage[myia64f=10:myia64g=10:duration=10]',
+
+
+Running on hosts of model 'IBMBC2800' hosts with not more than 200 active connections to myia64f;
+10 connections per job for the first 10 minutes:
+
+   resource =>'select[model==IBMBC2800 && myia64f<=200] rusage[myia64f=10:duration=10]',
+
+
+
+Running on hosts of host_group bc_hosts with not more than 200 active connections to myia64f;
+10 connections per job for the first 10 minutes:
+
+   resource =>'select[myia64f<=200] rusage[myia64f=10:duration=10]',
+   sub_args =>'-m bc_hosts'
 
 =head1 CONTACT
 
@@ -195,370 +237,6 @@ use vars qw(%Config);
       runner     => '',
       queue      => 'normal',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',    
-    },
-    {
-      logic_name => 'marker',        
-      batch_size => 10,
-      resource   => 'linux',
-      retries    => 4,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',    
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'cdna_wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'exonerate_wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',   
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'hum_cdna_wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'hum_exonerate_wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',   
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'Best_Wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',    
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'Blast_Wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no',        
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'Pmatch_Wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',    
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'Final_Wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'EST_Wait',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 1,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',   
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'Pmatch',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no',
-      output_dir => $LC_scratchDIR."pmatch",
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'BestPmatch',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."bestpmatch",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'TargettedGenewise',        
-      batch_size => 4,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."targettedgenewise",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'SimilarityGenewise',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 0,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'long',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."sim_gw_85_nomini_rerun",
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'combined_gw_e2g',        
-      batch_size => 100,
-     # resource   => 'linux',
-     # resource   => 'select[linux && myia64f<800 && ecs4my3350<2000 && my$LC_DBHOST<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1:my$LC_DBHOST=10:duration=10:decay=1]',
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."humutrs",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'ensembl',        
-      batch_size => 100,
-      #resource   => 'select[linux && myia64f<800 && ecs4my3351<400] rusage[myia64f=10:duration=30:decay=1:ecs4my3351=10:duration=30:decay=1]',
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."genebuild",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'pseudogene',        
-      batch_size => 50,
-     # resource   => 'linux',
-      #resource   => 'select[linux && myia64f<800 && ecs4my3351<500 && my$LC_DBHOST<800] rusage[myia64f=10:duration=20:decay=1:ecs4my3351=10:duration=20:decay=1:my$LC_DBHOST=10:duration=20:decay=1]',
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."pseudo",     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'GeneCombiner',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."genecombiner",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    }, 
-    {
-      logic_name => 'cdna_exonerate',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."cdna_exonerate",     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'hum_cdna_exonerate',        
-      batch_size => 1,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."hum_cdna_exonerate",     
-      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-    },
-    {
-      logic_name => 'est_exonerate',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."est_exonerate",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'cdna_genebuilder',        
-      batch_size => 200,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."cdna_genebuild",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'hum_cdna_genebuilder',        
-      batch_size => 200,
-      #resource   => 'select[linux && myia64f<2000 && ecs4my3350<2000] rusage[myia64f=10:duration=10:decay=1:ecs4my3350=10:duration=10:decay=1]',
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."hum_cdna_genebuild",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'est_genebuilder',        
-      batch_size => 1,
-      resource   => 'linux',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."est_genebuild",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'tmhmm',        
-      batch_size => 10,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      cleanup    => 'no', 
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'scanprosite',        
-      batch_size => 1,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'ncoils',        
-      batch_size => 10,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'pfscan',        
-      batch_size => 1,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'Pfam',        
-      batch_size => 1,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 0,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'Signalp',        
-      batch_size => 10,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'Seg',        
-      batch_size => 1,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
-    },
-    {
-      logic_name => 'Prints',        
-      batch_size => 10,
-      resource   => 'select[linux && my$LC_DBHOST<800] rusage[my$LC_DBHOST=10:duration=10:decay=1]',
-      retries    => 3,
-      sub_args   => '',
-      runner     => '',
-      queue      => 'normal',
-      output_dir => $LC_scratchDIR."protein_annotation",     
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
     },
   ]
 );
