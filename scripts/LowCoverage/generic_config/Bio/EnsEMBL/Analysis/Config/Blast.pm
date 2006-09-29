@@ -22,11 +22,11 @@ constructor arguments which should go to the Blast Runnable note any
 Blast constructor arguments will be overridden by the same key in
 analysis table parameters column
 
-BLAST_CONFIG is an hash of hashes which contains analysis specific
+BLAST_CONFIG is an array of hashes which contains analysis specific
 settings and is keyed on logic_name
 
-Important values are the key of the hash which should be the same as the
-the logic name of the analysis you are configuring
+Important values are logic_name which should be the same as the
+equivalent column in the analysis table. 
 and blast parser which should be a perl path to a object to parser the 
 blast report. 
 
@@ -68,89 +68,139 @@ package Bio::EnsEMBL::Analysis::Config::Blast;
 use strict;
 use vars qw(%Config);
 
-
-# PARSER_PARAMS-table for Blast-Configuration (below):
-#
-# Analysis  query_type    database_type
-#-------------------------------------
-#  blastp     pep            pep
-#  blastn     dna            dna
-#  blastx     dna            pep         (i.e.Uniprot-wublastx)
-# tblastn     pep            dna
-# tblastx     dna            dna
-#
-#
-# For running an unfiltered blastx against Uniprot with the logic_name "Uniprot" in the 
-# analysis-table, use query_type='dna' and database-type 'pep'.
-#
-#    ########  Example-configuration for blastx against UNIPROT  #########
-#    Uniprot =>
-#            {
-#             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-#             PARSER_PARAMS => {
-#                               -regex => '^\w+\s+(\w+)',
-#                               -query_type => 'dna',       # see PARSER_PARAMS-table
-#                               -database_type => 'pep',    # see PARSER_PARAMS-table
-#                               -threshold_type => 'PVALUE',
-#                               -threshold => 0.01,
-#                              },
-#             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-#             FILTER_PARAMS => { },
-#             BLAST_PARAMS => {
-#                              -unknown_error_string => 'FAILED',
-#                              -type => 'wu',
-#                             },
-
-
+# Analysis  Query type  Database type
+#  blastp    pep          pep
+#  blastn    dna          dna
+#  blastx    dna          pep
+# tblastn    pep          dna
+# tblastx    dna          dna
 
 %Config = (
-  BLAST_CONFIG => {
-    DEFAULT => {
-      BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
-      PARSER_PARAMS => {
-        -regex => '^(\w+)',
-        -query_type => undef,
-        -database_type => undef,
-      },
-      BLAST_FILTER => undef,
-      FILTER_PARAMS => {},
-      BLAST_PARAMS => {
-        -unknown_error_string => 'FAILED',
-        -type => 'wu',
-      }
-    }
-  },
-  BLAST_AB_INITIO_LOGICNAME => 'Genscan',
-);
-
-
-
+           BLAST_CONFIG =>
+           {
+            #below is an Uniprot
+            #example => 
+            #{
+            #BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+            #PARSER_PARAMS => {
+            #                   -regex => '^\w+\s+(\w+)',
+            #                   -query_type => 'pep',
+            #                   -database_type => 'pep',
+            #                   -threshold_type => 'PVALUE',
+            #                   -threshold => 0.01,
+            #                  },
+            #BLAST_FILTER =>'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+            #FILTER_PARAMS => {
+            #                  -min_score => 200,
+            #                  -prune => 1,
+            #                 },
+            #BLAST_PARAMS => {
+            #                 -unknown_error_string => 'FAILED',
+            #                 -type => 'wu',
+            #                },
+            #},
+            DEFAULT => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
+             PARSER_PARAMS => {
+                               -regex => '^(\w+)',
+                               -query_type => undef,
+                               -database_type => undef,
+                              },
+             BLAST_FILTER => undef,
+             FILTER_PARAMS => {},
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             }
+            },
+            Uniprot => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
+                               -regex => '^(\w+\W\d+)',
+                               -query_type => 'pep',
+                               -database_type => 'pep',
+                               -threshold_type => 'PVALUE',
+                               -threshold => 0.01,
+                              },
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
+                               -min_score => 200,
+                               -prune => 1,
+                              },
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             },
+            },
+            Vertrna => 
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
+                               -regex => '\w+\s+(\w+)',
+                               -query_type => 'pep',
+                               -database_type => 'dna',
+                               -threshold_type => 'PVALUE',
+                               -threshold => 0.001,
+                              },
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
+                               -prune => 1,
+                              },
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             },
+            },
+            Unigene =>
+            {
+             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+             PARSER_PARAMS => {
+                               -regex => '\/ug\=([\w\.]+)',
+                               -query_type => 'pep',
+                               -database_type => 'dna',
+                               -threshold_type => 'PVALUE',
+                               -threshold => 0.001,
+                              },
+             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+             FILTER_PARAMS => {
+                               -prune => 1,
+                              },
+             BLAST_PARAMS => {
+                              -unknown_error_string => 'FAILED',
+                              -type => 'wu',
+                             },
+            },
+           },
+           BLAST_AB_INITIO_LOGICNAME => 'Genscan',
+          );
 
 sub import {
-  my ($callpack) = caller(0); # Name of the calling package
-  my $pack = shift; # Need to move package off @_
+    my ($callpack) = caller(0); # Name of the calling package
+    my $pack = shift; # Need to move package off @_
 
     # Get list of variables supplied, or else all
-  my @vars = @_ ? @_ : keys(%Config);
-  return unless @vars;
+    my @vars = @_ ? @_ : keys(%Config);
+    return unless @vars;
 
     # Predeclare global variables in calling package
-  eval "package $callpack; use vars qw("
-       . join(' ', map { '$'.$_ } @vars) . ")";
-  die $@ if $@;
+    eval "package $callpack; use vars qw("
+         . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
 
 
     foreach (@vars) {
-    if (defined $Config{ $_ }) {
-              no strict 'refs';
-        # Exporter does a similar job to the following
-        # statement, but for function names, not
-        # scalar variables:
-        *{"${callpack}::$_"} = \$Config{ $_ };
-    } else {
-        die "Error: Config: $_ not known\n";
+	if (defined $Config{ $_ }) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Config{ $_ };
+	} else {
+	    die "Error: Config: $_ not known\n";
+	}
     }
-  }
 }
 
 1;
