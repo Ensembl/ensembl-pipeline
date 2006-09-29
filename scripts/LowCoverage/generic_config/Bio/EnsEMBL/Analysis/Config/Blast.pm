@@ -22,13 +22,13 @@ constructor arguments which should go to the Blast Runnable note any
 Blast constructor arguments will be overridden by the same key in
 analysis table parameters column
 
-BLAST_CONFIG is an array of hashes which contains analysis specific
+BLAST_CONFIG is an hash of hashes which contains analysis specific
 settings and is keyed on logic_name
 
-Important values are logic_name which should be the same as the
-equivalent column in the analysis table. 
-and blast parser which should be a perl path to a object to parser the 
-blast report. 
+Important values are the key of the hash which should be the same as the
+the logic name of the analysis you are configuring
+and blast parser which should be a perl path to a object to parser the
+blast report.
 
 the blast_parser object should fit the standard interface which is to 
 have a method called parse_file which accepts a filename as an argument and
@@ -68,12 +68,39 @@ package Bio::EnsEMBL::Analysis::Config::Blast;
 use strict;
 use vars qw(%Config);
 
-# Analysis  Query type  Database type
-#  blastp    pep          pep
-#  blastn    dna          dna
-#  blastx    dna          pep
-# tblastn    pep          dna
-# tblastx    dna          dna
+
+# PARSER_PARAMS-table for Blast-Configuration (below):
+#
+# Analysis  query_type    database_type
+#-------------------------------------
+#  blastp     pep            pep
+#  blastn     dna            dna
+#  blastx     dna            pep         (i.e.Uniprot-wublastx)
+# tblastn     pep            dna
+# tblastx     dna            dna
+#
+#
+# For running an unfiltered blastx against Uniprot with the logic_name "Uniprot" in the
+# analysis-table, use query_type='dna' and database-type 'pep'.
+#
+#    ########  Example-configuration for blastx against UNIPROT  #########
+#    Uniprot =>
+#            {
+#             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+#             PARSER_PARAMS => {
+#                               -regex => '^\w+\s+(\w+)',
+#                               -query_type => 'dna',       # see PARSER_PARAMS-table
+#                               -database_type => 'pep',    # see PARSER_PARAMS-table
+#                               -threshold_type => 'PVALUE',
+#                               -threshold => 0.01,
+#                              },
+#             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+#             FILTER_PARAMS => { },
+#             BLAST_PARAMS => {
+#                              -unknown_error_string => 'FAILED',
+#                              -type => 'wu',
+#                             },
+
 
 %Config = (
            BLAST_CONFIG =>
