@@ -18,7 +18,6 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_cvsDIR  			=> '',#/nfs/acari/ba1/PerlCode/
 		  LC_workDIR 			=> '',#/ecs4/work3/ba1/test/
 		  LC_scratchDIR			=> '', #/ecs2/scratch3/ba1/test/    Pipeline output directory
-		  #LC_scratchDIR2		=> '',#/ecs4/scratch1/ba1/armadillo1/arma_1.0/
 		  
 		  
 		  # Species-specific configuration:
@@ -26,12 +25,6 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_BUILD_VERSION	=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/	 
 		  LC_GENOMICSEQS        => '',#/data/blastdb/Ensembl/Large/Dasypus_novemcinctus/BROAD/Dasypus_novemcinctus.BROAD.stdrep.fa
 		  LC_CONFIG	        => '',#/nfs/acari/ba1/PerlCode/ensembl-config/
-		  LC_PMATCH 		=> '', #/ecs4/work3/ba1/armadillo1/seqdata/arma_proteome.fa  location of fasta file to be written by new_prepare_proteome.pl and used in pmatch analysis
-		  LC_KILL 	                => '',#/nfs/acari/ba1/PerlCode/ensembl-pipeline/scripts/GeneBuild/kill_list.txt	
-		  LC_PROTEOME 			=> '',#/ecs4/work3/ba1/armadillo1/seqdata/arma_pep_all_fixed_header.fa
-		  LC_PROT_INDEX 		=> '',#/ecs4/work3/ba1/armadillo1/seqdata/arma_proteome
-		  LC_PEPFILE 			=> '', #/ecs4/work3/ba1/armadillo1/seqdata/ensembl_peptides/arma_pep.fa     path to dumped peptides
-		  LC_CHUNKS_DIR 		=> '', #/ecs4/work3/ba1/armadillo1/seqdata/ensembl_peptides/chunks     path to directory chunks to be written
 		  
 		  
 		  #data-specific cofiguration from BROAD and EBI
