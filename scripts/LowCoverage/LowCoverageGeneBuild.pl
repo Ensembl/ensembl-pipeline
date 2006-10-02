@@ -12,9 +12,9 @@ LowCoverageGeneBuild.pl will:
 LowCoverageGeneBuild.pl will not:
 ---------------------------------
 - Tell you which RepeatMasks to use.
-It is up to you to decide which RepeatMasking analyses (RepeatMask, Ab_initio_RepeatMask, Supp_RepeatMask) 
-should be used for the RepeatMask-dependent analyses (Genscan, Unigene, Uniprot, Vertrna).
-
+  It is up to you to decide which RepeatMasking analyses (RepeatMask, Ab_initio_RepeatMask, Supp_RepeatMask) 
+  should be used for the RepeatMask-dependent analyses (Genscan, Unigene, Uniprot, Vertrna).
+  Usually RepeatMask and Supp_RepeatMask are sufficient. 
 This is an adapted version of Felix's wormbase_to_ensembl.pl 
 
 
@@ -40,12 +40,11 @@ Call the script with one of the following options, in the following order:
    clean        }
  
 
-
 =head1 DESCRIPTION
 
 The script sets up an ensembl database for a low-coverage genome in an automated fashion.
   1 - Assembly data are downloaded manually from BROAD and repeat data are downloaded manually from EBI.
-  2 - The appropriate config files should be added to ensembl-config
+  2 - The appropriate config files should be added to ensembl-config by this script.
   3 - The empty db is created, tables created, rules and analyses enetered, etc
   4 - The rulemanager runs RepeatMasking and RepeatMask-independent analyses
   5 - MANUALLY decide which RepeatMasking to use and fill in $LC_REPMASK_CHOICE (in LowCoverageGeneBuildConf.pm)
@@ -93,13 +92,13 @@ set_env(1);
 
 if ($comm eq "setup"){
   print STDERR "\nSet-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
-               "load_taxonomy, load_analysis_descriptions.\n\n";
+               "load_taxonomy, and load_analysis_descriptions.\n\n";
  
   #Get files  
   print STDERR "\nPreparing for setup... Please check that you have:\n".
-        "- updated your CVS\n".
+        "- updated your CVS co\n".
         "- Manually downloaded assembly and repeat data (see README)".
-        "- modified LowCoverageGeneBuildConf.pm\n".
+        "- modified LowCoverageGeneBuildConf.pm ***\n".
 	"- ssh bc-dev-64\n";
 
 
@@ -107,7 +106,7 @@ if ($comm eq "setup"){
   #---------------------------------
   print STDERR "\n>> Making config dir in $LC_cvsDIR...\n";
   config_setup();  
-  
+  print STDERR "   ...config setup completed.\n";  
 
   #Creating new db
   #---------------
@@ -132,10 +131,10 @@ if ($comm eq "setup"){
          "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
          "-coord_system_name contig -rank 2 -sequence_level -fasta_file $LC_ASSEMBLY";  
   if(system($cmd)){
-    die "\nError with first load_seq_region\n";
+    die "\n**Error with first load_seq_region**\n";
     exit 1;
   } else {
-    print STDERR "First load_seq_region successful\n";
+    print STDERR "   ...First load_seq_region successful\n";
   }
   print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
   system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") 
@@ -152,12 +151,12 @@ if ($comm eq "setup"){
          "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbpass $LC_DBPASS -dbname $LC_DBNAME ". 
          "-coord_system_name scaffold -coord_system_version $LC_DEFAULT -rank 1 -agp_file $LC_ASSEMBLY_AGP";  
   if(system($cmd)){
-    die "\nError with second load_seq_region\n";
+    die "\n**Error with second load_seq_region**\n";
     exit 1;
   } else {
-    print STDERR "Second load_seq_region successful\n";
+    print STDERR "   ...Second load_seq_region successful\n";
   }  
-   print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
+  print STDERR "  mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'\n";
   system("mysql -h$LC_DBHOST -u$LC_DBro -P$LC_DBPORT -D$LC_DBNAME -e 'SELECT count(*) FROM seq_region'") 
          && warn "\nCan't count 2nd seq_regions\n";  
  
@@ -291,7 +290,7 @@ if ($comm eq "setup"){
          "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -read -file ".
 	 "$LC_cvsDIR/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION/pipe_conf/rule.conf";
   if(system($cmd)){
-    die "\nError with rule_setup\n\n";
+    die "\n**Error with rule_setup**\n\n";
     exit 1;
   }  
   
@@ -348,15 +347,19 @@ if ($comm eq "setup"){
          "description from analysis left join analysis_description on analysis.analysis_id = analysis_description.analysis_id'") 
          && warn "\nProblem with MySQL query (analysis_description table)\n";
   
+  print STDERR "   ...Done loading the analysis descriptions.\n";
   print STDERR "\nAll of your analyses should have descriptions (except for SubmitContig)-\n".
   		"if not, insert descriptions into $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/analysis.descriptions\n".
 		"and run $LC_cvsDIR/ensembl-personal/lec/rhesus/scripts/load_analysis_descriptions.pl\n"; #copy above command  
 
+
   #Load taxonomy and other info into meta table
+  #---------------------------------------------
   print STDERR ">> Loading taxonomy and meta table information...";
   system("perl $LC_cvsDIR/ensembl-pipeline/scripts/load_taxonomy.pl -name '$LC_NAME' ".
          "-taxondbhost $TAXON_DBHOST -taxondbport $TAXON_DBPORT -taxondbname $TAXON_DBNAME ".
 	 "-lcdbhost $LC_DBHOST -lcdbport $LC_DBPORT -lcdbname $LC_DBNAME -lcdbuser $LC_DBUSER -lcdbpass $LC_DBPASS");
+  print STDERR "   ...Done loading taxonomy and meta table information.\n";
 
 
   #Make input_ids 
@@ -370,6 +373,8 @@ if ($comm eq "setup"){
   if(system($cmd)){
     die "\nError with making input ids\n";
     exit 1;
+  } else {
+    print STDERR "   ...Done making input_ids.\n";
   }
         
   print STDERR "\n\nSETUP IS FINISHED. (Now run 'check_seqs')\n\n";
@@ -494,7 +499,7 @@ if ($comm eq "setup"){
 	       "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
 	       "-logic Supp_RepeatMask -input_id contig::contig_10030:1:5096:1\n";
 
-  print STDERR "\n** Are you ready to run the RepeatMask_and_Independent analyses? \nyes or no:";
+  print STDERR "\n** Are you ready to start the rulemanager for RepeatMask_and_Independent analyses? \nyes or no:";
   my $ready = <STDIN>;  
   if ($ready =~ /yes/i){
 	
@@ -796,14 +801,11 @@ sub createDB{
 
 sub config_setup{
 
-	my @pipe_dirs = ("GeneBuild", "Protein_Annotation", "cDNAs_ESTs");
-	my $ensconfDIR = $LC_cvsDIR."/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION";
-	
-   foreach my $dir (@pipe_dirs){
-       system ("mkdir -p $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/$dir")
-           && warn "\nProblem with making Pipeline $dir in config setup\n";
-   }	   
+  my $ensconfDIR = $LC_cvsDIR."/ensembl-config/$LC_SPECIES/$LC_BUILD_VERSION";
 
+   system("mkdir -p $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/")
+           && warn "\nProblem with making Pipeline in config setup\n";
+	
    system("mkdir -p $ensconfDIR/Bio/EnsEMBL/Analysis/Config/")
            && warn "\nProblem with making Analysis in config setup\n";
 
@@ -812,10 +814,6 @@ sub config_setup{
 
    system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/*.pm $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/");
    
-   foreach my $dir (@pipe_dirs){
-       system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Pipeline/Config/$dir/*.pm $ensconfDIR/Bio/EnsEMBL/Pipeline/Config/$dir/");
-   }
-
    system("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/Bio/EnsEMBL/Analysis/Config/*.pm $ensconfDIR/Bio/EnsEMBL/Analysis/Config/");
    system ("cp $LC_cvsDIR/ensembl-pipeline/scripts/LowCoverage/generic_config/pipe_conf/*.conf $ensconfDIR/pipe_conf/");
 
