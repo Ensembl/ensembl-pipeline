@@ -163,7 +163,7 @@ use vars qw(%Config);
       retries    => 4,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
+      queue      => 'long',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
@@ -174,7 +174,7 @@ use vars qw(%Config);
       retries    => 4,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
+      queue      => 'long',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
@@ -185,7 +185,7 @@ use vars qw(%Config);
       retries    => 4,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal', 
+      queue      => 'long', 
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
