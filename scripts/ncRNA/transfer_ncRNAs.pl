@@ -389,6 +389,24 @@ sub generate_new_ids{
     $esp = $1;
     $esi = $2;
   }
+  # check stable ids of dead genes are not higher than the maximum in the gene stable id table
+  if (sql("SELECT max(gene_stable_id) from gene_archive ;",$ga)->[0] =~ /^(\D+)(\d+)$/){
+    if ($2 > $gsi){
+      print "dead gene with higher id $gsp$gsi\n";
+      $gsp = $1;
+      $gsi = $2;
+      print " becomes $gsp$gsi\n";
+    }
+  }
+  if ( sql("SELECT max(transcript_stable_id) from gene_archive ;",$ga)->[0] =~ /^(\D+)(\d+)$/){
+    if ($2 > $tsi){
+      print "dead trans with higher id $tsp$tsi";
+      $tsp = $1;
+      $tsi = $2;
+      print " becomes $tsp$tsi\n";
+    }
+  }
+
     unless ($gsp && $gsi && $tsp && $tsi && $esp && $esi){
     print "Cannot figure out how to make new stable ids\nHave got :";
     print sql("SELECT max(stable_id) from gene_stable_id ;",$ga)->[0];
