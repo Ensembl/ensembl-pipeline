@@ -42,7 +42,7 @@ use Data::Dumper;
         -port   => $dbport,
     );
 
-    my( $ids );
+    my $ids = [];
     if (! -t STDIN) {
         while (<>) {
             push(@$ids, split);
@@ -56,6 +56,7 @@ use Data::Dumper;
                         FROM ${table}_align_feature f LEFT JOIN hit_description h 
                           ON f.hit_name = h.hit_name
                        WHERE h.hit_name IS NULL 
+                       AND f.hit_name NOT LIKE '%\\_%' 
                     ORDER BY f.hit_name";
         }
         elsif($ana_id){
@@ -63,6 +64,7 @@ use Data::Dumper;
                         FROM ${table}_align_feature f LEFT JOIN hit_description h 
                           ON f.hit_name = h.hit_name
                        WHERE h.hit_name IS NULL 
+                       AND f.hit_name NOT LIKE '%\\_%' 
                          AND f.analysis_id = '${ana_id}'
                     ORDER BY f.hit_name";
         }else{
@@ -90,6 +92,7 @@ use Data::Dumper;
 	    my $failed = $seqfetcher->write_descriptions($db, $chunk);
         if (@$failed) {
             warn "Failed to fetch:\n", map("  $_\n", @$failed);
+            print STDERR "Failed ".scalar(@$failed)." ids\n";
         }
     }
     print STDERR "FINISHED OK\n"
