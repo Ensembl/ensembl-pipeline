@@ -274,7 +274,6 @@ if ($comm eq "setup"){
     print STDERR "\n** Type yes when you are ready to continue...  : ";
     $input = <STDIN>;
   }
-      
   
   #Setting up the analysis and rule tables
   #---------------------------------------
@@ -441,6 +440,8 @@ if ($comm eq "setup"){
 
   
   #Reformat sequence to 60 characters per row
+  system("mkdir -p $LC_workDIR/assembly");
+
   print STDERR ">> Reformatting $LC_SCAFFOLDS to 60 characters per row...\n";
   $status = 0;
   $status += system("$LC_cvsDIR/ensembl-personal/searle/scripts/reformat_fasta.pl $LC_SCAFFOLDS > $LC_workDIR/assembly/assembly.agp.fasta.60");
@@ -509,7 +510,7 @@ if ($comm eq "setup"){
     system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
          "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
          "-analysis RepeatMask -analysis Supp_RepeatMask -analysis Ab_initio_RepeatMask ".
-         "-analysis Eponine -analysis CpG -analysis Dust -analysis TRF -analysis tRNAscan ".
+         "-analysis Eponine -analysis CpG -analysis Dust -analysis TRF -analysis tRNAscan -shuffle ".
 	 ">& ".$LC_scratchDIR."/".$LC_BUILD_VERSION."_repeatmasking.out ");
 
     print STDERR "\n\nrun_RepeatMask_and_independent appears to be finished\nHOWEVER it is a good idea to check the jobs table "
@@ -542,32 +543,35 @@ if ($comm eq "setup"){
   print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select * from meta_coord' ");
 
+  
+  system("mkdir -p $LC_workDIR/repeat_libraries");
+
   print STDERR ">> Submitting jobs to check repeat coverage (output at $LC_workDIR/repeat_libraries/*.out)...\n";
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_initio_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/Ab_initio_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Ab_initio_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Supp_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/Supp_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Supp_RepeatMask -path $LC_DEFAULT");
 
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_and_supp_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/Ab_and_supp_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat Ab_initio_RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Supp_and_orig_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/Supp_and_orig_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/Ab_and_orig_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/Ab_and_orig_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Ab_initio_RepeatMask -path $LC_DEFAULT");
   
-  system("bsub -q normal -o $LC_workDIR/repeat_libraries/all_three_RepeatMask.out ".
+  system("bsub -q normal -R linux -o $LC_workDIR/repeat_libraries/all_three_RepeatMask.out ".
          "$LC_cvsDIR/ensembl-personal/searle/monodelphis1/scripts/repeat_coverage.pl ".
          "-dbname $LC_DBNAME -host $LC_DBHOST -port $LC_DBPORT -repeat RepeatMask -repeat Ab_initio_RepeatMask -repeat Supp_RepeatMask -path $LC_DEFAULT");
     
@@ -586,9 +590,9 @@ if ($comm eq "setup"){
                "(1) analyse results\n ". 
 	       "    This this done by seeing how many bases are masked out by the ".
 	       "different combinations of repeat masking compared to the total number of bases.\n".
-	       "    To see the total number of bases:\n    'more $LC_workDIR/repeat_libraries/scaffolds.lowercase.out'\n".
-	       "    To see how many bases are masked:\n    \'foreach file (`ls /ecs4/work3/ba1/bushbaby1//repeat_libraries/*.out`)\'\n".
-	       "      \'echo \$file\'\n      \'grep \^\"Total masked\" \$file\'\n    \'end\'\n".
+	       "    To see the total number of bases:\n    more $LC_workDIR/repeat_libraries/scaffolds.lowercase.out\n".
+	       "    To see how many bases are masked:\n    foreach file ($LC_workDIR/repeat_libraries/*.out)\n".
+	       "      echo \$file\n      grep \^\"Total masked\" \$file\n    end\n".
                "(2) decide which combination of the 3 RepeatMasks to use (look at the 'total masked' number at end of *.out files)\n".
 	       "(3) fill in LC_REPMASK_CHOICE in LowCoverageGeneBuildConf.pm".
 	       "(4) and then run 'run_RepeatMask_dependent'\n";
@@ -609,10 +613,16 @@ if ($comm eq "setup"){
                "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
                "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Uniprot -input_id contig::contig_10030:1:5096:1\n".
                "\nWhen they have all been tested you can run the rulemanager...\n";
+  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select sr.name,sr.length from prediction_transcript pt, seq_region sr where sr.seq_region_id=pt.seq_region_id limit 10'\n";
+  system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select sr.name,sr.length from prediction_transcript pt, seq_region sr where sr.seq_region_id=pt.seq_region_id limit 10'");
 
   print STDERR "\n** Are you ready to run the rulemanager on all analyses? \n yes or no:";  
   if (<STDIN>=~/yes/i){
     print STDERR "Rulemanager will now run Genscan, Uniprot, Unigene and Vertrna... don't forget to monitor your jobs\n".
+    print STDERR "perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
+           "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
+            "-analysis Genscan -analysis Uniprot -analysis Unigene -analysis Vertrna >& $LC_scratchDIR/".
+	    $LC_BUILD_VERSION."_repeatmask_dependents.out\n";
     system("perl $LC_cvsDIR/ensembl-pipeline/scripts/rulemanager.pl -dbname $LC_DBNAME -dbhost ".
            "$LC_DBHOST -dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT ".
             "-analysis Genscan -analysis Uniprot -analysis Unigene -analysis Vertrna >& $LC_scratchDIR/".
