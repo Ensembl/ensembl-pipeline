@@ -62,7 +62,8 @@ use vars qw(%Config);
   #regex for spiting up slice input_ids
   SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',	   
     
-  PIPELINE_REPEAT_MASKING => $LC_REPMASK_CHOICE,	
+# LC NOTE: This is NOT the repeat masking option used. Its the one in Bio/EnsEMBL/Analysis/Config/General.pm
+  PIPELINE_REPEAT_MASKING => ['RepeatMask'],	
 
   SNAP_MASKING => [],
 

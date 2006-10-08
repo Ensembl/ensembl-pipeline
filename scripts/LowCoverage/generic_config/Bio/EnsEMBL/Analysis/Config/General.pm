@@ -47,7 +47,7 @@ use vars qw(%Config);
     LIB_DIR  => '/usr/local/ensembl/lib',
 
     ANALYSIS_WORK_DIR => '/tmp',
-    ANALYSIS_REPEAT_MASKING => ['RepeatMask'],
+    ANALYSIS_REPEAT_MASKING => $LC_REPMASK_CHOICE,
 
 );
 
