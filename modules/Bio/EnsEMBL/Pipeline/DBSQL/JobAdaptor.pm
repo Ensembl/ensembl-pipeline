@@ -90,6 +90,7 @@ sub fetch_by_dbID {
     return undef;
   }
   my $job = $self->_objFromHashref( $rowHashRef );
+  $sth->finish;
   return $job;
 }
 
@@ -110,6 +111,7 @@ sub fetch_by_submission_id {
   while( my $rowHashRef = $sth->fetchrow_hashref ) {
     push( @result, $self->_objFromHashref( $rowHashRef ));
   }
+  $sth->finish;
  
   return @result;
 }
@@ -143,6 +145,7 @@ sub fetch_by_dbID_list {
     my $job = $self->_objFromHashref($row);
     push(@jobs,$job);
   }
+  $sth->finish;
   return @jobs or undef;
 }
 
@@ -159,73 +162,77 @@ sub fetch_by_dbID_list {
 =cut
 
 sub fetch_by_Status_Analysis {
-    my ($self,$status, $analysis, $start, $end) = @_;
+  my ($self,$status, $analysis, $start, $end) = @_;
 
-    throw("Require status and analysis id for fetch_by_Status_Analysis")
+  throw("Require status and analysis id for fetch_by_Status_Analysis")
                             unless ($analysis && $status);
-    if( ! defined $analysis->dbID ){
-       throw( "Analysis needs to be in database" );
-    }
-    my $analysisId = $analysis->dbID;
+  if( ! defined $analysis->dbID ){
+    throw( "Analysis needs to be in database" );
+  }
+  my $analysisId = $analysis->dbID;
 
-    my $query = q{
-	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
-	         j.stdout_file, j.stderr_file, j.retry_count,
+  my $query = q{
+        SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
+                 j.stdout_file, j.stderr_file, j.retry_count,
            j.temp_dir, j.exec_host
-	FROM     job j, job_status js
+        FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
         AND      j.analysis_id = ?
         AND      js.status = ?
-	AND      js.is_current = 'y'
+        AND      js.is_current = 'y'
         ORDER BY time desc
-    };
+  };
     
-    $query .= " LIMIT $start, $end" if ($start && $end);
+  $query .= " LIMIT $start, $end" if ($start && $end);
 
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute($analysisId, $status);
+  my $sth = $self->prepare($query);
+  my $res = $sth->execute($analysisId, $status);
 
-    my @jobs;
+  my @jobs;
 
-    while (my $row = $sth->fetchrow_hashref)
-    {
-	    my $job = $self->_objFromHashref($row);
-	    push(@jobs,$job);
-    }
-    return @jobs;
+  while (my $row = $sth->fetchrow_hashref)
+  {
+    my $job = $self->_objFromHashref($row);
+    push(@jobs,$job);
+  }
+  $sth->finish;
+  return @jobs;
 }
 
 sub fetch_by_Status {
-    my ($self, $status, $start, $end) = @_;
+  my ($self, $status, $start, $end) = @_;
 
-    throw("Require status for fetch_by_Status")
+  throw("Require status for fetch_by_Status")
                             unless ($status);
     
 
-    my $query = q{
-	SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
-	         j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
+  my $query = q{
+        SELECT   j.job_id, j.input_id, j.analysis_id, j.submission_id,
+                 j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
            j.exec_host
-	FROM     job j, job_status js
+        FROM     job j, job_status js
         WHERE    j.job_id = js.job_id
         AND      js.status = ?
-	AND      js.is_current = 'y'
+        AND      js.is_current = 'y'
         ORDER BY time desc
-    };
+  };
     
-    $query .= " LIMIT $start, $end" if ($start && $end);
+  $query .= " LIMIT $start, $end" if ($start && $end);
 
-    my $sth = $self->prepare($query);
-    my $res = $sth->execute($status);
+  my $sth = $self->prepare($query);
+  my $res = $sth->execute($status);
 
-    my @jobs;
+  my @jobs;
 
-    while (my $row = $sth->fetchrow_hashref)
-    {
-	    my $job = $self->_objFromHashref($row);
-	    push(@jobs,$job);
-    }
-    return @jobs;
+  while (my $row = $sth->fetchrow_hashref)
+  {
+    my $job = $self->_objFromHashref($row);
+    push(@jobs,$job);
+  }
+
+  $sth->finish;
+
+  return @jobs;
 }
 
 
@@ -247,6 +254,8 @@ sub list_dbIDs{
     push(@ids, $id);
   }
 
+  $sth->finish;
+
   return \@ids;
 }
 
@@ -265,11 +274,12 @@ sub fetch_all{
 
   my @jobs;
 
-  while (my $row = $sth->fetchrow_hashref)
-   {
+  while (my $row = $sth->fetchrow_hashref) {
      my $job = $self->_objFromHashref($row);
      push(@jobs,$job);
-    }
+  }
+
+  $sth->finish;
   return @jobs;
 }
 
@@ -285,32 +295,33 @@ sub fetch_all{
 =cut
 
 sub fetch_by_age {
-    my ($self,$age) = @_;
+  my ($self,$age) = @_;
 
-    throw("No input status for get_JobsByAge")
+  throw("No input status for get_JobsByAge")
         unless defined($age);
     #convert age from minutes to seconds
 
-    my $sth = $self->prepare(qq{
-	SELECT j.job_id, j.input_id, j.analysis_id, j.submission_id,
+  my $sth = $self->prepare(qq{
+        SELECT j.job_id, j.input_id, j.analysis_id, j.submission_id,
          j.stdout_file, j.stderr_file, j.retry_count, j.temp_dir, 
          j.exec_host
-	FROM   job j, job_status js
-	WHERE  j.job_id = js.job_id
-	AND    is_current = 'y'
-	AND    js.time < DATE_SUB(NOW(), INTERVAL $age MINUTE)
-    });
+        FROM   job j, job_status js
+        WHERE  j.job_id = js.job_id
+        AND    is_current = 'y'
+        AND    js.time < DATE_SUB(NOW(), INTERVAL $age MINUTE)
+  });
     
-    my $res = $sth->execute();
+  my $res = $sth->execute();
 
-    my @jobs;
+  my @jobs;
 
-    while (my $row = $sth->fetchrow_hashref) {
-	my $job = $self->_objFromHashref($row);
-	push(@jobs,$job);
-    }
+  while (my $row = $sth->fetchrow_hashref) {
+    my $job = $self->_objFromHashref($row);
+    push(@jobs,$job);
+  }
 
-    return @jobs;
+  $sth->finish;
+  return @jobs;
 }
 
 
@@ -341,6 +352,7 @@ sub fetch_by_input_id {
   while( my $rowHashRef = $sth->fetchrow_hashref ) {
     push( @result, $self->_objFromHashref( $rowHashRef ));
   }
+  $sth->finish;
 
   return @result;
 }
@@ -381,6 +393,7 @@ sub fetch_hash_by_input_id{
   foreach my $result (@results) {
     $hash{$result->analysis->dbID} = $result;
   }
+  $sth->finish;
 
   return \%hash;
 }
@@ -427,6 +440,8 @@ sub store {
   $job->dbID( $dbId );
   $job->adaptor( $self );
 
+  $sth->finish;
+
   $self->set_status( $job, "CREATED" );
 }
 
@@ -461,6 +476,7 @@ sub remove {
     WHERE  job_id = $dbID
   });
   $sth->execute;
+  $sth->finish;
 }
 
 
@@ -488,12 +504,14 @@ sub remove_by_dbID {
     WHERE       job_id IN $inExpr
   });
   $sth->execute;
+  $sth->finish;
 
   $sth = $self->prepare(qq{
     DELETE FROM job_status
     WHERE       job_id IN $inExpr
   });
   $sth->execute;
+  $sth->finish;
 }
 
 
@@ -538,6 +556,7 @@ sub update {
                    $job->temp_dir,
                    $job->dbID );
   }
+  $sth->finish;
 }
 
 
@@ -620,7 +639,10 @@ sub set_status {
                                });
 
         $sth_upd->execute($jobId);
+        $sth_upd->finish;
+
         $sth_ins->execute($jobId, $stat_str);
+        $sth_ins->finish;
         
         $sth = $self->prepare("SELECT NOW()");
         $sth->execute();
@@ -683,7 +705,8 @@ sub current_status {
         while (my  $rowhash = $sth->fetchrow_hashref() ) {
           $status = $rowhash->{'status'};
         }
-        
+        $sth->finish;
+
         $sth = $self->prepare("SELECT NOW()");
         $res = $sth->execute();
         my $time;
@@ -748,6 +771,8 @@ sub get_all_status {
     push(@status,$statusobj);
   }
 
+  $sth->finish;
+
   return @status;
 }
 
@@ -778,7 +803,7 @@ sub get_last_status {
   my $rowHashRef = $sth->fetchrow_hashref();
   if( ! defined $rowHashRef ) {
     return undef;
-  }
+  }    
 
   my $time      = $rowHashRef->{'UNIX_TIMESTAMP(time)'};
   my $status    = $rowHashRef->{'status'};
@@ -787,6 +812,8 @@ sub get_last_status {
     '-status'  => $status,
     '-created' => $time,
   );
+
+  $sth->finish;
 
   return $statusobj;
 }
@@ -810,6 +837,7 @@ sub list_job_id_by_status {
     push( @result, $row[0] );
   }
 
+  $sth->finish;
   return \@result;
 }
 
@@ -832,6 +860,7 @@ sub list_job_id_by_status_age {
     push( @result, $row[0] );
   }
 
+  $sth->finish;
   return \@result;
 }
 
@@ -871,6 +900,7 @@ sub lock_tables{
   my $sth = $self->db->prepare($sql);
 
   $sth->execute;
+  $sth->finish;
 
 }
 
@@ -882,6 +912,7 @@ sub unlock_tables{
   my $sth = $self->db->prepare($sql);
 
   $sth->execute;
+  $sth->finish;
 }
 
 
