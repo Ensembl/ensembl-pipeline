@@ -391,6 +391,7 @@ sub fetch_descriptions_by_accession {
         # Each entry may have one or more "no match" lines at the start
         while ($entry =~ s/^no match\n//m) {
             push(@$failed, $id_list->[$i]);
+            delete	$descriptions->{$id_list->[$i]};
             $i++;
         }
 
