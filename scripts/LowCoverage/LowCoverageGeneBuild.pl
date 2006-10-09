@@ -213,6 +213,8 @@ if ($comm eq "setup"){
          && warn "\nProblem with loading genebuild id\n";
 
 
+  system("mkdir -p $LC_workDIR/assembly");
+
   #Loading a standard agp file into the assembly table
   #---------------------------------------------------
   print STDERR "\n>> Loading agp file into the assembly table...\n";
@@ -440,7 +442,6 @@ if ($comm eq "setup"){
 
   
   #Reformat sequence to 60 characters per row
-  system("mkdir -p $LC_workDIR/assembly");
 
   print STDERR ">> Reformatting $LC_SCAFFOLDS to 60 characters per row...\n";
   $status = 0;
