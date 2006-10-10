@@ -119,7 +119,7 @@ while (1) {
 	my $free_slots = &job_stats;
 	&flush_queue($free_slots);
 	&flush_batch();
-	sleep(180);
+	sleep(30);
 	print "Waking up and run again!\n" if $verbose;
 }
 
