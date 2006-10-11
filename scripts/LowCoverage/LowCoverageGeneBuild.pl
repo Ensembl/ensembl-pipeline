@@ -93,6 +93,7 @@ set_env(1);
 if ($comm eq "setup"){
   print STDERR "\nSet-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
                "load_taxonomy, and load_analysis_descriptions.\n\n";
+if (0) {
  
   #Get files  
   print STDERR "\nPreparing for setup... Please check that you have:\n".
@@ -218,13 +219,12 @@ if ($comm eq "setup"){
   #Loading a standard agp file into the assembly table
   #---------------------------------------------------
   print STDERR "\n>> Loading agp file into the assembly table...\n";
-  print STDERR "  bsub -q normal -o $LC_workDIR/assembly/load_agp.log $LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
+  print STDERR "$LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl ".
                "-dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
-               "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP\n";
-  $cmd = "bsub -q normal -o $LC_workDIR/assembly/load_agp.log ".
-         "$LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl -dbhost $LC_DBHOST -dbuser ".
+               "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP >&  $LC_workDIR/assembly/load_agp.log\n";
+  $cmd = "$LC_cvsDIR/ensembl-pipeline/scripts/load_agp.pl -dbhost $LC_DBHOST -dbuser ".
          "$LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS ".
-	 "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP"; 
+	 "-assembled_name scaffold -assembled_version $LC_DEFAULT -component_name contig -agp_file $LC_ASSEMBLY_AGP >&  $LC_workDIR/assembly/load_agp.log"; 
   if(system($cmd)){
     die "\nError with load_agp.log\n";
     exit 1;
@@ -252,30 +252,40 @@ if ($comm eq "setup"){
 	  
   #Flag the set of non-redundant seq_regions as 'toplevel'.  
   #------------------------------------------------------
-  print STDERR "\n>> Setting toplevel...\n";
-  print STDERR "  bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
-               " -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS \n";
-  $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
-         "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER ".
-         "-dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
-  if(system($cmd)){
-    die "\nError submitting set_toplevel\n";
-    exit 1;
-  } else {
-    print STDERR "Submitted to bsub: set_toplevel";
-  }  
-
-
-  #insert a break or sleep here to wait for bsub
-  #---------------------------------------------
-  print STDERR "You need to wait for the 2nd job on the farm to be completed before you can continue.\n".
-                "To check if the job is finished, type 'bjobs' in another window.\n".
-		"WHEN THE JOB IS FINISHED, type 'yes':";
-  $input = <STDIN>;  
-  while ($input !~ /yes/i){
-    print STDERR "\n** Type yes when you are ready to continue...  : ";
-    $input = <STDIN>;
-  }
+  print STDERR "\n>> Setting toplevel (the quick way)...\n";
+#  print STDERR "  bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl $LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl". 
+#               " -dbhost $LC_DBHOST -dbuser $LC_DBUSER -dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS \n";
+#  $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
+#         "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER ".
+#         "-dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
+}
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -p$LC_DBPASS -P$LC_DBPORT -D$LC_DBNAME -e 'INSERT IGNORE INTO attrib_type ( code, name, description ) VALUES ( \"toplevel\",\"Top Level\",\"Top Level Non-Redundant Sequence Region\")'") && warn "\nCan't load attrib_type for toplevel\n";  
+  system("mysql -h$LC_DBHOST -u$LC_DBUSER -p$LC_DBPASS -P$LC_DBPORT -D$LC_DBNAME ".
+         "-e 'INSERT INTO seq_region_attrib " .
+             "SELECT distinct( sr.seq_region_id ), at.attrib_type_id, 1 " .
+             "FROM   seq_region sr LEFT JOIN assembly a " .
+             "ON sr.seq_region_id=a.cmp_seq_region_id, attrib_type at " .
+             "WHERE  cmp_seq_region_id is NULL " .
+             "AND    at.code=\"toplevel\"'"
+        ) && die "Failed setting toplevel";
+#  if(system($cmd)){
+#    die "\nError submitting set_toplevel\n";
+#    exit 1;
+#  } else {
+#    print STDERR "Submitted to bsub: set_toplevel";
+#  }  
+#
+#
+#  #insert a break or sleep here to wait for bsub
+#  #---------------------------------------------
+#  print STDERR "You need to wait for the 2nd job on the farm to be completed before you can continue.\n".
+#                "To check if the job is finished, type 'bjobs' in another window.\n".
+#		"WHEN THE JOB IS FINISHED, type 'yes':";
+#  $input = <STDIN>;  
+#  while ($input !~ /yes/i){
+#    print STDERR "\n** Type yes when you are ready to continue...  : ";
+#    $input = <STDIN>;
+#  }
   
   #Setting up the analysis and rule tables
   #---------------------------------------
@@ -614,7 +624,8 @@ if ($comm eq "setup"){
                "$LC_cvsDIR/ensembl-analysis/scripts/test_RunnableDB -dbname $LC_DBNAME -dbhost $LC_DBHOST ".
                "-dbuser $LC_DBUSER -dbpass $LC_DBPASS -dbport $LC_DBPORT -logic Uniprot -input_id contig::contig_10030:1:5096:1\n".
                "\nWhen they have all been tested you can run the rulemanager...\n";
-  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select sr.name,sr.length from prediction_transcript pt, seq_region sr where sr.seq_region_id=pt.seq_region_id limit 10'\n";
+  print STDERR "\nHere is a list of some contigs on which genscan has already been run (maybe empty if this is your first run of this step)\n";
+  print STDERR "mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select distinct(sr.name),count(*) as npred,sr.length from prediction_transcript pt, seq_region sr where sr.seq_region_id=pt.seq_region_id limit 10'\n";
   system("mysql -h $LC_DBHOST -u $LC_DBro -P $LC_DBPORT -D $LC_DBNAME -e 'select sr.name,sr.length from prediction_transcript pt, seq_region sr where sr.seq_region_id=pt.seq_region_id limit 10'");
 
   print STDERR "\n** Are you ready to run the rulemanager on all analyses? \n yes or no:";  
