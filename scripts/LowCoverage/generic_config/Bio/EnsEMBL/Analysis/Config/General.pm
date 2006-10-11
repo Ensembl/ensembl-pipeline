@@ -37,6 +37,7 @@ B<ensembl-dev@ebi.ac.uk>
 package Bio::EnsEMBL::Analysis::Config::General;
 
 use strict;
+use LowCoverageGeneBuildConf;
 use vars qw(%Config);
 
 %Config = (
