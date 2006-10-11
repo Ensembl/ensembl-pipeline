@@ -93,7 +93,6 @@ set_env(1);
 if ($comm eq "setup"){
   print STDERR "\nSet-up will make the necessary ensembl-config files, create your database, load sequence, set toplevel, create input-ids, ".
                "load_taxonomy, and load_analysis_descriptions.\n\n";
-if (0) {
  
   #Get files  
   print STDERR "\nPreparing for setup... Please check that you have:\n".
@@ -258,7 +257,6 @@ if (0) {
 #  $cmd = "bsub -q normal -o $LC_workDIR/assembly/set_toplevel.log perl  ".
 #         "$LC_cvsDIR/ensembl-pipeline/scripts/set_toplevel.pl -dbhost $LC_DBHOST -dbuser $LC_DBUSER ".
 #         "-dbport $LC_DBPORT -dbname $LC_DBNAME -dbpass $LC_DBPASS";
-}
   system("mysql -h$LC_DBHOST -u$LC_DBUSER -p$LC_DBPASS -P$LC_DBPORT -D$LC_DBNAME -e 'INSERT IGNORE INTO attrib_type ( code, name, description ) VALUES ( \"toplevel\",\"Top Level\",\"Top Level Non-Redundant Sequence Region\")'") && warn "\nCan't load attrib_type for toplevel\n";  
   system("mysql -h$LC_DBHOST -u$LC_DBUSER -p$LC_DBPASS -P$LC_DBPORT -D$LC_DBNAME ".
          "-e 'INSERT INTO seq_region_attrib " .
