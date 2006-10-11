@@ -14,7 +14,7 @@ use vars qw( %LowCoverageGeneBuildConf );
                   LC_ASSEMBLY_NAME              => '', #otoGar1, what broad calls the assembly
                   LC_ASSEMBLY_DATE              => '', #YYMM, when broad completed assembly
 		  #perl5lib - this is the path to be added (temporarily) to the front of your perl5lib, make sure ensembl-config goes first
-		  LC_PERL5LIB			=> '', #/ecs4/work1/sd3/rabbit1/ensembl-config/rabbit/rabbit_1.0:/ecs4/work1/sd3/rabbit1/ensembl/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/:/ecs4/work1/sd3/rabbit1/ensembl-analysis/modules:/ecs4/work1/sd3/rabbit1/ensembl-compara/modules
+		  LC_PERL5LIB			=> '', #/ecs4/work1/sd3/rabbit1/ensembl-config/rabbit/rabbit_1.0:/ecs4/work1/sd3/rabbit1/ensembl/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/scripts/buildchecks:/ecs4/work1/sd3/rabbit1/ensembl-compara/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/scripts
 		  LC_cvsDIR  			=> '',#/nfs/acari/ba1/PerlCode/
 		  LC_workDIR 			=> '',#/ecs4/work3/ba1/test/
 		  LC_scratchDIR			=> '', #/ecs2/scratch3/ba1/test/    Pipeline output directory
@@ -23,8 +23,6 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  # Species-specific configuration:
 		  LC_SPECIES 		=> '',#armadillo	
 		  LC_BUILD_VERSION	=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/	 
-		  LC_GENOMICSEQS        => '',#/data/blastdb/Ensembl/Large/Dasypus_novemcinctus/BROAD/Dasypus_novemcinctus.BROAD.stdrep.fa
-		  LC_CONFIG	        => '',#/nfs/acari/ba1/PerlCode/ensembl-config/
 		  
 		  
 		  #data-specific cofiguration from BROAD and EBI
@@ -35,7 +33,7 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_SCAFFOLDS		=> '', #/ecs4/work1/sd3/rabbit1/assembly/scaffolds.fasta #unzipped name
 		
 		# Taxonomy
-		  LC_DEFAULT	=> '', #RABBIT #use a short name - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
+		  LC_DEFAULT	=> '', #RABBIT #use a short name (used for assembly) - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
 		  LC_NAME       => '', #Oryctolagus cuniculus #scientific name
                   TAXON_DBNAME  => 'ncbi_taxonomy',
 		  TAXON_DBHOST  => 'ecs2',
@@ -49,9 +47,7 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_DBPASS   => '',
 		  LC_DBPORT   => '',#3306
 		  LC_DBprefix => '',#ba1_test_
-		  LC_DBro     => '',
-		  LC_ANALYSIS => '',#/nfs/acari/ba1/Projects/Armadillo1/arma_1.0/analysis.conf
-		  LC_RULE     => '',#/nfs/acari/ba1/Projects/Armadillo1/arma_1.0/rule.conf
+		  LC_DBro     => '',#ensro
 
 
 		# if want the debug statements printed
