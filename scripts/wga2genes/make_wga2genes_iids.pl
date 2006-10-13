@@ -89,6 +89,7 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
 	'-host' => $dbhost,
 	'-user' => $dbuser,
 	'-port' => $dbport,
+        '-pass' => $dbpass,
 );
 
 my $ana = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
