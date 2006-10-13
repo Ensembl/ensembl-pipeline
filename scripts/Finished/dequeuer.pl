@@ -91,7 +91,7 @@ my $fetch = &get_dbi( $queue_name, $queue_host )->prepare(
 	qq{
 		SELECT id, created, priority, job_id, host, pipeline FROM queue
 		ORDER BY priority DESC, CREATED ASC
-		LIMIT 1
+		LIMIT 100
 	}
 );
 
@@ -151,9 +151,11 @@ sub flush_batch {
 # and submit them into the farm
 sub flush_queue {
 	my ($slots) = @_;
-	while ($slots) {
+	
+	while($slots) {
+		print "\t$slots to use !\n";
 		$fetch->execute();
-		if ( my @row = $fetch->fetchrow_array ) {
+		while ( my @row = $fetch->fetchrow_array ) {
 			my ( $id, $created, $priority, $job_id, $host, $pipe_name ) =
 			  @row[ 0 .. 5 ];
 			my $submitted = 1;
@@ -190,10 +192,7 @@ sub flush_queue {
 				$submitted = 0;
 			}
 			$slots-- if $submitted;
-		}
-		else {
-			print "No job in queue\n" if $verbose;
-			last;
+			last unless $slots;
 		}
 	}
 }
