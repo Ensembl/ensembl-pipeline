@@ -465,7 +465,7 @@ sub flush_runs {
 			}
 			$adaptor->update(@jobs);
 		}
-		$queue->{'jobs'}         = {};
+		$queue->{'jobs'}->{$host}->{$dbname}         = [];
 		$queue->{'last_flushed'}->{$host}->{$dbname} = time;
 	}
 }
