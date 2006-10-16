@@ -1,0 +1,21 @@
+AV731135.1 Homo sapiens cDNA clone:HTFAIG06, 5'end, expressed in human hypothalamus.
+BM272754.1 ih03h11.x1 Human insulinoma Homo sapiens cDNA 3', mRNA sequence.
+AB045232.1 Homo sapiens cDNA, clone:D26.
+BU852513.1 AGENCOURT_10501051 NIH_MGC_82 Homo sapiens cDNA clone IMAGE:6618895 5', mRNA sequence.
+AV731202.1 Homo sapiens cDNA clone:HTFAYE08, 5'end, expressed in human hypothalamus.
+BX956454.1 Homo sapiens mRNA; EST DKFZp781C1281_r1  (from clone DKFZp781C1281)
+AA483243.1 nf03e03.s1 NCI_CGAP_Li1 Homo sapiens cDNA clone IMAGE:912700 similar to contains element CER repetitive element ;, mRNA sequence.
+BU154595.1 AGENCOURT_7951758 NIH_MGC_82 Homo sapiens cDNA clone IMAGE:6102879 5', mRNA sequence.
+BX953689.1 Homo sapiens mRNA; EST DKFZp781B024_r1  (from clone DKFZp781B024) 
+BX476642.1 Homo sapiens mRNA; EST DKFZp686H17188_r1  (from clone DKFZp686H17188)
+AI267160.1 aq49f01.x1 Stanley Frontal NB pool 2 Homo sapiens cDNA clone IMAGE:2034265 similar to contains element L1 repetitive element ;, mRNA sequence. 
+AI267397.1 aq47c11.x1 Stanley Frontal NB pool 2 Homo sapiens cDNA clone IMAGE:2034068, mRNA sequence.
+BU561453.1 AGENCOURT_10278618 NIH_MGC_82 Homo sapiens cDNA clone IMAGE:6592498 5', mRNA sequence.
+BU853777.1 AGENCOURT_10407479 NIH_MGC_82 Homo sapiens cDNA clone IMAGE:6620768 5', mRNA sequence.
+BX505881.1 Homo sapiens mRNA; EST DKFZp686N03212_r1  (from clone DKFZp686N03212)
+AI267391.1 aq47b08.x1 Stanley Frontal NB pool 2 Homo sapiens cDNA clone IMAGE:2034039 similar to contains element LTR1 repetitive element ;, mRNA sequence.
+BQ429581.1 AGENCOURT_7828383 NIH_MGC_82 Homo sapiens cDNA clone IMAGE:6101861 5', mRNA sequence. 
+AA572934.1 nm43f08.s1 NCI_CGAP_Pr4.1 Homo sapiens cDNA clone IMAGE:1062951, mRNA sequence.
+AA501770.1 ng05c10.s1 NCI_CGAP_Li1 Homo sapiens cDNA clone IMAGE:928530 similar to contains element CER repetitive element ;, mRNA sequence.
+BG434587.1 602506651F1 NIH_MGC_79 Homo sapiens cDNA clone IMAGE:4603789 5', mRNA sequence. 
+BM955712.1 EST0646 HEV PCR-select Homo sapiens cDNA clone HEV#0302, mRNA sequence.
