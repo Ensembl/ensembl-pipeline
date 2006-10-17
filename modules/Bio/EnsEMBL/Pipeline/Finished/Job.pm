@@ -363,7 +363,7 @@ sub flush_runs {
 		if ( !@job_ids ) {
 			next ANAL;
 		}
-		print "\tqueue $anal job_id @job_ids\n" if $verbose;
+		print "\t\t$anal\t".scalar(@job_ids)." jobs\n" if $verbose;
 			my $this_runner = $queue->{'runner'};
 		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
 
