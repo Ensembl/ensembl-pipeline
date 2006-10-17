@@ -25,17 +25,28 @@ See the Net::Netrc module for more details.
 =head1 OPTIONS
 
 	-help|h		displays this documentation with PERLDOC
-	-verbose	
+	-verbose
+	-sleep		this is the amount of time the script will sleep for
+			after each loop and wait for free slots (default: 180s)
+	-flush		flush the jobs batch queues after each loop (default: false)
+	-fetch_number	number of jobs fetched from the queue (default: 100)
+	-analysis 	a logic_name of an analysis you want to dequeue and submit.
+			If you specify this option you will only submit this analysis 
+			or analyses as the option can appear on the command line 
+			multiple times
+  	-skip_analysis	a logic_name of an analysis you don't want to dequeue and 
+  			submit. If this option is specified these are the only 
+  			analyses which won't be submit
 
 These arguments are overridable configurations 
 options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
 
-	-queue_manager this specifies which 
-	 Bio::EnsEMBL::Pipeline::BatchSubmission module is used
-	-job_limit the maximun number of jobs of specified status allowed in
-	 system
-	-queue_name database name of the MySQL based priority queue
-	-queue_host host name of the queue
+	-queue_manager		this specifies which 
+				Bio::EnsEMBL::Pipeline::BatchSubmission module is used
+	-job_limit		the maximun number of jobs of specified status allowed in
+	 			system
+	-queue_name		database name of the MySQL based priority queue
+	-queue_host		host name of the queue
 
 =head1 SEE ALSO
 
@@ -63,6 +74,11 @@ my $verbose = 0;
 my $job_limit;
 my $queue_host;
 my $queue_name;
+my $sleep = 180;
+my $flush = 0;
+my $fetch_number = 100;
+my @analyses_to_run;
+my @analyses_to_skip;
 my $db_adaptors;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
@@ -76,6 +92,11 @@ GetOptions(
 	'queue_manager=s' => \$queue_manager,
 	'queue_name=s'    => \$queue_name,
 	'queue_host=s'    => \$queue_host,
+	'sleep=s'		  => \$sleep,
+	'flush!'		  => \$flush,
+	'fetch_number=s'  => \$fetch_number,
+	'analysis|logic_name=s@' => \@analyses_to_run,
+	'skip_analysis=s@'       => \@analyses_to_skip,
 	'h|help!'         => $usage
 
   )
@@ -86,12 +107,18 @@ $queue_manager = $QUEUE_MANAGER unless ($queue_manager);
 $queue_host    = $QUEUE_HOST    unless ($queue_host);
 $queue_name    = $QUEUE_NAME    unless ($queue_name);
 
+@analyses_to_run = map {split/,/} @analyses_to_run ; 
+@analyses_to_skip = map {split/,/} @analyses_to_skip ;
+
+my %analyses_to_run = map {$_,1} @analyses_to_run ;
+my %analyses_to_skip = map {$_,1} @analyses_to_skip ; 
+
 # Job fetch statement handle
 my $fetch = &get_dbi( $queue_name, $queue_host )->prepare(
 	qq{
 		SELECT id, created, priority, job_id, host, pipeline FROM queue
 		ORDER BY priority DESC, CREATED ASC
-		LIMIT 100
+		LIMIT ?,?
 	}
 );
 
@@ -118,8 +145,8 @@ my $batch_q_object = $batch_q_module->new();
 while (1) {
 	my $free_slots = &job_stats;
 	&flush_queue($free_slots);
-	&flush_batch();
-	sleep(30);
+	&flush_batch() if $flush;
+	sleep($sleep);
 	print "Waking up and run again!\n" if $verbose;
 }
 
@@ -151,28 +178,43 @@ sub flush_batch {
 # and submit them into the farm
 sub flush_queue {
 	my ($slots) = @_;
-	
-	while($slots) {
-		print "\t$slots to use !\n";
-		$fetch->execute();
-		while ( my @row = $fetch->fetchrow_array ) {
+	my $index = 0;
+
+	SLOT:while($slots) {
+		$fetch->execute($index,$fetch_number);
+		if($fetch->rows == 0){
+			print "No job in queue\n";
+			last SLOT;
+		}
+		JOB:while ( my @row = $fetch->fetchrow_array ) {
 			my ( $id, $created, $priority, $job_id, $host, $pipe_name ) =
 			  @row[ 0 .. 5 ];
-			my $submitted = 1;
+			my $submitted = 0;
 			my $job = &get_job_from_db( $job_id, $pipe_name, $host );
 			if ($job) {
 				$job->priority($priority);
+				
+				if (keys(%analyses_to_run)) {
+					unless($analyses_to_run{$job->analysis->logic_name}){
+						$index++;
+						next JOB; 
+					}
+				} elsif (keys(%analyses_to_skip)) {
+					if($analyses_to_skip{$job->analysis->logic_name}){ 
+						$index++;
+						next JOB;
+					} 
+				}
+				
 				eval {
 					$submitted = $job->batch_runRemote;
-					my $location = 'LSF';
-					$location = 'BATCH' unless $submitted;  
-					    print "\t$location\tsubmitted job " . $job_id
+					my $location = $submitted ? 'LSF':'BATCH';
+					print "\t$location\tsubmitted job " . $job_id
 					  . " ${host}/${pipe_name} ".$job->analysis->logic_name."\tpriority "
 					  . $priority . "\n"
 					  if $verbose;
 				};
 				if ($@) {
-					$submitted = 0;
 					warn(   "ERROR running job "
 						  . $job->dbID . " "
 						  . $job->analysis->logic_name . " "
@@ -189,10 +231,9 @@ sub flush_queue {
 					  . $host . "/"
 					  . $pipe_name );
 				&delete_job($id);
-				$submitted = 0;
 			}
 			$slots-- if $submitted;
-			last unless $slots;
+			last SLOT unless $slots;
 		}
 	}
 }
