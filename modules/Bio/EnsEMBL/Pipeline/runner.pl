@@ -130,6 +130,14 @@ if($cleanup){
 sub run_jobs_with_selfcopy{
   my ($jobs, $host) = @_;
  
+  # fix needed here; when running a batch of jobs, a jobs failure causes
+  # all output so far to be copied to the output directory. Upon completion
+  # of the whole batch, LSF then appends output for the whole batch  to the 
+  # end of the earlier-created file in the output directory. This causes 
+  # duplication of all output up to the point of the job failure. If you 
+  # intend to use for output for anything (e.g. data mining) then this will
+  # obviously affect the results!
+
  JOB:foreach my $job(@$jobs) {
     
     my $job_id = $job->dbID;
