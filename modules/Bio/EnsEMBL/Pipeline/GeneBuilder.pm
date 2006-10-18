@@ -270,7 +270,7 @@ sub build_Genes{
   # prune the redundant transcripts for each cluster
   #print STDERR "pruning transcripts...\n";
   my @pruned_transcripts = $self->prune_Transcripts(@transcript_clusters);
-  #print STDERR scalar(@pruned_transcripts)." transcripts obtained\n";
+  print STDERR scalar(@pruned_transcripts)." transcripts obtained\n";
   
   # cluster transcripts into genes
   #print STDERR "clustering into genes...\n";
@@ -411,7 +411,7 @@ sub _prune_redundant_transcripts {
       $self->_remove_transcript_from_gene($gene,$trans);
     }
   }
-  print "Removed $nremoved transcript as redundant\n";
+  print STDERR "Removed $nremoved transcript as redundant\n";
 }
 
 
@@ -498,7 +498,7 @@ sub _prune_redundant_CDS {
       }
     }
   }
-  print "Removed $nremoved transcripts because of redundant CDS\n";
+  print STDERR "Removed $nremoved transcripts because of redundant CDS\n";
 }
 
 sub _remove_transcript_from_gene {
@@ -595,23 +595,27 @@ sub get_Genes {
 
   foreach my $type ($self->gene_types) {
     my @genes = @{$slice->get_all_Genes_by_type($type)};
-    #print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
+    print STDERR "Retrieved ".scalar(@genes)." genes of type ".$type."\n";
     foreach my $gene ( @genes ){
     
     TRANSCRIPT:
       foreach my $tran (@{$gene->get_all_Transcripts}) {
         
         # do NOT check intron sizes - they're already tightly controlled by Targetted & Similarity stages
-        unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query ) && 
-                 Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)
-               ){
+        if (not Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $tran,$self->query )) {
+          print STDERR "Rejecting  ",  $tran->dbID, " because failed transcript check\n";
+          next TRANSCRIPT;
+        } elsif (not Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)) {
+          print STDERR "Rejecting  ",  $tran->dbID, " because failed translation check\n";
           next TRANSCRIPT;
         }
+
         $tran->type($type);
         push(@transcripts, $tran);
       }
     }
   }
+  print STDERR "Obtained ", scalar(@transcripts), " transcripts\n";
   $self->combined_Transcripts(@transcripts);
 }
 
