@@ -19,3 +19,6 @@ AA572934.1 nm43f08.s1 NCI_CGAP_Pr4.1 Homo sapiens cDNA clone IMAGE:1062951, mRNA
 AA501770.1 ng05c10.s1 NCI_CGAP_Li1 Homo sapiens cDNA clone IMAGE:928530 similar to contains element CER repetitive element ;, mRNA sequence.
 BG434587.1 602506651F1 NIH_MGC_79 Homo sapiens cDNA clone IMAGE:4603789 5', mRNA sequence. 
 BM955712.1 EST0646 HEV PCR-select Homo sapiens cDNA clone HEV#0302, mRNA sequence.
+DW465578.1
+DB336342.1
+AI267405.1
