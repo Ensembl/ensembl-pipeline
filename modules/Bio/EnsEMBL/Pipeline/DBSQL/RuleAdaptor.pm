@@ -44,6 +44,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Exception qw (throw) ; 
 use vars qw(@ISA);
 use strict;
 
@@ -85,7 +86,11 @@ sub store {
 
   my $sth = $self->prepare( q{
     INSERT INTO rule_goal
-       SET goal = ? } );
+       SET goal = ? } ); 
+
+  throw("Can't store a rule_goal without a dbID") 
+  unless ( $rule->goalAnalysis->dbID ) ; 
+
   $sth->execute( $rule->goalAnalysis->dbID );
 
   $sth = $self->prepare( q {
