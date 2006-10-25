@@ -197,9 +197,12 @@ if ($ids_to_skip && ! -e $ids_to_skip) {
 if ($ids_to_run || @analyses_to_run || @types_to_run || @starts_from ||
     @analyses_to_skip || @types_to_skip || $ids_to_skip || 
     $submission_limit) {
-  print STDERR "You are running with options which may break " .
-               "accumulators they are being switched off. You can prevent this with " .
-               "the -force_accumulators option\n";
+     
+  if (!$force_accumulators) {
+    print STDERR "You are running with options which may break " .
+                 "accumulators they are being switched off. You can prevent this with " .
+                 "the -force_accumulators option\n";
+  }	        
   $accumulators = 0;
 }
 
@@ -209,7 +212,10 @@ if ($accumulators && $accumulator_sanity) {
   $accumulators = $sanity->accumulator_sanity_check($all_rules, $accumulators);
 }
 
-$accumulators = 1 if($force_accumulators);
+if($force_accumulators) {
+  $accumulators = 1;
+  print STDERR "Forcing accumulators\n";
+}
 
 if ($rules_sanity) {
   $sanity->rule_type_sanity($all_rules, $verbose);
