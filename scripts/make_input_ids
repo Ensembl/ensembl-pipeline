@@ -156,6 +156,7 @@ my $translation_id;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
+my $include_non_reference;
 my $insert_analysis = 0;
 &GetOptions(
             'dbhost:s'     => \$host,
@@ -179,6 +180,7 @@ my $insert_analysis = 0;
             'translation_ids!' => \$translation_id,
             'seq_level!' => \$seq_level,
             'top_level!' => \$top_level,
+            'include_non_reference!' => \$include_non_reference,
             'h|help'            => \$help,
             'insert_analysis!' => \$insert_analysis,
            );
@@ -233,6 +235,7 @@ my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
    -translation_id => $translation_id,
    -seq_level => $seq_level,
    -top_level => $top_level,
+   -include_non_reference => $include_non_reference,
    -dir => $dir,
    -regex => $regex,
    -single_name => $name,
