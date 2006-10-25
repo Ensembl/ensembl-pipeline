@@ -634,7 +634,7 @@ sub split_Transcript{
     my @ex = @{$st->get_all_Exons};
     
     if(scalar(@ex) > 1){
-      $st->{'temporary_id'} = $transcript->dbID . "." . $count++;
+      $st->{'temporary_id'} = ($transcript->dbID ? $transcript->dbID : "no_dbid") .  "." . $count++;
 
       foreach my $f (@{$transcript->get_all_supporting_features}) {
         my @ugs;
