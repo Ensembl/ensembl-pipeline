@@ -44,7 +44,7 @@ package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Utils::Exception qw (throw) ; 
+use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
 use vars qw(@ISA);
 use strict;
 
@@ -266,7 +266,13 @@ sub fetch_by_goal{
 
   my ( $sql, $rule, $sth ) ;
 
-  if ( $goal_analysis->dbID ) {
+  unless ( $goal_analysis->dbID ) {  
+    my $anaAdaptor = $self->db->get_AnalysisAdaptor;
+    my $ta= $anaAdaptor->fetch_by_logic_name($goal_analysis->logic_name) ; 
+    $goal_analysis->dbID($ta->dbID) ;  
+  } 
+
+  if ( $goal_analysis->dbID ) { 
     $sql = q{ SELECT rule_id
                  FROM rule_goal
                  WHERE goal = ?
@@ -276,18 +282,13 @@ sub fetch_by_goal{
     my ($dbID) = $sth->fetchrow;
     $rule = $self->fetch_by_dbID($dbID);
 
-  } else {
-    $sql = q{ SELECT rule_id
-                 FROM rule_goal rg, analysis a
-                 WHERE a.analysis_id = rg.goal
-                 and a.logic_name = ?
-               };
-    $sth = $self->prepare($sql);
-    $sth->execute($goal_analysis->logic_name);
-    ($rule) = $sth->fetchrow;
-  }
-  throw("Can't get the dbID for the analysis with logic_name ".
-        $goal_analysis->logic_name) unless $rule ;
+  } else { 
+    throw(" can't find analysis in database\n" ) ; 
+  } 
+
+  warning("Can't get the dbID for the analysis with logic_name ".
+        $goal_analysis->logic_name . "in database " . 
+        $self->db->dbname ) unless $rule ;
 
   return $rule;
 }
