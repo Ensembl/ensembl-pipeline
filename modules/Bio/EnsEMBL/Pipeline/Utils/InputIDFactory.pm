@@ -57,33 +57,37 @@ sub new{
       $coord_system_version,
       $seq_region_name,
       $seq_region_start,
-      $seq_region_end)  =    rearrange([qw(DB 
-                                           SLICE 
-                                           SINGLE 
-                                           FILE
-                                           TRANSLATION_ID 
-                                           SLICE_SIZE 
-                                           SLICE_OVERLAPS 
-                                           SEQ_LEVEL
-                                           TOP_LEVEL 
-                                           DIR 
-                                           REGEX 
-                                           SINGLE_NAME
-                                           VERBOSE 
-                                           LOGIC_NAME 
-                                           INPUT_ID_TYPE
-                                           INSERT_ANALYSIS 
-                                           COORD_SYSTEM
-                                           COORD_SYSTEM_VERSION
-                                           SEQ_REGION_NAME
-                                           SEQ_REGION_START
-                                           SEQ_REGION_END
-                                          )], @_);
+      $seq_region_end,
+      $include_non_reference)=rearrange([qw(DB 
+                                            SLICE 
+                                            SINGLE 
+                                            FILE
+                                            TRANSLATION_ID 
+                                            SLICE_SIZE 
+                                            SLICE_OVERLAPS 
+                                            SEQ_LEVEL
+                                            TOP_LEVEL 
+                                            DIR 
+                                            REGEX 
+                                            SINGLE_NAME
+                                            VERBOSE 
+                                            LOGIC_NAME 
+                                            INPUT_ID_TYPE
+                                            INSERT_ANALYSIS 
+                                            COORD_SYSTEM
+                                            COORD_SYSTEM_VERSION
+                                            SEQ_REGION_NAME
+                                            SEQ_REGION_START
+                                            SEQ_REGION_END
+ 					    INCLUDE_NON_REFERENCE
+                                           )], @_);
 
   $slice = 0 unless ($slice);
   $single = 0 unless ($single);
   $file = 0 unless ($file);
+  $include_non_reference = 0 unless ($include_non_reference);
   $translation_id = 0 unless($translation_id);
+
   if(!$db){
     throw("You can't create and store input_ids without a dbadaptor\n");
   }
@@ -115,6 +119,7 @@ sub new{
 
   $self->file($file) if($file);
   $self->single($single) if($single);
+  $self->include_non_reference($include_non_reference) if($include_non_reference);
   $self->translation_id($translation_id) if($translation_id);
   if(!$logic_name){
     throw("Must have a logic_name otherwise don't know which analysis to ".
@@ -199,6 +204,11 @@ sub single{
   return $self->{'single'};
 }
 
+sub include_non_reference{
+  my $self = shift;
+  $self->{'include_non_reference'} = shift if(@_);
+  return $self->{'include_non_reference'};
+}
 
 sub slice_size{
   my $self = shift;
@@ -375,7 +385,8 @@ sub get_slice_names{
     $slices = [$sa->fetch_by_name($sname)];
   } else {
     $slices = $sa->fetch_all($self->coord_system, 
-                             $self->coord_system_version);
+                             $self->coord_system_version,
+			     $self->include_non_reference);
   }  
 
   if($self->slice_size > 0){
