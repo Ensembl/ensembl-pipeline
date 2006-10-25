@@ -187,7 +187,7 @@ sub check_exdb {
   # test final db for external db table 
   my $query = "SELECT external_db_id FROM external_db WHERE db_name = 'RFAM'";
   die("Cannot find RFAM in external db table\n") unless sql($query,$db)->[0] == 4200;
-  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRNA_Registry'";
+  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase'";
   die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 3300;
   return;
 }
