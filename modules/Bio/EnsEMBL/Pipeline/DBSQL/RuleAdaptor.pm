@@ -262,15 +262,33 @@ sub fetch_by_goal{
      !$goal_analysis->isa("Bio::EnsEMBL::Pipeline::Analysis")){
     throw("analysis ".$goal_analysis." must be a ".
           "Bio:EnsEMBL::Pipeline::Analysis object");
+  } 
+
+  my ( $sql, $rule, $sth ) ;
+
+  if ( $goal_analysis->dbID ) {
+    $sql = q{ SELECT rule_id
+                 FROM rule_goal
+                 WHERE goal = ?
+               };
+    $sth = $self->prepare($sql);
+    $sth->execute($goal_analysis->dbID);
+    my ($dbID) = $sth->fetchrow;
+    $rule = $self->fetch_by_dbID($dbID);
+
+  } else {
+    $sql = q{ SELECT rule_id
+                 FROM rule_goal rg, analysis a
+                 WHERE a.analysis_id = rg.goal
+                 and a.logic_name = ?
+               };
+    $sth = $self->prepare($sql);
+    $sth->execute($goal_analysis->logic_name);
+    ($rule) = $sth->fetchrow;
   }
-  my $sql = q{ SELECT rule_id 
-               FROM rule_goal
-               WHERE goal = ?
-             };
-  my $sth = $self->prepare($sql);
-  $sth->execute($goal_analysis->dbID);
-  my ($dbID) = $sth->fetchrow;
-  my $rule = $self->fetch_by_dbID($dbID);
+  throw("Can't get the dbID for the analysis with logic_name ".
+        $goal_analysis->logic_name) unless $rule ;
+
   return $rule;
 }
 
