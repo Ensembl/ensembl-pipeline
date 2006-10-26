@@ -324,7 +324,7 @@ sub fetch_input {
     my $dga = Bio::EnsEMBL::Pipeline::DBSQL::DenormGeneAdaptor->new($self->est_db);
     $genes = $dga->get_genes_by_Slice_and_type($slice, $genetype);
   } else {
-    $genes  = $slice->get_all_Genes_by_type($genetype);
+    $genes  = $slice->get_all_Genes_by_type($genetype,undef,1);
   } 
   
   my $cdna_slice;
@@ -333,7 +333,7 @@ sub fetch_input {
     
     $cdna_slice = $cdna_db->get_SliceAdaptor->fetch_by_name
       ($self->input_id);
-    my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE);
+    my $cdna_genes  = $cdna_slice->get_all_Genes_by_type($cDNA_GENETYPE,undef,1);
     push (@$genes, @$cdna_genes);
     $self->cdna_db->dbc->disconnect_when_inactive(1); 
   }
@@ -374,14 +374,14 @@ sub fetch_input {
     $revgenes = $dga->get_genes_by_Slice_and_type($rev_slice, $genetype);
   } 
   else {
-    $revgenes  = $rev_slice->get_all_Genes_by_type($genetype);
+    $revgenes  = $rev_slice->get_all_Genes_by_type($genetype,undef,1);
   } 
   
   my @reverse_transcripts;
   
   if ( $USE_cDNA_DB ){
     my $cdna_revslice = $cdna_slice->invert;
-    my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE);
+    my $cdna_revgenes  = $cdna_revslice->get_all_Genes_by_type($cDNA_GENETYPE,undef,1);
     push ( @$revgenes, @$cdna_revgenes ); 
   }
   
@@ -447,15 +447,16 @@ sub _process_Transcripts {
   # the standard introns are taken to be:  (GT-AG, AT-AC, GC-AG)
   
 
+
   # apply default filtering of EST's (introduced 2003)
   if ( $USE_EST_DEFAULT_FILTERING ) {
 
     if ( scalar( @checked_transcripts ) > 50 ){
       my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-	->new( -coverage => 97,
-	       -perc_id  => 99,
-	       -depth    => 5,
-	     );
+       ->new( -coverage => 97,
+              -perc_id  => 99,
+              -depth    => 5,
+            );
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
     }
   }
@@ -464,15 +465,14 @@ sub _process_Transcripts {
   unless ( $USE_EST_DEFAULT_FILTERING ){
     if ( scalar( @checked_transcripts ) > $MAX_NUMBER_ESTS ){
       my $est_filter = Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter
-	->new( -coverage => 97,
-	       -perc_id  => 99,
-	       -depth    => 20,
-	     );
-      
+       ->new( -coverage => 97,
+              -perc_id  => 99,
+              -depth    => 20,
+            );
+
       @checked_transcripts = $est_filter->filter(\@checked_transcripts);
     }
   }
-
 
 
   if ( scalar(@checked_transcripts) == 0 ){
