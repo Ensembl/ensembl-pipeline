@@ -549,6 +549,7 @@ sub fetch_genes {
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
+	next if  $ncRNA->biotype =~ /RNAI/;	
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
       }
     }
@@ -561,6 +562,7 @@ sub fetch_genes {
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
+	next if  $ncRNA->biotype =~ /RNAI/;
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
       }
     }
