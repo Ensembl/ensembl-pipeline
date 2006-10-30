@@ -63,8 +63,9 @@ die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost 
 -dump (skip all the rest and just dump the xrefs)
 -no_ids (do the load without any stable ids)
 * = essential\n")
-  unless ($pass && $final_port && $final_host && $final_dbname && $sids );
+  unless ($pass && $final_port && $final_host && $final_dbname );
 
+die ("transfer_ncRNAs need a file to put stable ids in \n")  unless ($sids or $no_stable_ids);
 # get whitelist
 if ($list){
   open (LIST,$list) or die "Cannot open whitelist file $list\n";
