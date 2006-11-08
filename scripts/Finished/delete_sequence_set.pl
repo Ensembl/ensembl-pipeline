@@ -134,7 +134,7 @@ sub show_sequence_sets {
 	  sprintf( "|%-9s|%-29s|%-38s|\n", 'chr', 'sequence_set', 'description' );
 	print STDOUT $line;
 	my $sets = $s_sets || get_sequence_sets($db);
-	foreach my $set ( keys %$sets ) {
+	foreach my $set ( sort keys %$sets ) {
 		my $chr  = $sets->{$set}->[0];
 		my $desc = $sets->{$set}->[1];
 		print STDOUT sprintf( "|%-9s|%-29s|%-38s|\n", $chr, $set, $desc );
@@ -172,8 +172,10 @@ sub delete_sequence_sets {
 		$asm_sth->execute($set);
 		$seq_sth->execute($set);
 		print STDOUT "Set $set deleted from pipeline\n";
-		show_sequence_sets($db);
+		
 	}
+	
+	show_sequence_sets($db);
 }
 
 sub get_sequence_sets {
@@ -187,7 +189,7 @@ sub get_sequence_sets {
 	 AND c.version = 'Otter'
 	 AND c.coord_system_id = s.coord_system_id
 	 AND t1.code = 'chr'
-	 AND t2.code = 'desc'
+	 AND t2.code = 'description'
 	 AND t1.attrib_type_id = a1.attrib_type_id 
 	 AND t2.attrib_type_id = a2.attrib_type_id 
 	 AND a1.seq_region_id =  s.seq_region_id
