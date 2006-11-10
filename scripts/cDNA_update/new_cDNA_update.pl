@@ -133,7 +133,7 @@ my $kill_list			 = $cvsDIR."/ensembl-pipeline/scripts/GeneBuild/cDNA_kill_list.t
 my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
-my $fastasplit           = "/nfs/acari/searle/progs/fastasplit/fastasplit";
+my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
 my $chunknum             = 5000;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog 			 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
@@ -696,7 +696,7 @@ sub fastafiles{
     	print STDERR "\nERROR: $@";
     	return 0;
 	}
-	-return 1;
+	return 1;
 }
 
 sub remake_fasta_files{
