@@ -574,3 +574,6 @@ Q9N2J9 ENH2_HUMAN HERV-H_3q26 provirus ancestral Env polyprotein precursor  (vac
 Q9N2K0 ENH1_HUMAN HERV-H_2q24.3 provirus ancestral Env polyprotein precursor  (vac)
 Q1L836 Q1L836_BOVIN Transposase.
 Q96DL5 Q96DL5_HUMAN Incorrect ORF from large scale cDNA sequencing project causing incorrect prediction of cox6b2 (steve)
+Q14264 ENR1_HUMAN HERV-R_7q21.2 provirus ancestral Env polyprotein precursor (Envelope polyprotein) (ERV3 envelope protein) (ERV-3 envelope protein) (HERV-R envelope protein) (ERV-R envelope protein) [Contains: Surface protein (SU); Transmembrane protein (TM)].    (vac, during human build) 
+Q9UQF0 ENW1_HUMAN HERV-W_7q21.2 provirus ancestral Env polyprotein precursor (Envelope polyprotein gPr73) (HERV-7q Envelope protein) (HERV-W envelope protein) (Syncytin) (Syncytin-1) (Enverin) (Env-W) [Contains: Surface protein (SU) (gp50); Transmembrane protein (TM) (gp24)].   (vac, during human build)
+    
