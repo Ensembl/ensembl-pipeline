@@ -143,3 +143,69 @@ AY598346.2 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence
 AY598347.3 Homo sapiens heterochromatic block map Yq12 transcribed DYZ1 sequence mRNA, partial sequence.	Requires too much memory	ba1
 NM_001040064.1 	Homo sapiens hypothetical LOC440264 (LOC440264), mRNA	Hit too many times      ba1
 NM_001025473.1 	Homo sapiens hypothetical protein LOC349196 (LOC349196), mRNA	Hit too many times      ba1
+
+AB046582.1 Homo sapiens mRNA, HERV-K LTR family, isolate:FB-1.    ba1
+AB046583.1 Homo sapiens mRNA, HERV-K LTR family, isolate:FB-2.    ba1
+AB046585.1 Homo sapiens mRNA, HERV-K LTR family, isolate:FB-5.    ba1
+AB046586.1 Homo sapiens mRNA, HERV-K LTR family, isolate:FB-6.    ba1
+AB052569.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B6.    ba1
+AB052570.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B7.    ba1
+AB052571.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B8.    ba1
+AB052572.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B9.    ba1
+AB052573.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B10.    ba1
+AB052574.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-B12.    ba1
+AB059364.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-FB7.    ba1
+AB059368.1 Homo sapiens mRNA, HERV-K LTR element, isolate:HKL-FB11.    ba1
+AB062072.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-1.    ba1
+AB062074.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-4.    ba1
+AB062075.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-5.    ba1
+AB062076.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-6.    ba1
+AB062078.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HB-9.    ba1
+AB062081.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-3.    ba1
+AB062085.1 Homo sapiens cDNA, SINE-R retroposon, isolate:HFB-7.    ba1
+AF087510.1 Homo sapiens clone ENaC+Alu epithelial sodium channel alpha subunit (SCNN1A) mRNA, alternatively spliced, partial sequence.    ba1
+AF179225.1 Homo sapiens endogenous retrovirus K long terminal repeat, partial sequence.    ba1
+AF205199.1 Homo sapiens clone KC8 Alu repeat sequence.    ba1
+AF205202.1 Homo sapiens clone KC6 Alu repeat sequence.    ba1
+AF205205.1 Homo sapiens clone KC19 Alu repeat sequence.    ba1
+AF205209.1 Homo sapiens clone KC23 Alu repeat sequence.    ba1
+AF229358.1 Homo sapiens AOR4 mRNA, partial sequence.    ba1
+AF315093.1 Homo sapiens isolate HERV-H-HU8 long terminal repeat, partial sequence.    ba1
+AF424542.1 Homo sapiens rheumatoid arthritis synovial fibroblast L1 retrotransposon, partial sequence.    ba1
+AK024334.1 Homo sapiens cDNA FLJ14272 fis, clone PLACE1004793, weakly similar to RETROVIRUS-RELATED ENV POLYPROTEIN.    ba1
+AK055186.1 Homo sapiens cDNA FLJ30624 fis, clone CTONG2001800.    ba1
+AK091947.1 Homo sapiens cDNA FLJ34628 fis, clone KIDNE2015483.    ba1
+AK095445.1 Homo sapiens cDNA FLJ38126 fis, clone D6OST2000169.    ba1
+AK098679.1 Homo sapiens cDNA FLJ25813 fis, clone TST07386.    ba1
+AK123577.1 Homo sapiens cDNA FLJ41583 fis, clone CTONG2020127.    ba1
+AK123889.1 Homo sapiens cDNA FLJ41895 fis, clone OCBBF2025458.    ba1
+AK125547.1 Homo sapiens cDNA FLJ43559 fis, clone PROST2018902.    ba1
+AK130243.1 Homo sapiens cDNA FLJ26733 fis, clone PRS00352.    ba1
+AK130982.1 Homo sapiens cDNA FLJ27472 fis, clone DMC06411.    ba1
+AM392645.1 Synthetic construct Homo sapiens mRNA for hypothetical protein (TMEM98 gene), clone DKFZp564K1964.1E4    ba1
+AM393022.1 Synthetic construct Homo sapiens mRNA for hypothetical protein (SET gene), clone IMAGE:4068666.1E2    ba1
+AM393296.1 Synthetic construct Homo sapiens mRNA for hypothetical protein (PNMA6A gene), clone IMAGE:3507248.1E2    ba1
+AY208132.1 Homo sapiens isolate 1 endogenous retrovirus HERV-W long terminal repeat, partial sequence.    ba1
+AY499131.1 Homo sapiens isolate 1 cell-line A-498 LINE-1 element p40-like mRNA, partial sequence.    ba1
+BC005076.1 Homo sapiens cDNA clone IMAGE:3607960, partial cds.    ba1
+BC035656.1 Homo sapiens hypothetical protein LOC285835, mRNA (cDNA clone IMAGE:5588650), partial cds.    ba1
+BC035659.1 Homo sapiens hypothetical protein LOC642032, mRNA (cDNA clone IMAGE:5588965), partial cds.    ba1
+BC046346.1 Homo sapiens cDNA clone IMAGE:4418696, partial cds.    ba1
+BC120929.1 Homo sapiens olfactory receptor, family 10, subfamily A, member 3, mRNA (cDNA clone IMAGE:40114844), partial cds.    ba1
+BC126382.1 Homo sapiens hypothetical gene supported by AK094370, mRNA (cDNA clone MGC:161660 IMAGE:8992098), complete cds.    ba1
+BC126384.1 Homo sapiens hypothetical gene supported by AK094370, mRNA (cDNA clone MGC:161662 IMAGE:8992100), complete cds.    ba1
+DQ821442.1 Homo sapiens endogenous virus HERV-K reverse transcriptase (pol) mRNA, partial cds.    ba1
+DQ893942.1 Homo sapiens clone FLH165934.01L; RZPDo839A1085D DEXI mRNA, partial sequence.    ba1
+DQ894309.1 Homo sapiens clone FLH169569.01L; RZPDo839D1095D RPL10A mRNA, partial sequence.    ba1
+DQ894463.1 Homo sapiens clone FLH170659.01L; RZPDo839A0299D C10orf126 mRNA, partial sequence.    ba1
+DQ894541.1 Homo sapiens clone FLH176202.01L; RZPDo839A09121D EI24 mRNA, partial sequence.    ba1
+DQ895618.1 Homo sapiens clone FLH186050.01L; RZPDo839A0661D H2AFV mRNA, partial sequence.    ba1
+DQ895892.1 Homo sapiens clone FLH188674.01L; RZPDo839E1163D MSN mRNA, partial sequence.    ba1
+DQ896114.1 Homo sapiens clone FLH190420.01L; RZPDo839A0366D TFDP1 mRNA, partial sequence.    ba1
+DQ896541.1 Homo sapiens clone FLH195286.01L; RZPDo839A10151D RPS20 mRNA, partial sequence.    ba1
+DQ896678.1 Homo sapiens clone FLH196577.01L; RZPDo839F06155D MGC35361 mRNA, partial sequence.    ba1
+DQ983818.1 Homo sapiens C1orf81 mRNA, partial sequence.    ba1
+gi|61966814|ref|NM_001013681.1| Homo sapiens hypothetical gene supported by AK123889 (LOC401252), mRNA    ba1
+gi|70887680|ref|NM_001025473.1| Homo sapiens hypothetical protein LOC349196 (LOC349196), mRNA    ba1
+gi|91206409|ref|NM_001040064.1| Homo sapiens hypothetical LOC440264 (LOC440264), mRNA    ba1
+gi|110624767|ref|NM_182562.2| Homo sapiens hypothetical protein FLJ39743 (FLJ39743), mRNA    ba1
