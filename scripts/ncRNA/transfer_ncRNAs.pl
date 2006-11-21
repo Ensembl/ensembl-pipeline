@@ -321,13 +321,14 @@ sub stable_id_mapping {
   my ($non_coding_overlaps,$old_hash,$new_hash,$blacklist) = @_;
   # get the assembly information
   my $last_session = sql('SELECT max(mapping_session_id) from mapping_session',$final_db)->[0];
-  $last_session++;
-  my $old_release = sql('SELECT meta_value from meta where meta_key = "schema_version"',$sdb)->[0];
+  my $last_db =  sql("SELECT new_db_name from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
+  my $old_release = sql("SELECT new_release from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
   my $new_release = sql('SELECT meta_value from meta where meta_key = "schema_version"',$final_db)->[0];
-  my $old_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$sdb)->[0];
+  my $old_assembly = sql("SELECT new_assembly from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
   my $new_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$final_db)->[0];
+  my $new_session =  $last_session + 1;
   print SIDS "INSERT INTO  mapping_session(mapping_session_id,old_db_name,new_db_name,old_release,new_release,old_assembly,new_assembly,created) ".
-    " VALUES($last_session,\'$dbname\',\'$final_dbname\',\'$old_release\',\'$new_release\',\'$old_assembly\',\'$new_assembly\',now());\n";
+    " VALUES($new_session,\'$last_db\',\'$final_dbname\',\'$old_release\',\'$new_release\',\'$old_assembly\',\'$new_assembly\',now());\n";
   # trasfer them where you have overlaps with non coding genes
   # put the appropriate entries in the stable id mapping table
   my %done;
@@ -346,13 +347,12 @@ sub stable_id_mapping {
     $new_trans->version($old_trans->version);
     $new_exon->stable_id($old_exon->stable_id);
     $new_exon->version($old_exon->version);
-    my $version = $old_trans->version;
-    $version++;
+
     # transferring
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-      $new_gene->stable_id."\',".$old_gene->version.",\'".$new_gene->stable_id."\',$version,$last_session,\'gene\',0);\n";
+      $new_gene->stable_id."\',".$old_gene->version.",\'".$new_gene->stable_id."\',".$old_gene->version.",$new_session,\'gene\',1);\n";
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-      $new_trans->stable_id."\',".$old_trans->version.",\'".$new_trans->stable_id."\',$version,$last_session,\'transcript\',0);\n";
+      $new_trans->stable_id."\',".$old_trans->version.",\'".$new_trans->stable_id."\',".$old_trans->version.",$new_session,\'transcript\',1);\n";
     $done{$old_gene->dbID} = 1;
   }
   # deleting
@@ -362,15 +362,15 @@ sub stable_id_mapping {
     my $trans = $gene->get_all_Transcripts->[0];
     # old gene does not need stable id transferring stable id is dead 
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES('".
-      $gene->stable_id."',".$gene->version.",null,0,$last_session,'gene',0);\n";
+      $gene->stable_id."',".$gene->version.",null,0,$new_session,'gene',0);\n";
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES('".
-      $trans->stable_id."',".$trans->version.",null,0,$last_session,'transcript',0);\n";
+      $trans->stable_id."',".$trans->version.",null,0,$new_session,'transcript',0);\n";
     # need gene archive entries also...
     print SIDS "INSERT INTO gene_archive(gene_stable_id,gene_version,transcript_stable_id,transcript_version,translation_stable_id,translation_version,peptide_archive_id,mapping_session_id) ";
-    print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",'',0,0,$last_session);\n";
+    print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",'',0,0,$new_session);\n";
   }
   # new stable ids need to be added with the appropirate code...
-  return $last_session;
+  return $new_session;
 }
 
 sub generate_new_ids{
