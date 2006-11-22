@@ -65,9 +65,11 @@ sub new {
     rearrange( [ qw ( GOALANALYSIS
                       ADAPTOR
                       DBID
-                    ) ], @args );
-  throw( "Wrong parameter" ) unless
-    $goal->isa( "Bio::EnsEMBL::Analysis" );
+                    ) ], @args ); 
+  if ( $goal ) { 
+    throw( "Wrong parameter" ) unless
+     $goal->isa( "Bio::EnsEMBL::Analysis" ); 
+  }
   $self->dbID( $dbID );
   $self->goalAnalysis( $goal );
   $self->adaptor( $adaptor );
