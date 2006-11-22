@@ -247,6 +247,8 @@ setup_pipeline(
 
 update_analysis_dbversion();
 
+exit 0;
+
 my %completed_accumulator_analyses;
 my $submission_count = 0;
 LOOP: while (1) {
@@ -450,7 +452,7 @@ sub update_analysis_dbversion {
 		$anash->{$ln} = $ana;
 		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Halfwise/ ) ) {
 			$db_file    = fetch_databases( $ana->db_file );
-			$db_version = get_db_version( $db_file );
+			$db_version = get_db_version( $db_file , 1);
 			# save uniprot and pfam db versions
 			$uniprot_db_version = $db_version if $ana->logic_name =~ /Uniprot_raw/;
 			$pfam_db_version = $db_version if $mod =~ /Halfwise/;
@@ -472,7 +474,7 @@ sub update_analysis_dbversion {
 
 sub save_db_version {
 	my ($a_ad,$ana,$db_version) = @_;
-	if($db_version ne $ana->db_version){
+	if($db_version && ($db_version ne $ana->db_version)){
 		print STDOUT "Analysis update: ".$ana->logic_name." old version ".$ana->db_version.
 					 " new version $db_version\n" if $verbose;
 		$ana->db_version($db_version);
@@ -505,16 +507,22 @@ sub fetch_databases {
 }
 
 sub get_db_version {
-	my ($db) = @_;
-	my $force_dbi = 1;    # force the module to get the information from the server
+	my ($db,$force_dbi) = @_;
 	my $ver = eval {
 		my $blast_ver = BlastableVersion->new();
 		$blast_ver->force_dbi($force_dbi);
 		$blast_ver->get_version($db);
 		$blast_ver;
 	};
-	throw("I failed to get a BlastableVersion for $db [$@]") if $@;
-	my $dbv  = $ver->version();
+
+	my $dbv = '';
+	if($@ =~ /not in blast tracking db/ ) {
+		$dbv = get_db_version($db,0);
+	} elsif($@) {
+		throw("I failed to get a BlastableVersion for $db [$@]");
+	} else {
+		$dbv  = $ver->version();
+	}
 
 	return $dbv;
 }
