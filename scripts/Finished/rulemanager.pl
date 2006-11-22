@@ -247,7 +247,6 @@ setup_pipeline(
 
 update_analysis_dbversion();
 
-exit 0;
 
 my %completed_accumulator_analyses;
 my $submission_count = 0;
