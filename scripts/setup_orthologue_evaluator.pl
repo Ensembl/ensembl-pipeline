@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Analysis::Config::GeneBuild::OrthologueEvaluatorExonerate;
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::OrthologueEvaluator;
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::Analysis::Config::Exonerate2Genes;
-use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
+use Bio::EnsEMBL::Utils::Exception qw(info verbose throw warning);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Analysis::Tools::ConfigUtils; 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -58,7 +58,7 @@ use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::Rule; 
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory; 
-
+verbose('WARNING') ; 
 $! = 1;
 
 my %opt = (
@@ -159,7 +159,7 @@ if ($opt{write}){
    print "writing Exonerate2Genes-configuration and backing up your old one\n"; 
    $e2g_conf->write_config 
 } else { 
-   print "You haven't used the -write option so i won't write a configuration file for Exonerate2Genes\n" ; 
+   warning("You haven't used the -write option so i won't write a configuration file for Exonerate2Genes\n");
 }
 
    # ---> post_analysis will be wrapped Exonerate2Genes 
@@ -167,6 +167,8 @@ if ($opt{write}){
 my $pa = pipeline_adaptor(\%opt) ;  
  
 my $out_db = new Bio::EnsEMBL::DBSQL::DBAdaptor( %{ $$DATABASES{"ORTHOLOGUE_DB"} } );    
+
+my @test_runnable_statements ; 
 
 for my $analysis_type ( keys %main_analysis_setup ) {  
 
@@ -200,12 +202,15 @@ for my $analysis_type ( keys %main_analysis_setup ) {
 
         } elsif (  $analysis_type eq "FIND_PARTIAL_GENES" ) {  
           $dba = $pa ;   
-          $input_ids = generate_input_ids($dba,$logic_name) ;     
+          $input_ids = generate_input_ids($dba,$logic_name) ;      
 
         } elsif (  $analysis_type eq "FIND_SPLIT_GENES" ) {   
           $dba = $pa ;    
           $input_ids = [ keys %{$$FIND_SPLIT_GENES{"ANALYSIS_SETS"}} ];  
         } 
+        push @test_runnable_statements, "perl ensembl-analysis/scripts/test-RunnableDB" .
+         " -dbname $opt{dbname} -dbhost $opt{dbhost}\\\n -dbuser $opt{dbuser} " . 
+         "-dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name -input_id $$input_ids[0]\n" ; 
         upload_input_ids ( $input_ids, $pa, $submit) ; 
     }
   
@@ -221,8 +226,28 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       check_and_store_analysis ($out_db, $post_analysis) ; 
       add_rule($pa,$post_analysis,$submit) ;  
 
-    } 
-}
+    }  
+}  
+
+print "\n*** setup done ***\n" ; 
+print "You can now run some testRunnables or the rulemanager\n"; 
+print "="x80 . "\n\n" ; 
+print join ("\n" , @test_runnable_statements) ; 
+
+print "\n\n.... or the rulemanger :\n" . "="x80 . "\n\n" ; 
+print "\nperl rulemanager.pl -reread_input_ids -dbhost $opt{dbhost} -dbname $opt{dbname}\\\n -dbport $opt{dbport} -dbpass $opt{dbpass} -dbuser $opt{dbuser} -analysis ".
+join(",", @initial_analysis_to_run) . "\n\n" ;  
+
+
+
+
+
+
+
+#
+# some subroutines follow .....
+#
+
 
 sub upload_input_ids { 
    my ($input_ids, $dba, $submit_analysis)= @_;  
@@ -250,8 +275,10 @@ sub upload_input_ids {
        for my $i ( @$input_ids ) {
          push @input_ids_not_stored, $i unless (exists $tmp{$i}) ;
        }
+      
       print scalar(@$input_ids) - scalar(@input_ids_not_stored) .
-      " input ids already stored in db ". $dba->dbname . "\n" ;
+      " input ids already stored in db ". $dba->dbname . "\n" ; 
+
       $if->input_ids(\@input_ids_not_stored) ;
       $if->store_input_ids;
       print scalar(@input_ids_not_stored) . " input-ids uploaded to ".$dba->dbname . "\n" ; 
@@ -424,10 +451,6 @@ sub setup_config {
 }
 
 
-
-
-
-
 sub get_logic_names {
    my ($h)=@_;
    return keys %{$$h{ANALYSIS_SETS}};
@@ -463,7 +486,5 @@ sub add_rule {
 }
 
 
-print "\n**done**\n" ; 
-print "You can now run the rulemanager\n" ;  
-print "\nperl rulemanager.pl -dbhost $opt{dbhost} -dbname $opt{dbname} -dbport $opt{dbport} -dbpass $opt{dbpass} -dbuser $opt{dbuser} -analysis ".
-       join(",", @initial_analysis_to_run) . "\n\n" ; 
+
+
