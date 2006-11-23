@@ -33,8 +33,9 @@ my $help;
 my @genes;;
 my $translation; # JUST INCASE
 my $count;
-
-my %opt; 
+#use scaffold or supercontig:
+my $supercontig = 'supercontig';
+my %opt;
 
 
  # options submitted with commandline override MitConf.pm 
@@ -405,7 +406,7 @@ print "Have ".scalar(@genes)." gene objects\n";
 foreach my $gene (@genes ) { 
   print  $gene->seq_region_start . "\n" ;  
 }  
-exit(0) ;
+
 print " TESTING : Do you want to load them into the db ? (Y/N) ";
   my $answer = <>;
   chomp $answer;
@@ -610,17 +611,17 @@ my $first_entry = 0  ;
   # seq names from GFF file
 
   if ($MIT_SUPERCONTIG_SEQNAME){
-    $assembly{'supercontig'} = $MIT_SUPERCONTIG_SEQNAME;
+    $assembly{$supercontig} = $MIT_SUPERCONTIG_SEQNAME;
   }
   else {
-    $assembly{'supercontig'} = $entries[0]{'accession'}; 
+    $assembly{$supercontig} = $entries[0]{'accession'};
   }  
   if ($MIT_CLONE_SEQNAME){
-    $assembly{'clone'} = $MIT_CLONE_SEQNAME
+    $assembly{'clone'} = $MIT_CLONE_SEQNAME;
   }
   else {
     if ($comment =~ /reference,sequence,was,derived,from,(\w+)./){
-      $assembly{'clone'} = "$1"
+      $assembly{'clone'} = "$1";
     }
   }  
   if ($MIT_CONTIG_SEQNAME){
@@ -734,16 +735,16 @@ sub load_chromosomes{
   # Load a chromosome - supercontig entry in the asembly, if these
   # coord stestems exist
 
-  if ($slices{'top_level'} && $slices{'supercontig'}){
+  if ($slices{'top_level'} && $slices{$supercontig}){
     print "Making assembly for chromosome vs supercontig\n" if $MIT_DEBUG;
     &load_assembly
       (
        $slices{'top_level'}->get_seq_region_id,
        $slices{'top_level'}->start,
        $slices{'top_level'}->end,
-       $slices{'supercontig'}->get_seq_region_id,
-       $slices{'supercontig'}->start,
-       $slices{'supercontig'}->end,
+       $slices{$supercontig}->get_seq_region_id,
+       $slices{$supercontig}->start,
+       $slices{$supercontig}->end,
        1,
        $output_db
       );
