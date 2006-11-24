@@ -67,6 +67,7 @@ my %opt = (
     dbuser => 'ensadmin',
     dbpass => 'ensembl',
     dbport => '3306',
+    exonerate_file => 'exonerate-1.0.0',
 );
 
 &GetOptions(
@@ -76,7 +77,11 @@ my %opt = (
     'dbhost=s',
     'dbport=s',
     'dbpass=s',
-    'verbose+', 
+    'verbose+',  
+    'exonerate_file=s', # specify the name of the exonerate program_file for analysis table 
+                        # in /usr/local/bin/ensembl/bin if don't want to use the default 
+                        # (exonerate-1.0.0)
+
     'write',   # if you want to write the Exonerate2Genes file  
 ); 
 
@@ -135,7 +140,7 @@ my @initial_analysis_to_run ;
 if ( $analysis_to_configure{"RUN_LOCATE_MISSING_ORTHOLOGUES"}) {  
    push @{$main_analysis_setup{LOCATE_MISSING_ORTHOLOGUES}}, 
     @{ setup_config("LOCATE_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
-   push @initial_analysis_to_run, 'MissingOrtholouges';
+    push @initial_analysis_to_run, 'pre_MissingOrtholouges';
 }     
 
  
@@ -144,20 +149,20 @@ if ( $analysis_to_configure{"RUN_LOCATE_MISSING_ORTHOLOGUES"}) {
 if ( $analysis_to_configure{"RUN_FIND_PARTIAL_GENES"}) {  
   push @{$main_analysis_setup{FIND_PARTIAL_GENES}}, 
    @{setup_config("FIND_PARTIAL_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)}; 
-   push @initial_analysis_to_run, 'FindPartialGenes';
+   push @initial_analysis_to_run, 'pre_FindPartialGenes';
 }      
 
 if ( $analysis_to_configure{"RUN_FIND_SPLIT_GENES"}) {  
   push @{$main_analysis_setup{FIND_SPLIT_GENES}}, 
    @{setup_config("FIND_SPLIT_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)}; 
-   push @initial_analysis_to_run, 'FindSplitGenes';
+   push @initial_analysis_to_run, 'pre_FindSplitGenes';
 }      
 
 
 
 if ($opt{write}){  
    print "writing Exonerate2Genes-configuration and backing up your old one\n"; 
-   $e2g_conf->write_config 
+   $e2g_conf->write_config ; 
 } else { 
    warning("You haven't used the -write option so i won't write a configuration file for Exonerate2Genes\n");
 }
@@ -220,7 +225,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
 
     for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
 
-      my ($post_analysis,$submit) = get_analysis_set($analysis_type, $logic_name);      
+      my ($post_analysis,$submit) = get_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
       check_and_store_analysis ( $pa, $post_analysis ) ;  
       check_and_store_analysis ( $pa, $submit ) ;  
       check_and_store_analysis ($out_db, $post_analysis) ; 
@@ -328,17 +333,17 @@ sub get_pre_analysis {
    if ( $analysis_type eq "FIND_PARTIAL_GENES") {         
 
        $input_id_type = "fpg_slice"; 
-       $sname = "FindPartialGenes";  
+       $sname = "pre_FindPartialGenes";  
 
    } elsif ( $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES") {    
 
        $input_id_type = "mo_slice";  
-       $sname = "MissingOrthologues" ; 
+       $sname = "pre_MissingOrthologues" ; 
 
    }elsif ( $analysis_type eq "FIND_SPLIT_GENES" ) {    
 
        $input_id_type = "fsg_slice";   
-       $sname = "FindSplitGenes" ;  
+       $sname = "pre_FindSplitGenes" ;  
 
    }else{  
      throw("unknown type - can't setup initial analysis") ; 
@@ -360,7 +365,7 @@ sub get_pre_analysis {
 }
 
 sub get_analysis_set { 
-   my ( $analysis_type, $logic_name ) = @_ ;  
+   my ( $analysis_type, $logic_name,$exonerate_file ) = @_ ;  
 
      my ( $input_id_type ) ;  
 
@@ -377,8 +382,8 @@ sub get_analysis_set {
 
     my $post_analysis = new Bio::EnsEMBL::Pipeline::Analysis ( 
               -logic_name => $logic_name , 
-              -program    => 'exonerate' , 
-              -program_file => 'exonerate-1.0.0' , 
+              -program    => 'Exonerate' , 
+              -program_file => $exonerate_file , 
               -module      => 'Exonerate2Genes' ,
               -input_id_type => "file_".$logic_name,
             );      
