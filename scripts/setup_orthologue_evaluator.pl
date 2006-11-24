@@ -140,7 +140,7 @@ my @initial_analysis_to_run ;
 if ( $analysis_to_configure{"RUN_LOCATE_MISSING_ORTHOLOGUES"}) {  
    push @{$main_analysis_setup{LOCATE_MISSING_ORTHOLOGUES}}, 
     @{ setup_config("LOCATE_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
-    push @initial_analysis_to_run, 'pre_MissingOrtholouges';
+    push @initial_analysis_to_run, 'pre_MissingOrthologues';
 }     
 
  
@@ -185,10 +185,10 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       # store in ref-db and out-db
       check_and_store_analysis ($pa, $pre_ana) ; 
       check_and_store_analysis ($pa, $submit) ;   
-      check_and_store_analysis ($out_db, $pre_ana) ;  
+      check_and_store_analysis ($out_db, $pre_ana) ;   
       add_rule($pa, $pre_ana, $submit) ; 
 
-      # make input_ids for initial analysis 
+      # make and upload input_ids for initial analysis 
       # logic_name:slicename for LOCATE_MISSING_ORTHOLOGUES and FIND_PARTIAL_GENES 
       # logic_name for FIND_SPLIT_GENES  
       # "logic_name" refers to the analysis which will run in the second stage 
@@ -215,20 +215,19 @@ for my $analysis_type ( keys %main_analysis_setup ) {
         } 
         push @test_runnable_statements, "perl ensembl-analysis/scripts/test-RunnableDB" .
          " -dbname $opt{dbname} -dbhost $opt{dbhost}\\\n -dbuser $opt{dbuser} " . 
-         "-dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name -input_id $$input_ids[0]\n" ; 
+         "-dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name -input_id $$input_ids[0]\n" ;  
         upload_input_ids ( $input_ids, $pa, $submit) ; 
-    }
+     }
   
 
-     # setup POST analysis
-
+     # setup POST analysis 
 
     for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
 
       my ($post_analysis,$submit) = get_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
       check_and_store_analysis ( $pa, $post_analysis ) ;  
       check_and_store_analysis ( $pa, $submit ) ;  
-      check_and_store_analysis ($out_db, $post_analysis) ; 
+      check_and_store_analysis ($out_db, $post_analysis) ;  
       add_rule($pa,$post_analysis,$submit) ;  
 
     }  
@@ -269,7 +268,7 @@ sub upload_input_ids {
       unless ($saved_ana) { 
         throw( "Cant find analysis $submit_analysis in db ") ;
       }
-
+      print  "\n" . $submit_analysis->logic_name .  " : uploading input_ids !\n" ; 
      # check first if input_id is not already stored ...
 
        my $ia_db = $dba->get_StateInfoContainer->list_input_id_by_Analysis($saved_ana) ;
@@ -280,13 +279,16 @@ sub upload_input_ids {
        for my $i ( @$input_ids ) {
          push @input_ids_not_stored, $i unless (exists $tmp{$i}) ;
        }
-      
-      print scalar(@$input_ids) - scalar(@input_ids_not_stored) .
-      " input ids already stored in db ". $dba->dbname . "\n" ; 
+     
+       
+      print $submit_analysis->logic_name . " : " ; 
+      print  scalar(@$input_ids) - scalar(@input_ids_not_stored) .
+        " input ids already stored in db ". $dba->dbname . "\n" ; 
 
       $if->input_ids(\@input_ids_not_stored) ;
       $if->store_input_ids;
-      print scalar(@input_ids_not_stored) . " input-ids uploaded to ".$dba->dbname . "\n" ; 
+      print $submit_analysis->logic_name . " : " . scalar(@input_ids_not_stored) .
+       " input-ids uploaded to ".$dba->dbname . "\n" ; 
      
 } 
 
@@ -319,8 +321,9 @@ sub check_and_store_analysis {
 #               "\nCreating my very own analysis with hard-coded values ".
 #               "out of setup script and rules as well\n") ;  
 
-    print "\nAnalysis ".$analysis->logic_name . " does not exist -storing\n" ; 
-    $pa->get_AnalysisAdaptor->store($analysis) ; 
+    print "\nAnalysis ".$analysis->logic_name . " does not exist ...."; 
+    $pa->get_AnalysisAdaptor->store($analysis) ;  
+    print " **stored**\n"; 
   }
 }  
 
@@ -328,22 +331,25 @@ sub check_and_store_analysis {
 sub get_pre_analysis { 
    my ( $analysis_type ) = @_ ; 
 
-   my ( $sname, $input_id_type ) ; 
+   my ( $sname, $input_id_type, $module ) ; 
 
    if ( $analysis_type eq "FIND_PARTIAL_GENES") {         
 
        $input_id_type = "fpg_slice"; 
        $sname = "pre_FindPartialGenes";  
+       $module = "FindPartialGenes";  
 
    } elsif ( $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES") {    
 
        $input_id_type = "mo_slice";  
        $sname = "pre_MissingOrthologues" ; 
+       $module = "MissingOrthologues" ; 
 
    }elsif ( $analysis_type eq "FIND_SPLIT_GENES" ) {    
 
        $input_id_type = "fsg_slice";   
-       $sname = "pre_FindSplitGenes" ;  
+       $sname = "pre_FindSplitGenes" ; 
+       $module = "FindSplitGenes" ;  
 
    }else{  
      throw("unknown type - can't setup initial analysis") ; 
@@ -351,7 +357,7 @@ sub get_pre_analysis {
  
    my $pre_ana = new Bio::EnsEMBL::Pipeline::Analysis ( 
               -logic_name => $sname , 
-              -module      => $sname , 
+              -module      => $module, 
               -input_id_type => $input_id_type , 
             );      
 
@@ -473,18 +479,19 @@ sub analysis_already_in_config_file {
 sub add_rule { 
   my ( $pa, $ana , $condition )= @_;  
   
-  my $ra = $pa->get_RuleAdaptor; 
-  unless ( $ra->fetch_by_goal($ana)) {  
+  my $ra = $pa->get_RuleAdaptor;  
 
-    print "\nStoring rule :".$ana->logic_name." [condition: ".$condition->logic_name ." ]\n"; 
+  unless ( $ra->fetch_by_goal($ana)) {    
+
+    # check if the rule already exists in the database  
+    
+    print "\nStoring rule : ".$ana->logic_name." [condition: ".$condition->logic_name ." ]\n"; 
 
     my $rule = Bio::EnsEMBL::Pipeline::Rule->new(); 
 
-    $rule->goalAnalysis($pa->get_AnalysisAdaptor->fetch_by_logic_name($ana->logic_name));
-    $rule->add_condition($condition->logic_name) ;  
-
-    $pa->get_RuleAdaptor->store($rule) ; 
-    print "*stored*\n";
+    $rule->goalAnalysis($pa->get_AnalysisAdaptor->fetch_by_logic_name($ana->logic_name)); 
+    $rule->add_condition($condition->logic_name) ;   
+    $pa->get_RuleAdaptor->store($rule) ;  
   }else { 
    print "Not storing rule because it's already stored\n"; 
   }
