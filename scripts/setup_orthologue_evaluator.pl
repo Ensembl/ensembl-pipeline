@@ -90,7 +90,7 @@ my %opt = (
 #  
 # The are :  
 #
-#  MissingOrtholouges
+#  FindMissingOrtholouges
 #  FindPartialGenes
 #  FindSplitGenes 
 #
@@ -140,7 +140,7 @@ my @initial_analysis_to_run ;
 if ( $analysis_to_configure{"RUN_LOCATE_MISSING_ORTHOLOGUES"}) {  
    push @{$main_analysis_setup{LOCATE_MISSING_ORTHOLOGUES}}, 
     @{ setup_config("LOCATE_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
-    push @initial_analysis_to_run, 'pre_MissingOrthologues';
+    push @initial_analysis_to_run, 'pre_FindMissingOrthologues';
 }     
 
  
@@ -302,7 +302,7 @@ sub generate_input_ids {
 }
 
 # calculate input_ids 
-#  MissingOrthologues.pm :  logic_name:chromosome:NCBI36:1:3000000:5000000:1 
+#  FindMissingOrthologues.pm :  logic_name:chromosome:NCBI36:1:3000000:5000000:1 
 #   
 #   Tried to reply to all but it didn't let me. Thats' why you are getting this e-mail yourself\! 
 
@@ -342,8 +342,8 @@ sub get_pre_analysis {
    } elsif ( $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES") {    
 
        $input_id_type = "mo_slice";  
-       $sname = "pre_MissingOrthologues" ; 
-       $module = "MissingOrthologues" ; 
+       $sname = "pre_FindMissingOrthologues" ; 
+       $module = "FindMissingOrthologues" ; 
 
    }elsif ( $analysis_type eq "FIND_SPLIT_GENES" ) {    
 
