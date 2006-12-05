@@ -7,6 +7,8 @@
 use strict;
 use Getopt::Long;
 
+use Bio::EnsEMBL::Pipeline::Analysis;
+
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 
@@ -94,7 +96,9 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
 
 my $ana = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if (not defined $ana) {
-  die "Could not find analysis with logic name '$logic_name' in pipe db\n";
+  warn "Could not find analysis with logic name '$logic_name' in pipe db; creating\n";
+  $ana = Bio::EnsEMBL::Pipeline::Analysis->new;
+  $ana->input_id_type("SLICE");
 }
 
 
