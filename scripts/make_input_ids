@@ -153,6 +153,7 @@ my $single;
 my $verbose;
 my $help = 0;
 my $translation_id;
+my $seq_region_name;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
@@ -183,6 +184,7 @@ my $insert_analysis = 0;
             'include_non_reference!' => \$include_non_reference,
             'h|help'            => \$help,
             'insert_analysis!' => \$insert_analysis,
+            'seqregionname:s' => \$seq_region_name,
            );
 
 
@@ -247,6 +249,7 @@ my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
    -coord_system_version => $coord_system_version,
    -slice_size => $slice_size,
    -slice_overlaps => $slice_overlap,
+   -seq_region_name => $seq_region_name,
   );
 
 
