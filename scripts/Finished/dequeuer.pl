@@ -28,7 +28,7 @@ See the Net::Netrc module for more details.
 	-verbose
 	-sleep		this is the amount of time the script will sleep for
 			after each loop and wait for free slots (default: 180s)
-	-flush		flush the jobs batch queues after each loop (default: false)
+	-flush		the number of loop after which the jobs batch queues should be flushed (default: 30)
 	-fetch_number	number of jobs fetched from the queue (default: 100)
 	-analysis 	a logic_name of an analysis you want to dequeue and submit.
 			If you specify this option you will only submit this analysis 
@@ -75,7 +75,7 @@ my $job_limit;
 my $queue_host;
 my $queue_name;
 my $sleep = 180;
-my $flush = 0;
+my $flush = 30; # batch queue flush frequency: n => flush the batch queue once every n loops 
 my $fetch_number = 100;
 my @analyses_to_run;
 my @analyses_to_skip;
@@ -93,7 +93,7 @@ GetOptions(
 	'queue_name=s'    => \$queue_name,
 	'queue_host=s'    => \$queue_host,
 	'sleep=s'		  => \$sleep,
-	'flush!'		  => \$flush,
+	'flush=s'		  => \$flush,
 	'fetch_number=s'  => \$fetch_number,
 	'analysis|logic_name=s@' => \@analyses_to_run,
 	'skip_analysis=s@'       => \@analyses_to_skip,
@@ -114,13 +114,14 @@ my %analyses_to_run = map {$_,1} @analyses_to_run ;
 my %analyses_to_skip = map {$_,1} @analyses_to_skip ; 
 
 # Job fetch statement handle
-my $fetch = &get_dbi( $queue_name, $queue_host )->prepare(
-	qq{
-		SELECT id, created, priority, job_id, host, pipeline FROM queue
-		ORDER BY priority DESC, CREATED ASC
-		LIMIT ?,?
-	}
-);
+my $sql_fetch = "SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue";
+$sql_fetch .= " WHERE " if(@analyses_to_run || @analyses_to_skip);
+$sql_fetch .= " analysis IN (".join	',',@analyses_to_run.") " if @analyses_to_run;
+$sql_fetch .= " AND " if(@analyses_to_run && @analyses_to_skip);
+$sql_fetch .= " analysis NOT IN (".join	',',@analyses_to_skip.") " if @analyses_to_skip;			
+$sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
+
+my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);		
 
 # Job delete statement handle
 my $delete = &get_dbi( $queue_name, $queue_host )->prepare(
@@ -141,19 +142,20 @@ if ($@) {
 }
 my $batch_q_object = $batch_q_module->new();
 
+my $loop = 1;
 # The main loop
-while (1) {
+while ($loop) {
 	my $free_slots = &job_stats;
 	&flush_queue($free_slots);
-	&flush_batch() if $flush;
+	&flush_batch() if( $loop%$flush ==0);
 	sleep($sleep);
-	print "Waking up and run again!\n" if $verbose;
+	print "Waking up and run again (loop $loop) !\n" if $verbose;
+	$loop++;
 }
 
 ## methods
 
 sub termhandler {
-	print "Flushing the batch queues ....\n" if $verbose;
 	&flush_batch();
 	print "Exit DQdequeuer ....\n" if $verbose;
 	exit 0;
@@ -161,12 +163,14 @@ sub termhandler {
 
 # flush the batch jobs
 sub flush_batch {
+	print "Flushing the batch queues ....\n" if $verbose;
 	foreach my $host ( keys %$db_adaptors ) {
 		foreach my $dbname ( keys %{ $db_adaptors->{$host} } ) {
 			print "\tpipeline $host -> $dbname\n" if $verbose;
 			my $job_adaptor =
 			  $db_adaptors->{$host}->{$dbname}->get_JobAdaptor();
 			my ($a_job) = $job_adaptor->fetch_by_Status("CREATED",1,1);
+			($a_job) = $job_adaptor->fetch_by_Status("CREATED") unless($a_job) ;
 			if ($a_job) {
 				$a_job->flush_runs($job_adaptor,'',$verbose);
 			}
@@ -178,34 +182,22 @@ sub flush_batch {
 # and submit them into the farm
 sub flush_queue {
 	my ($slots) = @_;
-	my $index = 0;
 
 	SLOT:while($slots) {
-		$fetch->execute($index,$fetch_number);
+		$fetch->execute($fetch_number);
 		if($fetch->rows == 0){
 			print "No job in queue\n";
 			last SLOT;
 		}
 		JOB:while ( my @row = $fetch->fetchrow_array ) {
-			my ( $id, $created, $priority, $job_id, $host, $pipe_name ) =
-			  @row[ 0 .. 5 ];
+			my ( $id, $created, $priority, $job_id, $host, $pipe_name, $analysis, $update ) =
+			  @row[ 0 .. 7 ];
 			my $submitted = 0;
 			my $job = &get_job_from_db( $job_id, $pipe_name, $host );
 			if ($job) {
 				$job->priority($priority);
-				
-				if (keys(%analyses_to_run)) {
-					unless($analyses_to_run{$job->analysis->logic_name}){
-						$index++;
-						next JOB; 
-					}
-				} elsif (keys(%analyses_to_skip)) {
-					if($analyses_to_skip{$job->analysis->logic_name}){ 
-						$index++;
-						next JOB;
-					} 
-				}
-				
+				$job->update($update);
+
 				eval {
 					$submitted = $job->batch_runRemote;
 					my $location = $submitted ? 'LSF':'BATCH';
