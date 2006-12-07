@@ -86,19 +86,22 @@ sub push_job {
 	my $dbq    = $self->_job_db_queue;
 	my $insert = $dbq->prepare(
 		qq {
-			INSERT INTO queue (created, priority, job_id, host, pipeline) 
-			VALUES ( NOW() , ? , ? , ? , ? )
+			INSERT INTO queue (created, priority, job_id, host, pipeline, analysis, is_update) 
+			VALUES ( NOW() , ? , ? , ? , ? , ? , ?)
 		}
 	);
 	my $job_id = $job->dbID;
 	my $dbc    = $job->adaptor->db->dbc();
 	my $dbname = $dbc->dbname;
 	my $host   = $dbc->host;
-	$priority = $URGENT_JOB_PRIORITY
+	my $analysis = $job->analysis->logic_name;
+	my $job_priority = $job->priority;
+	$job_priority = $priority if $priority;
+	$job_priority = $URGENT_JOB_PRIORITY
 	  if ( $self->urgent_input_id->{ $job->input_id } );
-	$priority = $priority || $job->priority;
-
-	return $insert->execute( $priority, $job_id, $host, $dbname );
+	my $update = $job->update;
+	
+	return $insert->execute( $job_priority, $job_id, $host, $dbname, $analysis, $update );
 }
 
 =head2 can_run_job
@@ -393,6 +396,32 @@ sub get_db_param {
 	  unless ( $dbuser && $dbpass && $dbport );
 	  
 	  return ($dbuser, $dbpass, $dbport);
+}
+
+
+sub check_if_done {
+  my ($self) = @_;
+  my @jobs = $self->job_adaptor->fetch_all;
+  my $continue;
+
+ JOB: 
+  foreach my $job (@jobs) {
+    my $status = $job->current_status->status;
+
+    if ($status eq 'KILLED' || $status eq 'SUCCESSFUL') {
+      next JOB;
+    } elsif ($status eq 'FAILED' || $status eq 'AWOL' || $status eq 'OUT_OF_MEMORY') {
+      if (!$job->can_retry) {
+        next JOB;
+      } else {
+        return 1;
+      }
+    } else {
+      return 1;
+    }
+  }
+
+  return 0;
 }
 
 1;
