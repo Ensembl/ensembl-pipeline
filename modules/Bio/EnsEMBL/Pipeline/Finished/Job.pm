@@ -86,14 +86,41 @@ sub priority {
 			$self->{priority} = $p->[0];
 		}
 		else {
-			my $sic  = $self->adaptor->db->get_StateInfoContainer;
-			my $db_v =
-			  $sic->fetch_db_version( $self->input_id, $self->analysis );
-			$self->{priority} = $db_v ? $p->[1] : $p->[0];
+			$self->set_update_value;
+			$self->{priority} = $self->update ? $p->[1] : $p->[0];
 		}
 	}
 
 	return $self->{priority};
+}
+
+# update values: 0 no update, new clone analysis; 1 update only patch file; 2 update patch and release files; 
+sub set_update_value {
+	my ($self) = @_;
+	my $update_value = 0;
+	my $sic  = $self->adaptor->db->get_StateInfoContainer;
+	my $db_version_saved = $sic->fetch_db_version($self->input_id, $self->analysis);
+	my $db_version_current = $self->analysis->db_version;
+	if($db_version_saved) {
+		$update_value = 2;
+		# split the embl blast db version "12-Mar-06 (85)" to
+		# patch version "12-Mar-06" and release version "85"
+		my ($patch_sv,$release_sv) = $db_version_saved =~ /^(\S+)\s+\((\d+)\)$/;
+		my ($patch_cv,$release_cv) = $db_version_current =~ /^(\S+)\s+\((\d+)\)$/;
+		if($release_sv && ($release_sv eq $release_cv)){
+			$update_value = 1;
+		}	
+	}
+	$self->{update} = $update_value;
+}   
+
+sub update {
+	my ($self,$update) = @_;
+	if ($update) {
+    	$self->{update} = $update;
+  	}
+  	
+	return $self->{update} || 0;
 }
 
 sub run_module {
@@ -291,14 +318,20 @@ sub batch_runRemote {
 	else {
 		$queue = $self->analysis->logic_name;
 	}
-	
+	# add job to batch jobs array
 	my $batch_jobs = $BATCH_QUEUES{$queue}{'jobs'};
 	$batch_jobs->{$host}->{$dbname} = [] unless $batch_jobs->{$host}->{$dbname};
 	push @{ $batch_jobs->{$host}->{$dbname} }, $self->dbID;
-
+	# maximum batch jobs size
+	my $batch_size = $BATCH_QUEUES{$queue}{'batch_size'};
+	if(scalar(@$batch_size) > 1){
+		$batch_size = ($self->update == 1) ? @$batch_size[1] : @$batch_size[0];
+	} else {
+		$batch_size = @$batch_size[0];
+	}
+	
 	if (
-		scalar( @{ $batch_jobs->{$host}->{$dbname} } ) >=
-		$BATCH_QUEUES{$queue}{'batch_size'} )
+		scalar( @{ $batch_jobs->{$host}->{$dbname} } ) >= $batch_size )
 	{
 		$self->flush_runs( $self->adaptor, $queue );
 	} else {
@@ -353,7 +386,6 @@ sub flush_runs {
 			  . "$caller\n" )
 		  unless -x $runner;
 	}
-
 	  ANAL:
 	for my $anal (@analyses) {
 			my $queue = $BATCH_QUEUES{$anal};
@@ -477,8 +509,6 @@ sub set_up_queues {
 		my $ln = $queue->{logic_name};
 
 		next unless $ln;
-
-		#delete $queue->{logic_name};
 
 		while ( my ( $k, $v ) = each %$queue ) {
 			$q{$ln}{$k} = $v;
