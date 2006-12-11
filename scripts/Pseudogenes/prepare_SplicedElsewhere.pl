@@ -27,7 +27,7 @@ my @multiexon_files;
 
 die $usage unless($logic_name);
 
-my $dna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+my $ref_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   (
    '-host'   => $GB_DBHOST,
    '-user'   => $GB_DBUSER,
@@ -36,33 +36,13 @@ my $dna_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
    '-port'   => $GB_DBPORT,
   );
 
-#genes come from final genebuild database
-my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-  (
-   '-host'   => $GB_FINALDBHOST,
-   '-user'   => $GB_FINALDBUSER,
-   '-dbname' => $GB_FINALDBNAME,
-   '-pass'   => $GB_FINALDBPASS,
-   '-port'   => $GB_FINALDBPORT,
-   '-dnadb'  => $dna_db,
-  );
-
-my $final_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-  (
-   '-host'   => $PSEUDO_DBHOST,
-   '-user'   => $PSEUDO_DBUSER,
-   '-dbname' => $PSEUDO_DBNAME,
-   '-pass'   => $PSEUDO_DBPASS,
-   '-port'   => $PSEUDO_DBPORT,
-  );
-
-my $ga = $genes_db->get_GeneAdaptor;
-
 if ($SINGLE_EXON) {
   print "Making input ids for single exon genes\n";
-  my $fa = Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor->new($final_db);
-  my $aa = $final_db->get_AnalysisAdaptor;
+
+  my $fa = Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor->new($ref_db);
+  my $aa = $ref_db->get_AnalysisAdaptor;
   my $analysis = $aa->fetch_by_logic_name($SINGLE_EXON);
+  my $multifile = $PS_MULTI_EXON_DIR."/all_multi_exon_genes.fasta";
   die("analysis object not found $SINGLE_EXON\n") unless ($analysis);
   my @ids = @{$fa->fetch_by_analysis($analysis)};
   @ids = sort {$a->dbID <=> $b->dbID} @ids;
@@ -83,7 +63,7 @@ if ($SINGLE_EXON) {
 
   my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
     (
-     -db => $final_db,
+     -db => $ref_db,
      -top_level => 'top_level',
      -slice     => 'ignore this warning its just stupid',,
      -logic_name => $logic_name,
@@ -91,25 +71,31 @@ if ($SINGLE_EXON) {
   $inputIDFactory->input_ids(\@input_ids);
   $inputIDFactory->store_input_ids;
 
- print STDERR "Pooling multiexon genes into single blastDB .\n";
+  print STDERR "Pooling multiexon genes into single blastDB .\n";
 
   my $db_output = Bio::SeqIO->new(
-				  -file => ">$PS_MULTI_EXON_DIR"."all_multi_exon_genes.fasta",
+				  -file   => ">$multifile",
 				  -format => 'fasta'
 				 );
 
-  my @multiexon_files = split(/\n/,`ls $PS_MULTI_EXON_DIR/multi_exon_seq*.fasta`);
-  foreach my $file (@multiexon_files) {
-    my $bioseq = Bio::SeqIO->new(
-				 -file   => $file,
-				 -format => 'fasta'
-				);
-    while (my $seq = $bioseq->next_seq) {
-      $db_output->write_seq($seq);
-    }
- #   system ("rm $file");
+  unless (opendir(DIR, $PS_MULTI_EXON_DIR)) {
+    closedir(DIR);
+    die "cannot read files from $PS_MULTI_EXON_DIR.";
   }
-  system ("xdformat -p $PS_MULTI_EXON_DIR/all_multi_exon_genes.fasta");
+  foreach (readdir(DIR)) {
+    my $file = "$_";
+    if($file =~ m/^multi_exon_seq.*\.fasta$/){
+      my $bioseq = Bio::SeqIO->new(
+				   -file   => $PS_MULTI_EXON_DIR."/".$file,
+				   -format => 'fasta'
+				  );
+      while (my $seq = $bioseq->next_seq) {
+	$db_output->write_seq($seq);
+      }
+    }
+  }
+ #   system ("rm $file");
+  system ("xdformat -p $multifile");
 }
 
 print "Finished\n";
