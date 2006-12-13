@@ -120,14 +120,11 @@ sub fetch_analysis_by_input_id {
 			|| $analysis->logic_name =~ /Halfwise/
 			|| $analysis->db_version eq $version )
 		{
-			print "Analysis " . $analysis->logic_name . " V. $version\n";
+			#print "Analysis " . $analysis->logic_name . " V. $version\n";
 			push( @result, $analysis );
 		}
 		else {
-			print "Analysis "
-			  . $analysis->logic_name
-			  . " V. $version need to be updated to V. "
-			  . $analysis->db_version . "\n";
+			#print "Analysis ". $analysis->logic_name." V. $version need to be updated to V. ". $analysis->db_version."\n";
 		}
 	}
 
