@@ -116,9 +116,9 @@ my %analyses_to_skip = map {$_,1} @analyses_to_skip ;
 # Job fetch statement handle
 my $sql_fetch = "SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue";
 $sql_fetch .= " WHERE " if(@analyses_to_run || @analyses_to_skip);
-$sql_fetch .= " analysis IN (".join	',',@analyses_to_run.") " if @analyses_to_run;
+$sql_fetch .= " analysis IN ('".join("','",@analyses_to_run)."') " if @analyses_to_run;
 $sql_fetch .= " AND " if(@analyses_to_run && @analyses_to_skip);
-$sql_fetch .= " analysis NOT IN (".join	',',@analyses_to_skip.") " if @analyses_to_skip;			
+$sql_fetch .= " analysis NOT IN ('".join("','",@analyses_to_skip)."') " if @analyses_to_skip;			
 $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 
 my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);		
