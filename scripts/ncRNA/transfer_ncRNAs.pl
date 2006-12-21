@@ -188,8 +188,10 @@ sub check_exdb {
   # test final db for external db table 
   my $query = "SELECT external_db_id FROM external_db WHERE db_name = 'RFAM'";
   die("Cannot find RFAM in external db table\n") unless sql($query,$db)->[0] == 4200;
-  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRNA_Registry'";
-  die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 3300;
+  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase'";
+  die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 4020;
+  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase_predicted'";
+  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 4025;  
   return;
 }
 
@@ -504,7 +506,7 @@ sub dump_xrefs {
       my @xrefs = @{$trans->get_all_DBEntries};
       if (@xrefs){
 	foreach my $xref (@xrefs) {
-	  next unless ($xref->dbname eq 'miRNA_Registry' or $xref->dbname eq 'RFAM');
+	  next unless ($xref->dbname eq 'miRBase' or $xref->dbname eq 'RFAM');
 	  print XREFS $gene->dbID."\t";
 	  print XREFS $trans->dbID."\t";
 	  print XREFS $xref->dbname."\t"; 
