@@ -103,7 +103,7 @@ sub store {
     $sth = $self->prepare( qq{
       INSERT INTO rule_conditions
          SET rule_id = $dbID,
-             condition = '$literal' } );
+             rule_condition = '$literal' } );
     $sth->execute;
   }
   $rule->dbID( $dbID );
@@ -189,7 +189,7 @@ sub fetch_all {
 
 
   $sth= $self->prepare( q{
-    SELECT rule_id, condition
+    SELECT rule_id, rule_condition
     FROM   rule_conditions } );
   $sth->execute;
 
@@ -244,13 +244,13 @@ sub fetch_by_dbID {
       '-adaptor' => $self );
 
   $sth= $self->prepare( q{
-     SELECT rule_id, condition
+     SELECT rule_id, rule_condition
      FROM   rule_conditions
      WHERE  rule_id = ?} );
   $sth->execute( $dbID );
 
   while( $queryResult = $sth->fetchrow_hashref ) {
-    $rule->add_condition( $queryResult->{condition} );
+    $rule->add_condition( $queryResult->{rule_condition} );
   }
   return $rule;
 }

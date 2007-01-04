@@ -57,7 +57,7 @@ sub db_sanity_check{
   #check all rules in the rule_condition table have existing analyses
   $query = qq{SELECT COUNT(DISTINCT c.rule_id)
               FROM rule_conditions c
-              LEFT JOIN analysis a ON c.condition = a.logic_name
+              LEFT JOIN analysis a ON c.rule_condition = a.logic_name
               WHERE a.logic_name IS NULL};
   $msg = "Some of your conditions in the rule_condition table don't" .
     " seem to have entries in the analysis table";
