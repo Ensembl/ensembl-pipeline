@@ -189,9 +189,9 @@ sub check_exdb {
   my $query = "SELECT external_db_id FROM external_db WHERE db_name = 'RFAM'";
   die("Cannot find RFAM in external db table\n") unless sql($query,$db)->[0] == 4200;
   $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase'";
-  die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 4020;
+  die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 3300;
   $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase_predicted'";
-  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 4025;  
+  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 3310;  
   return;
 }
 
