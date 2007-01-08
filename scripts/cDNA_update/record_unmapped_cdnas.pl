@@ -6,34 +6,36 @@
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
+#use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
+
 
 use Getopt::Long;
 
+my $record_separator = $/;
 
-
-my ($kill_list, $gss, $seq_file, $user, $host);
+my ($gss, $seq_file, $user, $host);
 my ($port, $dbname, $species, $vertrna, $refseq);
 my ($vertrna_update, $infile, $outfile, $findN_prog);
 my ($reasons_file);
 
 &GetOptions(
-            'kill_list=s'       => \$kill_list,
-            'gss=s'      		=> \$gss,
+            'gss=s'      	=> \$gss,
             'seq_file=s'      	=> \$seq_file,
-            'user=s'          	=> \$user,
-            'host=s'    		=> \$host,
-            'port=s'    		=> \$port,
-            'dbname=s'    		=> \$dbname,
-            'species=s'    		=> \$species,
-            'vertrna=s'    		=> \$vertrna,
-            'refseq=s'    		=> \$refseq,
+            'user=s'            => \$user,
+            'host=s'    	=> \$host,
+            'port=s'    	=> \$port,
+            'dbname=s'    	=> \$dbname,
+            'species=s'    	=> \$species,
+            'vertrna=s'    	=> \$vertrna,
+            'refseq=s'    	=> \$refseq,
             'vertrna_update=s' 	=> \$vertrna_update,
-            'infile=s' 			=> \$infile,
-            'outfile=s' 		=> \$outfile,
-            'findN_prog=s' 		=> \$findN_prog,
-			'reasons_file=s'    => \$reasons_file
+            'infile=s' 		=> \$infile,
+            'outfile=s' 	=> \$outfile,
+            'findN_prog=s' 	=> \$findN_prog,
+       	    'reasons_file=s'    => \$reasons_file
 	   );
-
 
 my $db1 = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host    => $host,
@@ -186,13 +188,10 @@ while (my $hit = $q1->fetchrow_array){
 #now have done other analyses need to check whether the reason we have no output is because
 #cdnas are on the kill list
 
-open(LIST, "<", $kill_list) or die("can't open kill list $kill_list");
-my %kill_list;
-while (<LIST>){
-	my @tmp = split/\s+/, $_;
-	$kill_list{$tmp[0]} = 1;
-}
-close LIST;
+#re-create the kill_list hash, from the file dumped by new_cDNA_upadte.pl 
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA');
+my %kill_list = %{$kill_list_object->get_kill_list()};
+
 foreach my $k (keys %kill_list){
 	if (exists $cdnas{$k}){
 		delete $cdnas{$k};	
@@ -318,7 +317,7 @@ for my $id (@sorted){
 	if (exists $cdnas{$id}{"Low coverage with long intron"}){
 		$reason_id = $reason_list{"Low coverage with long intron"};
 		$query_score = $cdnas{$id}{"Low coverage with long intron"};
-		$reasons{$reason_id} = $query_score;
+                $reasons{$reason_id} = $query_score;
 	}
 	if (exists $cdnas{$id}{"Low percent_id with long intron"}){
 		$reason_id = $reason_list{"Low percent_id with long intron"};
