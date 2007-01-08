@@ -23,7 +23,7 @@ in an automated fashion.
 =head1 SYNOPSIS / OPTIONS
 
   A. Fill in config variables, start script with argument 'prepare':
-     "perl cDNA_update.pl prepare".
+     "perl cDNA_update.pl prepare". Fill in /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
   B. Start script again with argument 'run' to start the pipeline.
   B. Check the results by comparing them to the previous alignment
      by calling "perl cDNA_update.pl compare"
@@ -64,7 +64,8 @@ The steps the script performs:
  10. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
 What YOU will need to do:
-  1. Fill in the config variables in this script (just below this).
+  1. Fill in the config variables in this script (just below this) and
+     in /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm.
   2. Check for the existance of two additional programs needed:
        fastasplit (splitting a fasta file into a number of chunks)
        polyA_clipping (removing poly-A tails from sequences)
@@ -104,41 +105,39 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = "/nfs/acari/ba1/PerlCode/";
+my $cvsDIR               = "/lustre/work1/ensembl/ba1/cvs_co/";
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
-my $dataDIR              = "/ecs2/scratch3/ba1/hum_cdna_update_Sept06"; 
+my $dataDIR              = "/lustre/scratch1/ensembl/ba1/cDNA_updates/human_Jan07/"; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
 my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
-my $sourceHost           = "cbi1";
-my $sourceDIR            = "/data/blastdb";
+my $sourceHost           = "cbi1"; 
+my $sourceDIR            = "/data/blastdb/";
 my $assembly_version     = "NCBI36"; #"NCBIM36"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
-my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa","/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted_haplotypes.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa");
 #my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
-my $user 				 = "ba1";
-my $host 				 = "ecs2";
+my $user 		 = "ba1";
+my $host 		 = "bc-9-1-03";
 my $genebuild_id         = "4";
 
-
-my $kill_list			 = $cvsDIR."/ensembl-pipeline/scripts/GeneBuild/cDNA_kill_list.txt";
-my $gss				     = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
+my $gss		         = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
 my $chunknum             = 5000;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
-my $findN_prog 			 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
-my $reasons_prog		 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
-my $reasons_file		 = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
+my $findN_prog  	 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
+my $reasons_prog	 = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
+my $reasons_file	 = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
 my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 
 
@@ -147,43 +146,43 @@ my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_40_36b"; #is in schema 38
-my $WB_REF_DBHOST        = "ecs2"; 
-my $WB_REF_DBPORT        = "3365"; 
+my $WB_REF_DBNAME        = "homo_sapiens_core_42_36d"; 
+my $WB_REF_DBHOST        = "ens-livemirror"; 
+my $WB_REF_DBPORT        = "3306"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_hum_cdna0906_ref";
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_hum_cdna1106_ref";
 my $WB_PIPE_DBHOST       = "genebuild4";
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_hum_cdna0906_update";
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_hum_cdna1106_update";
 my $WB_TARGET_DBHOST     = "genebuild6";
 my $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_40_36b"; 
-my $WB_LAST_DBHOST       = "ecs2";
-my $WB_LAST_DBPORT       = "3365";  
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_42_36d"; 
+my $WB_LAST_DBHOST       = "ens-livemirror"; 
+my $WB_LAST_DBPORT       = "3306"; 
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_40_36b";
-my $WB_LAST_DNADBHOST    = "ecs2"; 
-my $WB_LAST_DNADBPORT    = "3365"; 
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_42_36d"; 
+my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
+my $WB_LAST_DNADBPORT    = "3306"; 
 
 #taxonomy db for loading meta_table - should not need to change:
 my $TAXONDBNAME          = "ncbi_taxonomy";       
-my $TAXONDBHOST          = "ecs2";
-my $TAXONDBPORT          = "3365";
-
-
+my $TAXONDBHOST          = "ens-livemirror";
+my $TAXONDBPORT          = "3306"; 
 
 #set the species
 my $common_species_name  = "human"; #"human"; #"mouse";
-my $species	      = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
+my $species	         = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
 
-my $oldFeatureName     = "cDNA_update"; #for the comparison only
+my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
 
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be necessary below this
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
@@ -191,6 +190,7 @@ use Data::Dumper;
 #we need the Net::SSH module from somewhere:
 use lib '/nfs/acari/fsk/perls/';
 use Net::SSH qw(sshopen2);
+
 
 my $newFeatureName     = "cDNA_update"; #the analysis name!
 #when comparing to a previously updated cdna db $oldFeatureName = $newFeatureName
@@ -631,14 +631,10 @@ sub fastafiles{
     		local $/ = "\n";
     	}    
 
-		#read in the seq_ids from the kill_list;
-		open(LIST, "<", $kill_list) or die("can't open kill list $kill_list");
-		my %kill_list;
-		while (<LIST>){
-			my @tmp = split/\s+/, $_;
-			$kill_list{$tmp[0]} = 1;
-		}
-		close LIST;
+                # now get the kill_list
+                #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
+                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA');
+                my %kill_list = %{$kill_list_object->get_kill_list()};
 
 		open(LIST, "<", $gss) or die("can't open gss list $gss");
 		my %gss;
@@ -664,7 +660,7 @@ sub fastafiles{
 			if ((!exists $kill_list{$tmp[0]}) && !exists $gss{$acc}){
 				print OUT ">$_";
 			}
-		}
+		} #while
 		local $/ = "\n";
 		close OUT;
 		close SEQS;
@@ -677,7 +673,7 @@ sub fastafiles{
 			#$cmd = "$polyA_clipping -mRNA ".$dataDIR."/".$newfile2." -out ".$newfile3." -clip"; #old polyAclipping command
     		if(system($cmd)){
 			   die("couldn t clip file.$@\n");
-    		}
+    		} 
 
     		#split fasta files, store into CHUNKDIR
     		print "splitting fasta file.\n";
@@ -690,8 +686,10 @@ sub fastafiles{
     		check_chunksizes();
 
     		print "\nchopped up file.\n";
-		}
-	};   
+		} #update
+	}; #eval   
+
+
 	if($@){
     	print STDERR "\nERROR: $@";
     	return 0;
@@ -1153,7 +1151,7 @@ sub why_cdnas_missed{
 	#need to pass all the variables to the script:
 
     $cmd = "perl ".$reasons_prog.
-           " -kill_list ".$kill_list." -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user $WB_DBUSER".
+           " -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user $WB_DBUSER".
            " -pass $WB_DBPASS -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
            " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna." -refseq ".$dataDIR."/".$refseq.
            " -vertrna_update ".$dataDIR."/".$vertrna_update." -infile ".$file.
