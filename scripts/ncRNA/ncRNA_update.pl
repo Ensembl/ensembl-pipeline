@@ -368,17 +368,6 @@ sub DB_setup{
       " insert into input_id_analysis(input_id,input_id_type,analysis_id) ".
 	"values('BlastmiRNA','GENOME','7');\"";
     $status += system($cmd);
-    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
-      " -dbhost $DBHOST -dbname $DBNAME -dbuser $WRITEUSER  -dbport $DBPORT  -dbpass $pass".
-	" -logic_name miRNA -database miRBase -database_file $BLASTDIR/all_mirnas.embl  ".
-	  " -database_version $MIRBASEVERSION -module Bio::EnsEMBL::Analysis::RunnableDB::miRNA -input_id_type GENOME";
-    $status += system($cmd);
-    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
-      " -dbhost $DBHOST -dbname $DBNAME -dbuser $WRITEUSER  -dbport $DBPORT -dbpass $pass".
-	" -logic_name ncRNA -program cmsearch -program_file cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
-	  " -module Bio::EnsEMBL::Analysis::RunnableDB::Infernal".
-	    " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type FLAG";
-    $status += system($cmd);
     print "database set up.\n";
   };
   if($@){
