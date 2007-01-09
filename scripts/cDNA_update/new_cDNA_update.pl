@@ -657,7 +657,7 @@ sub fastafiles{
 			if ($tmp[0]=~/(\w+)\./){
 				$acc = $1;
 			}
-			if ((!exists $kill_list{$tmp[0]}) && !exists $gss{$acc}){
+			if ((!exists $kill_list{$acc}) && !exists $gss{$acc}){
 				print OUT ">$_";
 			}
 		} #while
