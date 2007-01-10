@@ -30,7 +30,7 @@ package Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
-
+use Bio::EnsEMBL::Exon;
 
 @ISA = qw();
 
