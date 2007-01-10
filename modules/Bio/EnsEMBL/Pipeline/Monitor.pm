@@ -679,6 +679,7 @@ sub percent_finished{
   my %analysis_name      = ();
   my %analysis_maxnum    = ();
   my %analysis_condition = ();
+  my $ref3;
 
   $sth0->execute();
   while (my $ref0 = $sth0->fetchrow_hashref) {
@@ -688,56 +689,43 @@ sub percent_finished{
   }
   $sth1->execute();
   while (my $ref1 = $sth1->fetchrow_hashref) {
-    next if($ref1->{'goal'} =~ /Wait/i);
+    if($ref1->{'goal'} =~ /Wait/i){
+      $analysis_maxnum{$ref1->{'goal'}}  = 1;
+    }
     $analysis_condition{$ref1->{'goal'}} = $ref1->{'rule_condition'};
     $analysis_maxnum{$ref1->{'goal'}}    = 0;
   }
 
   foreach my $analysis_id (keys %analysis_name){
-    $sth2->execute($analysis_id);
-    my $ref2 = $sth2->fetchrow_hashref;
-    $analysis_maxnum{$analysis_id} = $ref2->{'count'};
+    next if($analysis_name{$analysis_id} =~ /Wait/i);
+    my $initial_id = $analysis_id;
+    #print "\n$analysis_id - ".$analysis_name{$analysis_id}.": ";
+    $sth2->execute($initial_id);
+    $ref3 = $sth2->fetchrow_hashref;
+    $analysis_maxnum{$initial_id} = $ref3->{'count'};
+    #print $analysis_maxnum{$initial_id};
 
-    if(defined($analysis_condition{$analysis_id})){
-      max_count($analysis_id, $analysis_condition{$analysis_id},
-		\%analysis_id, \%analysis_maxnum, \%analysis_condition, $sth2);
+    while(defined($analysis_condition{$analysis_id})){
+      $analysis_id = $analysis_id{ $analysis_condition{$analysis_id} };
+      $sth2->execute($analysis_id);
+      $ref3 = $sth2->fetchrow_hashref;
+      if($ref3->{'count'} > $analysis_maxnum{$initial_id}){
+	$analysis_maxnum{$initial_id} = $ref3->{'count'};
+      }
+      #print "\n\t-> ".$analysis_id.": ".$analysis_maxnum{$initial_id};
     }
-
-  }
-
-  #recursively find the highes input-id number
-  sub max_count{
-    my ($initial_id, $condition_name, $analysis_id, $analysis_maxnum, $analysis_condition, $sth2) = @_;
-
-    if(defined $analysis_id->{ $condition_name }){
-      if( !defined ($analysis_maxnum->{ $analysis_id->{ $condition_name } }) ){
-	$sth2->execute($analysis_id->{ $condition_name });
-	my $ref2 = $sth2->fetchrow_hashref;
-	$analysis_maxnum->{ $analysis_id->{ $condition_name } } = $ref2->{'count'};
-      }
-
-      if(defined($analysis_id->{ $initial_id }) && defined($analysis_id->{ $condition_name }) &&
-	 ($analysis_maxnum->{ $analysis_id->{ $initial_id } } < $analysis_maxnum->{ $analysis_id->{ $condition_name } })){
-	$analysis_maxnum->{ $analysis_id->{ $initial_id }}  = $analysis_maxnum->{ $analysis_id->{ $condition_name } };
-      }
-
-      if(defined $analysis_condition->{ $analysis_id->{ $condition_name } }){
-	max_count($initial_id, $analysis_condition->{ $analysis_id->{ $condition_name } },
-		  $analysis_id, $analysis_maxnum, $analysis_condition, $sth2);
-      }
-    }
-
   }
 
   #print out for testing
   if($print){
     print "\n\n\nanalysis_id\tlogic_name\tmax_num\n";
-    foreach my $analysis_id (keys %analysis_name){
-      print $analysis_name{$analysis_id}."\t".
+    foreach my $analysis_id (sort{$a<=>$b} keys %analysis_name){
+      print $analysis_name{$analysis_id}."\t\t".
 	    $analysis_id."\t".
 	    $analysis_maxnum{$analysis_id}."\n";
     }
   }
+
   return(\%analysis_maxnum);
 }
 
