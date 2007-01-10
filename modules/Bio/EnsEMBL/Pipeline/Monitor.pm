@@ -243,7 +243,6 @@ sub show_finished_summary {
 	$add = '%';
       }
       printf("%-${maxcount}s %-${maxname}s %-${maxid}s %3d%s\n",$count,$name,$id,$total,$add);
-      #printf("%-${maxcount}s %-${maxname}s %-${maxid}s %s%s\n",$count,$name,$id,$total,$add);
     }
   }
   else{
@@ -685,15 +684,16 @@ sub percent_finished{
   while (my $ref0 = $sth0->fetchrow_hashref) {
     $analysis_name{$ref0->{'analysis_id'}}      = $ref0->{'logic_name'};
     $analysis_id{$ref0->{'logic_name'}}         = $ref0->{'analysis_id'};
-    $analysis_maxnum{$ref0->{'analysis_id'}}    = 0;
+    if($ref0->{'logic_name'} =~ /Wait/i){
+      $analysis_maxnum{$ref0->{'analysis_id'}}  = 1;
+    }
+    else{
+      $analysis_maxnum{$ref0->{'analysis_id'}}  = 0;
+    }
   }
   $sth1->execute();
   while (my $ref1 = $sth1->fetchrow_hashref) {
-    if($ref1->{'goal'} =~ /Wait/i){
-      $analysis_maxnum{$ref1->{'goal'}}  = 1;
-    }
     $analysis_condition{$ref1->{'goal'}} = $ref1->{'rule_condition'};
-    $analysis_maxnum{$ref1->{'goal'}}    = 0;
   }
 
   foreach my $analysis_id (keys %analysis_name){
