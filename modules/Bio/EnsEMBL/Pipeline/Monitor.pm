@@ -390,7 +390,7 @@ sub show_Rules {
 sub show_Rules_and_Conditions {
   my ($self) = @_;
 
-  my $sql = "select a.logic_name,rg.rule_id,rc.condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id";
+  my $sql = "select a.logic_name,rg.rule_id,rc.rule_condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id";
   
   my $sth = $self->dbobj->prepare($sql);
 
@@ -407,7 +407,7 @@ sub show_Rules_and_Conditions {
   while (my $ref = $sth->fetchrow_hashref) {
     my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
-    my $cond = $ref->{'condition'};
+    my $cond = $ref->{'rule_condition'};
 
     if (length($id) > $maxid) { $maxid = length($id);}
     if (length($name) > $maxname) {$maxname = length($name);}
@@ -667,7 +667,7 @@ sub percent_finished{
   my $sql0 = "select a.analysis_id, a.logic_name ".
              "from analysis a;";
   my $sth0 = $self->dbobj->prepare($sql0) or die "cant prepare: $sql0";
-  my $sql1 = "select rg.goal, rc.condition ".
+  my $sql1 = "select rg.goal, rc.rule_condition ".
              "from rule_conditions rc,rule_goal rg ".
 	     "where rg.rule_id = rc.rule_id;";
   my $sth1 = $self->dbobj->prepare($sql1) or die "cant prepare: $sql1";
@@ -689,7 +689,7 @@ sub percent_finished{
   $sth1->execute();
   while (my $ref1 = $sth1->fetchrow_hashref) {
     next if($ref1->{'goal'} =~ /Wait/i);
-    $analysis_condition{$ref1->{'goal'}} = $ref1->{'condition'};
+    $analysis_condition{$ref1->{'goal'}} = $ref1->{'rule_condition'};
     $analysis_maxnum{$ref1->{'goal'}}    = 0;
   }
 
