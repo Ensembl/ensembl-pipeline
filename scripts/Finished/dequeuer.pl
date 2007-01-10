@@ -37,13 +37,14 @@ See the Net::Netrc module for more details.
   	-skip_analysis	a logic_name of an analysis you don't want to dequeue and 
   			submit. If this option is specified these are the only 
   			analyses which won't be submit
+  	-pipeline	only dequeue jobs stored in this pipeline(s)
 
 These arguments are overridable configurations 
 options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
 
 	-queue_manager		this specifies which 
 				Bio::EnsEMBL::Pipeline::BatchSubmission module is used
-	-job_limit		the maximun number of jobs of specified status allowed in
+	-job_limit		the maximun number of jobs of the specified status allowed in the
 	 			system
 	-queue_name		database name of the MySQL based priority queue
 	-queue_host		host name of the queue
@@ -79,6 +80,7 @@ my $flush = 30; # batch queue flush frequency: n => flush the batch queue once e
 my $fetch_number = 100;
 my @analyses_to_run;
 my @analyses_to_skip;
+my @pipeline;
 my $db_adaptors;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
@@ -97,6 +99,7 @@ GetOptions(
 	'fetch_number=s'  => \$fetch_number,
 	'analysis|logic_name=s@' => \@analyses_to_run,
 	'skip_analysis=s@'       => \@analyses_to_skip,
+	'pipeline=s@'		=> \@pipeline,
 	'h|help!'         => $usage
 
   )
@@ -115,10 +118,12 @@ my %analyses_to_skip = map {$_,1} @analyses_to_skip ;
 
 # Job fetch statement handle
 my $sql_fetch = "SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue";
-$sql_fetch .= " WHERE " if(@analyses_to_run || @analyses_to_skip);
+$sql_fetch .= " WHERE " if(@analyses_to_run || @analyses_to_skip || @pipeline);
 $sql_fetch .= " analysis IN ('".join("','",@analyses_to_run)."') " if @analyses_to_run;
 $sql_fetch .= " AND " if(@analyses_to_run && @analyses_to_skip);
 $sql_fetch .= " analysis NOT IN ('".join("','",@analyses_to_skip)."') " if @analyses_to_skip;			
+$sql_fetch .= " AND " if((@pipeline && @analyses_to_skip) || (@pipeline && @analyses_to_run));
+$sql_fetch .= " pipeline IN ('".join("','",@pipeline)."') " if @pipeline;
 $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 
 my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);		
