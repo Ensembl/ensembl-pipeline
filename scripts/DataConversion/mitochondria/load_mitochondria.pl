@@ -667,9 +667,6 @@ sub get_chromosomes{
 	 -adaptor           => $sa
 	)
       }
-    else{
-      croak "Dont have seq name for ".$cs->name." dying...\n";
-    }
   }
 
   # Die before storing anything unless you have sequences that are top level and seq level
