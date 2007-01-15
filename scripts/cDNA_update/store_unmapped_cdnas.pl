@@ -4,17 +4,18 @@
 #store this into the database
 
 use strict;
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::UnmappedObjectAdaptor;
 use Getopt::Long;
 
-my ($kill_list, $gss, $seq_file, $user, $pass, $host);
+my ($gss, $seq_file, $user, $pass, $host);
 my ($port, $dbname, $species, $vertrna, $refseq);
 my ($vertrna_update, $infile, $outfile, $findN_prog);
 my ($reasons_file);
 
 &GetOptions(
-            'kill_list=s'       => \$kill_list,
             'gss=s'      		=> \$gss,
             'seq_file=s'      	=> \$seq_file,
             'user=s'          	=> \$user,
@@ -179,18 +180,20 @@ while (my $hit = $q1->fetchrow_array){
 #now have done other analyses need to check whether the reason we have no output is because
 #cdnas are on the kill list
 
-open(LIST, "<", $kill_list) or die("can't open kill list $kill_list");
-my %kill_list;
-while (<LIST>){
-	my @tmp = split/\s+/, $_;
-	$kill_list{$tmp[0]} = 1;
-}
-close LIST;
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA');
+my %kill_list = %{$kill_list_object->get_kill_list()};
+
 foreach my $k (keys %kill_list){
-	if (exists $cdnas{$k}){
-		delete $cdnas{$k};	
-		$cdnas{$k}{"See kill list"} = 1;
-	}
+  foreach my $cdna_acc (keys %cdnas) {
+    my $truncated_acc;
+    if ($cdna_acc =~ /^(\w+)\./) {
+      $truncated_acc = $1;
+    }
+    if ($k eq $truncated_acc) {
+      delete $cdnas{$cdna_acc};
+      $cdnas{$cdna_acc}{"See kill list"} = 1;
+    }
+  }
 }
 
 #or the gss list:
