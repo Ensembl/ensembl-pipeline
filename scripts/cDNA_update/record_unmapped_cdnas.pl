@@ -193,10 +193,16 @@ my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA');
 my %kill_list = %{$kill_list_object->get_kill_list()};
 
 foreach my $k (keys %kill_list){
-	if (exists $cdnas{$k}){
-		delete $cdnas{$k};	
-		$cdnas{$k}{"See kill list"} = 1;
-	}
+  foreach my $cdna_acc (keys %cdnas) {
+    my $truncated_acc;
+    if ($cdna_acc =~ /^(\w+)\./) {
+      $truncated_acc = $1;
+    }
+    if ($k eq $truncated_acc) {
+      delete $cdnas{$cdna_acc};
+      $cdnas{$cdna_acc}{"See kill list"} = 1;
+    }
+  }
 }
 
 
