@@ -17,11 +17,10 @@ sub new {
     my $self = bless {}, $class;
 
     my ( $server, $port, $options, $archive_port ) = $self->_rearrange(
-        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS', 'ARCHIVE_PORT' ], @args );
+        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
-    $self->server($server || 'cbi2.internal.sanger.ac.uk');
-    $self->port($port || 22100);
-    $self->archive_port($archive_port || 23100);
+    $self->server($server || 'cbi3.internal.sanger.ac.uk');
+    $self->port($port || 22400);
     $self->options($options);
 
     return $self;
@@ -115,25 +114,6 @@ sub get_server {
     }
 }
 
-sub get_archive_server {
-    my ($self) = @_;
-
-    my $host = $self->server;
-    my $port = $self->archive_port;
-
-    my $server = IO::Socket::INET->new(
-        PeerAddr => $host,
-        PeerPort => $port,
-        #Proto    => 'tcp',
-		Proto    => 6,
-        Type     => SOCK_STREAM,
-        Timeout  => 10,
-    );
-    if ($server) {
-        $server->autoflush(1);
-        return $server;
-    }
-}
 
 =head2 get_Seq_by_acc
 
@@ -435,8 +415,8 @@ sub fetch_descriptions_by_accession {
 sub fetch_lengths_from_archive {
     my( $self, $id_list, $descriptions ) = @_;
 
-	my $server = $self->get_archive_server;
-	print $server join(" ", '-l', @$id_list), "\n";
+	my $server = $self->get_server;
+	print $server join(" ", '-al', @$id_list), "\n";
 
 	my $succeeded = [];
 	my $failed    = [];
