@@ -16,12 +16,11 @@ sub new {
     my ( $class, @args ) = @_;
     my $self = bless {}, $class;
 
-    my ( $server, $port, $options, $archive_port ) = $self->_rearrange(
-        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS', 'ARCHIVE_PORT' ], @args );
+    my ( $server, $port, $options ) = $self->_rearrange(
+        [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
-    $self->server($server || 'cbi2.internal.sanger.ac.uk');
-    $self->port($port || 22100);
-    $self->archive_port($archive_port || 23100);
+    $self->server($server || 'cbi3.internal.sanger.ac.uk');
+    $self->port($port || 22400);
     $self->options($options);
 
     return $self;
@@ -154,7 +153,7 @@ sub get_Seq_by_acc {
     }
 
     my $server = $self->get_server();
-    print $server "-q @id_list\n";
+    print $server "-aq @id_list\n";
     my (@seq_list);
     for ( my $i = 0 ; $i < @id_list ; $i++ ) {
         chomp( my $seq_string = <$server> );
@@ -316,8 +315,8 @@ sub fetch_descriptions_by_accession {
 sub fetch_lengths_from_archive {
     my( $self, $id_list, $descriptions ) = @_;
 
-	my $server = $self->get_archive_server;
-	print $server join(" ", '-l', @$id_list), "\n";
+	my $server = $self->get_server;
+	print $server join(" ", '-al', @$id_list), "\n";
 
 	my $succeeded = [];
 	my $failed    = [];
