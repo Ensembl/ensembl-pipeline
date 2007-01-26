@@ -486,19 +486,13 @@ sub get_db_param {
 #  the archive pfetch server is tried.
 #
 {
-	my ( $pfetch, $pfetch_archive );
+	my ( $pfetch );
 
 	sub pfetch_acc_sv {
 		my ($acc_ver) = @_;
 		print "Fetching '$acc_ver'\n";
 		$pfetch ||= Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
-		$pfetch_archive ||=
-		  Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new(
-			-PFETCH_PORT => 23100, );
 		my $seq = $pfetch->get_Seq_by_acc($acc_ver);
-		unless ($seq) {
-			$seq = $pfetch_archive->get_Seq_by_acc($acc_ver);
-		}
 		unless ($seq) {
 			my $seq_file = "$acc_ver.seq";
 			warn
