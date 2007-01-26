@@ -134,7 +134,7 @@ sub get_Seq_by_acc {
     }
 
     my $server = $self->get_server();
-    print $server "-q @id_list\n";
+    print $server "-aq @id_list\n";
     my (@seq_list);
     for ( my $i = 0 ; $i < @id_list ; $i++ ) {
         chomp( my $seq_string = <$server> );
