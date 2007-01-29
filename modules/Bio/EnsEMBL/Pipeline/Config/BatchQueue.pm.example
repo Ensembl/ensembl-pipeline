@@ -90,6 +90,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
+  DEFAULT_RESOURCE    => '',
   DEFAULT_OUTPUT_DIR  => '',
   DEFAULT_CLEANUP     => 'yes',	
   DEFAULT_VERBOSITY   => 'WARNING',
