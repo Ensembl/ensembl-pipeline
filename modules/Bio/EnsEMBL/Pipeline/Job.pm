@@ -946,6 +946,7 @@ sub set_up_queues {
     $q{$ln}{last_flushed} = undef;
     $q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
     $q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+    $q{$ln}{resource}        ||= $DEFAULT_RESOURCE;
     $q{$ln}{retries}         ||= $DEFAULT_RETRIES;
     $q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
     $q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
@@ -962,6 +963,7 @@ sub set_up_queues {
   # Need these set, so do the ||= thing 
   $q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
   $q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+  $q{default}{resource}        ||= $DEFAULT_RESOURCE;
   $q{default}{retries}         ||= $DEFAULT_RETRIES;
   $q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
   $q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
