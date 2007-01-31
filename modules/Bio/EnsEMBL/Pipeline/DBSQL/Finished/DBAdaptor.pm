@@ -57,6 +57,7 @@ sub get_available_adaptors {
 
   $pairs->{'Job'}                = 'Bio::EnsEMBL::Pipeline::DBSQL::Finished::JobAdaptor';
   $pairs->{'StateInfoContainer'} = 'Bio::EnsEMBL::Pipeline::DBSQL::Finished::StateInfoContainer';
+  $pairs->{'HitDescription'} = 'Bio::EnsEMBL::Pipeline::DBSQL::Finished::HitDescriptionAdaptor';
 
   return $pairs; 
 }
