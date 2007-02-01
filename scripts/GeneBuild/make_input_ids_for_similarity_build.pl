@@ -232,7 +232,7 @@ foreach my $slice_id (@slice_names) {
   my @ids =  get_iids_from_slice($slice_id);
   # print "have " . scalar(@ids) . " for slice $slice_id \n" if $verbose ; 
 
-  push @generated_iids,@ids ; # get_iids_from_slice($slice_id); 
+  push @generated_iids,@ids ; # get_iids_from_slice($slice_id);
 }
 
 foreach my $iid (@generated_iids) {
@@ -264,20 +264,20 @@ sub get_iids_from_slice {
   my $chr_slice    = $sl_adp->fetch_by_name($slice_id);
   my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name($slice_id);
 
-  #$verbose and print STDERR "Getting hits for $slice_id\n";
+  $verbose and print STDERR "Getting hits for $slice_id\n";
 
   my @mask_exons;
 
   # remove masked and killed hits as will be done in the build itself
-    foreach my $type ( @{$GB_SIMILARITY_GENETYPEMASKED} ) {
-      foreach my $mask_genes ( @{ $chr_gw_slice->get_all_Genes_by_type($type) } ) {
-        foreach my $mask_exon ( @{ $mask_genes->get_all_Exons } ) {
-          if ( $mask_exon->seqname eq $chr_gw_slice->id ) {
-            push @mask_exons, $mask_exon;
-          }
-        }
+  foreach my $type ( @{$GB_SIMILARITY_GENETYPEMASKED} ) {
+    foreach my $mask_genes ( @{ $chr_gw_slice->get_all_Genes_by_type($type) } ) {
+      foreach my $mask_exon ( @{ $mask_genes->get_all_Exons } ) {
+	if ( $mask_exon->seqname eq $chr_gw_slice->id ) {
+	  push @mask_exons, $mask_exon;
+	}
       }
-    } 
+    }
+  }
 
   # make the mask list non-redundant. Much faster when checking against features
   my @mask_regions;
@@ -288,7 +288,6 @@ sub get_iids_from_slice {
       }
     } else {
       push @mask_regions, { start => $mask_exon->start, end => $mask_exon->end }
-
     }
   }
 
@@ -309,7 +308,7 @@ sub get_iids_from_slice {
             push @{ $features{ $f->hseqname } }, $f; 
           }
         }
-      } 
+      }
     } else {  # don't restrict to any database, use all 
       #print "\n\tAll dbs:" . $db->{type}."\n";   
       foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {
@@ -317,48 +316,59 @@ sub get_iids_from_slice {
           push @{ $features{ $f->hseqname } }, $f;
         }
       }
-   }
- }
-   # print "have " . scalar(keys %features ) . " features \n" ; 
-    my @ids_to_ignore;
-   SEQID: foreach my $sid ( keys %features ) {
-      my $ex_idx = 0;
-      my $count  = 0;
-      # print $sid."\n" ; 
-      #print STDERR "Looking at $sid\n";
-    FEAT: foreach my $f ( sort { $a->start <=> $b->start } @{ $features{$sid} } ) {
+    }
+  }
+  # print "have " . scalar(keys %features ) . " features \n" ; 
+  my @ids_to_ignore;
+ SEQID: foreach my $sid ( keys %features ) {
+    my $ex_idx = 0;
+    my $count  = 0;
+    # print $sid."\n" ; 
+    #print STDERR "Looking at $sid\n";
+  FEAT: foreach my $f ( sort { $a->start <=> $b->start } @{ $features{$sid} } ) {
 
-        #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
-        for ( ; $ex_idx < @mask_regions ; ) {
-          my $mask_exon = $mask_regions[$ex_idx];
+      #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
+      for ( ; $ex_idx < @mask_regions ; ) {
+	my $mask_exon = $mask_regions[$ex_idx];
 
-          #printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
-          if ( $mask_exon->{'start'} > $f->end ) {
+	#printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
+	if ( $mask_exon->{'start'} > $f->end ) {
+	  
+	  # no exons will overlap this feature
+	  next FEAT;
+	} elsif ( $mask_exon->{'end'} >= $f->start ) {
 
-            # no exons will overlap this feature
-            next FEAT;
-          } elsif ( $mask_exon->{'end'} >= $f->start ) {
+	  # overlap
+	  push @ids_to_ignore, $f->hseqname;
 
-            # overlap
-            push @ids_to_ignore, $f->hseqname;
-
-            printf STDERR "Ignoring %s\n", $f->hseqname;
-            next SEQID;
-          } else {
-            $ex_idx++;
-          }
-        }
+#	  printf STDERR "Ignoring %s\n", $f->hseqname;
+	  next SEQID;
+	} else {
+	  $ex_idx++;
+	}
       }
     }
+  }
 
-    foreach my $dud_id ( @ids_to_ignore, keys %kill_list ) {
-      if ( exists $features{$dud_id} ) {
-        delete $features{$dud_id};
+  foreach my $dud_id ( @ids_to_ignore, keys %kill_list ) {
+    if ( exists $features{$dud_id} ) {
+#     print STDERR "Killing $dud_id from kill or mask list\n";
+      delete $features{$dud_id};
+    }
+  }
+
+# Addition to allow kill list identifiers without a sequence version to match hit_names with a sv
+  foreach my $hit (keys %features) {
+    if ($hit  =~ /^(\w+)\.\d/) {	
+      my $hit_trimmed = $1;
+      if (exists $kill_list{$hit_trimmed}) {
+#	print STDERR "Killing $hit after removing .sv with $hit_trimmed from kill list\n";
+	delete $features{$hit};
       }
     }
+  }
 
-    $num_seeds += scalar( keys %features );
-  # }
+  $num_seeds += scalar( keys %features );
 
   return () if $num_seeds == 0;
 
@@ -366,10 +376,10 @@ sub get_iids_from_slice {
 
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
-  
+
   my $num_chunks = int( $num_seeds / $number_of_prot_per_job ) + 1;
   for ( my $x = 1 ; $x <= $num_chunks ; $x++ ) {
-    
+
     # generate input id : $chr_name.1-$chr_length:$num_chunks:$x
     my $new_iid = $slice_id . ":$num_chunks:$x";
     push @iids, $new_iid;
