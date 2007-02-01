@@ -308,7 +308,18 @@ sub fetch_input {
           delete $features{$dud_id};
         }
       }
-	    	    
+
+# Addition to allow kill list identifiers without a sequence version to match hit_names with a sv
+      foreach my $hit (keys %features) {
+	if ($hit  =~ /^(\w+)\.\d/) {	
+	  my $hit_trimmed = $1;
+	  if (exists $kill_list{$hit_trimmed}) {
+#	    print STDERR "Killing $hit after removing .sv with $hit_trimmed from kill list\n";
+	    delete $features{$hit};
+	  }
+	}
+      }
+
       printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(keys %features));
 
       if ($id_pool_bins and $id_pool_index) {
