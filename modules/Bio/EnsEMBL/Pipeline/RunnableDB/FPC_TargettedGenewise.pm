@@ -210,12 +210,15 @@ sub make_targetted_runnables {
   my %kill_list = %{$self->fill_kill_list};
 
   foreach my $feat(@features){
-   #reject any proteins that are in the kill list
-    if(defined $kill_list{$feat->protein_id}){
+    #get the protein_id without a version
+    my $feat_protein_id = $feat->protein_id;
+    $feat_protein_id =~ s/\.\d+//;
+    #reject any proteins that are in the kill list
+    if(defined $kill_list{$feat_protein_id}){
       #print STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
-    
+                                   
     my ($start, $end);
     
     $start = $feat->start;
