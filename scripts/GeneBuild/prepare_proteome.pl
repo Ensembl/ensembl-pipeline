@@ -91,10 +91,14 @@ foreach my $file_info(@file_info){
       next SEQ;
     }
     
-    if($kill_list{$id}){
-      print $id." on kill list\n";
+    
+    my $no_version_id = $id;
+    $no_version_id =~ s/\.\d+//;
+    if(exists $kill_list{$no_version_id}){
+      print $id." on kill list as $no_version_id\n";
       next SEQ;
     }
+    
     if($ids{$id}){
       print $id." has already appeared\n";
       next SEQ;
