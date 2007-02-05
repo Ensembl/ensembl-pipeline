@@ -294,7 +294,7 @@ sub read_db{
 sub write_file{
   my $file = shift;
   my $analyses = shift;
-  print STDERR "opening ".$file."\n";
+  #print STDERR "opening ".$file."\n";
   open (FH, '>'.$file) or throw ("couldn't open $file to write to");
   foreach my $a(@$analyses){
     print FH "[".$a->logic_name."]\n";

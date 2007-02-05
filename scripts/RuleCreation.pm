@@ -278,7 +278,7 @@ sub read_db{
 
 sub write_file{
   my ($file, $rules) = @_;
-  print STDERR "Openning ".$file."\n";
+  #print STDERR "Opening ".$file."\n";
   open (FH, '>'.$file) or throw ("couldn't open $file to write to");
   foreach my $rule(@$rules){
     
