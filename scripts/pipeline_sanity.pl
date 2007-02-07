@@ -8,6 +8,8 @@ use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+use Bio::EnsEMBL::Analysis::Config::Blast;
+use Bio::EnsEMBL::Analysis::Tools::Utilities;
 
 my $host     = '';
 my $dbname   = '';
@@ -61,6 +63,10 @@ my @rules = $db->get_RuleAdaptor->fetch_all;
 
 if(!&accumulator_sanity($sanity, \@rules)){
   print ("Your accumulators aren't setup correctly\n");
+}
+
+if(!&blast_sanity_check($db)){
+  print ("Your blast config isn't setup correctly\n");
 }
 
 &db_sanity_check($sanity);
@@ -200,6 +206,25 @@ sub batchqueue_sanity_check{
   return $ok;
 }
 
+
+sub blast_sanity_check{
+  my ($db) = @_;
+  my @analyses = @{$db->get_AnalysisAdaptor->fetch_all};
+  my %blast_hash;
+  my $ok = 1;
+  foreach my $analysis(@analyses){
+    if($analysis->module eq "Blast" || $analysis->module =~ /^BlastGenscan/){
+     $blast_hash{$analysis->logic_name} = 1;
+    }
+  }
+  foreach my $k (keys %blast_hash) {
+    if(!$BLAST_CONFIG->{$k}){
+      print $BLAST_CONFIG." blast config does not contain entry for ".$k."\n";
+      $ok = 0;
+    }
+  }
+  return $ok;
+}
 
 sub config_sanity_check {
   my $ok = 1;
