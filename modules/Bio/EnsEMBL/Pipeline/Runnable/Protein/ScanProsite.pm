@@ -77,10 +77,11 @@ sub run_analysis {
     my ($self) = @_;
 
     my $run = $self->program . ' -pattern ' .
-      $self->database.' '.$self->parameters.' '.$self->filename . ' > ' 
+      $self->database.' '.$self->parameters.' '.$self->filename . ' > '
         .$self->results;
-    
-    $self->throw("Failed during ScanProsite run $!\n") unless 
+warn $run;
+
+    $self->throw("Failed during ScanProsite run $!\n") unless
       (system ($run) == 0) ;
 }
 
@@ -98,27 +99,34 @@ sub run_analysis {
 =cut
 sub parse_results {
   my ($self) = @_;
-  
+
   my $filehandle;
   my $resfile = $self->results();
   
   if (-e $resfile) {
-    
-    if (-z $self->results) {  
-      return; 
-    }       
+    warn "<HAS output $resfile>";
+    if (-z $self->results) {
+      return;
+    }
     else {
       open (CPGOUT, "<$resfile") or $self->throw("Error opening ", $resfile, " \n");#
         }
   }
   my %printsac;
   my $line;
-  
+
   while (<CPGOUT>) {
     $line = $_;
     chomp $line;
+    next if $line eq "";
     #print STDERR "$line\n";
-    my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
+
+    # this regexp works with scanregexpf.pl which previously lived in acari (gone)
+    # my ($id,$hid,$name,$from,$to,$confirmed) = split (/\|/,$line);
+
+    # this regexp works with /usr/local/ensembl32/iprscan/bin/scanregexpf.pl
+    my ($id,$hid,$name,$from,$to,$confirmed) = split (/\s+/,$line);
+
     if($id){
       if ($confirmed eq "?") {
         $confirmed = 0;
@@ -130,7 +138,7 @@ sub parse_results {
                                              0, 0);
       $self->add_to_output($fp);
     }
-  }  
+  }
 }
 
 
