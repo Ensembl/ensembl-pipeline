@@ -22,7 +22,7 @@ package  Bio::EnsEMBL::Analysis::Config::Blast;
       -type => 'wu',
      }
     },
-    Rfam =>   
+    RfamBlast =>   
     {	 
      BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
      PARSER_PARAMS => 
@@ -102,10 +102,11 @@ use vars qw(%Config);
   SLEEP_PER_JOB => 30,
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
   DEFAULT_RUNNER => '',
+  DEFAULT_RESOURCE => 'linux',
   QUEUE_CONFIG => [
     {
       logic_name => 'BlastmiRNA',
-      batch_size => 500,
+      batch_size => 1000,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
@@ -117,7 +118,7 @@ use vars qw(%Config);
     },
     {
       logic_name => 'RfamBlast',
-      batch_size => 50,
+      batch_size => 100,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
