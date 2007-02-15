@@ -297,7 +297,7 @@ sub DB_setup{
     # dont automatically run rfam jobs uless specifically requested
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT -dbpass $pass".
-	" -logic_name ncRNA -program cmsearch -program_file cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
+	" -logic_name ncRNA -program cmsearch -program_file /software/ensembl/bin/cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
 	  " -module Bio::EnsEMBL::Analysis::RunnableDB::Infernal".
 	    " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type FLAG";
     $status += system($cmd);
@@ -441,17 +441,17 @@ sub prepare_RFAM{
   print "Updating RFAM descriptions file ...\n";
   system ("mkdir $BLASTDIR") unless -e $BLASTDIR;
   system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.tar.gz  -O $BLASTDIR/Rfam.tar.gz");
-  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.tar.gz\n") if $exit > 0;
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz  -O $BLASTDIR/Rfam.tar.gz");
+  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.tar.gz");
   die ("Error decompressing Rfam.tar.gz\n") if $exit > 0;
   $exit =  system ("tar -xf $BLASTDIR/Rfam.tar -C $BLASTDIR");
   die ("Error extracting Rfam covariance models  file from $BLASTDIR/Rfam.tar\n") if $exit > 0;
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
   die ("Error with obtaining Rfam.seed file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
   die ("Error with obtaining Rfam.fasta file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.thr.gz -O $BLASTDIR/Rfam.thr.gz");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.thr.gz -O $BLASTDIR/Rfam.thr.gz");
   die ("Error with obtaining Rfam.thr file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.thr.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.seed.gz");
   die ("Error decompressing Rfam.seed.gz\n") if $exit > 0;
