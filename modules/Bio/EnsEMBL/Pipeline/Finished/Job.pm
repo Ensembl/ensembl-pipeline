@@ -388,9 +388,9 @@ sub flush_runs {
 	}
 	  ANAL:
 	for my $anal (@analyses) {
-			my $queue = $BATCH_QUEUES{$anal};
-			my @job_ids;
-			@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } 
+		my $queue = $BATCH_QUEUES{$anal};
+		my @job_ids;
+		@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } 
 				if ($queue->{'jobs'}->{$host}->{$dbname});
 		if ( !@job_ids ) {
 			next ANAL;
@@ -402,7 +402,7 @@ sub flush_runs {
 			my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
 
 			if ( !$lastjob ) {
-			throw("Last batch job not in db");
+			warning("Last batch job not in db");
 		}
 
 			my $pre_exec =
