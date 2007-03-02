@@ -122,8 +122,10 @@ sub _check_Transcript{
 	}
 
 	# check phase consistency:
-	if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
-	  print STDERR "check: transcript $id has phase inconsistency\n";
+        if ( $exons[$i-1]->end_phase != $exons[$i]->phase and
+             ($exons[$i-1]->end_phase != -1 or $exons[$i]->phase != 0) and
+             ($exons[$i-1]->end_phase != 0 or $exons[$i]->phase != -1)) {
+          print STDERR "check: transcript $id has phase inconsistency\n";
 	  $valid = 0;
 	  last EXON;
 	}
