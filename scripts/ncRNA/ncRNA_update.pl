@@ -289,6 +289,8 @@ sub DB_setup{
            "DELETE FROM assembly_exception;' $WRITENAME ";
     $status += system($cmd);
     print ".";
+    $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME -e\"load data local infile \'$CVSDIR/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt\' into table unmapped_reason;\"");
+    print ".";
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME -e\"load data local infile \'$CVSDIR/ensembl/misc-scripts/external_db/external_dbs.txt\' into table external_db;\"");
     print ".";
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < ".$DATADIR."/$species/import_tables.sql");
