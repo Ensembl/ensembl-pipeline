@@ -122,12 +122,25 @@ sub _check_Transcript{
 	}
 
 	# check phase consistency:
-        if ( $exons[$i-1]->end_phase != $exons[$i]->phase and
-             ($exons[$i-1]->end_phase != -1 or $exons[$i]->phase != 0) and
-             ($exons[$i-1]->end_phase != 0 or $exons[$i]->phase != -1)) {
-          print STDERR "check: transcript $id has phase inconsistency\n";
-	  $valid = 0;
-	  last EXON;
+        if (not $transcript->translation) {
+          if ($exons[$i-1]->phase != -1 or $exons[$i-1]->end_phase != -1 or
+              $exons[$i]->phase != -1 or $exons[$i]->end_phase != -1) {
+            print STDERR "check: transcript $id is not coding and has bad phases\n";
+            $valid = 0;
+            last EXON;
+          }
+        } else {
+          if ( $exons[$i-1]->end_phase != $exons[$i]->phase and 
+               (not ($exons[$i-1]->end_phase == -1 and 
+                     $exons[$i]->phase == 0 and
+                     $transcript->translation->start_Exon eq $exons[$i-1]) or
+                not ($exons[$i-1]->end_phase == 0 and 
+                     $exons[$i]->phase == -1 and
+                     $transcript->translation->end_Exon eq $exons[$i]))) {
+            print STDERR "check: transcript $id has phase inconsistency\n";
+            $valid = 0;
+            last EXON;
+          }
 	}
 		
 	# check for folded transcripts
