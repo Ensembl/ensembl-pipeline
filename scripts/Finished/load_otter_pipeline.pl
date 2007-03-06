@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/software/bin/perl -w
 
 =head1 NAME
 
@@ -111,7 +111,7 @@ if ( !$oname ) {
 	print STDERR "-o_host $ohost -o_user $ouser -o_pass $opass\n";
 }
 
-my $otter_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
+my $otter_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 	-user   => $ouser,
 	-dbname => $oname,
 	-host   => $ohost,
@@ -219,7 +219,7 @@ my $seqset_info     = {};
 		my $slice_a              = $dba->get_SliceAdaptor();
 		my $seq_a                = $dba->get_SequenceAdaptor();
 		my $analysis_a           = $dba->get_AnalysisAdaptor;
-		my $state_info_container = $dba->get_StateInfoContainer;
+		my $state_info_container = $dba->get_StateInfoContainer if ($dba->dbc->dbname =~ /pipe_/);
 	
 		my $chromosome_cs;
 		my $clone_cs;
@@ -279,7 +279,7 @@ my $seqset_info     = {};
 				(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori) 
 				values 
 				(?,?,?,?,?,?,?)};
-		my $insert_sth = $dba->prepare($insert_query);
+		my $insert_sth = $dba->dbc->prepare($insert_query);
 		for ( values %$contigs_hashref ) {
 			my $chr_name     = $_->[0];
 			my $sequence_set = $_->[8];
