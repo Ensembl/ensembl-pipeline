@@ -34,6 +34,8 @@ my $count;
 my $fbs;
 my $dump;
 my $no_stable_ids;
+#list of gene-descriptions to ignore
+my @genestoignore = ();
 
 $| = 1;
 
@@ -125,12 +127,14 @@ if ($dump){
   dump_xrefs($final_ga) if $xrefs;
   exit;
 }
+
+
 # check that the final db has the external db table loaded
 check_exdb($final_db);
 check_meta($sdb,$final_db);
 
 print "fetching and lazy-loading new predictions...\n";
-my $new_hash = fetch_genes($sga,$biotype,$fbs);
+my $new_hash = fetch_genes($sga,$biotype,$fbs,\@genestoignore);
 print "\nfetching and lazy-loading old predictions...\n";
 my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 
@@ -179,9 +183,6 @@ write_genes($new_hash,$blacklist,$final_ga) if $write;
 print "Dumping xrefs...\n" if $xrefs;
 dump_xrefs($final_ga) if $xrefs;
 
-exit;
-
-
 
 sub check_exdb {
   my($db) = @_;
@@ -190,8 +191,8 @@ sub check_exdb {
   die("Cannot find RFAM in external db table\n") unless sql($query,$db)->[0] == 4200;
   $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase'";
   die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 3300;
-  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase_predicted'";
-  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 3310;  
+#  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase_predicted'";
+#  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 3310;  
   return;
 }
 
@@ -487,11 +488,11 @@ sub write_genes {
 sub lazy_load {
   my ($gene) = @_;
   $gene->stable_id;
- $gene->get_all_Transcripts->[0]->stable_id;
- $gene->get_all_Exons->[0]->stable_id;
- $gene->get_all_DBEntries;
- $gene->get_all_Transcripts->[0]->get_all_supporting_features;
- return $gene;
+  $gene->get_all_Transcripts->[0]->stable_id;
+  $gene->get_all_Exons->[0]->stable_id;
+  $gene->get_all_DBEntries;
+  $gene->get_all_Transcripts->[0]->get_all_supporting_features;
+  return $gene;
 }
 
 sub dump_xrefs {
@@ -530,7 +531,7 @@ sub sql {
 }
 
 sub fetch_genes {
-  my ($ga,$biotype,$slice) = @_;
+  my ($ga,$biotype,$slice,$genestoignore) = @_;
   my %ncRNA_hash;
   my @ncRNAs;
   throw("Cannot fetch genes without gene adaptor $ga") unless $ga;
@@ -552,7 +553,11 @@ sub fetch_genes {
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
-	next if  $ncRNA->description =~ /RNAI/;	
+	next if  $ncRNA->description =~ /RNAI/;
+	#skip selected genes
+	foreach my $genestoignore (@$genestoignore){
+	  next if  $ncRNA->description =~ /$genestoignore/;
+	}
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
       }
     }
@@ -566,6 +571,9 @@ sub fetch_genes {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
 	next if  $ncRNA->description =~ /RNAI/;
+	foreach my $genestoignore (@$genestoignore){
+	  next if  $ncRNA->description =~ /$genestoignore/;
+	}
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
       }
     }
