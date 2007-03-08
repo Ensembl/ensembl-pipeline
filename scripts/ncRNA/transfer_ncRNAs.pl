@@ -433,6 +433,7 @@ sub generate_new_ids{
     $gene->version(1);
     $trans->version(1);
     $exon->version(1);
+
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(";
     print SIDS "null,0,'".$gene->stable_id."',1,$last_session,'gene',0);\n";
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(";
@@ -479,6 +480,17 @@ sub write_genes {
     $trans->analysis($analysis);
     $trans->biotype($gene->biotype);
     $trans->status($gene->status);
+
+    #set dates
+    $gene->created_date(time());
+    $gene->modified_date(time());
+    $trans->created_date(time());
+    $trans->modified_date(time());
+    foreach my $exon (@{$trans->get_all_Exons}){
+      $exon->created_date(time());
+      $exon->modified_date(time());
+    }
+
     print "Storing gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n" ;
     $ga->store($gene);
   }
