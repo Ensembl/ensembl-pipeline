@@ -165,11 +165,21 @@ sub load_taxonomy_in_core {
   $mc->delete_key('species.classification');
   $mc->delete_key('species.common_name');
   $mc->delete_key('species.taxonomy_id');
+  $mc->delete_key('species.ensembl_common_name');
+  $mc->delete_key('species.ensembl_alias_name');
   print "Loading species.taxonomy_id = ",$node->node_id,"\n";
   $mc->store_key_value('species.taxonomy_id',$node->node_id);
   if (defined $node->common_name) {
     $mc->store_key_value('species.common_name',$node->common_name);
     print "Loading species.common_name = ",$node->common_name,"\n";
+  }
+  if (defined $node->has_tag('ensembl common name')) {
+    $mc->store_key_value('species.ensembl_common_name',$node->get_tagvalue('ensembl common name'));
+    print "Loading species.ensembl_common_name = ",$node->get_tagvalue('ensembl common name'),"\n";
+  }
+  if (defined $node->has_tag('ensembl alias name')) {
+    $mc->store_key_value('species.ensembl_alias_name',$node->get_tagvalue('ensembl alias name'));
+    print "Loading species.ensembl_alias_name = ",$node->get_tagvalue('ensembl alias name'),"\n";
   }
   my @classification = split(",",$node->classification(","));
   foreach my $level (@classification) {
