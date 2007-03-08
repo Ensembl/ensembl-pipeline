@@ -36,6 +36,7 @@ my $dump;
 my $no_stable_ids;
 #list of gene-descriptions to ignore
 my @genestoignore = ();
+my $makewhitelist = 0;
 
 $| = 1;
 
@@ -54,6 +55,7 @@ $| = 1;
 	    'slice_fetch!'=> \$fbs,
 	    'dump!'      => \$dump,
 	    'no_ids!'    => \$no_stable_ids,
+	    'makewhitelist!' => \$makewhitelist,
 	   );
 
 die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost * \n-dbport * \n-species *(1 at at time)
@@ -75,6 +77,10 @@ if ($list){
     chomp;
     $whitelist->{$_} = 1;
   }
+}
+if($makewhitelist){
+  my $whitelist_file = $species.".whitelist";
+  open(WHITE, ">$whitelist_file") or die "cant create whitelist file $whitelist_file.\n";
 }
 
 # open xref file
@@ -183,6 +189,7 @@ write_genes($new_hash,$blacklist,$final_ga) if $write;
 print "Dumping xrefs...\n" if $xrefs;
 dump_xrefs($final_ga) if $xrefs;
 
+close(WHITE) if($makewhitelist);
 
 sub check_exdb {
   my($db) = @_;
@@ -289,6 +296,9 @@ sub overlaps {
 	    if ($codingexon) {
 	      print "gene ".$gene->dbID."\t".$gene->description." overlaps coding exon "
 		.$exon->stable_id." in  real_gene ".$overlap->stable_id."\t";
+	      if($makewhitelist){
+		print WHITE $gene->dbID."\n";
+	      }
 	      if ($whitelist->{$gene->dbID}){
 		print "Gene protected by whitelist\n";
 	      } else {
@@ -323,12 +333,21 @@ sub blacklist {
 sub stable_id_mapping {
   my ($non_coding_overlaps,$old_hash,$new_hash,$blacklist) = @_;
   # get the assembly information
-  my $last_session = sql('SELECT max(mapping_session_id) from mapping_session',$final_db)->[0];
-  my $last_db =  sql("SELECT new_db_name from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
-  my $old_release = sql("SELECT new_release from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
   my $new_release = sql('SELECT meta_value from meta where meta_key = "schema_version"',$final_db)->[0];
-  my $old_assembly = sql("SELECT new_assembly from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
+  my $last_session = sql('SELECT max(mapping_session_id) from mapping_session',$final_db)->[0];
   my $new_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$final_db)->[0];
+  my ($last_db, $old_release, $old_assembly);
+  if($last_session){
+    $last_db = sql("SELECT new_db_name from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
+    $old_release = sql("SELECT new_release from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
+    $old_assembly = sql("SELECT new_assembly from mapping_session where mapping_session_id = $last_session",$final_db)->[0];
+  }
+  else{
+    $last_session = 0;
+    $last_db      = $final_dbname;
+    $old_release  = $new_release;
+    $old_assembly = $new_assembly;
+  }
   my $new_session =  $last_session + 1;
   print SIDS "INSERT INTO  mapping_session(mapping_session_id,old_db_name,new_db_name,old_release,new_release,old_assembly,new_assembly,created) ".
     " VALUES($new_session,\'$last_db\',\'$final_dbname\',\'$old_release\',\'$new_release\',\'$old_assembly\',\'$new_assembly\',now());\n";
