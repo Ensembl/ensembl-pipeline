@@ -191,6 +191,10 @@ dump_xrefs($final_ga) if $xrefs;
 
 close(WHITE) if($makewhitelist);
 
+unless($no_stable_ids or !$sids){
+  print STDERR "\n# mysql -uensadmin -p".$pass." -h".$final_host." -P".$final_port." -D".$final_dbname." < ".$sids."\n\n";
+}
+
 sub check_exdb {
   my($db) = @_;
   # test final db for external db table 
