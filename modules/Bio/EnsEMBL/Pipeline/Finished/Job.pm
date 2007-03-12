@@ -399,10 +399,15 @@ sub flush_runs {
 			my $this_runner = $queue->{'runner'};
 		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
 
-			my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
-
-			if ( !$lastjob ) {
-			warning("Last batch job not in db");
+		my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
+		
+		while( !$lastjob && @$job_ids) {
+			pop @$job_ids;
+			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
+		}
+		
+		if ( !$lastjob ) {
+			next ANAL;
 		}
 
 			my $pre_exec =
