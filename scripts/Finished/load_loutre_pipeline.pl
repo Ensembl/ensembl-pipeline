@@ -2,38 +2,38 @@
 
 =head1 NAME
 
-load_otter_pipeline.pl
+load_loutre_pipeline.pl
 
 =head1 SYNOPSIS
 
-load_otter_pipeline.pl
+load_loutre_pipeline.pl
 
 =head1 DESCRIPTION
 
-This script is used to load an agp file into an otter and the corresponding pipeline database (both based on the new schema).
-The otter key 'pipeline_db_rw_head' in the meta table is used to retrieve the pipeline connexion parameters.  
+This script is used to load an agp file into a loutre and the corresponding pipeline database (both based on schema version 20+).
+The loutre key 'pipeline_db_rw_head' in the meta table is used to retrieve the pipeline connexion parameters.  
 The sequence loaded into the dna table is either Pfetched or fetched from a raw file.
-If the login, password and port parameters of the otter connexion are not provided, they will be 
+If the login, password and port parameters of the loutre connexion are not provided, they will be 
 recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 here is an example commandline
 
-./load_otter_pipeline.pl \
+./load_loutre_pipeline.pl \
 -set chr11-02 \
 -description 'chromosome 11' \
--o_host otterlive \
--o_port 3352 \
--o_name otter_human \
--o_user ottuser \
--o_pass *****
+-host otterlive \
+-port 3352 \
+-name loutre_human \
+-user ottuser \
+-pass *****
 
 =head1 OPTIONS
 
-    -o_host (default:otterlive)   host name for the otter database (gets put as phost= in locator)
-    -o_name (no default)  For RDBs, what name to connect to (pname= in locator)
-    -o_user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
-    -o_pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
-    -o_port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
+    -host (default:otterlive)   host name for the loutre database (gets put as phost= in locator)
+    -name (no default)  For RDBs, what name to connect to (pname= in locator)
+    -user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
+    -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
+    -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
     -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
     -set	the sequence set name
@@ -61,12 +61,12 @@ use Bio::EnsEMBL::CoordSystem;
 use Bio::EnsEMBL::Attribute;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-# Otter connexion parameters, default values.
-my $ohost = 'otterlive';
-my $oport = '';
+# loutre connexion parameters, default values.
+my $host = 'otterlive';
+my $port = '';
 my $oname = '';
-my $ouser = '';
-my $opass = '';
+my $user = '';
+my $pass = '';
 
 my $chromosome_cs_version = 'Otter';
 my $set;
@@ -76,11 +76,11 @@ my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
 &GetOptions(
-	'o_host:s'                => \$ohost,
-	'o_port:n'                => \$oport,
-	'o_name:s'                => \$oname,
-	'o_user:s'                => \$ouser,
-	'o_pass:s'                => \$opass,
+	'host:s'                => \$host,
+	'port:n'                => \$port,
+	'name:s'                => \$name,
+	'user:s'                => \$user,
+	'pass:s'                => \$pass,
 	'chromosome_cs_version:s' => \$chromosome_cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
@@ -98,29 +98,29 @@ throw("no description given") unless ( defined $description );
 
 throw("No sequence set name given") unless ($set);
 
-if ( !$ouser || !$opass || !$oport ) {
-	my @param = &get_db_param($ohost);
-	$ouser = $param[0] unless $ouser;
-	$opass = $param[1] unless $opass;
-	$oport = $param[2] unless $oport;
+if ( !$user || !$pass || !$port ) {
+	my @param = &get_db_param($host);
+	$user = $param[0] unless $user;
+	$pass = $param[1] unless $pass;
+	$port = $param[2] unless $port;
 }
 
-if ( !$oname ) {
+if ( !$name ) {
 	print STDERR
 	  "Can't load sequence set without a target pipeline database name\n";
-	print STDERR "-o_host $ohost -o_user $ouser -o_pass $opass\n";
+	print STDERR "-o_host $host -o_user $user -o_pass $pass\n";
 }
 
-my $otter_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-	-user   => $ouser,
-	-dbname => $oname,
-	-host   => $ohost,
-	-port   => $oport,
-	-pass   => $opass
+my $loutre_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+	-user   => $user,
+	-dbname => $name,
+	-host   => $host,
+	-port   => $port,
+	-pass   => $pass
 );
 
 my $pipe_dba;
-my $meta_container = $otter_dba->get_MetaContainer();
+my $meta_container = $loutre_dba->get_MetaContainer();
 my ($pipe_param) = @{$meta_container->list_value_by_key('pipeline_db_rw_head')};
 if($pipe_param) {
 	$pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
@@ -133,7 +133,7 @@ my $contigs_hashref = {};
 my $seqset_info     = {};
 
 #
-# Get the sequence data set from agp file and store it in a Hashtable.
+# Get the sequence set data from the agp and store it in a Hashtable.
 #
 {
 	print STDOUT "Getting data from agp file $agp_file\n";
@@ -205,12 +205,12 @@ my $seqset_info     = {};
 #
 {
 	my %objects;
-	my $otter_dbh = $otter_dba->dbc->db_handle;
+	my $loutre_dbh = $loutre_dba->dbc->db_handle;
 	my $pipe_dbh = $pipe_dba->dbc->db_handle;
-	$otter_dbh->begin_work;
+	$loutre_dbh->begin_work;
 	$pipe_dbh->begin_work;
 
-	foreach my $dba ($otter_dba,$pipe_dba) {
+	foreach my $dba ($loutre_dba,$pipe_dba) {
 		print STDOUT "Writing data into database: ".$dba->dbc->dbname." (".$dba->dbc->host.":".$dba->dbc->port.")\n";
 		my %asm_seq_reg_id;
 	
@@ -233,7 +233,7 @@ my $seqset_info     = {};
 	
 		};
 		if ($@) {
-			$otter_dbh->rollback;
+			$loutre_dbh->rollback;
 			$pipe_dbh->rollback;
 			throw( 
 				qq{ 
@@ -257,7 +257,7 @@ my $seqset_info     = {};
 			if ($slice) {
 				print STDOUT "Sequence set <$name> is already in database <".$dba->dbc->dbname.">\n";
 				if( $slice->length ne $endv ) {
-					$otter_dbh->rollback;
+					$loutre_dbh->rollback;
 					$pipe_dbh->rollback;
 					throw(  "There is a difference in size for $name: stored ["
 					  . $slice->length. "] =! new [". $endv. "]" );
@@ -310,7 +310,7 @@ my $seqset_info     = {};
 				$ctg_seq_reg_id   = $contig->get_seq_region_id;
 			}
 			elsif ( $clone && !$contig ) {
-				$otter_dbh->rollback;
+				$loutre_dbh->rollback;
 				$pipe_dbh->rollback;
 				### code to be added to create contigs related to the clone
 				throw(  
@@ -329,7 +329,7 @@ my $seqset_info     = {};
 					}
 				};
 				if($@) {
-					$otter_dbh->rollback;
+					$loutre_dbh->rollback;
 					$pipe_dbh->rollback;
 					throw($@);	
 				}
@@ -341,7 +341,7 @@ my $seqset_info     = {};
 				$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
 				$clone_seq_reg_id = $slice_a->store($clone);
 				if(!$clone_seq_reg_id) {
-					$otter_dbh->rollback;
+					$loutre_dbh->rollback;
 					$pipe_dbh->rollback;
 					throw("clone seq_region_id has not been returned for the accession $acc_ver");
 				}
@@ -355,7 +355,7 @@ my $seqset_info     = {};
 				  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
 				$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
 				if(!$ctg_seq_reg_id){
-					$otter_dbh->rollback;
+					$loutre_dbh->rollback;
 					$pipe_dbh->rollback;
 					throw("contig seq_region_id has not been returned for the contig $contig_name");
 				}
@@ -373,7 +373,7 @@ my $seqset_info     = {};
 	
 		}
 	}
-	$otter_dbh->commit;
+	$loutre_dbh->commit;
 	$pipe_dbh->commit;
 
 }
