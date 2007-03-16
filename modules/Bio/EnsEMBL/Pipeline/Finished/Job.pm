@@ -401,8 +401,8 @@ sub flush_runs {
 
 		my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
 		
-		while( !$lastjob && @$job_ids) {
-			pop @$job_ids;
+		while( !$lastjob && @job_ids) {
+			pop @job_ids;
 			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
 		}
 		
