@@ -2,35 +2,35 @@
 
 =head1 NAME
 
-load_loutre_pipeline.pl
+load_from_agp.pl
 
 =head1 SYNOPSIS
 
-load_loutre_pipeline.pl
+load_from_agp.pl
 
 =head1 DESCRIPTION
 
-This script is used to load an agp file into a loutre and the corresponding pipeline database (both based on schema version 20+).
-The loutre key 'pipeline_db_rw_head' in the meta table is used to retrieve the pipeline connexion parameters.
-The sequence loaded into the dna table is either Pfetched or fetched from a raw file.
-If the login, password and port parameters of the loutre connexion are not provided, they will be
+This script is used to load a sequence set from an agp file into either a pipeline or
+a loutre database, both based on ensembl schema version 20+.
+The loaded sequences are either Pfetched or fetched from fasta files in the current directory.
+If the login, password and port parameters are not provided, they will be
 recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 here is an example commandline
 
-./load_loutre_pipeline.pl \
--set chr11-02 \
--description 'chromosome 11' \
--host otterlive \
--port 3352 \
--name loutre_human \
--user ottuser \
+./load_from_agp.pl
+-set chr11-02
+-description 'chromosome 11'
+-host otterpipe2
+-port 3352
+-name pipe_human
+-user pipuser
 -pass *****
 
 =head1 OPTIONS
 
-    -host (default:otterlive)   host name for the loutre database (gets put as phost= in locator)
-    -name (no default)  For RDBs, what name to connect to (pname= in locator)
+    -host (default:otterpipe1)   host name of the target database (gets put as phost= in locator)
+    -name (no default)  For RDBs, what database to connect to (pname= in locator)
     -user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
@@ -38,8 +38,9 @@ here is an example commandline
     -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
     -set	the sequence set name
     -description the sequence set description
-    -nosubmit	Used to avoid the pipeline priming with the SubmitContig analysis
-    -help|h		displays this documentation with PERLDOC
+    -nosubmit	don't prime the pipeline with the SubmitContig analysis in case of pipeline
+    		database
+    -help|h	displays this documentation with PERLDOC
 
 =head1 CONTACT
 
@@ -59,8 +60,8 @@ use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::Attribute;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-# loutre connexion parameters, default values.
-my $host = 'otterlive';
+# otter and destination database connexion parameters, default values.
+my $host = 'otterpipe1';
 my $port = '';
 my $name = '';
 my $user = '';
@@ -109,29 +110,24 @@ if ( !$name ) {
 	print STDERR "-host $host -user $user -pass $pass\n";
 }
 
-my $loutre_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+my $module = $name =~ /pipe_/ ? 'Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor' :
+								'Bio::EnsEMBL::DBSQL::DBAdaptor';
+my $target_dba = $module->new(
 	-user   => $user,
 	-dbname => $name,
 	-host   => $host,
 	-port   => $port,
 	-pass   => $pass
 );
+my $target_dbc = $target_dba->dbc();
 
-my $pipe_dba;
-my $meta_container = $loutre_dba->get_MetaContainer();
-my ($pipe_param) = @{$meta_container->list_value_by_key('pipeline_db_rw_head')};
-if($pipe_param) {
-	$pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
-} else {
-	throw("need to add meta key pipeline_db_rw_head in ${host}/${name}\n");
-}
 
 my %end_value;
 my $contigs_hashref = {};
 my $seqset_info     = {};
 
 #
-# Get the sequence set data from the agp and store it in a Hashtable.
+# Get the sequence data set from agp file and store it in a Hashtable.
 #
 {
 	print STDOUT "Getting data from agp file $agp_file\n";
@@ -199,180 +195,163 @@ my $seqset_info     = {};
 }
 
 #
-# Load the sequence data set into the databases
+# Load the sequence data set into the Pipeline database
 #
 {
-	my %objects;
-	my $loutre_dbh = $loutre_dba->dbc->db_handle;
-	my $pipe_dbh = $pipe_dba->dbc->db_handle;
-	$loutre_dbh->begin_work;
-	$pipe_dbh->begin_work;
+	print STDOUT
+	  "Writing data into target database: $name ($host:$port)\n";
 
-	foreach my $dba ($loutre_dba,$pipe_dba) {
-		print STDOUT "Writing data into database: ".$dba->dbc->dbname." (".$dba->dbc->host.":".$dba->dbc->port.")\n";
-		my %asm_seq_reg_id;
+	my $dbh = $target_dbc->db_handle;
+	$dbh->begin_work;
 
-		my $attr_a               = $dba->get_AttributeAdaptor();
-		my $cs_a                 = $dba->get_CoordSystemAdaptor();
-		my $slice_a              = $dba->get_SliceAdaptor();
-		my $seq_a                = $dba->get_SequenceAdaptor();
-		my $analysis_a           = $dba->get_AnalysisAdaptor;
-		my $state_info_container = $dba->get_StateInfoContainer if ($dba->dbc->dbname =~ /pipe_/);
+	my %asm_seq_reg_id;
 
-		my $chromosome_cs;
-		my $clone_cs;
-		my $contig_cs;
+	my $attr_a               = $target_dba->get_AttributeAdaptor();
+	my $cs_a                 = $target_dba->get_CoordSystemAdaptor();
+	my $slice_a              = $target_dba->get_SliceAdaptor();
+	my $seq_a                = $target_dba->get_SequenceAdaptor();
+	my $analysis_a           = $target_dba->get_AnalysisAdaptor;
+	my $state_info_container = $target_dba->get_StateInfoContainer if($name =~ /pipe_/);
 
+	my $chromosome_cs;
+	my $clone_cs;
+	my $contig_cs;
+
+	eval {
+		$chromosome_cs =
+		  $cs_a->fetch_by_name( "chromosome", $chromosome_cs_version );
+		$clone_cs  = $cs_a->fetch_by_name("clone");
+		$contig_cs = $cs_a->fetch_by_name("contig");
+
+	};
+	if ($@) {
+		throw(
+			qq{
+				A coord_system matching the arguments does not exsist in the cord_system table,
+				please ensure you have the right coord_system entry in the database [$@]
+			}
+		);
+	}
+	my $slice;
+	my $ana = $analysis_a->fetch_by_logic_name('SubmitContig');
+
+	# insert the sequence set as a chromosome in seq_region
+	# table and its attributes in seq_region_attrib & attrib_type tables
+	foreach my $set_name ( keys(%end_value) ) {
+		my $endv = $end_value{$set_name};
 		eval {
-			$chromosome_cs =
-			  $cs_a->fetch_by_name( "chromosome", $chromosome_cs_version );
-			$clone_cs  = $cs_a->fetch_by_name("clone");
-			$contig_cs = $cs_a->fetch_by_name("contig");
-
+			$slice =
+			  $slice_a->fetch_by_region( 'chromosome', $set_name, undef, undef,
+				undef, $chromosome_cs_version );
 		};
-		if ($@) {
-			$loutre_dbh->rollback;
-			$pipe_dbh->rollback;
-			throw(
-				qq{
-					A coord_system matching the arguments does not exsist in the cord_system table,
-					please ensure you have the right coord_system entry in the database [$@]
-				}
-			);
+		if ($slice) {
+			print STDOUT "Sequence set <$set_name> is already in pipeline database <$name>\n";
+			throw(  "There is a difference in size for $set_name: stored ["
+				  . $slice->length. "] =! new [". $endv. "]" )
+			unless ( $slice->length eq $endv );
+			$asm_seq_reg_id{$set_name} = $slice->get_seq_region_id;
 		}
-		my $slice;
-		my $ana = $analysis_a->fetch_by_logic_name('SubmitContig');
-
-		# insert the sequence set as a chromosome in seq_region
-		# table and its attributes in seq_region_attrib & attrib_type tables
-		foreach my $name ( keys(%end_value) ) {
-			my $endv = $end_value{$name};
-			eval {
-				$slice =
-				  $slice_a->fetch_by_region( 'chromosome', $name, undef, undef,
-					undef, $chromosome_cs_version );
-			};
-			if ($slice) {
-				print STDOUT "Sequence set <$name> is already in database <".$dba->dbc->dbname.">\n";
-				if( $slice->length ne $endv ) {
-					$loutre_dbh->rollback;
-					$pipe_dbh->rollback;
-					throw(  "There is a difference in size for $name: stored ["
-					  . $slice->length. "] =! new [". $endv. "]" );
-				}
-				$asm_seq_reg_id{$name} = $slice->get_seq_region_id;
-			}
-			else {
-				$slice = &make_slice( $name, 1, $endv, $endv, 1, $chromosome_cs );
-				$asm_seq_reg_id{$name} = $slice_a->store($slice);
-				$attr_a->store_on_Slice( $slice,
-					&make_seq_set_attribute( $seqset_info->{$name} ) );
-			}
-		}
-
-		# insert clone & contig in seq_region, seq_region_attrib,
-		# dna and assembly tables
-		my $insert_query = qq {
-				INSERT IGNORE INTO assembly
-				(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)
-				values
-				(?,?,?,?,?,?,?)};
-		my $insert_sth = $dba->dbc->prepare($insert_query);
-		for ( values %$contigs_hashref ) {
-			my $chr_name     = $_->[0];
-			my $sequence_set = $_->[8];
-			my $chr_start    = $_->[1];
-			my $chr_end      = $_->[2];
-			my $ctg_start    = $_->[3];
-			my $ctg_end      = $_->[4];
-			my $ctg_ori      = $_->[5];
-			my $acc          = $_->[6];
-			my $ver          = $_->[7];
-			my $acc_ver      = $acc . "." . $ver;
-
-			my $clone;
-			my $clone_seq_reg_id;
-			my $contig;
-			my $contig_name = $acc_ver . "." . "1" . ".";
-			my $ctg_seq_reg_id;
-			my $seqlen;
-			eval {
-				$clone = $slice_a->fetch_by_region( 'clone', $acc_ver );
-				$seqlen = $clone->length;
-				$contig_name .= $seqlen;
-				$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
-			};
-			if ( $clone && $contig ) {
-				print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in database\n";
-				$clone_seq_reg_id = $clone->get_seq_region_id;
-				$ctg_seq_reg_id   = $contig->get_seq_region_id;
-			}
-			elsif ( $clone && !$contig ) {
-				$loutre_dbh->rollback;
-				$pipe_dbh->rollback;
-				### code to be added to create contigs related to the clone
-				throw(
-					"Missing contig entry in the database for clone ${acc_ver}"
-				);
-			}
-			else {
-				##fetch the dna sequence from pfetch server with acc_ver id
-				my $seqobj;
-				eval {
-					if($objects{$acc_ver}){
-						$seqobj = $objects{$acc_ver};
-					}else{
-						$seqobj = &pfetch_acc_sv($acc_ver);
-						$objects{$acc_ver} = $seqobj;
-					}
-				};
-				if($@) {
-					$loutre_dbh->rollback;
-					$pipe_dbh->rollback;
-					throw($@);
-				}
-				my $seq = $seqobj->seq;
-				$seqlen = $seqobj->length;
-				$contig_name .= $seqlen;
-
-				##make clone and insert clone to seq_region table
-				$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
-				$clone_seq_reg_id = $slice_a->store($clone);
-				if(!$clone_seq_reg_id) {
-					$loutre_dbh->rollback;
-					$pipe_dbh->rollback;
-					throw("clone seq_region_id has not been returned for the accession $acc_ver");
-				}
-
-				##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
-				$attr_a->store_on_Slice( $clone,
-					&make_clone_attribute( $acc, $ver ) );
-
-				##make contig and insert contig, and associated dna sequence to seq_region & dna table
-				$contig =
-				  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
-				$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
-				if(!$ctg_seq_reg_id){
-					$loutre_dbh->rollback;
-					$pipe_dbh->rollback;
-					throw("contig seq_region_id has not been returned for the contig $contig_name");
-				}
-			}
-			##insert chromosome to contig assembly data into assembly table
-			$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id,
-				$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
-			##insert clone to contig assembly data into assembly table
-			$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-				$seqlen, 1 );
-
-			##prime the input_id_analysis table
-			$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' )
-				if($do_submit and $dba->dbc->dbname =~ /pipe_/);
-
+		else {
+			$slice = &make_slice( $set_name, 1, $endv, $endv, 1, $chromosome_cs );
+			$asm_seq_reg_id{$set_name} = $slice_a->store($slice);
+			$attr_a->store_on_Slice( $slice,
+				&make_seq_set_attribute( $seqset_info->{$set_name} ) );
 		}
 	}
-	$pipe_dbh->commit;
-	$loutre_dbh->commit;
+
+	# insert clone & contig in seq_region, seq_region_attrib,
+	# dna and assembly tables
+	my $insert_query = qq {
+			INSERT IGNORE INTO assembly
+			(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)
+			values
+			(?,?,?,?,?,?,?)};
+	my $insert_sth = $target_dbc->prepare($insert_query);
+	for ( values %$contigs_hashref ) {
+		my $chr_name     = $_->[0];
+		my $sequence_set = $_->[8];
+		my $chr_start    = $_->[1];
+		my $chr_end      = $_->[2];
+		my $ctg_start    = $_->[3];
+		my $ctg_end      = $_->[4];
+		my $ctg_ori      = $_->[5];
+		my $acc          = $_->[6];
+		my $ver          = $_->[7];
+		my $acc_ver      = $acc . "." . $ver;
+
+		my $clone;
+		my $clone_seq_reg_id;
+		my $contig;
+		my $contig_name = $acc_ver . "." . "1" . ".";
+		my $ctg_seq_reg_id;
+		my $seqlen;
+		eval {
+			$clone = $slice_a->fetch_by_region( 'clone', $acc_ver );
+			$seqlen = $clone->length;
+			$contig_name .= $seqlen;
+			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
+		};
+		if ( $clone && $contig ) {
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
+			$clone_seq_reg_id = $clone->get_seq_region_id;
+			$ctg_seq_reg_id   = $contig->get_seq_region_id;
+		}
+		elsif ( $clone && !$contig ) {
+			$dbh->rollback;
+			### code to be added to create contigs related to the clone
+			throw(
+				"Missing contig entry in the database for clone ${acc_ver}"
+			);
+		}
+		else {
+			##fetch the dna sequence from pfetch server with acc_ver id
+			my $seqobj;
+			eval {
+				$seqobj = &pfetch_acc_sv($acc_ver);
+			};
+			if($@) {
+				$dbh->rollback;
+				throw($@);
+			}
+			my $seq = $seqobj->seq;
+			$seqlen = $seqobj->length;
+			$contig_name .= $seqlen;
+
+			##make clone and insert clone to seq_region table
+			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
+			$clone_seq_reg_id = $slice_a->store($clone);
+			if(!$clone_seq_reg_id) {
+				$dbh->rollback;
+				throw("clone seq_region_id has not been returned for the accession $acc_ver");
+			}
+
+			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
+			$attr_a->store_on_Slice( $clone,
+				&make_clone_attribute( $acc, $ver ) );
+
+			##make contig and insert contig, and associated dna sequence to seq_region & dna table
+			$contig =
+			  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
+			$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
+			if(!$ctg_seq_reg_id){
+				$dbh->rollback;
+				throw("contig seq_region_id has not been returned for the contig $contig_name");
+			}
+		}
+		##insert chromosome to contig assembly data into assembly table
+		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id,
+			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
+		##insert clone to contig assembly data into assembly table
+		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
+			$seqlen, 1 );
+
+		##prime the input_id_analysis table
+		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' )
+			if($do_submit && $name =~ /pipe_/);
+
+	}
+	$dbh->commit;
+
 }
 
 #
