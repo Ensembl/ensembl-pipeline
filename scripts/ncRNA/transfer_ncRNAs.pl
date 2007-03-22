@@ -37,6 +37,7 @@ my $no_stable_ids;
 #list of gene-descriptions to ignore
 my @genestoignore = ();
 my $makewhitelist = 0;
+my $new_release;
 
 $| = 1;
 
@@ -56,18 +57,20 @@ $| = 1;
 	    'dump!'      => \$dump,
 	    'no_ids!'    => \$no_stable_ids,
 	    'makewhitelist!' => \$makewhitelist,
+	    'release:s'  => \$new_release,
 	   );
 
 die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost * \n-dbport * \n-species *(1 at at time)
 -xrefs (file to dump xref data in) 
 -whitelist list of ids to keep
 -biotype biotype of genes to transfer
--stable* (file to put stable id mapping data in )
+-stable (file to put stable id mapping data in )
 -slice_fetch (fetch the genes slice at a time (quicker in some cases)
 -dump (skip all the rest and just dump the xrefs)
 -no_ids (do the load without any stable ids)
+-release ( the number of the release ie 44 )*
 * = essential\n")
-  unless ($pass && $final_port && $final_host && $final_dbname );
+  unless ($pass && $final_port && $final_host && $final_dbname &&  $new_release);
 
 die ("transfer_ncRNAs need a file to put stable ids in \n")  unless ($sids or $no_stable_ids);
 # get whitelist
@@ -337,7 +340,6 @@ sub blacklist {
 sub stable_id_mapping {
   my ($non_coding_overlaps,$old_hash,$new_hash,$blacklist) = @_;
   # get the assembly information
-  my $new_release = sql('SELECT meta_value from meta where meta_key = "schema_version"',$final_db)->[0];
   my $last_session = sql('SELECT max(mapping_session_id) from mapping_session',$final_db)->[0];
   my $new_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$final_db)->[0];
   my ($last_db, $old_release, $old_assembly);
