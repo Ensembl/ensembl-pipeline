@@ -2,7 +2,7 @@
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 
 use strict;
-use Bio::Root::RootI;
+use Bio::Root::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 use IO::Socket;
@@ -10,7 +10,7 @@ use IO::Socket;
 use Bio::EnsEMBL::Pipeline::Tools::Embl;
 use vars qw(@ISA);
 
-@ISA = qw(Bio::Root::RootI Bio::DB::RandomAccessI);
+@ISA = qw(Bio::Root::Root Bio::DB::RandomAccessI);
 
 sub new {
     my ( $class, @args ) = @_;
@@ -30,7 +30,7 @@ sub new {
 
   Title   : server
   Usage   : $self->server('address.of.server');
-  Function: Get/set for the path to the server being used by the module. 
+  Function: Get/set for the path to the server being used by the module.
   Returns : string
   Args    : string
 
@@ -48,7 +48,7 @@ sub server {
 
   Title   : port
   Usage   : $self->port('port');
-  Function: Get/set for the port to the pfetch server. 
+  Function: Get/set for the port to the pfetch server.
   Returns : string
   Args    : string
 
@@ -64,7 +64,7 @@ sub port {
 
 sub archive_port {
     my( $self, $archive_port ) = @_;
-    
+
     if ($archive_port) {
         $self->{'_archive_port'} = $archive_port;
     }
@@ -121,7 +121,7 @@ sub get_server {
   Usage   : $self->get_eq_by_acc($accession);
   Function: Does the sequence retrieval via pfetch
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
@@ -167,7 +167,7 @@ sub get_Seq_by_acc {
     }
     else {
 
-        # one acc was passed then return the first(and only) element of the array    
+        # one acc was passed then return the first(and only) element of the array
         return $seq_list[0];
     }
 }
@@ -216,7 +216,7 @@ sub write_descriptions {
 		};
 		if ($@) {
             print STDERR "Unable to fetch description for $accession [$@]\n";
-        } 
+        }
 	}
     return $failed;
 }
@@ -228,9 +228,9 @@ sub min {
 
 sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
-    
+
 	my $descriptions = {};	# results are stored here
-	# split protein isoform ids and normal ids 
+	# split protein isoform ids and normal ids
 	my $ids_iso = [];
 	my $ids_no_iso = [];
 	my %single_ids;
@@ -244,7 +244,7 @@ sub fetch_descriptions {
 	}
 	my @ids = keys %single_ids;
 	$ids_no_iso = \@ids;
-	
+
 	# first pass fails when the sequence version has changed:
     my $failed_first_pass = [];
     for (my $i = 0; $i < @$ids_no_iso; $i += $chunk_size) {
@@ -255,7 +255,7 @@ sub fetch_descriptions {
         my $chunk = [@$ids_no_iso[$i..$j]];
         push @$failed_first_pass, @{ $self->fetch_descriptions_by_accession($chunk, $descriptions) };
     }
-    
+
     my $failed_second_pass = [];
     for (my $i = 0; $i < @$failed_first_pass; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
@@ -277,17 +277,17 @@ sub fetch_descriptions {
         my $chunk = [@$ids_iso[$i..$j]];
         push @$failed_isoforms, @{ $self->fetch_isoform_descriptions($chunk, $descriptions) };
     }
-    
+
     push @$failed_second_pass, @$failed_isoforms;
-    
+
     return ($descriptions, $failed_second_pass);
 }
 
 sub fetch_isoform_descriptions {
 	my( $self, $id_list, $descriptions ) = @_;
 	my $server = $self->get_server;
-	
-	# fetch isoform length 
+
+	# fetch isoform length
 	print $server join(' ', '-l', @$id_list), "\n";
 	my $length_succeeded = [];
 	my $length_failed    = [];
@@ -304,7 +304,7 @@ sub fetch_isoform_descriptions {
 		}
 		$i++;
 	}
-	
+
 	# fetch isoform description
 	$server = $self->get_server;
 	print $server join(' ', '-D', @$length_succeeded), "\n";
@@ -324,7 +324,7 @@ sub fetch_isoform_descriptions {
 		}
 		$i++;
 	}
-	
+
 	# copy isoform taxonid and database
 	foreach my $iso (@$desc_succeeded) {
 		my $id = $iso;
@@ -344,7 +344,7 @@ sub fetch_isoform_descriptions {
 
 sub fetch_descriptions_by_accession {
     my( $self, $id_list, $descriptions, $trim_sv_flag ) = @_;
-    
+
     my $srv = $self->get_server;
     warn "Fetching full entries for ", scalar(@$id_list), " identifiers\n";
     if ($trim_sv_flag) {
@@ -383,7 +383,7 @@ sub fetch_descriptions_by_accession {
 
         my $name_without_version = $full_name;
         $name_without_version =~ s/\.\d+$//;
-        
+
 
 	    my $found = 0;
 	    NAMES: for my $one_of_names (@{ $embl_parser->accession }) {
@@ -438,8 +438,8 @@ sub fetch_lengths_from_archive {
 
 sub prepare_hit_desc_sth {
     my( $self, $dbobj ) = @_;
-    
-    my $sth = $dbobj->prepare(qq{ 
+
+    my $sth = $dbobj->prepare(qq{
         REPLACE INTO hit_description (hit_name
               , hit_description
               , hit_length
@@ -452,7 +452,7 @@ sub prepare_hit_desc_sth {
 
 sub get_hit_desc_sth {
     my( $self ) = @_;
-    
+
     reuturn $self->{'_hit_desc_sth'};	# ------,,----- and restore it, if it's only used in 1 place?
 }
 
