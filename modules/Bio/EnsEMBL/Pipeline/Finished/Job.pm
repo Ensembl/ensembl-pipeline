@@ -403,7 +403,7 @@ sub flush_runs {
 		
 		while( !$lastjob && @job_ids) {
 			pop @job_ids;
-			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
+			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] ) if($job_ids[-1]);
 		}
 		
 		if ( !$lastjob ) {
