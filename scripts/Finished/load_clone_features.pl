@@ -16,8 +16,7 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 here is an example commandline
 
-./load_clone_gaps.pl -p_host otterpipe2 -p_port 3352 -p_name pipe_human -p_user pipuser -p_pass ***** 
-	-type SimpleFeature features.gff
+./load_clone_features.pl -p_host otterpipe2 -p_port 3352 -p_name pipe_human -p_user pipuser -p_pass ***** -type SimpleFeature	features.gff
 
 
 =head1 OPTIONS
