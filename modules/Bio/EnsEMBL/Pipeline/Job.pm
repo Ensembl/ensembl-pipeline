@@ -937,9 +937,8 @@ sub set_up_queues {
 
     next unless $ln;
 
-    delete $queue->{logic_name};
-
     while (my($k, $v) = each %$queue) {
+      next if $k eq 'logic_name';
       $q{$ln}{$k}     = $v;
     }
     $q{$ln}{jobs} = [];
