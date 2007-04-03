@@ -65,7 +65,7 @@ require "$file";
 # this may be better encapsulated as a separate class, but
 # i can't think at the moment how best to do this.
 
-my %BATCH_QUEUES = Bio::EnsEMBL::Pipeline::Job->set_up_queues; 
+my %BATCH_QUEUES = &set_up_queues;
 
 =head2 run_module
 
@@ -505,6 +505,47 @@ sub flush_runs {
 		$queue->{'jobs'}->{$host}->{$dbname}         = [];
 		$queue->{'last_flushed'}->{$host}->{$dbname} = time;
 	}
+}
+
+sub set_up_queues {
+	my %q;
+
+	foreach my $queue (@$QUEUE_CONFIG) {
+		my $ln = $queue->{logic_name};
+
+		next unless $ln;
+
+		while ( my ( $k, $v ) = each %$queue ) {
+			$q{$ln}{$k} = $v;
+		}
+		$q{$ln}{jobs}         = {};
+		$q{$ln}{last_flushed} = undef;
+		$q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+		$q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+		$q{$ln}{retries}         ||= $DEFAULT_RETRIES;
+		$q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
+		$q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+		$q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+		$q{$ln}{runner}          ||= $DEFAULT_RUNNER;
+		$q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
+	}
+
+	# a default queue for everything else
+	if ( !exists( $q{default} ) ) {
+		$q{default}{jobs}         = {};
+		$q{default}{last_flushed} = undef;
+	}
+
+	# Need these set, so do the ||= thing
+	$q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
+	$q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
+	$q{default}{retries}         ||= $DEFAULT_RETRIES;
+	$q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
+	$q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
+	$q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
+	$q{default}{runner}          ||= $DEFAULT_RUNNER;
+	$q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
+	return %q;
 }
 
 1;
