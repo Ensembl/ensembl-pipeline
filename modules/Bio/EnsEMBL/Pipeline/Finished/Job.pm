@@ -413,16 +413,19 @@ sub flush_runs {
 			my $pre_exec =
 		  $this_runner . " -check -output_dir " . $self->output_dir;
 
-			my $farm_queue    = $queue->{'queue'};
+		my $farm_queue    = $queue->{'queue'};
 		my $farm_resource = $queue->{'resource'};
+		my $param = $queue->{'sub_args'}.' -sp '.$self->priority.' ';
+		
 		if ( $self->priority == $BIG_MEM_PRIORITY ) {
 			$farm_queue    = $BIG_MEM_QUEUE;
 			$farm_resource = $BIG_MEM_RESOURCE;
+			$param 		  .= $BIG_MEM_PARAM; 
 		}
 
 			my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
-			-PARAMETERS => $queue->{'sub_args'}.' -sp '.$self->priority.' ',
+			-PARAMETERS => $param,
 			-PRE_EXEC   => $pre_exec,
 			-QUEUE      => $farm_queue,
 			-JOBNAME    => $dbname . ':' . $anal,
