@@ -170,7 +170,7 @@ sub fetch_input{
     $end = $start;
     $start = $tmp_start;
   }
-  #print STDERR "Have pmatch results ".$start." ".$end." ".protein_id."\n";
+  print STDERR "Have pmatch results ".$start." ".$end." ".$protein_id."\n";
   my $new_start  = $start - $GB_TARGETTEDXRATE_TERMINAL_PADDING;
   my $new_end    = $end   + $GB_TARGETTEDXRATE_TERMINAL_PADDING;
 
@@ -192,7 +192,7 @@ sub fetch_input{
   }
 
 
-  #print STDERR "Have ".$slice->name." sequence to run\n";
+  print STDERR "Have ".$slice->name." sequence to run\n";
   $self->genomic($slice);
   my $seq;
   if(@$GB_TARGETTEDXRATE_MASKING){
@@ -211,14 +211,14 @@ sub fetch_input{
   $self->pepfile($pepfile);
 
 
-  print STDERR "running on targetted ".$protein_id." and ".$slice->name."length ".$slice->length."\n";
+  print STDERR "running on targetted ".$protein_id." and ".$slice->name." length ".$slice->length."\n";
 
   my $r = Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript->new(
                                                                      -analysis => $self->analysis,
                                                                      -target_file => $genfile,
                                                                      -query_type => 'protein',
                                                                      -query_file => $pepfile,
-                                                                     -options => "--model protein2genome --percent $GB_TARGETTEDXRATE_PERCENT",
+                                                                     -options => "--model protein2genome --bestn $GB_TARGETTEDXRATE_BESTN",
                                                                     );
  
   $self->runnable($r);
@@ -312,64 +312,6 @@ sub make_genes{
   return \@genes;
 }
 
-sub process_genes {
-  my ($self, $count, $genetype, $analysis_obj, $results) = @_;
-  my $contig = $self->query;
-  my @genes;
-
-  throw("[$analysis_obj] is not a Bio::EnsEMBL::Analysis\n")
-    unless defined($analysis_obj) && $analysis_obj->isa("Bio::EnsEMBL::Analysis");
-  my @seqfetchers;
-  push (@seqfetchers, $self->seqfetcher);
-
- PROCESS_GENE:
-  foreach my $unprocessed_gene (@$results) {
-    foreach my $transcript(@{$unprocessed_gene->get_all_Transcripts}){
-
-      my $valid_transcripts =
-        Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($transcript,
-                                                                      $self->query,
-                                                                      $GB_TARGETTEDXRATE_MULTI_EXON_COVERAGE,
-                                                                      $GB_TARGETTEDXRATE_SINGLE_EXON_COVERAGE,
-                                                                      $GB_TARGETTEDXRATE_MAX_INTRON,
-                                                                      $GB_TARGETTEDXRATE_MIN_SPLIT_COVERAGE,
-                                                                      \@seqfetchers
-                                                                     );
-
-      next PROCESS_GENE unless defined $valid_transcripts;
-
-      foreach my $checked_transcript (@$valid_transcripts){
-
-        # add a start codon if appropriate
-        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
-
-        # add a stop codon if appropriate
-        $checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($checked_transcript);
-
-        # attach analysis to supporting features
-        foreach my $exon(@{$checked_transcript->get_all_Exons}){
-          foreach my $sf(@{$exon->get_all_supporting_features}){
-            $sf->analysis($analysis_obj);
-          }
-        }
-        foreach my $tsf (@{$checked_transcript->get_all_supporting_features}){
-          $tsf->analysis($analysis_obj);
-        }
-
-        my $gene   = new Bio::EnsEMBL::Gene;
-        $gene->type($genetype);
-        $gene->analysis($analysis_obj);
-        $gene->add_Transcript($checked_transcript);
-        push(@genes,$gene);
-      }
-    }
-
-  }
-
-  return @genes;
-}
-     
-       
 sub check_genes{
   my ($self, $unchecked_genes) = @_;
   my $contig = $self->genomic;
@@ -398,30 +340,12 @@ sub check_genes{
       foreach my $checked_transcript (@$valid_transcripts){
 
         # balance complexity with coverage - this is not the right place for this, and possibly not the right way to do it ...
+        # Note that this check is not done in _validate_Transcript above as the method is not passed a 'low complexity'
+        # threshold value
         my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, \@seqfetchers);
-        my $protseq = $transcript->translate;
-    
-        my $analysis = Bio::EnsEMBL::Analysis->new(
-                                                   -db           => 'low_complexity',
-                                                   -program      => '/usr/local/ensembl/bin/seg',
-                                                   -program_file => '/usr/local/ensembl/bin/seg',
-                                                   -gff_source   => 'Seg',
-                                                   -gff_feature  => 'annot',
-                                                   -module       => 'Seg',
-                                                   -logic_name   => 'Seg'
-                                                   
-                                                  );
-    
-        my $seg = new  Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg(    
-                                                                      -query    => $protseq,
-                                                                      -analysis => $analysis,
-                                                                     );
-    
-        $seg->run;
-    
-        my $low_complexity = $seg->get_low_complexity_length;
-
-        next CHECKED_TRANSCRIPT unless $coverage > $low_complexity;
+        if(defined $coverage) {
+          next CHECKED_TRANSCRIPT unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript, $coverage);
+        }
 
 	# add a start codon if appropriate
 	$checked_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($checked_transcript);
