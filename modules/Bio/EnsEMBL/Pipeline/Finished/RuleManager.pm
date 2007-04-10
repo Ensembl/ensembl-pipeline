@@ -144,6 +144,7 @@ sub can_job_run {
 				|| $status eq 'AWOL'
 				|| $status eq 'BUS_ERROR'
 				|| $status eq 'OUT_OF_MEMORY'
+				|| $status eq 'RUNLIMIT'
 			)
 			&& $cj->can_retry
 		  )
@@ -165,8 +166,11 @@ sub can_job_run {
 
 	if ($job) {
 		my $priority = 0;
-		$priority = $BIG_MEM_PRIORITY
-		  if ( $status && ( $status eq 'OUT_OF_MEMORY' ) );
+		if($status) {
+			$priority = $BIG_MEM_PRIORITY if $status eq 'OUT_OF_MEMORY';
+			$priority = $LONG_JOB_PRIORITY if $status eq 'RUNLIMIT';
+		}
+
 		$self->push_job( $job, $priority );
 
 		return 1;
@@ -268,13 +272,10 @@ sub job_stats {
 			my $status = $awol->current_status->status;
 			if ( $self->valid_statuses_for_awol->{$status} ) {
 
-				# Test if job exited with an out_of_memory error
-				if ( $self->is_memory_error($awol) ) {
-					$awol->set_status('OUT_OF_MEMORY');
-				}
-				else {
-					$awol->set_status('AWOL');
-				}
+				# parse output file and get the corresponding status
+				my $s = $self->status_from_output($awol);
+				$s ||= 'AWOL';
+				$awol->set_status($s);
 
 				print "Job "
 				  . $awol->dbID
@@ -338,32 +339,33 @@ sub read_input_file {
 	return $list;
 }
 
-=head2 is_memory_error
+=head2 status_from_output
 
   Arg : Job object
-  Function  : Read the job's output file and return true if job exited 
-  			  with MEMORY LIMIT exception.
-  Returntype: boolean
+  Function  : Read the job's output file and return the exception status if system exception. 
+  			  OUT_OF_MEMORY for MEMORY LIMIT and RUNLIMIT for RUNTIME LIMIT.
+  Returntype: string
 
 =cut
 
-sub is_memory_error {
+sub status_from_output {
 	my ( $self, $job ) = @_;
 	my $out_file = $job->stdout_file;
-	my $is_mem   = 0;
+	my $status;
 	eval {
 		print "READING: $out_file\n" if ( $self->be_verbose );
 		if ( -e $out_file ) {
 			open( my $F, "<$out_file" );
 			while (<$F>) {
-				if (/TERM_MEMLIMIT/) { $is_mem = 1; last; }
+				if (/TERM_MEMLIMIT/) { $status = 'OUT_OF_MEMORY'; last; }
+				if (/TERM_RUNLIMIT/) { $status = 'RUNLIMIT'; last; }
 			}
 			close($F);
 		}
 	};
 	print STDERR "ERROR [$@]\n" if ( $@ && $self->be_verbose );
 
-	return $is_mem;
+	return $status;
 }
 
 

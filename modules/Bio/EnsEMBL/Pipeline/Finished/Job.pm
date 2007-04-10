@@ -422,6 +422,10 @@ sub flush_runs {
 			$farm_resource = $BIG_MEM_RESOURCE;
 			$param 		  .= $BIG_MEM_PARAM; 
 		}
+		
+		if ( $self->priority == $LONG_JOB_PRIORITY ) {
+			$farm_queue    = $LONG_JOB_QUEUE;
+		}
 
 			my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
