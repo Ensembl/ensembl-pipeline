@@ -144,7 +144,7 @@ sub can_job_run {
 				|| $status eq 'AWOL'
 				|| $status eq 'BUS_ERROR'
 				|| $status eq 'OUT_OF_MEMORY'
-				|| $status eq 'RUNLIMIT'
+				|| $status eq 'RUNTIME_LIMIT'
 			)
 			&& $cj->can_retry
 		  )
@@ -168,7 +168,7 @@ sub can_job_run {
 		my $priority = 0;
 		if($status) {
 			$priority = $BIG_MEM_PRIORITY if $status eq 'OUT_OF_MEMORY';
-			$priority = $LONG_JOB_PRIORITY if $status eq 'RUNLIMIT';
+			$priority = $LONG_JOB_PRIORITY if $status eq 'RUNTIME_LIMIT';
 		}
 
 		$self->push_job( $job, $priority );
@@ -272,7 +272,7 @@ sub job_stats {
 			my $status = $awol->current_status->status;
 			if ( $self->valid_statuses_for_awol->{$status} ) {
 
-				# parse output file and get the corresponding status
+				# parse output file and get the right status
 				my $s = $self->status_from_output($awol);
 				$s ||= 'AWOL';
 				$awol->set_status($s);
@@ -292,6 +292,16 @@ sub job_stats {
 	  : 0;    # total nb. of jobs must not exceeds job limit
 
 	return $free_slots;
+}
+
+sub valid_statuses_for_awol {
+  my ($self)  = @_;
+  if(!$self->{'status_for_awol'}) {
+    my %statuses = map{$_, 1} ('SUBMITTED', 'RUNNING', 'READING',
+                               'WRITING', 'WAITING','AWOL');
+      $self->{'status_for_awol'} = \%statuses;
+  }
+  return $self->{'status_for_awol'};
 }
 
 =head2 urgent_input_id/read_input_file
@@ -343,7 +353,7 @@ sub read_input_file {
 
   Arg : Job object
   Function  : Read the job's output file and return the exception status if system exception. 
-  			  OUT_OF_MEMORY for MEMORY LIMIT and RUNLIMIT for RUNTIME LIMIT.
+  			  OUT_OF_MEMORY for MEMORY LIMIT and RUNTIME_LIMIT for RUNTIME LIMIT.
   Returntype: string
 
 =cut
@@ -358,7 +368,7 @@ sub status_from_output {
 			open( my $F, "<$out_file" );
 			while (<$F>) {
 				if (/TERM_MEMLIMIT/) { $status = 'OUT_OF_MEMORY'; last; }
-				if (/TERM_RUNLIMIT/) { $status = 'RUNLIMIT'; last; }
+				if (/TERM_RUNLIMIT/) { $status = 'RUNTIME_LIMIT'; last; }
 			}
 			close($F);
 		}
