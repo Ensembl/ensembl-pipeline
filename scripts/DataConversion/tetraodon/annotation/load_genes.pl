@@ -20,6 +20,7 @@ my ($dbhost,
     $dbpass,
     $dbport,
     $test,
+    $do_stable_ids,
     );
 
 &GetOptions(
@@ -29,6 +30,7 @@ my ($dbhost,
             'dbport=s' => \$dbport,
             'dbpass=s' => \$dbpass,
             'test=s'     => \$test,
+            'stableids' => \$do_stable_ids,
 );
 
 
@@ -204,11 +206,13 @@ sub write_ens_genes {
       my $tran_hash = $gene_hash->{$gene_name};
       
       my $gene = Bio::EnsEMBL::Gene->new;
-      $gene->stable_id($gene_name);
-      $gene->type($type);
+      $gene->stable_id($gene_name) if $do_stable_ids;
+      $gene->biotype('protein_coding');
+      $gene->source("Genoscope");
       $gene->version(1);
       $gene->analysis($ana);
-      
+
+
       # Loop through each transcript
       TRAN: foreach my $tran_name (keys %$tran_hash) {
         #printf STDERR "  %20s\t%-s\n", $tran_name, $desc;
@@ -217,8 +221,9 @@ sub write_ens_genes {
         my $translation_id = $tran_hash->{$tran_name}->{'translation'};
         
         my $tsct = Bio::EnsEMBL::Transcript->new;
-        $tsct->stable_id($tran_name);                
+        $tsct->stable_id($tran_name) if $do_stable_ids;                
         $tsct->version(1);
+        $tsct->analysis($ana);
 
         # Get the CDS and exon data for this transcript
         my @mrna = sort {$a->[0] <=> $b->[0]} @{$gtf->{'exon'}{$tran_name}};
@@ -253,7 +258,7 @@ sub write_ens_genes {
           
           my $ex = Bio::EnsEMBL::Exon->new;
           $ex->version(1);
-          $ex->stable_id($m->[3]);
+          $ex->stable_id($m->[3]) if $do_stable_ids;
           $ex->start($start);
           $ex->end($end);
           $ex->strand($strand);
@@ -266,7 +271,7 @@ sub write_ens_genes {
         # Make Translation and set exon phases if there is CDS info
         if (@cds) {
           my $tsl = Bio::EnsEMBL::Translation->new;
-          $tsl->stable_id($translation_id);
+          $tsl->stable_id($translation_id) if $do_stable_ids;
           $tsl->version(1);
 
           my $j = 0;  # Points to first CDS segement
@@ -359,7 +364,7 @@ sub write_ens_genes {
         print STDERR "ERROR: Failed to write gene: $@";
         exit(1);
       } else {
-        print STDERR "Written gene " . $gene->stable_id . "(" . $gene_counter++ . ")\n";
+        print STDERR "Written gene " . $gene_counter++ . "\n";
       }
     }
   }
@@ -383,12 +388,16 @@ sub print_gene {
   my ($test, $gene) = @_;
   
   my $std = $gene->stable_id;
+  $std = $gene if not $std;
+
   foreach my $t (@{$gene->get_all_Transcripts}) {
     my $tid = $t->stable_id;
-    
+    $tid = $t if not $tid;
+
     foreach my $e (@{$t->get_all_Exons}) {
       my $eid = $e->stable_id;
-      
+      $eid = $e if not $eid;
+
       printf("chr: %s, start: %d, end: %d, strand: %d, phase: %d, end_phase: %d, gname: %s, tname: %s, ename: %s\n", 
              $e->slice->seq_region_name, 
              $e->start, 
@@ -403,9 +412,9 @@ sub print_gene {
     
     my $translation = $t->translation;
     printf("  Translation: %s (%d), %s (%d)\n", 
-           $translation->start_Exon->stable_id, 
+           $translation->start_Exon->stable_id ? $translation->start_Exon->stable_id :$translation->start_Exon, 
            $translation->start,
-           $translation->end_Exon->stable_id,
+           $translation->end_Exon->stable_id ? $translation->end_Exon->stable_id : $translation->end_Exon,
            $translation->end);
     
     my $translation_seq = $t->translate;
