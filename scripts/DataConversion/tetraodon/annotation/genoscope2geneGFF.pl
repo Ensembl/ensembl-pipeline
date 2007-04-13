@@ -15,6 +15,8 @@ while(<>) {
   /^\#/ and next;
 
   my @l = split /\t/;
+  $l[6] = "+" if $l[6] == 1;
+  $l[6] = "-" if $l[6] == -1;
 
   if ($sources{$l[1]}) {
     if ($l[2] eq "gene") {
@@ -211,8 +213,8 @@ sub print_transcript {
   my $tran = shift;
 
   my $chr = $tran->{chromosome};
-  my $strand = $tran->{strand};
   my $type = $tran->{type};
+  my $strand = $tran->{strand};
 
   my $t_id = $tran->{tran_id};
   
