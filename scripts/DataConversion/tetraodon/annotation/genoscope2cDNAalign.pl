@@ -18,10 +18,13 @@ my (
     $dbuser,
     $dbport,
     $dbpass,
+    $peptides,
     $logic_name,
     $verbose,
     $debug,
     $log_file,
+    $id_map_file,
+    $id_map,
     %slices, 
     @all_features,
     );
@@ -32,20 +35,23 @@ my (
             'dbhost=s' => \$dbhost,
             'dbport=s' => \$dbport,
             'dbpass=s' => \$dbpass,
+            'pep'      => \$peptides,
             'verbose'  => \$verbose,
             'debug'    => \$debug,
             'log=s'    => \$log_file,
+            'idmapfile=s' => \$id_map_file,
 );
 
 
 my $logic_name = shift;
-my $cdna_exon_file = shift;
 my $cdna_align_file = shift;
 
-die "Usage: $0 cDNA_exon_file.sql  cDNA_align_file.sql\n" 
-    if not $logic_name or not $cdna_exon_file or not $cdna_align_file;
+die "Usage: $0 cDNA_align_file.sql\n" 
+    if not $logic_name or not $cdna_align_file;
 
-my $id_map = &process_exon_file($cdna_exon_file);
+if (defined $id_map_file) {
+  $id_map = &process_exon_file($id_map_file);
+}
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
 	'-dbname' => $dbname,
@@ -80,16 +86,23 @@ while(<ALIGNS>) {
 
   my @l = split;
 
-  my $internal_align_id = $l[0];
+  my $align_id = $l[0];
 
-  next if not exists($id_map->{$internal_align_id});
+  if (defined $id_map) {
+    next if not exists($id_map->{$align_id});
+    $align_id = $id_map->{$align_id};
+  }
 
   my $chr_name = $l[3]; $chr_name =~ s/^chr//;  
-  my $cdna_name = $l[4];
-  my ($chr_start, $chr_end, $chr_strand) = ($l[5], $l[6], $l[8]);
-  my ($cdna_start, $cdna_end, $cdna_strand) = ($l[9], $l[10], $l[12]);
-  my ($score, $evalue, $pvalue, $pid) = ($l[13], $l[14], $l[15], $l[17]);
-  my ($chr_gaps, $cdna_gaps, $intron_pos) = ($l[19], $l[20], $l[21]);
+  my $cdna_name = $l[9];
+  my ($chr_start, $chr_end, $chr_strand) = ($l[4], $l[5], $l[6]);
+  my ($cdna_start, $cdna_end, $cdna_strand) = ($l[10], $l[11], $l[12]);
+  my ($score, $pid) = ($l[15], $l[19]);
+  my ($chr_gaps, $cdna_gaps, $intron_pos) = ($l[21], $l[22], $l[23]);
+
+  $chr_strand = "+" if $chr_strand == 1;
+  $chr_strand = "-" if $chr_strand == -1;
+  
   
   if (not $slices{$chr_name}) {
     $slices{$chr_name} = $db->get_SliceAdaptor->fetch_by_region('chromosome', $chr_name);
@@ -112,7 +125,10 @@ while(<ALIGNS>) {
     next;
   }
 
-  # $debug and &print_alignment(@align_blocks);
+  #$debug and do {
+  #  print $log_file "GOOD ALIGNMENT\n";
+  #  &print_alignment($log_file, @align_blocks);
+  #};
 
   foreach my $exon (@align_blocks) {
     my @features;
@@ -122,18 +138,23 @@ while(<ALIGNS>) {
       $fp->start($block->{gen_start});
       $fp->end($block->{gen_end});
       $fp->strand( $chr_strand eq "-" ? -1 : 1 );
-      $fp->hseqname( $id_map->{$internal_align_id} );
+      $fp->hseqname( $align_id );
       $fp->hstart($block->{rna_start});
       $fp->hend($block->{rna_end});
       $fp->hstrand($cdna_strand eq "-" ? -1 : 1 );
       $fp->score($score);
       $fp->percent_id($pid);
-      $fp->p_value($pvalue);
 
       push @features, $fp; 
     }
     
-    my $align = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@features);
+    my $align;
+    if ($peptides) {
+      $align = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@features);
+    } else {
+      $align = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@features);
+    }
+
     $align->slice( $slices{$chr_name} );
     $align->analysis( $ana_obj );
 
@@ -176,6 +197,11 @@ sub create_alignment {
     @deletes = map { $_ =~ /(\d+)\#(\d+)/; [$1,$2]; } split /,/,$gen_gaps;
   }
 
+  # treat introns as inserts
+  #push @inserts, @introns;
+  #@introns = ();
+  #@inserts = sort { $a->[0] <=> $b->[0] } @inserts;
+
   my @matches;
 
   my ($current_gen, $current_rna) = (1,1);
@@ -183,6 +209,7 @@ sub create_alignment {
   push @matches, [ { gen_start => $current_gen, rna_start => $current_rna } ];
 
   while($current_gen <= $gen_len and $current_rna <= $rna_len) {
+    #print "CURRENT GEN = $current_gen CURRENT RNA = $current_rna (len = $gen_len,$rna_len)\n";
 
     $matches[-1]->[-1]->{gen_end} = $current_gen;
     $matches[-1]->[-1]->{rna_end} = $current_rna;
@@ -194,7 +221,7 @@ sub create_alignment {
     if (@introns and ($introns[0]->[0] == $current_gen)) {
 
       # could be a delete at this position before the intron
-      if (@deletes and $deletes[0]->[0] == $current_gen) {
+      if (@deletes and $deletes[0]->[0] <= $current_gen) {
         # intron and genomic deletion at same position. 
         my $delete = shift @deletes;
         $current_rna += $delete->[1];
@@ -202,11 +229,11 @@ sub create_alignment {
 
       my $intron = shift @introns;
 
-      if (not @inserts or $inserts[0]->[0] != $current_rna) {
+      if (not @inserts or $inserts[0]->[0] > $current_rna) {
         # finally, there could be a DELETE at the *end* of the intron!
         $current_gen += $intron->[1];
 
-        if (@deletes and $deletes[0]->[0] == $current_gen) {
+        if (@deletes and $deletes[0]->[0] <= $current_gen) {
           my $delete = shift @deletes; 
           $current_rna += $delete->[1];
         }
@@ -219,10 +246,11 @@ sub create_alignment {
 
       $current_rna++;
 
-      push @matches, [ {gen_start => $current_gen, rna_start => $current_rna } ];
+      push @{$matches[-1]}, {gen_start => $current_gen, rna_start => $current_rna };
 
     }
     elsif (@inserts and $inserts[0]->[0] == $current_rna) {
+      #print " looking at insert ", $inserts[0]->[0], " ", $inserts[0]->[1], "\n";
       my $insert = shift @inserts;
       $current_gen += $insert->[1] + 1;
       $current_rna++;
@@ -242,7 +270,8 @@ sub create_alignment {
       $current_rna++;
     }
   }
-    
+  #print "EXIT: CURRENT GEN = $current_gen CURRENT RNA = $current_rna (len = $gen_len,$rna_len)\n";
+
   return @matches;
 }
 
@@ -307,6 +336,8 @@ sub transform_alignment {
       $test_rna_start != $rna_start or
       $test_rna_end   != $rna_end) {
 
+    #print "TEST = $test_gen_start $test_gen_end $test_rna_start $test_rna_end GIVEN = $gen_start $gen_end $rna_start $rna_end\n";
+
     return 0;
   } else {
     return 1;
@@ -323,7 +354,7 @@ sub process_exon_file {
 
   $verbose and print STDERR "Processing exon file for id map...\n";
 
-  open(EXONS, $exon_file) or die "Could not open '$cdna_exon_file' for reading;\n";
+  open(EXONS, $exon_file) or die "Could not open '$exon_file' for reading;\n";
   while(<EXONS>) {
     next unless /\S/;
     my @l = split;
