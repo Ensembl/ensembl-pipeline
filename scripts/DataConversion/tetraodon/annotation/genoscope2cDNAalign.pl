@@ -18,8 +18,8 @@ my (
     $dbuser,
     $dbport,
     $dbpass,
-    $peptides,
     $logic_name,
+    $per_exon,
     $verbose,
     $debug,
     $log_file,
@@ -35,7 +35,7 @@ my (
             'dbhost=s' => \$dbhost,
             'dbport=s' => \$dbport,
             'dbpass=s' => \$dbpass,
-            'pep'      => \$peptides,
+            'perexon=s' => \$per_exon,
             'verbose'  => \$verbose,
             'debug'    => \$debug,
             'log=s'    => \$log_file,
@@ -147,13 +147,8 @@ while(<ALIGNS>) {
 
       push @features, $fp; 
     }
-    
-    my $align;
-    if ($peptides) {
-      $align = Bio::EnsEMBL::DnaPepAlignFeature->new(-features => \@features);
-    } else {
-      $align = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@features);
-    }
+        
+    my $align = Bio::EnsEMBL::DnaDnaAlignFeature->new(-features => \@features);
 
     $align->slice( $slices{$chr_name} );
     $align->analysis( $ana_obj );
@@ -209,8 +204,6 @@ sub create_alignment {
   push @matches, [ { gen_start => $current_gen, rna_start => $current_rna } ];
 
   while($current_gen <= $gen_len and $current_rna <= $rna_len) {
-    #print "CURRENT GEN = $current_gen CURRENT RNA = $current_rna (len = $gen_len,$rna_len)\n";
-
     $matches[-1]->[-1]->{gen_end} = $current_gen;
     $matches[-1]->[-1]->{rna_end} = $current_rna;
 
@@ -246,11 +239,14 @@ sub create_alignment {
 
       $current_rna++;
 
-      push @{$matches[-1]}, {gen_start => $current_gen, rna_start => $current_rna };
+      if ($per_exon) {
+        push @matches, [{gen_start => $current_gen, rna_start => $current_rna}];
+      } else {
+        push @{$matches[-1]}, {gen_start => $current_gen, rna_start => $current_rna };
+      }
 
     }
     elsif (@inserts and $inserts[0]->[0] == $current_rna) {
-      #print " looking at insert ", $inserts[0]->[0], " ", $inserts[0]->[1], "\n";
       my $insert = shift @inserts;
       $current_gen += $insert->[1] + 1;
       $current_rna++;
@@ -270,7 +266,6 @@ sub create_alignment {
       $current_rna++;
     }
   }
-  #print "EXIT: CURRENT GEN = $current_gen CURRENT RNA = $current_rna (len = $gen_len,$rna_len)\n";
 
   return @matches;
 }
@@ -335,8 +330,6 @@ sub transform_alignment {
       $test_gen_end   != $gen_end   or
       $test_rna_start != $rna_start or
       $test_rna_end   != $rna_end) {
-
-    #print "TEST = $test_gen_start $test_gen_end $test_rna_start $test_rna_end GIVEN = $gen_start $gen_end $rna_start $rna_end\n";
 
     return 0;
   } else {
