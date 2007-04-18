@@ -3,10 +3,14 @@
 use strict;
  
 use Getopt::Long;
+
+my (@sources, %sources, %aligns);
+
+&GetOptions("source=s@" => \@sources);
  
-# source: 
-# EP3_H, EP3_S        (protein ecotigs -> transcript exon)
-# EG3_H, EG3_M, EG3_F (DNA ecotigs -> match HSP)
+die "You must provide at least one source with -source" if not @sources;
+
+map { $sources{$_} = 1 } @sources;
 
 my (%aligns);
 
@@ -17,7 +21,7 @@ while(<>) {
 
   $l[0] =~ s/^chr//;
 
-  if ($l[1] =~ /^EG3/ or $l[1] =~ /^EP3/ or $l[1] =~ /^GWS/) {    
+  if (exists $sources{$l[1]}) {
     if ($l[2] eq "match" or $l[2] eq "transcript") {
       my ($align_id) = $l[8] =~ /$l[2]\s+(\S+)/;
 
