@@ -74,6 +74,9 @@ while(<>) {
       $transcripts{$tran_id}->{start} = $l[3];
       $transcripts{$tran_id}->{end} = $l[4];
       $transcripts{$tran_id}->{score} = $l[5];
+      if ($l[8] =~ /transcript\s+\S+\s*;\s*Note\s+\"(\S+)\"/) {
+        $transcripts{$tran_id}->{source} = $1;
+      }
     }
     elsif ($l[2] eq "UTR") {
       my ($tran_id) = $l[8] =~ /UTR\s+(\S+)/;
@@ -217,6 +220,9 @@ sub print_transcript {
   my $strand = $tran->{strand};
 
   my $t_id = $tran->{tran_id};
+  if (exists $tran->{source}) {
+    $t_id .= ":" . $tran->{source};
+  }
   
   my $g_id = $tran->{gene_id};
   $g_id = $t_id if not $g_id;
