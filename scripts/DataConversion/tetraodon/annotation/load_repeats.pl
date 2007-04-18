@@ -54,8 +54,8 @@ while (<>) {
 
     my $ana_obj;
 
-    if (not exists($analyses{$l[1]})) {
-      my $logic_name = $l[1];
+    if (not exists($analyses{$line[1]})) {
+      my $logic_name = $line[1];
 
       # need to make the analysis object; try fetching from the database;
       if (not defined($ana_obj = $ana_adaptor->fetch_by_logic_name($logic_name))) {
@@ -68,11 +68,11 @@ while (<>) {
       }
       $analyses{$logic_name} = $ana_obj;
     } else {
-      $ana_obj = $analyses{$l[1]};
+      $ana_obj = $analyses{$line[1]};
     }
 
-    my ($repeat_name)  = $line[8] =~ /repeat_name=\"([^\"]+)\"/;
-    my ($repeat_class) = $line[8] =~ /repeat_class=\"([^\"]+)\"/;
+    my ($repeat_name)  = $line[8] =~ /repeat_name\s+\"([^\"]+)\"/;
+    my ($repeat_class) = $line[8] =~ /repeat_class\s+\"([^\"]+)\"/;
 
     my ($cons_obj, $slice);
 
