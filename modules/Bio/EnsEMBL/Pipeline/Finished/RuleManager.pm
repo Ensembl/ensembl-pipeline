@@ -422,7 +422,7 @@ sub check_if_done {
 
     if ($status eq 'KILLED' || $status eq 'SUCCESSFUL') {
       next JOB;
-    } elsif ($status eq 'FAILED' || $status eq 'AWOL' || $status eq 'OUT_OF_MEMORY') {
+    } elsif ($status eq 'FAILED' || $status eq 'AWOL' || $status eq 'OUT_OF_MEMORY' || $status eq 'RUNTIME_LIMIT') {
       if (!$job->can_retry) {
         next JOB;
       } else {
