@@ -134,7 +134,7 @@ sub get_Seq_by_acc {
     }
 
     my $server = $self->get_server();
-    print $server "-aq @id_list\n";
+    print $server "-q @id_list\n";
     my (@seq_list);
     for ( my $i = 0 ; $i < @id_list ; $i++ ) {
         chomp( my $seq_string = <$server> );
@@ -416,7 +416,7 @@ sub fetch_lengths_from_archive {
     my( $self, $id_list, $descriptions ) = @_;
 
 	my $server = $self->get_server;
-	print $server join(" ", '-al', @$id_list), "\n";
+	print $server join(" ", '-l', @$id_list), "\n";
 
 	my $succeeded = [];
 	my $failed    = [];
