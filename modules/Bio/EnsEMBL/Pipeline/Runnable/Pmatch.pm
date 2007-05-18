@@ -67,13 +67,13 @@ sub run_analysis{
   my ($self) = @_;
 
   
-  my $command = $self->program." -D ".$self->options." ".$self->protein_file." ".$self->filename." > ".$self->results;
+  my $command = $self->program." -D ".$self->options. " ".  $self->protein_file." ".$self->filename." > ".$self->results;
   print STDERR $command."\n";
   $self->throw("Error running pmatch on " . $self->filename) if system($command);
 }
 
 
-sub parse_results {
+sub parse_results_old {
   my ($self) = @_;
 
   my $command = "sort -k6,6 -k3,3n " . $self->results;
@@ -116,7 +116,68 @@ sub parse_results {
 }
 
 
+sub parse_results {
+  my ($self) = @_; 
 
+  my (%prot_ids);
+
+  open RES, $self->results or $self->throw("Could not open " . $self->results . " results file\n");
+  while(<RES>) {
+    my @cols = split;
+    $prot_ids{$cols[5]}++;
+  }
+  close(RES);
+  
+  my @idlist = sort keys %prot_ids;
+  my @lists;
+  # chop list into group ensuring that the total number of features
+  # in each group does not exceed 1M
+  foreach my $id (sort keys %prot_ids) {
+    my $size = $prot_ids{$id};
+    if (not @lists or $lists[-1]->{size} + $size > 1000000) {
+      push @lists, {
+        size => 0,
+        ids  => [],
+      };
+    }
+    push @{$lists[-1]->{ids}}, $id;
+    $lists[-1]->{size} += $size;
+  }
+
+  foreach my $list (@lists) {
+    #print STDERR "Doing ", $list->{ids}->[0] . "-" . $list->{ids}->[-1] . " (", scalar(@{$list->{ids}}), ")\n";
+    my %these_ids = map { $_ => 1 } @{$list->{ids}};
+    my (%hits);
+
+    #my ($hit_count, $merged_count);
+      
+    open RES, $self->results or $self->throw("Could not re-open " . $self->results . " results file\n");
+    while(<RES>) {
+      my @cols = split;
+      if (exists $these_ids{$cols[5]}) {
+        push @{$hits{$cols[5]}}, [$cols[2], $_];
+        #$hit_count++;
+      }
+    }
+    close(RES);
+    #print STDERR " original hit count = $hit_count\n";
+
+    foreach my $id (keys %hits) {
+      my $pmf = new Bio::EnsEMBL::Pipeline::Tools::Pmatch::First_PMF(
+                                                                     -plengths => $self->prot_lengths,
+                                                                     -maxintronlen => $self->max_intron_size,
+                                                                     );
+      foreach my $el (sort { $a->[0] <=> $b->[0] } @{$hits{$id}}) {
+        $_ = $el->[1];
+        $pmf->make_coord_pair($_);
+      }
+      my @merged_hits = $pmf->merge_hits;
+      #$merged_count += scalar(@merged_hits);
+      $self->add_merged_hits( @merged_hits );
+    }
+    #print STDERR " merged hit count = $merged_count\n";
+  }
+}
 
 
 
