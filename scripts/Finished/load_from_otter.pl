@@ -92,7 +92,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 &GetOptions(
 	'host:s'                 => \$host,
 	'port:n'                 => \$port,
-	'name:s'                 => \$name,
+	'name=s'                 => \$name,
 	'user:s'                 => \$user,
 	'pass:s'                 => \$pass,
 	'o_host:s'                 => \$ohost,
@@ -349,7 +349,7 @@ my $seqset_info     = {};
 			if($@) {
 				$dbh->rollback;
 				throw($@);
-				#print "$sequence_set => $acc_ver\n";
+				#print STDERR "$sequence_set => $acc_ver\n";
 				#next;
 			}
 			my $seq = $seqobj->seq;
@@ -390,6 +390,7 @@ my $seqset_info     = {};
 
 
 	}
+	#$dbh->rollback;
 	$dbh->commit;
 
 }

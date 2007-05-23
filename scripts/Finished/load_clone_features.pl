@@ -11,7 +11,7 @@ load_clone_features.pl
 =head1 DESCRIPTION
 
 This script is used to load clone features from a GFF file into a pipeline database.
-If the login, password and port parameters are not provided, they will be 
+If the login, password and port parameters are not provided, they will be
 recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 here is an example commandline
@@ -61,7 +61,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 &GetOptions(
 	'p_host:s'                 => \$phost,
 	'p_port:n'                 => \$pport,
-	'p_name:s'                 => \$pname,
+	'p_name=s'                 => \$pname,
 	'p_user:s'                 => \$puser,
 	'p_pass:s'                 => \$ppass,
 	'type:s'                   => \$type,
@@ -70,12 +70,12 @@ my $usage = sub { exec( 'perldoc', $0 ); };
   )
   or $usage->();
 
-my @gff_files = @ARGV;   
+my @gff_files = @ARGV;
 throw("cannot load features as there is no gff files")
-  unless ( @gff_files ); 
+  unless ( @gff_files );
 
 throw("need to specify a feature type")
-  unless ( $type ); 
+  unless ( $type );
 
 if ( !$puser || !$ppass || !$pport ) {
 	my @param = &get_db_param($phost);
@@ -107,7 +107,7 @@ foreach my $file (@gff_files) {
 	while(my $line = <$fh>) {
 		print STDOUT $line;
 		push @$gff_arr, GFF::GeneFeature->new_from_line($line);
-	} 
+	}
 }
 
 # write features into database
@@ -129,7 +129,7 @@ my %slices;
 my $features;
 
 foreach my $gff (@$gff_arr) {
-	my ($seq_name,$analysis,$start,$end,$score,$strand) = map { $gff->$_ } 
+	my ($seq_name,$analysis,$start,$end,$score,$strand) = map { $gff->$_ }
 		('seqname','feature','start','end','score','strand');
 	$strand = $strand eq '+' ? 1 : -1;
 	$score  = 0 if $score eq '.';
@@ -146,12 +146,12 @@ foreach my $gff (@$gff_arr) {
 		$slice = $slice_clone->project('contig')->[0]->to_Slice();
 		$slices{$seq_name} = $slice;
 	}
-	
+
 	if(!$slice || !$ana) {
 		$dbh->rollback;
 		throw("Cannot find Slice $seq_name [$slice] or Analysis $analysis [$ana]\n");
 	}
-	
+
 	# save features
 	my $feature = $feature_module->new
                         (-start    => $start,

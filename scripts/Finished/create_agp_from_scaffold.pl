@@ -10,8 +10,8 @@ create_agp_from_scaffold.pl
 
 =head1 DESCRIPTION
 
-This script is used to refactor a scaffold which is a set of short sequences into clone sized pieces (150Kb). 
-( It can also be used to refactor any coord_system type ) It will generate an agp of the new assembly 
+This script is used to refactor a scaffold which is a set of short sequences into clone sized pieces (150Kb).
+( It can also be used to refactor any coord_system type ) It will generate an agp of the new assembly
 into the chromosome coordinates, the clones sequence files (fasta) and GFF files for the internal gaps.
 
 here is an example commandline
@@ -33,7 +33,7 @@ here is an example commandline
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
-    -cs_name	(default:scaffold) coordinate system of the seq_region 
+    -cs_name	(default:scaffold) coordinate system of the seq_region
     -seq_region_name	seq_region name
     -start	The start of the slice on the sequence region
     -end	The end of the slice on the sequence region
@@ -76,14 +76,14 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 &GetOptions(
 	'host:s'                => \$phost,
 	'port:n'                => \$pport,
-	'name:s'                => \$pname,
+	'name=s'                => \$pname,
 	'user:s'                => \$puser,
 	'pass:s'                => \$ppass,
 	'cs_name:s'				=> \$coord_sytem,
 	'seq_region_name=s'     => \$seq_region_name,
 	'start:s'				=> \$start,
 	'end:s'					=> \$end,
-	'outdir=s'				=> \$output,
+	'outdir:s'				=> \$output,
 	'verbose!'				=> \$verbose,
 	'h|help!'               => $usage
   )
@@ -131,7 +131,7 @@ foreach my $segment (@$contig_projection) {
       $contigs->{$name} = [$chr->start(),$chr->end()];
       print 'chr',$chr->seq_region_name(), ':', $chr->start(), '-',$chr->end(), ':', $chr->strand(),"\t(",$chr->length,")\t|\t",
       		$slice->seq_region_name(), ':', $segment->from_start(), '-',$segment->from_end(), "\t(",$segment->from_end()-$segment->from_start()+1,")\t|\t",
-            $contig_slice->seq_region_name(), ':', $contig_slice->start(), '-',$contig_slice->end(), ':', $contig_slice->strand(), "\t(",$contig_slice->length,")\n" 
+            $contig_slice->seq_region_name(), ':', $contig_slice->start(), '-',$contig_slice->end(), ':', $contig_slice->strand(), "\t(",$contig_slice->length,")\n"
       if $verbose;
 }
 
@@ -147,19 +147,19 @@ foreach my $clone (sort {$clones->{$a}->{coord}->[0] <=> $clones->{$b}->{coord}-
 	my $cmp_start =	1;
 	my $cmp_end = $clones->{$clone}->{coord}->[2];
 	$l++;
-	
+
 	my $seq_out;
 	my $gap_out;
-	
+
 	open($seq_out, ">${output}${clone}.1.seq") or die "Can't create file ${clone}.1.seq : $!";
 	my $clone_slice = $slice_a->fetch_by_region('chromosome',$chromosome,$asm_start,$asm_end);
 	print $seq_out ">${clone}.1\n".$clone_slice->seq;
-	
+
 	open($gap_out, ">${output}${clone}.1.gff") or die "Can't create file ${clone}.1.gap : $!";
 	my $gaps = GFF::GeneFeatureSet->new();
-	
+
 	print $agp_out "chr$chromosome\t$asm_start\t$asm_end\t$l\tF\t${clone}.1\t$cmp_start\t$cmp_end\t+\n";
-	
+
 	while(my $gap = shift @{$clones->{$clone}->{gaps}}) {
 		my $gff = GFF::GeneFeature->new();
 		$gff->seqname("${clone}.1");
@@ -170,7 +170,7 @@ foreach my $clone (sort {$clones->{$a}->{coord}->[0] <=> $clones->{$b}->{coord}-
 		$gff->strand('+');
 		$gaps->addGeneFeature($gff);
 	}
-	
+
 	$gaps->dump($gap_out);
 }
 
@@ -198,15 +198,15 @@ sub merge_contigs_into_clone_1 {
 			$gap_length = $contig_start - $clone_end -1;
 			$gap_start = $clone_length+1;
 			$gap_end   = $gap_start + $gap_length -1;
-			
+
 			push @$gaps, [$gap_start,$gap_end];
 		}
-		
+
 		$clone_start  ||= $contig_start;
 		$clone_end      = $contig_end;
 		$clone_length  += $contig_length;
 		$clone_length  += $gap_length if $gap_length;
-		
+
 		# create clone if clone length >= 140Kb or last contig of the loop
 		if($clone_length && ($clone_length>=140000 || $count == $contigs_count) ) {
 			$i++;
@@ -219,7 +219,7 @@ sub merge_contigs_into_clone_1 {
 			$clone_end    = 0;
 		}
 	}
-	
+
 	return $clones;
 }
 
