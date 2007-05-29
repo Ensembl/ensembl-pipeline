@@ -42,16 +42,14 @@ use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Utils::Exception qw( throw ) ; 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences
   qw (
       GB_PROTEIN_SEQFETCHER
      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts
-  qw (
-      GB_KILL_LIST
-     );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -278,9 +276,9 @@ sub output_db {
 }
 
 
-=head2 fill_kill_list
+=head2 populate_kill_list
 
- Title   : fill_kill_list
+ Title   : populate_kill_list
  Usage   : 
  Function: 
  Returns : 
@@ -288,19 +286,11 @@ sub output_db {
 
 =cut
 
-sub fill_kill_list {
+sub populate_kill_list {
   my ($self) = @_;
-  my %kill_list;
-  open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
-  while (<KILL_LIST>) {
 
-    chomp;
-    my @list = split;
-    next unless scalar(@list); 	# blank or empty line
-    $kill_list{$list[0]} = 1;
-  }
-
-  close KILL_LIST or die "error closing $GB_KILL_LIST\n";
+  my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'protein');
+  my %kill_list = %{$kill_list_object->get_kill_list()};
 
   return \%kill_list;
 }
