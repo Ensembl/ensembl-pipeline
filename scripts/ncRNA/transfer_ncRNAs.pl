@@ -23,6 +23,7 @@ my $list;
 my $xrefs;
 my $skipchecks;
 my $biotype;
+my $biotype_to_skip;
 my @new_ncRNAs;
 my @old_ncRNAs;
 my $coding_overlaps;
@@ -52,6 +53,7 @@ $| = 1;
 	    'whitelist=s'=> \$list,
 	    'xrefs=s'    => \$xrefs,
 	    'biotype=s'  => \$biotype,
+	    'biotype_to_skip=s'  => \$biotype_to_skip,
 	    'stable:s'   => \$sids,
 	    'slice_fetch!'=> \$fbs,
 	    'dump!'      => \$dump,
@@ -60,15 +62,17 @@ $| = 1;
 	    'release:s'  => \$new_release,
 	   );
 
-die("transfer_ncRNAs\n-pass *\n-write \n-delete \n-dbname *(final db) \n-dbhost * \n-dbport * \n-species *(1 at at time)
--xrefs (file to dump xref data in) 
--whitelist list of ids to keep
--biotype biotype of genes to transfer
--stable (file to put stable id mapping data in )
--slice_fetch (fetch the genes slice at a time (quicker in some cases)
--dump (skip all the rest and just dump the xrefs)
--no_ids (do the load without any stable ids)
--release ( the number of the release ie 44 )*
+die("transfer_ncRNAs\n-pass $pass  *\n-write $write\n-delete $delete\n-dbname  $final_dbname *(final db) \n-dbhost $final_host* \n-dbport $final_port * 
+-species $species *(1 at at time)
+-xrefs $xrefs(file to dump xref data in) 
+-whitelist $list list of ids to keep
+-biotype $biotype biotype of genes to transfer
+-biotype_to_skip  $biotype_to_skip biotype of genes to not transfer
+-stable $sids (file to put stable id mapping data in )
+-slice_fetch $fbs (fetch the genes slice at a time (quicker in some cases)
+-dump $dump (skip all the rest and just dump the xrefs)
+-no_ids $no_stable_ids (do the load without any stable ids)
+-release $new_release ( the number of the release ie 44 )*
 * = essential\n")
   unless ($pass && $final_port && $final_host && $final_dbname &&  $new_release);
 
@@ -100,6 +104,11 @@ my $host    = $CONFIG->{$species}->{"WRITEHOST"};
 my $user    = 'ensro';
 my $dbname  = $CONFIG->{$species}->{"WRITENAME"};
 my $port    = $CONFIG->{$species}->{"WRITEPORT"};
+my $dnahost    = $CONFIG->{$species}->{"DBHOST"};
+my $user    = 'ensro';
+my $dnadbname  = $CONFIG->{$species}->{"DBNAME"};
+my $dnaport    = $CONFIG->{$species}->{"DBPORT"};
+
 
 print "$species: Using data in $dbname\@$host:$port\n" ; 
 
@@ -111,6 +120,15 @@ my $sdb = new Bio::EnsEMBL::DBSQL::DBAdaptor
    -dbname => $dbname,
   );
 
+my $ddb = new Bio::EnsEMBL::DBSQL::DBAdaptor
+  (
+   -host   => $dnahost,
+   -user   => $user,
+   -port   => $dnaport,
+   -dbname => $dnadbname,
+  );
+$sdb->dnadb($ddb);
+throw("No dna database found\n") unless $ddb;
 
 my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
   (
@@ -120,6 +138,8 @@ my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
    -dbname => $final_dbname,
    -pass   => $pass,
   );
+
+
 
 print "$species: Using data in $final_dbname\@$final_host:$final_port\n" ; 
 die ("Cannot find databases ") unless $final_db  && $sdb;
@@ -143,7 +163,7 @@ check_exdb($final_db);
 check_meta($sdb,$final_db);
 
 print "fetching and lazy-loading new predictions...\n";
-my $new_hash = fetch_genes($sga,$biotype,$fbs,\@genestoignore);
+my $new_hash = fetch_genes($sga,$biotype,$biotype_to_skip,$fbs,\@genestoignore);
 print "\nfetching and lazy-loading old predictions...\n";
 my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 
@@ -162,18 +182,22 @@ print "Checks\n";
 # checks
 # blacklist genes over the end of a seq region...
 print "Falls off slice\n";
+
 my $overhangs = drop_overhangs( $new_hash);
 
 # duplicte genes
 print "Duplicated\n";
 my $duplications = duplicates( $new_hash, $sga );
 
+# genes with high AT content are blacklisted because they are just wrong...
+my $repeats = at_content( $new_hash );
+
 print "Overlaps\n";
 # non-coding overlaps
 ($noncoding_overlaps,$coding_overlaps) = overlaps($new_hash, $final_sa , $final_ga);
 
 # make blacklist of genes to drop
-my $blacklist = blacklist($overhangs,$duplications,$coding_overlaps);
+my $blacklist = blacklist($overhangs,$duplications,$coding_overlaps,$repeats);
 
 print "Transferring stable ids\n" unless ($no_stable_ids);
 # transfer stable_ids
@@ -322,8 +346,35 @@ sub overlaps {
   return (\%noncoding, \%coding);
 }
 
+sub at_content {
+  my ($genes) = @_;
+    my %blacklist;
+  foreach my $key (keys %$genes) {
+    my $perc_at;
+    my $longest_at;
+    my $count;
+    my $gene = $genes->{$key};
+    # we want to eliminate genes with high 'AT' content, so we have 23 tests based on analysis of data over all genomes..
+    # not miRNAs though, just infernal predictions...
+    next if $gene->biotype eq 'miRNA';
+    my $seq = $gene->get_all_Transcripts->[0]->seq->seq;
+#    print "$seq\n";
+    while ($seq =~ /(AT)/g) { $count++ }
+    $perc_at = int($count / length($seq) * 200);
+    if ($seq =~ /((AT)+)/){
+      $longest_at = length($1);
+    }
+    # tests 
+    if ( $perc_at > 40 or $longest_at > 10 ) {
+      $blacklist{$gene->dbID} = 1 ;
+#      print "BAD SEQ\n";
+    }
+  }
+  return \%blacklist;
+}
+
 sub blacklist {
-  my ($overhangs,$duplications,$coding_overlaps) = @_;
+  my ($overhangs,$duplications,$coding_overlaps,$repeats) = @_;
   my %list;
   foreach my $key (keys %$overhangs){
     $list{$key} = 1 unless $whitelist->{$key};
@@ -332,6 +383,9 @@ sub blacklist {
     $list{$key} = 1 unless $whitelist->{$key};
   }
   foreach my $key (keys %$coding_overlaps){
+    $list{$key} = 1 unless $whitelist->{$key};
+  }
+  foreach my $key (keys %$repeats){
     $list{$key} = 1 unless $whitelist->{$key};
   }
   return \%list;
@@ -568,7 +622,7 @@ sub sql {
 }
 
 sub fetch_genes {
-  my ($ga,$biotype,$slice,$genestoignore) = @_;
+  my ($ga,$biotype,$biotype_to_skip,$slice,$genestoignore) = @_;
   my %ncRNA_hash;
   my @ncRNAs;
   throw("Cannot fetch genes without gene adaptor $ga") unless $ga;
@@ -584,6 +638,8 @@ sub fetch_genes {
       }
       if ($biotype) {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,"biotype = '".$biotype."'")};
+      } elsif ($biotype_to_skip) {
+	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,"biotype != '".$biotype_to_skip."'")};
       } else {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,'biotype like "%RNA"')};
       }
@@ -601,6 +657,8 @@ sub fetch_genes {
   } else {
       if ($biotype) {
 	@ncRNAs =  @{$ga->generic_fetch("biotype = '".$biotype."'")};
+      } elsif ($biotype_to_skip) {
+	@ncRNAs =  @{$ga->generic_fetch("biotype != '".$biotype_to_skip."'")};
       } else {
 	@ncRNAs =  @{$ga->generic_fetch('biotype like "%RNA"')};
       }      
