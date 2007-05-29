@@ -46,6 +46,9 @@ package Bio::EnsEMBL::Pipeline::RunnableDB::FPC_BlastMiniGenewise;
 use vars qw(@ISA);
 use strict;
 
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
+
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Pipeline::Runnable::BlastMiniGenewise;
@@ -247,7 +250,8 @@ sub fetch_input {
     my ($ex_msk_reg_ref) = $self->mask_gene_region_lists($self->query);
     my @exonmask_regions = @$ex_msk_reg_ref;
     
-    my %kill_list = %{$self->fill_kill_list};
+   # my %kill_list = %{$self->fill_kill_list};
+    my %kill_list = %{$self->populate_kill_list};
 
     DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
       my (%features);
@@ -308,18 +312,7 @@ sub fetch_input {
           delete $features{$dud_id};
         }
       }
-
-# Addition to allow kill list identifiers without a sequence version to match hit_names with a sv
-      foreach my $hit (keys %features) {
-	if ($hit  =~ /^(\w+)\.\d/) {	
-	  my $hit_trimmed = $1;
-	  if (exists $kill_list{$hit_trimmed}) {
-#	    print STDERR "Killing $hit after removing .sv with $hit_trimmed from kill list\n";
-	    delete $features{$hit};
-	  }
-	}
-      }
-
+	    	    
       printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(keys %features));
 
       if ($id_pool_bins and $id_pool_index) {
@@ -1230,9 +1223,15 @@ sub genewise_db {
   return $self->{_genewise_db};
 }
 
+sub populate_kill_list {
+  my ($self) = @_;
+  my %kill_list;
 
+  my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'protein');
+  my %kill_list = %{$kill_list_object->get_kill_list()};
 
-
+  return \%kill_list;
+}
 1;
 
 
