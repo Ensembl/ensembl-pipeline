@@ -116,7 +116,7 @@ sub make_targetted_runnables {
   
   $targetted_db->dnadb($self->db);
   $self->output_db($targetted_db);
-  my %kill_list = %{$self->fill_kill_list};
+  my %kill_list = %{$self->populate_kill_list};
 
   foreach my $feat(@features){
     #get the protein_id without a version
