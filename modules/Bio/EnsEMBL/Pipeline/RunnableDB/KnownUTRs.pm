@@ -96,7 +96,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General   qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts   qw (
-                                                             GB_KILL_LIST
 							     GB_FPCDIR
 							    );
 
@@ -1932,22 +1931,6 @@ sub tmpfile{
   return $self->{'_tmpfile'};
 }
 
-sub fill_kill_list {
-  my ($self) = @_;
-  my %kill_list;
-  open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
-  while (<KILL_LIST>) {
-
-    chomp;
-    my @list = split;
-    next unless scalar(@list); 	# blank or empty line
-    $kill_list{$list[0]} = 1;
-  }
-
-  close KILL_LIST or die "error closing $GB_KILL_LIST\n";
-
-  return \%kill_list;
-}
 
 sub populate_kill_list {
   my ($self) = @_;
