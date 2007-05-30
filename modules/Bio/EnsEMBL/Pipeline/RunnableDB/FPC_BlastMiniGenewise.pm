@@ -99,9 +99,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
 							     GB_INPUTID_REGEX
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts    qw (
-							     GB_KILL_LIST
-							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB );
 
@@ -250,7 +247,6 @@ sub fetch_input {
     my ($ex_msk_reg_ref) = $self->mask_gene_region_lists($self->query);
     my @exonmask_regions = @$ex_msk_reg_ref;
     
-   # my %kill_list = %{$self->fill_kill_list};
     my %kill_list = %{$self->populate_kill_list};
 
     DATABASE: foreach my $database(@{$GB_SIMILARITY_DATABASES}){
@@ -822,37 +818,6 @@ sub get_seqfetcher_by_type{
 }
 
 
-=head2 fill_kill_list
-
- Title   : fill_kill_list
- Usage   : 
- Function: 
-           
- Returns : 
- Args    : 
-
-=cut
-
-sub fill_kill_list {
-  my ($self) = @_;
-  my %kill_list;
-  
-  if (defined($GB_KILL_LIST) && $GB_KILL_LIST ne '') {
-    open (KILL_LIST, "< $GB_KILL_LIST") or die "can't open $GB_KILL_LIST";
-    while (<KILL_LIST>) {
-      
-      chomp;
-      my @list = split;
-      next unless scalar(@list); 	# blank or empty line
-      $kill_list{$list[0]} = 1;
-    }
-    
-    close KILL_LIST or die "error closing $GB_KILL_LIST\n";
-  }
-  return \%kill_list;
-}
-
-
 =head2 sort_hids_by_coverage
 
  Title   : sort_hids_by_coverage
@@ -1222,6 +1187,16 @@ sub genewise_db {
   }
   return $self->{_genewise_db};
 }
+
+=head2 populate_kill_list
+
+ Title   : populate_kill_list 
+ Usage   : retrieves the kill list 
+ Function:
+ Returns :
+ Args    :
+
+=cut
 
 sub populate_kill_list {
   my ($self) = @_;
