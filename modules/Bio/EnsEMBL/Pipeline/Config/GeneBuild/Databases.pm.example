@@ -55,6 +55,12 @@ use vars qw( %Databases );
 	      GB_DBUSER                  => '',
 	      GB_DBPASS                  => '',
 	      GB_DBPORT                  => '',
+              # database containing the kill list 
+              GB_KILL_DBHOST             => 'genebuild6',
+              GB_KILL_DBNAME             => 'ba1_ensembl_kill_list',
+              GB_KILL_DBUSER             => 'ensro',
+              GB_KILL_DBPASS             => '',
+              GB_KILL_DBPORT             => '3306',
 	      # database containing the genewise genes (TGE_gw,similarity_genewise)
               GB_GW_DBHOST               => '',
               GB_GW_DBNAME               => '',

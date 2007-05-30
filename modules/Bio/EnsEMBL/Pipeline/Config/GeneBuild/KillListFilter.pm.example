@@ -1,0 +1,166 @@
+#
+# package Bio::EnsEMBL::Analysis::Config::KillListFilter
+# 
+# Cared for by EnsEMBL (ensembl-dev@ebi.ac.uk)
+#
+# Copyright GRL & EBI
+#
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Analysis::Config::KillListFilter
+
+=head1 SYNOPSIS
+
+    use Bio::EnsEMBL::Analysis::Config::KillListFilter;
+
+=head1 DESCRIPTION
+
+It imports and sets a number of standard global variables into the
+calling package, which are used in many scripts in the human sequence
+analysis system.  The variables are first declared using "use vars",
+so that it can be used when "use strict" is in use in the calling
+script.  Without arguments all the standard variables are set, and
+with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%Exonerate> hash is asked to be set.
+
+Since The RunnableDB that this config controls can be used for 
+inferring transcript structures from (different sets of) EST, cDNA 
+and proteins, and several uses may be required in the same pipeline, 
+this Config contains one primary config variable, EXONERATE_TRANSCRIPT_CONFIG.
+This is hash keyed off logic name, each entry of which is a hash
+containing the variable that affect the behaviour of the RunnableDB.
+When the RunnableDB instance is created, the correct entry is identified
+by logic name and value for a corresponding set of local variables are
+set.
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::GeneBuild::KillListFilter;
+
+use strict;
+use vars qw( %Config );
+
+# Hash containing config info
+%Config = (
+  KILL_LIST_CONFIG => {
+
+    DEFAULT => {
+      GB_REF_DB => {
+        -dbname => '',
+        -host   => '',
+        -port   => '3306',
+        -user   => 'ensro',
+      },
+      KILL_LIST_DB => {
+        -dbname => 'ba1_ensembl_kill_list',
+        -host   => 'genebuild6',
+        -port   => '3306',
+        -user   => 'ensro',
+        -pass   => '',
+      },  
+      FILTER_PARAMS    => {
+        #can only be protein, cDNA, EST. 
+        -only_mol_type        => 'protein',
+        #name of user if you only want to fetch entries that have been added by one user
+        # eg. ba1
+        -user_name            => undef, 
+        #species (taxon number) from which the entry was found
+        -source_species       => undef,
+        #fetch all entries before this date
+        #if no date entered, fetch all entries in db
+        -before_date          => undef,
+        #if we only want to fetch entired with status 'UPDATED' or 'CREATED'
+        #by default, all entries that have a status other than 'REMOVED' will be fetched       
+        -having_status        => undef, 
+        #all kill_list accessions will have an entry in the kill_object_reason table for these reasons
+        #ie. all accessions in the kill-list will have been killed for these reasons below
+        -reasons              => [],
+        #kill_list will not return entries that have an entry in the kill_object_analysis table for these analysis_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these analyses below
+        -for_analyses         => [],
+        #kill_list will not return accessions that have an entry in the kill_object_species table for these species_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these species below
+        -for_species          => [], #['10090', '9606']
+        #fetch only entries that came from these external dbs eg. embl, refseq
+        -for_external_db_ids  => [], #['2000', '2200'];                   
+      },
+    },
+    EST => {
+      FILTER_PARAMS    => {
+        -only_mol_type        => 'EST',
+        -user_id              => undef,
+        -from_source_species  => undef,
+        -before_date          => undef,
+        -having_status        => undef,
+        -reasons              => [],
+        -for_analyses         => [],
+        -for_species          => [],
+        -for_external_db_ids  => [],
+      }    
+    },
+    cDNA => {
+      FILTER_PARAMS    => {
+        -only_mol_type        => 'cDNA',
+        -user_id              => undef,
+        -from_source_species  => undef,
+        -before_date          => undef,
+        -having_status        => undef,
+        -reasons              => [],
+        -for_analyses         => [],
+        -for_species          => [],
+        -for_external_db_ids  => [],
+      }
+    },
+    PROTEIN => {
+      FILTER_PARAMS    => {
+        -only_mol_type        => 'protein',
+        -user_id              => undef,
+        -from_source_species  => undef,
+        -before_date          => undef,
+        -having_status        => undef,
+        -reasons              => [],
+        -for_analyses         => [],
+        -for_species          => [],
+        -for_external_db_ids  => [],
+      }
+    },
+  },
+);
+
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+
+  # Get list of variables supplied, or else everything
+  my @vars = @_ ? @_ : keys( %Config );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $Config{$_} ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$Config{ $_ };
+	} else {
+	    die "Error: Config: $_ not known\n";
+	}
+    }
+}
+
+1;
