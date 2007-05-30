@@ -60,14 +60,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 
 # Hash containing config info
 %Scripts = (
-	     # path to swissprot "evidence kill list" file - file of
-	     # protein IDs that should not be used for building genes
-	     # but have made it into the protein databases eg
-	     # transposable elements 
-	     # ie /path/to/ensembl-pipeline/scripts/GeneBuild/kill_list.txt
-	    
-	    GB_KILL_LIST   => '',	
-
 	    # information about the different protein sources used by new_prepare_proteome.pl,
 	    # the header regex should be a regex to pull out the desired id from the fasta header
 
