@@ -2241,5 +2241,44 @@ sub replace_stops_with_introns {
   return $tran;
 }
 
+=head2 identical_Transcripts 
+ Title   : identical_Transcripts 
+ Usage   : $identical = identical_Transcripts($transcript1, $transcript2);
+ Function: compares 2 Transcripts. DOES NOT CHECK TO SEE WHETHER PHASES ARE IDENTICAL
+           OR WHETHER EVIDENCE IS IDENTICAL.
+           Transcripts are compared on the basis of (i) number of Exons, 
+           (ii) start and end coordinates for each Transcript, (iii) strand 
+ Example :
+ Returns : 1 if identical, 0 if not indentical 
+ Args    : Transcript, Transcript
+           Transcript, Transcript
+=cut
+sub identical_Transcripts {
+  my ($transcript1, $transcript2) = @_;
 
+  my @exons1 = @{$transcript1->get_all_Exons()}; 
+  my @exons2 = @{$transcript2->get_all_Exons()};
+
+  # compare no. of Exons
+  if (scalar(@exons1) != scalar(@exons2)) {
+    return 0;
+  }
+
+  # compare Exon coordinates and strand
+  foreach my $num ($num = 0; $num < scalar(@exons1); $num++) {
+    if ($exons1[$num]->strand != $exons2[$num]->strand) {
+      return 0;
+    }   
+    if ($exons1[$num]->start != $exons2[$num]->start) {
+      return 0;
+    }
+    if ($exons1[$num]->end != $exons2[$num]->end) {
+      return 0;
+    }
+  }
+
+  # you may want to check the evidence and phase at some stage by adding a wrapper method
+
+  return 1;
+}
 1;
