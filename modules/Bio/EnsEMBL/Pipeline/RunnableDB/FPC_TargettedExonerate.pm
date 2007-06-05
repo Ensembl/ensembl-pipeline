@@ -119,6 +119,7 @@ sub make_targetted_runnables {
   $self->output_db($targetted_db);
   my %kill_list = %{$self->populate_kill_list};
 
+  my %unique_proteins;
   foreach my $feat(@features){
     #get the protein_id without a version
     my $feat_protein_id = $feat->protein_id;
@@ -130,21 +131,38 @@ sub make_targetted_runnables {
     $feat_protein_id =~ s/\.\d+//;
     #reject any proteins that are in the kill list
     if(defined $kill_list{$feat_protein_id}){
-      #print STDERR "skipping " . $feat->protein_id . "\n";
+      print STDERR "skipping " . $feat->protein_id . "\n";
       next;
     }
-                                   
+
+    # group all pmatch hits from the same protein together 
+    if (!exists $unique_proteins{$feat_protein_id}) {
+      $unique_proteins{$feat_protein_id}{'start'} = $feat->start;
+      $unique_proteins{$feat_protein_id}{'end'} = $feat->end;
+    } else {
+      if ($feat->start < $unique_proteins{$feat_protein_id}{'start'}) {
+        $unique_proteins{$feat_protein_id}{'start'} = $feat->start;
+      }
+      if ($feat->end > $unique_proteins{$feat_protein_id}{'end'}) {
+        $unique_proteins{$feat_protein_id}{'end'} = $feat->end;
+      }
+    }
+  } # foreach my $feat(@features){
+  
+  #                                    
+  foreach my $prot (keys %unique_proteins) {  
+    print "Doing protein $prot\n";
     my ($start, $end);
     
-    $start = $feat->start;
-    $end = $feat->end;
+    $start = $unique_proteins{$prot}{'start'}; # $feat->start;
+    $end = $unique_proteins{$prot}{'end'}; # $feat->end;
 
     my $input = ($self->query->coord_system->name.":".
                  $self->query->coord_system->version.":".
                  $self->query->seq_region_name.":".
                  $start.":".$end.":".
                  $self->query->strand.",".
-                 $feat->protein_id);
+                 $prot);
 
     #print STDERR "\n\n***TGE input: $input***\n";
 
