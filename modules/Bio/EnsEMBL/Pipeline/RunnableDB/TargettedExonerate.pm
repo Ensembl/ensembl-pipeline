@@ -218,7 +218,8 @@ sub fetch_input{
                                                                      -target_file => $genfile,
                                                                      -query_type => 'protein',
                                                                      -query_file => $pepfile,
-                                                                     -options => "--model protein2genome --bestn $GB_TARGETTEDXRATE_BESTN",
+                                                                     -options => "--model protein2genome --bestn $GB_TARGETTEDXRATE_BESTN ".
+                                                                                 "--maxintron $GB_TARGETTEDXRATE_MAX_INTRON ",
                                                                     );
  
   $self->runnable($r);
