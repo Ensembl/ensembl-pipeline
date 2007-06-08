@@ -76,7 +76,7 @@ my $reread_input_ids   = 0;    # toggle whether to reread input_id each time the
                                # script loops
 my $reread_rules = 0;      # toggle whether to reread rules each time the script
                            # loops
-my $reupdate_analysis = 1;                            
+my $reupdate_analysis = 1;
 my $perldoc      = 0;
 my @command_args = @ARGV;
 my $submission_limit;
@@ -131,7 +131,7 @@ GetOptions(
 perldoc() if $perldoc;
 verbose($utils_verbosity);
 
-@analyses_to_run = map {split/,/} @analyses_to_run ; 
+@analyses_to_run = map {split/,/} @analyses_to_run ;
 
 unless ( $dbhost && $dbname && $dbuser ) {
 	print STDERR
@@ -271,7 +271,7 @@ LOOP: while (1) {
 			$all_rules, \%accumulator_analyses,
 			\%always_incomplete_accumulators );
 	}
-	
+
 	update_analysis_dbversion() if($reupdate_analysis);
 
 	my $id_hash = $rulemanager->input_ids;
@@ -442,14 +442,14 @@ sub update_analysis_dbversion {
 	my $a_hash;
 	my $uniprot_db_version;
 	my $pfam_db_version;
-	
+
 	foreach my $ana (@analysis) {
 		my $db_file;
 		my $db_version;
 		my $ln = $ana->logic_name;
 		my $mod = $ana->module();
 		my $ana_df;
-		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Halfwise/ ) ) {
+		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Exonerate/ || $mod =~ /Halfwise/ ) ) {
 			$a_hash->{$ln} = $ana;
 			$db_file    = fetch_databases( $ana->db_file );
 			$db_version = get_db_version( $db_file , 1);
@@ -459,20 +459,20 @@ sub update_analysis_dbversion {
 			$pfam_db_version = $db_version if $mod =~ /Halfwise/;
 		}
 	}
-				
+
 	foreach my $ana (@analysis) {
 		next unless $ana->module;
 		# update the DepthFilter analysis
 		if($ana->module =~ /DepthFilter/) {
 			my ($ori_ana) = $ana->parameters =~ /ori_analysis\s+=>\s+(\w+)/;
 			save_db_version($analysis_adaptor,$ana,$a_hash->{$ori_ana}->db_version);
-		} 
+		}
 		# update Halfwise
 		elsif ($ana->module =~ /Halfwise/) {
 			my $new_db_version  = $uniprot_db_version.'_'.$pfam_db_version;
 			save_db_version($analysis_adaptor,$ana,$new_db_version);
 		}
-	} 
+	}
 }
 
 sub save_db_version {
@@ -586,7 +586,7 @@ This is a script which replicates most of the behaviour previously
 described by RuleManager3.pl
 
 for more information about the ensembl-pipeline or using rulemanager.pl
-read using_the_ensembl_pipeline.txt in ensembl-doc, 
+read using_the_ensembl_pipeline.txt in ensembl-doc,
 
 There is a genome research paper
 The ensembl analysis pipeline.
@@ -617,41 +617,41 @@ These arguments are always required all other arguments are optional
 Affecting the scripts behaviour
 
    -once this flag means the script will only run through its loop once
-    this is useful for testing 
+    this is useful for testing
    -reread_rules, this flag will force the rulemanager to reread the rule
     table every loop
    -reread_input_ids, this will force the rulemanager to reread the input
     ids each and every loop
-   -reupdate_analysis, this flag will update the database version stored in 
+   -reupdate_analysis, this flag will update the database version stored in
     the analysis table each and every loop, by default set to true.
-   -accumulators, this is a flag to indicate if the accumulators are 
+   -accumulators, this is a flag to indicate if the accumulators are
     running. By default it is on but it is turned off if you specify any
     flag which affects the rules or input_ids sets. You can switch
-    it off by specifying -noaccumulators 
+    it off by specifying -noaccumulators
    -force_accumulators this forces accumulators on even if other conditions
     would switch it on
    -shuffle this reorders the array of input_ids each time it goes through
-    through the loop. The purpose of this is to ensure the ids aren't 
+    through the loop. The purpose of this is to ensure the ids aren't
     always checked in the same order'
    -utils_verbosity, this affects the amount of chatter you recieve from
     the core module Bio::EnsEMBL::Utils::Exception. By default this is set
     to WARNING which means you see the prints from warnings and throws but
-    not from deprecate and info calls. See the modules itself for more 
+    not from deprecate and info calls. See the modules itself for more
     information
    -verbose, toggles whether some print statements are printed in this
     script and in the RuleManager
    -rerun_sleep, this is the amount of time the script will sleep for
     if no jobs have been submitted in the previous loop
 
-Overridable Configurations options from Bio::EnsEMBL::Pipeline::Config 
+Overridable Configurations options from Bio::EnsEMBL::Pipeline::Config
 modules
 
   Options also defined in Bio::EnsEMBL::Pipeline::Config modules
 
   BatchQueue.pm
 
-  -queue_manager this specifies which 
-   Bio::EnsEMBL::Pipeline::BatchSubmission module is used by 
+  -queue_manager this specifies which
+   Bio::EnsEMBL::Pipeline::BatchSubmission module is used by
    Bio::EnsEMBL::Pipeline::RuleManager
   -job_limit the maximun number of jobs of specified status allowed in
    system
@@ -672,7 +672,7 @@ modules
    -runner path to a default runner script. This will override what is
     set in General.pm but will be overidden by any analyses specific
     settings found in BatchQueue.pm
-   -rename_on_retry a toggle to specify whether to rename stderr/stdout 
+   -rename_on_retry a toggle to specify whether to rename stderr/stdout
     file when a job is retried as otherwise the submission system just
     cats them all together
 
@@ -680,7 +680,7 @@ Sanity Checking
 
    -config_sanity this is a test to check certain values are defined in
     your General.pm and BatchQueue.pm config files
-   -db_sanity this checks various tables in the databases for missing 
+   -db_sanity this checks various tables in the databases for missing
    values or bad foreign key relationships
    -accumulator_sanity this checks you accumulators are set up correctly
    -rules_sanity this checks you rules are setup correctly
@@ -691,7 +691,7 @@ Altering what input_ids or analyses are considered for submission
 
   -starts_from this should be a logic_name of an analysis which has been
   run. The input_ids used for the central loop are retrived on the basis of
-  these logic_names. This option can appear in the commandline multiple 
+  these logic_names. This option can appear in the commandline multiple
   times
   -analysis a logic_name of an analysis you want run. If you specify
   this option you will only run this analysis or analyses as the option can
@@ -699,11 +699,11 @@ Altering what input_ids or analyses are considered for submission
   -skip_analysis a logic_name of an analysis you don't want to run. If
   this option is specified these are the only analyses which won't be run
   note this option and -analysis are mutually exclusive
-  -input_id_type a type of input_id you want to run with. If these is 
-  specified no other type of input will be considered. Again this can 
+  -input_id_type a type of input_id you want to run with. If these is
+  specified no other type of input will be considered. Again this can
   appear multiple times on the commandline
   -skip_input_id_type a type of input to no be considered. If this appears
-  only these input_ids will not be run. Again this can appear multiple 
+  only these input_ids will not be run. Again this can appear multiple
   times on the commandline and is multially exclusive with -input_id_type
   -input_id_file path to a file of input_ids which should be in the format
   input_id input_id_type
@@ -720,7 +720,7 @@ Currently unused options
   -kill_file a file where to record the input_ids and logic_names of killed
    jobs
 
-these options are currently unused as we aren't sure of the best way to 
+these options are currently unused as we aren't sure of the best way to
 check job running time. They have been brought over from RuleManager3.pl
 as the functionality may be reinstated at a later stage'
 
@@ -728,25 +728,25 @@ as the functionality may be reinstated at a later stage'
 
 a standard commandline for running rulemanager
 
-./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306
 -dbname my_pipeline_database -shuffle
 
 it is generally a good idea to redirect your output to a file and run the
 process in the background
 
-./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306
 -dbname my_pipeline_database -shuffle >& rulemanager_output.txt&
 
 if you still want to see the output on the screen you can do this by piping
 the output though tee
 
-./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306
 -dbname my_pipeline_database -shuffle | tee rulemanager_output.txt
 
 if you have just set up you database you may want to test everything is
 okay. the input_id_file option is a good way to do this
 
-./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306 
+./rulemanager -dbhost myhost -dbuser user -dbpass password -dbport 3306
 -dbname my_pipeline_database -shuffle -input_id_file my_input_ids
 
 as this way you can get the pipeline to considered a limited number of
