@@ -17,7 +17,8 @@ All configuration is done through MitConf.pm
 
 use strict;
 use Carp;
-
+#use Bio::EnsEMBL::Pipeline::Config::MitConf qw(%MitConf);
+use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
@@ -26,9 +27,11 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
-use Bio::EnsEMBL::Pipeline::Config::MitConf;
+#use MitConf;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
+
+
 my $help;
 my @genes;;
 my $translation; # JUST INCASE
@@ -404,11 +407,7 @@ print "Have ".scalar(@genes)." gene objects\n";
 foreach my $gene (@genes ) { 
   print  $gene->seq_region_start . "\n" ;  
 }  
-<<<<<<< load_mitochondria.pl
-#exit(0) ;
-=======
 
->>>>>>> 1.8
 print " TESTING : Do you want to load them into the db ? (Y/N) ";
   my $answer = <>;
   chomp $answer;
