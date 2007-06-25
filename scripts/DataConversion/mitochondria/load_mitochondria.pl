@@ -26,7 +26,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
-use MitConf;
+use Bio::EnsEMBL::Pipeline::Config::MitConf;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
 my $help;
@@ -151,14 +151,12 @@ GENBANK_ENTRY: for my $g (@$genbank_ref) {
      } 
    }   
    
-     if (!exists $nonred_entries{"$start-$end"} && $start && $end ){   
+     if (!exists $nonred_entries{"$start-$end"} && $start && $end ){
        if ( $note!~m/tRNAscan-SE/) {  
          $nonred_entries{"$start-$end"}=\%entry;   
        }else {  
          print " feature with coords $start-$end will be skipped because $note\n" ; 
        } 
-     } else{ 
-         print " feature with coords $start-$end will be skipped because $note\n" ; 
      }
 }
 
@@ -406,7 +404,11 @@ print "Have ".scalar(@genes)." gene objects\n";
 foreach my $gene (@genes ) { 
   print  $gene->seq_region_start . "\n" ;  
 }  
+<<<<<<< load_mitochondria.pl
+#exit(0) ;
+=======
 
+>>>>>>> 1.8
 print " TESTING : Do you want to load them into the db ? (Y/N) ";
   my $answer = <>;
   chomp $answer;
