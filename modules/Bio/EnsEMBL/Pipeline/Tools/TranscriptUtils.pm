@@ -2265,7 +2265,7 @@ sub identical_Transcripts {
   }
 
   # compare Exon coordinates and strand
-  foreach my $num ($num = 0; $num < scalar(@exons1); $num++) {
+  for(my $num = 0; $num < scalar(@exons1); $num++) {
     if ($exons1[$num]->strand != $exons2[$num]->strand) {
       return 0;
     }   
