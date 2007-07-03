@@ -693,17 +693,16 @@ sub percent_finished{
   }
   $sth1->execute();
   while (my $ref1 = $sth1->fetchrow_hashref) {
+    next if($ref1->{'rule_condition'} =~ m/.+wait/i);
     $analysis_condition{$ref1->{'goal'}} = $ref1->{'rule_condition'};
   }
 
   foreach my $analysis_id (keys %analysis_name){
     next if($analysis_name{$analysis_id} =~ /Wait/i);
     my $initial_id = $analysis_id;
-    #print "\n$analysis_id - ".$analysis_name{$analysis_id}.": ";
     $sth2->execute($initial_id);
     $ref3 = $sth2->fetchrow_hashref;
     $analysis_maxnum{$initial_id} = $ref3->{'count'};
-    #print $analysis_maxnum{$initial_id};
 
     while(defined($analysis_condition{$analysis_id})){
       $analysis_id = $analysis_id{ $analysis_condition{$analysis_id} };
