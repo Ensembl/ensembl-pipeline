@@ -55,14 +55,19 @@ $| = 1;
 	    'biotype=s'  => \$biotype,
 	    'biotype_to_skip=s'  => \$biotype_to_skip,
 	    'stable:s'   => \$sids,
-	    'slice_fetch!'=> \$fbs,
+	    'slice_fetch!' => \$fbs,
 	    'dump!'      => \$dump,
 	    'no_ids!'    => \$no_stable_ids,
 	    'makewhitelist!' => \$makewhitelist,
 	    'release:s'  => \$new_release,
 	   );
 
-die("transfer_ncRNAs\n-pass $pass  *\n-write $write\n-delete $delete\n-dbname  $final_dbname *(final db) \n-dbhost $final_host* \n-dbport $final_port * 
+die("transfer_ncRNAs\n-pass $pass  * 
+-write $write
+-delete $delete
+-dbname  $final_dbname *(final db)
+-dbhost $final_host*
+-dbport $final_port * 
 -species $species *(1 at at time)
 -xrefs $xrefs(file to dump xref data in) 
 -whitelist $list list of ids to keep
@@ -263,7 +268,7 @@ sub duplicates {
 	my $dbid = $duplications[$i]->dbID;
 	print $dbid;
 	$blacklist{$dbid} = 1;
-	print " are duplicted keeping ".$duplications[0]->dbID." and dumping the other one \n";
+	print " are duplicated keeping ".$duplications[0]->dbID." and dumping the other one \n";
       }
     }
   }
@@ -286,11 +291,13 @@ sub overlaps {
        $gene->strand,
       );
     unless ($slice){
-      die("NOs slice found for\n".
+      warn("NO slice found for\n".
 	  $gene->seq_region_name,"\n",
 	  $gene->start,"\n",
 	  $gene->end."\n"
 	 );
+      $coding{$gene->dbID} = 1;
+      next NCRNA;
     }
     my @overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
   GENE:  foreach my $overlap (@overlaps) {
@@ -299,8 +306,12 @@ sub overlaps {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
-	if($biotype && $overlap->biotype ne $biotype){
-	  warn("The non coding gene overlapping yours is of a different type, so it won't get deleted: $biotype vs ".$overlap->biotype." not transferring this stable id \n");
+	if( $overlap->biotype ne $gene->biotype  && !$biotype){
+	  print "The non coding gene overlap is of a different type, ".  $gene->biotype . " vs ".$overlap->biotype." not transferring this stable id \n";
+	  next GENE;
+	}
+	if($biotype && $overlap->biotype ne $biotype ){
+	  print "The non coding gene overlapping yours is of a different type, so it won't get deleted: $biotype vs ".$overlap->biotype." not transferring this stable id \n";
 	  next GENE;
 	}
 	# catch problem where you have multiple overlapping ncRNAs, maybe you can manually delete one
@@ -320,6 +331,8 @@ sub overlaps {
 	# overlapping gene is coding
 	# want to know if it actually overlaps a coding exon	
 	# exon is coding
+	# ignore overlaps if they are miRNAs we always end up letting these through anyway!
+	next GENE if $gene->biotype eq 'miRNA';
 	foreach my $trans (@{$overlap->get_all_Transcripts}) {
 	  foreach my $exon (@{$trans->get_all_translateable_Exons}) {
 	    my $codingexon = ($slice->start+$exon->end() >= $gene->start() &&
@@ -430,11 +443,11 @@ sub stable_id_mapping {
     $new_exon->stable_id($old_exon->stable_id);
     $new_exon->version($old_exon->version);
 
-    # transferring
-    print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-      $new_gene->stable_id."\',".$old_gene->version.",\'".$new_gene->stable_id."\',".$old_gene->version.",$new_session,\'gene\',1);\n";
-    print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-      $new_trans->stable_id."\',".$old_trans->version.",\'".$new_trans->stable_id."\',".$old_trans->version.",$new_session,\'transcript\',1);\n";
+    # transferring - this data is no longer stored to make the tables smaller
+    # print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
+    #   $new_gene->stable_id."\',".$old_gene->version.",\'".$new_gene->stable_id."\',".$old_gene->version.",$new_session,\'gene\',1);\n";
+    # print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
+    #   $new_trans->stable_id."\',".$old_trans->version.",\'".$new_trans->stable_id."\',".$old_trans->version.",$new_session,\'transcript\',1);\n";
     $done{$old_gene->dbID} = 1;
   }
   # deleting
@@ -532,7 +545,7 @@ sub delete_genes {
   if ($reply eq "Y" or $reply eq "y") {
     foreach my $key (keys %$old_hash){
       my $gene = lazy_load($old_hash->{$key});
-      unless ($gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA'){
+      unless ($gene->biotype =~ /RNA$/ && $gene->analysis->logic_name eq 'ncRNA'){
 	throw("Gene to be deleted is not a non coding gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n");
       }
       print "Deleting gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";
@@ -670,7 +683,7 @@ sub fetch_genes {
 	  next if  $ncRNA->description =~ /$genestoignore/;
 	}
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
-      }
+      } 
     }
   print STDERR  "\n";
   return \%ncRNA_hash;
@@ -683,9 +696,9 @@ sub check_meta {
   my $c1 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db1)->[0];
   my $c2 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db2)->[0];
 
-  unless ($m1->get_Species->common_name eq $m2->get_Species->common_name){
-    throw("Species do not agree ".$m1->get_Species->common_name." != ". $m2->get_Species->common_name."\n");
-  }
+#  unless ($m1->get_Species->common_name eq $m2->get_Species->common_name){
+#    throw("Species do not agree ".$m1->get_Species->common_name." != ". $m2->get_Species->common_name."\n");
+#  }
   unless ($m1->get_taxonomy_id eq $m2->get_taxonomy_id ){
     throw("Tax ids do not agree ".$m1->get_taxonomy_id." != ". $m2->get_taxonomy_id."\n");
   }
