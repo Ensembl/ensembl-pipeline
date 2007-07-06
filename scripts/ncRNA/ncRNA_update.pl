@@ -520,6 +520,7 @@ sub prepare_RFAM{
     if ($_ =~ /^\#=GF TP   Gene;/){
       next if $_ =~ /miRNA/;
       next if $_ =~ /tRNA/;
+      next if $_ =~ /antisense/;
       $families{$domain} = 1;
     }
   }
