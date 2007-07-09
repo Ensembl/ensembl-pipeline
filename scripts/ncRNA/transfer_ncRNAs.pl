@@ -11,6 +11,7 @@ use Getopt::Long;
 # it deletes old ncRNAs
 # copies new ones with stable ids and xrefs
 # it transfers stable ids and keeps track of the stable_id mappping data
+# adding a merge option for chicken and human
 
 my $pass;
 my $write;
@@ -35,6 +36,8 @@ my $count;
 my $fbs;
 my $dump;
 my $no_stable_ids;
+my $merge;
+my $merge_set;
 #list of gene-descriptions to ignore
 my @genestoignore = ();
 my $makewhitelist = 0;
@@ -60,6 +63,7 @@ $| = 1;
 	    'no_ids!'    => \$no_stable_ids,
 	    'makewhitelist!' => \$makewhitelist,
 	    'release:s'  => \$new_release,
+	    'merge!'     => \$merge,
 	   );
 
 die("transfer_ncRNAs\n-pass $pass  * 
@@ -78,6 +82,7 @@ die("transfer_ncRNAs\n-pass $pass  *
 -dump $dump (skip all the rest and just dump the xrefs)
 -no_ids $no_stable_ids (do the load without any stable ids)
 -release $new_release ( the number of the release ie 44 )*
+-merge ( special case for human where there are Sean Eddys genes that we want to keep except for where we have a better prediction )
 * = essential\n")
   unless ($pass && $final_port && $final_host && $final_dbname &&  $new_release);
 
@@ -110,7 +115,6 @@ my $user    = 'ensro';
 my $dbname  = $CONFIG->{$species}->{"WRITENAME"};
 my $port    = $CONFIG->{$species}->{"WRITEPORT"};
 my $dnahost    = $CONFIG->{$species}->{"DBHOST"};
-my $user    = 'ensro';
 my $dnadbname  = $CONFIG->{$species}->{"DBNAME"};
 my $dnaport    = $CONFIG->{$species}->{"DBPORT"};
 
@@ -125,15 +129,18 @@ my $sdb = new Bio::EnsEMBL::DBSQL::DBAdaptor
    -dbname => $dbname,
   );
 
-my $ddb = new Bio::EnsEMBL::DBSQL::DBAdaptor
-  (
-   -host   => $dnahost,
-   -user   => $user,
-   -port   => $dnaport,
-   -dbname => $dnadbname,
-  );
-$sdb->dnadb($ddb);
-throw("No dna database found\n") unless $ddb;
+# using the staging server db as the dna db because it has the same assembly right?
+# and the server is quieter generally
+
+# old data base on livemirror - useful to have sometimes
+#my $olddb = new Bio::EnsEMBL::DBSQL::DBAdaptor
+#  (
+#   -host   => $dnahost,
+#   -user   => 'ensro',
+#   -port   => 3306,
+#   -dbname => $dnadbname,
+#  );
+
 
 my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
   (
@@ -143,16 +150,19 @@ my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
    -dbname => $final_dbname,
    -pass   => $pass,
   );
+throw("No dna database found\n") unless $final_db;
 
-
+$sdb->dnadb($final_db);
 
 print "$species: Using data in $final_dbname\@$final_host:$final_port\n" ; 
 die ("Cannot find databases ") unless $final_db  && $sdb;
 my $final_ga = $final_db->get_GeneAdaptor;
+#my $old_ga =   $olddb->get_GeneAdaptor;
 my $sga = $sdb->get_GeneAdaptor;
 my $ssa = $sdb->get_SliceAdaptor;
 my $saa = $sdb->get_AnalysisAdaptor;
 my $final_sa = $final_db->get_SliceAdaptor;
+#my $old_sa =   $olddb->get_SliceAdaptor;
 my $final_aa = $final_db->get_AnalysisAdaptor;
 my $analysis;
 # just dump the xrefs
@@ -170,6 +180,7 @@ check_meta($sdb,$final_db);
 print "fetching and lazy-loading new predictions...\n";
 my $new_hash = fetch_genes($sga,$biotype,$biotype_to_skip,$fbs,\@genestoignore);
 print "\nfetching and lazy-loading old predictions...\n";
+#my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 
 print "\nFound ".scalar(keys %$new_hash)." new predictions\n";
@@ -199,20 +210,22 @@ my $repeats = at_content( $new_hash );
 
 print "Overlaps\n";
 # non-coding overlaps
-($noncoding_overlaps,$coding_overlaps) = overlaps($new_hash, $final_sa , $final_ga);
+($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $final_sa , $final_ga);
 
 # make blacklist of genes to drop
 my $blacklist = blacklist($overhangs,$duplications,$coding_overlaps,$repeats);
 
 print "Transferring stable ids\n" unless ($no_stable_ids);
 # transfer stable_ids
-my $mapping_session = stable_id_mapping($noncoding_overlaps,$old_hash,$new_hash,$blacklist) unless ($no_stable_ids);
+my $mapping_session = stable_id_mapping($noncoding_overlaps,$old_hash,$new_hash,$blacklist,$merge_set) unless ($no_stable_ids);
 
 print "Generating stable ids for new predictions\n" unless ($no_stable_ids);
 generate_new_ids($new_hash,$final_ga,$blacklist,$mapping_session) unless ($no_stable_ids);
 
 # delete
-delete_genes($old_hash,$final_ga ) if $delete;
+delete_genes($old_hash,$final_ga,$merge_set ) if $delete;
+
+
 
 # write
 write_genes($new_hash,$blacklist,$final_ga) if $write;
@@ -280,6 +293,7 @@ sub overlaps {
   # check for overlaps
   my %coding;
   my %noncoding;
+  my %merge_set;
  NCRNA: foreach my $key (keys %$genes) {
     my $gene = $genes->{$key};
     my $slice = $sa->fetch_by_region
@@ -306,6 +320,8 @@ sub overlaps {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
+	# used in a gene merge to remove overlapping ncRNAs from Sean Eddys set
+	$merge_set{$overlap->dbID} = 1 unless $overlap->description =~ /RFAM/;
 	if( $overlap->biotype ne $gene->biotype  && !$biotype){
 	  print "The non coding gene overlap is of a different type, ".  $gene->biotype . " vs ".$overlap->biotype." not transferring this stable id \n";
 	  next GENE;
@@ -356,7 +372,7 @@ sub overlaps {
       }
     }
   }
-  return (\%noncoding, \%coding);
+  return (\%noncoding, \%coding, \%merge_set);
 }
 
 sub at_content {
@@ -371,7 +387,6 @@ sub at_content {
     # not miRNAs though, just infernal predictions...
     next if $gene->biotype eq 'miRNA';
     my $seq = $gene->get_all_Transcripts->[0]->seq->seq;
-#    print "$seq\n";
     while ($seq =~ /(AT)/g) { $count++ }
     $perc_at = int($count / length($seq) * 200);
     if ($seq =~ /((AT)+)/){
@@ -380,7 +395,6 @@ sub at_content {
     # tests 
     if ( $perc_at > 40 or $longest_at > 10 ) {
       $blacklist{$gene->dbID} = 1 ;
-#      print "BAD SEQ\n";
     }
   }
   return \%blacklist;
@@ -405,7 +419,7 @@ sub blacklist {
 }
 
 sub stable_id_mapping {
-  my ($non_coding_overlaps,$old_hash,$new_hash,$blacklist) = @_;
+  my ($non_coding_overlaps,$old_hash,$new_hash,$blacklist,$merge_set) = @_;
   # get the assembly information
   my $last_session = sql('SELECT max(mapping_session_id) from mapping_session',$final_db)->[0];
   my $new_assembly = sql('SELECT meta_value from meta where meta_key = "assembly.default"',$final_db)->[0];
@@ -453,6 +467,10 @@ sub stable_id_mapping {
   # deleting
   foreach my $old_gene (keys %$old_hash){
     next if $done{$old_gene};
+    if ( $merge ){
+      # we might not delete all the old genes so we dont want stable id mappings for them
+      next unless ( $old_hash->{$old_gene}->description =~ /RFAM/ or $old_hash->{$old_gene}->biotype eq 'miRNA' or $merge_set->{$old_gene} )
+    }
     my $gene =  $old_hash->{$old_gene};
     my $trans = $gene->get_all_Transcripts->[0];
     # old gene does not need stable id transferring stable id is dead 
@@ -472,16 +490,18 @@ sub generate_new_ids{
   my ($ncRNAs,$ga,$list,$last_session) = @_;
   my ($gsp,$gsi,$tsp,$tsi,$esp,$esi);
   # ensembl_ids all have 11 numbers at the end and an indeterminate number of letters at the start
-  
-  if (sql("SELECT max(stable_id) from gene_stable_id ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  # this gets around a problem with the tetroadon dataset which has some weird stable ids...
+  my $tetroadon_hack ;
+  $tetroadon_hack = " WHERE stable_id like 'GSTEN%' " if $final_dbname =~ /tetraodon_nigroviridis_core/;
+  if (sql("SELECT max(stable_id) from gene_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $gsp = $1;
     $gsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from transcript_stable_id ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from transcript_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $tsp = $1;
     $tsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from exon_stable_id ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from exon_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $esp = $1;
     $esi = $2;
   }
@@ -536,7 +556,7 @@ sub generate_new_ids{
 
 
 sub delete_genes {
-  my ($old_hash,$ga) = @_;
+  my ($old_hash,$ga,$merge_set) = @_;
   return if scalar(keys %$old_hash) == 0;
   print STDERR "Warning you have not specified a biotype *ALL* ncRNAs will be deleted\n" unless ($biotype);
   print STDERR "Found ".scalar(keys %$old_hash)." genes  $final_dbname\nshall I delete them? (Y/N) ";
@@ -544,8 +564,24 @@ sub delete_genes {
   chomp $reply;
   if ($reply eq "Y" or $reply eq "y") {
     foreach my $key (keys %$old_hash){
-      my $gene = lazy_load($old_hash->{$key});
-      unless ($gene->biotype =~ /RNA$/ && $gene->analysis->logic_name eq 'ncRNA'){
+      my $gene;
+      if ( $merge ){
+	# delete ALL the RFAM  / miRBase genes and any overlapping Sean Eddy genes
+	if ( $old_hash->{$key}->description =~ /RFAM/ or $old_hash->{$key}->biotype eq 'miRNA' or $merge_set->{$key} ){
+	  print "MERGE: " . $old_hash->{$key}->description . " ";
+
+	  print $old_hash->{$key}->seq_region_name . " " . 
+	    $old_hash->{$key}->biotype . " " .
+	      $old_hash->{$key}->seq_region_start . " " .
+		$old_hash->{$key}->seq_region_end . " " .
+		  $old_hash->{$key}->seq_region_strand . "\n";
+	  $gene = lazy_load($old_hash->{$key});
+	}
+      } else {
+	$gene = lazy_load($old_hash->{$key});
+      }
+      next unless (defined($gene));
+      unless ($gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA'){
 	throw("Gene to be deleted is not a non coding gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n");
       }
       print "Deleting gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";
@@ -654,7 +690,7 @@ sub fetch_genes {
       } elsif ($biotype_to_skip) {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,"biotype != '".$biotype_to_skip."'")};
       } else {
-	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,'biotype like "%RNA"')};
+	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,'biotype like "%RNA%" ')};
       }
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
@@ -673,7 +709,7 @@ sub fetch_genes {
       } elsif ($biotype_to_skip) {
 	@ncRNAs =  @{$ga->generic_fetch("biotype != '".$biotype_to_skip."'")};
       } else {
-	@ncRNAs =  @{$ga->generic_fetch('biotype like "%RNA"')};
+	@ncRNAs =  @{$ga->generic_fetch('biotype like "%RNA%"')};
       }      
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
