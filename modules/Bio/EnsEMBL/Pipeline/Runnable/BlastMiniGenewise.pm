@@ -806,7 +806,7 @@ sub run_exonerate {
        -query_type  => 'protein',
        -target_seqs => ([$self->genomic_sequence]),
        -target_type => 'dna',
-       -options     => "-W 7 ". $self->exonerate_options,
+       -options     => "--proteinwordlen 7 ". $self->exonerate_options,
       );
     eval {
       $exonerate->run;
@@ -825,7 +825,7 @@ sub run_exonerate {
        -query_type  => 'protein',
        -target_seqs => ([$self->genomic_sequence]),
        -target_type => 'dna',
-       -options     => "-W 5 ". $self->exonerate_options,
+       -options     => "--proteinwordlen 5 ". $self->exonerate_options,
 	);
       eval {
 	$exonerate->run;
