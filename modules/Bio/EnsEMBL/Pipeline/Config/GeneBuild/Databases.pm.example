@@ -93,6 +93,14 @@ use vars qw( %Databases );
 	      PSEUDO_DBUSER              => '',
 	      PSEUDO_DBPASS              => '',
               PSEUDO_DBPORT              => '',
+
+              # This database is use mainly with human an mouse for merging the havana get set with the ensembl genebuild
+              GB_HAVANA_DBHOST             => '',
+              GB_HAVANA_DBNAME             => '',
+              GB_HAVANA_DBUSER             => '',
+              GB_HAVANA_DBPASS             => '',
+              GB_HAVANA_DBPORT             => '',
+
 	      # this db needs to have clone & contig & static_golden_path tables populated
 	      GB_FINALDBHOST             => '',
 	      GB_FINALDBNAME             => '',
