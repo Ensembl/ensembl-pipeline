@@ -94,6 +94,7 @@ use vars qw(%Config);
   DEFAULT_OUTPUT_DIR  => $LC_scratchDIR."/raw_computes/",
   DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
+  DEFAULT_RESOURCE    => 'linux',
 
   AUTO_JOB_UPDATE     => 1,
   JOB_LIMIT => 100000, # at this number of jobs RuleManager will sleep for 
