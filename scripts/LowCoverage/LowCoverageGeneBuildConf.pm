@@ -10,14 +10,14 @@ use vars qw( %LowCoverageGeneBuildConf );
 	 	# User-specific configuration:
 		  LC_USER		        => '', #ba1
 		  LC_GeneBuilderID		=> '', #4
-		  LC_DATE		        => '', #MMYYEnsembl
+		  LC_DATE		        => '', #YYYY-MM-Ensembl
                   LC_ASSEMBLY_NAME              => '', #otoGar1, what broad calls the assembly
-                  LC_ASSEMBLY_DATE              => '', #YYMM, when broad completed assembly
+                  LC_ASSEMBLY_DATE              => '', #YYYY-MM, when broad completed assembly
 		  #perl5lib - this is the path to be added (temporarily) to the front of your perl5lib, make sure ensembl-config goes first
 		  LC_PERL5LIB			=> '', #/ecs4/work1/sd3/rabbit1/ensembl-config/rabbit/rabbit_1.0:/ecs4/work1/sd3/rabbit1/ensembl/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/modules:/ecs4/work1/sd3/rabbit1/ensembl-analysis/scripts/buildchecks:/ecs4/work1/sd3/rabbit1/ensembl-compara/modules:/ecs4/work1/sd3/rabbit1/ensembl-pipeline/scripts
 		  LC_cvsDIR  			=> '',#/nfs/acari/ba1/PerlCode/
-		  LC_workDIR 			=> '',#/ecs4/work3/ba1/test/
-		  LC_scratchDIR			=> '', #/ecs2/scratch3/ba1/test/    Pipeline output directory
+		  LC_workDIR 			=> '',#/lustre/work1/ba1/test/
+		  LC_scratchDIR			=> '', #/lustre/scratch1/ba1/test/    Pipeline output directory
 		  
 		  
 		  # Species-specific configuration:
@@ -33,16 +33,16 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_SCAFFOLDS		=> '', #/ecs4/work1/sd3/rabbit1/assembly/scaffolds.fasta #unzipped name
 		
 		# Taxonomy
-		  LC_DEFAULT	=> '', #RABBIT #use a short name (used for assembly) - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
+		# Not used any more (assembly name used instead)LC_DEFAULT	=> '', #RABBIT #use a short name (used for assembly) - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
 		  LC_NAME       => '', #Oryctolagus cuniculus #scientific name
                   TAXON_DBNAME  => 'ncbi_taxonomy',
-		  TAXON_DBHOST  => 'ecs2',
-		  TAXON_DBPORT  => '3365',
+		  TAXON_DBHOST  => 'ens-livemirror',
+		  TAXON_DBPORT  => '3306',
 
 		 
 	 	# database to put sequence and genes into
 		  LC_DBNAME   => '',#ba1_test_code
-		  LC_DBHOST   => '',#ia64g
+		  LC_DBHOST   => '',#genebuild1
 		  LC_DBUSER   => '',#ensadmin
 		  LC_DBPASS   => '',
 		  LC_DBPORT   => '',#3306
