@@ -255,9 +255,9 @@ sub deletefiles {
     my ($self) = @_;
 
     foreach my $result ($self->file) {
-
-        next unless -e $result;
-
+      #print "Tying to delete file ".$result."\n";
+      next unless -e $result;
+      next if( -d $result);
         my $protected = undef; #flag for match found in $protected
 
         foreach my $suffix ($self->protect) {
@@ -289,21 +289,23 @@ sub diskspace {
     my $block_size; #could be used where block size != 512 ?
     my $Gb = 1024 ** 3;
     
-
+    my $status = 1;
     open DF, "df $dir |" or throw ("Can't open 'df' pipe ($!)\n");
 
     while (<DF>) {
 			if ($block_size)  {
 				my @L = split;
 				my $space_in_Gb = $L[3] * 512 / $Gb;
-				return 0 if ($space_in_Gb < $limit);
-				return 1;
+				$status = 0 if ($space_in_Gb < $limit);
+				
 			} else {
 				($block_size) = /(\d+).+blocks/i
 					|| throw ("Can't determine block size from:\n$_");
 			}
     }
     close DF || throw("Error from 'df' : $!\n");
+    return 0 if($status == 0);
+    return 1;
 }
 
 
