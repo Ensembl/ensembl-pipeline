@@ -27,15 +27,13 @@ $t_e2g->write_output(); #writes to DB
 
 =head1 DESCRIPTION
 
-Combines predictions from proteins with predictions from cDNA alignments:
-
-
-TODO:
->GB_UTR_BUILD_LEVEL 2 & 3
->For EST-bases elongation:
- filter for ESTs with best ditag coverage.
-
-
+New version of the UTR-addition procedure.
+Combines predictions made from proteins with cDNA alignments to add UTR regions to the
+gene models. Can also inlcude ESTs and ditags. Uses code from Coalescer/Consensus to produce
+score for the alternative models and chose the best option.
+Also includes ("look-for-both") code to correct the phases of the transcripts unless they are "blessed".
+Also inculdes the option to check for predefined protein/cDNA pairing as a first step,
+looking for entries in the protein table.
 
 =head1 CONTACT
 
@@ -47,10 +45,6 @@ The rest of the documentation details each of the object methods. Internal metho
 usually preceded with a '_'
 
 =cut
-
-
-# Let the code begin...
-
 
 package Bio::EnsEMBL::Pipeline::RunnableDB::UTR_Builder;
 
@@ -69,8 +63,14 @@ use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator;
 use Bio::SeqIO;
-#use Bio::EnsEMBL::Map::DBSQL::DitagFeatureAdaptor;
-
+use Bio::EnsEMBL::Analysis::Tools::Algorithms::ClusterUtils;
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::TranscriptConsensus;
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::CollapsedCluster;
+use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( merge_config_details ) ;
+use Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus;
+use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript;
 
 # all the parameters are read from GeneBuild config files
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
@@ -78,6 +78,11 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
 							     );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases  qw (
+							      GB_DBHOST
+							      GB_DBUSER
+							      GB_DBPASS
+							      GB_DBNAME
+							      GB_DBPORT
 							      GB_GW_DBHOST
 							      GB_GW_DBUSER
 							      GB_GW_DBPASS
@@ -118,39 +123,38 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 							      GB_SIMILARITY_GENETYPE
 							      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Blessed     qw (
-							      GB_BLESSED_GENETYPES
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
+							      UTR_GENETYPE
+							      BLESSED_UTR_GENETYPE
+							      BLESSED_GENETYPES
+							      cDNA_GENETYPE
+							      EST_GENETYPE
+							      MAX_INTRON
+							      PRUNE_GENES
+							      LOOK_FOR_KNOWN
+							      OTHER_GENETYPES
+							      DITAG_TYPE_NAMES
+							      VERBOSE
 							      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
-							      GB_cDNA_GENETYPE
-							      GB_EST_GENETYPE
-							      GB_COMBINED_MAX_INTRON
-							      GB_GENEWISE_COMBINED_GENETYPE
-							      GB_BLESSED_COMBINED_GENETYPE
-							      GB_UTR_BUILD_LEVEL
-							      OTHER_GENETYPES
-							      DITAG_LOGIC_NAME
-							      );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
+							     GB_PROTEIN_INDEX
+							     GB_PROTEIN_SEQFETCHER
+							     GB_CDNA_INDEX
+							     GB_CDNA_SEQFETCHER
+							    );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
 =head2 fetch_input
-  Arg [1]    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Example    : 
+
+  Description: Get all raw data needed from the databases
+  Returntype : none
 
 =cut
 
 sub fetch_input{
   my ($self,@args) = @_;
-
-  # do not proceed unless build level has been set
-  if(!$GB_UTR_BUILD_LEVEL){
-    $self->throw("No GB_UTR_BUILD_LEVEL set in UTR_Builder config. Cannot build UTRs\n");
-  }
 
   $self->fetch_sequence([], $self->genewise_db);
 
@@ -158,8 +162,8 @@ sub fetch_input{
   my $similarity_genes = $self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE);
   my $targetted_genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
 
-  print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes\n";
-  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes\n";
+  print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes.\n";
+  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes.\n";
 
   $self->gw_genes( $similarity_genes);
   $self->gw_genes( $targetted_genes );
@@ -167,107 +171,141 @@ sub fetch_input{
   # add user-defined gene-types in the same way
   foreach my $other_genetype (@{$OTHER_GENETYPES}) {
     my $other_genes = $self->query->get_all_Genes_by_type($other_genetype);
-    print STDERR "got " . scalar(@{$other_genes}) . " $other_genetype genes\n;";
+    print STDERR "got " . scalar(@{$other_genes}) . " $other_genetype genes.\n";
     $self->gw_genes( $other_genes );
   }
 
   # get blessed genes
-  my $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id)
-    if ($self->blessed_db);
-
+  my $blessed_slice;
   my @blessed_genes;
-  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
-    push(@blessed_genes, @{$blessed_slice->get_all_Genes_by_type($bgt->{'type'})});
-  }
-
-  print STDERR "got " . scalar(@blessed_genes) . " blessed genes\n";
-
-  $self->blessed_genes( $blessed_slice, \@blessed_genes );
-
-  print STDERR "converted to " . scalar(@{$self->blessed_genes}) . " blessed genes\n";
-
-  # use GB_UTR_BUILD_LEVEL to determine which sequences to fetch
-  my @cdna_genes;
-  my @ditags;
-
-  if($GB_UTR_BUILD_LEVEL <=2){
-    # cDNA build
-    my $cdna_vc = $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
-    @cdna_genes = @{$cdna_vc->get_all_Genes_by_type($GB_cDNA_GENETYPE)};
-    print STDERR "got " . scalar(@cdna_genes) . " cdnas ($GB_cDNA_GENETYPE)\n";
-    $self->cdna_db->dbc->disconnect_when_inactive(1);
+  if ($self->blessed_db){
+    $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id);
   }
   else{
-    # EST build
-    my $est_vc  = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
-    @cdna_genes = @{$est_vc->get_all_Genes_by_type($GB_EST_GENETYPE)};
-    print STDERR "got " . scalar(@cdna_genes) . " ests ($GB_EST_GENETYPE)\n";
-    $self->est_db->dbc->disconnect_when_inactive(1);
+    $blessed_slice = $self->query;
+  }
+  foreach my $bgt( @{$BLESSED_GENETYPES} ){
+    my $blessed_genes = $blessed_slice->get_all_Genes_by_type($bgt);
+    print STDERR "got " . scalar(@{$blessed_genes}) . " $bgt genes.\n";
+    $self->blessed_genes( $blessed_slice, $blessed_genes );
   }
 
-  #get ditags for support [fsk]
-  foreach my $ditag_type (@{$DITAG_LOGIC_NAME}) {
-    #$self->throw($ditag_type);
-    my $ditag_vc = $self->ditag_db->get_SliceAdaptor->fetch_by_name($self->input_id);
-    push(@ditags, @{$ditag_vc->get_all_DitagFeatures($ditag_type)});
-    print STDERR "got " . scalar(@ditags) . " ".$ditag_type." ditags\n";
-    $self->ditag_db->dbc->disconnect_when_inactive(1);
-  }
-  if(scalar @ditags){
-    @ditags = sort {$a->start <=> $b->start} @ditags;
-    $self->ditags(\@ditags);
-  }
-  else{
-    print STDERR "not using Ditags\n";
-  }
+  # get cdnas
+  my $cdna_vc = $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+  $self->_cdna_slice($cdna_vc);
+  my @cdna_genes = @{$cdna_vc->get_all_Genes_by_type($cDNA_GENETYPE)};
+  print STDERR "got " . scalar(@cdna_genes) . " $cDNA_GENETYPE cDNAs.\n";
+  $self->cdna_db->dbc->disconnect_when_inactive(1);
 
   # filter cdnas
-  my $filtered_cdna = $self->_filter_cdnas(\@cdna_genes);
+  my $filtered_cdna = $self->_filter_cdnas(\@cdna_genes, 0);
+
   $self->cdna_genes($filtered_cdna);
-  print STDERR "got " . scalar(@{$filtered_cdna}) . " cdnas or ESTs after filtering\n";
+  print STDERR "got " . scalar(@{$filtered_cdna}) . " cdnas after filtering.\n" if $VERBOSE;
+
+
+  # get ESTs
+  if(defined($EST_GENETYPE) && $self->est_db){
+    my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+    my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
+    print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
+    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
+    $self->ests($filtered_ests);
+    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
+  }
+
+  # get ditags
+  my ($dfa, $ditag_slice);
+  my @ditags;
+  if((scalar @{$DITAG_TYPE_NAMES})  && $self->ditag_db){
+    $dfa         = $self->ditag_db->get_DitagFeatureAdaptor;
+    $ditag_slice = $self->ditag_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+  }
+
+  foreach my $ditag_type (@{$DITAG_TYPE_NAMES}) {
+    my @type_ditags = @{$dfa->fetch_pairs_by_Slice($ditag_slice, $ditag_type)};
+    print STDERR "got " . scalar(@type_ditags) . " ".$ditag_type." ditags.\n" if $VERBOSE;
+    push(@ditags, @type_ditags);
+  }
+  if(scalar @ditags){
+    @ditags = sort {($a->{'start'} <=> $b->{'start'}) or ($a->{'end'} <=> $b->{'end'})} @ditags;
+    $self->ditags(\@ditags);
+    print STDERR "got " . scalar(@ditags) ." ditags.\n";
+  }
+  else{
+    print STDERR "not using Ditags.\n";
+  }
+
+  # create seqfetcher object for KnownUTR checking
+  my $protein_fetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
+  $self->_protein_seqfetcher($protein_fetcher);
+  my $cdna_fetcher = $self->make_seqfetcher($GB_CDNA_INDEX, $GB_CDNA_SEQFETCHER);
+  $self->_cdna_seqfetcher($cdna_fetcher);
+
+  # for checking cdna_ids
+  my $pmfa = $self->db->get_PmatchFeatureAdaptor();
+
+  $self->_PmatchFeatureAdaptor($pmfa);
+
+  # db disconnections
   $self->genewise_db->dbc->disconnect_when_inactive(1);
-  $self->blessed_db->dbc->disconnect_when_inactive(1) if ($self->blessed_db);
+  $self->cdna_db->dbc->disconnect_when_inactive(1);
+  $self->est_db->dbc->disconnect_when_inactive(1)
+    if($self->est_db);
+  $self->blessed_db->dbc->disconnect_when_inactive(1)
+    if($self->blessed_db);
+  $self->ditag_db->dbc->disconnect_when_inactive(1)
+    if($self->ditag_db);
+
+  #set evidence sets for Coalescer code
+  my (@est_biotypes, @cdna_logicnames);
+  push(@est_biotypes, $EST_GENETYPE);
+  my @simgw_biotypes  = @{ $OTHER_GENETYPES };
+  push(@cdna_logicnames, $cDNA_GENETYPE);
+  $self->{evidence_sets} = {
+			    'est'   => \@est_biotypes,
+			    'simgw' => \@simgw_biotypes,
+			    'cdna'  => \@cdna_logicnames,
+			   };
+
+  #prune genes during filtering if desired
+  #removed as too many good things were thrown out.
+  $self->prune($PRUNE_GENES);
 }
 
+
 =head2 run
-  Arg [1]    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Example    : 
+
+  Description: general run method
 
 =cut
 
 sub run {
   my ($self,@args) = @_;
 
-  # first filter the genewise predictions to remove fragments from
-  # the equation. Make sure we keep the fragments to let the
+  # filter the genewise predictions to remove fragments.
+  # Make sure we keep the fragments to let the
   # genebuilder do the final sorting out, but don't add UTRs to them.
-  my $filtered_genes = $self->filter_genes($self->gw_genes);
 
-  if($GB_UTR_BUILD_LEVEL == 1){
-    $self->run_basic_cdna_matching($self->blessed_genes, $GB_BLESSED_COMBINED_GENETYPE);
-    $self->run_basic_cdna_matching($filtered_genes, $GB_GENEWISE_COMBINED_GENETYPE);
-  }
-  elsif($GB_UTR_BUILD_LEVEL == 2){
-    $self->run_stringent_cdna_matching($self->blessed_genes, $GB_BLESSED_COMBINED_GENETYPE);
-    $self->run_stringent_cdna_matching($filtered_genes, $GB_GENEWISE_COMBINED_GENETYPE);
-  }
-  elsif($GB_UTR_BUILD_LEVEL == 3){
-    $self->run_stringent_est_matching($self->blessed_genes, $GB_BLESSED_COMBINED_GENETYPE);
-    $self->run_stringent_est_matching($filtered_genes, $GB_GENEWISE_COMBINED_GENETYPE);
-  }
-  else{
-    $self->throw("Build level " . $GB_UTR_BUILD_LEVEL . " is not one I recognise\n");
-  }
+  my $filtered_genes = $self->filter_genes($self->gw_genes);
+  print STDERR "filtered to ".(scalar @$filtered_genes). " genes.\n" if $VERBOSE;
+
+  $self->run_matching($self->blessed_genes, $BLESSED_UTR_GENETYPE,  1);
+  $self->run_matching($filtered_genes,      $UTR_GENETYPE, 0);
+
+  print STDERR "Have ".(scalar @{$self->combined_genes})." combined_genes & ".
+               (scalar @{$self->unmatched_genes})." unmatched_genes.\n" if $VERBOSE;
 
   # remap to raw contig coords
-  my @remapped = $self->remap_genes();
+  my @remapped;
+  push(@remapped, @{$self->remap_genes($self->combined_genes, undef)});
+  push(@remapped, @{$self->remap_genes($self->unmatched_genes, undef)});
   $self->output(@remapped);
 }
 
+
 =head2 filter_genes
+
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Description: We do not want to add UTRs to fragments of genes
   otherwise they get boosted in importance during the final gene build
@@ -278,34 +316,52 @@ sub run {
   GeneBuilder run, and attempt to add UTRs ony to the best ones eg
   fullest genomic extent.
   Returntype : ref to array of Bio::EnsEMBL::Gene
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
-sub filter_genes{
+sub filter_genes {
   my ($self, $genesref) = @_;
+
+  my @tested_genes;
+  my $pruned_CDS;
+
+  #get rid of long-intron genes, etc.
+  foreach my $testgene (@$genesref){
+    if($testgene && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+       _check_Transcript($testgene->get_all_Transcripts->[0]) &&
+       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+       _check_introns($testgene->get_all_Transcripts->[0])){
+      push(@tested_genes, $testgene);
+    }
+  }
+  $genesref = \@tested_genes;
 
   # all the genes are single transcript at this stage
   my $clustered_genes = $self->cluster_CDS($genesref);
 
-  my $pruned_CDS = $self->prune_CDS($clustered_genes);
+  #pruning if desired
+  if($self->prune){
+    $pruned_CDS = $self->prune_CDS($clustered_genes);
+  }
+  else{
+    $pruned_CDS = $genesref;
+  }
 
   return $pruned_CDS;
 }
 
+
 =head2 cluster_CDS
+
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Description: Separates CDSs according to strand and then clusters
                each set by calling _cluster_CDS_by_genomic_range()
   Returntype : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub cluster_CDS {
-  my ($self,$CDSref) = @_;
+  my ($self, $CDSref) = @_;
 
   my @forward_CDS;
   my @reverse_CDS;
@@ -345,12 +401,11 @@ sub cluster_CDS {
 
 
 =head2 _cluster_CDS_by_genomic_range
+
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Description: Clusters CDSs according to genomic overlap
   Returntype : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub _cluster_CDS_by_genomic_range{
@@ -365,21 +420,19 @@ sub _cluster_CDS_by_genomic_range{
   my @empty= ('');
 
   # first sort the genes
-
-  @genes = sort { $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
-		    ? $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
-		      : $b->get_all_Transcripts->[0]->end <=> $a->get_all_Transcripts->[0]->end } @genes;
-
+  @genes = sort { $a->get_all_Transcripts->[0]->start   <=> $b->get_all_Transcripts->[0]->start 
+		  ? $a->get_all_Transcripts->[0]->start <=> $b->get_all_Transcripts->[0]->start 
+		  : $b->get_all_Transcripts->[0]->end   <=> $a->get_all_Transcripts->[0]->end }  @genes;
 
   # create a new cluster 
-  my $cluster=Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
+  my $cluster = Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster->new();
   $cluster->gene_Types(\@genetypes, \@empty);
   my $count = 0;
   my @cluster_starts;
   my @cluster_ends;
   my @clusters;
 
-  # put the first gene into these cluster
+  # put the first gene into this cluster
   $cluster->put_Genes( $genes[0] );
 
   $cluster_starts[$count] = $genes[0]->get_all_Transcripts->[0]->start;
@@ -392,7 +445,7 @@ sub _cluster_CDS_by_genomic_range{
  LOOP1:
   for (my $c=1; $c<=$#genes; $c++){
 
-    if ( !( $genes[$c]->get_all_Transcripts->[0]->end < $cluster_starts[$count] ||
+    if ( !( $genes[$c]->get_all_Transcripts->[0]->end   < $cluster_starts[$count] ||
 	    $genes[$c]->get_all_Transcripts->[0]->start > $cluster_ends[$count] ) ){
       $cluster->put_Genes( $genes[$c] );
 
@@ -400,7 +453,7 @@ sub _cluster_CDS_by_genomic_range{
       if ($genes[$c]->get_all_Transcripts->[0]->start < $cluster_starts[$count]) {
 	$cluster_starts[$count] = $genes[$c]->get_all_Transcripts->[0]->start;
       }
-      if ( $genes[$c]->get_all_Transcripts->[0]->end > $cluster_ends[$count]) {
+      if ($genes[$c]->get_all_Transcripts->[0]->end   > $cluster_ends[$count]) {
 	$cluster_ends[$count] =  $genes[$c]->get_all_Transcripts->[0]->end;
       }
     }
@@ -412,25 +465,24 @@ sub _cluster_CDS_by_genomic_range{
       $cluster->put_Genes( $genes[$c] );
       $cluster_starts[$count] = $genes[$c]->get_all_Transcripts->[0]->start;
       $cluster_ends[$count]   = $genes[$c]->get_all_Transcripts->[0]->end;
-      
+
       # store it in the list of clusters
       push(@clusters,$cluster);
     }
   }
+
   return \@clusters;
 }
 
 
 =head2 prune_CDS
-  Arg [1]    : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster 
-  Description: rejects duplicate CDS, makes sure they are kept on
-               unmatched_geens or they (and their supporting evidence)
-               will be lost for the rest of the build
 
-  Returntype : ref to array of Bio::EnsEMBL::Gene 
-  Exceptions : 
-  Example    : my @pruned_CDS = $self->prune_CDS($CDS_clusters) 
- 
+  Arg [1]    : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster
+  Description: rejects duplicate CDS, makes sure they are kept on
+               unmatched_genes or they (and their supporting evidence)
+               will be lost for the rest of the build
+  Returntype : ref to array of Bio::EnsEMBL::Gene
+
 =cut
 
 sub prune_CDS {
@@ -444,7 +496,8 @@ sub prune_CDS {
     $cluster_count++;
     my @unpruned_genes;
 
-    foreach my $unpruned_gene($gene_cluster->get_Genes){
+    #check for multi-transcript genes
+    foreach my $unpruned_gene ($gene_cluster->get_Genes){
       if(scalar(@{$unpruned_gene->get_all_Transcripts}) > 1){
         print "VAC: " . $unpruned_gene->dbID . " has >1 transcript - can't handle it yet \n";
         next;
@@ -454,12 +507,6 @@ sub prune_CDS {
 
     # sort the unpruned_genes by total exon length of their single transcripts - there are no UTRs to worry about yet
     @unpruned_genes = sort{$b->get_all_Transcripts->[0]->length <=> $a->get_all_Transcripts->[0]->length} @unpruned_genes;
-
-    ##############################
-    #
-    # deal with single exon genes
-    #
-    ##############################
 
     # do we really just want to take the first transcript only?
     # If there's a very long single exon gene we will lose any underlying multi-exon transcripts
@@ -490,11 +537,8 @@ sub prune_CDS {
     # allows retrieval of exon objects by exon->id - convenience
     my %exonhash;
 
-    ##############################
-    #
     # prune redundant transcripts
-    #
-    ##############################
+
   GENE:
     foreach my $gene (@unpruned_genes) {
 
@@ -519,7 +563,8 @@ sub prune_CDS {
         # go through the exon pairs already stored in %pairhash. 
         # If there is a pair whose exon1 overlaps this exon1, and 
         # whose exon2 overlaps this exon2, then these two transcripts are paired
-	
+
+      EXONHASH:
         foreach my $first_exon_id (keys %pairhash) {
           my $first_exon = $exonhash{$first_exon_id};
 
@@ -528,7 +573,7 @@ sub prune_CDS {
 
             if ( $exon1->overlaps($first_exon) && $exon2->overlaps($second_exon) ) {
               $foundpair = 1;
-		
+	      last EXONHASH;  #fsk added
               # eae: this method allows a transcript to be covered by exon pairs
               # from different transcripts, rejecting possible
               # splicing variants. Needs rethinking
@@ -570,25 +615,33 @@ sub prune_CDS {
 }
 
 
-=head2 run_basic_cdna_matching 
+=head2 run_matching
+
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Arg [2]    : string representing genetype to be associated with UTR-modified genes
+  Arg [3]    : bool indicating that we are NOT trying to map to predefined cDNA (blessed genes)
   Description: matches CDS (genewise) predictions to cDNA alignments
                considering only terminal CDS exons
   Returntype : none
-  Exceptions : 
-  Example    : 
 
 =cut
 
-sub run_basic_cdna_matching{
-  my ($self, $genesref, $combined_genetype) = @_;
+sub run_matching{
+  my ($self, $genesref, $combined_genetype, $blessed) = @_;
 
   # merge exons with frameshifts into a big exon
-  my @merged_genes = $self->_merge_genes($genesref);
-  print STDERR "got " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n";  
+  my @merged_genes = ();
 
-  # first of all, sort genewises by exonic length and genomic length  
+  #maybe we should not do merging with blessed genes at all?!
+  #if(!$blessed){
+    @merged_genes = $self->_merge_genes($genesref);
+  #}
+  #else{
+  #  @merged_genes = @{$genesref};
+  #}
+  print STDERR "got " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n" if $VERBOSE;
+
+  # sort genewises by exonic length and genomic length
   @merged_genes = sort { my $result = (  $self->_transcript_length_in_gene($b) <=>
 					 $self->_transcript_length_in_gene($a) );
 			 unless ($result){
@@ -598,15 +651,16 @@ sub run_basic_cdna_matching{
 			 return $result;
 		       } @merged_genes;
 
-  print STDERR "now have " . scalar(@merged_genes) . " merged genes\n";
-
   # find one-2-one matching between proteins and cdnas
  CDS:
   foreach my $cds (@merged_genes){
+
+
     # should be only 1 transcript
     my @cds_tran  = @{$cds->get_all_Transcripts};			
     my @cds_exons = @{$cds_tran[0]->get_all_Exons}; # ordered array of exons
     my $strand    = $cds_exons[0]->strand;
+    my $cdna_match;
 
     if($cds_exons[$#cds_exons]->strand != $strand){
       $self->warn("first and last cds exons have different strands - can't make a sensible combined gene\n");
@@ -616,93 +670,120 @@ sub run_basic_cdna_matching{
       next CDS;
     }
 
-    # find the matching cdna
-    my ($matching_cdnas, $utr_length_hash) = $self->match_protein_to_cdna($cds);
-    my @matching_cdnas                     = @{$matching_cdnas};
-    my %utr_length_hash                    = %$utr_length_hash;
-
-    ##############################
-    # now we can sort by length of the added UTR
-    # using %utr_length_hash
-    # not yet in use
-    ##############################
-
-    if(!@matching_cdnas){
-      # store non matched genewise
-      #print STDERR "no matching cDNA for " . $gw->dbID ."\n";
-      my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
-      $self->unmatched_genes($unmerged_cds);
-      next CDS;
+    #look for a pre-defined pairing between a protein and a cDNA the gene was build from
+    my $predef_match = undef;
+    if($LOOK_FOR_KNOWN){
+      $predef_match = $self->check_for_predefined_pairing($cds);
     }
 
-    # from the matching ones, take the best fit
-
-    my @list;
-    foreach my $cdna ( @matching_cdnas ){
-      # we check exon_overlap and fraction of overlap in cdna and e2g:
-      my @cds_trans  = @{$cds->get_all_Transcripts};
-      my @cdna_trans = @{$cdna->get_all_Transcripts};
-      my ($exon_overlap, $extent_overlap) =
-	Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptComparator->
-	    _compare_Transcripts( $cds_trans[0], $cdna_trans[0] );
-      #[fsk]
-      #use ditags if avaliable, find the ones matching the cDNA within X bases
-      my $ditag_verificaction = undef;
-      if(scalar @{$DITAG_LOGIC_NAME}){
-	$ditag_verificaction = $self->look_for_ditags($cdna_trans[0]);
-      }
-      push (@list, [$exon_overlap, $extent_overlap, $cdna, $ditag_verificaction]);
+    if(defined $predef_match){
+      #use this cDNA
+      $cdna_match = $predef_match;
+      print STDERR "Using predefined cDNA!\n";
     }
+    else{
 
-    # sort them
-    @list = sort{
-      # by number of exon overlap
-      my $result = ( $$b[0] <=> $$a[0] );
-      unless ($result){
-	# else, by extent of the overlap
-	$result =  ( $$b[1] <=> $$a[1] );
-      }
-      if(scalar @{$DITAG_LOGIC_NAME}){
-	unless ($result){
-	  # else, by supporting ditags
-	  $result = ( $$b[3] <=> $$a[3] );
+      # find matching cdnas using scoring of all evidence available
+      my ($matching_cdnas, $utr_length_hash, $UTR_side_indicator_hash) = $self->match_protein_to_cdna($cds, 0);
+
+      #we probably dont need any of this UTR stuff anymore!?
+      my %utr_length_hash = %$utr_length_hash;
+
+      if(!(scalar @$matching_cdnas)){
+
+	#try to use ESTs instead
+	#should we use coalescer code to produce joined ESTs (find longest path, etc.)?
+	($matching_cdnas, $utr_length_hash, $UTR_side_indicator_hash) = $self->match_protein_to_cdna($cds, 1);
+	%utr_length_hash                    = %$utr_length_hash;
+	if(!(scalar @$matching_cdnas)){
+	  
+	  my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
+
+	  $self->unmatched_genes($unmerged_cds);
+	  next CDS;
 	}
-	#print STDERR "\nditagfiltered $result";
-      }
-      unless ($result){
-	# else, by genomic length of the cdna
-	$result = (  $self->_transcript_length_in_gene($$b[2]) <=>
-		     $self->_transcript_length_in_gene($$a[2]) );
-      }
-      unless ($result){
-	# else, by exonic extent of the cdna
-	$result = (  $self->_transcript_exonic_length_in_gene($$b[2]) <=>
-		     $self->_transcript_exonic_length_in_gene($$a[2]) );
-      }
-    } @list;
-
-    my $howmany = scalar(@list);
-    my $cdna_match;
-    my $this    = shift @list;
-    $cdna_match = $$this[2];
-
-    unless ( $cdna_match){
-      print STDERR "No cdna found for cds_gene ".$cds->dbID." ";
-      if ( $howmany == 0 ){
-	print STDERR "(no cdna matched this cds gene)\n";
+	else{
+	}
       }
 
+
+      ## scoring code...
+
+      #convert genes to extended objects
+      my $matching_extended_cdnas = $self->convert_to_extended_genes($matching_cdnas);
+
+      #cluster matching cDNA & EST genes
+      #call cluster method from ClusterUtils
+      my ($clusters, $non_clusters) = cluster_Genes( $matching_extended_cdnas, $self->{evidence_sets} ) ;
+
+
+      #store genes seperated by strand
+      my $genes_by_strand;
+      foreach my $gene (@$matching_extended_cdnas){
+	push @{$genes_by_strand->{$gene->strand}}, $gene;
+      }
+      #apply collapsing method copied from TranscriptConsensus:
+      #(creates scores!)
+      my $cluster_to_use;
+      if(scalar @$clusters){
+	$cluster_to_use = $clusters;
+      }
+      else{
+	$cluster_to_use = $non_clusters;
+      }
+
+      foreach my $cluster (@$cluster_to_use){
+	print STDERR $cluster->start." ".$cluster->end." ".$cluster->strand."\n" if $VERBOSE;
+	
+	my $collapsed_cluster = Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus->collapse_cluster( $cluster, $genes_by_strand );
+
+	my @potential_genes = $cluster->get_Genes;
+	my @possible_transcripts;
+	foreach my $potential_gene (@potential_genes){
+	  foreach my $potential_trans (@{$potential_gene->get_all_Transcripts}) {
+
+	    #create an extended transcript (with scores)
+	    my @exon_array = ( @{$potential_trans->get_all_Exons} );
+	    my $new_transcript = Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus->transcript_from_exons(
+								       \@exon_array, undef, $collapsed_cluster);
+
+	    #add a ditag score
+	    my ($ditag_score, $index) = $self->score_ditags($self->ditags, $new_transcript, 0);
+	    $new_transcript->score($new_transcript->score() + $ditag_score);
+
+	    #add a UTR length score
+	    my $UTR_score = $self->calculate_UTR_score($cds_tran[0], $new_transcript);
+	    $new_transcript->score($new_transcript->score() + $UTR_score);
+
+	    push(@possible_transcripts, $new_transcript);
+	  }
+	}
+
+
+	#get the highest scoring transcript
+	@possible_transcripts = sort { $a->score <=> $b->score } @possible_transcripts if @possible_transcripts;
+	my $chosen_transcript = $possible_transcripts[-1];
+
+
+	#make a gene from this
+	$cdna_match = Bio::EnsEMBL::Gene->new;
+	$cdna_match->slice($chosen_transcript->slice);
+	$cdna_match->add_Transcript($chosen_transcript);
+	$cdna_match->analysis($chosen_transcript->analysis);
+      }
+
+    } #find match
+
+    if(!defined $cdna_match){
+      print STDERR "No matching cDNA was found!\n\n" if $VERBOSE;
+      #retrieving unmerged!!!
       my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
       $self->unmatched_genes($unmerged_cds);
       next CDS;
     }
-
-  #  print STDERR "combining cds gene : " . $cds->dbID.":\n";
-  #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cds);
-  #  print STDERR "with cdna gene " . $cdna_match->dbID . ":\n";
-  #  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_print_Gene($cdna_match);
 
     my $combined_transcript = $self->combine_genes($cds, $cdna_match);
+
     # just check combined transcript works before throwing away the original  transcript
     unless (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
 	          _check_Transcript($combined_transcript,$self->query)
@@ -713,103 +794,363 @@ sub run_basic_cdna_matching{
 
     # make sure combined transcript doesn't misjoin any genewise clusters
     if ($combined_transcript){
-      print STDERR "About to check for cluster joiners\n";
+      print STDERR "About to check for cluster joiners\n" if $VERBOSE;
         if($self->find_cluster_joiners($combined_transcript)){
+	  print STDERR "Found a cluster_joiner!\n" if $VERBOSE;
+	  print STDERR $combined_transcript->seq_region_start."/".$combined_transcript->seq_region_end."\n" if $VERBOSE;
           # revert to unmodified
           $combined_transcript = undef;
         }
+    }
+    if ($combined_transcript){
+      #transfer evidence
+      $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
+
+      #make the new gene with UTR
+      my $combined_genes = $self->make_gene($combined_genetype, $combined_transcript);
+
+      #check phases, etc. if it is not a blessed gene
+      my $combined_gene;
+      if(!$blessed){
+	$combined_gene = $self->look_for_both($combined_genes->[0]);
+      }
+      else{
+	$combined_gene = $combined_genes->[0];
       }
 
-    if ( $combined_transcript ){
-      #transfer evidence and make the new gene
-      $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
-      $self->make_gene($combined_genetype, $combined_transcript);
+      #store as combined
+      $self->combined_genes($combined_gene);
     }
     else{
-      #print STDERR "no combined gene built from " . $gw->dbID ."\n";
+      #retrieving unmerged!
       my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
       $self->unmatched_genes($unmerged_cds);
       next CDS;
     }
+
   }
+
+  print STDERR "now have ".(scalar @{$self->combined_genes})." combined_genes genes".
+        " and ".(scalar @{$self->unmatched_genes})." unmatched_genes\n" if $VERBOSE;
+
+  if(!$blessed){
+    #remove redundatant models
+    my $unique_unmatched_genes = $self->remove_redundant_models($self->combined_genes, $self->unmatched_genes);
+
+    #replace all unmatched genes
+    $self->{'_unmatched_genes'} = [];
+    $self->unmatched_genes(@{$unique_unmatched_genes});
+    print STDERR "without redundant models, we have ".(scalar @{$self->combined_genes})." combined_genes genes".
+      " and ".(scalar @{$self->unmatched_genes})." unmatched_genes\n" if $VERBOSE;
+  }
+
 }
 
 
-=head2 look_for_ditags
-  Arg [1]    : cdna_transcript
-  Description: look for ditags in the region of the transcripts
+=head2 remove_redundant_models
+
+  Arg [1]    : ref to array of Bio::EnsEMBL::Gene (combined_genes)
+  Arg [2]    : ref to array of Bio::EnsEMBL::Gene (unmatched_genes)
+  Description: compare all unmatched_genes with eachother and with the combined_genes
+               and only store those that have a different translation.
+  Returntype : ref to array with unmatched_genes without duplicates
+
+=cut
+
+sub remove_redundant_models{
+  my ($self, $combined_genes, $unmatched_genes) = @_;
+
+  #save the unique ones
+  my @unique_genes = ();
+  #keep track of locations already seen
+  my %locations    = ();
+
+  foreach my $unmatched_gene (@$unmatched_genes){
+    my $notunique = 0;
+    if(defined($locations{$unmatched_gene->start.".".$unmatched_gene->end.".".$unmatched_gene->strand})){
+      $notunique = 1;
+    }
+    else{
+      $notunique = 0;
+      $locations{$unmatched_gene->start.".".$unmatched_gene->end.".".$unmatched_gene->strand} = 1;
+
+      foreach my $combined_gene (@$combined_genes){
+	if($unmatched_gene && $combined_gene){
+	  #check if they are overlapping
+	  if( ($combined_gene->strand  == $unmatched_gene->strand)
+	      && ($combined_gene->start  < $unmatched_gene->end)
+	      && ($unmatched_gene->start < $combined_gene->end)){
+	    #filter out identical genes/translations
+	    my $comparison = compare_translations(0, $unmatched_gene->get_all_Transcripts->[0], $combined_gene->get_all_Transcripts->[0]);
+	    if($comparison != 0 && $comparison != 2){
+	      $notunique = 1;
+	    }
+	  }
+	}
+      }
+    }
+    if(!$notunique){
+      push(@unique_genes, $unmatched_gene);
+    }
+  }
+
+  return(\@unique_genes);
+}
+
+
+=head calculate_UTR_score
+
+  Arg [1]    : genewise transcript
+  Arg [2]    : transcript adding UTR region
+  Description: calculate a score favouring transcripts that add UTR on both sides
+               Could also favour longer UTRs if desired
+  Returntype : int score
+
+=cut
+
+sub calculate_UTR_score {
+  my ($self, $gw_gene, $matching_gene) = @_;
+
+  my $BONUS_FOR_BOTH_SIDES = 1;
+  my $UTR_score = 0;
+  if(($gw_gene->start - $matching_gene->start) && ($matching_gene->end - $gw_gene->end)){
+    $UTR_score += $BONUS_FOR_BOTH_SIDES;
+  }
+
+  return $UTR_score;
+}
+
+
+=head2 score_ditags
+
+  Arg [1]    : array ref with mapped ditags to analyse
+  Arg [2]    : transcript to analyse
+  Arg [3]    : (optional) int index, where to start looking in the ditag-array
+  Description: score ditags in the region of a exon, transcripts or est
                that might support it
+               Give a higher score to those features that match well
+               to ditags and have a high tag_count.
   Returntype : int score: high value indicates many/well matching ditags
+               int index: updated array index
   Exceptions : none
 
 =cut
 
-sub look_for_ditags{
-  my ($self, $cdna_transcript) = @_;
+sub score_ditags{
+  my ($self, $ditags, $feature, $index) = @_;
 
-  my $ditag_score = 0;
-  my $cdna_start  = $cdna_transcript->start;
-  my $cdna_end    = $cdna_transcript->end;
-  my $ditag_distance = 5; #will need to go into CONFIG
+  my $ditag_score    = 0;
+  my $ditag_window   = 30; #will need to go into CONFIG: size of window (basepairs)
+                           #in which ditags are considered for a given cDNA position.
+  if(!$index){ $index = 0 }
+  #check start & end seperately, use best matching
+  for(my $i = $index; $i < (scalar @$ditags); $i++){
+    my $ditag = $ditags->[$i];
 
-  foreach my $ditag ($self->ditags){
-    if((abs($ditag->start - $cdna_start) < $ditag_distance)
-       && (abs($ditag->end - $cdna_end) < $ditag_distance)){
-      #matching ditag; produce a score favoring those transcripts,
-      #that have many ditags &/| perfectly positioned ditags.
-      $ditag_score += $ditag_distance - (abs($ditag->start - $cdna_start)) +
-                      $ditag_distance - (abs($ditag->end - $cdna_end));
+
+    if(($ditag->{'start'} < $feature->end) && ($ditag->{'end'} > $feature->start)){
+      my $start_distance = abs($ditag->{'start'} - $feature->start);
+      my $end_distance   = abs($ditag->{'end'}   - $feature->end);
+
+      if(($start_distance < $ditag_window) && ($end_distance < $ditag_window)){
+        #matching ditag; produce a score favoring those transcripts,
+        #that have a high ditag count &/| perfectly positioned ditags.
+
+        #magic equation to generate a score
+        my $score = 0;
+        $score += ($ditag->{'tag_count'} / (($start_distance +1) * 0.9));
+        $score += ($ditag->{'tag_count'} / (($end_distance +1) * 0.9));
+	#older version of equation
+        #my $score = ( 1 - ($distance * 0.1 / log($ditag->{'tag_count'}+1)) );
+
+        if($score > 0){ $ditag_score += $score; }
+      }
     }
-    if($ditag->start > $cdna_end){ last; }
+
+    if($ditag->{'end'} < $feature->start){
+      $index++;
+    }
+    elsif($ditag->{'start'} > $feature->start){
+      last;
+    }
+  }
+  print STDERR " returning ditagscore $ditag_score.\n" if $VERBOSE;
+
+  return($ditag_score, $index);
+}
+
+
+=head2 check_for_predefined_pairing
+
+  Arg [1]    : Bio::EnsEMBL::Gene
+  Description: check whether there is a certain cDNA assigned to the given gene
+  Returntype : Bio::EnsEMBL::Gene or undef
+
+=cut
+
+sub check_for_predefined_pairing {
+  my ($self, $gene) = @_;
+
+  my $cdna = undef;
+  my $protein_id;
+  my $cdna_evidence = $self->_cdna_evidence();
+
+  # get the protein id, the gene was built from
+ EXON:
+  foreach my $exon(@{$gene->get_all_Exons}){
+    my @feat = @{$exon->get_all_supporting_features};
+    foreach my $feat(@feat){
+      $protein_id = $feat->hseqname;
+      last EXON if (defined $protein_id);
+    }
+  }
+  if (!defined $protein_id || $protein_id eq ''){
+    print STDERR "no protein_id for gene.\n" if $VERBOSE;
+    return undef;
   }
 
-  return $ditag_score;
+  # Using the protein id of the targetted gene, determine the
+  # corresponding cDNA id.
+
+  my $cdna_id = $self->_PmatchFeatureAdaptor->get_cdna_id($protein_id);
+
+  if (!defined $cdna_id || $cdna_id eq ''){
+    print STDERR "no predefined cDNA for $protein_id\n" if $VERBOSE;
+    return undef;
+  }
+
+  # hash genes to cdna_ids
+  $self->targetted_cdna_pairs($gene, $cdna_id);
+
+  # get cdna sequence
+  eval{
+    $cdna = $self->_cdna_seqfetcher()->get_Seq_by_acc($cdna_id);
+  };
+  if($@) {
+    print STDERR "problem fetching cdna sequence for [$cdna_id]: [$@]\n";
+    return undef;
+  }
+
+  # If the cdna cant be retrieved try decrementing the version number 
+  # and having a second attempt.
+  unless ($cdna) {
+    warn("Unable to fetch cDNA sequence [$cdna_id].  Will decrement\n" .
+	    "the cDNA version number and have another go.");
+
+    if ($cdna_id =~ s/([\_\w]+)\.(\d+)/$1/){
+      my $version_number = $2;
+      $version_number--;
+      $cdna_id = $1 . '.' . $version_number;
+    }
+
+    eval{
+      $cdna = $self->_cdna_seqfetcher->get_Seq_by_acc($cdna_id);
+    };
+    if($@) {
+      print STDERR "problem fetching cdna sequence for [$cdna_id]: [$@]\n";
+      return undef;
+    }
+
+    if ($cdna) {
+      $self->targetted_cdna_pairs($gene, $cdna_id);
+    } else {
+      print STDERR "Unable to fetch cDNA sequence [$cdna_id] even after incrementing the version number.";
+      return undef;
+    }
+
+  }
+
+  #get the gene for this cDNA
+  my $cdna_gene = $cdna_evidence->{$cdna_id};
+  if($VERBOSE && $cdna_gene){ print STDERR "found cdna gene $cdna_gene / $cdna_id.\n" }
+
+  #check if they really are overlapping to avoid disappointment when combining
+  if($cdna_gene){
+    if( !(($gene->seq_region_name  eq $cdna_gene->seq_region_name)
+	  && ($gene->strand  == $cdna_gene->strand)
+	  && ($gene->seq_region_start  < $cdna_gene->seq_region_end)
+	  && ($cdna_gene->seq_region_start < $gene->seq_region_end)
+	  && ($gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand  == $cdna_gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand))){
+
+
+      print $gene->seq_region_name."/".$cdna_gene->seq_region_name.
+	"  && ".$gene->strand."/".$cdna_gene->strand.
+	"  && ".$gene->seq_region_start."/".$cdna_gene->seq_region_end.
+	"  && ".$cdna_gene->seq_region_start."/".$gene->seq_region_end.
+	"  && ".$gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand."/".$cdna_gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand.".\n";
+      
+      $cdna_gene = undef;
+    }
+  }
+
+  return $cdna_gene;
 }
 
 
-=head2 run stringent_cdna_matching
-  Arg [1]    : ref to array of Bio::EnsEMBL::Gene
-  Arg [2]    : string representing genetype to be associated with UTR-modified genes
-  Description: 
-  Returntype : none
-  Exceptions : 
-  Example    : 
- 
+=head2 targetted_cdna_pairs
+
+    Title   :   targetted_cdna_pairs
+    Usage   :   $self->targetted_cdna_pairs($gene, $cdna)
+    Function:   Pairs targetted gene objects with the accession of the cdna that it will use for UTRs
+    Returns :   nothing
+    Args    :   Bio::EnsEMBL::Gene, string
+
 =cut
 
-sub run_stringent_cdna_matching{
+sub targetted_cdna_pairs {
+  my ($self, $gene, $cdna) = @_;
 
-  self->throw("UTR-BUILDING 2: not implemented yet!");
+  unless (defined $gene && defined $cdna){
+    throw("Missing arguments to targetted_cdna_pairs: [$gene], [$cdna]\n");
+  }
 
+  unless ($gene->isa("Bio::EnsEMBL::Gene")){
+    throw("$gene is not a Bio:EnsEMBL::Gene\n");
+  }
+  $self->{_targetted_cdnas}{$cdna} = $gene;
 }
 
-=head2 run_stringent_est_matching
- 
-  Arg [1]    : ref to array of Bio::EnsEMBL::Gene
-  Arg [2]    : string representing genetype to be associated with UTR-modified genes
-  Description: 
-  Returntype : none
-  Exceptions : 
-  Example    : 
- 
+=head2 get_targetted_gene_from_cdna
+
+    Title   :   get_targetted_gene_from_cdna
+    Usage   :   $self->get_targetted_gene_from_cdna($cdna_id)
+    Function:   Retrieves targetted gene that needs to have UTRs from cdna_id; 
+                currently throws if more than one gene shares the same cdna id
+    Returns :   Bio::EnsEMBL::Gene
+    Args    :   string
+
 =cut
 
-sub run_stringent_est_matching{
+sub get_targetted_gene_from_cdna{
+  my ($self, $cdna) = @_;
+  my $gene;
 
-  self->throw("UTR-BUILDING 3: not implemented yet!");
+ ENTRY:
+  foreach my $entry(keys %{$self->{_targetted_cdnas}}){
+    if ($entry eq $cdna){
+      if (defined $gene){
+	throw("More than one gene for $cdna - skip for now\n");
+      }
+      $gene = $self->{_targetted_cdnas}{$entry};
+      # losing the db in the hashing for some reason ...
+      $gene->adaptor->db($self->genewise_db);
+    }
+  }
 
+  throw("Unable to find Targetted Gene from cDNA") 
+    unless $gene;
+
+  return $gene;
 }
+
 
 =head2 find_cluster_joiners
-  Arg [1]    : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster 
+
+  Arg [1]    : ref to array of Bio::EnsEMBL::Pipeline::GeneComparison::GeneCluster
   Description: screens UTR modified transcripts for those that
-               potentially misjoin genewise clusters, and removes them
-
-
+               potentially misjoin genewise clusters, and remove them
   Returntype : ref to array of Bio::EnsEMBL::Gene 
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub find_cluster_joiners{
@@ -836,20 +1177,20 @@ sub find_cluster_joiners{
     return 0;
   }
 
-  print STDERR "VAC: strand: " . $transcript->get_all_Exons->[0]->strand  . "\n";
-  print "transcript spans $transcript_start - $transcript_end\n";
-  print "clusters span: \n";
+  print STDERR "VAC: strand: " . $transcript->get_all_Exons->[0]->strand  . "\n".
+        "transcript spans $transcript_start - $transcript_end\n".
+        "clusters span: \n" if $VERBOSE;
 
   # clusters are stored sorted so that $a->start <= $b->start regardless of strand
   CLUSTER:
   foreach my $cluster(@clusters){
-    print "\n" . $cluster->start . " - " . $cluster->end . "\n";
+    print $cluster->start . " - " . $cluster->end . "\n";
     if($transcript_start <= $cluster->start
        && $transcript_end >= $cluster->start
        && $transcript_end <= $cluster->end){
-      print "transcript ends in this cluster\n";
+      print "transcript ends in this cluster\n" if $VERBOSE;
       if($overlaps_previous_cluster){
-        print "transcript joins clusters - discard it\n";
+        print "transcript joins clusters - discard it\n" if $VERBOSE;
         return 1;
       }
       # else not a problem
@@ -858,12 +1199,12 @@ sub find_cluster_joiners{
     elsif($transcript_start <= $cluster->end
 	  && $transcript_start >= $cluster->start
 	  && $transcript_end >= $cluster->end){
-      print STDERR "VAC: transcript starts in this cluster\n";
+      print STDERR "VAC: transcript starts in this cluster\n" if $VERBOSE;
       $overlaps_previous_cluster = 1;
     }
     elsif($transcript_start <= $cluster->start
 	  && $transcript->end >= $cluster->end){
-      print STDERR "VAC: transcript spans this cluster\n";
+      print STDERR "VAC: transcript spans this cluster\n" if $VERBOSE;
       $overlaps_previous_cluster = 1;
     }
   }
@@ -872,6 +1213,7 @@ sub find_cluster_joiners{
 }
 
 =head2 _filter_cdnas
+
   Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Description: This method checks the cDNAs. ( see
                Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils::_check_transcript()
@@ -879,21 +1221,27 @@ sub find_cluster_joiners{
                translation is not checked as these cdnas come without
                translation
   Returntype : ref to array of Bio::EnsEMBL::Gene
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub _filter_cdnas{
-  my ($self,$cdna_arrayref) = @_;
+  my ($self, $cdna_arrayref, $ests) = @_;
   my @newcdna;
+  my %cdna_evidence;
 
-  #print STDERR "filtering ".scalar(@{$cdna_arrayref})." cdnas\n";
  cDNA_GENE:
   foreach my $cdna (@{$cdna_arrayref}) {
 
   cDNA_TRANSCRIPT:
     foreach my $tran (@{$cdna->get_all_Transcripts}) {
+
+      if(!$ests){
+	#store cDNA gene evidence for later
+	foreach my $evidence (@{ $tran->get_all_supporting_features }){
+	  #print STDERR "evidence: ".$evidence->hseqname()." = ".$cdna->dbID."\n";
+	  $cdna_evidence{$evidence->hseqname()} = $cdna;
+	}
+      }
 
       # rejecting on basis of intron length may not be valid here
       # - it may not be that simple in the same way as it isn;t that simple in Targetted & Similarity builds
@@ -904,24 +1252,26 @@ sub _filter_cdnas{
 				   && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
 				   _check_introns($tran,$self->query)
 				  );
-
-      #print STDERR "keeping trans_dbID:" . $tran->dbID . "\n";
-      push(@newcdna,$cdna);
+      push(@newcdna, $cdna);
     }
   }
+
+  if(!$ests){
+    $self->_cdna_evidence(\%cdna_evidence);
+  }
+
   return \@newcdna;
 }
 
+
 =head2  _transcript_exonic_length_in_gene
+
   Arg [1]    : Bio::EnsEMBL::Gene
   Description: method to calculate the exonic length of a transcript
                which is inside a gene; this assumes that these
                genewise genes contain one transcript each
-
   Returntype : integer - total length of exons
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub _transcript_exonic_length_in_gene{
@@ -932,19 +1282,20 @@ sub _transcript_exonic_length_in_gene{
   foreach my $exon ( @{$tran->get_all_Exons} ){
     $exonic_length += ($exon->end - $exon->start + 1);
   }
+
   return $exonic_length;
 }
 
+
 =head2  _transcript_length_in_gene
+
   Arg [1]    : Bio::EnsEMBL::Gene
   Description: method to calculate the length of a transcript in
                genomic extent; this assumes that these genewise genes
                contain one transcript each
   Returntype : integer - length of genome covered by transcript
-  Exceptions : 
-  Example    : 
- 
-=cut 
+
+=cut
 
 sub _transcript_length_in_gene{
   my ($self, $gene) = @_;
@@ -962,22 +1313,24 @@ sub _transcript_length_in_gene{
   return $genomic_extent;
 }
 
+
 =head2  write_output
+
   Arg [1]    : none
   Description: 
   Returntype : none
   Exceptions : 
   Example    : 
- 
+
 =cut 
 
 sub write_output {
   my($self) = @_;
 
-  # write genes in the database: GB_COMB_DBNAME@GB_COMB_DBHOST
+  # write genes in the database: GB_COMB_DBNAME
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
 
-print STDERR "Have " . scalar ($self->output) . "genes to write\n";
+  print STDERR "Have " . scalar ($self->output) . "genes to write\n";
 
  GENE:
   foreach my $gene ($self->output) {	
@@ -999,35 +1352,99 @@ print STDERR "Have " . scalar ($self->output) . "genes to write\n";
 
     eval {
       $gene_adaptor->store($gene);
-      print STDERR "wrote gene dbID " . $gene->dbID . "\n";
-      #      foreach my $t ( @{$gene->get_all_Transcripts} ){
-      #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      #      }
+      print STDERR "wrote gene dbID " . $gene->dbID . "\n" if $VERBOSE;
     };
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE " . $gene->dbID. "of type " . $gene->type  . "\n\n$@\n\nSkipping this gene\n";
-      #      foreach my $t ( @{$gene->get_all_Transcripts} ){
-      #	Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Evidence($t);
-      #      }
     }
   }
 }
 
-=head2 make_gene 
+
+=head2  convert_to_extended_genes
+
+  Arg [1]    : ref to array of Bio::EnsEMBL::Gene
+  Description: converts transcripts to Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended
+  Returntype : ref to array of TranscriptExtended
+  Exceptions : throws if gene has multiple transcripts
+
+=cut
+
+sub convert_to_extended_genes {
+  my ($self, $genes) =@_;
+
+  my @new_genes;
+  for my $g (@$genes){ 
+    #my $st  = _get_evidence_set( $g->biotype );
+    #my $set = $g->biotype;
+    my ( $set ) = $self->_get_evidence_set ( $g->biotype ) ;
+    for my $t (@{$g->get_all_Transcripts}){
+      throw ("gene has more than one trancript - only processing 1-gene-1-transcript-genes")
+	if (@{$g->get_all_Transcripts}>1);
+
+      # conversion 
+      my $gene_from_pt = Bio::EnsEMBL::Gene->new( 
+                         -start    => $t->start , 
+                         -end      => $t->end , 
+                         -strand   => $t->strand ,  
+                         -slice    => $t->slice ,  
+                         -biotype  => $g->biotype,
+                         -analysis => $t->analysis, 
+                        );
+
+      my $new_tr = Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended->new(
+                    -BIOTYPE  => $g->biotype ,  
+                    -ANALYSIS => $t->analysis , 
+                   );
+      $new_tr->ev_set($set);
+
+      my @pt_exons  = @{$t->get_all_Exons} ;
+      for (my $i=0 ; $i<scalar(@pt_exons) ; $i++) { 
+	# converting Bio::EnsEMBL::PredictionExon into ExonExtened (ISA Bio::EnsEMBL::Exon)  
+	my $pte = $pt_exons[$i];
+	bless $pte,"Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended" ; 
+	$pte->biotype($g->biotype);
+	$pte->ev_set($set);
+	$pte->end_phase(0);
+	$pte->phase(0);
+	$pte->next_exon($pt_exons[$i+1]) ;
+        if ($i == 0 ) {
+	  $pte->prev_exon(0);
+	} else {
+	  $pte->prev_exon($pt_exons[$i-1]);
+	}
+	$pte->transcript($new_tr) ; 
+	$pte->analysis($t->analysis) ; 
+      };
+
+      # Extending the Bio::EnsEMBL::Transcript object by ev_set methods
+      for (@pt_exons) {
+	$new_tr->add_Exon($_);
+      }
+      $gene_from_pt->add_Transcript($new_tr);
+      push @new_genes , $gene_from_pt;
+    }
+  }
+
+  return \@new_genes;
+}
+
+
+=head2 make_gene
+
   Arg [1]    : string representing genetyoe to be associated with genes
-  Arg [1]    : array of Bio::EnsEMBL::Transcript
+  Arg [2]    : array of Bio::EnsEMBL::Transcript
   Description: Constructs Bio::EnsEMBL::Gene objects from UTR-modified transcripts
   Returntype : none; new genes are stored in self->combined_genes
-  Exceptions : 
-  Example    : 
- 
+  Exceptions : throws when missing genetype or analysis
+
 =cut
 
 sub make_gene{
   my ($self, $genetype, @transcripts) = @_;
 
   unless ( $genetype ){
-    $self->throw("You must define GB_GENEWISE_COMBINED_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::GeneBuild::Combined");
+    $self->throw("You must define UTR_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::GeneBuild::Combined");
   }
 
   # an analysis should be passed in via the RunnableDB.m parent class:
@@ -1047,7 +1464,8 @@ sub make_gene{
     }
 
     my $gene = new Bio::EnsEMBL::Gene;
-    $gene->type($genetype);
+    $gene->biotype($genetype);
+    $trans->biotype($genetype);
     $gene->add_Transcript($trans);
     $gene->analysis($analysis);
 
@@ -1058,14 +1476,19 @@ sub make_gene{
       push (@genes,$gene);
       $count++;
     }
+    else{
+      print STDERR "Could not validate gene!\n";
+    }
   }
 
-  $self->combined_genes(\@genes);
-
+  return(\@genes);
 }
 
+
 =head2 match_protein_to_cdna
+
   Arg [1]    : Bio::EnsEMBL::Gene
+  Arg [2]    : int is_est
   Description: this method tries to find the cdnas that can be merged with the genewise genes.
              Basically it checks for exact internal splice matching in the 5' and 3' exons of the genewise gene.
              In order to match a starting genewise exon with an cDNA exon, we need to have 
@@ -1076,18 +1499,17 @@ sub make_gene{
              Substitute "end" for "start" for 3prime ends of transcripts  
              BUT do not allow through any cDNA that will result just in a 
              shortened peptide without additional UTR exons.
-  Returntype :  ref to array of Bio::EnsEMBL::Gene, ref to hash relating Bio::EnsEMBL::Gene to UTR length
+  Returntype : ref to array of Bio::EnsEMBL::Gene, ref to hash relating Bio::EnsEMBL::Gene to UTR length
   Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub match_protein_to_cdna{
-  my ($self, $gw) = @_;
+  my ($self, $gw, $is_est) = @_;
 
-  my %UTR_hash;
+  my (%UTR_hash, %UTR_side_indicator_hash);
+  my @other_genes;
 
-  #print STDERR "\nSearching cDNA for gw gene dbID: ".$gw->dbID."\n";
   my @matching_e2g;
   my @gw_tran = @{$gw->get_all_Transcripts};
 
@@ -1113,8 +1535,19 @@ sub match_protein_to_cdna{
 
   my $exon_slop = 20;
 
+  my $cds_length = length($gw_tran[0]->translateable_seq());
+
+  my @genes;
+  if($is_est){
+    @genes = @{$self->ests};
+  }
+  else{
+    @genes = @{$self->cdna_genes};
+  }
+
  cDNA:
-  foreach my $e2g($self->cdna_genes){
+  foreach my $e2g(@genes){
+
     my @egtran  = @{$e2g->get_all_Transcripts};
     my @eg_exons = @{$egtran[0]->get_all_Exons};
 
@@ -1136,8 +1569,6 @@ sub match_protein_to_cdna{
     my $right_exon;
     my $left_diff  = 0;
     my $right_diff = 0;
-    my $UTR_length;
-
 
     # Lets deal with single exon genes first
     if ($#gw_exons == 0) {
@@ -1158,12 +1589,6 @@ sub match_protein_to_cdna{
 	  $left_diff   = $gw_exons[0]->start - $current_exon->start;
 	  $right_diff  = $current_exon->end  - $gw_exons[0]->end;
 	}
-      }
-      # can match either end, or both
-      if($fiveprime_match || $threeprime_match){
-	$UTR_length = $self->_compute_UTRlength($egtran[0],$left_exon,$left_diff,$right_exon,$right_diff);
-	$UTR_hash{$e2g} = $UTR_length;
-	push(@matching_e2g, $e2g);
       }
 
       # Now the multi exon genewises
@@ -1201,7 +1626,7 @@ sub match_protein_to_cdna{
 		  $current_exon != $eg_exons[$#eg_exons]))){
 	
 	    $threeprime_match = 1;
-	    $right_exon = $current_exon;
+	    $right_exon  = $current_exon;
 	    $right_diff  = $current_exon->end - $gw_exons[0]->end;
 	  }
 	}
@@ -1237,28 +1662,43 @@ sub match_protein_to_cdna{
 	  }
 	}
       }
-      if($fiveprime_match || $threeprime_match){
-	$UTR_length = $self->_compute_UTRlength($egtran[0],$left_exon,$left_diff,$right_exon,$right_diff);
-	$UTR_hash{$e2g} = $UTR_length;
-	push(@matching_e2g, $e2g);
-	
-	# test
-	foreach my $egtran ( @{$e2g->get_all_Transcripts} ){
-	  #print STDERR "Found cDNA match trans_dbID:".$egtran->dbID."\n";
-	}
-      }
     }
+
+    # can match either end, or both
+    if($fiveprime_match || $threeprime_match){
+      print STDERR "MATCHING_CDNA: ".$e2g->dbID; #fskcheck
+      my ($UTR_length, $left_UTR_length, $right_UTR_length) = 
+	 $self->_compute_UTRlength($egtran[0], $left_exon, $left_diff, $right_exon, $right_diff);
+      my $UTR_diff   = $egtran[0]->length;
+      #make sure CDS is not much smaller than UTR
+      if(($cds_length * 10) > $UTR_diff){
+	$UTR_hash{$e2g} = $UTR_length;
+	$UTR_side_indicator_hash{$e2g} = 1;
+	push(@matching_e2g, $e2g);
+      }
+      else{
+	print STDERR "didnt pass UTR length check." if $VERBOSE;
+      }
+      print STDERR "\n" if $VERBOSE;
+    }
+
   }
-  return (\@matching_e2g,\%UTR_hash);
+
+  return (\@matching_e2g,\%UTR_hash, \%UTR_side_indicator_hash);
 }
 
+
 =head2 _compute_UTRlength
-  Arg [1]    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Example    : 
- 
+
+  Arg [1]    : eg-transcript
+  Arg [2]    : first matching exon
+  Arg [3]    : (int) UTR bases of first matching exon
+  Arg [4]    : last matching exon
+  Arg [5]    : (int) UTR bases of first matching exon
+  Description: add up genomic extend of UTR regions
+  Returntype : int (basepairs) total UTR-length, left UTR-length, right UTR-lenght
+  Exceptions : none
+
 =cut
 
 sub _compute_UTRlength{
@@ -1266,8 +1706,11 @@ sub _compute_UTRlength{
  my $strand = $transcript->start_Exon->strand;
  my @exons  = sort { $a->start <=> $b->start } @{ $transcript->get_all_Exons };
 
- my $UTRlength = 0;
- my $in_UTR = 1;
+ my $UTRlength  = 0;
+ my $in_UTR     = 1;
+ my $start_flag = 0;
+ my $left_UTR   = $left_diff;
+ my $right_UTR  = $right_diff;
 
  foreach my $exon ( @exons ){
    if ( defined $left_exon && $exon == $left_exon ){
@@ -1280,19 +1723,26 @@ sub _compute_UTRlength{
    }
    elsif( $in_UTR == 1 ){
      $UTRlength += $exon->length;
+     if(!$start_flag){
+       $left_UTR  += $UTRlength;
+       $start_flag = 1;
+     }
+     else{
+       $right_UTR  += $UTRlength;
+     }
    }
  }
- return $UTRlength;
 
+ return($UTRlength, $left_UTR, $right_UTR);
 }
 
+
 =head2 _merge_genes
-  Arg [1]    :
+
+  Arg [1]    : ref to array of Bio::EnsEMBL::Gene
   Description: merges adjacent exons if they are frameshifted; stores
                component exons as subSeqFeatures of the merged exon
-  Returntype :
-  Exceptions :
-  Example    :
+  Returntype : ref to array of Bio::EnsEMBL::Gene
 
 =cut
 
@@ -1305,7 +1755,7 @@ sub _merge_genes {
   foreach my $unmerged (@{$genesref}){
 
     my $gene = new Bio::EnsEMBL::Gene;
-    $gene->type('combined');
+    #$gene->type('combined');                 ## tmp-change of biotype?!
     $gene->dbID($unmerged->dbID);
     my @pred_exons;
     my $ecount = 0;
@@ -1313,7 +1763,9 @@ sub _merge_genes {
     # order is crucial
     my @trans = @{$unmerged->get_all_Transcripts};
     if(scalar(@trans) != 1) { 
-      $self->throw("Gene with dbID " . $unmerged->dbID . " has NO or more than one related transcript, where a 1-gene-to-1-transcript-relation is assumed. Check preceding analysis \n"); 
+      $self->throw("Gene with dbID " . $unmerged->dbID .
+		   " has NO or more than one related transcript, where a 1-gene-to-1-transcript-relation is assumed.".
+		   " Check preceding analysis \n");
     }
 
     # check the sanity of the transcript
@@ -1321,10 +1773,6 @@ sub _merge_genes {
 
     ### we follow here 5' -> 3' orientation ###
 #    $trans[0]->sort;
-
-    #print STDERR "checking for merge: ".$trans[0]->dbID."\n";
-    #print STDERR "translation:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($trans[0]);
 
     my $cloned_translation = new Bio::EnsEMBL::Translation;
 
@@ -1378,7 +1826,7 @@ sub _merge_genes {
 
 	  $previous_exon->add_sub_SeqFeature($exon,'');
 	
-	  # if this is end of translation, keep that info:
+	  # if this is end of translation, keep that inf:
 	  if ( $exon == $trans[0]->translation->end_Exon ){
 	    $cloned_translation->end_Exon( $previous_exon );
 	    $cloned_translation->end($trans[0]->translation->end);
@@ -1425,50 +1873,48 @@ sub _merge_genes {
     $merged_transcript->sort;
     $merged_transcript->translation($cloned_translation);
 
-  my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
-  if (scalar(@seqeds)) {
-    print "Copying sequence edits\n"; 
-    foreach my $se (@seqeds) {
-      my $new_se =
-              Bio::EnsEMBL::SeqEdit->new(
-                -CODE    => $se->code,
-                -NAME    => $se->name,
-                -DESC    => $se->description,
-                -START   => $se->start,
-                -END     => $se->end,
-                -ALT_SEQ => $se->alt_seq
-              );
-      my $attribute = $new_se->get_Attribute();
-      $cloned_translation->add_Attributes($attribute);
+    my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
+    if (scalar(@seqeds)) {
+      print "Copying sequence edits\n"; 
+      foreach my $se (@seqeds) {
+	my $new_se =
+	  Bio::EnsEMBL::SeqEdit->new(
+				     -CODE    => $se->code,
+				     -NAME    => $se->name,
+				     -DESC    => $se->description,
+				     -START   => $se->start,
+				     -END     => $se->end,
+				     -ALT_SEQ => $se->alt_seq
+				    );
+	my $attribute = $new_se->get_Attribute();
+	$cloned_translation->add_Attributes($attribute);
+      }
     }
-  }
-  my @support = @{$trans[0]->get_all_supporting_features};
-  if (scalar(@support)) {
-    $merged_transcript->add_supporting_features(@support);
-  }
-  $merged_transcript->add_Attributes(@{$trans[0]->get_all_Attributes});
-    
-    #print STDERR "merged_transcript:\n";
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($merged_transcript);
+    my @support = @{$trans[0]->get_all_supporting_features};
+    if (scalar(@support)) {
+      $merged_transcript->add_supporting_features(@support);
+    }
+    $merged_transcript->add_Attributes(@{$trans[0]->get_all_Attributes});
 
     # and gene
     $gene->add_Transcript($merged_transcript);
     push(@merged, $gene);
     $count++;
 
-    # store match between merged and original gene so we can easily retrieve the latter if we need to
+    # store match between merged and original gene so we can easily retrieve the latter if we need to #fsk!!!
     $self->merged_unmerged_pairs($gene,$unmerged);
   } # end UNMERGED_GENE
 
   return @merged;
 }
 
+
 =head2 combine_genes
-  Arg [1]    :
-  Description:
-  Returntype :
-  Exceptions :
-  Example    :
+
+  Arg [1]    : genewise gene
+  Arg [2]    : cDNA gene
+  Description: combine gene with matching cDNA
+  Returntype : Bio::EnsEMBL::Transcript
 
 =cut
 
@@ -1535,8 +1981,8 @@ sub combine_genes{
 
       # check strands are consistent
       if ($ee->strand != $gw_exons[0]->strand){
-	  $self->warn("gw and e2g exons have different strands - can't combine genes\n") ;
-	  next GENEWISE;
+	  warn("gw and e2g exons have different strands - can't combine genes\n") ;
+	  return undef;
       }
 
       # single exon genewise prediction?
@@ -1576,10 +2022,6 @@ sub combine_genes{
   # (the sub_SeqFeatures have been flushed for this exon)
   if (defined($newtranscript)){
 
-      # test
-      #print STDERR "before expanding exons, newtranscript: $newtranscript\n"; 
-      #$self->_print_Transcript($newtranscript);
-
       foreach my $ex (@{$newtranscript->get_all_Exons}){
 
         if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
@@ -1598,10 +2040,6 @@ sub combine_genes{
           $ex->flush_sub_SeqFeature;
         }
       }
-
-     # unless($self->compare_translations($gw_tran[0], $newtranscript) ){
-     #   print STDERR "translation has been modified\n";
-     # }
 
       # check that the result is fine
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query) ){
@@ -1630,12 +2068,6 @@ sub combine_genes{
 
         $newtrans = $self->_recalculate_translation($newtranscript, $strand);
 
-        #print STDERR "after genomewise:\n";
-        #    Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Transcript($newtrans);
-        #      unless($self->compare_translations($gw_tran[0], $newtrans) ){
-        #      	print STDERR "translation has been modified\n";
-        #      }
-
         # if the genomewise results gets stop codons, return the original transcript:
         unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
           print STDERR "Arrgh, stop codons, returning the original transcript\n";
@@ -1648,12 +2080,14 @@ sub combine_genes{
       return $newtrans;
     }
   else{
-    $self->warn("No combination could be built\n");
+    warn("No combination could be built\n");
     return undef;
   }
 }
 
+
 =head2 transcript_from_single_exon_genewise
+
   Arg [1]    :
   Description: This method will actually do the combination of both
                cdna and genewise gene.  Note that if there is a match
@@ -1662,8 +2096,6 @@ sub combine_genes{
                genewise genes. This will explit cdna matches that look
                fine on one end and we disregard the mismatching part.
   Returntype :
-  Exceptions :
-  Example    :
 
 =cut
 
@@ -1682,7 +2114,7 @@ sub transcript_from_single_exon_genewise {
     my $gwstart = $gw_exon->start;
     my $gwend   = $gw_exon->end;
 
-    # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";	    
+    # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";
 	
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_Exon;
@@ -1709,8 +2141,11 @@ sub transcript_from_single_exon_genewise {
       $translation->start($tstart + $diff);
       $translation->end($tend + $diff);
 
-      $self->throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-      $self->throw("Forward strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
+      $self->throw("Forward strand: setting very dodgy translation start: " . $translation->start.  "\n")
+	unless $translation->start > 0;
+      $self->throw("Forward strand: setting dodgy translation end: " . $translation->end .
+		   " exon_length: " . $translation->end_Exon->length . "\n")
+	unless $translation->end <= $translation->end_Exon->length;
     }
 
     #REVERSE:
@@ -1721,8 +2156,11 @@ sub transcript_from_single_exon_genewise {
       $translation->start($tstart+$diff);
       $translation->end($tend + $diff);
 
-      $self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
-      $self->throw("Reverse strand: setting dodgy translation end: " . $translation->end . " exon_length: " . $translation->end_Exon->length . "\n") unless $translation->end <= $translation->end_Exon->length;
+      $self->throw("Reverse strand: setting very dodgy translation start: " . $translation->start.  "\n")
+	unless $translation->start > 0;
+      $self->throw("Reverse strand: setting dodgy translation end: " . $translation->end .
+		   " exon_length: " . $translation->end_Exon->length . "\n")
+	unless $translation->end <= $translation->end_Exon->length;
     }
 	
     # expand frameshifted single exon genewises back from one exon to multiple exons
@@ -1768,6 +2206,7 @@ sub transcript_from_single_exon_genewise {
 
 
 =head2 transcript_from_multi_exon_genewise
+
   Arg [1]    : 
   Description: This method will actually do the combination of both
                cdna and genewise gene.  Note that if there is a match
@@ -1775,10 +2214,8 @@ sub transcript_from_single_exon_genewise {
                one end, but will leave the other as it is in the
                genewise genes. This will explit cdna matches that look
                fine on one end and we disregard the mismatching part.
-  Returntype : 
-  Exceptions : 
-  Example    : 
- 
+  Returntype : none
+
 =cut
 
 sub transcript_from_multi_exon_genewise {
@@ -1805,25 +2242,26 @@ sub transcript_from_multi_exon_genewise {
   # substitute "end" for "start" for 3' ends of transcripts
 
   # compare to the first genewise exon
-
   if($gwexons[0]->strand == 1){
-    return $self->transcript_from_multi_exon_genewise_forward($current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene);
+    return $self->transcript_from_multi_exon_genewise_forward($current_exon, $transcript, $translation, 
+							      $exoncount, $gw_gene, $eg_gene);
   }
   elsif( $gwexons[0]->strand == -1 ){
-    return $self->transcript_from_multi_exon_genewise_reverse($current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene);
+    return $self->transcript_from_multi_exon_genewise_reverse($current_exon, $transcript, $translation, 
+							      $exoncount, $gw_gene, $eg_gene);
   }
 }
 
-=head2 
+
+=head2 transcript_from_multi_exon_genewise_forward
+
   Arg [1]    : 
   Description: 
   Returntype : 
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
-sub transcript_from_multi_exon_genewise_forward{
+sub transcript_from_multi_exon_genewise_forward {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
 
   my $modified_peptide = 0;
@@ -1932,7 +2370,8 @@ sub transcript_from_multi_exon_genewise_forward{
       #print STDERR "gw exon starts: $gwstart > new start: $current_start";
       #print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
     }
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n")
+      unless $translation->start > 0;
 
   } # end 5' exon
 
@@ -2033,16 +2472,17 @@ sub transcript_from_multi_exon_genewise_forward{
   return ($transcript,$modified_peptide);
 }
 
-=head2 
+=head2 transcript_from_multi_exon_genewise_reverse
+
   Arg [1]    : 
   Description: 
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
-sub transcript_from_multi_exon_genewise_reverse{
+sub transcript_from_multi_exon_genewise_reverse {
   my ($self, $current_exon, $transcript, $translation, $exoncount, $gw_gene, $eg_gene) = @_;
 
   my $modified_peptide = 0;
@@ -2106,7 +2546,8 @@ sub transcript_from_multi_exon_genewise_reverse{
 	$self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");}
     }
 
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n") unless $translation->start > 0;
+    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n")
+      unless $translation->start > 0;
 
     # this exon is the start of translation, convention: phase = -1
     my $ex = $transcript->start_Exon;
@@ -2226,7 +2667,9 @@ sub transcript_from_multi_exon_genewise_reverse{
 
       if($expanded){
 	# set translation end to what it originally was in the unmerged genewise gene
-	#print STDERR "Reverse: expanded 3' exon, re-setting translation exon ".$translation->end." to original end( $orig_tend ) - shifts_due_to_phases_etc ( $end_translation_shift ) :".($orig_tend - $end_translation_shift)."\n";
+	#print STDERR "Reverse: expanded 3' exon, re-setting translation exon ".$translation->end.
+        # " to original end( $orig_tend ) - shifts_due_to_phases_etc ( $end_translation_shift ) :".
+        # ($orig_tend - $end_translation_shift)."\n";
 	$translation->end($orig_tend - $end_translation_shift);
       }
       Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($current_exon, $ex);
@@ -2237,16 +2680,15 @@ sub transcript_from_multi_exon_genewise_reverse{
   return ($transcript,$modified_peptide);
 }
 
-=head2 
+=head2 add_5prime_exons
+
   Arg [1]    : 
   Description: 
   Returntype : 
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
-sub add_5prime_exons{
+sub add_5prime_exons {
   my ($self, $transcript, $exoncount, @e2g_exons) = @_;
 
   # add all the exons from the est2genome transcript, previous to this one
@@ -2291,7 +2733,8 @@ sub add_5prime_exons{
 # start but not its end. The rest of the components are added. The translation end will have to be modified,
 # this happens in the method _transcript_from_multi_exon....
 
-=head2 
+=head2 expand_3prime_exon
+
   Arg [1]    : 
   Description: $exon is the terminal exon in the genewise transcript,
                $transcript. We need to expand any frameshifts we
@@ -2301,12 +2744,8 @@ sub add_5prime_exons{
                rest of the components are added. The translation end
                will have to be modified, this happens in the method
                _transcript_from_multi_exon....
-
-
   Returntype : 
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub expand_3prime_exon{
@@ -2340,18 +2779,16 @@ sub expand_3prime_exon{
   return 0;
 }
 
-=head2 
+=head2 add_3prime_exons
+
   Arg [1]    : 
   Description: $exoncount tells us which position in the array of e2g
                exons corresponds to the end of the genewise transcript
                so we add back exons 3 to that position.  $exon and
                $transcript are references to Exon and Transcript
                objects.
-
   Returntype : 
-  Exceptions : 
-  Example    : 
- 
+
 =cut
 
 sub add_3prime_exons {
@@ -2393,129 +2830,121 @@ sub add_3prime_exons {
   }
 }
 
+
 =head2 compare_translations
 
-  Arg [1]    : 
+  Arg [1 & 2]: Bio::EnsEMBL::Transcript
   Description: it compares the peptides from two transcripts.
-               It returns 1 if both translations are the same or when
+               It returns 1 if both translations are the same, 2 or 3 when
                one is a truncated version of the other. It returns 0 otherwise.
                Also returns 0 if either of the transcripts has stops.
-  ReturnType : BOOLEAN
-  Exceptions : 
-  Example    : 
- 
+               CAN GO INTO GENERAL MODULE
+  ReturnType : int
+
 =cut
 
 sub compare_translations{
-  my ($self, $genewise_transcript, $combined_transcript) = @_;
+  my ($self, $transcript_1, $transcript_2) = @_;
 
   my $seqout = new Bio::SeqIO->new(-fh => \*STDERR);
 
-  my $genewise_translation;
-  my $combined_translation;
+  my $translation_1;
+  my $translation_2;
 
   eval {
-    $genewise_translation = $genewise_transcript->translate;
+    $translation_1 = $transcript_1->translate;
   };
   if ($@) {
-    print STDERR "Couldn't translate genewise gene\n";
+    print STDERR "Couldn't translate transcript 1:[$@]\n";
   }
-  else{
-    #print STDERR "genewise: \n";             
-    $seqout->write_seq($genewise_translation);
-    #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($genewise_transcripts[0]);
-  }
-
-  $@ = '';
 
   eval{
-    $combined_translation = $combined_transcript->translate;
+    $translation_2 = $transcript_2->translate;
   };
 
   if ($@) {
-    print STDERR "Couldn't translate combined gene:[$@]\n";
+    print STDERR "Couldn't translate transcript 2:[$@]\n";
     return 0;
   }
-  else{
-    $seqout->write_seq($combined_translation);
-  }
 
-  if ( $genewise_translation && $combined_translation ){
-    my $gwseq  = $genewise_translation->seq;
-    my $comseq = $combined_translation->seq;
+  if ( $translation_1 && $translation_2 ){
+    my $gwseq  = $translation_1->seq;
+    my $comseq = $translation_2->seq;
 
     if($gwseq eq $comseq) {
-      #print STDERR "combined translation is identical to genewise translation\n";
+      #identical translations
       return 1;
     }
     elsif($gwseq =~ /$comseq/){
-      #print STDERR "combined translation is a truncated version of genewise translation\n";
-      return 1;
+      #translation 2 is a truncated version of translation 1
+      return 2;
     }
     elsif($comseq =~ /$gwseq/){
-      #print STDERR "interesting: genewise translation is a truncated version of the combined-gene translation\n";
-      return 1;
+      #translation 1 is a truncated version of the translation 2
+      return 3;
     }
   }
 
   return 0;
 }
 
-#VAC< strictly speaking this is no longer remapping anything
 
-=head2 
-  Arg [1]    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Example    : 
- 
+=head2 remap_genes
+
+  Description: strictly speaking this is no longer remapping anything...
+               checks translation, set start/stop, sets biotype
+  Returntype : ref to array of Bio::EnsEMBL::Gene
+
 =cut
 
 sub remap_genes {
-  my ($self) = @_;
-  my @newf;
-  my $slice = $self->query;
+  my ($self, $genes, $biotype) = @_;
 
-  my @genes = @{$self->combined_genes};
-  push(@genes, $self->unmatched_genes);
+  #my $slice = $self->query;
+  my @remapped_genes = ();
+  print STDERR "remapping ".scalar @$genes." genes.\n" if $VERBOSE;
 
-  my $genecount = 0;
  GENE:
-  foreach my $gene (@genes) {
-    $genecount++;
+  foreach my $gene (@$genes) {
+    #force a centain biotype?
+    if($biotype){
+      $gene->biotype($biotype);
+    }
+
     my @t = @{$gene->get_all_Transcripts};
     my $tran = $t[0];
 
     # check that it translates
     unless(Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)){
+      print STDERR "Gene doesn't translate!\n";
       next GENE;
     }
 
-    my $transcount = 0;
     foreach my $transcript ( @{$gene->get_all_Transcripts} ){
-      $transcount++;
-      $transcript->type( $genecount."_".$transcount );
-
+      if($biotype){
+	$transcript->biotype($gene->biotype);
+	$transcript->analysis($gene->analysis);
+      }
       # set start and stop codons
       $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($transcript);
       $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($transcript);
     }
+    push(@remapped_genes, $gene);
   }
-  return @genes;
+
+  return \@remapped_genes;
 }
 
 
 =head2 validate_gene
+
   Arg [1]    : Bio::EnsEMBL::Gene
   Description: checks start and end coordinates of each exon of each transcript are sane 
   Returntype : 1 if gene is valid, otherwise zero
-  Exceptions : 
-  Example    : $self->validate_gene($gene) 
- 
+
 =cut
 
-sub validate_gene{
+sub validate_gene {
   my ($self, $gene) = @_;
 
   # should be only a single transcript
@@ -2539,10 +2968,11 @@ sub validate_gene{
   return 1;
 }
 
+
 =head2 _recalculate_translation
- 
+
  Arg[1]      : Bio::EnsEMBL::Transcript
- Arg[2]      : the strand where the transcript sits
+ Arg[2]      : strand of the transcript
  Description : a transcript is used as evidence for genomewise
               to recalculate the ORF. The idea is to use this when
               the peptide has been shortened, due to a genewise model
@@ -2552,12 +2982,10 @@ sub validate_gene{
               We tell genomewise to keep the splice boundaries pretty much
               static, so that we preserve the original splicing structure.
  Returntype  : Bio::EnsEMBL::Transcript
-  Exceptions : 
-  Example    : 
 
 =cut
 
-sub _recalculate_translation{
+sub _recalculate_translation {
   my ($self, $mytranscript, $strand) = @_;
 
   my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
@@ -2575,98 +3003,14 @@ sub _recalculate_translation{
 }
 
 
-=head2 
-  Arg [1]    : 
-  Description: 
-  Returntype : 
-  Exceptions : 
-  Example    : 
- 
-=cut
-
-sub _recalculate_translation_old {
-  my ($self, $mytranscript, $strand) = @_;
-
-  my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
-  my $transcript;
-
-  my $slice = $self->query;
-  my $inverted_slice = $slice->invert;
-
-  # the genomic sequence to be used with Genomewise (a PrimarySeq)
-
-  # genomewise doesn't know about strands, we need to put everything in forward strand:
-  my $genomic_sequence;
-
-  if ( $strand == -1 ){
-    $genomic_sequence = $inverted_slice;
-
-    my $mygene               = Bio::EnsEMBL::Gene->new();
-    $mygene->add_Transcript($mytranscript);
-    my $gene                 = $mygene->transform($inverted_slice);
-    my @inverted_transcripts = @{$gene->get_all_Transcripts};
-    $transcript              = $inverted_transcripts[0];
-
-  }
-  else{
-    $transcript       = $mytranscript;
-    $genomic_sequence = $slice;
-  }
-
-  my @transcripts;
-  push(@transcripts,$transcript);
-
-  my $runnable = Bio::EnsEMBL::Pipeline::Runnable::MiniGenomewise->new(
-								       -genomic     => $genomic_sequence,
-								       -transcripts => \@transcripts,
-								       -smell       => 0,
-								      );
-  eval{
-      $runnable->run;
-  };
-  if ($@){
-    print STDERR $@;
-  }
-  my @trans = $runnable->output;
-
-  unless ( scalar(@trans) == 1 ){
-    $self->warn("Something went wrong running Genomewise. Got ".scalar(@trans).
-		" transcripts. returning without modifying the translation\n");
-    return $mytranscript;
-  }
-
-  my $newtranscript;
-  # if in the reverse strand, put it back in the original slice
-  if ( $strand == -1 ){
-    my $gene = Bio::EnsEMBL::Gene->new();
-    $gene->add_Transcript($trans[0]);
-    my $newgene        = $gene->transform($slice);
-    my @newtranscripts = @{$newgene->get_all_Transcripts};
-    $newtranscript     = $newtranscripts[0];
-  }
-  else{
-    $newtranscript = $trans[0];
-  }
-
-  # check that everything is sane:
-  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript)){
-    print STDERR "problem with the translation. Returning the original transcript\n";
-    return $this_is_my_transcript;
-  }
-  return $newtranscript;
-}
-
 =head2 _transfer_evidence
 
-  
   Arg [1]    : reference to Bio::EnsEMBL::Tanscript $combined_transcript
   Arg [2]    : reference to Bio::EnsEMBL::Transcript $cdna_transcript
   Description: transfers cdna evidence to combined transcript
   Returntype: Bio::EnsEMBL::Transcript
-  Exceptions : 
-  Example    : 
-           
-=cut 
+
+=cut
 
 sub _transfer_evidence {
   my ($self, $combined_transcript, $cdna_transcript) = @_;
@@ -2677,7 +3021,6 @@ sub _transfer_evidence {
       # exact match or overlap?
 
 # exact match
-#
 #      if($combined_exon->start == $cdna_exon->start &&
 #         $combined_exon->end == $cdna_exon->end &&
 #         $combined_exon->strand == $cdna_exon->strand){
@@ -2700,17 +3043,459 @@ sub _transfer_evidence {
 }
 
 
+=head2 look_for_both
+
+  Arg [1]    : Bio:EnsEMBL:Gene
+  Description: a copy of Steve's look_for_both-script,
+               checks phases, etc.
+  Returntype : Bio:EnsEMBL:Gene
+
+=cut
+
+sub look_for_both {
+  my ($self, $gene) = @_;
+
+  my $time = time;
+  my $nupdated_start = 0;
+  my $nupdated_end = 0;
+  my $metcnt = 1;
+  my $maxterdist = 150;
+  #my $slice;
+
+  foreach my $trans (@{$gene->get_all_Transcripts}) {
+    if ($trans->translation) {
+      my $tln = $trans->translation;
+      my $coding_start = $trans->cdna_coding_start;
+      my $orig_coding_start = $coding_start;
+      $trans->sort;
+      my $cdna_seq = uc($trans->spliced_seq);
+      my @pepgencoords = $trans->pep2genomic(1,1);
+      if(scalar(@pepgencoords) > 2) {
+	print STDERR "pep start does not map cleanly\n";
+	goto TLNEND; # I swore I'd never use this - this code desperately needs a rewrite
+      }
+      my $pepgenstart = $pepgencoords[0]->start;
+      my $pepgenend   = $pepgencoords[$#pepgencoords]->end;
+
+      unless($pepgencoords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+	print STDERR "pep start maps to gap\n";
+	goto TLNEND; # I swore I'd never use this - this code desperately needs a rewrite
+      }
+      unless($pepgencoords[$#pepgencoords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+	print STDERR "pep start (end of) maps to gap\n";
+	goto TLNEND; # I swore I'd never use this - this code desperately needs a rewrite
+      }
+  
+      print STDERR "Pep genomic location = " . $pepgenstart . " " . $pepgenend . "\n" if $VERBOSE;
+      
+      my $startseq= substr($cdna_seq,$coding_start-1,3);
+      print "cdna seq for pep start = " . $startseq . "\n";
+      if ($startseq ne "ATG") {
+	if ($coding_start > 3) {
+	  my $had_stop = 0;
+	  while ($coding_start > 3 && !$had_stop) {
+	    my $testseq = substr($cdna_seq,$coding_start-4,3);
+	    if ($testseq eq "ATG") {
+	      Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($trans) if $VERBOSE;
+	      my @coords = $trans->cdna2genomic($coding_start-3,$coding_start-1,$gene->strand);
+	      my $new_start;
+	      my $new_end;
+	      if(scalar(@coords) > 2) {
+		die("Shouldn't happen - new start does not map cleanly - I'm out of here\n");
+		next;
+	      } elsif (scalar(@coords) == 2) {
+		print STDERR "WOW ISN'T NATURE HORRIBLE: new start crosses intron\n";
+		print STDERR "coord[0] = " . $coords[0]->start . " " . $coords[0]->end ."\n";
+		print STDERR "coord[1] = " . $coords[1]->start . " " . $coords[1]->end ."\n";
+		if ($gene->strand == 1) {
+		  $new_start = $coords[0]->start;
+		  $new_end   = $coords[$#coords]->end;
+		} else {
+		  $new_start = $coords[0]->end;
+		  $new_end   = $coords[$#coords]->start;
+		}
+	      } else {
+		$new_start = $coords[0]->start;
+		$new_end   = $coords[0]->end;
+	      }
+          
+	      
+	      unless($coords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+		die("Shouldn't happen - new start maps to gap - I'm out of here\n");
+		next;
+	      }
+	      unless($coords[$#coords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+		die("Shouldn't happen - new start (end of) maps to gap - I'm out of here\n");
+		next;
+	      }
+          
+	      print STDERR "genomic pos for new start = " . $new_start . " " . $new_end . "\n" if $VERBOSE;
+	      
+	      if ($new_end - $new_start == 2) {
+  
+		$nupdated_start++;
+  
+		my $newstartexon;
+		foreach my $exon (@{$trans->get_all_Exons}) {
+		  if ($exon->end >= $new_start && $exon->start <= $new_start) {
+		    $newstartexon = $exon;
+		    last;
+		  }
+		}
+  
+		if ($newstartexon == $tln->start_Exon) {
+    
+		  if ($tln->start_Exon->strand == 1) {
+		    $tln->start($new_start - $tln->start_Exon->start + 1);
+		  } else {
+		    $tln->start($tln->start_Exon->end - $new_end + 1);
+		  }
+
+		  # NAUGHTY, but hey I should have to do this - I've changed the translation after all
+		  $trans->{'transcript_mapper'} = undef;
+		  $trans->{'coding_region_start'} = undef;
+		  $trans->{'coding_region_end'} = undef;
+		  $trans->{'cdna_coding_start'} = undef;
+		  $trans->{'cdna_coding_end'} = undef;
+		  
+		} else {
+		  # find exon
+		  if (!defined($newstartexon)) {
+		    die "Failed finding new start exon - how can this be?\n";
+		  }
+		  # create a copy of if and of current start exon (because of phase change)
+		  my $copyexon = new Bio::EnsEMBL::Exon(
+							-start  => $tln->start_Exon->start,
+							-end    => $tln->start_Exon->end,
+							-strand => $gene->strand,
+						       );
+		  my $copynewstartexon = new Bio::EnsEMBL::Exon(
+								-start  => $newstartexon->start,
+								-end    => $newstartexon->end,
+								-strand => $gene->strand,
+							       );
+		  
+		  # $copyexon->phase(0);
+		  $copyexon->end_phase($tln->start_Exon->end_phase);
+		  $copyexon->contig($tln->start_Exon->contig);
+		  if ($tln->start_Exon->stable_id) {
+		    $copyexon->stable_id($tln->start_Exon->stable_id . "MET" . $metcnt++);
+		    $copyexon->created($time);
+		    $copyexon->modified($time);
+		    $copyexon->version(1);
+		  }
+    
+		  $copynewstartexon->phase($newstartexon->phase);
+		  # $copynewstartexon->end_phase(0);
+		  $copynewstartexon->contig($newstartexon->contig);
+		  if ($newstartexon->stable_id) {
+		    $copynewstartexon->stable_id($newstartexon->stable_id . "MET" . $metcnt++);
+		    $copynewstartexon->created($time);
+		    $copynewstartexon->modified($time);
+		    $copynewstartexon->version(1);
+		  }
+    
+		  # TODO evidence
+        
+		  if ($copynewstartexon->strand == 1) {
+		    $tln->start($new_start - $copynewstartexon->start + 1);
+		  } else {
+		    $tln->start($copynewstartexon->end - $new_end + 1);
+		  }
+  
+		  # Replace exons in transcript, and fix phases
+  
+		  my @newexons;
+		  my $inrange = 0;
+		  foreach my $exon (@{$trans->get_all_Exons}) {
+		    if ($inrange) {
+		      $exon->phase( $newexons[$#newexons]->end_phase );
+		      $exon->end_phase(($exon->length + $exon->phase) % 3);
+		    }
+		    if ($exon == $tln->start_Exon) {
+		      $copyexon->phase( $newexons[$#newexons]->end_phase );
+  
+		      push @newexons,$copyexon;
+		      $inrange = 0;
+		    } elsif ($exon == $newstartexon) {
+		      push @newexons,$copynewstartexon;
+		      $copynewstartexon->end_phase(($exon->length - $tln->start + 1)%3);
+		      print STDERR "Setting end_phase on new start exon to " . $copynewstartexon->end_phase . 
+			    " l = " . $exon->length . " ts = " . $tln->start . "\n" if $VERBOSE;
+		      $inrange = 1;
+		    } else {
+		      push @newexons,$exon;
+		    }
+		  }
+  
+  
+		  $trans->flush_Exons;
+		  foreach my $exon (@newexons) {
+		    $trans->add_Exon($exon);
+		  }
+  
+		  # Reset translation start exon
+		  if ($tln->end_Exon == $tln->start_Exon) {
+		    $tln->end_Exon($copyexon);
+		  }
+		  $tln->start_Exon($copynewstartexon);
+  
+		}
+		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($trans);
+	      } else {
+		print STDERR "Across exons - not handling this\n";
+	      }
+
+	      last;
+	    } else {
+	      if ($testseq =~ /TAA/ or $testseq =~ /TGA/ or $testseq =~ /TAG/) {
+		$had_stop = 1;
+	      } else {
+		$coding_start -= 3;
+	      }
+	    }
+	  }
+	} else {
+	  print STDERR "Not enough bases upstream - NOT looking into genomic\n"if $VERBOSE;
+	}
+      }
+      
+    TLNEND:
+      {
+	my $coding_end = $trans->cdna_coding_end;
+	my $orig_coding_end = $coding_end;
+	
+	$trans->sort;
+    
+	my $peplen = $trans->translate->length;
+	
+	my @pepgencoords = $trans->pep2genomic($peplen,$peplen);
+	
+	if(scalar(@pepgencoords) > 2) {
+	  print STDERR "pep end does not map cleanly\n";
+	  next;
+	}
+    
+	my $pepgenstart = $pepgencoords[0]->start;
+	my $pepgenend   = $pepgencoords[$#pepgencoords]->end;
+	
+	unless($pepgencoords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+	  print STDERR "pep end maps to gap\n";
+	  next;
+	}
+	unless($pepgencoords[$#pepgencoords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+	  print STDERR "pep start (end of) maps to gap\n";
+	  next;
+	}
+    
+	#print "End Pep genomic location = " . $pepgenstart . " " . $pepgenend . "\n";
+	
+	my $endseq= substr($cdna_seq,$coding_end-3,3);
+	my $cdnalen = length($cdna_seq);
+  
+	#print "cdna seq for pep end = " . $endseq . "\n";
+	my $longendseq= substr($cdna_seq,$coding_end-6,12);
+	#print "long end seq (-3 to len 12) = $longendseq\n";
+	
+	#          if (!($endseq ne "TGA" and $endseq ne "TAA" and $endseq ne "TAG")) {
+	#            print "Has end " . $trans->translateable_seq . "\n";
+	#          } 
+	if ($endseq ne "TGA" and $endseq ne "TAA" and $endseq ne "TAG") {
+	  if (($cdnalen-$coding_end) > 3) {
+	    while (($cdnalen-$coding_end) > 3 && ($coding_end-$orig_coding_end) <= $maxterdist) {
+	      my $testseq = substr($cdna_seq,$coding_end,3);
+	      print "Test seq = $testseq\n";
+	      if ($testseq eq "TGA" or $testseq eq "TAA" or $testseq eq "TAG") {
+
+		my @coords = $trans->cdna2genomic($coding_end+1,$coding_end+3,$gene->strand);
+		my $new_start;
+		my $new_end;
+		if(scalar(@coords) > 2) {
+		  die("new end does not map cleanly\n");
+		  next;
+		} elsif (scalar(@coords) == 2) {
+		  print STDERR "WOW ISN'T NATURE HORRIBLE: new end crosses intron\n";
+		  print STDERR "coord[0] = " . $coords[0]->start . " " . $coords[0]->end ."\n";
+		  print STDERR "coord[1] = " . $coords[1]->start . " " . $coords[1]->end ."\n";
+		  if ($gene->strand == 1) {
+		    $new_start = $coords[0]->start;
+		    $new_end   = $coords[$#coords]->end;
+		  } else {
+		    $new_start = $coords[0]->end;
+		    $new_end   = $coords[$#coords]->start;
+		  }
+		} else {
+		  $new_start = $coords[0]->start;
+		  $new_end   = $coords[0]->end;
+		}
+		
+		unless($coords[0]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+		  die("new start maps to gap\n");
+		  next;
+		}
+		unless($coords[$#coords]->isa('Bio::EnsEMBL::Mapper::Coordinate')) {
+		  die("new start (end of) maps to gap\n");
+		  next;
+		}
+		
+		if ($new_end - $new_start == 2) {
+    
+		  #print "Sequence of genomic pos of new end = " . $slice->subseq($new_start,$new_end,$gene->strand) . "\n";
+		  $nupdated_end++;
+    
+		  my $newendexon;
+		  foreach my $exon (@{$trans->get_all_Exons}) {
+		    if ($exon->end >= $new_start && $exon->start <= $new_start) {
+		      $newendexon = $exon;
+		      last;
+		    }
+		  }
+    
+		  if ($newendexon == $tln->end_Exon) {
+		    if ($tln->end_Exon->strand == 1) {
+		      $tln->end($new_end - $tln->end_Exon->start + 1);
+		    } else {
+		      $tln->end($tln->end_Exon->end - $new_start + 1);
+		    }
+		    
+		    # NAUGHTY, but hey I should have to do this - I've changed the translation after all
+		    $trans->{'transcript_mapper'} = undef;
+		    $trans->{'coding_region_start'} = undef;
+		    $trans->{'coding_region_end'} = undef;
+		    $trans->{'cdna_coding_start'} = undef;
+		    $trans->{'cdna_coding_end'} = undef;
+		    
+		  } else {
+		    # find exon
+		    if (!defined($newendexon)) {
+		      die "Failed finding new end exon - how can this be?\n";
+		    }
+		    # create a copy of if and of current end exon (because of phase change)
+		    my $copyexon = new Bio::EnsEMBL::Exon(
+							  -start  => $tln->end_Exon->start,
+							  -end    => $tln->end_Exon->end,
+							  -strand => $gene->strand,
+							 );
+		    my $copynewendexon = new Bio::EnsEMBL::Exon(
+								-start  => $newendexon->start,
+								-end    => $newendexon->end,
+								-strand => $gene->strand,
+							       );
+      
+		    $copyexon->phase($tln->end_Exon->phase);
+		    $copyexon->end_phase($tln->end_Exon->end_phase);
+		    $copyexon->contig($tln->end_Exon->contig);
+		    if ($tln->end_Exon->stable_id) {
+		      $copyexon->stable_id($tln->end_Exon->stable_id . "TER" . $metcnt++);
+		      $copyexon->created($time);
+		      $copyexon->modified($time);
+		      $copyexon->version(1);
+		    }
+      
+		    $copynewendexon->phase($newendexon->phase);
+		    # $copynewendexon->end_phase(0);
+		    $copynewendexon->contig($newendexon->contig);
+		    if ($newendexon->stable_id) {
+		      $copynewendexon->stable_id($newendexon->stable_id . "TER" . $metcnt++);
+		      $copynewendexon->created($time);
+		      $copynewendexon->modified($time);
+		      $copynewendexon->version(1);
+		    }
+      
+		    # TODO evidence
+          
+		    if ($copynewendexon->strand == 1) {
+		      $tln->end($new_end - $copynewendexon->start + 1);
+		    } else {
+		      $tln->end($copynewendexon->end - $new_start + 1 );
+  
+		      my $tercodon = $copynewendexon->seq->subseq($copynewendexon->end - $new_start-1, $copynewendexon->end - $new_start +1);
+		      #reverse($tercodon);
+		      #$tercodon =~ tr /ACGT/TGCA/;
+  		      
+		    }
+    
+		    # Replace exons in transcript, and fix phases
+		    my @newexons;
+		    my $inrange = 0;
+		    foreach my $exon (@{$trans->get_all_Exons}) {
+		      if ($inrange) {
+			print STDERR "in range exon before phase = " . $exon->phase . " endphase " . $exon->end_phase . "\n" if $VERBOSE;
+			$exon->phase( $newexons[$#newexons]->end_phase );
+			$exon->end_phase(($exon->length + $exon->phase) % 3);
+			print STDERR "in range exon after phase = " . $exon->phase . " endphase " . $exon->end_phase . "\n" if $VERBOSE;
+		      }
+		      if ($exon == $tln->end_Exon) {
+			my $phase = $exon->phase;
+			if ($phase == -1) {
+			  $phase = 0;
+			}
+			if ($exon == $tln->start_Exon) {
+			  $copyexon->end_phase(($exon->length - $tln->start + 1)%3);
+			} else {
+			  $copyexon->end_phase(($exon->length + $exon->phase)%3);
+			}
+			print STDERR "Setting end_phase on old end exon to " . $copyexon->end_phase . " l = " . $exon->length . "\n" if $VERBOSE;
+    
+			push @newexons,$copyexon;
+			$inrange = 1;
+		      } elsif ($exon == $newendexon) {
+			$copynewendexon->phase( $newexons[$#newexons]->end_phase );
+			$copynewendexon->end_phase( -1);
+  
+			push @newexons,$copynewendexon;
+			$inrange = 0;
+		      } else {
+                            push @newexons,$exon;
+                          }
+		    }
+    
+		    $trans->flush_Exons;
+		    foreach my $exon (@newexons) {
+		      $trans->add_Exon($exon);
+		    }
+		    
+		    # Reset translation start exon
+		    if ($tln->end_Exon == $tln->start_Exon) {
+		      $tln->start_Exon($copyexon);
+		    }
+		    $tln->end_Exon($copynewendexon);
+		    
+		  }
+		  #Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_print_Translation($trans);
+		  # print "translateable seq = \n";
+		  # print $trans->translateable_seq . "\n"; 
+		} else {
+		  print STDERR "Across exons - not handling this\n" if $VERBOSE;
+		}
+		last;
+	      }
+	      $coding_end += 3;
+	    }
+	  } else {
+	    print STDERR "Not enough bases downstream - NOT looking into genomic\n" if $VERBOSE;
+	  }
+	}
+      }
+    }
+  }
+
+  return($gene);
+}
+
+
 #
 # GET/SET METHODS
 #
 
 =head2 forward_genewise_clusters
+
   Arg [1]    : 
   Description: get/set for genewise clusters
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub forward_genewise_clusters{
@@ -2729,12 +3514,13 @@ sub forward_genewise_clusters{
 }
 
 =head2 reverse_genewise_clusters
+
   Arg [1]    : 
   Description: get/set for genewise clusters
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub reverse_genewise_clusters{
@@ -2754,12 +3540,13 @@ sub reverse_genewise_clusters{
 
 
 =head2 cdna_genes
+
   Arg [1]    : 
   Description: get/set for e2g gene array
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub cdna_genes {
@@ -2773,16 +3560,63 @@ sub cdna_genes {
     push(@{$self->{'_cdna_genes'}},@{$genes});
   }
 
-  return @{$self->{'_cdna_genes'}};
+  return ($self->{'_cdna_genes'});
+}
+
+
+=head2 prune
+
+  Arg [1]    : (optional) bool
+  Description: get/set for option to prune genes
+
+=cut
+
+sub prune {
+  my ($self, $bool) = @_;
+
+  if (!defined($self->{'_prune_genes'})) {
+    $self->{'_prune_genes'} = undef;
+  }
+
+  if (defined $bool) {
+    $self->{'_prune_genes'} = $bool;
+  }
+
+  return ($self->{'_prune_genes'});
+}
+
+
+=head2 ests
+
+  Arg [1]    : (optional) ref to array with ests
+  Description: get/set for ests
+  Returntype : array ref with EST objects
+  Exceptions : none
+
+=cut
+
+sub ests {
+  my ($self, $ests) = @_;
+
+  if (!defined($self->{'_ests'})) {
+    $self->{'_ests'} = [];
+  }
+
+  if (defined $ests && scalar(@{$ests})) {
+    push(@{$self->{'_ests'}},@{$ests});
+  }
+
+  return($self->{'_ests'});
 }
 
 
 =head2 ditags
-  Arg [1]    : ref to array with ditags
+
+  Arg [1]    : (optional) ref to array with ditags
   Description: get/set ditags
-  Returntype : 
-  Exceptions : 
-  Example    : 
+  Returntype : array ref with ditag objects
+  Exceptions : none
+
 =cut
 
 sub ditags {
@@ -2793,20 +3627,21 @@ sub ditags {
   }
 
   if (defined $ditags && scalar(@{$ditags})) {
-    push(@{$self->{'_ditags'}},@{$ditags});
+    push(@{$self->{'_ditags'}}, @{$ditags});
   }
 
-  return @{$self->{'_ditags'}};
+  return($self->{'_ditags'});
 }
 
 
 =head2 gw_genes
+
   Arg [1]    : 
   Description: get/set for genewise gene array
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub gw_genes {
@@ -2823,12 +3658,13 @@ sub gw_genes {
 }
 
 =head2 blessed_genes
+
   Arg [1]    : 
   Description: get/set for blessed gene array
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub blessed_genes {
@@ -2849,7 +3685,7 @@ sub blessed_genes {
 
 	# make a new gene
 	my $newgene = new Bio::EnsEMBL::Gene;
-	$newgene->type($gene->type);
+	$newgene->biotype($gene->biotype);
 
 	# clone transcript
 	my $newtranscript = new Bio::EnsEMBL::Transcript;
@@ -2898,6 +3734,9 @@ sub blessed_genes {
 		$newtranslation->end($transcript->translation->end);
 	    }
 	  $newtranscript->add_Exon($newexon);
+
+	  #add sf
+	  $newexon->add_supporting_features(@{$exon->get_all_supporting_features});
 	}
 
 	$newgene->add_Transcript($newtranscript);
@@ -2910,13 +3749,14 @@ sub blessed_genes {
   return $self->{'_blessed_genes'};
 }
 
-=head2 
-  Arg [1]    : combined_genes
+=head2 combined_genes
+
+  Arg [1]    : ref to Bio::EnsEMBL::Gene
   Description: get/set for combined gene array
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub combined_genes {
@@ -2925,21 +3765,24 @@ sub combined_genes {
   if (!defined($self->{'_combined_genes'})) {
     $self->{'_combined_genes'} = [];
   }
-
-  if (defined $genesref && scalar(@{$genesref})) {
-    push(@{$self->{'_combined_genes'}},@{$genesref});
+  if (defined $genesref) {
+    push(@{$self->{'_combined_genes'}}, $genesref);
   }
+#  if (defined $genesref && scalar(@{$genesref})) {
+#    push(@{$self->{'_combined_genes'}},@{$genesref});
+#  }
 
   return $self->{'_combined_genes'};
 }
 
 =head2 unmatched_genes
+
   Arg [1]    : 
   Description: get/set for unmatched gene array
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub unmatched_genes {
@@ -2949,20 +3792,23 @@ sub unmatched_genes {
     $self->{'_unmatched_genes'} = [];
   }
 
+  if(@genes){
     push(@{$self->{'_unmatched_genes'}},@genes);
+  }
 
 
-  return @{$self->{'_unmatched_genes'}};
+  return $self->{'_unmatched_genes'};
 }
 
 
 =head2 retrieve_unmerged_gene
+
   Arg [1]    : Bio::EnsEMBL::Gene
   Description: Returns unmeregd, frameshifted version of input gene
   Returntype : Bio::EnsEMBL::Gene
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub retrieve_unmerged_gene{
@@ -2973,6 +3819,7 @@ sub retrieve_unmerged_gene{
 }
 
 =head2 merged_unmerged_pairs
+
   Arg [1]    : 
   Description: get/set for pairs of frameshift merged and unmerged
                genes. Key is merged gene, value is unmerged
@@ -2980,7 +3827,7 @@ sub retrieve_unmerged_gene{
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub merged_unmerged_pairs {
@@ -2999,14 +3846,14 @@ sub merged_unmerged_pairs {
 }
 
 =head2 modified_unmodified_pairs
+
   Arg [1]    : 
   Description: get/set for pairs of UTR modified and unmodified genes.
                Key is modified gene, value is unmodified
-
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub modified_unmodified_pairs {
@@ -3024,13 +3871,15 @@ sub modified_unmodified_pairs {
   return $self->{'_modified_unmodified_pairs'};
 }
 
+
 =head2 output
+
   Arg [1]    : 
   Description: 
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub output{
@@ -3048,12 +3897,13 @@ sub output{
 }
 
 =head2 cdna_db
+
   Arg [1]    : 
   Description: get/set for db storing exonerate alignments of cDNAs 
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub cdna_db {
@@ -3080,12 +3930,13 @@ sub cdna_db {
 }
 
 =head2 est_db
+
   Arg [1]    : 
   Description: get/set for db storing exonerate alignments of ESTs 
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub est_db {
@@ -3113,6 +3964,7 @@ sub est_db {
 
 
 =head2 ditag_db
+
   Arg [1]    : 
   Description: get/set for db storing exonerate alignments of ditags
   Returntype : 
@@ -3150,12 +4002,11 @@ sub ditag_db {
 
 
 =head2 genewise_db
-  Arg [1]    : 
+
+  Arg [1]    : (optional) db
   Description: get/set for db storing genewise alignments
-  Returntype : 
-  Exceptions : 
-  Example    : 
- 
+  Returntype : db
+
 =cut
 
 sub genewise_db {
@@ -3182,12 +4033,13 @@ sub genewise_db {
 }
 
 =head2 blessed_db
+
   Arg [1]    : 
   Description: get/set for db storing blessed gene structures
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub blessed_db {
@@ -3217,12 +4069,13 @@ sub blessed_db {
 }
 
 =head2 output_db
+
   Arg [1]    : 
   Description: get/set for db in which UTR modified genes should be stored
   Returntype : 
   Exceptions : 
   Example    : 
- 
+
 =cut
 
 sub output_db {
@@ -3248,7 +4101,118 @@ sub output_db {
     return $self->{_output_db};
 }
 
+=head2 _get_evidence_set ($logic_name_or_biotype)
 
+  Name     : get_evidence_set( $logic_name_or_biotype )
+  Arg      : String 
+  Func     : returns the name of the evidence_set of a genee / PredictionTranscript 
+  Returnval: String describing evidence_set_name
+
+=cut 
+
+sub _get_evidence_set {
+  my ($self, $logic_name_or_biotype) = @_ ;
+
+  my %ev_sets = %{ $self->{evidence_sets} } ;
+  my $result_set_name;
+  for my $set_name (keys %ev_sets){
+    my @logic_names = @{$ev_sets{$set_name}} ;
+    for my $ln (@logic_names ) {
+       if ($ln eq $logic_name_or_biotype){
+         $result_set_name = $set_name ;
+       }
+    }
+  }
+
+  return $result_set_name;
+}
+
+
+=head2 make_seqfetcher
+
+ Title   : make_seqfetcher
+ Usage   :
+ Description: for the KnownUTR module
+ Example :
+ Returns : Bio::DB::RandomAccessI
+ Args    :
+
+
+=cut
+
+sub make_seqfetcher{
+  my ( $self, $index, $seqfetcher_class  ) = @_;
+  my $seqfetcher;
+
+  (my $class = $seqfetcher_class) =~ s/::/\//g;
+  require "$class.pm";
+
+  print "index = $index \n" if $VERBOSE;
+
+  if(defined $index && $index ne ''){
+    my @db = ( $index );
+
+    # make sure that your class is compatible with the index type
+    $seqfetcher = "$seqfetcher_class"->new('-db' => \@db, );
+  }
+  else{
+    throw("can't make seqfetcher\n");
+  }
+
+  return $seqfetcher;
+
+}
+
+
+sub _protein_seqfetcher{
+  my ($self, $seqfetcher) = @_;
+
+  if($seqfetcher){
+    $self->{'_protein_seqfetcher'} = $seqfetcher;
+  }
+
+  return $self->{'_protein_seqfetcher'};
+}
+
+sub _cdna_seqfetcher{
+  my ($self, $seqfetcher) = @_;
+
+  if($seqfetcher){
+    $self->{'_cdna_seqfetcher'} = $seqfetcher;
+  }
+
+  return $self->{'_cdna_seqfetcher'};
+}
+
+sub _PmatchFeatureAdaptor{
+  my ($self, $pmfa) = @_;
+
+  if($pmfa){
+    $self->{'_PmatchFeatureAdaptor'} = $pmfa;
+  }
+
+  return $self->{'_PmatchFeatureAdaptor'};
+}
+
+sub _cdna_slice {
+  my ($self, $slice) = @_;
+
+  if($slice){
+    $self->{'_cdna_slice'} = $slice;
+  }
+
+  return $self->{'_cdna_slice'};
+}
+
+sub _cdna_evidence {
+  my ($self, $cdna_evidence) = @_;
+
+  if($cdna_evidence){
+    $self->{'_cdna_evidence'} = $cdna_evidence;
+  }
+
+  return $self->{'_cdna_evidence'};
+}
 
 
 1;
