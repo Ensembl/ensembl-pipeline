@@ -134,12 +134,12 @@ my %analysis_to_configure = %{$oa_conf->get_config_by_name("MAIN_CONFIG" )};
 
 my %main_analysis_setup ;  
 
-# configure LOCATE_MISSING_ORTHOLOGUES   
+# configureFIND_MISSING_ORTHOLOGUES 
 my @initial_analysis_to_run ; 
 
-if ( $analysis_to_configure{"RUN_LOCATE_MISSING_ORTHOLOGUES"}) {  
-   push @{$main_analysis_setup{LOCATE_MISSING_ORTHOLOGUES}}, 
-    @{ setup_config("LOCATE_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
+if ( $analysis_to_configure{"RUN_FIND_MISSING_ORTHOLOGUES"}) {  
+   push @{$main_analysis_setup{FIND_MISSING_ORTHOLOGUES}}, 
+    @{ setup_config("FIND_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
     push @initial_analysis_to_run, 'pre_FindMissingOrthologues';
 }     
 
@@ -189,7 +189,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       add_rule($pa, $pre_ana, $submit) ; 
 
       # make and upload input_ids for initial analysis 
-      # logic_name:slicename for LOCATE_MISSING_ORTHOLOGUES and FIND_PARTIAL_GENES 
+      # logic_name:slicename for FIND_MISSING_ORTHOLOGUES and FIND_PARTIAL_GENES 
       # logic_name for FIND_SPLIT_GENES  
       # "logic_name" refers to the analysis which will run in the second stage 
       #
@@ -199,9 +199,9 @@ for my $analysis_type ( keys %main_analysis_setup ) {
         my $input_ids ;   
 
         # get correct core db-adaptor   
-        if (  $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES" ) {   
+        if (  $analysis_type eq "FIND_MISSING_ORTHOLOGUES" ) {   
 
-          my $species_alias = ${$$LOCATE_MISSING_ORTHOLOGUES{"ANALYSIS_SETS"}{$logic_name}}[0]; 
+          my $species_alias = ${$$FIND_MISSING_ORTHOLOGUES{"ANALYSIS_SETS"}{$logic_name}}[0]; 
           $dba = Bio::EnsEMBL::Registry->get_DBAdaptor($species_alias,'core') ; 
           $input_ids = generate_input_ids($dba,$logic_name) ;    
 
@@ -339,7 +339,7 @@ sub get_pre_analysis {
        $sname = "pre_FindPartialGenes";  
        $module = "FindPartialGenes";  
 
-   } elsif ( $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES") {    
+   } elsif ( $analysis_type eq "FIND_MISSING_ORTHOLOGUES") {    
 
        $input_id_type = "mo_slice";  
        $sname = "pre_FindMissingOrthologues" ; 
@@ -379,7 +379,7 @@ sub get_analysis_set {
         $input_id_type = "file_$logic_name" ; 
      } elsif ( $analysis_type eq "FIND_PARTIAL_GENES") {       
         $input_id_type = "file_$logic_name" ; 
-     } elsif ( $analysis_type eq "LOCATE_MISSING_ORTHOLOGUES") {  
+     } elsif ( $analysis_type eq "FIND_MISSING_ORTHOLOGUES") {  
         $input_id_type = "file_$logic_name" ; 
      } else { 
        throw ("Can't find the analysis type specified\n") ; 
