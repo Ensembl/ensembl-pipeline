@@ -304,8 +304,7 @@ sub diskspace {
 			}
     }
     close DF || throw("Error from 'df' : $!\n");
-    return 0 if($status == 0);
-    return 1;
+    return $status;
 }
 
 
