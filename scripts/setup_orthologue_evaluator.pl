@@ -213,7 +213,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
           $dba = $pa ;    
           $input_ids = [ keys %{$$FIND_SPLIT_GENES{"ANALYSIS_SETS"}} ];  
         } 
-        push @test_runnable_statements, "perl ensembl-analysis/scripts/test-RunnableDB" .
+        push @test_runnable_statements, "perl ensembl-analysis/scripts/test_RunnableDB" .
          " -dbname $opt{dbname} -dbhost $opt{dbhost}\\\n -dbuser $opt{dbuser} " . 
          "-dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name -input_id $$input_ids[0]\n" ;  
         upload_input_ids ( $input_ids, $pa, $submit) ; 
