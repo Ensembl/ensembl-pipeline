@@ -631,6 +631,8 @@ sub run_matching{
 
   # merge exons with frameshifts into a big exon
   my @merged_genes = ();
+  my %blacklist = ();
+  my $redoing = 0;
 
   #maybe we should not do merging with blessed genes at all?!
   #if(!$blessed){
@@ -639,7 +641,7 @@ sub run_matching{
   #else{
   #  @merged_genes = @{$genesref};
   #}
-  print STDERR "got " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n" if $VERBOSE;
+  print STDERR "\n --- \ngot " . scalar(@merged_genes) . " merged " . $combined_genetype . " genes\n" if $VERBOSE;
 
   # sort genewises by exonic length and genomic length
   @merged_genes = sort { my $result = (  $self->_transcript_length_in_gene($b) <=>
@@ -667,19 +669,49 @@ sub run_matching{
       # get and store unmerged version of cds
       my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
       $self->unmatched_genes($unmerged_cds);
+      $redoing = 0;
       next CDS;
     }
 
     #look for a pre-defined pairing between a protein and a cDNA the gene was build from
     my $predef_match = undef;
+    my $combined_transcript = undef;
+
     if($LOOK_FOR_KNOWN){
+
       $predef_match = $self->check_for_predefined_pairing($cds);
+
+      if(defined $predef_match){
+
+	$combined_transcript = $self->combine_genes($cds, $predef_match);
+
+	# just check combined transcript works before throwing away the original  transcript
+	if (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	      _check_Transcript($combined_transcript,$self->query)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	      _check_introns($combined_transcript,$self->query)){
+
+	  # make sure combined transcript doesn't misjoin any genewise clusters
+	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
+	  if($self->find_cluster_joiners($combined_transcript)){
+	    print STDERR "Found a cluster_joiner!\n" if $VERBOSE;
+	    print STDERR $combined_transcript->seq_region_start."/".$combined_transcript->seq_region_end."\n" if $VERBOSE;
+	    #dont use this one
+	    $combined_transcript = undef;
+	    #put cDNA on blacklist & try and find another one!
+	    $blacklist{$predef_match->start."_".$predef_match->end."_".$predef_match->strand} = 1;
+	  }
+	}
+	else{
+	  $combined_transcript = undef;
+	}
+      }
     }
 
-    if(defined $predef_match){
+    if($predef_match && $combined_transcript){
       #use this cDNA
-      $cdna_match = $predef_match;
       print STDERR "Using predefined cDNA!\n";
+      $cdna_match = $predef_match;
     }
     else{
 
@@ -696,13 +728,11 @@ sub run_matching{
 	($matching_cdnas, $utr_length_hash, $UTR_side_indicator_hash) = $self->match_protein_to_cdna($cds, 1);
 	%utr_length_hash                    = %$utr_length_hash;
 	if(!(scalar @$matching_cdnas)){
-	  
+
 	  my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
 
 	  $self->unmatched_genes($unmerged_cds);
 	  next CDS;
-	}
-	else{
 	}
       }
 
@@ -719,11 +749,11 @@ sub run_matching{
 
       #store genes seperated by strand
       my $genes_by_strand;
+      my @possible_transcripts;
       foreach my $gene (@$matching_extended_cdnas){
 	push @{$genes_by_strand->{$gene->strand}}, $gene;
       }
-      #apply collapsing method copied from TranscriptConsensus:
-      #(creates scores!)
+      #apply collapsing method from TranscriptConsensus (creates the scores)
       my $cluster_to_use;
       if(scalar @$clusters){
 	$cluster_to_use = $clusters;
@@ -738,7 +768,7 @@ sub run_matching{
 	my $collapsed_cluster = Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus->collapse_cluster( $cluster, $genes_by_strand );
 
 	my @potential_genes = $cluster->get_Genes;
-	my @possible_transcripts;
+	#my @possible_transcripts;
 	foreach my $potential_gene (@potential_genes){
 	  foreach my $potential_trans (@{$potential_gene->get_all_Transcripts}) {
 
@@ -758,58 +788,60 @@ sub run_matching{
 	    push(@possible_transcripts, $new_transcript);
 	  }
 	}
+      } #clusters
 
+      #get the highest scoring transcript, that survives tests
+      @possible_transcripts = sort { $a->score <=> $b->score } @possible_transcripts if @possible_transcripts;
 
-	#get the highest scoring transcript
-	@possible_transcripts = sort { $a->score <=> $b->score } @possible_transcripts if @possible_transcripts;
-	my $chosen_transcript = $possible_transcripts[-1];
-
+    POS:
+      while(my $chosen_transcript = pop @possible_transcripts){
 
 	#make a gene from this
 	$cdna_match = Bio::EnsEMBL::Gene->new;
 	$cdna_match->slice($chosen_transcript->slice);
 	$cdna_match->add_Transcript($chosen_transcript);
 	$cdna_match->analysis($chosen_transcript->analysis);
+
+	#combine it with the cds gene
+	$combined_transcript = $self->combine_genes($cds, $cdna_match);
+
+	# just check combined transcript works before throwing away the original  transcript
+	if ( defined($combined_transcript) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	      _check_Transcript($combined_transcript,$self->query)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
+	      _check_introns($combined_transcript,$self->query)){
+
+	  # make sure combined transcript doesn't misjoin any genewise clusters
+	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
+	  if($self->find_cluster_joiners($combined_transcript)){
+
+	      print STDERR "Found a cluster_joiner!\n" if $VERBOSE;
+	      print STDERR $combined_transcript->seq_region_start."/".$combined_transcript->seq_region_end."\n" if $VERBOSE;
+	      #dont use this one
+	      $combined_transcript = undef;
+	    }
+	}
+	else{
+	  $combined_transcript = undef;
+	}
+
+	if(defined $combined_transcript){
+	  #leave the loop
+	  last POS;
+	}
+
       }
 
     } #find match
 
-    if(!defined $cdna_match){
-      print STDERR "No matching cDNA was found!\n\n" if $VERBOSE;
-      #retrieving unmerged!!!
-      my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
-      $self->unmatched_genes($unmerged_cds);
-      next CDS;
-    }
-
-    my $combined_transcript = $self->combine_genes($cds, $cdna_match);
-
-    # just check combined transcript works before throwing away the original  transcript
-    unless (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	          _check_Transcript($combined_transcript,$self->query)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	           _check_introns($combined_transcript,$self->query)){
-      $combined_transcript = undef;
-    }
-
-    # make sure combined transcript doesn't misjoin any genewise clusters
-    if ($combined_transcript){
-      print STDERR "About to check for cluster joiners\n" if $VERBOSE;
-        if($self->find_cluster_joiners($combined_transcript)){
-	  print STDERR "Found a cluster_joiner!\n" if $VERBOSE;
-	  print STDERR $combined_transcript->seq_region_start."/".$combined_transcript->seq_region_end."\n" if $VERBOSE;
-          # revert to unmodified
-          $combined_transcript = undef;
-        }
-    }
-    if ($combined_transcript){
+    if (defined $combined_transcript){
       #transfer evidence
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
 
       #make the new gene with UTR
       my $combined_genes = $self->make_gene($combined_genetype, $combined_transcript);
 
-      #check phases, etc. if it is not a blessed gene
+      #check phases, etc.- if it is not a blessed gene
       my $combined_gene;
       if(!$blessed){
 	$combined_gene = $self->look_for_both($combined_genes->[0]);
