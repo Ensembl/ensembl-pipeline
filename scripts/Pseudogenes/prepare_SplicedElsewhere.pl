@@ -95,7 +95,7 @@ if ($SINGLE_EXON) {
     }
   }
  #   system ("rm $file");
-  system ("xdformat -p $multifile");
+  system ("xdformat -n $multifile");
 }
 
 print "Finished\n";
