@@ -178,6 +178,7 @@ sub fetch_input{
   # get blessed genes
   my $blessed_slice;
   my @blessed_genes;
+  my $blessed_type;
   if ($self->blessed_db){
     $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id);
   }
@@ -188,7 +189,10 @@ sub fetch_input{
     my $blessed_genes = $blessed_slice->get_all_Genes_by_type($bgt);
     print STDERR "got " . scalar(@{$blessed_genes}) . " $bgt genes.\n";
     $self->blessed_genes( $blessed_slice, $blessed_genes );
+    $blessed_type .= $bgt."";
   }
+  #store all blessed type names for VIP treatment
+  $self->{'blessed_type'} = ($blessed_type.$BLESSED_UTR_GENETYPE);
 
   # get cdnas
   my $cdna_vc = $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
@@ -631,8 +635,6 @@ sub run_matching{
 
   # merge exons with frameshifts into a big exon
   my @merged_genes = ();
-  my %blacklist = ();
-  my $redoing = 0;
 
   #maybe we should not do merging with blessed genes at all?!
   #if(!$blessed){
@@ -669,7 +671,6 @@ sub run_matching{
       # get and store unmerged version of cds
       my $unmerged_cds = $self->retrieve_unmerged_gene($cds);
       $self->unmatched_genes($unmerged_cds);
-      $redoing = 0;
       next CDS;
     }
 
@@ -698,8 +699,6 @@ sub run_matching{
 	    print STDERR $combined_transcript->seq_region_start."/".$combined_transcript->seq_region_end."\n" if $VERBOSE;
 	    #dont use this one
 	    $combined_transcript = undef;
-	    #put cDNA on blacklist & try and find another one!
-	    $blacklist{$predef_match->start."_".$predef_match->end."_".$predef_match->strand} = 1;
 	  }
 	}
 	else{
@@ -714,6 +713,7 @@ sub run_matching{
       $cdna_match = $predef_match;
     }
     else{
+
 
       # find matching cdnas using scoring of all evidence available
       my ($matching_cdnas, $utr_length_hash, $UTR_side_indicator_hash) = $self->match_protein_to_cdna($cds, 0);
@@ -1787,7 +1787,6 @@ sub _merge_genes {
   foreach my $unmerged (@{$genesref}){
 
     my $gene = new Bio::EnsEMBL::Gene;
-    #$gene->type('combined');                 ## tmp-change of biotype?!
     $gene->dbID($unmerged->dbID);
     my @pred_exons;
     my $ecount = 0;
@@ -1930,6 +1929,7 @@ sub _merge_genes {
 
     # and gene
     $gene->add_Transcript($merged_transcript);
+    $gene->biotype($unmerged->biotype);
     push(@merged, $gene);
     $count++;
 
@@ -2045,6 +2045,13 @@ sub combine_genes{
 
   } # end of EACH_E2G_EXON
 
+  #don't modify translation of blessed genes
+  my $biotype = $gw->biotype;
+  if($modified_peptide && (($self->{'blessed_type'}) =~ m/$biotype/)){
+    print STDERR "translation of blessed gene would need to be modified - not using combined gene.\n";
+    return undef;
+  }
+
   ##############################
   # expand merged exons
   ##############################
@@ -2075,11 +2082,11 @@ sub combine_genes{
 
       # check that the result is fine
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query) ){
-        print STDERR "problems with this combined transcript, return undef";
+        print STDERR "problems with this combined transcript, return undef\n";
         return undef;
       }
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript) ){
-        print STDERR "problems with this combined translation, return undef";
+        print STDERR "problems with this combined translation, return undef\n";
         return undef;
       }
 
@@ -2924,7 +2931,7 @@ sub compare_translations{
 =head2 remap_genes
 
   Description: strictly speaking this is no longer remapping anything...
-               checks translation, set start/stop, sets biotype
+               checks translation, set start/stop, can set biotype
   Returntype : ref to array of Bio::EnsEMBL::Gene
 
 =cut
@@ -2932,12 +2939,22 @@ sub compare_translations{
 sub remap_genes {
   my ($self, $genes, $biotype) = @_;
 
-  #my $slice = $self->query;
   my @remapped_genes = ();
+  my $blessed_type   = $self->{'blessed_type'};
   print STDERR "remapping ".scalar @$genes." genes.\n" if $VERBOSE;
 
  GENE:
   foreach my $gene (@$genes) {
+
+    #leave the blessed genes alone
+    my $biotype = $gene->biotype;
+    if($blessed_type =~ m/$biotype/){
+      print STDERR "not remapping ".$gene->biotype."\n";
+      push(@remapped_genes, $gene);
+      next;
+    }
+    print STDERR "remapping ".$gene->biotype."\n";
+
     #force a centain biotype?
     if($biotype){
       $gene->biotype($biotype);
@@ -3021,8 +3038,6 @@ sub _recalculate_translation {
   my ($self, $mytranscript, $strand) = @_;
 
   my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
-
-  my $slice = $self->query;
 
   Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation($mytranscript);
 
