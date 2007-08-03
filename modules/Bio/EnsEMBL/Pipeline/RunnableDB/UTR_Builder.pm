@@ -1800,7 +1800,11 @@ sub _merge_genes {
     }
 
     # check the sanity of the transcript
-    next UNMERGED_GENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0],$self->query));
+    if(! Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0],$self->query)){
+      print STDERR "transcript ".$unmerged->dbID."did NOT pass sanity check!\n";
+      print STDERR "found at ".$unmerged->seq_region_name.", ".$unmerged->seq_region_start.", ".$unmerged->seq_region_end."\n";
+      next UNMERGED_GENE;
+    }
 
     ### we follow here 5' -> 3' orientation ###
 #    $trans[0]->sort;
