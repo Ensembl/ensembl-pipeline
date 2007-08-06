@@ -146,6 +146,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
+#tmp var to check number of genes
+my $totalgenes = 0;
+
 =head2 fetch_input
 
   Description: Get all raw data needed from the databases
@@ -154,7 +157,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 =cut
 
 sub fetch_input{
-  my ($self,@args) = @_;
+  my ($self, @args) = @_;
 
   $self->fetch_sequence([], $self->genewise_db);
 
@@ -162,8 +165,8 @@ sub fetch_input{
   my $similarity_genes = $self->query->get_all_Genes_by_type($GB_SIMILARITY_GENETYPE);
   my $targetted_genes  = $self->query->get_all_Genes_by_type($GB_TARGETTED_GW_GENETYPE);
 
-  print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes.\n";
-  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes.\n";
+  print STDERR "got " . scalar(@{$targetted_genes}) . " targetted genewise genes [$GB_TARGETTED_GW_GENETYPE].\n";
+  print STDERR "got " . scalar(@{$similarity_genes}) . " similarity genewise genes [$GB_SIMILARITY_GENETYPE].\n";
 
   $self->gw_genes( $similarity_genes);
   $self->gw_genes( $targetted_genes );
@@ -194,6 +197,12 @@ sub fetch_input{
   #store all blessed type names for VIP treatment
   $self->{'blessed_type'} = ($blessed_type.$BLESSED_UTR_GENETYPE);
 
+  #are there any genes here?
+  if(!scalar @{$self->gw_genes} and !scalar @{$self->blessed_genes}){
+    print STDERR "No genes found here.\n";
+    return 0;
+  }
+
   # get cdnas
   my $cdna_vc = $self->cdna_db->get_SliceAdaptor->fetch_by_name($self->input_id);
   $self->_cdna_slice($cdna_vc);
@@ -209,14 +218,14 @@ sub fetch_input{
 
 
   # get ESTs
-  if(defined($EST_GENETYPE) && $self->est_db){
-    my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
-    my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
-    print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
-    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
-    $self->ests($filtered_ests);
-    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
-  }
+#  if(defined($EST_GENETYPE) && $self->est_db){
+#    my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+#    my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
+#    print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
+#    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
+#    $self->ests($filtered_ests);
+#    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
+#  }
 
   # get ditags
   my ($dfa, $ditag_slice);
@@ -275,6 +284,10 @@ sub fetch_input{
   #prune genes during filtering if desired
   #removed as too many good things were thrown out.
   $self->prune($PRUNE_GENES);
+
+  #get rid of identical models
+  $self->{'remove_redundant'} = 0;
+
 }
 
 
@@ -291,8 +304,9 @@ sub run {
   # Make sure we keep the fragments to let the
   # genebuilder do the final sorting out, but don't add UTRs to them.
 
+  my $ininumber = scalar @{$self->gw_genes};
   my $filtered_genes = $self->filter_genes($self->gw_genes);
-  print STDERR "filtered to ".(scalar @$filtered_genes). " genes.\n" if $VERBOSE;
+  print STDERR "filtered from $ininumber to ".(scalar @$filtered_genes). " genes.\n" if $VERBOSE;
 
   $self->run_matching($self->blessed_genes, $BLESSED_UTR_GENETYPE,  1);
   $self->run_matching($filtered_genes,      $UTR_GENETYPE, 0);
@@ -300,11 +314,13 @@ sub run {
   print STDERR "Have ".(scalar @{$self->combined_genes})." combined_genes & ".
                (scalar @{$self->unmatched_genes})." unmatched_genes.\n" if $VERBOSE;
 
-  # remap to raw contig coords
+  # remap & check
   my @remapped;
-  push(@remapped, @{$self->remap_genes($self->combined_genes, undef)});
+  push(@remapped, @{$self->remap_genes($self->combined_genes,  undef)});
   push(@remapped, @{$self->remap_genes($self->unmatched_genes, undef)});
   $self->output(@remapped);
+
+
 }
 
 
@@ -331,10 +347,9 @@ sub filter_genes {
 
   #get rid of long-intron genes, etc.
   foreach my $testgene (@$genesref){
-    if($testgene && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-       _check_Transcript($testgene->get_all_Transcripts->[0]) &&
-       Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-       _check_introns($testgene->get_all_Transcripts->[0])){
+    if( $testgene
+	&& Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($testgene->get_all_Transcripts->[0])
+	&& Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($testgene->get_all_Transcripts->[0]) ){
       push(@tested_genes, $testgene);
     }
   }
@@ -687,10 +702,9 @@ sub run_matching{
 	$combined_transcript = $self->combine_genes($cds, $predef_match);
 
 	# just check combined transcript works before throwing away the original  transcript
-	if (  $combined_transcript && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	      _check_Transcript($combined_transcript,$self->query)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	      _check_introns($combined_transcript,$self->query)){
+	if (  $combined_transcript
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript, $self->query, 1)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript, $self->query, undef, 1) ){
 
 	  # make sure combined transcript doesn't misjoin any genewise clusters
 	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
@@ -806,10 +820,9 @@ sub run_matching{
 	$combined_transcript = $self->combine_genes($cds, $cdna_match);
 
 	# just check combined transcript works before throwing away the original  transcript
-	if ( defined($combined_transcript) && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	      _check_Transcript($combined_transcript,$self->query)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-	      _check_introns($combined_transcript,$self->query)){
+	if ( defined($combined_transcript)
+	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript,$self->query, 1)
+	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript,$self->query, undef, 1) ){
 
 	  # make sure combined transcript doesn't misjoin any genewise clusters
 	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
@@ -865,7 +878,7 @@ sub run_matching{
   print STDERR "now have ".(scalar @{$self->combined_genes})." combined_genes genes".
         " and ".(scalar @{$self->unmatched_genes})." unmatched_genes\n" if $VERBOSE;
 
-  if(!$blessed){
+  if(!$blessed && ($self->{'remove_redundant'})){
     #remove redundatant models
     my $unique_unmatched_genes = $self->remove_redundant_models($self->combined_genes, $self->unmatched_genes);
 
@@ -1279,10 +1292,8 @@ sub _filter_cdnas{
       # - it may not be that simple in the same way as it isn;t that simple in Targetted & Similarity builds
 
       next cDNA_TRANSCRIPT unless (
-				   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-				   _check_Transcript($tran,$self->query)
-				   && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->
-				   _check_introns($tran,$self->query)
+		Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($tran, $self->query, 1)
+		&& Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($tran, $self->query, undef, 1)
 				  );
       push(@newcdna, $cdna);
     }
@@ -1359,13 +1370,17 @@ sub _transcript_length_in_gene{
 sub write_output {
   my($self) = @_;
 
+  my $blessed = 0;
+
   # write genes in the database: GB_COMB_DBNAME
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
 
-  print STDERR "Have " . scalar ($self->output) . "genes to write\n";
+  print STDERR "Have ".scalar ($self->output)."(".$totalgenes.") genes to write\n";
 
  GENE:
-  foreach my $gene ($self->output) {	
+  foreach my $gene ($self->output) {
+
+
     if(!$gene->analysis ||
        $gene->analysis->logic_name ne $self->analysis->logic_name){
       $gene->analysis($self->analysis);
@@ -1390,6 +1405,7 @@ sub write_output {
       print STDERR "UNABLE TO WRITE GENE " . $gene->dbID. "of type " . $gene->type  . "\n\n$@\n\nSkipping this gene\n";
     }
   }
+  print STDERR "BLESSED: $blessed / ".scalar @{$self->blessed_genes}."\n";
 }
 
 
@@ -1490,14 +1506,15 @@ sub make_gene{
 
   foreach my $trans(@transcripts){
 
-    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $trans ) ){
-      print STDERR "rejecting transcript\n";
+    unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $trans, undef, 1 ) ){
+      print STDERR "\nrejecting transcript\n";
       return;
     }
 
     my $gene = new Bio::EnsEMBL::Gene;
     $gene->biotype($genetype);
     $trans->biotype($genetype);
+    $trans->analysis($analysis);
     $gene->add_Transcript($trans);
     $gene->analysis($analysis);
 
@@ -1509,7 +1526,7 @@ sub make_gene{
       $count++;
     }
     else{
-      print STDERR "Could not validate gene!\n";
+      print STDERR "\nCould not validate gene!\n";
     }
   }
 
@@ -1550,7 +1567,7 @@ sub match_protein_to_cdna{
   if($gw_exons[$#gw_exons]->strand != $strand){
     $self->warn("first and last gw exons have different strands ".
 		"- can't make a sensible combined gene\n with ".$gw_tran[0]->dbId );
-      return;
+      return undef;
   }
   if ( @gw_exons ){
     if ($strand == 1 ){
@@ -1800,7 +1817,7 @@ sub _merge_genes {
     }
 
     # check the sanity of the transcript
-    if(! Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0],$self->query)){
+    if(! Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($trans[0], $self->query, 0)){
       print STDERR "transcript ".$unmerged->dbID."did NOT pass sanity check!\n";
       print STDERR "found at ".$unmerged->seq_region_name.", ".$unmerged->seq_region_start.", ".$unmerged->seq_region_end."\n";
       next UNMERGED_GENE;
@@ -2085,11 +2102,15 @@ sub combine_genes{
       }
 
       # check that the result is fine
-      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query) ){
+
+      # PROBLEM: this throws out genes combined with cDNAs that are starting on previous slice!
+
+      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query, 1) ){
+#AAnew cds: 50021060-50046337, 1
         print STDERR "problems with this combined transcript, return undef\n";
         return undef;
       }
-      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript) ){
+      unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtranscript, 1) ){
         print STDERR "problems with this combined translation, return undef\n";
         return undef;
       }
@@ -2112,7 +2133,7 @@ sub combine_genes{
         $newtrans = $self->_recalculate_translation($newtranscript, $strand);
 
         # if the genomewise results gets stop codons, return the original transcript:
-        unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
+        unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans, 1) ){
           print STDERR "Arrgh, stop codons, returning the original transcript\n";
           $newtrans = $newtranscript;
         }
@@ -2968,7 +2989,7 @@ sub remap_genes {
     my $tran = $t[0];
 
     # check that it translates
-    unless(Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran)){
+    unless(Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($tran, 1)){
       print STDERR "Gene doesn't translate!\n";
       next GENE;
     }
@@ -3003,16 +3024,14 @@ sub validate_gene {
   # should be only a single transcript
   my @transcripts = @{$gene->get_all_Transcripts};
   if(scalar(@transcripts) != 1) {
-    my $msg = "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
-    $self->warn($msg);
+    print STDERR "Rejecting gene - should have one transcript, not " . scalar(@transcripts) . "\n";
     return 0;
   }
 
   foreach my $transcript(@transcripts){
     foreach my $exon(@{$transcript->get_all_Exons}){
-      unless ( Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exon)){
-	my $msg = "Rejecting gene because of invalid exon\n";
-	$self->warn($msg);
+      unless ( Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exon, 1)){
+	print STDERR "Rejecting gene because of invalid exon\n";
 	return 0;
       }
     }
@@ -3046,7 +3065,7 @@ sub _recalculate_translation {
   Bio::EnsEMBL::Pipeline::Tools::TranslationUtils->compute_translation($mytranscript);
 
   # check that everything is sane:
-  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($mytranscript)){
+  unless (Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($mytranscript, 1)){
     print STDERR "problem with the translation. Returning the original transcript\n";
     return $this_is_my_transcript;
   }
@@ -3497,8 +3516,8 @@ sub look_for_both {
 			push @newexons,$copynewendexon;
 			$inrange = 0;
 		      } else {
-                            push @newexons,$exon;
-                          }
+			push @newexons,$exon;
+		      }
 		    }
     
 		    $trans->flush_Exons;
@@ -3732,7 +3751,7 @@ sub blessed_genes {
       foreach my $transcript(@{$gene->get_all_Transcripts}){
 
 	# check transcript sanity
-	next OLDGENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript,$self->query));
+	next OLDGENE unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($transcript, $self->query, 1));
 
 	# make a new gene
 	my $newgene = new Bio::EnsEMBL::Gene;
