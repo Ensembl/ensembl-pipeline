@@ -30,7 +30,7 @@ package Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
-use Bio::EnsEMBL::Exon;
+
 
 @ISA = qw();
 
@@ -51,8 +51,6 @@ sub new {
   Example   : Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence
 
 =cut
-
-
 
 sub _transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
@@ -124,11 +122,11 @@ sub _transfer_supporting_evidence{
 
 
 sub _validate_Exon{
-  my ($self, $exon) = @_;
+  my ($self, $exon, $allow_neg_coords) = @_;
 
-  if($exon->start < 0 ){
+  if($exon->start < 0 && !$allow_neg_coords){
     my $msg = "rejecting exon, start < 0 : " . $exon->start . "\n";
-    #warning($msg);
+    warning($msg);
     return 0;
   }
   elsif($exon->start > $exon->end){
@@ -200,6 +198,7 @@ sub _print_Evidence{
 
 sub _clone_Exon{
   my ($self,$exon) = @_;
+
   my $newexon = new Bio::EnsEMBL::Exon;
   $newexon->start      ($exon->start);
   $newexon->end        ($exon->end);

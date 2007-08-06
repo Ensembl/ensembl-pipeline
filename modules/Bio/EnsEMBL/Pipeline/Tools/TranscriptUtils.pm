@@ -42,9 +42,6 @@ use Bio::EnsEMBL::PredictionTranscript;
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
- 
-
-
 
 ###########################################################
 #
@@ -58,7 +55,7 @@ use Bio::EnsEMBL::PredictionTranscript;
 # note - intron lengths now checked separately using _check_introns
 
 sub _check_Transcript{
-  my ($self,$transcript, $slice) = @_;
+  my ($self,$transcript, $slice, $allow_neg_coords) = @_;
 
   # hardcoded stuff, to go in a config file
   my $MAX_EXON_LENGTH   = 20000;
@@ -68,13 +65,14 @@ sub _check_Transcript{
   my $valid = 1;
   my $strand;
   #my ($p, $f, $l) = caller;
-  #print "Checking transcript ".$id." ".$f.":".$l."\n";
+  #print STDERR "Checking transcript ".$id."\n";
   $transcript->sort;
   my @exons = @{$transcript->get_all_Exons};
   eval {
     $strand =  $exons[0]->strand;
   };
   if ($@) {
+    print STDERR "strand problems\n";
     $self->throw;
   }
 
@@ -89,7 +87,7 @@ sub _check_Transcript{
       print STDERR "check: transcript $id outside the slice\n";
       $valid = 0;
     }
-    elsif ( $transcript->start < 1 && $transcript->end > 1 ){
+    elsif ( ($transcript->start < 1 && $transcript->end > 1) && !$allow_neg_coords){
       print STDERR "check: transcript $id falls off the slice by its lower end\n";
       $valid = 0;
     }
@@ -100,7 +98,8 @@ sub _check_Transcript{
     for (my $i = 0; $i <= $#exons; $i++) {
 
       # check exon coords are valid
-      if (! Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exons[$i])){
+      if (! Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_validate_Exon($exons[$i], $allow_neg_coords)){
+	print STDERR "check: exon invalid\n";
         $valid = 0;;
         last EXON;
       }
@@ -122,25 +121,10 @@ sub _check_Transcript{
 	}
 
 	# check phase consistency:
-        if (not $transcript->translation) {
-          if ($exons[$i-1]->phase != -1 or $exons[$i-1]->end_phase != -1 or
-              $exons[$i]->phase != -1 or $exons[$i]->end_phase != -1) {
-            print STDERR "check: transcript $id is not coding and has bad phases\n";
-            $valid = 0;
-            last EXON;
-          }
-        } else {
-          if ( $exons[$i-1]->end_phase != $exons[$i]->phase and 
-               (not ($exons[$i-1]->end_phase == -1 and 
-                     $exons[$i]->phase == 0 and
-                     $transcript->translation->start_Exon eq $exons[$i-1]) or
-                not ($exons[$i-1]->end_phase == 0 and 
-                     $exons[$i]->phase == -1 and
-                     $transcript->translation->end_Exon eq $exons[$i]))) {
-            print STDERR "check: transcript $id has phase inconsistency\n";
-            $valid = 0;
-            last EXON;
-          }
+	if ( $exons[$i-1]->end_phase != $exons[$i]->phase  ){
+	  print STDERR "check: transcript $id has phase inconsistency\n";
+	  $valid = 0;
+	  last EXON;
 	}
 		
 	# check for folded transcripts
@@ -183,8 +167,8 @@ sub _check_Transcript{
     $valid = 0;
   }
   if ($valid == 0 ){
-    #my ($p, $f, $l) = caller;
-    #print "***".$f.":".$l."***\n"
+    my ($p, $f, $l) = caller;
+    print "***".$f.":".$l."***\n"
   }
   return $valid;
 }
@@ -196,12 +180,10 @@ sub _check_Transcript{
 # although always on chromosomal/slice coordinates, never in rawcontig coordinates.
 
 sub _check_introns{
-    my ($self,$transcript, $slice, $maxintron) = @_;
+    my ($self, $transcript, $slice, $maxintron, $allow_neg_coords) = @_;
     
     # hardcoded stuff, to go in a config file
     my $MAX_INTRON_LENGTH = $maxintron || 200000;
-    
-    #my $MAX_INTRON_LENGTH = 25000;
 
     my $id = $self->transcript_id( $transcript );
     my $valid = 1;
@@ -228,10 +210,10 @@ sub _check_introns{
     ############################################################
     if ( $slice ){
       if ( $transcript->start > $slice->length || $transcript->end < 1 ){
-        #print STDERR "transcript $id outside the slice\n";
+        print STDERR "transcript $id outside the slice\n";
         $valid = 0;
-      }elsif ( $transcript->start < 1 && $transcript->end > 1 ){
-        #print STDERR "transcript $id falls off the slice by its lower end\n";
+      }elsif ( ($transcript->start < 1 && $transcript->end > 1) && ! $allow_neg_coords){
+        print STDERR "transcript $id falls off the slice by its lower end\n";
         $valid = 0;
       }
     }
@@ -273,6 +255,7 @@ sub _check_introns{
     if ($valid == 0 ){
       #$self->_print_Transcript($transcript);
     }
+
     return $valid;
   }
 
@@ -352,16 +335,18 @@ Description : it returns TRUE if a transcript has a translation, and this has
               we may have some transcripts whih are valid but
               for which we haven not assigned a translation yet.
 ReturnType  : a BOOLEAN.
+
 =cut
 
 sub _check_Translation{
-  my ($self,$transcript) = @_;
+  my ($self, $transcript, $allow_neg_coords) = @_;
+
   my $id = $self->transcript_id( $transcript );
   my $valid = 1;
   my $translation = $transcript->translation;
 
   # double check sane translation start & end
-  if( $translation->start < 1){
+  if( $translation->start < 1 && !$allow_neg_coords){
     print STDERR "dodgy translation start: " . $translation->start . "\n";
     $valid = 0;
   }
@@ -401,6 +386,7 @@ sub _check_Translation{
 }
 
 ############################################################
+
 =head2 _check_low_complexity
 
   Arg [1]   : Bio::EnsEMBL::Transcript $transcript
@@ -649,7 +635,7 @@ sub split_Transcript{
     my @ex = @{$st->get_all_Exons};
     
     if(scalar(@ex) > 1){
-      $st->{'temporary_id'} = ($transcript->dbID ? $transcript->dbID : "no_dbid") .  "." . $count++;
+      $st->{'temporary_id'} = $transcript->dbID . "." . $count++;
 
       foreach my $f (@{$transcript->get_all_supporting_features}) {
         my @ugs;
@@ -2241,44 +2227,5 @@ sub replace_stops_with_introns {
   return $tran;
 }
 
-=head2 identical_Transcripts 
- Title   : identical_Transcripts 
- Usage   : $identical = identical_Transcripts($transcript1, $transcript2);
- Function: compares 2 Transcripts. DOES NOT CHECK TO SEE WHETHER PHASES ARE IDENTICAL
-           OR WHETHER EVIDENCE IS IDENTICAL.
-           Transcripts are compared on the basis of (i) number of Exons, 
-           (ii) start and end coordinates for each Transcript, (iii) strand 
- Example :
- Returns : 1 if identical, 0 if not indentical 
- Args    : Transcript, Transcript
-           Transcript, Transcript
-=cut
-sub identical_Transcripts {
-  my ($transcript1, $transcript2) = @_;
 
-  my @exons1 = @{$transcript1->get_all_Exons()}; 
-  my @exons2 = @{$transcript2->get_all_Exons()};
-
-  # compare no. of Exons
-  if (scalar(@exons1) != scalar(@exons2)) {
-    return 0;
-  }
-
-  # compare Exon coordinates and strand
-  for(my $num = 0; $num < scalar(@exons1); $num++) {
-    if ($exons1[$num]->strand != $exons2[$num]->strand) {
-      return 0;
-    }   
-    if ($exons1[$num]->start != $exons2[$num]->start) {
-      return 0;
-    }
-    if ($exons1[$num]->end != $exons2[$num]->end) {
-      return 0;
-    }
-  }
-
-  # you may want to check the evidence and phase at some stage by adding a wrapper method
-
-  return 1;
-}
 1;
