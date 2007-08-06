@@ -341,14 +341,26 @@ sub run {
       print STDERR "For the cdna ",$cdna_id , " there are ",scalar(@targetted_genes) ," genes\n"; 
 
       foreach my $targetted_gene (@targetted_genes){
-
         # combine blat & targetted genes
         my $combined_transcript = $self->combine_transcripts($targetted_gene->get_all_Transcripts->[0], $exonerate_transcript);
         
         if ( $combined_transcript ){
-          $combined_transcript = $self->_transfer_evidence($combined_transcript, $exonerate_transcript);
-          $combined_transcript->add_supporting_features(@{$targetted_gene->get_all_Transcripts->[0]->get_all_supporting_features});
-          $combined_transcript->add_supporting_features(@{$exonerate_transcript->get_all_supporting_features});
+          
+	  my @csf_array;
+	  foreach my $sf(@{$targetted_gene->get_all_Transcripts->[0]->get_all_supporting_features}){
+	    $sf->slice($combined_transcript->slice);
+	    push @csf_array, $sf;
+	  } 
+	  
+	  my @esf_array;
+	  foreach my $sf(@{$exonerate_transcript->get_all_supporting_features}){
+	    $sf->slice($combined_transcript->slice);
+	    push @esf_array, $sf;
+	  }   
+	  
+	  $combined_transcript = $self->_transfer_evidence($combined_transcript, $exonerate_transcript);
+	  $combined_transcript->add_supporting_features(@csf_array);
+          $combined_transcript->add_supporting_features(@esf_array);
           $self->make_gene($combined_transcript);
         }
         else{
@@ -363,11 +375,13 @@ sub run {
   }
   # remap to raw contig coords
   my @remapped = $self->remap_genes();
+  
   $self->output(@remapped);
 
-#  print "I REACH REMAPPED STATUS\n";
+  #print "I REACH REMAPPED STATUS\n";
   
   foreach my $outgene ($self->output){
+    
     foreach my $newtrans (@{$outgene->get_all_Transcripts}){
         #print "ADDING analysis to NEW TRANSCRIPT\n";
         $newtrans->analysis($self->analysis);
@@ -384,8 +398,9 @@ sub run {
           }
         }
       }
+      
  
-   print "Gene was Remapped\n";
+    print "Gene was Remapped\n";
     eval {
       foreach my $outtrans (@{$outgene->get_all_Transcripts}){
         print "There is a transcript for this remapped gene\n";
@@ -479,7 +494,7 @@ sub write_output {
     # do a per gene eval...
     eval {
       $gene_adaptor->store($gene);
-      print STDERR "wrote to database gene dbID " . $gene->dbID . "\n";
+      print STDERR "wrote to database gene dbID " . $gene->dbID . "coords ".$gene->start()."-".$gene->end()."\n";
     }; 
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE\n\n$@\n\nSkipping this gene\n";
@@ -639,20 +654,21 @@ sub combine_transcripts{
     my $rsa = $ref_db->get_SliceAdaptor;
     
     my $chromosome_slice = $rsa->fetch_by_region(
-						 'chromosome',
+						 'toplevel',
 						 $self->query->chr_name,
                                                  );
     
     # IF YOU WANT TO RUN THE SCRIPT ON SLICES INSTEAD OF CHROMOSOMES
     # YOU MAY NEED TO UNCOMMENT THE FOLLOWING CODE
+
     
-    #   my  $tmp =$genewise_transcript->transfer($chromosome_slice); 
-    #  $genewise_transcript=$tmp;
-    #  print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
-    
-    #   my $cdna_tmp =  $cdna_transcript->transfer($chromosome_slice); 
-    #  $cdna_transcript =$cdna_tmp;
-    #  print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
+    my  $tmp =$genewise_transcript->transfer($chromosome_slice); 
+    $genewise_transcript=$tmp;
+    #print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
+
+    my $cdna_tmp =  $cdna_transcript->transfer($chromosome_slice); 
+    $cdna_transcript =$cdna_tmp;
+    #print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
     
     
     my $modified_peptide = 0;
@@ -695,7 +711,7 @@ sub combine_transcripts{
       
       # single exon genewise prediction?
       if(scalar(@gw_exons) == 1) {
-        # print "I enter single exon gene\n";
+         #print "I enter single exon gene\n";
         
 	($newtranscript,$modified_peptide_flag) = $self->transcript_from_single_exon_genewise( $ee,
 											       $gw_exons[0],
@@ -706,7 +722,7 @@ sub combine_transcripts{
       }
       
       else {
-        # print "I enter multiexon gene\n";#test
+         #print "I enter multiexon gene\n";#test
         
 	($newtranscript,$modified_peptide_flag) = $self->transcript_from_multi_exon_genewise($ee,
 											     $newtranscript,
@@ -726,6 +742,7 @@ sub combine_transcripts{
     } # end of EACH_CDNA_EXON
     
     
+   
     ##############################
     # expand merged exons
     ##############################
@@ -733,7 +750,7 @@ sub combine_transcripts{
     # check the transcript and expand frameshifts in all but original 3' gw_exon
     # (the sub_SeqFeatures have been flushed for this exon)
     if (defined($newtranscript)){
-      print "I enter new defined transcript\n"; #test
+      #print "I enter new defined transcript\n"; #test
       foreach my $ex (@{$newtranscript->get_all_Exons}){
         if($ex->sub_SeqFeature && scalar($ex->sub_SeqFeature) > 1 ){
           my @sf    = $ex->sub_SeqFeature;
@@ -744,7 +761,7 @@ sub combine_transcripts{
           
           # add back the remaining component exons
           foreach my $s(@sf){
-            print "Supporting feature slice ", $s->slice->name,"\n"; #test
+            #print "Supporting feature slice ", $s->slice->name,"\n"; #test
             $newtranscript->add_Exon($s);
             $newtranscript->sort;
           }
@@ -775,6 +792,7 @@ sub combine_transcripts{
       # always find very tiny exons.
       # we then recalculate the translation:
       
+     
       my $newtrans;
       if ( $modified_peptide ){
         my $strand = $newtranscript->start_Exon->strand;
@@ -782,7 +800,6 @@ sub combine_transcripts{
         print STDERR "before genomewise:\n";
         $newtrans = $self->_recalculate_translation($newtranscript,$strand); 
         print STDERR "after genomewise:\n";
-        
         # if the genomewise results gets stop codons, return the original transcript:
         unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($newtrans) ){
           print STDERR "Arrgh, stop codons, returning the original transcript\n";
@@ -1014,7 +1031,7 @@ sub transcript_from_multi_exon_genewise_forward{
     elsif($genewise_start < $current_start && $exoncount != 0){
 
       $modified_peptide = 1;
-      print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+      print STDERR "SHORTENING GENEWISE TRANSLATION - 5'\n";
 
       # genewise has leaked over the start. Tougher call - we need to take into account the
       # frame here as well
@@ -1091,7 +1108,7 @@ sub transcript_from_multi_exon_genewise_forward{
       elsif ( $current_exon->end < $genewise_exons[$#genewise_exons]->end && $exoncount != $#cdna_exons ){
 	
 	$modified_peptide = 1;
-	print STDERR "SHORTENING GENEWISE TRANSLATION\n";
+	print STDERR "SHORTENING GENEWISE TRANSLATION - 3'\n";
 	  ## fix translation end iff genewise has leaked over - will need truncating
 	  my $diff   = $genewise_exons[$#genewise_exons]->end - $current_exon->end;
 	  print STDERR "diff: $diff\n";
@@ -1357,7 +1374,7 @@ my ($self, $transcript, $exoncount, @cdna_exons) = @_;
 	# these are all 5prime UTR exons
 	$newexon->phase(-1);
 	$newexon->end_phase(-1);
-	$newexon->contig($oldexon->contig);
+	$newexon->slice($transcript->slice);
 	my %evidence_hash;
 
 	foreach my $sf( @{$oldexon->get_all_supporting_features} ){
@@ -1496,11 +1513,11 @@ sub remap_genes {
       $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_start_codon($transcript);
       $transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->set_stop_codon($transcript);
     }
-
+    
     eval {
       $gene->transform('toplevel');	
     };
-
+    
     if ($gene){
       push(@newf,$gene);
     }
@@ -1532,6 +1549,7 @@ sub _transfer_evidence {
     foreach my $cdna_exon(@{$cdna_transcript->get_all_Exons}){
        my $tmp_e_cdna = $cdna_exon->transfer($combined_exon->slice);#added by jb16
        $cdna_exon =$tmp_e_cdna;  #added by jb16
+       
        # overlap - feature boundaries may well be wonky
        if($combined_exon->overlaps($cdna_exon)){
          Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
@@ -1565,8 +1583,6 @@ sub make_gene{
   foreach my $trans(@transcripts){
     $trans->sort;
 
-    
-
     unless ( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript( $trans ) ){
       print STDERR "rejecting transcript\n";
       return;
@@ -1584,6 +1600,8 @@ sub make_gene{
       push (@genes,$gene);
       $count++;
     }
+    
+
   }
 
   print STDERR "Produced genes:",scalar(@genes) ,"\n";
@@ -1998,9 +2016,9 @@ sub _recalculate_translation{
   my $this_is_my_transcript = Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_clone_Transcript($mytranscript);
   my $transcript;
 
-  my $slice = $self->query;
+  my $slice = $mytranscript->slice;
   my $inverted_slice = $slice->invert;
-
+  
   # the genomic sequence to be used with Genomewise (a PrimarySeq)
 
   # genomewise doesn't know about strands, we need to put everything in forward strand:
