@@ -217,14 +217,14 @@ sub fetch_input{
 
 
   # get ESTs
-#  if(defined($EST_GENETYPE) && $self->est_db){
-#    my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
-#    my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
-#    print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
-#    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
-#    $self->ests($filtered_ests);
-#    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
-#  }
+  if(defined($EST_GENETYPE) && $self->est_db){
+    my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
+    my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
+    print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
+    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
+    $self->ests($filtered_ests);
+    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
+  }
 
   # get ditags
   my ($dfa, $ditag_slice);
@@ -354,7 +354,7 @@ sub filter_genes {
     else{
       #test if it falls off the slice on the left, these will be picked up by another job
       if($testgene->get_all_Transcripts->[0]->start < 1 && $testgene->get_all_Transcripts->[0]->end > 1){
-	print STDERR "check: gene falls off the slice by its lower end\n";
+	print STDERR "ignoring here: gene falls off the slice by its lower end\n";
       }
       else{
 	#keep them in the set!
@@ -527,8 +527,7 @@ sub prune_CDS {
     #check for multi-transcript genes
     foreach my $unpruned_gene ($gene_cluster->get_Genes){
       if(scalar(@{$unpruned_gene->get_all_Transcripts}) > 1){
-        print "VAC: " . $unpruned_gene->dbID . " has >1 transcript - can't handle it yet \n";
-        next;
+        die($unpruned_gene->dbID . " has > 1 transcript - can't handle it yet \n");
       }
       push(@unpruned_genes, $unpruned_gene);
     }
@@ -552,7 +551,7 @@ sub prune_CDS {
     if ($maxexon_number == 1){ # ie the longest transcript is a single exon one
       # take the longest:
       push (@pruned_genes, $unpruned_genes[0]);
-      print STDERR "VAC: found single_exon_transcript: " .$unpruned_genes[0]->dbID. "\n";
+      print STDERR "VAC: found single_exon_transcript: " .$unpruned_genes[0]->dbID. "\n" if $VERBOSE;
       shift @unpruned_genes;
       $self->unmatched_genes(@unpruned_genes);
       next CLUSTER;
@@ -732,7 +731,7 @@ sub run_matching{
 
     if($predef_match && $combined_transcript){
       #use this cDNA
-      print STDERR "Using predefined cDNA!\n";
+      print STDERR "Using predefined cDNA!\n" if $VERBOSE;
       $cdna_match = $predef_match;
     }
     else{
@@ -1127,12 +1126,12 @@ sub check_for_predefined_pairing {
 	  && ($gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand  == $cdna_gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand))){
 
 
-      print $gene->seq_region_name."/".$cdna_gene->seq_region_name.
-	"  && ".$gene->strand."/".$cdna_gene->strand.
-	"  && ".$gene->seq_region_start."/".$cdna_gene->seq_region_end.
-	"  && ".$cdna_gene->seq_region_start."/".$gene->seq_region_end.
-	"  && ".$gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand."/".$cdna_gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand.".\n";
-      
+      #print $gene->seq_region_name."/".$cdna_gene->seq_region_name.
+	#"  && ".$gene->strand."/".$cdna_gene->strand.
+	#"  && ".$gene->seq_region_start."/".$cdna_gene->seq_region_end.
+	#"  && ".$cdna_gene->seq_region_start."/".$gene->seq_region_end.
+	#"  && ".$gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand."/".$cdna_gene->get_all_Transcripts->[0]->get_all_Exons->[0]->strand.".\n";
+      print STDERR "not overlapping properly, not using." if $VERBOSE;
       $cdna_gene = undef;
     }
   }
@@ -1227,7 +1226,7 @@ sub find_cluster_joiners{
   }
 
   if(!scalar(@clusters)){
-    print STDERR "VAC: odd, no clusters\n";
+    print STDERR "VAC: odd, no clusters\n" if $VERBOSE;
     return 0;
   }
 
@@ -1724,7 +1723,6 @@ sub match_protein_to_cdna{
 
     # can match either end, or both
     if($fiveprime_match || $threeprime_match){
-      print STDERR "MATCHING_CDNA: ".$e2g->dbID; #fskcheck
       my ($UTR_length, $left_UTR_length, $right_UTR_length) = 
 	 $self->_compute_UTRlength($egtran[0], $left_exon, $left_diff, $right_exon, $right_diff);
       my $UTR_diff   = $egtran[0]->length;
@@ -1936,7 +1934,7 @@ sub _merge_genes {
 
     my @seqeds = @{$trans[0]->translation->get_all_SeqEdits};
     if (scalar(@seqeds)) {
-      print "Copying sequence edits\n"; 
+      print "Copying sequence edits\n" if $VERBOSE; 
       foreach my $se (@seqeds) {
 	my $new_se =
 	  Bio::EnsEMBL::SeqEdit->new(
@@ -2015,7 +2013,7 @@ sub combine_genes{
 
   my @seqeds = @{$gw_tran[0]->translation->get_all_SeqEdits};
   if (scalar(@seqeds)) {
-    print "Copying sequence edits\n"; 
+    print "Copying sequence edits\n" if $VERBOSE; 
     foreach my $se (@seqeds) {
       my $new_se =
               Bio::EnsEMBL::SeqEdit->new(
@@ -2115,7 +2113,6 @@ sub combine_genes{
       # PROBLEM: this throws out genes combined with cDNAs that are starting on previous slice!
 
       unless( Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($newtranscript, $self->query, 1) ){
-#AAnew cds: 50021060-50046337, 1
         print STDERR "problems with this combined transcript, return undef\n";
         return undef;
       }
@@ -2187,8 +2184,6 @@ sub transcript_from_single_exon_genewise {
     my $gwstart = $gw_exon->start;
     my $gwend   = $gw_exon->end;
 
-    # print STDERR "single exon gene, " . $gw_exon->strand  .  " strand\n";
-	
     # modify the coordinates of the first exon in $newtranscript
     my $ex = $transcript->start_Exon;
 	
@@ -2983,11 +2978,11 @@ sub remap_genes {
     #leave the blessed genes alone
     my $biotype = $gene->biotype;
     if($blessed_type =~ m/$biotype/){
-      print STDERR "not remapping ".$gene->biotype."\n";
+      print STDERR "not remapping ".$gene->biotype."\n" if $VERBOSE;
       push(@remapped_genes, $gene);
       next;
     }
-    print STDERR "remapping ".$gene->biotype."\n";
+    print STDERR "remapping ".$gene->biotype."\n" if $VERBOSE;
 
     #force a centain biotype?
     if($biotype){
@@ -3774,7 +3769,7 @@ sub blessed_genes {
 	my $newtranslation = new Bio::EnsEMBL::Translation;
         my @seqeds = @{$transcript->translation->get_all_SeqEdits};
         if (scalar(@seqeds)) {
-          print "Copying sequence edits\n"; 
+          print "Copying sequence edits\n" if $VERBOSE; 
           foreach my $se (@seqeds) {
             my $new_se =
               Bio::EnsEMBL::SeqEdit->new(
