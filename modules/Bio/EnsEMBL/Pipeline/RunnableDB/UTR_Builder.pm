@@ -146,7 +146,6 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
-#tmp var to check number of genes
 my $totalgenes = 0;
 
 =head2 fetch_input
@@ -351,6 +350,16 @@ sub filter_genes {
 	&& Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($testgene->get_all_Transcripts->[0])
 	&& Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($testgene->get_all_Transcripts->[0]) ){
       push(@tested_genes, $testgene);
+    }
+    else{
+      #test if it falls off the slice on the left, these will be picked up by another job
+      if($testgene->get_all_Transcripts->[0]->start < 1 && $testgene->get_all_Transcripts->[0]->end > 1){
+	print STDERR "check: gene falls off the slice by its lower end\n";
+      }
+      else{
+	#keep them in the set!
+	$self->unmatched_genes($testgene);
+      }
     }
   }
   $genesref = \@tested_genes;
