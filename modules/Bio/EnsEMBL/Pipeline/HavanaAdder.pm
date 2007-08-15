@@ -454,10 +454,13 @@ sub cluster_into_Genes{
   
   my $num_trans = scalar(@transcripts_unsorted);
 
-  my @transcripts = sort { $a->start <=> $b->start ? $a->start <=> $b->start  : $b->end <=> $a->end } @transcripts_unsorted;
+  # First clean the coding exon cache in case it has any exons stored from previous called to the cluster_into_Genes function.
+  $self->clear_coding_exons_cache;
+
+  my @transcripts = sort { $a->coding_region_start <=> $b->coding_region_start ? $a->coding_region_start <=> $b->coding_region_start  : $b->coding_region_end <=> $a->coding_region_end } @transcripts_unsorted;
   my @clusters;
 
-  # clusters transcripts by whether or not any exon overlaps with an exon in 
+  # clusters transcripts by whether or not any coding exon overlaps with a coding exon in 
   # another transcript (came from original prune in GeneBuilder)
   foreach my $tran (@transcripts) {
 
@@ -465,11 +468,17 @@ sub cluster_into_Genes{
   CLUSTER: 
     foreach my $cluster (@clusters) {
       foreach my $cluster_transcript (@$cluster) {
-        if ($tran->end  >= $cluster_transcript->start &&
-            $tran->start <= $cluster_transcript->end) {
+        if ($tran->coding_region_end  >= $cluster_transcript->coding_region_start &&
+            $tran->coding_region_start <= $cluster_transcript->coding_region_end) {
+          
+          # foreach my $exon1 (@{$tran->get_all_Exons}) {
+          # foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
+          my $exons1 = get_coding_exons_for_transcript($tran);
+          my $cluster_exons = get_coding_exons_for_transcript($cluster_transcript);
 
-          foreach my $exon1 (@{$tran->get_all_Exons}) {
-  	  foreach my $cluster_exon (@{$cluster_transcript->get_all_Exons}) {
+          foreach my $exon1 (@{$exons1}) {
+            foreach my $cluster_exon (@{$cluster_exons}) {
+              
               if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
                 push (@matching_clusters, $cluster);
                 next CLUSTER;
@@ -536,12 +545,54 @@ sub cluster_into_Genes{
 
 ############################################################
 
+=head2 get_coding_exons_for_transcript
+
+    Example :    my $exons1 = $self->get_coding_exons_for_gene($tran);
+Description :   It returns the coding exons of a transcript and stores 
+                them in a hash to safe computer time                
+    Returns :   An ArrayRef than contain Exon objects.
+    Args    :   a transcript object
+
+=cut
+
+{
+  my %coding_exon_cache;
+
+  sub clear_coding_exons_cache {
+    %coding_exon_cache = ();
+  }
+
+
+sub get_coding_exons_for_transcript {
+    my ($trans) = @_;
+
+    if (exists($coding_exon_cache{$trans})) {
+      return $coding_exon_cache{$trans};
+    } else {
+      my %coding_hash;
+      
+      next if (!$trans->translation);
+      foreach my $exon (@{$trans->get_all_translateable_Exons}) {
+        $coding_hash{$exon} = $exon;
+      }
+
+      # my @coding = sort { $a->start <=> $b->start } values %coding_hash;
+      my @coding = values %coding_hash;
+
+      $coding_exon_cache{$trans} = \@coding;
+      return $coding_exon_cache{$trans};
+    }
+  }
+}
+
+############################################################
+
 sub check_Clusters{
   my ($self, $num_transcripts, $clusters) = @_;
   #Safety checks
   my $ntrans = 0;
 
-my $cluster_num = 0;
+  my $cluster_num = 0;
 
   my %trans_check_hash;
   foreach my $cluster (@$clusters) {
