@@ -202,8 +202,9 @@ for my $analysis_type ( keys %main_analysis_setup ) {
         if (  $analysis_type eq "FIND_MISSING_ORTHOLOGUES" ) {   
 
           my $species_alias = ${$$FIND_MISSING_ORTHOLOGUES{"ANALYSIS_SETS"}{$logic_name}}[0]; 
-          $dba = Bio::EnsEMBL::Registry->get_DBAdaptor($species_alias,'core') ; 
-          $input_ids = generate_input_ids($dba,$logic_name) ;    
+          
+	  $dba = Bio::EnsEMBL::Registry->get_DBAdaptor($species_alias,'core') ; 
+	  $input_ids = generate_input_ids($dba,$logic_name) ;    
 
         } elsif (  $analysis_type eq "FIND_PARTIAL_GENES" ) {  
           $dba = $pa ;   
@@ -297,7 +298,15 @@ sub generate_input_ids {
    my ($db, $logic_name ) = @_ ; 
    
    my $toplevel_slices = $db->get_SliceAdaptor->fetch_all('toplevel') ;    
-   my @input_ids = map { "$logic_name:".$_->name } @$toplevel_slices ;  
+   my @clean_slices;
+   foreach my $t (@$toplevel_slices){
+     if ($t->seq_region_name =~/MT/){
+       warning( "Genes on slice ".$t->seq_region_name." will not be used because slice is MT region\n");
+     }else{
+       push @clean_slices, $t;
+     }  
+   }
+   my @input_ids = map { "$logic_name:".$_->name } @clean_slices ;  
    return \@input_ids ; 
 }
 
