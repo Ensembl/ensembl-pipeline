@@ -1,0 +1,85 @@
+# You may distribute this module under the same terms as perl itself
+
+# POD documentation - main docs before the code
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::Config::HavanaAdder - imports global variables used by EnsEMBL gene building
+
+=head1 SYNOPSIS
+    use Bio::EnsEMBL::Pipeline::Config::HavanaAdder;
+    use Bio::EnsEMBL::Pipeline::Config::HavanaAdder qw(  );
+
+=head1 DESCRIPTION
+
+ HavanaAdder is based on Genebuilder.
+
+It imports and sets a number of standard global variables into the
+calling package, which are used in many scripts in the human sequence
+analysis system.  The variables are first decalared using "use vars",
+so that it can be used when "use strict" is in use in the calling
+script.  Without arguments all the standard variables are set, and
+with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn\'t appear in its
+C<%GeneBuilder> hash is asked to be set.
+
+The variables can also be references to arrays or hashes.
+
+Edit C<%HavanaAdder> to add or alter variables.
+
+All the variables are in capitals, so that they resemble environment
+variables.
+
+=head1 CONTACT
+
+=cut
+
+
+package Bio::EnsEMBL::Pipeline::Config::HavanaAdder;
+
+use strict;
+use vars qw( %GeneBuilder );
+
+# Hash containing config info
+%GeneBuilder = (
+
+                # Biotype of Ensembl Genes
+	        GB_ENSEMBL_INPUT_GENETYPE => 'ensembl', 
+	
+                # Biotype of Havana Genes
+	        GB_HAVANA_INPUT_GENETYPE => 'havana', 
+
+                # Biotype of Havana transcripts
+                GB_HAVANA_INPUT_TRANSCRIPTTYPES => ['Coding','Known_CDS','Novel_CDS','Putative_CDS'],
+                
+	       );
+
+sub import {
+  my ($callpack) = caller(0); # Name of the calling package
+  my $pack = shift; # Need to move package off @_
+  
+  # Get list of variables supplied, or else
+  # all of GeneBuilder:
+  my @vars = @_ ? @_ : keys( %GeneBuilder );
+  return unless @vars;
+  
+  # Predeclare global variables in calling package
+  eval "package $callpack; use vars qw("
+    . join(' ', map { '$'.$_ } @vars) . ")";
+    die $@ if $@;
+
+
+    foreach (@vars) {
+	if ( defined $GeneBuilder{ $_ } ) {
+            no strict 'refs';
+	    # Exporter does a similar job to the following
+	    # statement, but for function names, not
+	    # scalar variables:
+	    *{"${callpack}::$_"} = \$GeneBuilder{ $_ };
+	} else {
+	    die "Error: GeneBuilder: $_ not known\n";
+	}
+    }
+}
+
+1;
