@@ -84,6 +84,12 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 							       GB_INPUTID_REGEX
 							      );
 
+use Bio::EnsEMBL::Pipeline::Config::HavanaAdder qw (
+                                                    GB_ENSEMBL_INPUT_GENETYPE
+                                                    GB_HAVANA_INPUT_GENETYPE
+                                                    GB_HAVANA_INPUT_TRANSCRIPTTYPES
+                                                    );
+
 use vars qw(@ISA);
 use strict;
 
@@ -105,8 +111,8 @@ sub new {
     $self->{_gene_types}  = [];
 
     $self->query($slice);
-    $self->gene_types("ensembl");
-    $self->gene_types("havana");
+    $self->gene_types($GB_ENSEMBL_INPUT_GENETYPE);
+    $self->gene_types($GB_HAVANA_INPUT_GENETYPE);
   
     $self->input_id($input_id);
 
@@ -176,13 +182,21 @@ sub _merge_redundant_transcripts{
     my @transcripts = @{$gene->get_all_Transcripts};
     my @havana;
     my @ensembl;
+
     
     # are there any havana transcripts?
     foreach my $transcript(@transcripts){
-      if($transcript->biotype eq 'protein_coding'){
-        push(@havana, $transcript);
+      my $havana_t = 0;
+
+      foreach my $htranscript (@{$GB_HAVANA_INPUT_TRANSCRIPTTYPES}){
+        if($transcript->biotype eq  $htranscript){
+        #  print "IM HERE\n";
+          push(@havana, $transcript);
+          $havana_t = 1;
+        }
       }
-      else{
+      if($havana_t == 0){
+       # print "IM with ENSEMBL\n";
         push(@ensembl, $transcript);
       }
     }
