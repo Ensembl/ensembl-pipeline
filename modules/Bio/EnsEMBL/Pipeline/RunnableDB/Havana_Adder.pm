@@ -56,18 +56,26 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_VCONTIG
 							      );
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-                                                             GB_FINALDBHOST
-                                                             GB_FINALDBNAME
-                                                             GB_FINALDBUSER
-                                                             GB_FINALDBPASS
-                                                             GB_FINALDBPORT
-                                                             GB_HAVANA_DBHOST
-                                                             GB_HAVANA_DBNAME
-                                                             GB_HAVANA_DBUSER
-                                                             GB_HAVANA_DBPASS
-                                                             GB_HAVANA_DBPORT
-                                                            );
+use Bio::EnsEMBL::Pipeline::Config::HavanaAdder            qw (
+                                                               GB_GENE_OUTPUT_BIOTYPE
+                                                              );
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
+                                                               GB_FINALDBHOST
+                                                               GB_FINALDBNAME
+                                                               GB_FINALDBUSER
+                                                               GB_FINALDBPASS
+                                                               GB_FINALDBPORT
+                                                               PSEUDO_DBHOST
+                                                               PSEUDO_DBNAME
+                                                               PSEUDO_DBUSER
+                                                               PSEUDO_DBPASS
+                                                               PSEUDO_DBPORT
+                                                               GB_HAVANA_DBHOST
+                                                               GB_HAVANA_DBNAME
+                                                               GB_HAVANA_DBUSER
+                                                               GB_HAVANA_DBPASS
+                                                               GB_HAVANA_DBPORT
+                                                              );
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -137,74 +145,72 @@ sub input_id {
     
     
 sub write_output {
-    my($self,@genes) = @_;
+  my($self,@genes) = @_;
+  
+  # write genes out to a different database from the one we read genewise genes from.
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                              '-host'   => $GB_FINALDBHOST,
+                                              '-user'   => $GB_FINALDBUSER,
+                                              '-dbname' => $GB_FINALDBNAME,
+                                              '-pass'   => $GB_FINALDBPASS,
+                                              '-port'   => $GB_FINALDBPORT,
+                                              '-dnadb'  => $self->db,
+                                              );
+  # sort out analysis
+  
+  my $analysis = $self->analysis;
+  unless ($analysis){
+    $self->throw("an analysis logic name must be defined in the command line");
+  }
+  
+  my %contighash;
+  my $gene_adaptor = $db->get_GeneAdaptor;
+  
+  # this now assummes that we are building on a single VC.
+  my $genebuilders = $self->get_genebuilders;
     
-    # write genes out to a different database from the one we read genewise genes from.
-    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						'-host'   => $GB_FINALDBHOST,
-						'-user'   => $GB_FINALDBUSER,
-						'-dbname' => $GB_FINALDBNAME,
-						'-pass'   => $GB_FINALDBPASS,
-						'-port'   => $GB_FINALDBPORT,
-						'-dnadb'  => $self->db,
-					       );
-    # sort out analysis
-
-    my $analysis = $self->analysis;
-    unless ($analysis){
-	$self->throw("an analysis logic name must be defined in the command line");
-    }
+  foreach my $contig ( keys %$genebuilders ){
+    my $vc = $genebuilders->{$contig}->query;
+      
+    @genes = $genebuilders->{$contig}->final_genes;
     
-    my %contighash;
-    my $gene_adaptor = $db->get_GeneAdaptor;
+    return unless ($#genes >= 0);
+    my @newgenes;
     
-    # this now assummes that we are building on a single VC.
-    my $genebuilders = $self->get_genebuilders;
-    
-    foreach my $contig ( keys %$genebuilders ){
-        my $vc = $genebuilders->{$contig}->query;
-	
-	@genes = $genebuilders->{$contig}->final_genes;
-	
-	return unless ($#genes >= 0);
-	my @newgenes;
-	
-	foreach my $gene (@genes) { 
-          $gene->analysis($analysis);
-          $gene->type('ensemblHA');
-          # poke the caches
-          my %s_pfhash;
-	  foreach my $tran (@{$gene->get_all_Transcripts}) {
-          $tran->stable_id(undef);
-          my @tsf = @{$tran->get_all_supporting_features};
-
+    foreach my $gene (@genes) { 
+      $gene->analysis($analysis);
+      $gene->type($GB_GENE_OUTPUT_BIOTYPE);
+      # poke the caches
+      my %s_pfhash;
+      foreach my $tran (@{$gene->get_all_Transcripts}) {
+        $tran->stable_id(undef);
+        my @tsf = @{$tran->get_all_supporting_features};
+        
 #this may be a miostake - will proftein features get transferred?
 #          if (defined($tran->translation) && defined($s_pfa)) {
 #              $s_pfhash{get_transcript_id($tran)} = $s_pfa->fetch_by_translation_id($tran->translation->dbID);
 #              print "Got " . scalar(@{$s_pfhash{get_transcript_id($tran)}}) . " pfs for translation " . get_translation_id($tran->translation) . "\n";
 #          }
-
-          my @exons= @{$tran->get_all_Exons};
-          my $tln = $tran->translation;
-          $tln->{'stable_id'} = undef;
-
-          foreach my $exon (@exons) {
-             $exon->{'stable_id'} = undef;
-          }
-        }  
-	    # store
-	    eval {
-        $gene_adaptor->store($gene);
-#        print STDERR "wrote gene " . $gene->dbID . " to database ".
-          $gene->adaptor->db->dbname."\n";
-	    }; 
-	    if( $@ ) {
-              $self->warn("UNABLE TO WRITE GENE:\n$@");
-	    }
-          }
         
+        my @exons= @{$tran->get_all_Exons};
+        my $tln = $tran->translation;
+        $tln->{'stable_id'} = undef;
+        
+        foreach my $exon (@exons) {
+          $exon->{'stable_id'} = undef;
+        }
+      }  
+      # store
+      eval {
+        $gene_adaptor->store($gene);
+        #print STDERR "wrote gene " . $gene->dbID . " to database ".
+        #   $gene->adaptor->db->dbname."\n";
+      }; 
+      if( $@ ) {
+        $self->warn("UNABLE TO WRITE GENE:\n$@");
       }
-    
+    }   
+  }    
 }
 
 ############################################################
