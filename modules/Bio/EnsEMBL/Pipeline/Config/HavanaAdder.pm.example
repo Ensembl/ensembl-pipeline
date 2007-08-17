@@ -51,7 +51,12 @@ use vars qw( %GeneBuilder );
 
                 # Biotype of Havana transcripts
                 GB_HAVANA_INPUT_TRANSCRIPTTYPES => ['Coding','Known_CDS','Novel_CDS','Putative_CDS'],
-                
+
+                # Output Biotype for Genes
+                GB_GENE_OUTPUT_BIOTYPE => 'ensemblHA',
+
+                # Output Biotype for merged transcripts
+                GB_MERGED_TRANSCRIPT_TYPE => 'havana_ensembl',
 	       );
 
 sub import {
