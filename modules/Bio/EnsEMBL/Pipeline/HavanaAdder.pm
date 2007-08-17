@@ -88,6 +88,7 @@ use Bio::EnsEMBL::Pipeline::Config::HavanaAdder qw (
                                                     GB_ENSEMBL_INPUT_GENETYPE
                                                     GB_HAVANA_INPUT_GENETYPE
                                                     GB_HAVANA_INPUT_TRANSCRIPTTYPES
+                                                    GB_MERGED_TRANSCRIPT_TYPE
                                                     );
 
 use vars qw(@ISA);
@@ -211,10 +212,13 @@ sub _merge_redundant_transcripts{
     # compare each havana transcript to each ensembl one
     foreach my $ht(@havana){
       foreach my $et(@ensembl){
-        if ($self->are_matched_pair($ht, $et)){
-          $ht->biotype('havana_ensembl');
-          $self->_remove_transcript_from_gene($gene, $et);          
-        }
+        my $delete_t = 0;
+        if ($delete_t = $self->are_matched_pair($ht, $et)){
+          $ht->biotype($GB_MERGED_TRANSCRIPT_TYPE);
+          $self->_remove_transcript_from_gene($gene, $delete_t);          
+        }#else{
+         # print "BOTH TRANSCRIPTS KEPT\n"; 
+       # }
       }
     }
   }
@@ -224,35 +228,128 @@ sub _merge_redundant_transcripts{
 sub are_matched_pair {
   my($self, $havana, $ensembl) = @_;
 
-  #looking for an exact match of every exon.
+
+  # Fetch all exons in each transcript 
   my @hexons = @{$havana->get_all_Exons};
   my @eexons = @{$ensembl->get_all_Exons};
+
+  my @thexons = @{$havana->get_all_translateable_Exons};
+  my @teexons = @{$ensembl->get_all_translateable_Exons};
+
+
+#  print "NUMBER OF HAVANE EXONS",scalar(@hexons),"\n";
+#  print "NUMBER OF ENSEMBL EXONS",scalar(@eexons),"\n";
+#  print "_________________\n";
+  # Fetch only coding exons
+  #$self->clear_coding_exons_cache;
+  #my @thexons = @{get_coding_exons_for_transcript($havana)};
+  #my @teexons = @{get_coding_exons_for_transcript($ensembl)};
+
+  
+  # Check that the number of exons is the same in both transcripts
   return 0 unless scalar(@hexons) == scalar(@eexons);
+
+
+ # print "____________________________________\n";
+ # print "HAVANA ID: ",$havana->dbID, " ENSEMBL: ",$ensembl->dbID,"\n";
+
+ # Check return 3 different possible values:
+ # 0 means keep both transcript
+ # 1($ensembl) means keep havana transcript and remove ensembl 
+ # 2($havana) means keep ensembl transcript and remove hanana
+
+  # double check translation coords
+  return 0 unless($havana->translation->start == $ensembl->translation->start);
+  return 0 unless($havana->translation->end   == $ensembl->translation->end);
+
+
 
   # special case for single exon genes
   if(scalar(@hexons ==1)){
-    return 0 unless ($hexons[0]->start     == $eexons[0]->start &&
-                     $hexons[0]->end       == $eexons[0]->end &&
-                     $hexons[0]->strand    == $eexons[0]->strand);
-    
-    # double check translation coords
-    return 0 unless($havana->translation->start == $ensembl->translation->start);
-    return 0 unless($havana->translation->end   == $ensembl->translation->end);
+    print "SINGLE EXONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+    if ($hexons[0]->start     == $eexons[0]->start &&
+        $hexons[0]->end       == $eexons[0]->end &&
+        $hexons[0]->strand    == $eexons[0]->strand &&
+        $thexons[0]->start    == $teexons[0]->start &&
+        $thexons[0]->end      == $teexons[0]->end ){
+      print "HERE\n";
+      return $ensembl;
+      
+    }elsif($hexons[0]->start     <= $eexons[0]->start &&
+           $hexons[0]->end       >= $eexons[0]->end &&
+           $hexons[0]->strand    == $eexons[0]->strand &&
+           $thexons[0]->start    == $teexons[0]->start &&
+           $thexons[0]->end      == $teexons[0]->end){
+      print "HERE2\n";
+      return $ensembl;
+      
+    }elsif($hexons[0]->start     >= $eexons[0]->start &&
+           $hexons[0]->end       <= $eexons[0]->end &&
+           $hexons[0]->strand    == $eexons[0]->strand &&
+           $thexons[0]->start    == $teexons[0]->start &&
+           $thexons[0]->end      == $teexons[0]->end){
+      print "HERE3\n";
+      return $havana;
+      
+    }else{
+      print "Keep single both\n";
+      return 0;
+      
+    }
   }
+  # if is a multi exons transcript
   else{
-    for(my $i=0; $i<=$#hexons; $i++){
+    # First we check the internal structure of the transcript where everything has to be exactly equal
+    for(my $i=1; $i<=($#hexons-1); $i++){
       return 0 unless ($hexons[$i]->start     == $eexons[$i]->start &&
                        $hexons[$i]->end       == $eexons[$i]->end &&
                        $hexons[$i]->strand    == $eexons[$i]->strand &&
                        $hexons[$i]->phase     == $eexons[$i]->phase &&
                        $hexons[$i]->end_phase == $eexons[$i]->end_phase);
+   # print "EXONS PHASE HAVANA: ", $hexons[$i]->phase," AND ENSEMBL: ",$eexons[$i]->phase,"\n";
+      # print "EXONS ENDPHASE HAVANA: ",$hexons[$i]->end_phase," AND ENSEMBL: ",$eexons[$i]->end_phase,"\n";
+      
     }
+    # Then check the first an last exon to check if they are the same. If just start and end of UTR are different keep ensembl one
+    if ($hexons[0]->start     == $eexons[0]->start &&
+        $hexons[0]->end       == $eexons[0]->end &&
+        $hexons[0]->strand    == $eexons[0]->strand &&
+        $hexons[-1]->start    == $eexons[-1]->start &&
+        $hexons[-1]->end      == $eexons[-1]->end &&
+        $hexons[-1]->strand   == $eexons[-1]->strand &&
+        $thexons[0]->start    == $teexons[0]->start &&
+        $thexons[-1]->end     == $teexons[-1]->end ){
+      print "MULTIEXON DELETE ENSEMBL\n";
+      return $ensembl;
+
+    }elsif ($hexons[0]->start     != $eexons[0]->start &&
+            $hexons[0]->end       == $eexons[0]->end &&
+            $hexons[0]->strand    == $eexons[0]->strand &&
+            $hexons[-1]->start    == $eexons[-1]->start &&
+            $hexons[-1]->end      != $eexons[-1]->end &&
+            $hexons[-1]->strand   == $eexons[-1]->strand &&
+            $thexons[0]->start    == $teexons[0]->start &&
+            $thexons[-1]->end     == $teexons[-1]->end ){
+      print "MULTIEXON DELETE HAVANA\n";      
+      return $havana;
+      
+    }else{
+
+      print "Keep MULTIEXON BOTH\n";
+      return 0;
+
+    }
+    
   }
-
-  print "all exons match !\n";
-  return 1;
-
+  # double check translation coords
+  #return 0 unless($havana->translation->start == $ensembl->translation->start);
+  #return 0 unless($havana->translation->end   == $ensembl->translation->end);
+  
+  print "CASE NOT THOUGHT ABOUT, CHECK RULES!\n";
+#  return 1;
+  
 }
+
 
 sub _remove_transcript_from_gene {
   my ($self, $gene, $trans_to_del)  = @_;
@@ -313,11 +410,11 @@ sub get_Genes {
   my $ensemblslice = $self->fetch_sequence($self->input_id, $self->ensembl_db);
   my $havanaslice = $self->fetch_sequence($self->input_id, $self->havana_db);
   print STDERR "Fetching ensembl genes\n";  
-  my @genes = @{$ensemblslice->get_all_Genes_by_type('ensembl')};
-  print STDERR "Retrieved ".scalar(@genes)." genes of type ".'ensembl'."\n";
+  my @genes = @{$ensemblslice->get_all_Genes_by_type($GB_ENSEMBL_INPUT_GENETYPE)};
+  print STDERR "Retrieved ".scalar(@genes)." genes of type ".$GB_ENSEMBL_INPUT_GENETYPE."\n";
   print STDERR "Fetching havana genes\n";  
-  my @hgenes = @{$havanaslice->get_all_Genes_by_type('havana')};
-    print STDERR "Retrieved ".scalar(@hgenes)." genes of type ".'havana'."\n";
+  my @hgenes = @{$havanaslice->get_all_Genes_by_type($GB_HAVANA_INPUT_GENETYPE)};
+    print STDERR "Retrieved ".scalar(@hgenes)." genes of type ".$GB_HAVANA_INPUT_GENETYPE."\n";
 
   push(@genes, @hgenes);
 
@@ -448,11 +545,114 @@ sub _cluster_Transcripts_by_genomic_range{
   return @clusters;
 }
 
-
-
 ############################################################
 
 =head2 cluster_into_Genes
+
+    Example :   my @genes = $self->cluster_into_Genes(@transcripts);
+Description :   it clusters transcripts into genes according to exon overlap.
+                It will take care of difficult cases like transcripts within introns.
+                It also unify exons that are shared among transcripts.
+    Returns :   a beautiful list of geen objects
+    Args    :   a list of transcript objects
+
+=cut
+
+
+sub no_cluster_into_Genes{
+  my ($self, @transcripts_unsorted) = @_;
+  
+  my $num_trans = scalar(@transcripts_unsorted);
+
+  # First clean the coding exon cache in case it has any exons stored from previous called to the cluster_into_Genes function.
+  #$self->clear_coding_exons_cache;
+
+  my @transcripts = sort { $a->start <=> $b->start ? $a->start <=> $b->start  : $b->end <=> $a->end } @transcripts_unsorted;
+  my @clusters;
+
+  # clusters transcripts by whether or not any coding exon overlaps with a coding exon in 
+  # another transcript (came from original prune in GeneBuilder)
+  foreach my $tran (@transcripts) {
+
+    my @matching_clusters;
+  CLUSTER: 
+    foreach my $cluster (@clusters) {
+      foreach my $cluster_transcript (@$cluster) {
+        if ($tran->end  >= $cluster_transcript->start &&
+            $tran->start <= $cluster_transcript->end) {
+          
+          my $exons1 = $tran->get_all_Exons;
+          my $cluster_exons = $cluster_transcript->get_all_Exons;
+          
+          foreach my $exon1 (@{$exons1}) {
+            foreach my $cluster_exon (@{$cluster_exons}) {
+              
+              if ($exon1->overlaps($cluster_exon) && $exon1->strand == $cluster_exon->strand) {
+                push (@matching_clusters, $cluster);
+                next CLUSTER;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    if (scalar(@matching_clusters) == 0) {
+      my @newcluster;
+      push(@newcluster,$tran);
+      push(@clusters,\@newcluster);
+    } 
+    elsif (scalar(@matching_clusters) == 1) {
+      push @{$matching_clusters[0]}, $tran;
+      
+    } 
+    else {
+      # Merge the matching clusters into a single cluster
+      my @new_clusters;
+      my @merged_cluster;
+      foreach my $clust (@matching_clusters) {
+        push @merged_cluster, @$clust;
+      }
+      push @merged_cluster, $tran;
+      push @new_clusters,\@merged_cluster;
+      # Add back non matching clusters
+      foreach my $clust (@clusters) {
+        my $found = 0;
+      MATCHING: 
+	foreach my $m_clust (@matching_clusters) {
+          if ($clust == $m_clust) {
+            $found = 1;
+            last MATCHING;
+          }
+        }
+        if (!$found) {
+          push @new_clusters,$clust;
+        }
+      }
+      @clusters =  @new_clusters;
+    }
+  }
+  
+  # safety and sanity checks
+  $self->check_Clusters(scalar(@transcripts), \@clusters);
+  
+  # make and store genes
+  #print STDERR scalar(@clusters)." created, turning them into genes...\n";
+  my @genes;
+  foreach my $cluster(@clusters){
+    my $count = 0;
+    my $gene = new Bio::EnsEMBL::Gene;
+    foreach my $transcript (@$cluster){
+      $gene->add_Transcript($transcript);
+    }
+    push( @genes, $gene );
+  }
+  return @genes;
+}
+
+############################################################
+
+=head2 re_cluster_into_Genes
 
     Example :   my @genes = $self->cluster_into_Genes(@transcripts);
 Description :   it clusters transcripts into genes according to exon overlap.
@@ -477,10 +677,15 @@ sub cluster_into_Genes{
   # clusters transcripts by whether or not any coding exon overlaps with a coding exon in 
   # another transcript (came from original prune in GeneBuilder)
   foreach my $tran (@transcripts) {
+  # First clean the coding exon cache in case it has any exons stored from previous called to the cluster_into_Genes function.
+ # $self->clear_coding_exons_cache;
 
     my @matching_clusters;
   CLUSTER: 
     foreach my $cluster (@clusters) {
+      
+     # $self->clear_coding_exons_cache;
+
       foreach my $cluster_transcript (@$cluster) {
         if ($tran->coding_region_end  >= $cluster_transcript->coding_region_start &&
             $tran->coding_region_start <= $cluster_transcript->coding_region_end) {
@@ -499,7 +704,6 @@ sub cluster_into_Genes{
               }
             }
           }
-
         }
       }
     }
@@ -590,8 +794,8 @@ sub get_coding_exons_for_transcript {
         $coding_hash{$exon} = $exon;
       }
 
-      # my @coding = sort { $a->start <=> $b->start } values %coding_hash;
-      my @coding = values %coding_hash;
+      my @coding = sort { $a->start <=> $b->start } values %coding_hash;
+      #my @coding = values %coding_hash;
 
       $coding_exon_cache{$trans} = \@coding;
       return $coding_exon_cache{$trans};
