@@ -19,11 +19,11 @@ use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General qw(
 my ($dbhost, $dbuser, $dbpass, $dbport, $dbname, $help);
 
 GetOptions('dbhost=s' => \$dbhost,
-		   'dbuser=s' => \$dbuser,
-		   'dbpass=s' => \$dbpass,
-		   'dbport=s' => \$dbport,
-		   'dbname=s' => \$dbname,
-		  );    # plus default options
+           'dbuser=s' => \$dbuser,
+           'dbpass=s' => \$dbpass,
+           'dbport=s' => \$dbport,
+           'dbname=s' => \$dbname,
+          );    # plus default options
 				
 exec('perldoc', $0) if !($dbhost && $dbuser && $dbpass && $dbport && $dbname);
 
@@ -39,18 +39,14 @@ if ( $last_chunk =~ /\d+/ ){
 }
 else {
   warn "\nNo last chunk file in input_id_analysis table: starting from 1\n";
+  $last_chunk=0;
 }
 
 &chunk_pepfile($PA_PEPTIDE_FILE, $PA_CHUNKS_DIR, $PA_CHUNK_SIZE, $last_chunk);
 
 sub get_last_chunk_file {
 
-  my $sql= $dbh->prepare(qq{
-							SELECT max(input_id)
-							FROM input_id_analysis
-							WHERE input_id_type='filename'
-						   }
-						);
+  my $sql= $dbh->prepare(qq{ SELECT max(input_id) FROM input_id_analysis WHERE input_id_type='filename' });
 
   $sql->execute;
 
@@ -85,7 +81,7 @@ sub chunk_pepfile {
     #print $_."\n";
     if ($_ ne "\>") {
       if ($count == 0) {
-	open (CHUNK,">".$scratchdir."/chunk.$chunk") or die "couldn't opne ".$scratchdir."/chunk.$chunk";
+	open (CHUNK,">".$scratchdir."/chunk.$chunk") or die "couldn't open ".$scratchdir."/chunk.$chunk";
 	#print "have opened ".$scratchdir."/chunks/chunk.$chunk\n";
       }
       
