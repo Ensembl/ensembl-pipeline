@@ -134,7 +134,7 @@ my %analysis_to_configure = %{$oa_conf->get_config_by_name("MAIN_CONFIG" )};
 
 my %main_analysis_setup ;  
 
-# configureFIND_MISSING_ORTHOLOGUES 
+# configure FIND_MISSING_ORTHOLOGUES 
 my @initial_analysis_to_run ; 
 
 if ( $analysis_to_configure{"RUN_FIND_MISSING_ORTHOLOGUES"}) {  
@@ -144,7 +144,7 @@ if ( $analysis_to_configure{"RUN_FIND_MISSING_ORTHOLOGUES"}) {
 }     
 
  
-# configure RUN_FIND_PARTIAL_GENES  
+# configure FIND_PARTIAL_GENES  
 
 if ( $analysis_to_configure{"RUN_FIND_PARTIAL_GENES"}) {  
   push @{$main_analysis_setup{FIND_PARTIAL_GENES}}, 
@@ -192,7 +192,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       # logic_name:slicename for FIND_MISSING_ORTHOLOGUES and FIND_PARTIAL_GENES 
       # logic_name for FIND_SPLIT_GENES  
       # "logic_name" refers to the analysis which will run in the second stage 
-      #
+      # 
       
       for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
         my $dba ;
@@ -210,13 +210,21 @@ for my $analysis_type ( keys %main_analysis_setup ) {
           $dba = $pa ;   
           $input_ids = generate_input_ids($dba,$logic_name) ;      
 
-        } elsif (  $analysis_type eq "FIND_SPLIT_GENES" ) {   
+        } elsif (  $analysis_type eq "FIND_SPLIT_GENES" ) {     
+          #
+          # FindSplitGenes queries the compara database with raw sql, 
+          # it does not require a proper input-id ( slice format or whatever ) 
+          # any random string can be used !!!! 
+          #
           $dba = $pa ;    
           $input_ids = [ keys %{$$FIND_SPLIT_GENES{"ANALYSIS_SETS"}} ];  
-        } 
+        }  
+
         push @test_runnable_statements, "perl ensembl-analysis/scripts/test_RunnableDB" .
          " -dbname $opt{dbname} -dbhost $opt{dbhost}\\\n -dbuser $opt{dbuser} " . 
-         "-dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name -input_id $$input_ids[0]\n" ;  
+         " -dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name ".
+         " -input_id $$input_ids[0]\n" ;   
+
         upload_input_ids ( $input_ids, $pa, $submit) ; 
      }
   
@@ -225,7 +233,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
 
     for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
 
-      my ($post_analysis,$submit) = get_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
+      my ($post_analysis,$submit)=get_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
       check_and_store_analysis ( $pa, $post_analysis ) ;  
       check_and_store_analysis ( $pa, $submit ) ;  
       check_and_store_analysis ($out_db, $post_analysis) ;  
