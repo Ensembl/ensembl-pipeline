@@ -77,6 +77,9 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::DBEntry;
+use Bio::EnsEMBL::Attribute;
+use Bio::EnsEMBL::DnaDnaAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 
@@ -211,14 +214,17 @@ sub _merge_redundant_transcripts{
 
     # compare each havana transcript to each ensembl one
     foreach my $ht(@havana){
+      print "Deleting havana transcript supporting features\n";
+      $ht->flush_supporting_features;
       foreach my $et(@ensembl){
         my $delete_t = 0;
         if ($delete_t = $self->are_matched_pair($ht, $et)){
+          my @t_pair = ($ht, $et);
+          $self->set_transcript_relation($delete_t, @t_pair);
           $ht->biotype($GB_MERGED_TRANSCRIPT_TYPE);
+          $et->biotype($GB_MERGED_TRANSCRIPT_TYPE);
           $self->_remove_transcript_from_gene($gene, $delete_t);          
-        }#else{
-         # print "BOTH TRANSCRIPTS KEPT\n"; 
-       # }
+        }
       }
     }
   }
@@ -237,8 +243,6 @@ sub are_matched_pair {
   my @teexons = @{$ensembl->get_all_translateable_Exons};
 
 
-#  print "NUMBER OF HAVANE EXONS",scalar(@hexons),"\n";
-#  print "NUMBER OF ENSEMBL EXONS",scalar(@eexons),"\n";
 #  print "_________________\n";
   # Fetch only coding exons
   #$self->clear_coding_exons_cache;
@@ -250,45 +254,50 @@ sub are_matched_pair {
   return 0 unless scalar(@hexons) == scalar(@eexons);
 
 
- # print "____________________________________\n";
- # print "HAVANA ID: ",$havana->dbID, " ENSEMBL: ",$ensembl->dbID,"\n";
+  #print "____________________________________\n";
+  #print "HAVANA ID: ",$havana->dbID, " ENSEMBL: ",$ensembl->dbID,"\n";
 
  # Check return 3 different possible values:
  # 0 means keep both transcript
- # 1($ensembl) means keep havana transcript and remove ensembl 
- # 2($havana) means keep ensembl transcript and remove hanana
+ # return ($ensembl) means keep havana transcript and remove ensembl 
+ # return ($havana) means keep ensembl transcript and remove hanana
 
   # double check translation coords
-  return 0 unless($havana->translation->start == $ensembl->translation->start);
-  return 0 unless($havana->translation->end   == $ensembl->translation->end);
+  #print "HAVANA TRANS START: ",$havana->translation->genomic_start()," END: ",$havana->translation->genomic_end,"\n";
+  #print "ENSEMBL TRANS START: ",$ensembl->translation->genomic_start," END: ",$ensembl->translation->genomic_end,"\n";
+
+  return 0 unless($havana->translation->genomic_start == $ensembl->translation->genomic_start);
+  return 0 unless($havana->translation->genomic_end   == $ensembl->translation->genomic_end);
 
 
 
   # special case for single exon genes
   if(scalar(@hexons ==1)){
     print "SINGLE EXONS !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n";
+ 
     if ($hexons[0]->start     == $eexons[0]->start &&
         $hexons[0]->end       == $eexons[0]->end &&
-        $hexons[0]->strand    == $eexons[0]->strand &&
-        $thexons[0]->start    == $teexons[0]->start &&
-        $thexons[0]->end      == $teexons[0]->end ){
-      print "HERE\n";
+        $hexons[0]->strand    == $eexons[0]->strand
+        ){
+      # Both are exactly the same so we delete Ensembl one
       return $ensembl;
       
     }elsif($hexons[0]->start     <= $eexons[0]->start &&
            $hexons[0]->end       >= $eexons[0]->end &&
            $hexons[0]->strand    == $eexons[0]->strand &&
-           $thexons[0]->start    == $teexons[0]->start &&
-           $thexons[0]->end      == $teexons[0]->end){
-      print "HERE2\n";
+           $eexons[0]->start     == $teexons[0]->coding_region_start($ensembl) &&
+           $eexons[0]->end       == $teexons[0]->coding_region_end($ensembl)
+           ){
+      # Ensembl gene don't have UTR and Havana has then delete Ensembl one
       return $ensembl;
       
-    }elsif($hexons[0]->start     >= $eexons[0]->start &&
-           $hexons[0]->end       <= $eexons[0]->end &&
-           $hexons[0]->strand    == $eexons[0]->strand &&
-           $thexons[0]->start    == $teexons[0]->start &&
-           $thexons[0]->end      == $teexons[0]->end){
-      print "HERE3\n";
+    }elsif((($hexons[0]->start    != $eexons[0]->start ||
+            $hexons[0]->end       != $eexons[0]->end) &&
+            $hexons[0]->strand    == $eexons[0]->strand) &&
+            ($eexons[0]->start    != $teexons[0]->coding_region_start($ensembl) ||
+            $eexons[0]->end       != $teexons[0]->coding_region_end($ensembl))
+           ){
+      # Both contain UTR keep ENSEMBL
       return $havana;
       
     }else{
@@ -300,36 +309,83 @@ sub are_matched_pair {
   # if is a multi exons transcript
   else{
     # First we check the internal structure of the transcript where everything has to be exactly equal
+    print "CHECKING INTERNAL EXONS \n";
     for(my $i=1; $i<=($#hexons-1); $i++){
       return 0 unless ($hexons[$i]->start     == $eexons[$i]->start &&
                        $hexons[$i]->end       == $eexons[$i]->end &&
                        $hexons[$i]->strand    == $eexons[$i]->strand &&
                        $hexons[$i]->phase     == $eexons[$i]->phase &&
                        $hexons[$i]->end_phase == $eexons[$i]->end_phase);
-   # print "EXONS PHASE HAVANA: ", $hexons[$i]->phase," AND ENSEMBL: ",$eexons[$i]->phase,"\n";
-      # print "EXONS ENDPHASE HAVANA: ",$hexons[$i]->end_phase," AND ENSEMBL: ",$eexons[$i]->end_phase,"\n";
-      
     }
+    print "INTERNAL EXONS ARE OK \n";
     # Then check the first an last exon to check if they are the same. If just start and end of UTR are different keep ensembl one
+
+    # CASE 1: Both coding and UTR are the same, keep Havana and delete Ensembl
     if ($hexons[0]->start     == $eexons[0]->start &&
         $hexons[0]->end       == $eexons[0]->end &&
         $hexons[0]->strand    == $eexons[0]->strand &&
         $hexons[-1]->start    == $eexons[-1]->start &&
         $hexons[-1]->end      == $eexons[-1]->end &&
-        $hexons[-1]->strand   == $eexons[-1]->strand &&
-        $thexons[0]->start    == $teexons[0]->start &&
-        $thexons[-1]->end     == $teexons[-1]->end ){
+        $hexons[-1]->strand   == $eexons[-1]->strand 
+        ){
       print "MULTIEXON DELETE ENSEMBL\n";
       return $ensembl;
-
-    }elsif ($hexons[0]->start     != $eexons[0]->start &&
+      
+    }elsif (#CASE 2": HAVANA HAS UTR AND ENSEMBL DOESNT, KEEP HAVANA
+            $hexons[0]->strand == 1 &&
             $hexons[0]->end       == $eexons[0]->end &&
             $hexons[0]->strand    == $eexons[0]->strand &&
             $hexons[-1]->start    == $eexons[-1]->start &&
-            $hexons[-1]->end      != $eexons[-1]->end &&
             $hexons[-1]->strand   == $eexons[-1]->strand &&
-            $thexons[0]->start    == $teexons[0]->start &&
-            $thexons[-1]->end     == $teexons[-1]->end ){
+            $eexons[0]->start     == $teexons[0]->coding_region_start($ensembl) &&
+            $eexons[-1]->end      == $teexons[-1]->coding_region_end($ensembl) &&
+            ($hexons[-1]->end     != $eexons[-1]->end ||
+             $hexons[0]->start    != $eexons[0]->start)  
+            ){
+      print "MULTIEXON DELETE ENSEMBL\n";      
+      return $ensembl;
+      
+    }elsif (# CASE 3: BOTH ENSEMBL AND HAVANA HAVE UTR KEEP ENSEMBL
+            $hexons[0]->strand == 1 &&
+            $hexons[0]->end       == $eexons[0]->end &&
+            $hexons[0]->strand    == $eexons[0]->strand &&
+            $hexons[-1]->start    == $eexons[-1]->start &&
+            $hexons[-1]->strand   == $eexons[-1]->strand &&
+            ($eexons[0]->start    != $teexons[0]->coding_region_start($ensembl) ||
+            $eexons[-1]->end      != $teexons[-1]->coding_region_end($ensembl)) &&
+            ($hexons[-1]->end     != $eexons[-1]->end ||
+            $hexons[0]->start     != $eexons[0]->start)
+            ){
+      print "MULTIEXON DELETE HAVANA\n";      
+      return $havana;
+      
+    }elsif (# CASE 4: Same as case 2 but in reverse strand
+            $hexons[0]->strand == -1 &&
+            $hexons[0]->start     == $eexons[0]->start &&
+            $hexons[0]->strand    == $eexons[0]->strand &&
+            $hexons[-1]->end      == $eexons[-1]->end &&
+            $hexons[-1]->strand   == $eexons[-1]->strand &&
+            $eexons[-1]->start    == $teexons[-1]->coding_region_start($ensembl) &&
+            $eexons[0]->end       == $teexons[0]->coding_region_end($ensembl) &&
+            ($hexons[0]->end      != $eexons[0]->end ||
+             $hexons[-1]->start   != $eexons[-1]->start)
+            
+            ){
+      print "MULTIEXON DELETE ENSEMBL\n";      
+      return $ensembl;
+      
+    }elsif (# CASE 5: Same as case 3 but in reverse strand
+            $hexons[0]->strand == -1 &&
+            $hexons[0]->start     == $eexons[0]->start &&
+            $hexons[0]->strand    == $eexons[0]->strand &&
+            $hexons[-1]->end      == $eexons[-1]->end &&
+            $hexons[-1]->strand   == $eexons[-1]->strand &&
+            ($eexons[-1]->start   != $teexons[-1]->coding_region_start($ensembl) ||
+            $eexons[0]->end       != $teexons[0]->coding_region_end($ensembl)) &&
+            ($hexons[0]->end      != $eexons[0]->end ||
+             $hexons[-1]->start   != $eexons[-1]->start)
+
+            ){
       print "MULTIEXON DELETE HAVANA\n";      
       return $havana;
       
@@ -337,23 +393,168 @@ sub are_matched_pair {
 
       print "Keep MULTIEXON BOTH\n";
       return 0;
-
+      
     }
     
   }
-  # double check translation coords
-  #return 0 unless($havana->translation->start == $ensembl->translation->start);
-  #return 0 unless($havana->translation->end   == $ensembl->translation->end);
   
-  print "CASE NOT THOUGHT ABOUT, CHECK RULES!\n";
-#  return 1;
+  print " WEIRD CASE NOT WE DID NOT THOUGHT ABOUT, CHECK RULES!\n";
+  return 0;
   
 }
+sub set_transcript_relation {
+  
+  my($self, $delete_t, @t_pair) = @_;
+  
+ # print " To delete: ",$delete_t," havana ", $t_pair[0],"\n";
+  
+  # If transcript to delete is Havana we create an xref for the entry say that the transcript is CDS equal to ENSEMBL
+  if ($delete_t == $t_pair[0]){
+    # transfer OTT ID and/or ENST
+    foreach my $entry(@{ $t_pair[0]->get_all_DBEntries}){
+      if ($entry->dbname eq 'Vega_transcript'){
+        my $newentry = new Bio::EnsEMBL::DBEntry
+            (
+              -primary_id => $entry->primary_id,
+              -display_id => $entry->display_id,
+              -priority => 1,
+              -xref_priority => 0,
+              -version => 1,
+              -release => 1,
+              -dbname => 'shares_CDS_with'
+              );
+        
+        $newentry->status("XREF");
+        
+        $t_pair[1]->add_DBEntry($newentry);
+      }
+    }
+    
+    # We add a transcript attribute to the ensembl transcript with the start and end coords of the Havana transcript that we will delete
+    my $attrib_value = $t_pair[0]->slice->coord_system_name.":".$t_pair[0]->slice->assembly_type.":".$t_pair[0]->slice->seq_region_name.":".
+                       $t_pair[0]->start.":".$t_pair[0]->end.":1";
+   # print "ATTRIB VALUE:---------- ",$attrib_value,"\n";
+    my $attribute = Bio::EnsEMBL::Attribute->new
+       (-CODE => 'TranscriptEdge',
+        -NAME => 'Transcript Edge',
+        -DESCRIPTION => '',
+        -VALUE => $attrib_value);
 
+   $t_pair[1]->add_Attributes($attribute);
+
+    #$t_pair[1]->get_all_supporting_features;
+    # When we delete a Havana transcript we want to transfer the exon supporting features to the transcript we keep    
+    my @delete_e = @{$delete_t->get_all_Exons};
+    my @exons    = @{$t_pair[1]->get_all_Exons};
+    
+    if (scalar(@delete_e) == scalar(@exons)){
+      # Single exon genes
+      if (scalar(@delete_e) == 1){
+        $self->transfer_supporting_evidence($delete_e[0], $exons[0]); 
+      }else{
+        #  print "IM GETTING HERE\n";
+        my $e;
+        for ($e = 0, $e<scalar(@delete_e), $e++){
+          if($delete_e[$e] && $exons[$e]){
+            $self->transfer_supporting_evidence($delete_e[$e], $exons[$e]); 
+          }
+        }
+      }
+    }
+  }else{
+    # If the transcript to delete is ENSEMBL we add an xref entry say that both transcripts are exact matches (including UTR)
+    foreach my $entry(@{ $t_pair[0]->get_all_DBEntries}){
+      if ($entry->dbname eq 'Vega_transcript'){
+        my $enstentry = new Bio::EnsEMBL::DBEntry
+            ( 
+              -primary_id => $entry->primary_id,
+              -display_id => $entry->display_id,
+              -version => 1,
+              -release => 1,
+              -priority => 1,
+              -xref_priority => 0,
+              -dbname => 'shares_CDS_and_UTR_with'
+              );
+        
+        $enstentry->status("XREF");
+        
+        $t_pair[0]->add_DBEntry($enstentry);
+      }
+    } 
+  # Transfer the supporting features both for transccript and exon of the transcript to delete to the transcript we keep
+    $self->transfer_supporting_features($delete_t,$t_pair[0]);
+  }
+}
+
+sub transfer_supporting_features{
+  my ($self, $delete_t, $transcript) = @_;
+  
+  print "TRANSCRIPT IS:::: ", $transcript,"\n";
+  
+  my @exon_features;
+
+  # Delete all the supporting features for the Havana Transcript 
+  #$transcript->flush_supporting_features;
+  
+  my @delete_tsf = @{ $delete_t->get_all_supporting_features };
+  #my @transcript_sf = @{ $transcript->get_all_supporting_features };
+  
+  # print "NUMBER OF TRANSCRIPT SF: ",scalar(@transcript_sf),"\n";
+  # print " AND DELETE TSF: ", scalar(@delete_tsf),"\n";
+ DTSF: foreach my $dtsf (@delete_tsf){
+   next DTSF unless $dtsf->isa("Bio::EnsEMBL::FeaturePair");
+   #TSF: foreach my $tsf (@transcript_sf){
+   #  next TSF unless $tsf->isa("Bio::EnsEMBL::FeaturePair");
+   
+   # Check that the supporting feature to transfer does not already exist
+   #if($dtsf->start    == $tsf->start &&
+   #   $dtsf->end      == $tsf->end &&
+   #   $dtsf->strand   == $tsf->strand &&
+   #   $dtsf->hseqname eq $tsf->hseqname &&
+   #   $dtsf->hstart   == $tsf->hstart &&
+   #   $dtsf->hend     == $tsf->hend){
+   
+   #  print STDERR "feature already exists\n";
+   #  next DTSF;
+   # Now check that the supporting feature is not longer (to avoid write_gene check to fail)
+   #}elsif($dtsf->start   <= $tsf->start &&
+   #       $dtsf->end     >= $tsf->end &&
+   #       $dtsf->strand  == $tsf->strand){
+   
+   #print STDERR "feature already\n";
+   #  next DTSF;
+   #}
+   #}
+   
+   # Transfer supporting feature if we reach this point
+   #  print "TRANSFErring SUpporting Feature\n";
+   $transcript->add_supporting_features($dtsf);
+ }
+  
+  my @delete_e = @{$delete_t->get_all_Exons};
+  my @exons    = @{$transcript->get_all_Exons};
+  
+  if (scalar(@delete_e) == scalar(@exons)){
+    # Single exon genes
+    if (scalar(@delete_e) == 1){
+     $self->transfer_supporting_evidence($delete_e[0], $exons[0]); 
+    }else{
+      #  print "IM GETTING HERE\n";
+      my $e;
+      for ($e = 0, $e<scalar(@delete_e), $e++){
+        if($delete_e[$e] && $exons[$e]){
+          $self->transfer_supporting_evidence($delete_e[$e], $exons[$e]); 
+        }
+      }
+    }
+  }
+  
+#  print "NUMBER AFT ADDITTION: ", scalar(@{ $transcript->get_all_supporting_features }),"\n";
+}
 
 sub _remove_transcript_from_gene {
   my ($self, $gene, $trans_to_del)  = @_;
-
+  
   my @newtrans;
   foreach my $trans (@{$gene->get_all_Transcripts}) {
     if ($trans != $trans_to_del) {
@@ -1176,6 +1377,7 @@ sub query {
 sub transfer_supporting_evidence{
   my ($self, $source_exon, $target_exon) = @_;
   
+  #print "NOW IM HERE\n";
   my @target_sf = @{$target_exon->get_all_supporting_features};
   #  print "target exon sf: \n";
   #  foreach my $tsf(@target_sf){ print STDERR $tsf; $self->print_FeaturePair($tsf); }
@@ -1218,6 +1420,7 @@ sub transfer_supporting_evidence{
     }
     #print STDERR "from ".$source_exon->dbID." to ".$target_exon->dbID."\n";
     #$self->print_FeaturePair($feat);
+    # I may need to add a paranoid check to see that no exons longer than the current one are transferred 
     $target_exon->add_supporting_features($feat);
     $unique_evidence{ $feat } = 1;
     $hold_evidence{ $feat->hseqname }{ $feat->start }{ $feat->end }{ $feat->hstart }{ $feat->hend } = 1;
