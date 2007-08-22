@@ -197,6 +197,7 @@ sub write_output {
         $tln->{'stable_id'} = undef;
         
         foreach my $exon (@exons) {
+          my @esf = @{$exon->get_all_supporting_features};
           $exon->{'stable_id'} = undef;
         }
       }  
