@@ -431,7 +431,7 @@ sub set_transcript_relation {
     }
     
     # We add a transcript attribute to the ensembl transcript with the start and end coords of the Havana transcript that we will delete
-    my $attrib_value = $t_pair[0]->slice->coord_system_name.":".$t_pair[0]->slice->assembly_type.":".$t_pair[0]->slice->seq_region_name.":".
+    my $attrib_value = $t_pair[0]->slice->coord_system_name.":".$t_pair[0]->slice->coord_system->version.":".$t_pair[0]->slice->seq_region_name.":".
                        $t_pair[0]->start.":".$t_pair[0]->end.":1";
    # print "ATTRIB VALUE:---------- ",$attrib_value,"\n";
     my $attribute = Bio::EnsEMBL::Attribute->new
