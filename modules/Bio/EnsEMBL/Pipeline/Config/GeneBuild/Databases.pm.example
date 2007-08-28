@@ -107,6 +107,14 @@ use vars qw( %Databases );
 	      GB_FINALDBUSER             => '',
 	      GB_FINALDBPASS             => '',
               GB_FINALDBPORT             => '',
+
+              #db containing ditag mappings
+              GB_DITAG_DBHOST            => '',
+              GB_DITAG_DBNAME            => '',
+              GB_DITAG_DBUSER            => '',
+              GB_DITAG_DBPASS            => '',
+              GB_DITAG_DBPORT            => '',
+
 	     );
 
 sub import {
