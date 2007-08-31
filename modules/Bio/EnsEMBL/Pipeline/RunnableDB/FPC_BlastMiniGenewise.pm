@@ -303,12 +303,18 @@ sub fetch_input {
       
       # remove those IDs that are either masked targetted genes or killed; 
 	    
-      foreach my $dud_id (@ids_to_ignore, keys %kill_list) {
+      foreach my $dud_id (@ids_to_ignore) {
         if (exists $features{$dud_id}) {
           delete $features{$dud_id};
         }
       }
 	    	    
+      foreach my $id(keys(%features)){
+        my $temp_id = $id;
+        $temp_id =~ s/\.\d+//;
+        print "KILLING ".$temp_id."\n" if($kill_list{$temp_id});
+        delete $features{$id} if($kill_list{$temp_id});
+      }
       printf (STDERR "There are %d prots left after removal of masked/killed proteins\n", scalar(keys %features));
 
       if ($id_pool_bins and $id_pool_index) {
