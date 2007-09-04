@@ -596,9 +596,17 @@ sub process_genes {
       my ($first_supp_feat) = $supp_feat[0];
       my $prot_id = $first_supp_feat ? $first_supp_feat->hseqname : "Unknown protein";
 
-      #fetch exon sequence again, avoid caching masked sequence
+      # fetch exon sequence again, avoid caching masked sequence
+      # and avoid to attach exons on different slice objects 
+      # ( causes trouble with Intron-objects... 
+
+      my $old_exon_slice = $exons[0]->slice;
+      my $std_slc = $exons[0]->slice->adaptor->db->get_SliceAdaptor->fetch_by_name($exons[0]->slice->name);
+
       foreach my $exon (@exons) {
-        $exon->slice($exon->slice->adaptor->db->get_SliceAdaptor->fetch_by_name($exon->slice->name));
+        if ( $exon->slice eq $old_exon_slice ) {     
+           $exon->slice($std_slc);
+        }
       }
 
       my $valid_transcripts = 
