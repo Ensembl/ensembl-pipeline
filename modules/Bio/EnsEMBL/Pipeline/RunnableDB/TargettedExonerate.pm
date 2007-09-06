@@ -129,7 +129,7 @@ sub protein {
     $self->throw("Problem fetching sequence for [$id]: [$@]\n");
   }
   if(!$seq){
-    print STDERR "have had problems fetching sequence for ".$id."\n";
+    $self->throw("Can't fetch the sequence $id with pfetch - it's not in the pfetch index\n"); 
   }
   $self->{'_protein'} = $seq;
 
