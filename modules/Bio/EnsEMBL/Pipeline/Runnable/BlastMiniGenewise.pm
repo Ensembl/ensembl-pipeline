@@ -67,6 +67,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
 							      GB_SIMILARITY_EXONERATE
 							     );
 
+use Bio::EnsEMBL::Utils::Exception qw ( stack_trace_dump ) ; 
 use Bio::EnsEMBL::Pipeline::Config::Blast;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableI Bio::EnsEMBL::Pipeline::Runnable::BlastMiniBuilder);
@@ -96,7 +97,8 @@ sub new {
 			  EXONERATE_OPTIONS
 			  ANALYSIS)],
 		      @args);
-  
+ 
+ 
   $self->throw("No genomic sequence input")            unless defined($genomic);
   $self->throw("No seqfetcher provided")               unless defined($seqfetcher);
   $self->throw("No ids arrary ref provided")           unless defined($ids);
@@ -518,14 +520,13 @@ sub run {
 
   foreach my $mg (@$mg_runnables){
     $mg->run;
-    my @f = $mg->output;
+    my @f = $mg->output; 
     #print STDERR "There were " . scalar @f . " $f[0]  " 
     #  . " features after the MiniGenewise run.\n";
     push(@{$self->{'_output'}},@f);
   }
 
   return 1;
-
 }
 
 sub run_blast {
@@ -665,7 +666,8 @@ sub make_object {
   if (defined($cluster_end)) {
     $pars{-cluster_start} = $cluster_start;
     $pars{-cluster_end}   = $cluster_end;
-  }
+  } 
+
   my $mg      = new Bio::EnsEMBL::Pipeline::Runnable::MultiMiniGenewise(
                                 '-genomic'          => $miniseq,
                                 '-features'         => $features,
@@ -678,6 +680,7 @@ sub make_object {
                                 '-extension'        => $self->extension,
                                 '-matrix'           => $self->matrix,
 				'-fullseq'          => $self->full_seq,
+                                '-seq_cache'        => $self->{_seq_cache},
                                 %pars, 
 				);
 
@@ -690,10 +693,12 @@ sub get_Sequences {
     my @seq;
 
     foreach my $id ($self->ids) {
-      #print STDERR "Fetching ".$id." sequence\n";
         my $seq = $self->get_Sequence($id);
 
         if ($seq && $seq->length > 0) {
+            unless (  $self->{'_seq_cache'}{$id} ){ 
+              $self->{'_seq_cache'}{$id}=$seq;
+            }
             push(@seq,$seq);
         } else {
             print STDERR "Invalid sequence for $id - skipping\n";
@@ -703,6 +708,9 @@ sub get_Sequences {
     return @seq;
 
 }
+
+
+
 
 sub validate_sequence {
     my ($self,@seq) = @_;
@@ -744,7 +752,13 @@ sub validate_sequence {
 =cut
     
 sub get_Sequence {
-    my ($self,$id) = @_;
+    my ($self,$id) = @_; 
+
+
+    if (defined($self->{'_seq_cache'}{$id})) { 
+       return $self->{'_seq_cache'}{$id};
+    }
+
     my $seqfetcher = $self->seqfetcher;
     my $seq;
     my $name;
@@ -756,7 +770,6 @@ sub get_Sequence {
     if (!defined($id)) {
       $self->warn("No id input to get_Sequence");
     }  
-    
     eval {
       $seq = $seqfetcher->get_Seq_by_acc($id);
     };
@@ -769,9 +782,9 @@ sub get_Sequence {
     if(!defined($seq)){
       $self->warn("Could not find sequence for [$id] with $seqfetcher $name called by $f:$l");
     }
-
+    $self->{_seq_cache}{$id}=$seq;
     return $seq;
-	}
+}
 
 =head2 run_exonerate
 
@@ -842,11 +855,11 @@ sub run_exonerate {
   
     my @transcripts = @{$exonerate->output};
     foreach my $trans (@transcripts){
-      foreach my $exon (@{$trans->get_all_Exons}){
-	push @features, @{$exon->get_all_supporting_features};
+      foreach my $exon (@{$trans->get_all_Exons}){ 
+	push @features, @{$exon->get_all_supporting_features}; 
       }
     }
-  }
+  } 
   return @features;
 }
 
