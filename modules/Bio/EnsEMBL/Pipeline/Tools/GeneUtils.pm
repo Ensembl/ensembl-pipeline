@@ -37,6 +37,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::Protein::Seg;
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning info stack_trace_dump);
 
 @ISA = qw(Bio::EnsEMBL::Root);
 
@@ -120,7 +121,7 @@ sub validate_Transcript {
 
 sub _check_coverage {
   my ( $self, $transcript, $seqfetchers) = @_;
-  
+ 
   my $matches = 0;
   my $pstart  = 0;
   my $pend    = 0;
@@ -150,21 +151,28 @@ sub _check_coverage {
     }
     $matches += ($pend - $pstart + 1);
   }
-  
-  my $seq; 
-  SEQFETCHER: foreach my $seqfetcher (@$seqfetchers){
-    eval{
-      $seq = $seqfetcher->get_Seq_by_acc($protname);
-    };
-    if ($@) {
-      $self->warn("GeneUtils:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+
+
+  my $seq;  
+
+  if ( ref($seqfetchers)=~m/ARRAY/ && ref(${$seqfetchers}[0])=~m/Bio::EnsEMBL::Pipeline::SeqFetcher/){
+    SEQFETCHER: foreach my $seqfetcher (@$seqfetchers){ 
+      eval{
+        $seq = $seqfetcher->get_Seq_by_acc($protname);
+      };
+      if ($@) {
+        warning("GeneUtils:Error fetching sequence for [$protname] - trying next seqfetcher:[$@]\n");
+      }
+      
+      if (defined $seq) { 
+        last SEQFETCHER;
+      }     
+      
     }
-    
-    if (defined $seq) {
-      last SEQFETCHER;
-    }    
+  }elsif ( ref($seqfetchers)=~m/Bio::Seq/){
+   $seq=$seqfetchers; 
   }
-  
+
   if(!defined $seq){
     $self->warn("GeneUtils: No sequence fetched for [$protname] - can't check coverage, assuming 100%\n");
     return 100;
