@@ -48,7 +48,7 @@ sub new {
     my $self = $class->SUPER::new(@_);    
            
     my( $genomic, $features,$seqfetcher, $terminal_padding, $exon_padding, $minimum_intron, 
-        $endbias, $gap, $extension, $matrix, $minimum_feature_length, $cluster_start, $cluster_end,$full_seq) = 
+        $endbias, $gap, $extension, $matrix, $minimum_feature_length, $cluster_start, $cluster_end,$full_seq,$seq_cache) = 
       $self->_rearrange([qw(GENOMIC
                             FEATURES
                             SEQFETCHER
@@ -63,6 +63,7 @@ sub new {
                             CLUSTER_START
                             CLUSTER_END
                             FULLSEQ
+                            SEQ_CACHE 
 			   )],
 			@args);
 
@@ -88,8 +89,8 @@ sub new {
 
     $self->cluster_start($cluster_start)    if defined($cluster_start);
     $self->cluster_end($cluster_end)        if defined($cluster_end);
-    $self->full_seq($full_seq)              if defined($full_seq);
-
+    $self->full_seq($full_seq)              if defined($full_seq); 
+    $self->{_seq_cache}=$seq_cache          if defined($seq_cache) ;  
     #print STDERR @$features." have be passed into MultiMiniGenewise\n";
     return $self;
   }
@@ -241,7 +242,7 @@ sub get_Sequence {
   
   if (defined($self->{'_seq_cache'}{$id})) {
     return $self->{'_seq_cache'}{$id};
-  } 
+  }
   
   my $seqfetcher = $self->seqfetcher;    
   
@@ -288,7 +289,7 @@ sub run {
     my @features = @{$fhash->{$id}};
 
     printf STDERR "Doing $id (%d feats)\n", scalar(@features);
-  
+ 
     my $pepseq = $self->get_Sequence($features[0]->hseqname);
       
     my @forward;
