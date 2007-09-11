@@ -4,7 +4,6 @@ use vars qw(@ISA);
 use strict;
 
 
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
 use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript;
 use Bio::EnsEMBL::Gene;
@@ -24,7 +23,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							    );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::TargettedExonerate;
-
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
 							     GB_GW_DBHOST
 							     GB_GW_DBUSER
@@ -41,6 +40,7 @@ sub new {
 
   my ($output_db) = $self->_rearrange([qw(OUTPUT_DB)], @args);
 
+
   # makes it easier to run standalone if required
   $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
     (
@@ -50,12 +50,14 @@ sub new {
      '-dbname' => $GB_GW_DBNAME,
      '-port' => $GB_GW_DBPORT,
     ) if(!$output_db);
-  
+ 
+
   # protein sequence fetcher
-  if(!defined $self->seqfetcher) {
+  if(!defined $self->seqfetcher) { 
     my $seqfetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
     $self->seqfetcher($seqfetcher);
-  }
+  } 
+
   throw("no output database defined can't store results $!") unless($output_db);
   $self->output_db($output_db);
   # IMPORTANT
@@ -117,16 +119,19 @@ sub protein {
     return $self->{'_protein'};
   }   
 
+  # either construct a seq fetcher which works with mfetch or try whatever 
+  throw ( "ERROR :  no id as input - id maybe not found in previous run" ) unless $id ; 
+
   my $seqfetcher = $self->seqfetcher;    
   
   my $seq;
-  print STDERR "Fetching ".$id." sequence\n";
+  print STDERR "Fetching ".$id." sequence\n";  
+
   eval {
     $seq = $seqfetcher->get_Seq_by_acc($id);
   };
-  
   if ($@) {
-    $self->throw("Problem fetching sequence for [$id]: [$@]\n");
+    throw("Problem fetching sequence for [$id]: [$@]\n");
   }
   if(!$seq){
     $self->throw("Can't fetch the sequence $id with pfetch - it's not in the pfetch index\n"); 
@@ -195,7 +200,7 @@ sub fetch_input{
   print STDERR "Have ".$slice->name." sequence to run\n";
   $self->genomic($slice);
   my $seq;
-  if(@$GB_TARGETTEDXRATE_MASKING){
+  if(@$GB_TARGETTEDXRATE_MASKING){ 
     $seq = $slice->get_repeatmasked_seq($GB_TARGETTEDXRATE_MASKING, $GB_TARGETTEDXRATE_SOFTMASK);
   }else{
     $seq = $slice;
@@ -211,7 +216,7 @@ sub fetch_input{
   $self->pepfile($pepfile);
 
 
-  print STDERR "running on targetted ".$protein_id." and ".$slice->name." length ".$slice->length."\n";
+  print STDERR "running ExonerateTranscript on Protein :  ".$protein_id." and ".$slice->name." length ".$slice->length."\n";
 
   my $r = Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript->new(
                                                                      -analysis => $self->analysis,
@@ -235,16 +240,18 @@ sub run{
   $self->runnable->run;     
   push ( @results, @{$self->runnable->output} );
 
+  print STDERR "\nExonerateTranscript produced : " . scalar ( @results ) . " transcripts  output \n" ; 
   unlink $self->genfile;
   unlink $self->pepfile;
 
   my $genes = $self->make_genes(\@results);
  
-  
-
   # check genes
-  print STDERR "TargettedExonerate: starting with " . scalar(@$genes) . " unchecked transcripts\n";
-  my $checked_genes = $self->check_genes($genes);
+  print STDERR "TargettedExonerate: starting with " . scalar(@$genes) . " unchecked transcripts\n"; 
+  print STDERR " checking transcript ...\n" ;  
+
+  my $checked_genes = $self->check_genes($genes); 
+
   print STDERR "TargettedExonerate: now have " . scalar(@$checked_genes) . " checked transcripts\n";
   $self->output($checked_genes);
 #  $self->write_output;
@@ -314,27 +321,24 @@ sub make_genes{
 }
 
 sub check_genes{
-  my ($self, $unchecked_genes) = @_;
+  my ($self, $unchecked_genes) = @_; 
+
   my $contig = $self->genomic;
   my @checked_genes;
-
-  my @seqfetchers;
-  push (@seqfetchers, $self->seqfetcher);
 
  PROCESS_GENE:
   foreach my $unchecked_gene (@$unchecked_genes) {
     foreach my $transcript(@{$unchecked_gene->get_all_Transcripts}){
-
       my $valid_transcripts = 
 	Bio::EnsEMBL::Pipeline::Tools::GeneUtils->validate_Transcript($transcript,
 								      $self->genomic,
 								      $GB_TARGETTEDXRATE_MULTI_EXON_COVERAGE,
 								      $GB_TARGETTEDXRATE_SINGLE_EXON_COVERAGE,
-								      $GB_TARGETTEDXRATE_MAX_INTRON,
-								      $GB_TARGETTEDXRATE_MIN_SPLIT_COVERAGE,
-								      \@seqfetchers,
+								      $GB_TARGETTEDXRATE_MAX_INTRON, 
+								      $GB_TARGETTEDXRATE_MIN_SPLIT_COVERAGE, 
+                                                                      $self->protein, 
 								     );
-
+      
       next PROCESS_GENE unless defined $valid_transcripts;
 
     CHECKED_TRANSCRIPT:
@@ -342,8 +346,8 @@ sub check_genes{
 
         # balance complexity with coverage - this is not the right place for this, and possibly not the right way to do it ...
         # Note that this check is not done in _validate_Transcript above as the method is not passed a 'low complexity'
-        # threshold value
-        my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, \@seqfetchers);
+        # threshold value 
+        my $coverage     =  Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_check_coverage($transcript, $self->protein);
         if(defined $coverage) {
           next CHECKED_TRANSCRIPT unless Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_low_complexity($transcript, $coverage);
         }
@@ -412,10 +416,9 @@ sub pepfile{
 
 sub write_output{
   my($self) = @_;
-  print STDERR "writing genes\n";
   my $gene_adaptor = $self->output_db->get_GeneAdaptor;
   my @genes = $self->output;
-  #print STDERR "have ".@genes." genes\n";
+  print STDERR "have ".@genes." genes\n";
  GENE: foreach my $gene ($self->output) {	
     # do a per gene eval...
     eval {
