@@ -64,8 +64,10 @@ sub new {
 
   if (defined $options) {
     $self->options($options);
-  }
-  
+  } 
+  # caching of sequences 
+  $self->{_seq_cache}={};    
+
   return $self; # success - we hope!
 }
 
@@ -125,7 +127,11 @@ sub  get_Seq_by_acc {
   if (!defined($acc)) {
     $self->throw("No accession input");
   }  
-  
+ 
+  if ( defined ( $self->{_seq_cache}{$acc})) {  
+     return $self->{_seq_cache}{$acc};
+  } 
+  # seqence not cached, needs to be fetched 
   my $seqstr;
   my $seq;
   my $pfetch = $self->executable;
@@ -160,6 +166,7 @@ sub  get_Seq_by_acc {
   
   $self->throw("Could not pfetch sequence for [$acc]\n") unless defined $seq;
 
+  $self->{_seq_cache}{$acc}=$seq;
   return $seq;
 }
 
@@ -202,7 +209,7 @@ sub  batch_fetch {
 
   $command .= $accession_concatenation;
 
-  print STDERR "$command\n";
+  #print STDERR "$command\n";
 
   open(IN,"$command |") or $self->throw("Error opening pipe to pfetch : $pfetch");
 
