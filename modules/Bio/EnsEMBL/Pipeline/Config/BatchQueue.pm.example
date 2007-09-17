@@ -39,9 +39,9 @@ Here are some example resource-statements / sub_args statements:
  sub_args => '-m bc_hosts',                 # only use hosts of host-group 'bc_hosts' (see bmgroup)
  sub_args => '-m bc1_1',                    # only use hosts of host-group 'bc1_1' 
 
- resource => '-R "select[type=LINUX64]" ',  # use Linux 64 bit machines only 
- resource => '"select[type=LINUX64]" ',     # same as above
- resource => '"select[model=IBMBC2800]" ',  # only run on IBMBC2800 hosts
+ resource => 'select[type=LINUX64]',  # use Linux 64 bit machines only 
+ resource => 'select[type=LINUX64] ',     # same as above
+ resource => 'select[model=IBMBC2800] ',  # only run on IBMBC2800 hosts
 
  resource => 'alpha',                       # only run on DEC alpha 
  resource => 'linux',                       # only run on linux machines 
