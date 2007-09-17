@@ -5,7 +5,7 @@ use strict;
 ## CREATED FROM TEMPLATE
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch;
 use Data::Dumper;
 
 {
@@ -53,18 +53,18 @@ use Data::Dumper;
     } else {
         if($left){
             $query = "SELECT DISTINCT(f.hit_name)
-                        FROM ${table}_align_feature f LEFT JOIN hit_description h 
+                        FROM ${table}_align_feature f LEFT JOIN hit_description h
                           ON f.hit_name = h.hit_name
-                       WHERE h.hit_name IS NULL 
-                       AND f.hit_name NOT LIKE '%\\_%' 
+                       WHERE h.hit_name IS NULL
+                       AND f.hit_name NOT LIKE '%\\_%'
                     ORDER BY f.hit_name";
         }
         elsif($ana_id){
             $query = "SELECT DISTINCT(f.hit_name)
-                        FROM ${table}_align_feature f LEFT JOIN hit_description h 
+                        FROM ${table}_align_feature f LEFT JOIN hit_description h
                           ON f.hit_name = h.hit_name
-                       WHERE h.hit_name IS NULL 
-                       AND f.hit_name NOT LIKE '%\\_%' 
+                       WHERE h.hit_name IS NULL
+                       AND f.hit_name NOT LIKE '%\\_%'
                          AND f.analysis_id = '${ana_id}'
                     ORDER BY f.hit_name";
         }else{
@@ -79,17 +79,14 @@ use Data::Dumper;
         }
     }
 
-    my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new(
-        #-PFETCH_PORT    => 22101,
-        #-ARCHIVE_PORT   => 23101,
-        );
-    
-    my $chunk_size = 200;
+    my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch->new( -type => $table );
+
+    my $chunk_size = 1000;
     for (my $i = 0; $i < @$ids; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         $j = $#$ids if $j > $#$ids;
         my $chunk = [@$ids[$i..$j]];
-	    my $failed = $seqfetcher->write_descriptions($db, $chunk);
+	    my $failed = $seqfetcher->write_descriptions($db, $chunk,$chunk_size);
         if (@$failed) {
             warn "Failed to fetch:\n", map("  $_\n", @$failed);
             print STDERR "Failed ".scalar(@$failed)." ids\n";
