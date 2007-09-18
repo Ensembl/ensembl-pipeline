@@ -31,7 +31,7 @@ sub new {
 sub write_descriptions {
     my( $self, $dbobj, $id_list, $chunk_size ) = @_;
 
-    $chunk_size ||= 200;
+    $chunk_size ||= 1000;
 	my ($descriptions,$failed) = $self->fetch_descriptions($id_list, $chunk_size);
     my $sth = $self->prepare_hit_desc_sth($dbobj);
 	for my $accession (keys %$descriptions) {
@@ -167,7 +167,7 @@ sub fetch_mm_data {
         # create a list of failed ids
         my %failed_list = map {$_ , 1 } @$chunk;
 
-		print STDOUT "Fetching data from M&M database for ".@$chunk." ids\n";
+		print STDOUT "Fetching data from M&M database $dbname for ".@$chunk." ids\n";
 
         $sth = $dbh->prepare($sql);
         $sth->execute() or die "Couldn't execute statement: " . $sth->errstr;
