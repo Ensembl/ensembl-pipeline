@@ -75,6 +75,7 @@ sub fetch_descriptions {
 		}
 	}
 
+
 	# Fetch data from M&M database
 	my $iso_full_query = "	SELECT i_e.accession_version, i_e.sequence_length,p_e.data_class, d.description, t.ncbi_tax_id
 							FROM entry i_e, entry  p_e, description d, taxonomy t, isoform i
@@ -93,9 +94,8 @@ sub fetch_descriptions {
 
 
 	my $light_query = "  SELECT e.accession_version, e.data_class, t.ncbi_tax_id
-						 FROM entry e, description d, taxonomy t
-						 WHERE e.entry_id = d.entry_id
-						 AND e.entry_id = t.entry_id
+						 FROM entry e, taxonomy t
+						 WHERE e.entry_id = t.entry_id
 						 AND e.accession_version IN ('";
 
 	my $full_query =  "	 SELECT e.accession_version, e.sequence_length,e.data_class, d.description, t.ncbi_tax_id
@@ -116,23 +116,22 @@ sub fetch_descriptions {
 			}
 		}
 
-		my $dbh = $self->get_dbh_mm_protein;
 		$query = $fetch_all ? $full_query : $light_query;
-		$f = $self->fetch_mm_data($dbh,$query,$fetch_all,$ids, $chunk_size,$descriptions);
+		$f = $self->fetch_mm_data($uniprot_db_name,$query,$fetch_all,$ids, $chunk_size,$descriptions);
 		push @$failed, @$f;
 
 		$query = $fetch_all ? $iso_full_query : $iso_light_query;
-		$f = $self->fetch_mm_data($dbh,$query,$fetch_all,$ids_iso, $chunk_size,$descriptions);
+		$f = $self->fetch_mm_data($uniprot_db_name,$query,$fetch_all,$ids_iso, $chunk_size,$descriptions);
 		push @$failed, @$f;
 
 
 	} else {
-		my $dbh = $self->get_dbh_mm_dna();
+		my $dbs = $self->get_dbname_dna();
 		$query = $fetch_all ? $full_query : $light_query;
 		$f = $id_list;
-		while(my $con = shift @$dbh)
+		while(my $db = shift @$dbs)
 		{
-			$f = $self->fetch_mm_data($con,$query,$fetch_all,$f, $chunk_size,$descriptions);
+			$f = $self->fetch_mm_data($db,$query,$fetch_all,$f, $chunk_size,$descriptions);
 			last unless @$f;
 		}
 		push @$failed, @$f;
@@ -150,8 +149,12 @@ sub fetch_descriptions {
 }
 
 sub fetch_mm_data {
-	my ($self,$dbh,$sql,$fetch_all,$ids, $chunk_size,$descriptions) = @_;
+	my ($self,$dbname,$sql,$fetch_all,$ids, $chunk_size,$descriptions) = @_;
+
+	my $dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$dbname;
+	my $dbh = DBI->connect( $dsn_mole, $self->mm_user, '',{ 'RaiseError' => 1 } );
 	my $failed = [];
+
 	for (my $i = 0; $i < @$ids; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         # Set second index to last element if we're off the end of the array
@@ -201,18 +204,11 @@ sub fetch_mm_data {
     return $failed;
 }
 
-sub get_dbh_mm_protein {
-	my ($self) = @_;
-	my $dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$uniprot_db_name;
-	my $dbh = DBI->connect( $dsn_mole, $self->mm_user, '',{ 'RaiseError' => 1 } );
-	return $dbh;
-}
 
-sub get_dbh_mm_dna {
+sub get_dbname_dna {
 	my ($self) = @_;
 
 	my $ini_db = 'mm_ini';
-	my @dbh;
 	my @dbs;
 
 	my $dsn_mole_ini = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$ini_db;
@@ -227,12 +223,11 @@ sub get_dbh_mm_dna {
 	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
 
 	while(my $hash = $ini_sth->fetchrow_hashref()) {
-		my $dsn_mole_embl = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$hash->{'database_name'};
-		push @dbh, DBI->connect( $dsn_mole_embl, $self->mm_user, '',{ 'RaiseError' => 1 } );
+		push @dbs, $hash->{'database_name'};
 	}
 	$ini_sth->finish();
 
-	return \@dbh;
+	return \@dbs;
 }
 
 
