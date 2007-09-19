@@ -210,6 +210,8 @@ if (   $ids_to_run
 	$accumulators = 0;
 }
 
+update_analysis_dbversion();
+
 my $all_rules = $rulemanager->rules;
 
 if ( $accumulators && $accumulator_sanity ) {
@@ -245,14 +247,13 @@ setup_pipeline(
 	$rulemanager
 );
 
-update_analysis_dbversion();
-
 
 my %completed_accumulator_analyses;
 my $submission_count = 0;
 LOOP: while (1) {
 	print "Reading IDs \n" if $verbose;
 	my $submitted = 0;
+	update_analysis_dbversion() if($reupdate_analysis);
 
 	%completed_accumulator_analyses =
 	  %{ $rulemanager->fetch_complete_accumulators };
@@ -271,8 +272,6 @@ LOOP: while (1) {
 			$all_rules, \%accumulator_analyses,
 			\%always_incomplete_accumulators );
 	}
-
-	update_analysis_dbversion() if($reupdate_analysis);
 
 	my $id_hash = $rulemanager->input_ids;
 
