@@ -300,7 +300,7 @@ sub flush_runs {
   for my $anal (@analyses) {
 
     my $queue = $BATCH_QUEUES{$anal};
-
+   
     
     my @job_ids = @{$queue->{'jobs'}};
     if (!@job_ids) {
@@ -319,16 +319,26 @@ sub flush_runs {
     
     my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
    
-
+    my ($system_queue, $parameters, $resources) = 
+      ($queue->{'queue'}, $queue->{'sub_args'},
+       $queue->{'resource'});
+    if($self->retry_count >= 1){
+      print "RETRYING A JOB\n";
+      $system_queue = $queue->{retry_queue} if($queue->{retry_queue});
+      $parameters = $queue->{retry_sub_args} if($queue->{retry_sub_args});
+      $resources = $queue->{retry_resource} if($queue->{retry_resource});
+    }
+    print "HAVE queue ".$system_queue." sub args ".$parameters." and resources ".$resources."\n";
+    print "Creating batch job from ".$batch_q_module."\n";
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
-       -PARAMETERS => $queue->{'sub_args'},
+       -PARAMETERS => $parameters,
        -PRE_EXEC   => $pre_exec,
-       -QUEUE      => $queue->{'queue'},
+       -QUEUE      => $system_queue,
        -JOBNAME    => $dbname . ':' . $anal,
        -NODES      => $queue->{'nodes'},
-       -RESOURCE   => $queue->{'resource'}
+       -RESOURCE   => $resources,
       );
 
     my $cmd;
@@ -952,6 +962,10 @@ sub set_up_queues {
     $q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
     $q{$ln}{runner}          ||= $DEFAULT_RUNNER;
     $q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
+    $q{$ln}{sub_args}        ||= $DEFAULT_SUB_ARGS;
+    $q{$ln}{retry_queue}     ||= $DEFAULT_RETRY_QUEUE;
+    $q{$ln}{retry_resource}  ||= $DEFAULT_RETRY_RESOURCE;
+    $q{$ln}{retry_sub_args}  ||= $DEFAULT_RETRY_SUB_ARGS;
   }
 
   # a default queue for everything else
@@ -969,6 +983,10 @@ sub set_up_queues {
   $q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
   $q{default}{runner}          ||= $DEFAULT_RUNNER;
   $q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
+  $q{default}{sub_args}        ||= $DEFAULT_SUB_ARGS;
+  $q{default}{retry_queue}     ||= $DEFAULT_RETRY_QUEUE;
+  $q{default}{retry_resource}  ||= $DEFAULT_RETRY_RESOURCE;
+  $q{default}{retry_sub_args}  ||= $DEFAULT_RETRY_SUB_ARGS;
   return %q;
 }
 
