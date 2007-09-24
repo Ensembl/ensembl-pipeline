@@ -105,35 +105,40 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = 'path/to/base/cvsdir';
+my $cvsDIR               = '/path/to/cvs/dir';
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
-my $dataDIR              = "path/to/output/dir"; 
+
+my $dataDIR              = 'path/to/output/dir'; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi1"; 
 my $sourceDIR            = "/data/blastdb/";
-my $assembly_version     = "NCBI36"; #"NCBIM36"; #NCBI36
+my $assembly_version     = "NCBI37"; #"NCBIM36"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
-my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa");
-#my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM36/genome/softmasked_dusted/toplevel.fa");
+my @target_masked_genome = (" /data/blastdb/Ensembl/Human/NCBIM36//genome/softmasked_dusted.fa");
+#my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
+
 my $user                 = "lec";
-my $host                 = "bc-9-1-02";
+my $host                 = "bc-9-1-04";
 my $genebuild_id         = "6";
+
 
 my $gss                  = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
-my $chunknum             = 6000;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
+
+my $chunknum             = 5500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
+
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
 my $reasons_prog         = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
@@ -146,23 +151,31 @@ my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_47_36i"; 
+
+my $WB_REF_DBNAME        = "mus_musculus_core_47_37"; 
 my $WB_REF_DBHOST        = "ens-staging"; 
+
 my $WB_REF_DBPORT        = "3306"; 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_hum_cdna0907_ref";
-my $WB_PIPE_DBHOST       = "genebuild3";
+
+my $WB_PIPE_DBNAME       = $ENV{'USER'}."_mouse_cdna0907_ref";
+my $WB_PIPE_DBHOST       = "genebuild4";
+
 my $WB_PIPE_DBPORT       = "3306";
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_hum_cdna_0907_update";
-my $WB_TARGET_DBHOST     = "genebuild1";
+
+my $WB_TARGET_DBNAME     = $ENV{'USER'}."_mouse_cdna0907_update";
+my $WB_TARGET_DBHOST     = "genebuild3";
+
 my $WB_TARGET_DBPORT     = "3306";
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_46_36h"; 
+
+my $WB_LAST_DBNAME       = "mus_musculus_cdna_46_36g"; 
+
 my $WB_LAST_DBHOST       = "ens-livemirror"; 
 my $WB_LAST_DBPORT       = "3306"; 
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_42_36d"; 
+my $WB_LAST_DNADBNAME    = "mus_musculus_core_46_36g"; 
 my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
 my $WB_LAST_DNADBPORT    = "3306"; 
 
@@ -172,8 +185,8 @@ my $TAXONDBHOST          = "ens-livemirror";
 my $TAXONDBPORT          = "3306"; 
 
 #set the species
-my $common_species_name  = "human"; #"human"; #"mouse";
-my $species              = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "mouse"; #"human"; #"mouse";
+my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
 
 my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
@@ -190,7 +203,7 @@ use Data::Dumper;
 #we need the Net::SSH module from somewhere:
 use lib '/nfs/acari/fsk/perls/';
 use Net::SSH qw(sshopen2);
-
+use File::Copy;
 
 my $newFeatureName     = "cDNA_update"; #the analysis name!
 #when comparing to a previously updated cdna db $oldFeatureName = $newFeatureName
@@ -261,14 +274,12 @@ if($option eq "prepare"){
   print "\nstarting cDNA-update procedure.\n";
 
   config_setup();
-
   print "\nGet fasta files?(y/n) "; 
   if ( get_input_arg() ) { 
     if(! fastafiles() ){
        unclean_exit(); 
     }
   }
-
   print "\nset-up the databases?(y/n) "; 
   if ( get_input_arg() ) { 
     if(! DB_setup()   ) { 
@@ -369,7 +380,6 @@ elsif($option eq "compare"){
 #  using the variables defined above.
 
 sub config_setup{
-
   $status = 0;
   my $filecount = 0;
   my ($header, $filename, $path);
@@ -398,20 +408,20 @@ sub config_setup{
   }
   1;
   ';
-
   check_vars();
 
   #check existence of source databases
   if(!connect_db($WB_REF_DBHOST, $WB_REF_DBPORT, $WB_REF_DBNAME, $WB_DBUSER, $WB_DBPASS)){
     die "could not find $WB_REF_DBNAME.";
   }
-
   #go through config info to create defined files,
   #back-up the original, write version with filled-in variables
   open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
   local $/ = '>>';
   <RP>;
+
   while(my $content = <RP>){
+       
     #get specific config-file name
     $content  =~ s/([\w\/_\-\.]+)\n//;
     $header   = $1;
@@ -420,27 +430,31 @@ sub config_setup{
     $filename = $2;
     $content  =~ s/>>//;
     #replace variables in config file
+  
     foreach my $configvarref (keys %configvars){
       $content =~ s/\<$configvarref\>/$configvars{$configvarref}/g;
     }
-        
+    
         #if rerunning seqs change Exonerate options:
         if (($filename=~/Exonerate2Genes/ ) && ($rerun_flag == 1 )){
                 $content =~s/-verbosity => 0/-verbosity => 1/; #because only interested in those which don't align after new parameters
                 $content =~s/--softmasktarget TRUE/--maxintron 400000 --bestn 10 --softmasktarget FALSE/;
         }       
-        
+      
     #backup file if exists
     if(-e $cvsDIR."/".$header){
-      $cmd = "mv ".$cvsDIR."/".$header." ".$configDIR."/".$filecount;
-      if(system($cmd)){
-                die "could not backup config file $header.\n";
-      }
+    print $cvsDIR."/".$header." exists\n";
+      #$cmd = "mv ".$cvsDIR."/".$header." ".$configDIR."/".$filecount;
+    eval{
+         move($cvsDIR."/".$header, $configDIR."/".$filecount);
+     };
+    if($@){
+       die("Failed to move ".$cvsDIR."/".$header." to ".$configDIR."/".$filecount." $@");
     }
-    
+    }
+
         #store file location
     $saved_files{$filecount} = $header;
-        
         #write modified file
     $filename = $cvsDIR."/".$path.$filename;
     open(WP, ">", $filename) or die("can't create new config file $filename.\n");
@@ -449,7 +463,6 @@ sub config_setup{
     $filecount++;
   }
   close(RP);
-
   #save data dump with config paths
   $Data::Dumper::Purity = 1;
   open(WP, "> config_paths.perldata") or die "\ncan't create file for data dumping!\n";
@@ -457,6 +470,7 @@ sub config_setup{
   close(WP);
   $/ = "\n";
   print "created backup of current config files, new config files written.\n";
+  
 }
 
 
@@ -1444,7 +1458,7 @@ sub compare{
   }
 
   print "\nGetting hits per chromosome\n".
-        "\told\tnew\n";
+        "\told\tnew\tdiff\n";
   #check hits per chromosome
   $sql = "select count(distinct hit_name) from  dna_align_feature daf, analysis a where a.logic_name='".
          $oldFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
@@ -1460,9 +1474,10 @@ sub compare{
     $sth2->execute($chromosomes_2{$chromosome});
     $hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
     $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
+    my $diff = $hits_per_chrom_2{$chromosome} - $hits_per_chrom_1{$chromosome};
     print "\n$chromosome:".
       "\t".$hits_per_chrom_1{$chromosome}.
-      "\t".$hits_per_chrom_2{$chromosome};
+      "\t".$hits_per_chrom_2{$chromosome}."\t".$diff;
     $hitcount1 += $hits_per_chrom_1{$chromosome};
     $hitcount2 += $hits_per_chrom_2{$chromosome};
   }
