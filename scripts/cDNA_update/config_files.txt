@@ -82,7 +82,7 @@ use vars qw(%Config);
 %Config = (
            EXONERATE_CONFIG_BY_LOGIC => {
              DEFAULT => {
-               GENOMICSEQS         => ['<masked_genome>'],
+               GENOMICSEQS         => '<masked_genome>',
                QUERYTYPE           => undef,
                QUERYSEQS           => undef,
                IIDREGEXP           => undef,
@@ -93,7 +93,7 @@ use vars qw(%Config);
 	       NONREF_REGIONS      => 1,
              },
              <newFeatureName> => {
-	       GENOMICSEQS         => ['<masked_genome>'],
+	       GENOMICSEQS         => '<masked_genome>',
                QUERYTYPE           => 'dna',
                QUERYSEQS           => '<chunkDIR>',
                OUTDB               => { -dbname => '<WB_TARGET_DBNAME>',
