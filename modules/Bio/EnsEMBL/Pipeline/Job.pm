@@ -323,13 +323,11 @@ sub flush_runs {
       ($queue->{'queue'}, $queue->{'sub_args'},
        $queue->{'resource'});
     if($self->retry_count >= 1){
-      print "RETRYING A JOB\n";
       $system_queue = $queue->{retry_queue} if($queue->{retry_queue});
       $parameters = $queue->{retry_sub_args} if($queue->{retry_sub_args});
       $resources = $queue->{retry_resource} if($queue->{retry_resource});
     }
-    print "HAVE queue ".$system_queue." sub args ".$parameters." and resources ".$resources."\n";
-    print "Creating batch job from ".$batch_q_module."\n";
+
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
