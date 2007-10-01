@@ -607,6 +607,7 @@ sub combine_transcripts{
 
   my $cdna_start;
   my $cdna_end;
+
   $cdna_transcript->slice($genewise_transcript->slice);
 
   foreach my $cdna_sf(@{$cdna_transcript->get_all_supporting_features}){
@@ -618,20 +619,21 @@ sub combine_transcripts{
   }
 
   #print "my cdna transcript has ",scalar(@{$cdna_transcript->get_all_Exons})," exons\n";
-
-  foreach my $cdna_exon(@{$cdna_transcript->get_all_Exons}){    
+  my @cdna_transcript_exons = @{$cdna_transcript->get_all_Exons};
+  foreach my $cdna_exon(@cdna_transcript_exons){
 
     $cdna_exon->slice($genewise_transcript->slice);
 
     foreach my $e_cdna_sf(@{$cdna_exon->get_all_supporting_features}){
 
-   #   print "my cdna exons have supporting features\n";
+      #print "my cdna exons have supporting features\n";
       $e_cdna_sf->slice($genewise_transcript->slice);
     }
+
   }
 
   my $gw_start = $genewise_transcript->coding_region_start;
-  my $gw_end = $genewise_transcript->coding_region_end;
+  my $gw_end   = $genewise_transcript->coding_region_end;
 
   print "COORDINATES: cdnaS ",$cdna_start," cdnaE ",$cdna_end," gwS ",$gw_start," gwE ",$gw_end,"\n";
 
@@ -680,10 +682,27 @@ sub combine_transcripts{
     # OK, let's see if we need a new gene
     # base it on the existing genewise one
     my $newtranscript = new Bio::EnsEMBL::Transcript;
-    
+    my $coding_overlap = 0;
+
     foreach my $exon(@gw_exons){
       
       $newtranscript->add_Exon($exon);
+
+      #sneak in the check, if some coding region is actually overlapping
+    CODINGCHECK:
+      if($exon->start > $gw_start){
+	foreach my $cdna_exon (@cdna_transcript_exons){
+	  if(($exon->strand == $cdna_exon->strand) and ($exon->overlaps($cdna_exon))){
+	    $coding_overlap = 1;
+	    last CODINGCHECK;
+	  }
+	}
+      }
+
+    }
+    if(!$coding_overlap){
+      print STDERR "NO CODING REGIONS ARE OVERLAPPING. SKIPPING.\n";
+      return undef;
     }
     
     my $translation   = new Bio::EnsEMBL::Translation;
