@@ -132,6 +132,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
 							      EST_GENETYPE
 							      MAX_INTRON
 							      PRUNE_GENES
+							      FILTER_ESTS
 							      LOOK_FOR_KNOWN
 							      OTHER_GENETYPES
 							      DITAG_TYPE_NAMES
@@ -223,8 +224,13 @@ sub fetch_input{
     my $est_vc    = $self->est_db->get_SliceAdaptor->fetch_by_name($self->input_id);
     my @est_genes = @{$est_vc->get_all_Genes_by_type($EST_GENETYPE)};
     print STDERR "got " . scalar(@est_genes) . " $EST_GENETYPE ESTs.\n";
-    my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
-    $self->ests($filtered_ests);
+    if($FILTER_ESTS){
+      my $filtered_ests = $self->_filter_cdnas(\@est_genes, 1);
+      $self->ests($filtered_ests);
+    }
+    else{
+      $self->ests(@est_genes);
+    }
     print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
   }
 
@@ -960,7 +966,7 @@ sub remove_redundant_models{
 }
 
 
-=head calculate_UTR_score
+=head2 calculate_UTR_score
 
   Arg [1]    : genewise transcript
   Arg [2]    : transcript adding UTR region
@@ -978,6 +984,7 @@ sub calculate_UTR_score {
   if(($gw_gene->start - $matching_gene->start) && ($matching_gene->end - $gw_gene->end)){
     $UTR_score += $BONUS_FOR_BOTH_SIDES;
   }
+  #...to be extended
 
   return $UTR_score;
 }
@@ -1022,8 +1029,6 @@ sub score_ditags{
         my $score = 0;
         $score += ($ditag->{'tag_count'} / (($start_distance +1) * 0.9));
         $score += ($ditag->{'tag_count'} / (($end_distance +1) * 0.9));
-	#older version of equation
-        #my $score = ( 1 - ($distance * 0.1 / log($ditag->{'tag_count'}+1)) );
 
         if($score > 0){ $ditag_score += $score; }
       }
@@ -1045,8 +1050,8 @@ sub score_ditags{
 =head2 check_for_predefined_pairing
 
   Arg [1]    : Bio::EnsEMBL::Gene
-  Description: check whether there is a certain cDNA assigned to the given gene
-  Returntype : Bio::EnsEMBL::Gene or undef
+  Description: check whether there is a specific cDNA assigned to the given gene model
+               These are stored in the protein table using a sep. script
 
 =cut
 
@@ -2245,7 +2250,7 @@ sub transcript_from_single_exon_genewise {
     }
 	
     # expand frameshifted single exon genewises back from one exon to multiple exons
-    if(if($ex->sub_SeqFeature) && (scalar($ex->sub_SeqFeature) > 1)){
+    if(defined($ex->sub_SeqFeature) && (scalar($ex->sub_SeqFeature) > 1)){
       #print STDERR "frameshift in a single exon genewise\n";
       my @sf = $ex->sub_SeqFeature;
 	
@@ -2820,7 +2825,7 @@ sub add_5prime_exons {
 sub expand_3prime_exon{
   my ($self, $exon, $transcript, $strand) = @_;
 
-  if($exon->sub_SeqFeature && (scalar($exon->sub_SeqFeature) > 1)){
+  if(defined($exon->sub_SeqFeature) && (scalar($exon->sub_SeqFeature) > 1)){
     #print STDERR "expanding 3'prime frameshifted exon $exon in strand $strand: ".
     #$exon->start."-".$exon->end." phase: ".$exon->phase." end_phase: ".$exon->end_phase."\n";
     my @sf = $exon->sub_SeqFeature;
@@ -3105,7 +3110,12 @@ sub _transfer_evidence {
 
       # overlap - feature boundaries may well be wonky
       if($combined_exon->overlaps($cdna_exon)){
-	Bio::EnsEMBL::Pipeline::Tools::ExonUtils-> _transfer_supporting_evidence($cdna_exon, $combined_exon);
+	if($combined_exon->strand != $cdna_exon->strand){
+	  print STDERR "OVERLAPPING-BUT-DIFFERENT_STRANDS!\n";
+	}
+	else{
+	  Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_transfer_supporting_evidence($cdna_exon, $combined_exon);
+	}
       }
     }
   }
@@ -4256,6 +4266,14 @@ sub make_seqfetcher{
 }
 
 
+=head2 _protein_seqfetcher
+
+  Arg [1]    : 
+  Description: 
+  Returntype : 
+
+=cut
+
 sub _protein_seqfetcher{
   my ($self, $seqfetcher) = @_;
 
@@ -4265,6 +4283,14 @@ sub _protein_seqfetcher{
 
   return $self->{'_protein_seqfetcher'};
 }
+
+=head2 _cdna_seqfetcher
+
+  Arg [1]    : 
+  Description: 
+  Returntype : 
+
+=cut
 
 sub _cdna_seqfetcher{
   my ($self, $seqfetcher) = @_;
@@ -4276,6 +4302,14 @@ sub _cdna_seqfetcher{
   return $self->{'_cdna_seqfetcher'};
 }
 
+=head2 _PmatchFeatureAdaptor
+
+  Arg [1]    : 
+  Description: 
+  Returntype : 
+
+=cut
+
 sub _PmatchFeatureAdaptor{
   my ($self, $pmfa) = @_;
 
@@ -4286,6 +4320,14 @@ sub _PmatchFeatureAdaptor{
   return $self->{'_PmatchFeatureAdaptor'};
 }
 
+=head2 _cdna_slice
+
+  Arg [1]    : 
+  Description: 
+  Returntype : 
+
+=cut
+
 sub _cdna_slice {
   my ($self, $slice) = @_;
 
@@ -4295,6 +4337,15 @@ sub _cdna_slice {
 
   return $self->{'_cdna_slice'};
 }
+
+
+=head2 _cdna_evidence
+
+  Arg [1]    : 
+  Description: 
+  Returntype : 
+
+=cut
 
 sub _cdna_evidence {
   my ($self, $cdna_evidence) = @_;

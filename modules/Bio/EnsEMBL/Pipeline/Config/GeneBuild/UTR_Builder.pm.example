@@ -65,6 +65,9 @@ use vars qw( %UTR_Builder );
 	     #prune genes during filtering if desired (not recommended)
 	     PRUNE_GENES          => 0,
 
+	     #filtering the ESTs like the cDNA removes most, but is cleaner
+	     FILTER_ESTS      => 0,
+
 	     #try to find predefined pairing (between protein & cDNA) as the first step
 	     LOOK_FOR_KNOWN       => 1,
 
