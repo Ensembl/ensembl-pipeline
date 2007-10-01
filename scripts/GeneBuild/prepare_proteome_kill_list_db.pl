@@ -80,14 +80,12 @@ foreach my $file_info(@file_info){
  SEQ:while(my $seq = $in->next_seq){
     my $parseable_string = $seq->id." ".$seq->desc;
 
-    print $parseable_string . "\n" ;exit(0) ; 
-
     my ($id) = $parseable_string =~ /$regex/;
     if(!$id){
 #      throw($regex." failed to parse an id out of ".
 #            $parseable_string)
       warn($regex." failed to parse an id out of ".
-            $parseable_string);
+            $parseable_string . " you might want to cheange the regex to parse out the acc\n" );
         next SEQ;
     }
     if($seq->seq =~ /XXXXX/){
@@ -113,7 +111,6 @@ foreach my $file_info(@file_info){
 
     $seq->desc('');
     $seq->id($id);
-    print "Adding ".$id." to hash\n";
     $ids{$id} = 1;
     my $seq_string = $seq->seq;
     $seq_string =~	s/U/X/g;
