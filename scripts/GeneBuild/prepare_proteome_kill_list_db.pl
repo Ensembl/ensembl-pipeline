@@ -50,7 +50,8 @@ my $pmatch    = $GB_PMATCH;
 
 my %ids;
 
-foreach my $file_info(@file_info){
+foreach my $file_info(@file_info){ 
+  print "processing $file_info\n" ; 
   my $file  = $file_info->{file_path};
   my $regex = $file_info->{header_regex};
   my $refseq = $file_info->{refseq};
@@ -61,12 +62,15 @@ foreach my $file_info(@file_info){
   if(-e $protfile){
     print "Protfile ".$protfile." already exists, these ".
       "entries will be appended to the end of the file\n";
-    print "Do you want this? answer y/n\n";
+    print "Do you want this? answer y/n - enter \"delete\" if you like to delete the file\n";
     my $reply = <>;
     chomp;
     if($reply =~ /^n/i){
       print "You need to delete or change the name of ".$protfile." before rerunning\n";
       exit(0);
+    }elsif($reply =~ /delete/i){
+      system("rm $protfile");
+      print "file deleted: $protfile\n" ;  
     }
   }
   my $out = Bio::SeqIO->new(
@@ -76,6 +80,7 @@ foreach my $file_info(@file_info){
  SEQ:while(my $seq = $in->next_seq){
     my $parseable_string = $seq->id." ".$seq->desc;
 
+    print $parseable_string . "\n" ;exit(0) ; 
 
     my ($id) = $parseable_string =~ /$regex/;
     if(!$id){
