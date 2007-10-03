@@ -53,6 +53,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
   my $dbuser = '';
   my $dbpass = '';
   my $help;
+  my @coord_system;
 
   &GetOptions(
               'dbhost:s'   => \$host,
@@ -60,6 +61,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
               'dbname:s'   => \$dbname,
               'dbuser:s'   => \$dbuser,
               'dbpass:s'   => \$dbpass,
+              'ignore_coord_system:s@' => \@coord_system,
               'h|help'     => \$help,
              ) or ($help = 1);
 
@@ -72,6 +74,10 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
   if ($help) {
     exec('perldoc', $0);
+  }
+  my %coord_systems_to_ignore;
+  foreach my $cs(@coord_system){
+    $coord_systems_to_ignore{$cs} = 1;
   }
 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new
@@ -123,7 +129,8 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
       my $seq_region_id = $proj_slice->get_seq_region_id();
 
       if(!$already_seen{$seq_region_id}) {
-
+        next if(keys(%coord_systems_to_ignore) &&
+                $coord_systems_to_ignore{$proj_slice->coord_system->name});
         my $string = $proj_slice->coord_system->name();
         $string .= " " . $proj_slice->seq_region_name();
         print STDERR "Adding $string to toplevel\n";
