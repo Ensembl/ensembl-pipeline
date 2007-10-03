@@ -53,6 +53,7 @@ sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
 
 	my $descriptions = {};	# results are stored here
+	$chunk_size ||= 1000;
 	my $failed = [];
 	my $f;
 	my $fetch_all = 1;
@@ -178,12 +179,14 @@ sub fetch_mm_data {
 			delete $failed_list{$id};
 
 			my $hit_db = $hash->{'data_class'};
-			if($hit_db eq 'STD') {
-				#print STDOUT "$hit_db => Swissprot\n";
-				$hit_db = 'Swissprot';
-			} elsif ($hit_db eq 'PRE') {
-				#print STDOUT "$hit_db => TrEMBL\n";
-				$hit_db = 'TrEMBL';
+			if($dbname =~ /uniprot/i) {
+				if($hit_db eq 'STD') {
+					#print STDOUT "$hit_db => Swissprot\n";
+					$hit_db = 'Swissprot';
+				} elsif ($hit_db eq 'PRE') {
+					#print STDOUT "$hit_db => TrEMBL\n";
+					$hit_db = 'TrEMBL';
+				}
 			} else {
 				#print STDOUT "$hit_db => EMBL\n";
 				$hit_db = 'EMBL';
