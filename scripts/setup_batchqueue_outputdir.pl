@@ -18,6 +18,7 @@ if($help || $h){
 }
 
 if(! -d $DEFAULT_OUTPUT_DIR){
+  throw("DEFAULT_OUTPUT_DIR is not defined") if(!$DEFAULT_OUTPUT_DIR);
   create_directory($DEFAULT_OUTPUT_DIR);
 }
 
