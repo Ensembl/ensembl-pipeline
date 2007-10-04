@@ -120,7 +120,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
   my $total_processed = 0;
   my $five_percent = int($total_number/20);
 
-  print STDERR "Adding new toplevel attributes\n";
+  print STDERR "Adding new toplevel attributes to ".$total_number." slices.\n";
 
   foreach my $slice (@$slices) {
     my $projection = $slice->project('toplevel');
@@ -140,10 +140,12 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
       }
     }
 
-    # print out progress periodically
-    $total_processed++;
-    if($total_processed % $five_percent == 0) {
-      print STDERR ceil($total_processed/$total_number*100)."% complete\n";
+    # print out progress periodically if there are a decent number of slices
+    if($five_percent > 5){
+      $total_processed++;
+      if($total_processed % $five_percent == 0) {
+	print STDERR ceil($total_processed/$total_number*100)."% complete\n";
+      }
     }
   }
 
