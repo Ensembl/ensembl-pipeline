@@ -58,6 +58,7 @@ sub fetch_descriptions {
 	my $f;
 	my $fetch_all = 1;
 	my $query;
+	my $dbs;
 
 	# Get sequence length and description from local OBDA index
 	# if an Analysis object is set
@@ -116,18 +117,25 @@ sub fetch_descriptions {
 				push @$ids, $_ ;
 			}
 		}
-
+		# fetch protein descriptions from uniprot db (query most recent first)
+		$dbs = $self->get_dbname_protein();
 		$query = $fetch_all ? $full_query : $light_query;
-		$f = $self->fetch_mm_data($uniprot_db_name,$query,$fetch_all,$ids, $chunk_size,$descriptions);
+		$f = $ids;
+		while(my $db = shift @$dbs)
+		{
+			$f = $self->fetch_mm_data($db,$query,$fetch_all,$f, $chunk_size,$descriptions);
+			last unless @$f;
+		}
 		push @$failed, @$f;
 
+		# fetch isoform protein descriptions from uniprot archive db
 		$query = $fetch_all ? $iso_full_query : $iso_light_query;
 		$f = $self->fetch_mm_data($uniprot_db_name,$query,$fetch_all,$ids_iso, $chunk_size,$descriptions);
 		push @$failed, @$f;
 
 
 	} else {
-		my $dbs = $self->get_dbname_dna();
+		$dbs = $self->get_dbname_dna();
 		$query = $fetch_all ? $full_query : $light_query;
 		$f = $id_list;
 		while(my $db = shift @$dbs)
@@ -228,6 +236,33 @@ sub get_dbname_dna {
 	while(my $hash = $ini_sth->fetchrow_hashref()) {
 		push @dbs, $hash->{'database_name'};
 	}
+	$ini_sth->finish();
+
+	return \@dbs;
+}
+
+sub get_dbname_protein {
+	my ($self) = @_;
+
+	my $ini_db = 'mm_ini';
+	my @dbs;
+
+	my $dsn_mole_ini = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$ini_db;
+	my $dbh_ini = DBI->connect( $dsn_mole_ini, $self->mm_user, '',{ 'RaiseError' => 1 } );
+
+	my $query = "SELECT database_name
+				 FROM ini
+				 WHERE available = 'yes'
+				 AND database_category LIKE 'uniprot%'
+				 ORDER BY installation DESC";
+	my $ini_sth = $dbh_ini->prepare($query);
+	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
+
+	while(my $hash = $ini_sth->fetchrow_hashref()) {
+		push @dbs, $hash->{'database_name'};
+	}
+	push @dbs, $uniprot_db_name;
+
 	$ini_sth->finish();
 
 	return \@dbs;
