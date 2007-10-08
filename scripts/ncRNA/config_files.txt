@@ -103,10 +103,15 @@ use vars qw(%Config);
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
   DEFAULT_RUNNER => '',
   DEFAULT_RESOURCE => 'linux',
+  DEFAULT_RETRY_QUEUE => 'long',
+  DEFAULT_RETRY_SUB_ARGS => '',
+  DEFAULT_RETRY_RESOURCE => '',  
+  DEFAULT_SUB_ARGS => '',   
+  
   QUEUE_CONFIG => [
     {
       logic_name => 'BlastmiRNA',
-      batch_size => 500,
+      batch_size => 1000,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
@@ -133,9 +138,9 @@ use vars qw(%Config);
       batch_size => 1,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD> && mem>3500] rusage[mem=3500:<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
-      sub_args   => '',
+      sub_args   => '-M3500000',
       runner     => '',
-      queue      => 'bigmem',
+      queue      => 'normal',
       output_dir => '<DATADIR>/<species>/miRNA',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
@@ -177,27 +182,40 @@ use vars qw(%Config);
 
     ANALYSIS_WORK_DIR => '/tmp',
     ANALYSIS_REPEAT_MASKING => ['RepeatMask','Dust'],
+    CORE_VERBOSITY => 'WARNING',
+    LOGGER_VERBOSITY => 'OFF',
 );
 
->>Bio/EnsEMBL/Analysis/Config/Databases.pm
-package Bio::EnsEMBL::Analysis::Config::Databases;
+>>Bio/EnsEMBL/Analysis/Config/GeneBuild/Databases.pm
+package Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
+
 
 use strict;
-use vars qw( %Config );
+use vars qw(%Config);
 
-# Hash containing config info
-%Config = (
-	      
-	      # database containing sequence plus features from raw computes
-	      GB_DBHOST                  => '<DBHOST>',
-	      GB_DBNAME                  => '<DBNAME>',
-	      GB_DBUSER                  => 'ensro',
-	      GB_DBPASS                  => '',
-	      GB_DBPORT                  => '<DBPORT>',
-	      # this db needs to have clone & contig & static_golden_path tables populated
-	      GB_FINALDBHOST                  => '<WRITEHOST>',
-	      GB_FINALDBNAME                  => '<WRITENAME>',
-	      GB_FINALDBUSER                  => 'ensadmin',
-	      GB_FINALDBPASS                  => '<PASS>',
-              GB_FINALDBPORT                  => '<WRITEPORT>',
-	     );
+%Config= (
+
+
+  DATABASES => { 
+                  
+                 REFERENCE_DB => 
+                                 { 
+                                   -dbname => '<DBNAME>',
+                                   -host => '<DBHOST>',
+                                   -port => '<DBPORT>',
+                                   -user => 'ensro',
+                                   -pass => '',
+                                  },
+  
+
+                 GENEBUILD_DB => 
+                                 { 
+                                   -dbname => '<WRITENAME>',
+                                   -host => '<WRITEHOST>',
+                                   -port => '<WRITEPORT>',
+                                   -user => 'ensadmin',
+                                   -pass => '<PASS>',
+                                  },
+		},
+             DNA_DBNAME => "REFERENCE_DB",  
+	  );

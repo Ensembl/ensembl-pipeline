@@ -72,6 +72,7 @@ foreach my $species (@speciess){
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis";
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline";
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis/Config";
+  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild";
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline/Config";
   # set up batchqueue output dirs
   print "Checking config\n";
