@@ -10,76 +10,89 @@ use vars qw( %FlyBaseConf );
 		 FB_CHR_INFO => [
 				 {
 				  chr_name => '2L',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2L-r4.1.gff",
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-2L-r5.3.gff",
 				 },
 				 {
+				  chr_name => '2LHet',
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-2LHet-r5.3.gff",
+				 },
+	                         {
 				  chr_name => '2R',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2R-r4.1.gff",
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-2R-r5.3.gff",
+				 },
+	                         {
+				  chr_name => '2RHet',
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-2RHet-r5.3.gff",
 				 },
 	                         {
 				  chr_name => '3L',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3L-r4.1.gff",
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-3L-r5.3.gff",
 				 },
 	                         {
-				  chr_name => '3R',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3R-r4.1.gff",
+				  chr_name => '3LHet',
+				  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-3LHet-r5.3.gff",
 				 },
-	                         {
-				  chr_name => '4',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-4-r4.1.gff",
-				 },
-	                         {
-				  chr_name => 'X',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-X-r4.1.gff",
-				 },
-	                         {
-				  chr_name => '2h',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-2h-hetr32b2.gff",
-				 },
-	                         {
-				  chr_name => '3h',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-3h-hetr32b2.gff",
-				 },
-	                         {
-				  chr_name => '4h',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-4h-hetr32b2.gff",
-				 },
-	                         {                                 
-				  chr_name => 'Xh',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-Xh-hetr32b2.gff",
-				 },
-	                         {                                 
-				  chr_name => 'Yh',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-Yh-hetr32b2.gff",
-				 },
-	                         {                                 
-				  chr_name => 'U',
-				  gff_file => "$ENV{HOME}/project_droso/bdgp4.1/droso_setup/gff/dmel-U-hetr32b2.gff.modified",
-				 },
+                                 {
+                                  chr_name => '3R',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-3R-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => '3RHet',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-3RHet-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => '4',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-4-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'U',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-U-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'Uextra',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-Uextra-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'X',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-X-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'XHet',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-XHet-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'YHet',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-YHet-r5.3.gff",
+                                 },
+                                 {
+                                  chr_name => 'dmel_mitochondrion_genome',
+                                  gff_file => "/lustre/work1/ensembl/ba1/drosophila5.3/seqdata/dmel-dmel_mitochondrion_genome-r5.3.gff",
+                                 },
 			       ],
 
-                LOGIC_NAME_EXON=>'bla',
+                LOGIC_NAME_EXON=>'ba1_flybase_import',
+                ATTRIBUTE_VERSION => 5, # set this to the FlyBase import version eg. '5' if working with r5.3
                 # details for db-connection are stored in registry-file
-                FB_DBNAME => 'jhv_drosophila_testcore_2',
-                FB_DBHOST => 'ia64g',
+                FB_DBNAME => 'ba1_drosophila_5_3_seq',
+                FB_DBHOST => 'genebuild6',
                 FB_DBUSER => 'ensadmin',
-                FB_DBPASS => '',
+                FB_DBPASS => 'ensembl',
                 FB_DBPORT => '3306',
 
 
                 #files for proteindumps
-                FB_DUMPED_SELENOCYSTEINE_FILE => "gff_load_dumped_selenocysteines.fasta",
-                FB_DUMPED_TRANSLATIONS_FILE => "gff_load_dumped_translations.fasta",
-
+                FB_DUMPED_SELENOCYSTEINE_FILE => "/lustre/work1/ensembl/ba1/drosophila5.3/dumps/gff_load_dumped_selenocysteines.fasta",
+                FB_DUMPED_TRANSLATIONS_FILE => "/lustre/work1/ensembl/ba1/drosophila5.3/dumps/gff_load_dumped_translations.fasta",
+                FB_CVS_DIR => '/nfs/acari/ba1/cvs_co/',
 
                 # parameters for analysis object (logic_name is set in flybase_to_ensembl.pl
-                ANA_DB => 'Flybase',
-                ANA_DB_VERSION => '4.1',
+                ANA_DB => 'FlyBase',
+                ANA_DB_VERSION => '5.3',
                 ANA_DB_FILE => '',
                 ANA_PROGRAM => '',
                 ANA_PROGRAM_VERSION => '',
                 ANA_PROGRAM_FILE => '',
-                ANA_GFF_SOURCE => 'Flybase-GFF v4.1',
+                ANA_GFF_SOURCE => 'Flybase-GFF dmel_r5.3_FB2007_02',
                 ANA_GFF_FEATURE => '',
                 ANA_MODULE => '',
                 ANA_MODULE_VERSION => '',
@@ -94,76 +107,86 @@ use vars qw( %FlyBaseConf );
                 # list of simple-features which have to be stored (type must match the type-field (column 3) in gff 
                 SIMPLE_FEATURES => [
                                     {
-                                     type => 'oligo' ,
-                                     label => 'use_gff_id' ,
-                                     logic_name => 'oligo'
+                                     type => 'BAC_cloned_genomic_insert',
+                                    },
+                                    {
+                                     type => 'DNA_motif',
                                     },
                                     {
                                      type => 'aberration_junction',
-                                     label => 'use_gff_id',
-                                     logic_name => 'abberation_junction',
+                                    },
+                                    {
+                                     type => 'chromosome_band',
+                                    },
+                                    {
+                                     type => 'deletion',
                                     },
                                     {
                                      type => 'enhancer',
-                                     label => 'use_gff_id',
-                                     logic_name => 'enhancer'
-                                    },
-                                    {
-                                     type => 'transcription_start_site',
-                                     label => 'use_gff_id',
-                                     logic_name => 'transcription_start_site',
-                                    },
-                                    {
-                                     type => 'regulatory_region',
-                                     label => 'use_gff_id',
-                                     logic_name => 'regulatory_region',
-                                    },
-                                    {
-                                     type => 'mature_peptide',
-                                     label => 'use_gff_id',
-                                     logic_name => 'mature_peptide'
-                                    },
-                                    {
-                                     type => 'signal_peptide',
-                                     label => 'use_gff_id',
-                                     logic_name => 'signal_peptide',
                                     },
                                     {
                                      type => 'insertion_site',
-                                     label => 'use_gff_id',
-                                     logic_name => 'insertion_site',
+                                    },
+                                    {
+                                     type => 'match',
+                                    },
+                                    {
+                                     type => 'match_part',
+                                    },
+                                    {
+                                     type => 'mature_peptide',
+                                    },
+                                    {
+                                     type => 'oligonucleotide' ,
+                                    },
+                                    {
+                                     type => 'orthologous_region',
+                                    },
+                                    {
+                                     type => 'orthologous_to',
+                                    },
+                                    {
+                                     type => 'pcr_product',
+                                    },
+                                    {
+                                     type => 'point_mutation',
+                                    },
+                                    {
+                                     type => 'polyA_site',
                                     },
                                     {
                                      type => 'protein_binding_site',
-                                     label => 'use_gff_id',
-                                     logic_name => 'protein_binding_site',
                                     },
                                     {
-                                     type => 'scaffold',
-                                     label => 'use_gff_id',
-                                     logic_name => 'scaffold',
+                                     type => 'regulatory_region',
                                     },
                                     {
-                                     type => 'sequence_variant',
-                                     label => 'use_gff_id',
-                                     logic_name => 'allele',
-                                    },
-                                    {
-                                     type => 'transposable_element_insertion_site',
-                                     label => 'use_gff_id',
-                                     logic_name => 'transposable_element_insertion_site',
-                                    },
-                                    {
-                                     type => 'transposable_element',
-                                     label => 'use_gff_id',
-                                     logic_name => 'transposable_element',
+                                     type => 'repeat_region',
                                     },
                                     {
                                      type => 'rescue_fragment',
-                                     label => 'use_gff_id',
-                                     logic_name => 'rescue_fragment',
                                     },
-
+                                    {
+                                     type => 'sequence_variant',
+                                    },
+                                    {
+                                     type => 'syntenic_region',
+                                    },
+                                    {
+                                     type => 'tandem_repeat',
+                                    },
+                                    {
+                                     type => 'transposable_element',
+                                    },
+                                    {
+                                     type => 'transposable_element_insertion_site',
+                                    },
+                                    {
+                                     type => 'transposable_element_target_site_duplication',
+                                    },
+                                    {
+                                     type => 'uncharacterized_change_in_nucleotide_sequence',
+                                    },
                                    ], 
 		                );	
 
