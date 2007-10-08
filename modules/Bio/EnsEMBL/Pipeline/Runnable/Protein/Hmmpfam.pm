@@ -70,13 +70,13 @@ sub run_analysis {
     my ($self) = @_;
 
     # some of these options require HMMER 2.2g (August 2001)
-    
+
     my @dbfiles = split(/;/,$self->database);
 
     # print STDERR "FILENAME: ".$self->filename."\n";
 
     if ($dbfiles[0] =~ /ls/) {
-      my $cmd = $self->program .' --acc --cut_ga  ';
+      my $cmd = $self->program .' --acc --cut_ga --cpu 1 '; #--cpu 1 necessary with the new farm config. (oct.07)
       if (defined($self->parameters)) {
         $cmd .= $self->parameters . ' ';
       }
@@ -91,9 +91,8 @@ sub run_analysis {
       $self->throw( "Cannot run " . $self->program . " as 'ls' pfam file has not been provided" );
     }
 
-    if ($dbfiles[1] =~ /fs/) { 
-       
-      my $cmd = $self->program .' --acc --cut_ga ';
+    if ($dbfiles[1] =~ /fs/) {
+      my $cmd = $self->program .' --acc --cut_ga --cpu 1 ';  #--cpu 1 necessary with the new farm config. (oct.07)
       if (defined($self->parameters)) {
         $cmd .= $self->parameters . ' ';
       }
@@ -102,7 +101,7 @@ sub run_analysis {
       $self->file($self->fsresults);
 
       $self->throw ("Error running ".$self->program." on ".
-                    $self->filename." against ".$dbfiles[1]) unless 
+                    $self->filename." against ".$dbfiles[1]) unless
                       ((system ($cmd)) == 0);
     }else {
       $self->throw( "Cannot run " . $self->program . " as 'fs' pfam file has not been provided" );
