@@ -340,10 +340,6 @@ sub DB_setup{
 	" -logic_name DummyFlag -module Dummy -input_id_type FLAG";
     # rules 
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
-      "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -insert -goal miRNA -condition SubmitmiRNA";
-    $status += system($cmd);
-    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal BlastmiRNA -condition DummySlice";
     $status += system($cmd);
@@ -355,17 +351,9 @@ sub DB_setup{
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal ncRNA -condition DummyFlag";
     $status += system($cmd);
-    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
-      "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -insert -goal BlastWait -condition BlastmiRNA";
-    $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/make_input_ids ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name DummySlice -slice -slice_size 200000 -coord_system toplevel";
-    $status += system($cmd);
-    $cmd = "mysql -h $WRITEHOST -D $WRITENAME -u $WRITEUSER  -P$WRITEPORT  -p$pass -e\"".
-      " insert into input_id_analysis(input_id,input_id_type,analysis_id) ".
-	"values('BlastmiRNA','GENOME','7');\"";
     $status += system($cmd);
     print "database set up.\n";
   };

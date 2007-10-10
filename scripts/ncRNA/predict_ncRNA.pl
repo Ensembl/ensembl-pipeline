@@ -24,8 +24,6 @@ my @dbID;
 my $count =0;
 my $num=0;
 my $start;
-my $aln = 'ncRNA';
-my $mialn = 'BlastmiRNA';
 my $dln = 'DummyFlag';
 
 my @multiexon_files;
@@ -93,17 +91,8 @@ SPECIES:  foreach my $species (@speciess){
    print " ok\n";
   }
  print "Checks complete - loading the next stage of input_ids...\n";
-print "reading RFAM family data...\n";
-# fetch them by familly!!!!!!!!!
-my %thr;
-open( T, "$BLASTDIR/Rfam.thr" ) or die("can't file the Rfam.thr file");
-while(<T>) {
-  if( /^(RF\d+)\s+(\S+)\s+(\S+)\s+(\d+)\s+(\S+)\s*$/ ) {
-    $thr{ $1 } = { 'id' => $2, 'thr' => $3, 'win' => $4, 'mode' => $5 };
-  }
-}
-close T;
-SPECIES :foreach my $species (@speciess){
+
+  SPECIES :foreach my $species (@speciess){
   my @input_ids;
   my @flags;
   print "Running species $species\n";
@@ -117,38 +106,48 @@ SPECIES :foreach my $species (@speciess){
      -port   => $CONFIG->{$species}->{"WRITEPORT"},
      -dbname => $CONFIG->{$species}->{"WRITENAME"},
     );
-  my $dna_db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-    (
-     '-host'   => $CONFIG->{$species}->{"DBHOST"},
-     '-user'   => 'ensro',
-     '-dbname' => $CONFIG->{$species}->{"DBNAME"},
-     '-pass'   => '',
-     '-port'   => $CONFIG->{$species}->{"DBPORT"},
-    );
-  #add dna_db
-  $sdb->dnadb($dna_db);
-  
+;
   my $fa = Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor->new($sdb);
   # dont rerun the filtering if it has already been done
   my @test_flags = @{$fa->fetch_all};
   unless (scalar(@test_flags > 0)){
     my $aa = $sdb->get_AnalysisAdaptor;
     my $sa = $sdb->get_SliceAdaptor;
-    my $analysis = $aa->fetch_by_logic_name($aln);
-    my $mianalysis = $aa->fetch_by_logic_name($mialn);
+    my $analysis = $aa->fetch_by_logic_name('ncRNA');
+    my $mianalysis = $aa->fetch_by_logic_name('BlastmiRNA');
+    my $RFanalysis = $aa->fetch_by_logic_name('RfamBlast');
+    my $migoalanalysis = $aa->fetch_by_logic_name('miRNA');
     my $limit = 0;
     my %rfam_blasts;
+    my %mirbase_blasts;
     my %rfam_threshold;
     my $dafa = $sdb->get_DnaAlignFeatureAdaptor;
     my @dafs;
-    
+
+print "reading RFAM family data...\n";
+# fetch them by familly!!!!!!!!!
+my %thr;
+my @domcount =  @{sql("select count(*) , LEFT(hit_name,7) from dna_align_feature where  analysis_id = ". $RFanalysis->dbID .
+		      " group by LEFT(hit_name,7) limit 10 ;",$sdb)};
+foreach my $dom (@domcount){
+  $thr{$dom->[1]} = $dom->[0];
+}
+
     my $total = scalar(keys (%thr));
     my $complete;
     my $last;
     print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
     foreach my $domain (keys %thr){
       $count ++;
-      my @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\"")};
+      my @dafs;
+      if ($thr{$domain} > 2000){
+	my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $RFanalysis->dbID .
+			       " AND LEFT(hit_name,7) = '".$domain."' ORDER BY  score DESC limit 2000;",$sdb)};
+	my $cutoff = pop (@top_scores)->[0];
+	@dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" AND score >= $cutoff")};
+      } else {
+	@dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" ")};
+      }
       $complete = int($count/$total*100);
       if ($complete > $last){
       my $num = $complete -  $last;
@@ -180,7 +179,59 @@ SPECIES :foreach my $species (@speciess){
 	push @flags,$flag;
       }
     }
+
+    print "Filtering miRNAs";
+    print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
     
+    my %mi_types;
+    @domcount =  @{sql("select count(*) , hit_name from dna_align_feature where  analysis_id = ". $mianalysis->dbID .
+			  " group by hit_name;",$sdb)};
+    foreach my $dom (@domcount){
+      $mi_types{$dom->[1]} = $dom->[0];
+    }
+   $count = 0;
+    $total = scalar(keys %mi_types);
+    $last = 0;
+    foreach my $type (keys %mi_types){
+      $count ++;
+      if ($mi_types{$type} > 50){
+	my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $mianalysis->dbID .
+			       " AND hit_name = '".$type."' ORDER BY  score DESC limit 50;",$sdb)};
+	my $cutoff = pop (@top_scores)->[0];
+	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" AND score >= $cutoff")};
+      } else {
+	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" ")};
+      }
+      $complete = int($count/$total*100);
+      if ($complete > $last){
+	my $num = $complete -  $last;
+	foreach (my $i = 0; $i < $num; $i++){
+	  print "=";
+	}
+      }
+      $last = $complete;
+      @dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 50 );
+    DAF:  foreach my $daf(@dafs){
+	#    print $daf->p_value." ";
+	last DAF if ($mirbase_blasts{$type} &&  scalar(@{$mirbase_blasts{$type}}) >= 50 );
+	push @{$mirbase_blasts{$type}},$daf;
+      }
+    }
+    print "\nGenerating Flags\n";
+    
+    foreach my $domain(keys %mirbase_blasts){
+      my @hits = @{$mirbase_blasts{$domain}};
+      foreach my $hit (@hits){
+	my $flag = Bio::EnsEMBL::Pipeline::Flag->new
+	  (
+	   '-type'         => 'dna_align_feature',
+	   '-ensembl_id'   => $hit->dbID,
+	   '-goalAnalysis' => $migoalanalysis,
+	  );
+	push @flags,$flag;
+      }
+    }
+
     print "Storing and randomizing flags so the input ids dont run in families\n";
     while (scalar(@flags >= 1)){
       my $random =  rand($#flags);
@@ -189,50 +240,35 @@ SPECIES :foreach my $species (@speciess){
       $fa->store($flags[$random]);
       splice(@flags,$random,1);
     }
-    
     $count =0;
-    print "Making input ids for $aln\n";
-    
-    die("analysis object not found $aln\n") unless ($analysis);
+    print "Making input ids for ncRNA\n";
+
+    die("analysis object not found ncRNA\n") unless ($analysis);
     my @ids = @{$fa->fetch_by_analysis($analysis)};
     @ids = sort {$a->dbID <=> $b->dbID} @ids;
     foreach my $id (@ids){
       push @input_ids,$id->dbID;
     }
-    
+
     my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
       (
        -db => $sdb,
        -top_level => 'top_level',
        -slice     => 1,
-       -logic_name => $dln,
+       -logic_name => 'DummyFlag',
       );
     $inputIDFactory->input_ids(\@input_ids);
     $inputIDFactory->store_input_ids;
-    print "Making miRNA input ids\n";
-    my $start = sql("SELECT MIN(dna_align_feature_id) from dna_align_feature where analysis_id = ". $mianalysis->dbID . ";",$sdb);
-    my $end  = sql("SELECT MAX(dna_align_feature_id) from dna_align_feature where analysis_id = ". $mianalysis->dbID . ";",$sdb);
-    my @miRNAids;
-    my $i;
-    for ( $i = $start ; $i <= $end-500000 ; $i += 500000 ) {
-      my $iid = $i.':'.($i+499999);
-      push @miRNAids , $iid;
-    }
-    if ( $i < $end ) {
-      my $iid = $i.':'.$end;
-      push @miRNAids , $iid; 
-    }
-    
-    my $IIF = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
-      (
-       -db => $sdb,
-       -top_level => 'top_level',
-       -slice     => 1,
-       -logic_name => 'SubmitmiRNA',
-      );
-    $IIF->input_ids(\@miRNAids);
-    $IIF->store_input_ids;
   }
+  # add the single input id to start the miRNA job
+  # check its not already there first...
+  my @check =  @{sql("select count(*) from input_id_analysis where input_id = \"BlastmiRNA\"",$sdb)};
+  unless ($check[0]->[0]){
+    sql_write(" insert into input_id_analysis(input_id,input_id_type,analysis_id) ".
+	      "values(\"BlastmiRNA\",\"GENOME\",7);",$sdb);
+  }
+
+
 
   print "Finished species $species\n";
   # do I want to start the rulemanager again at this point?
@@ -271,9 +307,20 @@ exit;
 
 sub sql {
   my ($query,$db) = @_;
+  my @array;
+#  print "QUERY\n$query\n";
   my $sth = $db->dbc->prepare($query);
   $sth->execute();
-  my @array = $sth->fetchrow_array;
-  return $array[0];
+  while ( my @row = $sth->fetchrow_array ) {
+    push @array , \@row;
+  }
+  return \@array;
+}
+
+sub sql_write {
+  my ($query,$db) = @_;
+  my $sth = $db->dbc->prepare($query);
+  $sth->execute();
+  return ;
 }
 __END__
