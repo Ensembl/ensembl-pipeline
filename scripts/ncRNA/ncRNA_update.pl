@@ -324,10 +324,6 @@ sub DB_setup{
     $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -logic_name BlastWait -module Accumulator -input_id_type ACCUMULATOR";
-   $status += system($cmd);
-    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
-      " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name miRNA -database miRBase -database_file $BLASTDIR/all_mirnas.embl  ".
 	  " -database_version $MIRBASEVERSION -module Bio::EnsEMBL::Analysis::RunnableDB::miRNA -input_id_type GENOME";
     $status += system($cmd);
@@ -345,7 +341,7 @@ sub DB_setup{
     # rules 
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -insert -goal miRNA -condition SubmitmiRNA -condition BlastWait ";
+	" -insert -goal miRNA -condition SubmitmiRNA";
     $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".

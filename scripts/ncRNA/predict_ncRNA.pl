@@ -25,6 +25,7 @@ my $count =0;
 my $num=0;
 my $start;
 my $aln = 'ncRNA';
+my $mialn = 'BlastmiRNA';
 my $dln = 'DummyFlag';
 
 my @multiexon_files;
@@ -79,15 +80,17 @@ SPECIES:  foreach my $species (@speciess){
      '-port'   => $CONFIG->{$species}->{"DBPORT"},
     );
   #add dna_db
-  $sdb->dnadb($dna_db);
-  my $sic = $sdb->get_StateInfoContainer;
-  # assumes dbs were set up using the update_ncRNA script so the analysis ids aer correct.
-  my $RFAM = $sic->list_input_ids_by_analysis('2');
-  my $jobs = $sic->list_input_ids_by_analysis('8');
-  my $lock = $sdb->get_meta_value_by_key('pipeline.lock');
-  die "Pipeline is locked, rulemanager may still be running aborting...\n" if $lock;
-  die "RFAM jobs not finished yet ".scalar(@$RFAM)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$RFAM) == scalar(@$jobs));
-  print " ok\n";
+   $sdb->dnadb($dna_db);
+   my $sic = $sdb->get_StateInfoContainer;
+   # assumes dbs were set up using the update_ncRNA script so the analysis ids aer correct.
+   my $RFAM = $sic->list_input_ids_by_analysis('2');
+   my $jobs = $sic->list_input_ids_by_analysis('8');
+   my $miRBase = $sic->list_input_ids_by_analysis('3');
+   my $lock = $sdb->get_meta_value_by_key('pipeline.lock');
+   die "Pipeline is locked, rulemanager may still be running aborting...\n" if $lock;
+   die "RFAM jobs not finished yet ".scalar(@$RFAM)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$RFAM) == scalar(@$jobs));
+   die "miRBase jobs not finished yet ".scalar(@$miRBase)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$miRBase) == scalar(@$jobs));
+   print " ok\n";
   }
  print "Checks complete - loading the next stage of input_ids...\n";
 print "reading RFAM family data...\n";
@@ -132,6 +135,7 @@ SPECIES :foreach my $species (@speciess){
     my $aa = $sdb->get_AnalysisAdaptor;
     my $sa = $sdb->get_SliceAdaptor;
     my $analysis = $aa->fetch_by_logic_name($aln);
+    my $mianalysis = $aa->fetch_by_logic_name($mialn);
     my $limit = 0;
     my %rfam_blasts;
     my %rfam_threshold;
@@ -205,8 +209,32 @@ SPECIES :foreach my $species (@speciess){
       );
     $inputIDFactory->input_ids(\@input_ids);
     $inputIDFactory->store_input_ids;
+    print "Making miRNA input ids\n";
+    my $start = sql("SELECT MIN(dna_align_feature_id) from dna_align_feature where analysis_id = ". $mianalysis->dbID . ";",$sdb);
+    my $end  = sql("SELECT MAX(dna_align_feature_id) from dna_align_feature where analysis_id = ". $mianalysis->dbID . ";",$sdb);
+    my @miRNAids;
+    my $i;
+    for ( $i = $start ; $i <= $end-500000 ; $i += 500000 ) {
+      my $iid = $i.':'.($i+499999);
+      push @miRNAids , $iid;
+    }
+    if ( $i < $end ) {
+      my $iid = $i.':'.$end;
+      push @miRNAids , $iid; 
+    }
+    
+    my $IIF = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
+      (
+       -db => $sdb,
+       -top_level => 'top_level',
+       -slice     => 1,
+       -logic_name => 'SubmitmiRNA',
+      );
+    $IIF->input_ids(\@miRNAids);
+    $IIF->store_input_ids;
   }
-  print "Finished species $species\nStarting the rulemanager again...\n";
+
+  print "Finished species $species\n";
   # do I want to start the rulemanager again at this point?
   my $perlpath = $ENV{"PERL5LIB"};
 
@@ -241,4 +269,11 @@ SPECIES :foreach my $species (@speciess){
 
 exit;
 
+sub sql {
+  my ($query,$db) = @_;
+  my $sth = $db->dbc->prepare($query);
+  $sth->execute();
+  my @array = $sth->fetchrow_array;
+  return $array[0];
+}
 __END__
