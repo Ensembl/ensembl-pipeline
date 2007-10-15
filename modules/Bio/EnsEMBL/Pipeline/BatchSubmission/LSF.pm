@@ -435,10 +435,7 @@ sub copy_output {
     foreach my $set ([$temp_out, $dest_out], [$temp_err, $dest_err]) {
         my( $temp, $dest ) = @$set;
         if (-e $temp) {
-	    # This is a hack pending a proper fix - if the destination is
-	    # on a Lustre filesystem, then simply copy the file directly
-	    # rather than invoking lsrcp
-	    if ($dest =~ /^\/lustre/) {
+	    if ($command eq 'cp') {
 		copy($temp, $dest);
 	    } else {
                 my $err_copy = "$command $temp $remote:$dest";
