@@ -435,7 +435,7 @@ sub copy_output {
     foreach my $set ([$temp_out, $dest_out], [$temp_err, $dest_err]) {
         my( $temp, $dest ) = @$set;
         if (-e $temp) {
-	    if ($command eq 'cp') {
+	    if ($command eq 'cp' || $dest =~ /^\/lustre/) {
 		copy($temp, $dest);
 	    } else {
                 my $err_copy = "$command $temp $remote:$dest";
