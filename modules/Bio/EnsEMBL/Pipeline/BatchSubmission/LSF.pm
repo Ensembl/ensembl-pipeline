@@ -56,6 +56,7 @@ package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
+use File::Copy;
 use vars qw(@ISA);
 use strict;
 
@@ -212,6 +213,7 @@ sub get_job_time{
   my $command = "bjobs -l";
   #print $command."\n";
   my %id_times;
+  local *BJOB;
   open(BJOB, "$command |") or throw("couldn't open pipe to bjobs");
   my $job_id;
   while(<BJOB>){
@@ -235,6 +237,7 @@ sub check_existance{
   my ($self, $id_hash, $verbose) = @_;
   my %job_submission_ids = %$id_hash;
   my $command = "bjobs";
+  local *BJOB;
   open(BJOB, "$command 2>&1 |") or 
     throw("couldn't open pipe to bjobs");
   my %existing_ids;
@@ -272,6 +275,7 @@ sub job_stats {
   # Need to sleep to make sure lsf is displaying correct info
   sleep(20);
 
+  local *BJOB;
   open(BJOB, "$command 2>&1 |") or throw("couldn't open pipe to bjobs");
 
   my %jobs;
@@ -431,10 +435,17 @@ sub copy_output {
     foreach my $set ([$temp_out, $dest_out], [$temp_err, $dest_err]) {
         my( $temp, $dest ) = @$set;
         if (-e $temp) {
-            my $err_copy = "$command $temp $remote:$dest";
-            unless (system($err_copy) == 0) {
-                warn "Error: copy '$err_copy' failed exit($?)";
-            }
+	    # This is a hack pending a proper fix - if the destination is
+	    # on a Lustre filesystem, then simply copy the file directly
+	    # rather than invoking lsrcp
+	    if ($dest =~ /^\/lustre/) {
+		copy($temp, $dest);
+	    } else {
+                my $err_copy = "$command $temp $remote:$dest";
+                unless (system($err_copy) == 0) {
+                    warn "Error: copy '$err_copy' failed exit($?)";
+                }
+	    }
         } else {
             warn "No such file '$temp' to copy\n";
         }
