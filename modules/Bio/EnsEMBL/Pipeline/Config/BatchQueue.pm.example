@@ -39,13 +39,11 @@ Here are some example resource-statements / sub_args statements:
  sub_args => '-m bc_hosts',                 # only use hosts of host-group 'bc_hosts' (see bmgroup)
  sub_args => '-m bc1_1',                    # only use hosts of host-group 'bc1_1' 
 
- resource => 'select[type=LINUX64]',  # use Linux 64 bit machines only 
- resource => 'select[type=LINUX64] ',     # same as above
- resource => 'select[model=IBMBC2800] ',  # only run on IBMBC2800 hosts
+ resource => 'select[type==X86_64]',  # use Linux 64 bit machines only 
+ resource => 'select[model==IBMBC2800] ',  # only run on IBMBC2800 hosts
 
  resource => 'alpha',                       # only run on DEC alpha 
- resource => 'linux',                       # only run on linux machines 
-
+ resource => 'linux',                       # run on any machine capable of running 32-bit X86 Linux apps
  
 Database throtteling :
 This runs a job on a linux host, throttles ecs4:3350 to not have more than 300 cative connections, 10 connections per 
@@ -89,7 +87,7 @@ use vars qw(%Config);
   QUEUE_MANAGER       => 'LSF',
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
-  DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'acari'
+  DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'normal'
   DEFAULT_RESOURCE    => '',
   DEFAULT_SUB_ARGS => '',
   DEFAULT_OUTPUT_DIR  => '',
@@ -98,6 +96,9 @@ use vars qw(%Config);
   JOB_LIMIT           => 10000, # at this number of jobs RuleManager will sleep for 
                                 # a certain period of time if you effectively want this never to run set 
                                 # the value to very high ie 100000 for a certain period of time
+				# this is important for queue managers which cannot cope with large numbers
+				# of pending jobs (e.g. early LSF versions and SGE)
+
   JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be
                                      # counted
                                      # valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE
