@@ -8,15 +8,16 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
 
 
-my $uniprot_db_name = 'uniprot_archive';
+my $uniprot_archive = 'uniprot_archive';
 
 sub new {
     my ( $class, @args ) = @_;
     my $self = bless {}, $class;
 
-	my ( $analysis , $type , $mm_host , $mm_port , $mm_user ) = rearrange(
-        [  'ANALYSIS' , 'TYPE' , 'MM_HOST', 'MM_PORT','MM_USER' ], @args );
+	my ( $analysis , $type , $light , $mm_host , $mm_port , $mm_user ) = rearrange(
+        [  'ANALYSIS' , 'TYPE' , 'LIGHT' , 'MM_HOST', 'MM_PORT','MM_USER' ], @args );
     $self->analysis($analysis) if $analysis;
+    $self->is_light_fetch($light) if $light;
     throw("Must pass a molecule type, either protein or dna ".
           "not a ".$type) unless($type eq 'protein' || $type eq 'dna');
     $self->type($type);
@@ -63,7 +64,7 @@ sub fetch_descriptions {
 	# Get sequence length and description from local OBDA index
 	# if an Analysis object is set
 	if($self->analysis) {
-		$fetch_all = 0;
+		$self->is_light_fetch(1);
 		print STDOUT "Fetching ".@$id_list." sequences from OBDA index\n";
 		SEQ :
 		foreach (@$id_list) {
@@ -79,32 +80,49 @@ sub fetch_descriptions {
 
 
 	# Fetch data from M&M database
-	my $iso_full_query = "	SELECT i_e.accession_version, i_e.sequence_length,p_e.data_class, d.description, t.ncbi_tax_id
-							FROM entry i_e, entry  p_e, description d, taxonomy t, isoform i
-							WHERE i_e.entry_id = d.entry_id
-							AND i_e.entry_id = i.isoform_entry_id
-							AND p_e.entry_id = i.parent_entry_id
-							AND p_e.entry_id = t.entry_id
-							AND i_e.accession_version IN ('";
-
-	my $iso_light_query = " SELECT i_e.accession_version, p_e.data_class, t.ncbi_tax_id
-							FROM entry i_e, entry  p_e, taxonomy t, isoform i
-							WHERE i_e.entry_id = i.isoform_entry_id
-							AND p_e.entry_id = i.parent_entry_id
-							AND p_e.entry_id = t.entry_id
-							AND i_e.accession_version IN ('";
-
-
-	my $light_query = "  SELECT e.accession_version, e.data_class, t.ncbi_tax_id
-						 FROM entry e, taxonomy t
-						 WHERE e.entry_id = t.entry_id
-						 AND e.accession_version IN ('";
-
-	my $full_query =  "	 SELECT e.accession_version, e.sequence_length,e.data_class, d.description, t.ncbi_tax_id
-						 FROM entry e, description d, taxonomy t
-						 WHERE e.entry_id = d.entry_id
-						 AND e.entry_id = t.entry_id
-						 AND e.accession_version IN ('";
+	# full sql query to get all sequence description: length, data class, description, taxon. id
+	my $full_query = qq{
+		SELECT e.accession_version, e.sequence_length,e.data_class, d.description, t.ncbi_tax_id
+		FROM entry e, description d, taxonomy t
+		WHERE e.entry_id = d.entry_id
+		AND e.entry_id = t.entry_id
+		AND e.accession_version IN ('};
+	my $full_arch_query = qq{
+		SELECT e.accession_version, e.sequence_length,MAX(r.data_class) AS data_class, d.description, t.ncbi_tax_id
+		FROM entry e, db_release r,description d, taxonomy t
+		WHERE e.entry_id = d.entry_id
+		AND e.entry_id = t.entry_id
+		AND e.entry_id = r.entry_id
+		AND e.accession_version IN ('};
+	my $iso_full_query = qq{
+		SELECT i_e.accession_version, i_e.sequence_length,MAX(r.data_class) AS data_class, d.description, t.ncbi_tax_id
+		FROM entry i_e, entry  p_e, db_release r, description d, taxonomy t, isoform i
+		WHERE i_e.entry_id = d.entry_id
+		AND i_e.entry_id = i.isoform_entry_id
+		AND p_e.entry_id = i.parent_entry_id
+		AND p_e.entry_id = t.entry_id
+		AND p_e.entry_id = r.entry_id
+		AND i_e.accession_version IN ('};
+	# light sql query to get the data class and taxon. id only
+	my $light_query = qq{
+		SELECT e.accession_version, e.data_class, t.ncbi_tax_id
+		FROM entry e, taxonomy t
+		WHERE e.entry_id = t.entry_id
+		AND e.accession_version IN ('};
+	my $light_arch_query = qq{
+		SELECT e.accession_version, MAX(r.data_class) AS data_class, t.ncbi_tax_id
+		FROM entry e, db_release r, taxonomy t
+		WHERE e.entry_id = t.entry_id
+		AND e.entry_id = r.entry_id
+		AND e.accession_version IN ('};
+	my $iso_light_query = qq{
+		SELECT i_e.accession_version, MAX(r.data_class) AS data_class, t.ncbi_tax_id
+		FROM entry i_e, entry  p_e, db_release r, taxonomy t, isoform i
+		WHERE i_e.entry_id = i.isoform_entry_id
+		AND p_e.entry_id = i.parent_entry_id
+		AND p_e.entry_id = t.entry_id
+		AND p_e.entry_id = r.entry_id
+		AND i_e.accession_version IN ('};
 
 	if($self->type eq 'protein') {
 		# get isoform ids
@@ -118,29 +136,33 @@ sub fetch_descriptions {
 			}
 		}
 		# fetch protein descriptions from uniprot db (query most recent first)
-		$dbs = $self->get_dbname_protein();
-		$query = $fetch_all ? $full_query : $light_query;
+		$dbs = $self->get_dbnames_like("uniprot%");
+		$query = $self->is_light_fetch() ? $light_query : $full_query ;
 		$f = $ids;
 		while(my $db = shift @$dbs)
 		{
-			$f = $self->fetch_mm_data($db,$query,$fetch_all,$f, $chunk_size,$descriptions);
+			$f = $self->fetch_mm_data($db,$query,0,$f, $chunk_size,$descriptions);
 			last unless @$f;
 		}
+		# fetch remaining protein description from uniprot archive
+		$query = $self->is_light_fetch() ? $light_arch_query : $full_arch_query ;
+		$f = $self->fetch_mm_data($uniprot_archive,$query,1,$f, $chunk_size,$descriptions) if @$f;
+
 		push @$failed, @$f;
 
 		# fetch isoform protein descriptions from uniprot archive db
-		$query = $fetch_all ? $iso_full_query : $iso_light_query;
-		$f = $self->fetch_mm_data($uniprot_db_name,$query,$fetch_all,$ids_iso, $chunk_size,$descriptions);
+		$query = $self->is_light_fetch() ? $iso_light_query : $iso_full_query ;
+		$f = $self->fetch_mm_data($uniprot_archive,$query,1,$ids_iso, $chunk_size,$descriptions);
 		push @$failed, @$f;
 
 
 	} else {
-		$dbs = $self->get_dbname_dna();
-		$query = $fetch_all ? $full_query : $light_query;
+		$dbs = $self->get_dbnames_like("embl%");
+		$query = $self->is_light_fetch() ? $light_query : $full_query ;
 		$f = $id_list;
 		while(my $db = shift @$dbs)
 		{
-			$f = $self->fetch_mm_data($db,$query,$fetch_all,$f, $chunk_size,$descriptions);
+			$f = $self->fetch_mm_data($db,$query,0,$f, $chunk_size,$descriptions);
 			last unless @$f;
 		}
 		push @$failed, @$f;
@@ -151,14 +173,14 @@ sub fetch_descriptions {
 		delete $descriptions->{$_};
 	}
 
-	print STDOUT "Failed to fetch ".@$failed." ids\n[@$failed]\n" if @$failed;
+	print STDOUT "Failed to fetch ".@$failed." ids\n" if @$failed;
 
 
 	return ($descriptions, $failed);
 }
 
 sub fetch_mm_data {
-	my ($self,$dbname,$sql,$fetch_all,$ids, $chunk_size,$descriptions) = @_;
+	my ($self,$dbname,$sql,$group,$ids, $chunk_size,$descriptions) = @_;
 
 	my $dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$dbname;
 	my $dbh = DBI->connect( $dsn_mole, $self->mm_user, '',{ 'RaiseError' => 1 } );
@@ -170,7 +192,8 @@ sub fetch_mm_data {
         $j = $#$ids if $#$ids < $j;
         # Take a slice from the array
         my $chunk = [@$ids[$i..$j]];
-        my $sql = $sql.join("','",@$chunk)."')";
+        my $query = $sql . join("','",@$chunk)."')";
+        $query .= " GROUP BY r.entry_id" if $group;
         my $sth;
 
         # create a list of failed ids
@@ -178,7 +201,7 @@ sub fetch_mm_data {
 
 		print STDOUT "Fetching data from M&M database $dbname for ".@$chunk." ids\n";
 
-        $sth = $dbh->prepare($sql);
+        $sth = $dbh->prepare($query);
         $sth->execute() or die "Couldn't execute statement: " . $sth->errstr;
         while(my $hash = $sth->fetchrow_hashref()) {
 
@@ -202,7 +225,7 @@ sub fetch_mm_data {
 			$descriptions->{$id}{database} = $hit_db;
 			$descriptions->{$id}{taxonid} = $hash->{'ncbi_tax_id'};
 
-			if($fetch_all) {
+			if(!$self->is_light_fetch()) {
 				$descriptions->{$id}{description} = $hash->{'description'};
 		    	$descriptions->{$id}{length} = $hash->{'sequence_length'};
 			}
@@ -216,8 +239,8 @@ sub fetch_mm_data {
 }
 
 
-sub get_dbname_dna {
-	my ($self) = @_;
+sub get_dbnames_like {
+	my ($self, $db) = @_;
 
 	my $ini_db = 'mm_ini';
 	my @dbs;
@@ -228,7 +251,7 @@ sub get_dbname_dna {
 	my $query = "SELECT database_name
 				 FROM ini
 				 WHERE available = 'yes'
-				 AND database_category LIKE 'embl%'
+				 AND database_category LIKE \'$db\'
 				 ORDER BY installation DESC";
 	my $ini_sth = $dbh_ini->prepare($query);
 	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
@@ -236,33 +259,6 @@ sub get_dbname_dna {
 	while(my $hash = $ini_sth->fetchrow_hashref()) {
 		push @dbs, $hash->{'database_name'};
 	}
-	$ini_sth->finish();
-
-	return \@dbs;
-}
-
-sub get_dbname_protein {
-	my ($self) = @_;
-
-	my $ini_db = 'mm_ini';
-	my @dbs;
-
-	my $dsn_mole_ini = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$ini_db;
-	my $dbh_ini = DBI->connect( $dsn_mole_ini, $self->mm_user, '',{ 'RaiseError' => 1 } );
-
-	my $query = "SELECT database_name
-				 FROM ini
-				 WHERE available = 'yes'
-				 AND database_category LIKE 'uniprot%'
-				 ORDER BY installation DESC";
-	my $ini_sth = $dbh_ini->prepare($query);
-	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
-
-	while(my $hash = $ini_sth->fetchrow_hashref()) {
-		push @dbs, $hash->{'database_name'};
-	}
-	push @dbs, $uniprot_db_name;
-
 	$ini_sth->finish();
 
 	return \@dbs;
@@ -409,6 +405,16 @@ sub type {
         $self->{'_type'} = $type;
     }
     return $self->{'_type'};
+}
+
+
+sub is_light_fetch {
+	my ( $self, $light) = @_;
+	if($light){
+		$self->{'light'} = $light;
+	}
+
+	return $self->{'light'};
 }
 
 sub db_version {
