@@ -37,6 +37,9 @@ my $stable_id = 0;
 my $db_id = 0;
 my $file;
 
+# flag: print seq even if it has a '*' (stop codon)
+my $print_all;
+
 GetOptions(
 		   'dbhost=s'    => \$dbhost,
 		   'dbname=s'    => \$dbname,
@@ -51,6 +54,7 @@ GetOptions(
 		   'stable_id!' => \$stable_id,
 		   'db_id!' => \$db_id,
 		   'file=s' => \$file,
+                   'print_all' => \$print_all,  
 )
 or die ("Couldn't get options");
 
@@ -139,10 +143,11 @@ foreach my $gene (@{$gene_adaptor->fetch_all_by_dbID_list($gene_ids)}) {
 
     eval {      
 	    if ( $tseq->seq =~ /\*/ ) {
-
-	      print STDERR "Translation of $identifier has stop codons ",
-        	"- Skipping! (in ",$trans->slice->name(),")\n";
-	      next;
+              if (!$print_all) {
+	        print STDERR "Translation of $identifier has stop codons ",
+                             "- Skipping! (in ",$trans->slice->name(),")\n";
+	        next;
+              }
 	     }
 	 };
 	 
