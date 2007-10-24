@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl 
+#!/usr/local/ensembl/bin/perl
 
 =pod
 
@@ -8,17 +8,17 @@ dequeuer.pl
 
 =head1 DESCRIPTION
 
-a script that dequeue and submit a limited number of jobs 
+a script that dequeue and submit a limited number of jobs
 (depending on JOB_LIMIT in BatchQueue) from a MySQL based priority queue
-(QUEUE_HOST and QUEUE_NAME) into the LSF farm queue. The jobs are progressively 
+(QUEUE_HOST and QUEUE_NAME) into the LSF farm queue. The jobs are progressively
 added in the MySQL queue by the pipeline rulemanager scripts.
 
 =head1 SYNOPSIS
 
 The MySQL queue is a single table that orders the jobs by job's priority
-and by job's creation date. A job object can be recovered from the 
-pipeline database with the parameters 'job_id', 'host' and 'pipeline'. 
-Note that, the pipeline database and queue connexion parameters  
+and by job's creation date. A job object can be recovered from the
+pipeline database with the parameters 'job_id', 'host' and 'pipeline'.
+Note that, the pipeline database and queue connexion parameters
 (login, password and port) are fetched from the ~/.netrc file.
 See the Net::Netrc module for more details.
 
@@ -31,18 +31,19 @@ See the Net::Netrc module for more details.
 	-flush		the number of loop after which the jobs batch queues should be flushed (default: 30)
 	-fetch_number	number of jobs fetched from the queue (default: 100)
 	-analysis 	a logic_name of an analysis you want to dequeue and submit.
-			If you specify this option you will only submit this analysis 
-			or analyses as the option can appear on the command line 
+			If you specify this option you will only submit this analysis
+			or analyses as the option can appear on the command line
 			multiple times
-  	-skip_analysis	a logic_name of an analysis you don't want to dequeue and 
-  			submit. If this option is specified these are the only 
+  	-skip_analysis	a logic_name of an analysis you don't want to dequeue and
+  			submit. If this option is specified these are the only
   			analyses which won't be submit
   	-pipeline	only dequeue jobs stored in this pipeline(s)
+  	-skip_pipeline	don't dequeue jobs stored in this pipeline(s)
 
-These arguments are overridable configurations 
+These arguments are overridable configurations
 options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
 
-	-queue_manager		this specifies which 
+	-queue_manager		this specifies which
 				Bio::EnsEMBL::Pipeline::BatchSubmission module is used
 	-job_limit		the maximun number of jobs of the specified status allowed in the
 	 			system
@@ -52,7 +53,7 @@ options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
 =head1 SEE ALSO
 
 rulemanager.pl in ensembl-pipeline/scripts/Finished
- 
+
 =head1 CONTACT
 
 Mustapha Larbaoui B<email> ml6@sanger.ac.uk
@@ -76,11 +77,12 @@ my $job_limit;
 my $queue_host;
 my $queue_name;
 my $sleep = 180;
-my $flush = 30; # batch queue flush frequency: n => flush the batch queue once every n loops 
+my $flush = 30; # batch queue flush frequency: n => flush the batch queue once every n loops
 my $fetch_number = 100;
 my @analyses_to_run;
 my @analyses_to_skip;
-my @pipeline;
+my @pipeline_to_run;
+my @pipeline_to_skip;
 my $db_adaptors;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
@@ -99,7 +101,8 @@ GetOptions(
 	'fetch_number=s'  => \$fetch_number,
 	'analysis|logic_name=s@' => \@analyses_to_run,
 	'skip_analysis=s@'       => \@analyses_to_skip,
-	'pipeline=s@'		=> \@pipeline,
+	'pipeline=s@'		=> \@pipeline_to_run,
+	'skip_pipeline=s@'       => \@pipeline_to_skip,
 	'h|help!'         => $usage
 
   )
@@ -110,23 +113,36 @@ $queue_manager = $QUEUE_MANAGER unless ($queue_manager);
 $queue_host    = $QUEUE_HOST    unless ($queue_host);
 $queue_name    = $QUEUE_NAME    unless ($queue_name);
 
-@analyses_to_run = map {split/,/} @analyses_to_run ; 
+@analyses_to_run = map {split/,/} @analyses_to_run ;
 @analyses_to_skip = map {split/,/} @analyses_to_skip ;
-
-my %analyses_to_run = map {$_,1} @analyses_to_run ;
-my %analyses_to_skip = map {$_,1} @analyses_to_skip ; 
+@pipeline_to_run = map {split/,/} @pipeline_to_run ;
+@pipeline_to_skip = map {split/,/} @pipeline_to_skip ;
 
 # Job fetch statement handle
-my $sql_fetch = "SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue";
-$sql_fetch .= " WHERE " if(@analyses_to_run || @analyses_to_skip || @pipeline);
-$sql_fetch .= " analysis IN ('".join("','",@analyses_to_run)."') " if @analyses_to_run;
-$sql_fetch .= " AND " if(@analyses_to_run && @analyses_to_skip);
-$sql_fetch .= " analysis NOT IN ('".join("','",@analyses_to_skip)."') " if @analyses_to_skip;			
-$sql_fetch .= " AND " if((@pipeline && @analyses_to_skip) || (@pipeline && @analyses_to_run));
-$sql_fetch .= " pipeline IN ('".join("','",@pipeline)."') " if @pipeline;
+my $sql_fetch = qq(SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue);
+my @where = ();
+if(@analyses_to_run) {
+  my $ana_string = join("', '", @analyses_to_run);
+  push @where, "analysis IN ('$ana_string')";
+}
+if(@analyses_to_skip) {
+  my $skip_ana_string = join("', '", @analyses_to_skip);
+  push @where, "analysis NOT IN ('$skip_ana_string')";
+}
+if(@pipeline_to_run) {
+  my $pipe_string = join("', '", @pipeline_to_run);
+  push @where, "pipeline IN ('$pipe_string')";
+}
+if(@pipeline_to_skip) {
+  my $skip_pipe_string = join("', '", @pipeline_to_skip);
+  push @where, "pipeline NOT IN ('$skip_pipe_string')";
+}
+if(scalar(@where)) {
+    $sql_fetch .= ' WHERE '.join(' AND ', @where);
+}
 $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 
-my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);		
+my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);
 
 # Job delete statement handle
 my $delete = &get_dbi( $queue_name, $queue_host )->prepare(
