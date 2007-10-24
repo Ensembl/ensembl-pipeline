@@ -84,7 +84,11 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
-  QUEUE_MANAGER       => 'LSF',
+  QUEUE_MANAGER       => 'LSF', # depending on the job-submission-system you're using 
+                                # use LSF, you can also use 'Local' 
+                                # for mor info look into 
+                                # /ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/BatchSubmission 
+                                # 
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => '', # put in the queue  of your choice, eg. 'normal'
@@ -108,7 +112,7 @@ use vars qw(%Config);
   MIN_JOB_SLEEP => 120, # the minium time to sleep for when job limit reached
   SLEEP_PER_JOB => 30, # the amount of time to sleep per job when job limit 
                        # reached
-  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',      
 
   DEFAULT_RUNNER => '',      
   DEFAULT_RETRY_QUEUE => 'long',
@@ -127,7 +131,7 @@ use vars qw(%Config);
       output_dir => '/some_dir/',
       cleanup => 'yes',        
       verbosity => 'INFO',
-      runnabledb_path => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+      runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
       retry_queue => '',
       retry_resource => '',
       retry_sub_args => '',
