@@ -14,7 +14,8 @@ my $usage = "perl ncRNA_update.pl
 -verbose 
 -dbsetup (create the dbs) 
 -refresh (refresh/create the RFAM/miRBasefiles) 
--species (list of species to run on) 
+-species (list of species to run on)
+-norfam  (Only run miRNA annotation)
 writes the rulemanager command and path to a shell script species.csh 
 * = required\n";
 my $pass;
@@ -22,6 +23,7 @@ my $verbose;
 my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
 my $dbsetup;
 my $refresh;
+my $norfam;
 my @species_list;
 $| = 1;
 &GetOptions(
@@ -30,6 +32,7 @@ $| = 1;
 	    'config=s'     => \$config_file,
 	    'dbsetup!'     => \$dbsetup,
 	    'refresh!'     => \$refresh,
+	    'norfam!'      => \$norfam,
             'species=s' => \@species_list,
 	   );
 die "$usage\n" unless ($config_file && $pass);
@@ -346,7 +349,7 @@ sub DB_setup{
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal RfamBlast -condition DummySlice";
-    $status += system($cmd);
+    $status += system($cmd)    unless ($norfam);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER   -dbport $WRITEPORT -dbpass $pass".
 	" -insert -goal ncRNA -condition DummyFlag";
@@ -426,7 +429,6 @@ sub prepare_RFAM{
   # create Rfam.seed file
   my $exit;
   print "Updating RFAM descriptions file ...\n";
-  system ("mkdir $BLASTDIR") unless -e $BLASTDIR;
   system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
   $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz  -O $BLASTDIR/Rfam.tar.gz");
   die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz\n") if $exit > 0;

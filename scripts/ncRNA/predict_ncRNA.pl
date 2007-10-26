@@ -29,6 +29,7 @@ my $dln = 'DummyFlag';
 my @multiexon_files;
 my @species_list;
 my $verbose;
+my $norfam;
 
 
 $| = 1; 
@@ -37,10 +38,15 @@ $| = 1;
 	    'pass=s'    => \$pass,
 	    'verbose!'  => \$verbose, 
 	    'species=s' => \@species_list,
+	    'norfam!'      => \$norfam,
            );
 
 if(!$pass || $help){
-  die ("perl predict_ncRNA.pl -pass *(password) -species (species list) -verbose 
+  die ("perl predict_ncRNA.pl 
+-pass *(password) 
+-species (species list) 
+-verbose 
+-norfam  (Only run miRNA annotation)
 writes paths and rulemanager command lines to shell script species.csh(* required)\n");
   $help = 1;
 }
@@ -82,11 +88,11 @@ SPECIES:  foreach my $species (@speciess){
    my $sic = $sdb->get_StateInfoContainer;
    # assumes dbs were set up using the update_ncRNA script so the analysis ids aer correct.
    my $RFAM = $sic->list_input_ids_by_analysis('2');
-   my $jobs = $sic->list_input_ids_by_analysis('8');
+   my $jobs = $sic->list_input_ids_by_analysis('7');
    my $miRBase = $sic->list_input_ids_by_analysis('3');
    my $lock = $sdb->get_meta_value_by_key('pipeline.lock');
    die "Pipeline is locked, rulemanager may still be running aborting...\n" if $lock;
-   die "RFAM jobs not finished yet ".scalar(@$RFAM)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$RFAM) == scalar(@$jobs));
+   die "RFAM jobs not finished yet ".scalar(@$RFAM)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$RFAM) == scalar(@$jobs) or $norfam);
    die "miRBase jobs not finished yet ".scalar(@$miRBase)." jobs finished out of ".scalar(@$jobs)." jobs submitted\n" unless (scalar(@$miRBase) == scalar(@$jobs));
    print " ok\n";
   }
@@ -123,75 +129,76 @@ SPECIES:  foreach my $species (@speciess){
     my %rfam_threshold;
     my $dafa = $sdb->get_DnaAlignFeatureAdaptor;
     my @dafs;
-
-print "reading RFAM family data...\n";
-# fetch them by familly!!!!!!!!!
-my %thr;
-my @domcount =  @{sql("select count(*) , LEFT(hit_name,7) from dna_align_feature where  analysis_id = ". $RFanalysis->dbID .
-		      " group by LEFT(hit_name,7) limit 10 ;",$sdb)};
-foreach my $dom (@domcount){
-  $thr{$dom->[1]} = $dom->[0];
-}
-
-    my $total = scalar(keys (%thr));
-    my $complete;
-    my $last;
-    print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
-    foreach my $domain (keys %thr){
-      $count ++;
-      my @dafs;
-      if ($thr{$domain} > 2000){
-	my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $RFanalysis->dbID .
-			       " AND LEFT(hit_name,7) = '".$domain."' ORDER BY  score DESC limit 2000;",$sdb)};
-	my $cutoff = pop (@top_scores)->[0];
-	@dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" AND score >= $cutoff")};
-      } else {
-	@dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" ")};
+    unless ($norfam){
+      print "reading RFAM family data...\n";
+      # fetch them by familly!!!!!!!!!
+      my %thr;
+      my @domcount =  @{sql("select count(*) , LEFT(hit_name,7) from dna_align_feature where  analysis_id = ". $RFanalysis->dbID .
+			    " group by LEFT(hit_name,7) limit 10 ;",$sdb)};
+      foreach my $dom (@domcount){
+	$thr{$dom->[1]} = $dom->[0];
       }
-      $complete = int($count/$total*100);
-      if ($complete > $last){
-      my $num = $complete -  $last;
-      foreach (my $i = 0; $i < $num; $i++){
-	print "=";
-       }
+      
+      my $total = scalar(keys (%thr));
+      my $complete;
+      my $last;
+      print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
+      foreach my $domain (keys %thr){
+	$count ++;
+	my @dafs;
+	if ($thr{$domain} > 2000){
+	  my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $RFanalysis->dbID .
+				 " AND LEFT(hit_name,7) = '".$domain."' ORDER BY  score DESC limit 2000;",$sdb)};
+	  my $cutoff = pop (@top_scores)->[0];
+	  @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" AND score >= $cutoff")};
+	} else {
+	  @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" ")};
+	}
+	$complete = int($count/$total*100);
+	if ($complete > $last){
+	  my $num = $complete -  $last;
+	  foreach (my $i = 0; $i < $num; $i++){
+	    print "=";
+	  }
+	}
+	$last = $complete;
+	@dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 2000 );
+      DAF:  foreach my $daf(@dafs){
+	  next if ($daf->score < 20);
+	  #    print $daf->p_value." ";
+	  last DAF if ($rfam_blasts{$domain} &&  scalar(@{$rfam_blasts{$domain}}) >= 2000 );
+	  push @{$rfam_blasts{$domain}},$daf;
+	}
     }
-      $last = $complete;
-      @dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 2000 );
-    DAF:  foreach my $daf(@dafs){
-	next if ($daf->score < 20);
-	#    print $daf->p_value." ";
-	last DAF if ($rfam_blasts{$domain} &&  scalar(@{$rfam_blasts{$domain}}) >= 2000 );
-	push @{$rfam_blasts{$domain}},$daf;
+    
+      print "\nGenerating Flags\n";
+      
+      foreach my $domain(keys %rfam_blasts){
+	my @hits = @{$rfam_blasts{$domain}};
+	foreach my $hit (@hits){
+	  my $flag = Bio::EnsEMBL::Pipeline::Flag->new
+	    (
+	     '-type'         => 'dna_align_feature',
+	     '-ensembl_id'   => $hit->dbID,
+	     '-goalAnalysis' => $analysis,
+	    );
+	  push @flags,$flag;
+	}
       }
     }
     
-    print "\nGenerating Flags\n";
-    
-    foreach my $domain(keys %rfam_blasts){
-      my @hits = @{$rfam_blasts{$domain}};
-      foreach my $hit (@hits){
-	my $flag = Bio::EnsEMBL::Pipeline::Flag->new
-	  (
-	   '-type'         => 'dna_align_feature',
-	   '-ensembl_id'   => $hit->dbID,
-	   '-goalAnalysis' => $analysis,
-	  );
-	push @flags,$flag;
-      }
-    }
-
     print "Filtering miRNAs";
     print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
     
     my %mi_types;
-    @domcount =  @{sql("select count(*) , hit_name from dna_align_feature where  analysis_id = ". $mianalysis->dbID .
+    my @domcount =  @{sql("select count(*) , hit_name from dna_align_feature where  analysis_id = ". $mianalysis->dbID .
 			  " group by hit_name;",$sdb)};
     foreach my $dom (@domcount){
       $mi_types{$dom->[1]} = $dom->[0];
     }
    $count = 0;
-    $total = scalar(keys %mi_types);
-    $last = 0;
+    my $total = scalar(keys %mi_types);
+    my $last = 0;
     foreach my $type (keys %mi_types){
       $count ++;
       if ($mi_types{$type} > 50){
@@ -202,7 +209,7 @@ foreach my $dom (@domcount){
       } else {
 	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" ")};
       }
-      $complete = int($count/$total*100);
+      my $complete = int($count/$total*100);
       if ($complete > $last){
 	my $num = $complete -  $last;
 	foreach (my $i = 0; $i < $num; $i++){
@@ -264,8 +271,8 @@ foreach my $dom (@domcount){
   # check its not already there first...
   my @check =  @{sql("select count(*) from input_id_analysis where input_id = \"BlastmiRNA\"",$sdb)};
   unless ($check[0]->[0]){
-    sql_write(" insert into input_id_analysis(input_id,input_id_type,analysis_id) ".
-	      "values(\"BlastmiRNA\",\"GENOME\",7);",$sdb);
+    sql_write(" insert into input_id_analysis(input_id,input_id_type,analysis_id,created) ".
+	      "values(\"BlastmiRNA\",\"GENOME\",6,now());",$sdb);
   }
 
 

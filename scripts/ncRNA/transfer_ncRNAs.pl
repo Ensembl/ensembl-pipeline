@@ -247,8 +247,6 @@ sub check_exdb {
   die("Cannot find RFAM in external db table\n") unless sql($query,$db)->[0] == 4200;
   $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase'";
   die("Cannot find miRBase in external db table\n") unless sql($query,$db)->[0]  == 3300;
-#  $query = "SELECT external_db_id FROM external_db WHERE db_name = 'miRBase_predicted'";
-#  die("Cannot find miRBase_predicted in external db table\n") unless sql($query,$db)->[0]  == 3310;  
   return;
 }
 
@@ -456,12 +454,6 @@ sub stable_id_mapping {
     $new_trans->version($old_trans->version);
     $new_exon->stable_id($old_exon->stable_id);
     $new_exon->version($old_exon->version);
-
-    # transferring - this data is no longer stored to make the tables smaller
-    # print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-    #   $new_gene->stable_id."\',".$old_gene->version.",\'".$new_gene->stable_id."\',".$old_gene->version.",$new_session,\'gene\',1);\n";
-    # print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES(\'".
-    #   $new_trans->stable_id."\',".$old_trans->version.",\'".$new_trans->stable_id."\',".$old_trans->version.",$new_session,\'transcript\',1);\n";
     $done{$old_gene->dbID} = 1;
   }
   # deleting
@@ -732,9 +724,6 @@ sub check_meta {
   my $c1 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db1)->[0];
   my $c2 = sql("SELECT meta_value from meta where meta_key = 'assembly.default'",$db2)->[0];
 
-#  unless ($m1->get_Species->common_name eq $m2->get_Species->common_name){
-#    throw("Species do not agree ".$m1->get_Species->common_name." != ". $m2->get_Species->common_name."\n");
-#  }
   unless ($m1->get_taxonomy_id eq $m2->get_taxonomy_id ){
     throw("Tax ids do not agree ".$m1->get_taxonomy_id." != ". $m2->get_taxonomy_id."\n");
   }
