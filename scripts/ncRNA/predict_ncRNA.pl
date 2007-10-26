@@ -202,10 +202,10 @@ SPECIES:  foreach my $species (@speciess){
     foreach my $type (keys %mi_types){
       $count ++;
       if ($mi_types{$type} > 50){
-	my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $mianalysis->dbID .
-			       " AND hit_name = '".$type."' ORDER BY  score DESC limit 50;",$sdb)};
+	my @top_scores = @{sql("SELECT evalue FROM dna_align_feature WHERE analysis_id = ". $mianalysis->dbID .
+			       " AND hit_name = '".$type."' ORDER BY  evalue ASC limit 50;",$sdb)};
 	my $cutoff = pop (@top_scores)->[0];
-	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" AND score >= $cutoff")};
+	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" AND evalue <= $cutoff")};
       } else {
 	@dafs = @{$dafa->generic_fetch("hit_name = \"$type\" ")};
       }
@@ -291,7 +291,7 @@ SPECIES:  foreach my $species (@speciess){
   
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
   # if all be well, run the rulemanager
-  my $cmd_rulemanager = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
+  my $cmd_rulemanager = "bsub -o $species.out -q normal perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".

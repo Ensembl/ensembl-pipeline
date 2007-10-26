@@ -20,7 +20,7 @@ writes the rulemanager command and path to a shell script species.csh
 * = required\n";
 my $pass;
 my $verbose;
-my $config_file = $CVSDIR."/ensembl-pipeline/scripts/ncRNA/config_files.txt";
+my $config_file = "config_files.txt";
 my $dbsetup;
 my $refresh;
 my $norfam;
@@ -108,7 +108,7 @@ foreach my $species (@speciess){
   
   system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
   # if all be well, run the rulemanager
-  my $cmd_rulemanager = "perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
+  my $cmd_rulemanager = "bsub -o $species.out -q normal perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
