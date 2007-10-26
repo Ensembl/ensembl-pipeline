@@ -358,6 +358,10 @@ sub DB_setup{
       "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name DummySlice -slice -slice_size 200000 -coord_system toplevel";
     $status += system($cmd);
+    $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/RuleHandler.pl ".
+      "-dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
+	" -insert -goal miRNA -condition SubmitmiRNA ";
+    $status += system($cmd);
     print "database set up.\n";
   };
   if($@){
