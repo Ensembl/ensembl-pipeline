@@ -37,9 +37,9 @@ GetOptions('help'           => \$help,
            'taxondbname=s'  => \$taxondbname,
            'dbhost|lcdbhost=s'     => \$lcdbhost,
            'dbport|lcdbport=s'     => \$lcdbport,
-           'dbnamelcdbname=s'     => \$lcdbname,
-		   'dbuser|lcdbuser=s'     => \$lcdbuser,
-		   'dbpass|lcdbpass=s'     => \$lcdbpass,
+           'dbname|lcdbname=s'     => \$lcdbname,
+           'dbuser|lcdbuser=s'     => \$lcdbuser,
+	   'dbpass|lcdbpass=s'     => \$lcdbpass,
           );
 
 my $state;
