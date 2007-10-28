@@ -1214,7 +1214,6 @@ sub genewise_db {
 
 sub populate_kill_list {
   my ($self) = @_;
-  my %kill_list;
 
   my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'protein');
   my %kill_list = %{$kill_list_object->get_kill_list()};
