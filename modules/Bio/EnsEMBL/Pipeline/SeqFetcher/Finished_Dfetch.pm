@@ -9,6 +9,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
 
 
 my $uniprot_archive = 'uniprot_archive';
+my $verbose = 0;
 
 sub new {
     my ( $class, @args ) = @_;
@@ -65,7 +66,7 @@ sub fetch_descriptions {
 	# if an Analysis object is set
 	if($self->analysis) {
 		$self->is_light_fetch(1);
-		print STDOUT "Fetching ".@$id_list." sequences from OBDA index\n";
+		print STDOUT "Fetching ".@$id_list." sequences from OBDA index\n" if $verbose;
 		SEQ :
 		foreach (@$id_list) {
 			my $seq = $self->get_Seq_by_acc($_);
@@ -173,7 +174,7 @@ sub fetch_descriptions {
 		delete $descriptions->{$_};
 	}
 
-	print STDOUT "Failed to fetch ".@$failed." ids\n" if @$failed;
+	print STDOUT "Failed to fetch ".@$failed." ids\n" if @$failed && $verbose;
 
 
 	return ($descriptions, $failed);
@@ -193,13 +194,13 @@ sub fetch_mm_data {
         # Take a slice from the array
         my $chunk = [@$ids[$i..$j]];
         my $query = $sql . join("','",@$chunk)."')";
-        $query .= " GROUP BY r.entry_id" if $group;
+        $query .= " GROUP BY accession_version" if $group;
         my $sth;
 
         # create a list of failed ids
         my %failed_list = map {$_ , 1 } @$chunk;
 
-		print STDOUT "Fetching data from M&M database $dbname for ".@$chunk." ids\n";
+		print STDOUT "Fetching data from M&M database $dbname for ".@$chunk." ids\n" if $verbose;
 
         $sth = $dbh->prepare($query);
         $sth->execute() or die "Couldn't execute statement: " . $sth->errstr;
