@@ -127,6 +127,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
 							      UTR_GENETYPE
 							      BLESSED_UTR_GENETYPE
+							      KNOW_UTR_GENETYPE
 							      BLESSED_GENETYPES
 							      cDNA_GENETYPE
 							      EST_GENETYPE
@@ -229,9 +230,9 @@ sub fetch_input{
       $self->ests($filtered_ests);
     }
     else{
-      $self->ests(@est_genes);
+      $self->ests(\@est_genes);
     }
-    print STDERR "got " . scalar(@$filtered_ests) . " ESTs after filtering.\n" if $VERBOSE;
+    print STDERR "got " . scalar(@{$self->ests}) . " ESTs after filtering.\n" if $VERBOSE;
   }
 
   # get ditags
@@ -690,6 +691,8 @@ sub run_matching{
  CDS:
   foreach my $cds (@merged_genes){
 
+    print STDERR "\n -next cds- \n" if $VERBOSE;
+
     #my $cds_saved = Bio::EnsEMBL::Pipeline::Tools::GeneUtils->_clone_Gene($cds);
 
 
@@ -698,6 +701,7 @@ sub run_matching{
     my @cds_exons = @{$cds_tran[0]->get_all_Exons}; # ordered array of exons
     my $strand    = $cds_exons[0]->strand;
     my $cdna_match;
+    my $usingKnown = 0;
 
 
 
@@ -745,6 +749,7 @@ sub run_matching{
       #use this cDNA
       print STDERR "Using predefined cDNA!\n" if $VERBOSE;
       $cdna_match = $predef_match;
+      $usingKnown = 1;
     }
     else{
       # find matching cdnas using scoring of all evidence available
@@ -810,6 +815,7 @@ sub run_matching{
 								       \@exon_array, undef, $collapsed_cluster);
 
 	    #add a ditag score
+	    print STDERR "new_transcript score :".$new_transcript->score()."\n" if $VERBOSE;
 	    my ($ditag_score, $index) = $self->score_ditags($self->ditags, $new_transcript, 0);
 	    $new_transcript->score($new_transcript->score() + $ditag_score);
 
@@ -875,7 +881,10 @@ sub run_matching{
 
 
       #make the new gene with UTR
-      my $combined_genes = $self->make_gene($combined_genetype, $combined_transcript);
+      my $genetype;
+      if($usingKnown){ $genetype = $KNOW_UTR_GENETYPE; }
+      else{ $genetype = $combined_genetype; }
+      my $combined_genes = $self->make_gene($genetype, $combined_transcript);
 
       #check phases, etc.- if it is not a blessed gene
       my $combined_gene;
@@ -3122,6 +3131,7 @@ sub _transfer_evidence {
 
   my $cdna_trans = $cdna_transcript->get_all_Transcripts()->[0];
   foreach my $tsf (@{$cdna_trans->get_all_supporting_features}) {
+    print STDERR "adding supporting feature: ".$tsf->hseqname."\n" if $VERBOSE;
     $combined_transcript->add_supporting_features($tsf);
   }
   return $combined_transcript;
