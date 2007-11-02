@@ -50,6 +50,9 @@ use vars qw( %UTR_Builder );
 	     # biotype for blessed UTR_Builder output genes
 	     BLESSED_UTR_GENETYPE => 'Blessed_UTR_Genes',
 
+	     # biotype for UTR_Builder output genes using "known cdnas"
+	     KNOW_UTR_GENETYPE    => 'known_UTR',
+
 	     # input genes that need to go through without change of CDS (like CCDS genes)
 	     BLESSED_GENETYPES    => ['ccds_gene'],
 
@@ -81,6 +84,9 @@ use vars qw( %UTR_Builder );
 	     # Ditags can be use ditags to filter ESTs / cDNAs
 	     # format: ['SHC012', 'SHC013'],
 	     DITAG_TYPE_NAMES     => [],
+
+             # do you want to apply filtering to the est genes?
+	     FILTER_ESTS          => 0,
 
              #output verbosity
 	     VERBOSE              => 0,
