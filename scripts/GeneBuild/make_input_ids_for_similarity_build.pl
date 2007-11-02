@@ -63,43 +63,36 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
-  GB_DBNAME
-  GB_DBHOST
-  GB_DBUSER
-  GB_DBPASS
-  GB_DBPORT
-  GB_GW_DBNAME
-  GB_GW_DBHOST
-  GB_GW_DBUSER
-  GB_GW_DBPASS
-  GB_GW_DBPORT
-);
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
   GB_SIMILARITY_DATABASES
   GB_SIMILARITY_GENETYPEMASKED
 );
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
-  GB_KILL_LIST
-);
+
+#needs to be fixed
+#use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
+#  GB_KILL_LIST
+#);
+my $GB_KILL_LIST;
 
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
 my ( $write, $help, $verbose, $max_slice_size, $logic_name, $slice_name_file ,$number_of_prot_per_job);
 my $coord_system = 'toplevel';
-my @restrict_to_proteins ; 
+my @restrict_to_proteins ;
+
 &GetOptions(
              'logic_name=s'      => \$logic_name,
-             'write'             => \$write,
+             'write!'            => \$write,
              'help'              => \$help,
              'max_slice=s'       => \$max_slice_size,
              'verbose'           => \$verbose,
              'coord_system=s'    => \$coord_system,
              'slice_name_file:s' => \$slice_name_file,
              'number_of_proteins_per_job:i' => \$number_of_prot_per_job , 
-             'restrict_to_proteins:s@' => \@restrict_to_proteins, 
+             'restrict_to_proteins:s@'      => \@restrict_to_proteins, 
 );
 exec( 'perldoc', $0 ) if $help;
 
@@ -128,36 +121,27 @@ unless ( $number_of_prot_per_job ) {
   warning("you haven't used the\n\t-number_of_proteins_per_job - option\nto set the set the number of proteins per job - using default (20) ")  ;
   $number_of_prot_per_job = 20 ; 
 }
-foreach my $arg ( $GB_DBNAME, $GB_DBHOST, $GB_DBUSER ) {
+foreach my $arg ( $$DATABASES{REFERENCE_DB}{"-dbname"}, $$DATABASES{REFERENCE_DB}{"-host"}, $$DATABASES{REFERENCE_DB}{"-user"} ) {
   if ( $arg eq '' ) {
-    print STDERR "You need to set various parameters in GeneBuild config files\n"
-      . "Here are your current values for required settings: \n"
-      . "dbname      => $GB_DBNAME\n"
-      . "dbhost      => $GB_DBHOST\n"
-      . "dbuser      => $GB_DBUSER\n"
-      . "dbpass      => $GB_DBPASS\n"
-      . "dbport      => $GB_DBPORT\n";
-
+    print STDERR "You need to define database parameters in Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases.\n";
     exit(1);
   }
 }
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
-  '-dbname' => $GB_DBNAME,
-  '-host'   => $GB_DBHOST,
-  '-user'   => $GB_DBUSER,
-  '-pass'   => $GB_DBPASS,
-  '-port'   => $GB_DBPORT
-
+  '-dbname' => $$DATABASES{REFERENCE_DB}{"-dbname"},
+  '-host'   => $$DATABASES{REFERENCE_DB}{"-host"},
+  '-user'   => $$DATABASES{REFERENCE_DB}{"-user"},
+  '-pass'   => $$DATABASES{REFERENCE_DB}{"-pass"},
+  '-port'   => $$DATABASES{REFERENCE_DB}{"-port"}
 ) or die "Could not connect to the pipeline database; check config\n";
 
 my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-  '-host'   => $GB_GW_DBHOST,
-  '-user'   => $GB_GW_DBUSER,
-  '-pass'   => $GB_GW_DBPASS,
-  '-port'   => $GB_GW_DBPORT,
-  '-dbname' => $GB_GW_DBNAME,
-
+  '-dbname' => $$DATABASES{GENEWISE_DB}{"-dbname"},
+  '-host'   => $$DATABASES{GENEWISE_DB}{"-host"},
+  '-user'   => $$DATABASES{GENEWISE_DB}{"-user"},
+  '-pass'   => $$DATABASES{GENEWISE_DB}{"-pass"},
+  '-port'   => $$DATABASES{GENEWISE_DB}{"-port"}
 ) or die "Could not connect to the genewise database; check config\n";
 
 my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
