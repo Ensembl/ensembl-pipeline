@@ -773,11 +773,25 @@ sub run_matching{
 	}
       }
 
+      #check here 
+      #foreach my $test_cdna(@{$matching_cdnas}){
+      #  foreach my$test_t_cdna(@{$test_cdna->get_all_Transcripts}){
+      #  print "TEST1: ", scalar(@{$test_t_cdna->get_all_supporting_features}),"\n";
+      #}
+      #}
 
       ## scoring code...
 
       #convert genes to extended objects
       my $matching_extended_cdnas = $self->convert_to_extended_genes($matching_cdnas);
+
+      #check here 
+      #foreach my $test_extended_cdna(@{$matching_extended_cdnas}){
+      #  foreach my$test_extended_t_cdna(@{$test_extended_cdna->get_all_Transcripts}){
+      #  print "TEST2: ", scalar(@{$test_extended_t_cdna->get_all_supporting_features}),"\n";
+      #}
+      #}
+
 
       #cluster matching cDNA or EST genes
       #call cluster method from ClusterUtils
@@ -809,10 +823,16 @@ sub run_matching{
 	foreach my $potential_gene (@potential_genes){
 	  foreach my $potential_trans (@{$potential_gene->get_all_Transcripts}) {
 
+            #print "WE ARE HERE ",scalar(@{$potential_trans->get_all_supporting_features}),"\n";
+
+
 	    #create an extended transcript (with scores)
 	    my @exon_array = ( @{$potential_trans->get_all_Exons} );
 	    my $new_transcript = Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus->transcript_from_exons(
 								       \@exon_array, undef, $collapsed_cluster);
+
+            #add supporting features
+            $new_transcript->add_supporting_features(@{$potential_trans->get_all_supporting_features});
 
 	    #add a ditag score
 	    print STDERR "new_transcript score :".$new_transcript->score()."\n" if $VERBOSE;
@@ -837,12 +857,16 @@ sub run_matching{
 
 #	my @cdsexons = @{$cds->get_all_Transcripts->[0]->get_all_Exons};
 
+        my $chosen_feats = $chosen_transcript->get_all_supporting_features;
+
+        #print "FEATS: ",scalar(@{$chosen_feats}),"\n";
 
 	#make a gene from this
 	$cdna_match = Bio::EnsEMBL::Gene->new;
 	$cdna_match->slice($chosen_transcript->slice);
 	$cdna_match->add_Transcript($chosen_transcript);
 	$cdna_match->analysis($chosen_transcript->analysis);
+        $cdna_match->get_all_Transcripts->[0]->add_supporting_features(@$chosen_feats);
 
 	#combine it with the cds gene
 	$combined_transcript = $self->combine_genes($cds, $cdna_match);
@@ -877,6 +901,8 @@ sub run_matching{
 
     if (defined $combined_transcript){
       #transfer evidence
+      #print "Supporting Feats: ",scalar(@{$cdna_match->get_all_Transcripts->[0]->get_all_supporting_features}), "\n";
+
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
 
 
@@ -1471,6 +1497,8 @@ sub convert_to_extended_genes {
                     -ANALYSIS => $t->analysis , 
                    );
       $new_tr->ev_set($set);
+
+      $new_tr->add_supporting_features(@{$t->get_all_supporting_features});
 
       my @pt_exons  = @{$t->get_all_Exons} ;
       for (my $i=0 ; $i<scalar(@pt_exons) ; $i++) { 
