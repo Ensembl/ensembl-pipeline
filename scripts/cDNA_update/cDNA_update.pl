@@ -187,7 +187,7 @@ my $TAXONDBPORT          = "3306";
 #set the species
 my $common_species_name  = "mouse"; #"human"; #"mouse";
 my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
-
+my $taxonomy_id          = "9606"; # 9606 for human # 10090 for mouse
 my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
 
@@ -201,7 +201,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 use Data::Dumper;
 #we need the Net::SSH module from somewhere:
-use lib '/nfs/acari/fsk/perls/';
+use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
 use Net::SSH qw(sshopen2);
 use File::Copy;
 
@@ -246,10 +246,11 @@ my %configvars      = (
          "WB_PIPE_DBNAME" => $WB_PIPE_DBNAME,
          "WB_PIPE_DBHOST" => $WB_PIPE_DBHOST,
          "WB_PIPE_DBPORT" => $WB_PIPE_DBPORT, 
-     "WB_TARGET_DBNAME" => $WB_TARGET_DBNAME,
+         "WB_TARGET_DBNAME" => $WB_TARGET_DBNAME,
          "WB_TARGET_DBHOST" => $WB_TARGET_DBHOST,
          "WB_TARGET_DBPORT" => $WB_TARGET_DBPORT,
          "newFeatureName" => $newFeatureName,
+         "taxonomy_id" => $taxonomy_id,
 );
 
 
@@ -639,7 +640,7 @@ sub fastafiles{
 
                 # now get the kill_list
                 #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA');
+                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'DEFAULT');
                 my %kill_list = %{$kill_list_object->get_kill_list()};
 
                 open(LIST, "<", $gss) or die("can't open gss list $gss");
