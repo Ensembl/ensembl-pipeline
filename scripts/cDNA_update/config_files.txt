@@ -28,6 +28,7 @@ use vars qw(%Config);
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
   DEFAULT_BATCH_QUEUE => 'normal',
+  DEFAULT_SUB_ARGS => '',
   DEFAULT_OUTPUT_DIR  => '<outDIR>',
   DEFAULT_CLEANUP     => 'yes',
   DEFAULT_RESOURCE    => '',
@@ -41,6 +42,9 @@ use vars qw(%Config);
   SLEEP_PER_JOB => 30,
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
   DEFAULT_RUNNER => '',
+  DEFAULT_RETRY_QUEUE => 'long',
+  DEFAULT_RETRY_SUB_ARGS => '',
+  DEFAULT_RETRY_RESOURCE => '',
   QUEUE_CONFIG => [
     {
       logic_name => '<newFeatureName>',
@@ -52,7 +56,7 @@ use vars qw(%Config);
       retries    => 1,
       sub_args   => '',
       runner     => '',
-      queue      => 'long',
+      queue      => 'normal',
       output_dir => '<outDIR>',
       cleanup    => 'yes',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
@@ -72,6 +76,8 @@ use vars qw(%Config);
 
     ANALYSIS_WORK_DIR => '/tmp',
     ANALYSIS_REPEAT_MASKING => ['RepeatMask'],
+    CORE_VERBOSITY => 'WARNING',
+    LOGGER_VERBOSITY => 'OFF',
 );
 
 >>ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config/Exonerate2Genes.pm
@@ -115,5 +121,41 @@ use vars qw(%Config);
                OPTIONS             => "--model est2genome --forwardcoordinates FALSE --softmasktarget TRUE --exhaustive FALSE --score 500 --saturatethreshold 100 --dnahspthreshold 60 --dnawordlen 14",
              },
            }
+);
+
+>>ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
+package Bio::EnsEMBL::Pipeline::Config::GeneBuild::KillListFilter;
+
+use strict;
+use vars qw( %Config );
+%Config = (
+  KILL_LIST_CONFIG => {
+
+    DEFAULT => {
+      GB_REF_DB => {
+        -dbname => '',
+        -host   => '',
+        -port   => '3306',
+        -user   => 'ensro',
+      },
+      KILL_LIST_DB => {
+        -dbname => 'ba1_ensembl_kill_list',
+        -host   => 'genebuild6',
+        -port   => '3306',
+        -user   => 'ensro',
+        -pass   => '',
+      },  
+      FILTER_PARAMS    => {
+        #can only be protein, cDNA, EST.
+        -only_mol_type        => 'cDNA',
+        #kill_list will not return entries that have an entry in the kill_object_analysis table for these analysis_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these analyses below
+        -for_analyses         => ['cDNA_update'],
+        #kill_list will not return accessions that have an entry in the kill_object_species table for these species_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these species below
+        -for_species          => ['<taxonomy_id>'], # ['10090'] = mouse, ['9606'] = human
+      },
+    },
+  },
 );
 
