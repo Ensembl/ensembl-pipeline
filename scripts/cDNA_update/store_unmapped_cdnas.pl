@@ -191,7 +191,7 @@ foreach my $k (keys %kill_list){
     }
     if ($k eq $truncated_acc) {
       delete $cdnas{$cdna_acc};
-      $cdnas{$cdna_acc}{"See kill list"} = 1;
+      $cdnas{$cdna_acc}{"See kill-list database"} = 1;
     }
   }
 }
@@ -269,6 +269,8 @@ while(<IN>){
 }
 close IN;
 
+
+
 #get unmapped_object adaptor:
 my $uoa = $db1->get_UnmappedObjectAdaptor();
 
@@ -287,8 +289,8 @@ for my $id (@sorted){
 	if (exists $cdnas{$id}{"GSS sequence"}){
 		$reasons{"GSS sequence"} = undef;
 	}
-	if (exists $cdnas{$id}{"See kill list"}){
-		$reasons{"See kill list"} = undef;
+	if (exists $cdnas{$id}{"See kill-list database"}){
+		$reasons{"See kill-list database"} = undef;
 	}
 	if (exists $cdnas{$id}{"Low coverage"}){
 		$reasons{"Low coverage"} = $cdnas{$id}{"Low coverage"};
@@ -320,16 +322,17 @@ for my $id (@sorted){
 	
     #insert into unmapped_object tables of database:
       my $analysis_adaptor = $db1->get_AnalysisAdaptor;
-	  my $analysis = $analysis_adaptor->fetch_by_logic_name('cDNA_update');
-
+      my $analysis = $analysis_adaptor->fetch_by_logic_name('cDNA_update');
+      
+     
       my $uo = Bio::EnsEMBL::UnmappedObject->new (
         -type           => 'cDNA',
         -analysis       => $analysis,
         -external_db_id => $external_db_id,
         -identifier     => $id,
         -summary        => $summary,
-		-full_desc      => $reason_list{$summary},
-		-query_score    => $reasons{$summary},
+	-full_desc      => $reason_list{$summary},
+	-query_score    => $reasons{$summary},
         -target_score   => $target_score,
         -ensembl_id     => $ensembl_id,
         -ensembl_object_type   => $ensembl_object_type,
