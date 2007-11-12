@@ -159,3 +159,34 @@ use vars qw( %Config );
   },
 );
 
+>>ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config/GeneBuild/Databases.pm
+package Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases ;
+
+use strict;
+use vars qw(%Config);
+%Config= (
+
+  DATABASES => {
+
+                 REFERENCE_DB =>
+                                 {
+                                   -dbname => '<WB_PIPE_DBNAME>',
+                                   -host => '<WB_PIPE_DBHOST>',
+                                   -port => '<WB_PIPE_DBPORT>',
+                                   -user => '<WB_DBUSER>',
+                                   -pass => '<WB_DBPASS>',
+                                  },
+
+                 EXONERATE_DB =>
+                                 {
+                                   -dbname => '<WB_TARGET_DBNAME>',
+                                   -host => '<WB_TARGET_DBHOST>',
+                                   -port => '<WB_TARGET_DBPORT>',
+                                   -user => '<WB_DBUSER>',
+                                   -pass => '<WB_DBPASS>',
+                                  },
+             },
+
+             DNA_DBNAME => "REFERENCE_DB",
+
+             );
