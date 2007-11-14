@@ -26,6 +26,7 @@ retrieved from the ~/.netrc file if it exists or provided as command line argume
     -user       - (check the ~/.netrc file) For RDBs, what username to connect as (user= in locator)
     -pass       - (check the ~/.netrc file) For RDBs, what password to use (pass= in locator)
 
+    -cs_version	- the coordinate system version of the chromosome to use for deletion (default Otter)
     -delete       - delete the set
      -set|name     - set the set name to delete (could be used several times)
      or
@@ -50,6 +51,7 @@ my $port;
 my $dbname;
 my $delete;
 my @sets;
+my $cs_version = 'Otter';
 my $show;
 my $help;
 
@@ -65,6 +67,7 @@ my $line_format  = "|%-4s|%-7s|%-20s|%-90s|%-12s|%-6s|\n";
 	'delete!'    => \$delete,
 	'show!'      => \$show,
 	'set|name:s' => \@sets,
+	'cs_version:s' => \$cs_version,
 	'h|help'     => \$help
 );
 
@@ -135,12 +138,13 @@ sub show_sequence_sets {
 	  sprintf( $line_format, 'chr', 'version', 'sequence_set', 'description','write_access','hidden' );
 	print STDOUT $table_header;
 	my $sets = $s_sets || get_sequence_sets($db);
-	foreach my $set ( sort keys %$sets ) {
-		my $version  = $sets->{$set}->[1];
-		my $chr  = $sets->{$set}->[2];
-		my $desc = $sets->{$set}->[3];
-		my $wa = defined($sets->{$set}->[4]) ? $sets->{$set}->[4] : 'null';
-		my $hidden= defined($sets->{$set}->[5]) ? $sets->{$set}->[5] : 'null';;
+	foreach my $sr_id ( sort keys %$sets ) {
+		my $set  = $sets->{$sr_id}->[0];
+		my $version  = $sets->{$sr_id}->[1];
+		my $chr  = $sets->{$sr_id}->[2];
+		my $desc = $sets->{$sr_id}->[3];
+		my $wa = defined($sets->{$sr_id}->[4]) ? $sets->{$sr_id}->[4] : 'null';
+		my $hidden= defined($sets->{$sr_id}->[5]) ? $sets->{$sr_id}->[5] : 'null';;
 		print STDOUT sprintf( $line_format, $chr, $version, $set, $desc, $wa , $hidden );
 	}
 	print STDOUT $table_header;
@@ -148,28 +152,27 @@ sub show_sequence_sets {
 
 sub delete_sequence_sets {
 	my ( $db, $del_sets ) = @_;
-	my $stored_sets = get_sequence_sets($db);
-	foreach my $set (@$del_sets) {
-		if ( !$stored_sets->{$set} ) {
-			show_sequence_sets( $db, $stored_sets );
-			throw("Sequence set [$set] is not in $dbname database");
-		}
-	}
 
 	my $sql = qq{
 		DELETE a,s,at
-		FROM assembly a, seq_region s, seq_region_attrib at
+		FROM assembly a, seq_region s,  coord_system c, seq_region_attrib at
 		WHERE s.name = ?
 		AND ( a.asm_seq_region_id = s.seq_region_id
 		OR a.cmp_seq_region_id = s.seq_region_id )
 		AND at.seq_region_id = s.seq_region_id
+		AND c.version = '$cs_version'
+		AND c.name = 'chromosome'
+		AND c.coord_system_id = s.coord_system_id
 	};
 	my $sth     = $db->prepare($sql);
 
 	foreach my $set (@$del_sets) {
-		$sth->execute($set);
-		print STDOUT "Set $set deleted from $dbname\n";
-
+		my $nb = $sth->execute($set);
+		if($nb >= 1 ) {
+			print STDOUT "Sequence set $set on chromosome:$cs_version deleted from $dbname\n";
+		} else {
+			print STDOUT "There is no sequence set $set on chromosome:$cs_version in $dbname\n";
+		}
 	}
 
 	show_sequence_sets($db);
@@ -205,7 +208,7 @@ sub get_sequence_sets {
 	my $sth = $db->prepare($query);
 	$sth->execute();
 	while ( my ( $sr_id, $version, $chr, $set, $desc, $wa, $hidden ) = $sth->fetchrow ) {
-		$hash->{$set} = [ $sr_id, $version, $chr, $desc, $wa, $hidden ];
+		$hash->{$sr_id} = [ $set, $version, $chr, $desc, $wa, $hidden ];
 	}
 
 	return $hash;
