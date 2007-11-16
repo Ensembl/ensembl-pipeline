@@ -199,10 +199,6 @@ sub get_sequence_sets {
 				AND t2.code = 'description'
 				AND t3.code = 'write_access'
 				AND t4.code = 'hidden'
-				AND t1.attrib_type_id = a1.attrib_type_id
-				AND t2.attrib_type_id = a2.attrib_type_id
-				AND a1.seq_region_id =  s.seq_region_id
-				AND a2.seq_region_id =  s.seq_region_id
 				ORDER BY  s.seq_region_id DESC
 					};
 	my $sth = $db->prepare($query);
