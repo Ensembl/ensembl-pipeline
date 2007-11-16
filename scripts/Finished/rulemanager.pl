@@ -476,7 +476,8 @@ sub update_analysis_dbversion {
 
 sub save_db_version {
 	my ($a_ad,$ana,$db_version) = @_;
-	if($db_version && ($db_version ne $ana->db_version)){
+	if($db_version && ($db_version ne $ana->db_version))
+	{
 		print STDOUT "Analysis update: ".$ana->logic_name." old version ".$ana->db_version.
 					 " new version $db_version\n" if $verbose;
 		$ana->db_version($db_version);
