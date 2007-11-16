@@ -43,7 +43,8 @@ here is an example commandline
     -tpass (check the ~/.netrc file)  For RDBs, what password to use
     -tport (check the ~/.netrc file)   For RDBs, what port to use
 
-    -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
+    -from_cs_version (default:Otter) the version of chromosome coordinate system being copied from
+    -to_cs_version (default:from_cs_version) the version of chromosome coordinate system being stored
     -set|chr	the sequence set(s) to load
     -nosubmit	don't prime the pipeline with the SubmitContig analysis in case of pipeline
     		database
@@ -67,7 +68,7 @@ use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::Attribute;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-# otter and destination database connexion parameters, default values.
+# source and destination database connexion parameters, default values.
 my $shost = 'otterlive';
 my $sport = '';
 my $sname = 'loutre_human';
@@ -80,7 +81,8 @@ my $tname = '';
 my $tuser = '';
 my $tpass = '';
 
-my $chromosome_cs_version = 'Otter';
+my $from_cs_version = 'Otter';
+my $to_cs_version ;
 my @seq_sets;
 my $do_submit = 1;	  # Set if we want to prime the pipeline with the SubmitContig analysis
 
@@ -97,13 +99,16 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'tname=s'                 => \$tname,
 	'tuser:s'                 => \$tuser,
 	'tpass:s'                 => \$tpass,
-	'chromosome_cs_version:s' => \$chromosome_cs_version,
+	'from_cs_version:s' 	  => \$from_cs_version,
+	'to_cs_version:s' 		  => \$to_cs_version,
 	'chr|set=s'               => \@seq_sets,
 	'no_submit!'			  => sub{ $do_submit = 0 },
 	'submit!'			  	  => \$do_submit,
 	'h|help!'                 => $usage
   )
   or $usage->();
+
+$to_cs_version ||= $from_cs_version;
 
 if ( !$tuser || !$tpass || !$tport ) {
 	my @param = &get_db_param($thost);
@@ -160,40 +165,53 @@ my $seqset_info     = {};
 	print STDOUT
 "Getting Sequence set @seq_sets from source database: $sname ($shost:$sport)\n";
 	my $contigs_sth = $source_dbc->prepare(
-		q{
-        SELECT t.value, a.asm_start, a.asm_end, a.cmp_start, a.cmp_end, a.ori,
-            substring_index(s2.name,'.',1) ,
-            substring_index(substring_index(s2.name,'.',-3),'.',1) ,
-            t.value
-		FROM assembly a, seq_region_attrib t, seq_region s1, seq_region s2
-		WHERE s1.name = ?
-		AND s2.seq_region_id = a.cmp_seq_region_id
-		AND s1.seq_region_id = a.asm_seq_region_id
-		AND t.seq_region_id = s1.seq_region_id
-		AND t.attrib_type_id = 97
+		qq{
+		SELECT	a.asm_start, a.asm_end,
+            	a.cmp_start, a.cmp_end, a.ori,
+            	substring_index(sc.name,'.',2) as accession_v
+		FROM assembly a, seq_region sa, seq_region sc, coord_system ca, coord_system cc
+		WHERE sa.name =  ?
+		AND sc.seq_region_id = a.cmp_seq_region_id
+		AND sa.seq_region_id = a.asm_seq_region_id
+		AND ca.name = 'chromosome'
+		AND ca.version = ?
+		AND cc.name = 'contig'
+		AND sa.coord_system_id = ca.coord_system_id
+		AND sc.coord_system_id = cc.coord_system_id
 		ORDER BY  a.asm_start
 		}
 	);
 	my $description_sth = $source_dbc->prepare(
-		q{
-		SELECT t.value
-		FROM seq_region_attrib t, seq_region s
-		WHERE s.name = ?
-		AND t.seq_region_id = s.seq_region_id
-		AND t.attrib_type_id = 49
+		qq{
+			SELECT 	a1.value AS chromosome,
+					a2.value AS description,
+			       	a3.value AS write_access,
+			       	a4.value AS hidden
+			FROM attrib_type t1,attrib_type t2,attrib_type t3, attrib_type t4,coord_system c, seq_region s
+			LEFT JOIN seq_region_attrib a1 ON (a1.seq_region_id =  s.seq_region_id AND t1.attrib_type_id = a1.attrib_type_id)
+			LEFT JOIN seq_region_attrib a2 ON (a2.seq_region_id =  s.seq_region_id AND t2.attrib_type_id = a2.attrib_type_id)
+			LEFT JOIN seq_region_attrib a3 ON (a3.seq_region_id =  s.seq_region_id AND t3.attrib_type_id = a3.attrib_type_id)
+			LEFT JOIN seq_region_attrib a4 ON (a4.seq_region_id =  s.seq_region_id AND t4.attrib_type_id = a4.attrib_type_id)
+			WHERE c.name = 'chromosome'
+			AND c.coord_system_id = s.coord_system_id
+			AND c.version = ?
+			AND t1.code = 'chr'
+			AND t2.code = 'description'
+			AND t3.code = 'write_access'
+			AND t4.code = 'hidden'
+			AND s.name =  ?
 		}
 	);
 	SET:foreach my $sequence_set (@seq_sets) {
 		my $contig_number = 0;
-		my $chr_href;
 
 		# fetch all the contigs for this sequence set
-		$contigs_sth->execute($sequence_set);
+		$contigs_sth->execute($sequence_set,$from_cs_version);
 		CONTIG:while (
 			my (
-				$chr_name,     $chr_start,  $chr_end,
+				$chr_start,  $chr_end,
 				$contig_start, $contig_end, $strand,
-				$acc,          $sv,         $superctg_name
+				$acc_v
 			)
 			= $contigs_sth->fetchrow
 		  )
@@ -206,26 +224,23 @@ my $seqset_info     = {};
 					$end_value{$sequence_set} = $chr_end;
 				}
 			}
-			$contigs_hashref->{ $acc . $sv.$sequence_set } = [
-				$chr_name,     $chr_start,  $chr_end,
+			$contigs_hashref->{ $acc_v.$sequence_set } = [
+				$chr_start,  $chr_end,
 				$contig_start, $contig_end, $strand,
-				$acc,          $sv,         $sequence_set
+				$acc_v,         $sequence_set
 			];
-			$chr_href->{$chr_name} = 1;
+
 			$contig_number++;
 
 		}
 
 		# fetch the sequence set description from the sequence_set table
-		$description_sth->execute($sequence_set);
-		my ($desc) = $description_sth->fetchrow;
-		my @chrs = keys %$chr_href;
-		$seqset_info->{$sequence_set} = [ $desc, @chrs ];
+		$description_sth->execute($from_cs_version,$sequence_set);
+		my ($chr,$desc,$write,$hidden) = $description_sth->fetchrow;
+		$seqset_info->{$sequence_set} = [ $chr,$desc,$write,$hidden ];
 
 		throw("No data for '$sequence_set' in $sname")
 		  unless ($contig_number);
-		throw("Set $sequence_set should contains (only) one chromosome: [@chrs]")
-		  unless (scalar(@chrs) == 1);
 		print STDOUT $contig_number." contigs retrieved for $sequence_set\n";
 	}
 }
@@ -255,7 +270,7 @@ my $seqset_info     = {};
 
 	eval {
 		$chromosome_cs =
-		  $cs_a->fetch_by_name( "chromosome", $chromosome_cs_version );
+		  $cs_a->fetch_by_name( "chromosome", $to_cs_version );
 		$clone_cs  = $cs_a->fetch_by_name("clone");
 		$contig_cs = $cs_a->fetch_by_name("contig");
 
@@ -278,7 +293,7 @@ my $seqset_info     = {};
 		eval {
 			$slice =
 			  $slice_a->fetch_by_region( 'chromosome', $set_name, undef, undef,
-				undef, $chromosome_cs_version );
+				undef, $to_cs_version );
 		};
 		if ($slice) {
 			print STDOUT "Sequence set <$set_name> is already in target database <$tname>\n";
@@ -297,24 +312,14 @@ my $seqset_info     = {};
 
 	# insert clone & contig in seq_region, seq_region_attrib,
 	# dna and assembly tables
-	my $insert_query = qq {
+	my $insert_query = qq{
 				INSERT IGNORE INTO assembly
 				(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)
 				values
 				(?,?,?,?,?,?,?)};
 	my $insert_sth = $target_dbc->prepare($insert_query);
 	for ( values %$contigs_hashref ) {
-		my $chr_name     = $_->[0];
-		my $sequence_set = $_->[8];
-		my $chr_start    = $_->[1];
-		my $chr_end      = $_->[2];
-		my $ctg_start    = $_->[3];
-		my $ctg_end      = $_->[4];
-		my $ctg_ori      = $_->[5];
-		my $acc          = $_->[6];
-		my $ver          = $_->[7];
-		my $acc_ver      = $acc . "." . $ver;
-
+		my ($chr_start,$chr_end,$ctg_start,$ctg_end,$ctg_ori,$acc_ver,$sequence_set) = @$_;
 		my $clone;
 		my $clone_seq_reg_id;
 		my $contig;
@@ -323,14 +328,18 @@ my $seqset_info     = {};
 		my $seqlen;
 		eval {
 			$clone  = $slice_a->fetch_by_region( 'clone', $acc_ver );
-			$seqlen = $clone->length;
-			$contig_name .= $seqlen;
-			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
+			$contig = $clone->project('contig')->[0]->to_Slice();
 		};
+		if($@) {
+			print "$@\n";
+			exit;
+		}
 		if ( $clone && $contig ) {
-			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
+			$seqlen = $contig->length;
+			$contig_name.= $seqlen;
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
 		}
 		elsif ( $clone && !$contig ) {
 			$dbh->rollback;
@@ -340,22 +349,32 @@ my $seqset_info     = {};
 			);
 		}
 		else {
-			##fetch the dna sequence from pfetch server with acc_ver id
-			my $seqobj;
-			eval {
-				$seqobj = &pfetch_acc_sv($acc_ver);
-				#$seqobj = &pfetch_acc_sv($acc);
-			};
-			if($@) {
-				$dbh->rollback;
-				throw($@);
-				#print STDERR "$sequence_set => $acc_ver\n";
-				#next;
-			}
-			my $seq = $seqobj->seq;
-			$seqlen = $seqobj->length;
-			$contig_name .= $seqlen;
+			my $seq;
 
+			my $slice_adaptor = $source_dba->get_SliceAdaptor();
+			my $clone_slice = $slice_adaptor->fetch_by_region( 'clone', $acc_ver );
+			if($clone_slice) {
+				my $contig_slice = $clone_slice->project('contig')->[0]->to_Slice();
+				if($contig_slice){
+					$seqlen = $contig_slice->length;
+					$contig_name .= $seqlen;
+					$seq = $contig_slice->seq();
+				}
+			}
+			if (!$seq) {
+				# fetch the dna sequence from pfetch server with acc_ver id
+				# if it fails to get it from the source database
+				eval {
+					my $seqobj = &pfetch_acc_sv($acc_ver);
+					$seq = $seqobj->seq;
+					$seqlen = $seqobj->length;
+					$contig_name .= $seqlen;
+				};
+				if($@) {
+					$dbh->rollback;
+					throw("fail to get sequence for $acc_ver in $sequence_set\n$@");
+				}
+			}
 			##make clone and insert clone to seq_region table
 			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
 			$clone_seq_reg_id = $slice_a->store($clone);
@@ -366,7 +385,7 @@ my $seqset_info     = {};
 
 			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
 			$attr_a->store_on_Slice( $clone,
-				&make_clone_attribute( $acc, $ver ) );
+				&make_clone_attribute( $acc_ver ) );
 
 			##make contig and insert contig, and associated dna sequence to seq_region & dna table
 			$contig =
@@ -399,16 +418,14 @@ my $seqset_info     = {};
 # Methods
 #
 sub make_clone_attribute {
-	my ( $acc, $ver ) = @_;
+	my ( $acc_ver ) = @_;
 	my @attrib;
 	my $attrib = &make_attribute(
 		'htg',                              'htg',
 		'High Throughput phase attribute', '3'
 	);
+	my ($acc,$ver) = split('.',$acc_ver);
 	push @attrib, $attrib;
-#	push @attrib,
-#	  &make_attribute( 'intl_clone_name', 'International Clone Name',
-#		'', '' );
 	push @attrib,
 	  &make_attribute( 'embl_acc', 'EMBL accession', '', $acc );
 	push @attrib, &make_attribute( 'embl_version', 'EMBL Version', '', $ver );
@@ -417,22 +434,35 @@ sub make_clone_attribute {
 
 sub make_seq_set_attribute {
 	my ($arr_ref) = @_;
-	my ($desc,@chr) =  @$arr_ref;
+	my ($chr,$desc,$hide,$write) =  @$arr_ref;
 	my @attrib;
+
+	$hide = defined($hide) ? $hide : 1;
+	$write = defined($write) ? $write : 0;
+
 	push @attrib,
 	  &make_attribute(
 		'description',
 		'Description',
 		'A general descriptive text attribute', $desc
 	  );
-	foreach my $ch (@chr) {
-		push @attrib,
-		  &make_attribute(
+	push @attrib,
+		&make_attribute(
 			'chr',
 			'Chromosome Name',
-			'Chromosome Name Contained in the Assembly', $ch
-		  );
-	}
+			'Chromosome Name Contained in the Assembly', $chr
+	);
+	push @attrib,
+		&make_attribute(
+			'write_access',
+			'Write access for Sequence Set',
+			'1 for writable , 0 for read-only', $write
+	);
+	push @attrib,
+		&make_attribute(
+			'hidden',
+			'Hidden Sequence Set', '',$hide
+	);
 
 	return \@attrib;
 }

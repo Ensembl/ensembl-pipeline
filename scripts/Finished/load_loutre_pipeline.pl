@@ -35,7 +35,7 @@ here is an example commandline
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
-    -chromosome_cs_version (default:Otter) the version of the coordinate system being stored
+    -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	the sequence set name
     -description the sequence set description
     -nosubmit	Used to avoid the pipeline priming with the SubmitContig analysis
@@ -66,7 +66,7 @@ my $name = '';
 my $user = '';
 my $pass = '';
 
-my $chromosome_cs_version = 'Otter';
+my $cs_version = 'Otter';
 my $set;
 my $description;
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
@@ -79,7 +79,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'name:s'                => \$name,
 	'user:s'                => \$user,
 	'pass:s'                => \$pass,
-	'chromosome_cs_version:s' => \$chromosome_cs_version,
+	'chromosome_cs_version:s' => \$cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
 	'submit!'                 => \$do_submit,
@@ -189,12 +189,14 @@ my $seqset_info     = {};
 		$contig_number++;
 	}
 	my @chrs = keys %$chr_href;
-	$seqset_info->{$set} = [ $description, @chrs ];
+	throw("AGP should contains (only) one chromosome: [@chrs]")
+		unless (scalar(@chrs) == 1);
+
+	$seqset_info->{$set} = [ shift @chrs ,$description  ];
 
 	close $fh;
 
-	throw("AGP should contains (only) one chromosome: [@chrs]")
-		  unless (scalar(@chrs) == 1);
+
 	print STDOUT $contig_number." contigs retrieved from $agp_file\n";
 }
 
@@ -225,7 +227,7 @@ my $seqset_info     = {};
 
 		eval {
 			$chromosome_cs =
-			  $cs_a->fetch_by_name( "chromosome", $chromosome_cs_version );
+			  $cs_a->fetch_by_name( "chromosome", $cs_version );
 			$clone_cs  = $cs_a->fetch_by_name("clone");
 			$contig_cs = $cs_a->fetch_by_name("contig");
 
@@ -250,7 +252,7 @@ my $seqset_info     = {};
 			eval {
 				$slice =
 				  $slice_a->fetch_by_region( 'chromosome', $name, undef, undef,
-					undef, $chromosome_cs_version );
+					undef, $cs_version );
 			};
 			if ($slice) {
 				print STDOUT "Sequence set <$name> is already in database <".$dba->dbc->dbname.">\n";
@@ -272,11 +274,11 @@ my $seqset_info     = {};
 
 		# insert clone & contig in seq_region, seq_region_attrib,
 		# dna and assembly tables
-		my $insert_query = qq {
+		my $insert_query = qq{
 				INSERT IGNORE INTO assembly
 				(asm_seq_region_id, cmp_seq_region_id,asm_start,asm_end,cmp_start,cmp_end,ori)
 				values
-				(?,?,?,?,?,?,?)};
+				(?,?,?,?,?,?,?) };
 		my $insert_sth = $dba->dbc->prepare($insert_query);
 		for ( values %$contigs_hashref ) {
 			my $chr_name     = $_->[0];
@@ -398,22 +400,35 @@ sub make_clone_attribute {
 
 sub make_seq_set_attribute {
 	my ($arr_ref) = @_;
-	my ($desc,@chr) =  @$arr_ref;
+	my ($chr,$desc,$hide,$write) =  @$arr_ref;
 	my @attrib;
+
+	$hide = defined($hide) ? $hide : 1;
+	$write = defined($write) ? $write : 0;
+
 	push @attrib,
 	  &make_attribute(
 		'description',
 		'Description',
 		'A general descriptive text attribute', $desc
 	  );
-	foreach my $ch (@chr) {
-		push @attrib,
-		  &make_attribute(
+	push @attrib,
+		&make_attribute(
 			'chr',
 			'Chromosome Name',
-			'Chromosome Name Contained in the Assembly', $ch
-		  );
-	}
+			'Chromosome Name Contained in the Assembly', $chr
+	);
+	push @attrib,
+		&make_attribute(
+			'write_access',
+			'Write access for Sequence Set',
+			'1 for writable , 0 for read-only', $write
+	);
+	push @attrib,
+		&make_attribute(
+			'hidden',
+			'Hidden Sequence Set', '',$hide
+	);
 
 	return \@attrib;
 }
