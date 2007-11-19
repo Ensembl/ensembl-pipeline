@@ -153,6 +153,8 @@ sub store_as_gene_object {
 
  GENE:  foreach my $gene_id ( @gene_ids ) {
     print "Looking at gene $gene_id\n";
+    # note that genes with no transcripts are not stored
+    # eg. mt:ori gene     
 
     # # #
     # Transcripts
@@ -562,6 +564,10 @@ sub store_as_simple_feature{
 
       # my $cds_start = ${$self->get_features_from_ID($protein_ids[0])}{'start'};
         my $score = ${$self->get_features_from_ID($unique_id)}{'score'};
+        my $display = ${$self->get_features_from_ID($unique_id)}{'ID'}[0];
+        if (${$self->get_features_from_ID($unique_id)}{'Name'}[0]) {
+          $display = ${$self->get_features_from_ID($unique_id)}{'Name'}[0];
+        }
         # we could also use the name field as a display name but for now the ID is unique and more descriptive
         my $sf = Bio::EnsEMBL::SimpleFeature->new(
                                                     -start    => ${$self->get_features_from_ID($unique_id)}{'start'}, 
@@ -570,7 +576,7 @@ sub store_as_simple_feature{
                                                     -slice    => $self->slice,
                                                     -analysis => $analyses{$analysis_logic},
                                                     -score    => ($score eq '.' ? '0.0' : $score),
-                                                    -display_label => ${$self->get_features_from_ID($unique_id)}{'ID'},
+                                                    -display_label => $display,
                                                     -dbID     => undef,
                                                     -adaptor  => undef
                                                    );
@@ -579,8 +585,12 @@ sub store_as_simple_feature{
         next SIMPLE;
       }
     } # end for
-   $sf_adaptor->store(@simple_features);
-   return scalar @simple_features;
+    if (scalar(@simple_features > 0)) {    
+      $sf_adaptor->store(@simple_features);
+      return scalar @simple_features;
+    } else {
+      return 0; 
+    }
   } else {
     warning("Can't find any simple features of type $type");
     return 0;

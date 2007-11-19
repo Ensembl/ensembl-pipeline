@@ -47,26 +47,32 @@ sub add_TranslationObject{
 
         # set start-phase of first coding exon
         $first_coding_exon->phase("0");
+        print "set first coding exon ".$ex->stable_id." 1\n";
       }
       if ($ex->start <= $cds_end  && $cds_end <= $ex->end) {
         # EXON CONTAINS TES, coord-conversion and add the stop-codon (3bp.) to the seq-end
         $seq_end = convert_to_exon_coords($cds_end, $ex->start,$ex->end,$ex->strand ) + 3 ;
         $last_coding_exon = $ex;
+        print "set last coding exon ".$ex->stable_id." 1\n";
       }
     }
 
     # reverse strand
     #####################################
-    if ($nw_transcript->strand eq "-1") {
+    elsif ($nw_transcript->strand == -1) {
 
       if ( ($ex->start <= $cds_end) && ($cds_end <= $ex->end)) {
         $first_coding_exon = $ex;
         $seq_start = ($ex->end - $cds_end) + 1 ;
+        print "set first coding exon ".$ex->stable_id." -1\n";
       }
       if ( ($ex->start <= $cds_start) &&  ($cds_start <= $ex->end)) {
         $last_coding_exon = $ex;
         $seq_end = ($last_coding_exon->end - $cds_start)+ 1 + 3 ;
+        print "set last coding exon ".$ex->stable_id." -1\n";
       }
+    } else {
+      throw("strand of transcript is not '1' or '-1'.");
     }
   }
 
@@ -80,6 +86,9 @@ sub add_TranslationObject{
                                          );
   # add translation
   $nw_transcript->translation($tl);
+  
+  print "first ".$first_coding_exon->stable_id." \n";
+  print "last ".$last_coding_exon->stable_id." \n";
 
   # set end-phase for case if single exon contains 2 UTR-regions at end
   throw("There is a CDS-Start or CDS-End, but I can't find an exon which spans these points\n")   unless ($first_coding_exon && $last_coding_exon );
