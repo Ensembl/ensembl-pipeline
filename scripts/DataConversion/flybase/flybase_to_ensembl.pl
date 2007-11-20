@@ -1,5 +1,7 @@
 #!/usr/local/ensembl/bin/perl
 
+# "insert into seq_region_attrib (seq_region_id,attrib_type_id,value) values (seq_region_id_of_mitochondrion,11,5)"
+
 # based on ensembl branch 25
 use strict;
 use FlyBaseGff;
@@ -7,6 +9,7 @@ use FlyBaseConf;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 $| = 1;
 
@@ -62,6 +65,8 @@ foreach my $chr(@{$FB_CHR_INFO}) {
   # # #
   # process genes of gff
   # # #
+
+  # note that the mt:ori gene is not stored because it has no transcripts
   if ($load_genes) {
   $gff->store_as_gene_object("gene","mRNA","protein_coding");
   $gff->store_as_gene_object("gene","ncRNA","ncRNA");
