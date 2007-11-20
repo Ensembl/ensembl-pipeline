@@ -86,14 +86,16 @@ my %opt = (
 ); 
 
 #
-# The names of the initial analysis are hard-coded in sub get_pre_analysis.  
+# The names of the initial analysis are hard-coded in subroutine : get_pre_analysis.   
+# I know that hard_coding stuff is not really ideal ... feel free to change this if you
+# fancy other logic_names ...
 #  
 # The are :  
 #
 #  FindMissingOrtholouges
 #  FindPartialGenes
 #  FindSplitGenes 
-#
+#  FindFalseIntrons
 
 unless ($opt{dbname} && $opt{dbhost} ) { 
   throw("You need to run the script with db-parameters to connect to your reference database\n".
@@ -138,24 +140,40 @@ my %main_analysis_setup ;
 my @initial_analysis_to_run ; 
 
 if ( $analysis_to_configure{"RUN_FIND_MISSING_ORTHOLOGUES"}) {  
-   push @{$main_analysis_setup{FIND_MISSING_ORTHOLOGUES}}, 
-    @{ setup_config("FIND_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)};  
-    push @initial_analysis_to_run, 'pre_FindMissingOrthologues';
+ 
+   my @analysis_sets_logic_names =
+     @{ setup_config("FIND_MISSING_ORTHOLOGUES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf,1)};  
+
+   push @{$main_analysis_setup{FIND_MISSING_ORTHOLOGUES}}, @analysis_sets_logic_names;
+   push @initial_analysis_to_run, 'pre_FindMissingOrthologues';
 }     
 
  
 # configure FIND_PARTIAL_GENES  
 
-if ( $analysis_to_configure{"RUN_FIND_PARTIAL_GENES"}) {  
+if ( $analysis_to_configure{"RUN_FIND_PARTIAL_GENES"}) {   
+
   push @{$main_analysis_setup{FIND_PARTIAL_GENES}}, 
-   @{setup_config("FIND_PARTIAL_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)}; 
-   push @initial_analysis_to_run, 'pre_FindPartialGenes';
+    @{setup_config("FIND_PARTIAL_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf,1)}; 
+
+  push @initial_analysis_to_run, 'pre_FindPartialGenes';
 }      
 
-if ( $analysis_to_configure{"RUN_FIND_SPLIT_GENES"}) {  
+# configure FIND_SPLIT_GENES 
+if ( $analysis_to_configure{"RUN_FIND_SPLIT_GENES"}) {   
+
   push @{$main_analysis_setup{FIND_SPLIT_GENES}}, 
-   @{setup_config("FIND_SPLIT_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf)}; 
-   push @initial_analysis_to_run, 'pre_FindSplitGenes';
+   @{setup_config("FIND_SPLIT_GENES",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf,1)};  
+
+  push @initial_analysis_to_run, 'pre_FindSplitGenes';
+}       
+
+# configure FIND_FALSE_INTRONS
+if ( $analysis_to_configure{"RUN_FIND_FALSE_INTRONS"}) {  
+  push @{$main_analysis_setup{FIND_FALSE_INTRONS}}, 
+   @{setup_config("FIND_FALSE_INTRONS",$oa_conf,$basic_xrate_param,$dbs,$e2g_conf,0)};  
+
+   push @initial_analysis_to_run, 'FindFalseIntrons';
 }      
 
 
@@ -188,36 +206,52 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       check_and_store_analysis ($out_db, $pre_ana) ;   
       add_rule($pa, $pre_ana, $submit) ; 
 
-      # make and upload input_ids for initial analysis 
-      # logic_name:slicename for FIND_MISSING_ORTHOLOGUES and FIND_PARTIAL_GENES 
-      # logic_name for FIND_SPLIT_GENES  
+      # make and upload input_ids for initial analysis  
+      
+       # - logic_name:slicename for FIND_MISSING_ORTHOLOGUES 
+       # - logic_name:slicename for FIND_PARTIAL_GENES 
+       # - slicename for FIND_FALSE_INTRONS
+       # - logic_name for FIND_SPLIT_GENES   
+      
       # "logic_name" refers to the analysis which will run in the second stage 
-      # 
+       
       
       for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
         my $dba ;
         my $input_ids ;   
 
-        # get correct core db-adaptor   
+        # get correct core db-adaptor    
+        
         if (  $analysis_type eq "FIND_MISSING_ORTHOLOGUES" ) {   
 
           my $species_alias = ${$$FIND_MISSING_ORTHOLOGUES{"ANALYSIS_SETS"}{$logic_name}}[0]; 
-          
-	  $dba = Bio::EnsEMBL::Registry->get_DBAdaptor($species_alias,'core') ; 
-	  $input_ids = generate_input_ids($dba,$logic_name) ;    
+	  $dba = Bio::EnsEMBL::Registry->get_DBAdaptor($species_alias,'core') ;  
+
+	  $input_ids = generate_input_ids($dba,$logic_name,1) ;    
 
         } elsif (  $analysis_type eq "FIND_PARTIAL_GENES" ) {  
           $dba = $pa ;   
-          $input_ids = generate_input_ids($dba,$logic_name) ;      
+          $input_ids = generate_input_ids($dba,$logic_name,1) ;      
 
-        } elsif (  $analysis_type eq "FIND_SPLIT_GENES" ) {     
-          #
+        } elsif (  $analysis_type eq "FIND_SPLIT_GENES" ) {      
+
+          
           # FindSplitGenes queries the compara database with raw sql, 
           # it does not require a proper input-id ( slice format or whatever ) 
           # any random string can be used !!!! 
-          #
+          
           $dba = $pa ;    
-          $input_ids = [ keys %{$$FIND_SPLIT_GENES{"ANALYSIS_SETS"}} ];  
+          $input_ids = [ keys %{$$FIND_SPLIT_GENES{"ANALYSIS_SETS"}} ];   
+
+        } elsif (  $analysis_type eq "FIND_FALSE_INTRONS" ) {     
+          
+          # FindFalseIntrons gets all genes out of the QUERY_SPECIES core db on 
+          # the toplevels and invstigates the genes of configured biotypes i
+          # input_ids are slice-formatted toplevel regions 
+          # chromosome:BROADD2:X:12345:1  
+          
+          $dba = $pa ;    
+          $input_ids = generate_input_ids($dba,$logic_name,0) ;      
         }  
 
         push @test_runnable_statements, "perl ensembl-analysis/scripts/test_RunnableDB" .
@@ -233,7 +267,7 @@ for my $analysis_type ( keys %main_analysis_setup ) {
 
     for my $logic_name ( @{$main_analysis_setup{$analysis_type}} ) {    
 
-      my ($post_analysis,$submit)=get_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
+      my ($post_analysis,$submit)= get_post_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
       check_and_store_analysis ( $pa, $post_analysis ) ;  
       check_and_store_analysis ( $pa, $submit ) ;  
       check_and_store_analysis ($out_db, $post_analysis) ;  
@@ -303,7 +337,7 @@ sub upload_input_ids {
 
 
 sub generate_input_ids {
-   my ($db, $logic_name ) = @_ ; 
+   my ($db, $logic_name,$use_logic_name_in_input_id ) = @_ ; 
    
    my $toplevel_slices = $db->get_SliceAdaptor->fetch_all('toplevel') ;    
    my @clean_slices;
@@ -313,8 +347,29 @@ sub generate_input_ids {
      }else{
        push @clean_slices, $t;
      }  
-   }
-   my @input_ids = map { "$logic_name:".$_->name } @clean_slices ;  
+   } 
+   my @input_ids; 
+
+
+   
+   if ( $use_logic_name_in_input_id ) {  
+
+      # if we run FIND_PARTIAL_GENES or FIND_MISSING_ORTHOLOGUES there's the option to 
+      # configure multiple analysis-sets so the input_id contains the name of the analysis-set  
+     
+      #     hum_mus_set:chromosome:NCBI36:1:3000000:5000000:1
+     
+      @input_ids = map { "$logic_name:".$_->name } @clean_slices ;  
+
+   } else {   
+
+     # FIND_FALSE_INTRONS does only have normal slices without the logic-name 
+     # as input-id
+    
+     # chromosome:BROADD2:X:1:234545:1  
+     @input_ids = @clean_slices ; 
+   } 
+
    return \@input_ids ; 
 }
 
@@ -363,10 +418,22 @@ sub get_pre_analysis {
        $module = "FindMissingOrthologues" ; 
 
    }elsif ( $analysis_type eq "FIND_SPLIT_GENES" ) {    
-
+       
        $input_id_type = "fsg_slice";   
        $sname = "pre_FindSplitGenes" ; 
        $module = "FindSplitGenes" ;  
+
+   }elsif ( $analysis_type eq "FIND_FALSE_INTRONS" ) {    
+
+       # runs on whole toplevel-regions / chromosomes 
+       # chromosome:BROADD1:1:34567:1 
+       # pre-analysis  : FindFalseIntrons.pm 
+       # post-analysis : RecoverFalseIntrons.pm 
+       # ( post analysis is set up by RunnableDB we might want to change this )  
+       
+       $input_id_type = "ffi_slice";   
+       $sname = "FindFalseIntrons" ; 
+       $module = "FindFalseIntrons" ;  
 
    }else{  
      throw("unknown type - can't setup initial analysis") ; 
@@ -387,23 +454,63 @@ sub get_pre_analysis {
    return ( $pre_ana, $submit_pre ) ; 
 }
 
-sub get_analysis_set { 
+
+
+
+# configure the post analysis :  
+
+# -  for FIND_MISSING_ORTHOLOGUES / FIND_SPLIT_GENES / FIND_PARTIAL_GENES 
+#    an exoneate run with module Exonerate2Genes. the logic_name is the key of the 
+#    ANALYSIS_SETS - hash in the OrthologueEvaluator.pm config file. 
+
+# - FIND_FALSE_INTRONS has an RecoverFalseIntrons run as post analysis 
+
+
+sub get_post_analysis_set { 
    my ( $analysis_type, $logic_name,$exonerate_file ) = @_ ;  
 
-     my ( $input_id_type ) ;  
+     my ( $input_id_type,$post_analysis,$post_submit_analysis ) ;  
 
-     if ( $analysis_type eq "FIND_SPLIT_GENES" ) {   
-        $input_id_type = "file_$logic_name" ; 
-     } elsif ( $analysis_type eq "FIND_PARTIAL_GENES") {       
-        $input_id_type = "file_$logic_name" ; 
-     } elsif ( $analysis_type eq "FIND_MISSING_ORTHOLOGUES") {  
-        $input_id_type = "file_$logic_name" ; 
+
+     if ( $analysis_type eq "FIND_SPLIT_GENES" ) {    
+
+        $input_id_type = "file_$logic_name" ;  
+
+     } elsif ( $analysis_type eq "FIND_PARTIAL_GENES") {        
+
+        $input_id_type = "file_$logic_name" ;  
+
+     } elsif ( $analysis_type eq "FIND_MISSING_ORTHOLOGUES") {   
+
+        $input_id_type = "file_$logic_name" ;  
+
+     } elsif ( $analysis_type eq "FIND_FALSE_INTRONS") {   
+
+        # FindFalseIntrons is a bit different to setup 
+        $input_id_type = "prot_slice_form" ;  
+        $logic_name    = "RecoverFalseIntrons";
+ 
+        $post_analysis = new Bio::EnsEMBL::Pipeline::Analysis 
+           ( 
+              -logic_name => $logic_name ,
+              -module      => "RecoverFalseIntrons",
+              -input_id_type => $input_id_type ,
+            );      
+
+        $post_submit_analysis = new Bio::EnsEMBL::Pipeline::Analysis
+               ( 
+                  -logic_name => "Submit_". $logic_name , 
+                  -module      => 'Dummy', 
+                  -input_id_type => lc($input_id_type), 
+                )  ; 
+
      } else { 
        throw ("Can't find the analysis type specified\n") ; 
-    }    
+     }    
 
-
-    my $post_analysis = new Bio::EnsEMBL::Pipeline::Analysis ( 
+    unless ( $post_analysis ) { 
+       # if post_analysis is not already set up for FIND_FALSE_INTRONS above 
+       $post_analysis = new Bio::EnsEMBL::Pipeline::Analysis ( 
               -logic_name => $logic_name , 
               -program    => 'Exonerate' , 
               -program_file => $exonerate_file , 
@@ -411,13 +518,13 @@ sub get_analysis_set {
               -input_id_type => "file_".$logic_name,
             );      
 
-    my $post_submit_analysis = new Bio::EnsEMBL::Pipeline::Analysis
+       $post_submit_analysis = new Bio::EnsEMBL::Pipeline::Analysis
                ( 
                   -logic_name => "Submit_". $logic_name , 
                   -module      => 'Dummy', 
                   -input_id_type => lc("file_".$logic_name) , 
                 )  ; 
-
+    }
     return ( $post_analysis ,$post_submit_analysis) ; 
 }
 
@@ -442,39 +549,46 @@ sub pipeline_adaptor{
 
  
 
+# checks each config hash for keys in ANALYSIS_SETS ( sub-analyses to configure ) 
+# - sets up config in Exonerate2Genes.pm  
 
 sub setup_config { 
-  my ($analysis_name,$oa_conf,$basic_xrate_param,$dbs,$e2g_conf ) = @_ ;  
+  my ($analysis_name,$oa_conf,$basic_xrate_param,$dbs,$e2g_conf,$write_config ) = @_ ;  
 
-  my %conf=%{$oa_conf->get_config_by_name($analysis_name)};
+  my %conf=%{$oa_conf->get_config_by_name($analysis_name)}; 
+
   my @logic_names_to_use = keys %{$conf{"ANALYSIS_SETS"}} ;
 
-  for my $logic_name ( @logic_names_to_use ) {
-    print "\n\nSetting up configuration in Exonerate2Genes.pm for analysis : $logic_name\n" ;
-
-    my %merged_config = %{$basic_xrate_param} ;  
-
-    #
-    # get OUTDB parameters out of Bio::EnsEMBL::A*::Config::GeneBuild::Databases
-    # and add it to the default OrthologueEvaluatorExonerate Config 
-    #
-
-    if ( $dbs->exists_in_config("ORTHOLOGUE_DB")){   
-      $dbs->get_config_by_name("ORTHOLOGUE_DB"); 
-      my %outdb_parameters = %{$dbs->result} ;  
-      $merged_config{OUTDB}=$dbs->result ; 
-    }else{ 
-      throw("Can't find entry for ORTHOLOGUE_DB in ".$dbs->file."\n") ; 
-    }  
-
-    # get SEQUENCE_DUMP_BASE_DIR  out of OrthologueEvaluator and merge it 
-
-    $oa_conf->get_config_by_name("SEQUENCE_DUMP_BASE_DIR");
-    $merged_config{QUERYSEQS} = $oa_conf->result;
-
-    # change the e2g config 
-    $e2g_conf->append_href(\%merged_config, "EXONERATE_CONFIG_BY_LOGIC" , $logic_name ) ;
-   } 
+  if ( $write_config ) { 
+    for my $logic_name ( @logic_names_to_use ) { 
+       print "\n\nSetting up configuration in Exonerate2Genes.pm for analysis : $logic_name\n" ; 
+       
+       my %merged_config = %{$basic_xrate_param} ;  
+  
+       #
+       # get OUTDB parameters out of Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases
+       # and add it to the default OrthologueEvaluatorExonerate Config 
+       #
+  
+      if ( $dbs->exists_in_config("ORTHOLOGUE_DB")){   
+         $dbs->get_config_by_name("ORTHOLOGUE_DB"); 
+         my %outdb_parameters = %{$dbs->result} ;  
+         $merged_config{OUTDB}=$dbs->result ; 
+       }else{ 
+         throw("Can't find entry for ORTHOLOGUE_DB in ".$dbs->file."\n") ; 
+       }  
+   
+       # get SEQUENCE_DUMP_BASE_DIR  out of OrthologueEvaluator and merge it 
+   
+       $oa_conf->get_config_by_name("SEQUENCE_DUMP_BASE_DIR");
+       $merged_config{QUERYSEQS} = $oa_conf->result;
+   
+       # change the e2g config 
+       $e2g_conf->append_href(\%merged_config, "EXONERATE_CONFIG_BY_LOGIC" , $logic_name ) ;
+     } 
+   } else {  
+     print "no need to write Exonerate2Genes-config\n";
+   }
    return \@logic_names_to_use ; 
 }
 
