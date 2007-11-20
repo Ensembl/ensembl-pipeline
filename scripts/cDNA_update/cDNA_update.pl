@@ -46,6 +46,8 @@ Check out the latest code to match the database to be updated, for example:
    cvs co -r branch-ensembl-32 ensembl-analysis
    cvs co -r branch-ensembl-32 ensembl-compara
 
+*MAKE SURE THAT YOU HAVE THE LATEST ensembl/sql/table.sql FILE*
+
 The steps the script performs:
   1. config_setup: check config variables & files
   2. DB_setup: partly copy current db (PIPELINE database),
@@ -105,31 +107,31 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = '/path/to/cvs/dir';
+my $cvsDIR               = '/nfs/acari/ba1/cvs_co/';
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
 
-my $dataDIR              = 'path/to/output/dir'; 
+my $dataDIR              = '/lustre/work1/ensembl/ba1/cDNA_update_hum_Nov07/'; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi1"; 
 my $sourceDIR            = "/data/blastdb/";
-my $assembly_version     = "NCBI37"; #"NCBIM36"; #NCBI36
+my $assembly_version     = "NCBI36"; #"NCBIM37"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
-my @target_masked_genome = (" /data/blastdb/Ensembl/Human/NCBIM36//genome/softmasked_dusted.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
 #my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
 
-my $user                 = "lec";
-my $host                 = "bc-9-1-04";
-my $genebuild_id         = "6";
+my $user                 = "ba1";
+my $host                 = "bc-9-1-03";
+my $genebuild_id         = "4";
 
 
 my $gss                  = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
@@ -150,32 +152,29 @@ my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
 #admin rights required
 my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
+
 # reference db (current build)
-
-my $WB_REF_DBNAME        = "mus_musculus_core_47_37"; 
+my $WB_REF_DBNAME        = "homo_sapiens_core_48_36j"; 
 my $WB_REF_DBHOST        = "ens-staging"; 
-
 my $WB_REF_DBPORT        = "3306"; 
+
 # new source db (PIPELINE)
-
-my $WB_PIPE_DBNAME       = $ENV{'USER'}."_mouse_cdna0907_ref";
-my $WB_PIPE_DBHOST       = "genebuild4";
-
+my $WB_PIPE_DBNAME       = "ba1_hum_cdna1107_ref";
+my $WB_PIPE_DBHOST       = "genebuild7";
 my $WB_PIPE_DBPORT       = "3306";
+
 # new target db (ESTGENE)
-
-my $WB_TARGET_DBNAME     = $ENV{'USER'}."_mouse_cdna0907_update";
-my $WB_TARGET_DBHOST     = "genebuild3";
-
+my $WB_TARGET_DBNAME     = "ba1_hum_cdna1107_update";
+my $WB_TARGET_DBHOST     = "genebuild5";
 my $WB_TARGET_DBPORT     = "3306";
+
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-
-my $WB_LAST_DBNAME       = "mus_musculus_cdna_46_36g"; 
-
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_47_36i"; 
 my $WB_LAST_DBHOST       = "ens-livemirror"; 
 my $WB_LAST_DBPORT       = "3306"; 
+
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "mus_musculus_core_46_36g"; 
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_47_36i"; 
 my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
 my $WB_LAST_DNADBPORT    = "3306"; 
 
@@ -185,8 +184,8 @@ my $TAXONDBHOST          = "ens-livemirror";
 my $TAXONDBPORT          = "3306"; 
 
 #set the species
-my $common_species_name  = "mouse"; #"human"; #"mouse";
-my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
+my $common_species_name  = "human"; #"human"; #"mouse";
+my $species              = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
 my $taxonomy_id          = "9606"; # 9606 for human # 10090 for mouse
 my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
@@ -194,16 +193,18 @@ my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be necessary below this
-use Bio::EnsEMBL::KillList::KillList;
+my $option = $ARGV[0];
+use Bio::EnsEMBL::KillList::KillList; # add later after perldocs made
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor; 
 use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg ) ; 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 use Data::Dumper;
+use File::Copy;
+
 #we need the Net::SSH module from somewhere:
 use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
-use Net::SSH qw(sshopen2);
-use File::Copy;
+use Net::SSH qw(sshopen2); 
 
 my $newFeatureName     = "cDNA_update"; #the analysis name!
 #when comparing to a previously updated cdna db $oldFeatureName = $newFeatureName
@@ -266,15 +267,16 @@ my $ans             = "";
 my $num_missing_cdnas = 0;
 my $rerun_flag = 0;
 
-my $option = $ARGV[0];
 if(!$option or ($option ne "prepare" and $option ne "run" and $option ne "clean" and $option ne "compare")){
    exec('perldoc', $0);
    exit 1;
 }
+
 if($option eq "prepare"){
   print "\nstarting cDNA-update procedure.\n";
 
   config_setup();
+
   print "\nGet fasta files?(y/n) "; 
   if ( get_input_arg() ) { 
     if(! fastafiles() ){
@@ -290,7 +292,6 @@ if($option eq "prepare"){
   }
 }
 elsif($option eq "run"){
-
  
   print "\nDo we need to set re-set the configs?(y/n) "; 
   if ( get_input_arg() ) { 
@@ -431,7 +432,7 @@ sub config_setup{
     $filename = $2;
     $content  =~ s/>>//;
     #replace variables in config file
-  
+
     foreach my $configvarref (keys %configvars){
       $content =~ s/\<$configvarref\>/$configvars{$configvarref}/g;
     }
@@ -1008,7 +1009,7 @@ sub chase_jobs{
         #want to find the list of input files which did not finish running in the db
         my $sql = ("select input_id from job as j, job_status as s where j.job_id = s.job_id && s.is_current = 'y'");                   
 
-        my $q1 = $db->dbc->prepare($sql) or die "sql error";
+       my $q1 = $db->dbc->prepare($sql) or die "sql error";
         $q1->execute();
         my %chunks;
         while (my $file = $q1->fetchrow_array){
@@ -1064,10 +1065,10 @@ sub chase_jobs{
                     $configvars{"chunkDIR"} = $chunkDIR;
                     $outDIR             = $dataDIR."/output3";
                     $configvars{"outDIR"} = $outDIR;
-                   
-                    #check that the new exonerate parameters are set
+#                   
+#                    #check that the new exonerate parameters are set
                     config_setup();
-                        
+#                        
                     $chunknum = $ans;
                     $chunkDIR = $dataDIR."/chunks3";
                     print "splitting into $chunknum chunks.\n";
@@ -1086,9 +1087,9 @@ sub chase_jobs{
                       if(! DB_setup()   ){ unclean_exit(); }
                         print "\n\nFinished setting up the analysis.\n";
                       }
-                    run_analysis();
+                   run_analysis();
                     print "you should check for any AWOL jobs now, hopefully there won't be any \n";
-                  }
+                   }
                 }       
         }       
 }
