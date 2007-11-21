@@ -64,7 +64,7 @@ sub new{
   my ($db, $input_ids, $rules, $queue_manager,
       $awol_mark, $rename, $max_sleep,
       $min_sleep, $base_sleep, $verbose,
-      $runner, $output_dir, $job_limit,$delete_lock) = rearrange (
+      $runner, $output_dir, $job_limit,$delete_lock,$number_output_dirs) = rearrange (
          ['DB', 
           'INPUT_IDS', 
           'RULES', 
@@ -79,6 +79,7 @@ sub new{
           'OUTPUT_DIR',
           'JOB_LIMIT',
           'UNLOCK',
+          'NUMBER_OUTPUT_DIRS',
          ],@args);
 
   if(!$db){
@@ -89,7 +90,7 @@ sub new{
   $self->delete_lock if $delete_lock ; 
   $self->is_locked;
   $self->create_lock;
-
+  $self->number_output_dirs($number_output_dirs) ;
   if(!$queue_manager){
     $queue_manager = $QUEUE_MANAGER; #found in BatchQueue.pm
   }
@@ -552,13 +553,15 @@ sub create_and_store_job{
   if(!$input_id || !$analysis){
     throw("Can't create job without an input_id $input_id or analysis ".
           "$analysis");
-  }
+  }  
+
   my $job = Bio::EnsEMBL::Pipeline::Job->new
     (
      -input_id => $input_id,
      -analysis => $analysis,
      -output_dir => $self->output_dir,
-     -runner => $self->runner,
+     -runner => $self->runner, 
+     -number_output_dirs => $self->number_output_dirs, 
     );
 
   eval{
@@ -1220,5 +1223,11 @@ sub check_if_done {
 
   return 0;
 }
+
+sub number_output_dirs { 
+  my ($self,$arg) = @_ ; 
+  $self->{number_output_dirs} = $arg if $arg ;  
+  return $self->{number_output_dirs} ; 
+} 
 
 1;
