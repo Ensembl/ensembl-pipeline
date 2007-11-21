@@ -75,7 +75,8 @@ my $reread_rules = 0; # toggle whether to reread rules each time the script
 my $perldoc = 0;
 my @command_args = @ARGV;
 my $submission_limit;
-my $submission_number = 1000;
+my $submission_number = 1000; 
+my $number_output_dirs = 10;  
 GetOptions(
            'dbhost=s'              => \$dbhost,
            'dbname=s'              => \$dbname,
@@ -119,6 +120,7 @@ GetOptions(
            'submission_limit!'     => \$submission_limit,
            'submission_number=s'   => \$submission_number,
            'unlock|delete_lock'    => \$unlock,
+           'number_output_dirs=i'    => \$number_output_dirs,  
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -168,6 +170,7 @@ my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
    -OUTPUT_DIR => $output_dir,
    -JOB_LIMIT => $job_limit,
    -UNLOCK => $unlock,
+   -NUMBER_OUTPUT_DIRS => $number_output_dirs,
    );
    
 
