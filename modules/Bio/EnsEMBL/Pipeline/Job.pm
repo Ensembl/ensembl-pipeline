@@ -71,7 +71,7 @@ sub new {
   my $self = bless {},$class;
   my ($p, $f, $l) = caller;
 
-  my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner) 
+  my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner,$number_output_dirs) 
 	= rearrange([qw(ADAPTOR
                   ID
                   SUBMISSION_ID
@@ -82,7 +82,8 @@ sub new {
                   RETRY_COUNT
                   OUTPUT_DIR
                   RUNNER
-                 )],@args);
+                  NUMBER_OUTPUT_DIRS
+                 )],@args); 
 
   $dbID            = -1 unless defined($dbID);
   $submission_id   = -1 unless defined($submission_id);
@@ -102,6 +103,7 @@ sub new {
   $self->retry_count($retry_count);
   $self->submission_id($submission_id);
   $self->output_dir($output_dir);
+  $self->number_output_dirs($number_output_dirs); 
 
   if ($self->output_dir) {
     $self->make_filenames;
@@ -743,26 +745,41 @@ sub get_last_status {
 
 =head2 make_filenames
 
-=cut
+=cut 
 
 sub make_filenames {
   my ($self) = @_;
+ 
+  my $output_dir_number ; 
+  if ( $self->number_output_dirs ) {   
+   $output_dir_number =$self->number_output_dirs ; ;  
+  }  else { 
+   $output_dir_number =10 ;  
+  } 
+  my $num = int(rand($output_dir_number));
   
-  my $num = int(rand(10));
+  my $dir = $self->output_dir . "/$num/"; 
+  #print "MY dir ".$dir."\n"; 
   
-  my $dir = $self->output_dir . "/$num/";
-  #print "MY dir ".$dir."\n";
+  if ( ! -e $self->output_dir) {
+    warning("Your output-directory " . $self->output_dir . " does not exist - i'll create it now.\n") ;  
+    eval{
+      system("mkdir -p " . $self->output_dir ) ;  
+    };
+    if($@){
+      throw("Failed to make dir " . $self->output_dir . "$@" );
+    }
+  }  
+
   if ( ! -e $dir) {
     eval{
       my $command  = "mkdir $dir";
-      #print "Command ".$command."\n";
       system( $command );
     };
     if($@){
       throw("Failed to make dir ".$dir." $@");
     }
-  }
-
+  }   
   my $stub = $self->input_id.".";
   $stub .= $self->analysis->logic_name.".";
   $stub .= int(rand(1000));
@@ -1028,5 +1045,10 @@ sub batch_q_object {
 }
 
 
+sub number_output_dirs {  
+   my ($self, $arg ) = @_ ; 
+   $self->{number_output_dirs} = $arg if $arg ; 
+   return $self->{number_output_dirs}; 
+} 
 
 1;
