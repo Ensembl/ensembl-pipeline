@@ -47,10 +47,17 @@ use vars qw( %Combined );
 %Combined = (
 
 
-	     # gene type for Combine_Genewises_and_E2Gs
-	     GB_GENEWISE_COMBINED_GENETYPE           => 'UTR',
+	     # gene type for Combine_Genewises_and_E2Gs 
 
+             #
+             # If you only want to configure your Gene_Builder.pm run only set the 
+             # biotypes of GB_GENEWISE_COMBINED_GENETYPE  and GB_BLESSED_COMBINED_GENETYPE 
+             #
+
+	     GB_GENEWISE_COMBINED_GENETYPE           => 'UTR',
 	     GB_BLESSED_COMBINED_GENETYPE           => 'BlessedUTR',
+
+
 
 	     # gene type for genes built from cDNAs with exonerate & est2genome
              # you may pass one single value as well as an arrayref ['type_1','type_2'] , 
