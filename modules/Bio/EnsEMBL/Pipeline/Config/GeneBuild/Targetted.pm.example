@@ -72,8 +72,16 @@ use vars qw( %Targetted );
 	      GB_TARGETTED_GENEWISE_GAP                       => 20,
 	      GB_TARGETTED_GENEWISE_EXTENSION                 => 8,
 
-	      # genetype for Targetted_GeneWise
-	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	   
+	      # genetype for Targetted_GeneWise 
+
+              #
+              # IF YOU WANT TO CONFIGURE ONLY THE Gene_Builder.pm RUN you only need to 
+              # add your GB_TARGETTED_GW_GENETYPE - type ( the biotype of your targetted genes ) 
+              #
+	      GB_TARGETTED_GW_GENETYPE              => 'TGE_gw',	    
+
+
+
 	      GB_TARGETTED_MASKING => [],  
 
               GB_TARGETTED_FULLSEQ => 0, # run on fullseq (1) or miniseq (0) 
