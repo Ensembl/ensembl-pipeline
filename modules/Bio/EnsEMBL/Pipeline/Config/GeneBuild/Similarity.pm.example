@@ -46,6 +46,14 @@ use vars qw( %Similarity );
 # Hash containing config info
 %Similarity = (
 
+               # NOTE :     
+               #
+               # If you only run Gene_Builder.pm you only need to add the biotype of your similiarty_genes 
+               #
+	       # GB_SIMILARITY_GENETYPE           => 'similarity_genewise',
+               #
+
+
 	       GB_SIMILARITY_INPUTID_REGEX => '^([^:]*:[^:]*:[^:]*:[^:]*:[^:]*:[^:]*)(?::([^:]+):([^:]+))?$',
 
 	       # fill in one complete hash for each database from which blast 
