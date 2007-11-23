@@ -48,7 +48,8 @@ use strict;
 # Object preamble
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::RunnableDB;
-use Bio::EnsEMBL::Pipeline::GeneBuilder;
+use Bio::EnsEMBL::Pipeline::GeneBuilder; 
+use Bio::EnsEMBL::Analysis::Tools::Utilities; 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 							       GB_FINALDBNAME
 							       GB_FINALDBHOST
@@ -70,6 +71,8 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
 							       GB_INPUTID_REGEX
 							      );
+
+use Bio::EnsEMBL::Utils::Exception qw( warning );   
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RunnableDB);
 
@@ -148,14 +151,27 @@ sub write_output {
     my $dbpass = $GB_FINALDBPASS;
     my $dbport = $GB_FINALDBPORT;
 
-    my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+
+    my $db ;
+ 
+    # use the old database configuration in ensembl-pipeline ... Databases.pm 
+    if ( length($dbname) > 0 ) {
+     print "Writing output to : $dbname @ $dbhost : $dbport \n" ;  
+    $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						'-host'   => $dbhost,
 						'-user'   => $dbuser,
 						'-dbname' => $dbname,
 						'-pass'   => $dbpass,
 						'-port'   => $dbport,
 						'-dnadb'  => $self->db,
-					       );
+					       );  
+    } else { 
+       warning( "The Configuration-file Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases.pm\n".
+               "contains a database-name for GB_FINALDBNAME which has length == 0. I assume you\n".
+               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;  
+       $db = get_db_adaptor_by_string("GENEBUILD_DB",1) ; 
+    }  
+   
     # sort out analysis
     my $genetype = $GB_FINAL_GENETYPE;
     unless ( $genetype ){
@@ -225,17 +241,26 @@ sub fetch_input {
     $self->throw("No input id") unless defined($self->input_id);
     
     $self->fetch_sequence();
-    # database where all the genewise and combined genes are:
-    my $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
-      (
-       '-host'   => $GB_COMB_DBHOST,
-       '-user'   => $GB_COMB_DBUSER,
-       '-dbname' => $GB_COMB_DBNAME,
-       '-pass'   => $GB_COMB_DBPASS,
-       '-port'   => $GB_COMB_DBPORT,
-       '-dnadb'  => $self->db,
-      );
-    
+    # database where all the genewise and combined genes are:  
+   my $genes_db ; 
+   if ( length($GB_COMB_DBNAME) > 0 ) { 
+     print " using Database-configuration out EnsEMBL/Pipeline ... dbname : $GB_COMB_DBNAME\n" ; 
+      $genes_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
+       (
+        '-host'   => $GB_COMB_DBHOST,
+        '-user'   => $GB_COMB_DBUSER,
+        '-dbname' => $GB_COMB_DBNAME,
+        '-pass'   => $GB_COMB_DBPASS,
+        '-port'   => $GB_COMB_DBPORT,
+        '-dnadb'  => $self->db,
+       );
+    } else {   
+       warning( "The Configuration-file Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases.pm\n".
+               "contains a database-name for GB_COMB_DBNAME  which has length == 0. I assume you\n".
+               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;  
+       $genes_db = get_db_adaptor_by_string("UTR_DB",1) ; 
+    }   
+
     #print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
     
     my $genebuilder = new Bio::EnsEMBL::Pipeline::GeneBuilder
