@@ -40,7 +40,11 @@ my $seqout = new Bio::SeqIO( -file   => ">$clipped_cdnas",
 SEQFETCH:
 while ( my $unclipped = $seqin->next_seq ) {
   my ($clipped, $clip_end, $num_bases_removed) = clip_if_necessary($unclipped);
-  $seqout->write_seq($clipped);
+  if (defined $clipped) {
+    $seqout->write_seq($clipped);
+  } else {
+    print STDERR "Sequence removed: ".$unclipped->display_id."\n";
+  }
 }  
 
 
