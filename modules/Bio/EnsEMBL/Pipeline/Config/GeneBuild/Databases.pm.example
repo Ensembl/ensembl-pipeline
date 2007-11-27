@@ -86,7 +86,14 @@ use vars qw( %Databases );
 	      GB_cDNA_DBNAME             => '',
 	      GB_cDNA_DBUSER             => '',
 	      GB_cDNA_DBPASS             => '',
-              GB_cDNA_DBPORT             => '',
+              GB_cDNA_DBPORT             => '', 
+
+              # used by UTR_Builder.pm
+	      GB_EST_DBHOST             => '',
+	      GB_EST_DBNAME             => '',
+	      GB_EST_DBUSER             => '',
+	      GB_EST_DBPASS             => '',
+              GB_EST_DBPORT             => '',
 	      # db to put pseudogenes in
 	      PSEUDO_DBHOST              => '',
 	      PSEUDO_DBNAME              => '',
@@ -109,11 +116,11 @@ use vars qw( %Databases );
               GB_FINALDBPORT             => '',
 
               #db containing ditag mappings
-              GB_DITAG_DBHOST            => '',
-              GB_DITAG_DBNAME            => '',
-              GB_DITAG_DBUSER            => '',
-              GB_DITAG_DBPASS            => '',
-              GB_DITAG_DBPORT            => '',
+              DITAG_DBHOST            => '',
+              DITAG_DBNAME            => '',
+              DITAG_DBUSER            => '',
+              DITAG_DBPASS            => '',
+              DITAG_DBPORT            => '',
 
 	     );
 
