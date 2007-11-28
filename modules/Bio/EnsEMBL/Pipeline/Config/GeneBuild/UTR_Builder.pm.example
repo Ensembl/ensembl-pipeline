@@ -81,7 +81,13 @@ use vars qw( %UTR_Builder );
 	     # format: ['exonerate_genes', 'other_great_genes']
 	     OTHER_GENETYPES      => [],
 
-	     # Ditags can be use ditags to filter ESTs / cDNAs
+	     # the biotype of all genes where no UTR has been added will be 
+             # extended to $biotype .= EXTEND_BIOTYPE_OF_UNCHANGED_GENES if 
+             # you add a string in here.
+ 
+             EXTEND_BIOTYPE_OF_UNCHANGED_GENES => "",
+
+Ditags can be use ditags to filter ESTs / cDNAs
 	     # format: ['SHC012', 'SHC013'],
 	     DITAG_TYPE_NAMES     => [],
 
