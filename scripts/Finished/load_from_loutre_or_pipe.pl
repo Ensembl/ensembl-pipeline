@@ -330,10 +330,7 @@ my $seqset_info     = {};
 			$clone  = $slice_a->fetch_by_region( 'clone', $acc_ver );
 			$contig = $clone->project('contig')->[0]->to_Slice();
 		};
-		if($@) {
-			print "$@\n";
-			exit;
-		}
+
 		if ( $clone && $contig ) {
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
