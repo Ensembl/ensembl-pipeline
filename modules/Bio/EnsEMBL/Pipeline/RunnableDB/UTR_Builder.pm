@@ -69,21 +69,18 @@ use Bio::EnsEMBL::Analysis::Config::GeneBuild::TranscriptConsensus;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptExtended;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonExtended;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::CollapsedCluster;
-use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( merge_config_details ) ;
+use Bio::EnsEMBL::Analysis::Tools::Utilities;
 use Bio::EnsEMBL::Analysis::Runnable::TranscriptConsensus;
-use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript;
-
+use Bio::EnsEMBL::Analysis::Runnable::ExonerateTranscript; 
+use Bio::EnsEMBL::Utils::Exception qw( throw warning )  ;
 # all the parameters are read from GeneBuild config files
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General    qw (
 							      GB_INPUTID_REGEX
 							     );
+# note : if you like to use the Database-configuration out of ensembl-analysis 
+# please do not fill out the Databases-configuration file in ensembl-pipeline. 
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases  qw (
-							      GB_DBHOST
-							      GB_DBUSER
-							      GB_DBPASS
-							      GB_DBNAME
-							      GB_DBPORT
 							      GB_GW_DBHOST
 							      GB_GW_DBUSER
 							      GB_GW_DBPASS
@@ -124,22 +121,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity  qw (
 							      GB_SIMILARITY_GENETYPE
 							      );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder qw (
-							      UTR_GENETYPE
-							      BLESSED_UTR_GENETYPE
-							      KNOW_UTR_GENETYPE
-							      BLESSED_GENETYPES
-							      cDNA_GENETYPE
-							      EST_GENETYPE
-							      MAX_INTRON
-							      PRUNE_GENES
-							      FILTER_ESTS
-							      LOOK_FOR_KNOWN
-							      OTHER_GENETYPES
-							      DITAG_TYPE_NAMES
-							      VERBOSE
-							      );
-
+use Bio::EnsEMBL::Pipeline::Config::GeneBuild::UTR_Builder;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Sequences qw (
 							     GB_PROTEIN_INDEX
 							     GB_PROTEIN_SEQFETCHER
@@ -177,14 +159,15 @@ sub fetch_input{
   # add user-defined gene-types in the same way
   foreach my $other_genetype (@{$OTHER_GENETYPES}) {
     my $other_genes = $self->query->get_all_Genes_by_type($other_genetype);
-    print STDERR "got " . scalar(@{$other_genes}) . " $other_genetype genes.\n";
+    print STDERR "got " . scalar(@{$other_genes}) . " $other_genetype genes [ ".
+    $self->genewise_db->dbname() . "@" . $self->genewise_db->host ." ]\n";
     $self->gw_genes( $other_genes );
   }
 
   # get blessed genes
   my $blessed_slice;
   my @blessed_genes;
-  my $blessed_type;
+  my $blessed_type; 
   if ($self->blessed_db){
     $blessed_slice = $self->blessed_db->get_SliceAdaptor->fetch_by_name($self->input_id);
   }
@@ -258,8 +241,9 @@ sub fetch_input{
   }
 
   # create seqfetcher object for KnownUTR checking
-  my $protein_fetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER);
-  $self->_protein_seqfetcher($protein_fetcher);
+#  my $protein_fetcher = $self->make_seqfetcher($GB_PROTEIN_INDEX, $GB_PROTEIN_SEQFETCHER); 
+#  $self->_protein_seqfetcher($protein_fetcher); 
+
   my $cdna_fetcher = $self->make_seqfetcher($GB_CDNA_INDEX, $GB_CDNA_SEQFETCHER);
   $self->_cdna_seqfetcher($cdna_fetcher);
 
@@ -323,11 +307,20 @@ sub run {
                (scalar @{$self->unmatched_genes})." unmatched_genes.\n" if $VERBOSE;
 
   # remap & check
-  my @remapped;
-  push(@remapped, @{$self->remap_genes($self->combined_genes,  undef)});
-  push(@remapped, @{$self->remap_genes($self->unmatched_genes, undef)});
-  $self->output(@remapped);
+  my @remapped;  
 
+  push(@remapped, @{$self->remap_genes($self->combined_genes,  undef)});   
+
+  if ( length($EXTEND_BIOTYPE_OF_UNCHANGED_GENES) > 0 ) { 
+    push(@remapped, @{$self->remap_genes($self->unmatched_genes, $EXTEND_BIOTYPE_OF_UNCHANGED_GENES )});
+  } else {
+    push(@remapped, @{$self->remap_genes($self->unmatched_genes, undef)});
+  }
+  $self->output(@remapped); 
+
+  foreach ( @remapped ) {   
+    print "final biotype : " . $_->biotype . "\n" ; 
+  }
 
 }
 
@@ -905,11 +898,19 @@ sub run_matching{
 
       $combined_transcript = $self->_transfer_evidence($combined_transcript, $cdna_match);
 
-
       #make the new gene with UTR
       my $genetype;
-      if($usingKnown){ $genetype = $KNOW_UTR_GENETYPE; }
-      else{ $genetype = $combined_genetype; }
+      if($usingKnown){ 
+         $genetype = $KNOW_UTR_GENETYPE; 
+      } else{  
+         if ( $EXTEND_ORIGINAL_BIOTYPE ) { 
+           my $sep = "";  
+           $sep = "_"  unless ( $UTR_GENETYPE=~m/_/) ;  
+           $genetype = $combined_transcript->biotype. $sep. $UTR_GENETYPE ; 
+         } else { 
+           $genetype = $combined_genetype;  
+         }
+      }
       my $combined_genes = $self->make_gene($genetype, $combined_transcript);
 
       #check phases, etc.- if it is not a blessed gene
@@ -1432,7 +1433,6 @@ sub write_output {
  GENE:
   foreach my $gene ($self->output) {
 
-
     if(!$gene->analysis ||
        $gene->analysis->logic_name ne $self->analysis->logic_name){
       $gene->analysis($self->analysis);
@@ -1447,11 +1447,21 @@ sub write_output {
     foreach my $exon (@{$gene->get_all_Exons}) {
       $exon->adaptor(undef);
       $exon->dbID(undef);
+    } 
+    $gene->dbID(undef) ; 
+    $gene->adaptor(undef) ;    
+    for ( @{$gene->get_all_Transcripts} ) {  
+      for ( @{$_->get_all_supporting_features}){    
+        $_->dbID(undef) ;  
+        $_->adaptor(undef); 
+      }
+      $_->dbID(undef) ; 
+      $_->adaptor(undef) ;  
     }
 
     eval {
-      $gene_adaptor->store($gene);
-      print STDERR "wrote gene dbID " . $gene->dbID . "\n" if $VERBOSE;
+      $gene_adaptor->store($gene); 
+      print STDERR "wrote gene dbID " . $gene->dbID  . "\t".$gene->biotype . "\n"  ; 
     };
     if( $@ ) {
       print STDERR "UNABLE TO WRITE GENE " . $gene->dbID. "of type " . $gene->type  . "\n\n$@\n\nSkipping this gene\n";
@@ -1546,13 +1556,13 @@ sub make_gene{
   my ($self, $genetype, @transcripts) = @_;
 
   unless ( $genetype ){
-    $self->throw("You must define UTR_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::GeneBuild::Combined");
+    throw("You must define UTR_GENETYPE in Bio::EnsEMBL::Pipeline::Conf::GeneBuild::Combined");
   }
 
   # an analysis should be passed in via the RunnableDB.m parent class:
   my $analysis = $self->analysis;
   unless ($analysis){
-    $self->throw("You have to pass an analysis to this RunnableDB through new()");
+    throw("You have to pass an analysis to this RunnableDB through new()");
   }
 
   my @genes;
@@ -1651,7 +1661,7 @@ sub match_protein_to_cdna{
  cDNA:
   foreach my $e2g(@genes){
 
-    my @egtran  = @{$e2g->get_all_Transcripts};
+    my @egtran  = @{$e2g->get_all_Transcripts}; 
     my @eg_exons = @{$egtran[0]->get_all_Exons};
 
     $strand   = $eg_exons[0]->strand;
@@ -1863,7 +1873,7 @@ sub _merge_genes {
     # order is crucial
     my @trans = @{$unmerged->get_all_Transcripts};
     if(scalar(@trans) != 1) { 
-      $self->throw("Gene with dbID " . $unmerged->dbID .
+      throw("Gene with dbID " . $unmerged->dbID .
 		   " has NO or more than one related transcript, where a 1-gene-to-1-transcript-relation is assumed.".
 		   " Check preceding analysis \n");
     }
@@ -2024,7 +2034,7 @@ sub _merge_genes {
 =cut
 
 sub combine_genes{
-  my ($self, $gw, $e2g) = @_;
+  my ($self, $gw, $e2g) = @_; 
 
   my $modified_peptide = 0;
   my @combined_transcripts = ();
@@ -2042,7 +2052,13 @@ sub combine_genes{
   # OK, let's see if we need a new gene
   # base it on the existing genewise one
   #yes, bloody hell, you do and you need to CLONE the exons, too!
-  my $newtranscript = new Bio::EnsEMBL::Transcript;
+  my $newtranscript = new Bio::EnsEMBL::Transcript;  
+ 
+  if ( $EXTEND_ORIGINAL_BIOTYPE ) {  
+    # original biotype of gene / transcript will only be extended, not  
+    # overwritten  
+    $newtranscript->biotype($gw->biotype) ; 
+  }
   foreach my $exon(@gw_exons){
     my $new_exon = Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon($exon);
     $newtranscript->add_Exon($new_exon);
@@ -2493,7 +2509,7 @@ sub transcript_from_multi_exon_genewise_forward {
       #print STDERR "gw exon starts: $gwstart > new start: $current_start";
       #print STDERR "but cdna exon is the first of transcript-> exoncount = $exoncount, so we don't modify it\n";
     }
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n")
+    throw("setting very dodgy translation start: " . $translation->start.  "\n")
       unless $translation->start > 0;
 
   } # end 5' exon
@@ -2664,7 +2680,7 @@ sub transcript_from_multi_exon_genewise_reverse {
 	$self->warn("very odd - $diff mod 3 = " . $diff % 3 . "\n");}
     }
 
-    $self->throw("setting very dodgy translation start: " . $translation->start.  "\n")
+    throw("setting very dodgy translation start: " . $translation->start.  "\n")
       unless $translation->start > 0;
 
     # this exon is the start of translation, convention: phase = -1
@@ -3009,7 +3025,7 @@ sub compare_translations{
 =cut
 
 sub remap_genes {
-  my ($self, $genes, $biotype) = @_;
+  my ($self, $genes, $biotype_suffix) = @_; 
 
   my @remapped_genes = ();
   my $blessed_type   = $self->{'blessed_type'};
@@ -3028,8 +3044,8 @@ sub remap_genes {
     print STDERR "remapping ".$gene->biotype."\n" if $VERBOSE;
 
     #force a centain biotype?
-    if($biotype){
-      $gene->biotype($biotype);
+    if($biotype_suffix){  
+      $gene->biotype($gene->biotype().$biotype_suffix);
     }
 
     my @t = @{$gene->get_all_Transcripts};
@@ -3052,7 +3068,6 @@ sub remap_genes {
     }
     push(@remapped_genes, $gene);
   }
-
   return \@remapped_genes;
 }
 
@@ -3428,7 +3443,7 @@ sub look_for_both {
 	  if (($cdnalen-$coding_end) > 3) {
 	    while (($cdnalen-$coding_end) > 3 && ($coding_end-$orig_coding_end) <= $maxterdist) {
 	      my $testseq = substr($cdna_seq,$coding_end,3);
-	      print "Test seq = $testseq\n";
+	      print "Test seq = $testseq\n" if $VERBOSE ; 
 	      if ($testseq eq "TGA" or $testseq eq "TAA" or $testseq eq "TAG") {
 
 		my @coords = $trans->cdna2genomic($coding_end+1,$coding_end+3,$gene->strand);
@@ -4051,11 +4066,16 @@ sub cdna_db {
 
     if ($cdna_db){
       $cdna_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$cdna_db] isn't a ".
+        || throw("Input [$cdna_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_cdna_db} = $cdna_db;
     }
     if(!$self->{_cdna_db}){
+      if ( length($GB_cDNA_DBNAME)==0){  
+         $self->{_cdna_db} = get_db_adaptor_by_string("EST_CDNA_DB",1);
+      } else {   
+        print "Using databbase-configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n".
+              " for $GB_cDNA_DBNAME@ $GB_cDNA_DBHOST\n" ;  
       $self->{_cdna_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
          '-host'   => $GB_cDNA_DBHOST,
@@ -4065,6 +4085,7 @@ sub cdna_db {
          '-dbname' => $GB_cDNA_DBNAME,
          '-dnadb' => $self->db,
         ); 
+      } 
     }
     return $self->{_cdna_db};
 }
@@ -4084,11 +4105,16 @@ sub est_db {
 
     if ($est_db){
       $est_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$est_db] isn't a ".
+        || throw("Input [$est_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_est_db} = $est_db;
     }
     if(!$self->{_est_db}){
+      if ( length($GB_EST_DBNAME)==0){  
+         $self->{_est_db} = get_db_adaptor_by_string("EST_CDNA_DB",1);
+      } else {   
+        print "Using databbase-configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n".
+              " for $GB_EST_DBNAME @ $GB_EST_DBHOST\n" ;  
       $self->{_est_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
          '-host'   => $GB_EST_DBHOST,
@@ -4098,6 +4124,7 @@ sub est_db {
          '-dbname' => $GB_EST_DBNAME,
          '-dnadb' => $self->db,
         );
+      } 
     }
     return $self->{_est_db};
 }
@@ -4118,11 +4145,15 @@ sub ditag_db {
 
     if ($ditag_db){
       $ditag_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$ditag_db] isn't a ".
+        || throw("Input [$ditag_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_ditag_db} = $ditag_db;
     }
     if(!$self->{_ditag_db}){
+      if ( length($DITAG_DBNAME)==0){  
+         $self->{_ditag_db} = get_db_adaptor_by_string("DITAG_DB",1);
+      } else {   
+        print "Using databbase_configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n" ;  
       $self->{_ditag_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
          '-host'   => $DITAG_DBHOST,
@@ -4132,9 +4163,10 @@ sub ditag_db {
          '-dbname' => $DITAG_DBNAME,
          '-dnadb'  => $self->db,
         );
+      }
     }
     if(!$self->{_ditag_db}){
-      $self->throw("Could not create DitagDB-Adaptor!\n");
+      warning("Could not create DitagDB-Adaptor!\n");
     }
 
     return $self->{_ditag_db};
@@ -4154,20 +4186,26 @@ sub genewise_db {
 
     if ($genewise_db){
       $genewise_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$genewise_db] isn't a ".
+        || throw("Input [$genewise_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_genewise_db} = $genewise_db;
     }
-    if(!$self->{_genewise_db}){
-      $self->{_genewise_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
-        (
-         '-host'   => $GB_GW_DBHOST,
-         '-user'   => $GB_GW_DBUSER,
-         '-pass'   => $GB_GW_DBPASS,
-         '-port'   => $GB_GW_DBPORT,
-         '-dbname' => $GB_GW_DBNAME,
-         '-dnadb' => $self->db,
-        );
+    if(!$self->{_genewise_db}){   
+
+      if ( length($GB_GW_DBNAME)==0){  
+         $self->{_genewise_db} = get_db_adaptor_by_string("GENEWISE_DB",1);
+      } else {   
+        print "Using databbase_configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n" ;  
+        $self->{_genewise_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+          (
+           '-host'   => $GB_GW_DBHOST,
+           '-user'   => $GB_GW_DBUSER,
+           '-pass'   => $GB_GW_DBPASS,
+           '-port'   => $GB_GW_DBPORT,
+           '-dbname' => $GB_GW_DBNAME,
+           '-dnadb' => $self->db,
+          );
+      }
     }
     return $self->{_genewise_db};
 }
@@ -4187,21 +4225,27 @@ sub blessed_db {
 
     if ($blessed_db){
       $blessed_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$blessed_db] isn't a ".
+        || throw("Input [$blessed_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_blessed_db} = $blessed_db;
     }
     if(!$self->{_blessed_db}){
-      if($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME) {
-	$self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
-          (
-           '-host'   => $GB_BLESSED_DBHOST,
-           '-user'   => $GB_BLESSED_DBUSER,
-           '-pass'   => $GB_BLESSED_DBPASS,
-           '-port'   => $GB_BLESSED_DBPORT,
-           '-dbname' => $GB_BLESSED_DBNAME,
-           '-dnadb' => $self->db,
-          );
+      if ( length($GB_BLESSED_DBNAME)==0){  
+         $self->{_blessed_db} = get_db_adaptor_by_string("BLESSED_DB",1);
+      } else {   
+        print "Using databbase-configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n".
+              " for $GB_BLESSED_DBNAME @ $GB_BLESSED_DBHOST\n" ;  
+         if($GB_BLESSED_DBHOST && $GB_BLESSED_DBNAME) {
+           $self->{_blessed_db} = new Bio::EnsEMBL::DBSQL::DBAdaptor
+            (
+             '-host'   => $GB_BLESSED_DBHOST,
+             '-user'   => $GB_BLESSED_DBUSER,
+             '-pass'   => $GB_BLESSED_DBPASS,
+             '-port'   => $GB_BLESSED_DBPORT,
+             '-dbname' => $GB_BLESSED_DBNAME,
+             '-dnadb' => $self->db,
+            );
+         }
       }
     }
 
@@ -4223,11 +4267,16 @@ sub output_db {
 
     if ($output_db){
       $output_db->isa("Bio::EnsEMBL::DBSQL::DBAdaptor")
-        || $self->throw("Input [$output_db] isn't a ".
+        || throw("Input [$output_db] isn't a ".
                         "Bio::EnsEMBL::DBSQL::DBAdaptor");
       $self->{_output_db} = $output_db;
     }
     if(!$self->{_output_db}){
+      if ( length($GB_COMB_DBNAME)==0){  
+         $self->{_output_db} = get_db_adaptor_by_string("UTR_DB",1);
+      } else {   
+        print "Using databbase-configuration out of Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases\n".
+              " for $GB_COMB_DBNAME @ $GB_COMB_DBHOST\n" ;  
       $self->{_output_db} =  new Bio::EnsEMBL::DBSQL::DBAdaptor
         (
          '-host'   => $GB_COMB_DBHOST,
@@ -4237,6 +4286,7 @@ sub output_db {
          '-dbname' => $GB_COMB_DBNAME,
          '-dnadb' => $self->db,
         ); 
+     }
     }
     return $self->{_output_db};
 }
@@ -4374,8 +4424,7 @@ sub _cdna_slice {
   }
 
   return $self->{'_cdna_slice'};
-}
-
+}  
 
 =head2 _cdna_evidence
 
