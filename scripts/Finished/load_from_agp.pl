@@ -30,11 +30,12 @@ here is an example commandline
 =head1 OPTIONS
 
     -host (default:otterpipe1)   host name of the target database (gets put as phost= in locator)
-    -name (no default)  For RDBs, what database to connect to (pname= in locator)
+    -dbname (no default)  For RDBs, what database to connect to (pname= in locator)
     -user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
+	-cs_name (default:chromosome) the name of the coordinate system being stored
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	the sequence set name
     -description the sequence set description
@@ -67,6 +68,7 @@ my $name = '';
 my $user = '';
 my $pass = '';
 
+my $cs_name = 'chromosome';
 my $cs_version = 'Otter';
 my $set;
 my $description;
@@ -77,10 +79,11 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 &GetOptions(
 	'host:s'                => \$host,
 	'port:n'                => \$port,
-	'name:s'                => \$name,
+	'dbname:s'                => \$name,
 	'user:s'                => \$user,
 	'pass:s'                => \$pass,
-	'chromosome_cs_version:s' => \$cs_version,
+	'cs_name:s' 			=> \$cs_name,
+	'cs_version:s' 			=> \$cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
 	'submit!'                 => \$do_submit,
@@ -106,7 +109,7 @@ if ( !$user || !$pass || !$port ) {
 
 if ( !$name ) {
 	print STDERR
-	  "Can't load sequence set without a target pipeline database name\n";
+	  "Can't load sequence set without a target database name\n";
 	print STDERR "-host $host -user $user -pass $pass\n";
 }
 
@@ -184,13 +187,17 @@ my $seqset_info     = {};
 		$chr_href->{$agp_chr_name} = 1;
 		$contig_number++;
 	}
+
 	my @chrs = keys %$chr_href;
+
+	throw("AGP should contains (only) one $cs_name: [@chrs]")
+		unless (scalar(@chrs) == 1);
+
 	$seqset_info->{$set} = [shift @chrs , $description];
 
 	close $fh;
 
-	throw("AGP should contains (only) one chromosome: [@chrs]")
-		  unless (scalar(@chrs) == 1);
+
 	print STDOUT $contig_number." contigs retrieved from $agp_file\n";
 }
 
@@ -213,13 +220,13 @@ my $seqset_info     = {};
 	my $analysis_a           = $target_dba->get_AnalysisAdaptor;
 	my $state_info_container = $target_dba->get_StateInfoContainer if($name =~ /pipe_/);
 
-	my $chromosome_cs;
+	my $super_cs;
 	my $clone_cs;
 	my $contig_cs;
 
 	eval {
-		$chromosome_cs =
-		  $cs_a->fetch_by_name( "chromosome", $cs_version );
+		$super_cs =
+		  $cs_a->fetch_by_name( $cs_name, $cs_version );
 		$clone_cs  = $cs_a->fetch_by_name("clone");
 		$contig_cs = $cs_a->fetch_by_name("contig");
 
@@ -241,18 +248,18 @@ my $seqset_info     = {};
 		my $endv = $end_value{$set_name};
 		eval {
 			$slice =
-			  $slice_a->fetch_by_region( 'chromosome', $set_name, undef, undef,
+			  $slice_a->fetch_by_region( $cs_name, $set_name, undef, undef,
 				undef, $cs_version );
 		};
 		if ($slice) {
-			print STDOUT "Sequence set <$set_name> is already in pipeline database <$name>\n";
+			print STDOUT "Sequence set <$set_name> is already in database <$name>\n";
 			throw(  "There is a difference in size for $set_name: stored ["
 				  . $slice->length. "] =! new [". $endv. "]" )
 			unless ( $slice->length eq $endv );
 			$asm_seq_reg_id{$set_name} = $slice->get_seq_region_id;
 		}
 		else {
-			$slice = &make_slice( $set_name, 1, $endv, $endv, 1, $chromosome_cs );
+			$slice = &make_slice( $set_name, 1, $endv, $endv, 1, $super_cs );
 			$asm_seq_reg_id{$set_name} = $slice_a->store($slice);
 			$attr_a->store_on_Slice( $slice,
 				&make_seq_set_attribute( $seqset_info->{$set_name} ) );
@@ -292,7 +299,7 @@ my $seqset_info     = {};
 			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
-			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the database\n";
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
 		}
@@ -338,7 +345,7 @@ my $seqset_info     = {};
 				throw("contig seq_region_id has not been returned for the contig $contig_name");
 			}
 		}
-		##insert chromosome to contig assembly data into assembly table
+		##insert super cs to contig assembly data into assembly table
 		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id,
 			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
 		##insert clone to contig assembly data into assembly table
