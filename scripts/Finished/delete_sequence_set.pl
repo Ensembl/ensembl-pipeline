@@ -98,7 +98,7 @@ if ( !$user || !$pass || !$port ) {
 }
 
 if ( !$dbname ) {
-	throw("You must specify a database name (-p_name)");
+	throw("You must specify a database name (-dbname)");
 }
 
 my $db = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
