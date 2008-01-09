@@ -220,7 +220,7 @@ sub run_lastz {
     my $tmpdir = $self->tempdir;
     my $id = $self->id;
 
-    my $blastz_cmd = qq(/software/anacode/bin/lastz $tmpdir/$A_basename.fa $tmpdir/$R_basename.fa Q=blastz_matrix.txt T=0 L=10000 H=2200 Y=3400 --format=axt > $tmpdir/blastz.$id.axt);
+    my $blastz_cmd = qq(/software/anacode/bin/lastz $tmpdir/$A_basename.fa $tmpdir/$R_basename.fa Q=lastz_matrix.txt T=0 L=10000 H=2200 Y=3400 --format=axt > $tmpdir/blastz.$id.axt);
 	print "lastz command $blastz_cmd\n";
     unless (-e "$tmpdir/blastz.$id.axt") {
       system($blastz_cmd) == 0 or
