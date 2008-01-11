@@ -255,6 +255,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			$tg->analysis( $g->analysis );
 			$tg->biotype( $g->biotype );
 			$tg->status( $g->status );
+			$tg->source( $g->source );
 			$tg->stable_id( $g->stable_id ) unless $haplo;
 			$tg->gene_author( $g->gene_author );
 			$tg->description( $g->description );
