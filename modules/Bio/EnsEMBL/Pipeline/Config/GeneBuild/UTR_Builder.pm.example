@@ -44,6 +44,21 @@ use vars qw( %UTR_Builder );
 # Hash containing config info
 %UTR_Builder = (
 
+
+             INPUT_DB =>'GENEWISE_DB',  # db with genes which have NO utr
+             OUTPUT_DB =>'UTR_DB',      # write processed genes to this DB 
+
+             # From which databases should we get the data from ?  
+             # each key points to a hash-key in Analysis/Config/GeneBuild/Databases.pm 
+
+             CDNA_DB    => 'EST_CDNA_DB',     # db with cDNA's 
+             EST_DB     => 'EST_CDNA_DB',     # db with est's 
+             DITAG_DB   => 'DITAG_DB',        # db where ditags are stored  
+             BLESSED_DB => 'BLESSED_DB' ,     # db with blessed genes 
+
+
+
+
 	     # biotype  for UTR_Builder output genes
 	     UTR_GENETYPE         => 'UTR_Genes',
 
