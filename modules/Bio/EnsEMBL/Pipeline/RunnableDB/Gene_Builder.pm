@@ -65,7 +65,9 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases   qw (
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
 							       GB_VCONTIG
-							       GB_FINAL_GENETYPE
+							       GB_FINAL_GENETYPE 
+                                                               GB_INPUT_DATABASE 
+                                                               GB_OUTPUT_DATABASE 
 							      );
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::General     qw (
@@ -168,8 +170,9 @@ sub write_output {
     } else { 
        warning( "The Configuration-file Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases.pm\n".
                "contains a database-name for GB_FINALDBNAME which has length == 0. I assume you\n".
-               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;  
-       $db = get_db_adaptor_by_string("GENEBUILD_DB",1) ; 
+               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;   
+       print "Writing output to $GB_OUTPUT_DATABASE\n" ; 
+       $db = get_db_adaptor_by_string("$GB_OUTPUT_DATABASE",1) ; 
     }  
    
     # sort out analysis
@@ -257,8 +260,11 @@ sub fetch_input {
     } else {   
        warning( "The Configuration-file Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases.pm\n".
                "contains a database-name for GB_COMB_DBNAME  which has length == 0. I assume you\n".
-               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;  
-       $genes_db = get_db_adaptor_by_string("UTR_DB",1) ; 
+               " want to use the configuration out of Ensembl-analysis so i will read this now\n" ) ;   
+       print "Your source-genes for the GeneBuilder run will be fetched ". 
+             "out of $GB_INPUT_DATABASE\n" ; 
+
+       $genes_db = get_db_adaptor_by_string("$GB_INPUT_DATABASE",1) ; 
     }   
 
     #print STDERR "reading genewise and combined genes from $GB_COMB_DBNAME : $GB_COMB_DBHOST\n";
