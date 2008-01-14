@@ -46,13 +46,16 @@ use vars qw( %GeneBuilder );
 # Hash containing config info
 %GeneBuilder = (
 
+                GB_OUTPUT_DATABASE          => 'GENEBUILD_DB',
+
 		GB_FINAL_GENETYPE           => 'ensembl', 
 
                 # other gene-types which have to be combined / fetched (in GB_COMB_DBNAME)
                 # make sure you don't use GB_GENEWISE_COMBINED_GENETYPE (Combined.pm), 
                 # GB_TARGETTED_GW_GENETYPE or  other genetypes mentioned in other configs
-                # otherwise genes will be fetched twice 
-                #
+                # otherwise genes will be fetched twice  
+
+                GB_INPUT_DATABASE       => "UTR_DB" 
 	        GB_MISC_OTHER_INPUT_GENETYPES => [''], 
 
 		# parameters for use of genscan predictions in final build		
