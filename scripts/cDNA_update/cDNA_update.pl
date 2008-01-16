@@ -118,7 +118,7 @@ my $dataDIR              = '/lustre/work1/ensembl/ba1/cDNA_update_hum_Nov07/';
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
 my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
-my $sourceHost           = "cbi1"; 
+my $sourceHost           = "cbi4"; 
 my $sourceDIR            = "/data/blastdb/";
 my $assembly_version     = "NCBI36"; #"NCBIM37"; #NCBI36
 
