@@ -124,7 +124,7 @@ if ( !$ouser || !$opass || !$oport ) {
 
 if ( !$name ) {
 	print STDERR
-	  "Can't load sequence set without a target pipeline database name\n";
+	  "Can't load sequence set without a target loutre/pipeline database name\n";
 	print STDERR "-host $host -user $user -pass $pass\n";
 }
 
@@ -234,11 +234,11 @@ my $seqset_info     = {};
 }
 
 #
-# Load the sequence data set into the Pipeline database
+# Load the sequence data set into the loutre/pipeline database
 #
 {
 	print STDOUT
-	  "Writing data into Pipeline database: $name ($host:$port)\n";
+	  "Writing data into database: $name ($host:$port)\n";
 
 	my $dbh = $target_dbc->db_handle;
 	$dbh->begin_work;
@@ -284,7 +284,7 @@ my $seqset_info     = {};
 				undef, $cs_version );
 		};
 		if ($slice) {
-			print STDOUT "Sequence set <$set_name> is already in pipeline database <$name>\n";
+			print STDOUT "Sequence set <$set_name> is already in database <$name>\n";
 			throw(  "There is a difference in size for $set_name: stored ["
 				  . $slice->length. "] =! new [". $endv. "]" )
 			unless ( $slice->length eq $endv );
@@ -331,7 +331,7 @@ my $seqset_info     = {};
 			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
-			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the pipeline database\n";
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the database\n";
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
 		}
