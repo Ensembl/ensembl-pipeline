@@ -165,11 +165,15 @@ foreach my $chr (@{sort_chr_names($chrhash)}) {
       push @all_biotypes, $biotype ; 
       print "Fetching all genes from ".$tmp_slice->name." by ".
             "biotype ".$biotype." from ".$tmp_slice->adaptor->dbc->dbname."\n";
-      my @genes =@{ $tmp_slice->get_all_Genes_by_type($biotype,undef,1)} ; 
+      my @genes =@{ $tmp_slice->get_all_Genes_by_type($biotype,undef,1)} ;  
       print "Have " . scalar(@genes) . " genes [$biotype]\n" ; 
       push @all_genes , @genes ; 
     }
-     
+     for ( @all_genes ) {  
+       print "gene_db_id : " . $_->dbID . "\t" . $_->biotype . "\n"  ; 
+     }     
+
+ 
     # PREDICTION  TRANSCRIPTS 
     for my $logic_name_becomes_biotype ( @{$coalescer_hash{$category}{AB_INITIO_LOGICNAMES} }) { 
        
@@ -208,7 +212,11 @@ sub create_input_ids {
   my @all_genes = @$genes;
   my @all_biotypes = @$biotypes;
 
-  @all_genes = sort { $a->seq_region_start <=> $b->seq_region_start }  @all_genes ; 
+  @all_genes = sort { $a->seq_region_start <=> $b->seq_region_start }  @all_genes ;  
+
+     for ( @all_genes ) {  
+       print "gene_db_id : " . $_->dbID . "\t" . $_->biotype . "\t" .$_->seq_region_start . "\n"  ; 
+     }     
 
   my %types_hash;
   $types_hash{all} = \@all_biotypes;
@@ -217,7 +225,10 @@ sub create_input_ids {
   my $unclustered;
   ($clustered,$unclustered)  =  cluster_Genes(\@all_genes, \%types_hash);
 
-  my @cluster = @$clustered;
+  my @cluster = @$clustered; 
+
+  push @cluster ,@$unclustered; 
+
 
   @cluster = sort {$a->start <=> $b->start } @cluster ;  
   print "Printing cluster info\n";
