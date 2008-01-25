@@ -666,11 +666,11 @@ sub combine_transcripts{
     
     my  $tmp =$genewise_transcript->transfer($chromosome_slice); 
     $genewise_transcript=$tmp;
-    print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
+    #print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
 
     my $cdna_tmp =  $cdna_transcript->transfer($chromosome_slice); 
     $cdna_transcript =$cdna_tmp;
-    print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
+    #print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
     
     
     my $modified_peptide = 0;
@@ -690,9 +690,9 @@ sub combine_transcripts{
 
       #sneak in the check, if some coding region is actually overlapping
       if($exon->start > $gw_start){
-			print "EXON START: ",$exon->start,"\n"; 
+			#print "EXON START: ",$exon->start,"\n"; 
 	    CODINGCHECK: foreach my $cdna_exon (@cdna_exons){
-	    print "CDNA EXON START: ",$cdna_exon->start,"\n";
+	    #print "CDNA EXON START: ",$cdna_exon->start,"\n";
 	  if(($exon->strand == $cdna_exon->strand) and ($exon->overlaps($cdna_exon))){
 	    $coding_overlap = 1;
 	    last CODINGCHECK;
