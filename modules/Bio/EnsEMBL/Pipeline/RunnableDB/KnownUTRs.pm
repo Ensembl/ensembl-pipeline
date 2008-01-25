@@ -523,9 +523,9 @@ sub make_cdna_chunks{
   
   while(@{$cdna_seqs}){
     if ($files_in_chunk<10){
-      if (!$chunks{$number_of_chunk}){
-        $chunks{$number_of_chunk};
-      }
+      #unless ($chunks{$number_of_chunk}){
+      #  $chunks{$number_of_chunk};
+      #}
       
       push(@{$chunks{$number_of_chunk}}, pop(@{$cdna_seqs}));
       $files_in_chunk++;
@@ -666,11 +666,11 @@ sub combine_transcripts{
     
     my  $tmp =$genewise_transcript->transfer($chromosome_slice); 
     $genewise_transcript=$tmp;
-    #print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
+    print "Genewise Transcript ",$genewise_transcript->slice->name,"\n";
 
     my $cdna_tmp =  $cdna_transcript->transfer($chromosome_slice); 
     $cdna_transcript =$cdna_tmp;
-    #print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
+    print "Exonerate Transcripts ", $cdna_transcript->slice->name,"\n";
     
     
     my $modified_peptide = 0;
@@ -689,9 +689,10 @@ sub combine_transcripts{
       $newtranscript->add_Exon($exon);
 
       #sneak in the check, if some coding region is actually overlapping
-    CODINGCHECK:
       if($exon->start > $gw_start){
-	foreach my $cdna_exon (@cdna_transcript_exons){
+			print "EXON START: ",$exon->start,"\n"; 
+	    CODINGCHECK: foreach my $cdna_exon (@cdna_exons){
+	    print "CDNA EXON START: ",$cdna_exon->start,"\n";
 	  if(($exon->strand == $cdna_exon->strand) and ($exon->overlaps($cdna_exon))){
 	    $coding_overlap = 1;
 	    last CODINGCHECK;
