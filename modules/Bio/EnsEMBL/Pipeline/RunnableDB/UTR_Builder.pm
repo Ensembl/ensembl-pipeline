@@ -877,7 +877,15 @@ sub run_matching{
       #check phases, etc.- if it is not a blessed gene
       my $combined_gene;
       if(!$blessed){
-	$combined_gene = $self->look_for_both($combined_genes->[0]);
+	my $new_combined_gene = $self->look_for_both($combined_genes->[0]);
+	if(   Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($new_combined_gene->get_all_Transcripts->[0], $self->query, 1)
+	   && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($new_combined_gene->get_all_Transcripts->[0], $self->query, undef, 1)
+	   && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($new_combined_gene->get_all_Transcripts->[0], 1)  ){
+	  $combined_gene = $new_combined_gene;
+	}
+	else{
+	  $combined_gene = $combined_genes->[0];
+	}
       }
       else{
 	$combined_gene = $combined_genes->[0];
@@ -1505,10 +1513,10 @@ sub convert_to_extended_genes {
 
 =head2 make_gene
 
-  Arg [1]    : string representing genetyoe to be associated with genes
+  Arg [1]    : string representing genetype to be associated with genes
   Arg [2]    : array of Bio::EnsEMBL::Transcript
   Description: Constructs Bio::EnsEMBL::Gene objects from UTR-modified transcripts
-  Returntype : none; new genes are stored in self->combined_genes
+  Returntype : array of genes
   Exceptions : throws when missing genetype or analysis
 
 =cut
