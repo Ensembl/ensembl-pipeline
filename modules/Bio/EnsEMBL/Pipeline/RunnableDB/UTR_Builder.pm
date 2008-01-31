@@ -680,7 +680,8 @@ sub run_matching{
 	# just check combined transcript works before throwing away the original  transcript
 	if (  $combined_transcript
 	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript, $self->query, 1)
-	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript, $self->query, undef, 1) ){
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript, $self->query, undef, 1)
+	      && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($combined_transcript, 1)  ){
 
 	  # make sure combined transcript doesn't misjoin any genewise clusters
 	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
@@ -826,7 +827,8 @@ sub run_matching{
 	# just check combined transcript works before throwing away the original  transcript
 	if ( defined($combined_transcript)
 	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Transcript($combined_transcript, $self->query, 1)
-	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript, $self->query, undef, 1) ){
+	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_introns($combined_transcript, $self->query, undef, 1)
+	     && Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils->_check_Translation($combined_transcript, 1)  ){
 
 	  # make sure combined transcript doesn't misjoin any genewise clusters
 	  print STDERR "About to check for cluster joiners\n" if $VERBOSE;
@@ -4030,7 +4032,7 @@ sub cdna_db {
       $self->{_cdna_db} = $cdna_db;
     }
     if(!$self->{_cdna_db}){
-      $self->{_cdna_db} = get_db_adaptor_by_string("$CDNA_DB",1);
+      $self->{_cdna_db} = get_db_adaptor_by_string("EXONERATE_DB",1);
     }
     return $self->{_cdna_db};
 }
@@ -4055,7 +4057,7 @@ sub est_db {
       $self->{_est_db} = $est_db;
     }
     if(!$self->{_est_db}){
-      $self->{_est_db} = get_db_adaptor_by_string("$EST_DB",1);
+      $self->{_est_db} = get_db_adaptor_by_string("EST_CDNA_DB",1);
     }
     return $self->{_est_db};
 }
@@ -4081,7 +4083,7 @@ sub ditag_db {
       $self->{_ditag_db} = $ditag_db;
     }
     if(!$self->{_ditag_db}){
-      $self->{_ditag_db} = get_db_adaptor_by_string("$DITAG_DB",1);
+      $self->{_ditag_db} = get_db_adaptor_by_string("DITAG_DB",1);
     }
     return $self->{_ditag_db};
 }
@@ -4105,7 +4107,7 @@ sub genewise_db {
       $self->{_genewise_db} = $genewise_db;
     }
     if(!$self->{_genewise_db}){
-      $self->{_genewise_db} = get_db_adaptor_by_string($INPUT_DB,1);
+      $self->{_genewise_db} = get_db_adaptor_by_string("GENEWISE_DB",1);
       print STDERR "SETTING GWDB\n";
     }
     return $self->{_genewise_db};
@@ -4131,7 +4133,7 @@ sub blessed_db {
       $self->{_blessed_db} = $blessed_db;
     }
     if(!$self->{_blessed_db}){
-      $self->{_blessed_db} = get_db_adaptor_by_string("$BLESSED_DB",1);
+      $self->{_blessed_db} = get_db_adaptor_by_string("BLESSED_DB",1);
     }
 
     return $self->{_blessed_db};
@@ -4157,7 +4159,7 @@ sub output_db {
       $self->{_output_db} = $output_db;
     }
     if(!$self->{_output_db}){
-      $self->{_output_db} = get_db_adaptor_by_string($OUTPUT_DB,1);
+      $self->{_output_db} = get_db_adaptor_by_string("UTR_DB",1);
     }
     return $self->{_output_db};
 }
