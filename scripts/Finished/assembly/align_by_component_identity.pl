@@ -67,17 +67,17 @@ load_alternative_assembly.pl.
 
 The alignment is created in two steps:
 
-    1. Match components with same name and version directly and create alignment
-       blocks for these regions. Components can be tagged manually to be excluded
-       from these direct matches by listing them in a file of components to skip
-       (--skipcomponents argument). This can be useful to get better results in
-       regions with major assembly differences.
+    1. Match components with same name and version directly using the sdiff method
+       in Algorithm::Diff and create alignment blocks for these regions. Components
+       can be tagged manually to be excluded from these direct matches by listing
+       them in a file of components to skip (--skipcomponents argument). This can be
+       useful to get better results in regions with major assembly differences.
 
        The result is stored in the assembly table as an assembly between the
        chromosomes of both genome assemblies.
 
     2. Store non-aligned blocks in a temporary table (tmp_align). They can
-       later be aligned using blastz by align_nonident_regions.pl.
+       later be aligned using lastz by align_nonident.pl.
 
 =head1 RELATED FILES
 
@@ -126,6 +126,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Utils::ConversionSupport;
 use Bio::EnsEMBL::Attribute;
+use Algorithm::Diff qw(diff sdiff LCS);
 
 $| = 1;
 
@@ -307,6 +308,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 
 	my @A_components = @{ $A_slice->project($component_cs) };
+	$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
 	my @R_components = @{ $R_slice->project($component_cs) };
 
 	if($A_start){
@@ -319,229 +321,65 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		map ($_->[1] += ($R_start-1) , @R_components);
 	}
 
-
-	# loop over alternative components
-	my $last       = 0;
+	my $i          = 0;
 	my $j          = 0;
+	my ($left,$right,$type,$tag);
 	my $match_flag = 0;
-	my $last_A_seg;
 	my %stats_chr;
 
-	foreach my $A_seg (@A_components) {
+	my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
 
-		my $A_component = $A_seg->to_Slice;
+	# loop over sdiff results
+	foreach my $diff (@assembly_diffs)  {
+		$type = $diff->[0];
+		($left,$right,$tag) = ('-','-','');
+		($i,$j) = (0,0);
 
-		print STDOUT
-			"Alternative component ($j) "
-			  . $A_component->seq_region_name . ":"
-			  . $A_component->start . "-"
-			  . $A_component->end . ":"
-			  . $A_component->strand
-			  . " $A_chr:"
-			  . $A_seg->from_start . "-"
-			  . $A_seg->from_end . "\n";
-
-		# walk reference components
-	  REFCOMPONENTS:
-		for ( my $i = $last ; $i < scalar(@R_components) ; $i++ ) {
-
-			my $R_component = $R_components[$i]->to_Slice;
-
-			print STDOUT "Reference component ($i) "
-			  . $R_component->seq_region_name . ":"
-			  . $R_component->start . "-"
-			  . $R_component->end . ":"
-			  . $R_component->strand
-			  . " $R_chr:"
-			  . $R_components[$i]->from_start . "-"
-			  . $R_components[$i]->from_end . "\n";
-
-			# same name.version and strand found
-			if ( $A_component->seq_region_name eq $R_component->seq_region_name
-				and $A_component->strand == $R_component->strand )
-			{
-
-				# same component start/end -> identical assembly
-				if (    $A_component->start == $R_component->start
-					and $A_component->end == $R_component->end )
-				{
-
-					# check if component is tagged to be skipped
-					# this can be used to resolve some odd assembly differences
-					if ( $skip{ $A_component->seq_region_name } ) {
-
-						$support->log_verbose(
-							"Skipping matching reference component ($i)"
-							  . $R_component->seq_region_name . ":"
-							  . $R_component->start . "-"
-							  . $R_component->end . ":"
-							  . $R_component->strand
-							  . "$R_chr:"
-							  . $R_components[$i]->from_start . "-"
-							  . $R_components[$i]->from_end . "\n",
-							2
-						);
-
-						&found_nomatch(
-							$R_chr,            $A_chr,
-							$match,            $nomatch,
-							$A_seg,            $last_A_seg,
-							$R_components[$i], $R_components[ $i - 1 ],
-							$match_flag,       $i,
-							$j
-						);
-
-						$stats_chr{'skipped'}++;
-						$match_flag = 0;
-
-					}
-					else {
-
-						$support->log_verbose(
-							"Found matching reference component ($i)"
-							  . $R_component->seq_region_name . ":"
-							  . $R_component->start . "-"
-							  . $R_component->end . ":"
-							  . $R_component->strand
-							  . "$R_chr:"
-							  . $R_components[$i]->from_start . "-"
-							  . $R_components[$i]->from_end . "\n",
-							2
-						);
-						print STDOUT "Found matching reference component ($i)"
-						  . $R_component->seq_region_name . ":"
-						  . $R_component->start . "-"
-						  . $R_component->end . ":"
-						  . $R_component->strand
-						  . "$R_chr:"
-						  . $R_components[$i]->from_start . "-"
-						  . $R_components[$i]->from_end . "\n";
-						&found_match(
-							$R_chr,            $A_chr,
-							$match,            $nomatch,
-							$A_seg,            $last_A_seg,
-							$R_components[$i], $R_components[ $i - 1 ],
-							$match_flag,       $i,
-							$j
-						);
-
-						$stats_chr{'identical'}++;
-						$match_flag = 1;
-					}
-
-					# start/end mismatch
-				}
-				else {
-
-					$support->log_verbose(
-						"Start/end mismatch for component ($i) "
-						  . $R_component->seq_region_name . ":"
-						  . $R_component->start . "-"
-						  . $R_component->end . ":"
-						  . $R_component->strand
-						  . " $R_chr:"
-						  . $R_components[$i]->from_start . "-"
-						  . $R_components[$i]->from_end . "\n",
-						2
-					);
-
-					print STDOUT "Start/end mismatch for component ($i) "
-						  . $R_component->seq_region_name . ":"
-						  . $R_component->start . "-"
-						  . $R_component->end . ":"
-						  . $R_component->strand
-						  . " $R_chr:"
-						  . $R_components[$i]->from_start . "-"
-						  . $R_components[$i]->from_end . "\n";
-
-					&found_nomatch(
-						$R_chr,            $A_chr,
-						$match,            $nomatch,
-						$A_seg,            $last_A_seg,
-						$R_components[$i], $R_components[ $i - 1 ],
-						$match_flag,       $i,
-						$j
-					);
-
-					$stats_chr{'mismatch'}++;
-					$match_flag = 0;
-				}
-				$i++;
-				$last = $i;
-				last REFCOMPONENTS;
-
-				# different components
-			}
-			else {
-
-				$support->log_verbose(
-					"Skipping component ($i)"
-					  . $R_component->seq_region_name . ":"
-					  . $R_component->start . "-"
-					  . $R_component->end . ":"
-					  . $R_component->strand
-					  . " $R_chr:"
-					  . $R_components[$i]->from_start . "-"
-					  . $R_components[$i]->from_end . "\n",
-					2
-				);
-
-				print STDOUT "Skipping component ($i)"
-					  . $R_component->seq_region_name . ":"
-					  . $R_component->start . "-"
-					  . $R_component->end . ":"
-					  . $R_component->strand
-					  . " $R_chr:"
-					  . $R_components[$i]->from_start . "-"
-					  . $R_components[$i]->from_end . "\n";
-
-				&found_nomatch(
-					$R_chr,            $A_chr,
-					$match,            $nomatch,
-					$A_seg,            $last_A_seg,
-					$R_components[$i], $R_components[ $i - 1 ],
-					$match_flag,       $i,
-					$j
-				);
-
+		if($type eq 'u') {
+			($i,$j) = (1,1);
+			if( $skip{ $diff->[1]->to_Slice->seq_region_name } ) {
+				found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+				$stats_chr{'skipped'}++;
 				$match_flag = 0;
-
+			} else {
+				found_match($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+				$stats_chr{'identical'}++;
+				$match_flag = 1;
 			}
+		}else{
+			$i = 1 if $type eq '-';
+			$j = 1 if $type eq '+';
+			if($type eq 'c') {
+				($i,$j) = (1,1);
+				my ($R_acc, $R_sv) = split '.',$diff->[1]->to_Slice->seq_region_name;
+				my ($A_acc, $A_sv) = split '.',$diff->[2]->to_Slice->seq_region_name;
+				$stats_chr{'mismatch'}++ if ($R_acc eq $A_acc && $R_sv eq $A_sv);
+			}
+			found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+			$match_flag = 0;
 		}
 
-		$last_A_seg = $A_seg;
-		$j++;
-	}
-
-	# adjust the final component count
-	if ($match_flag) {
-
-		# last component was a match, adjust matching component count
-		if ( $match->{$R_chr} ) {
-
-			my $c = scalar( @{ $match->{$R_chr} } ) - 1;
-			$match->{$R_chr}->[$c]->[2] =
-			  scalar(@A_components) - $match->{$R_chr}->[$c]->[2];
-			$match->{$R_chr}->[$c]->[5] =
-			  scalar(@R_components) - $match->{$R_chr}->[$c]->[5];
-
+		if($type eq '+'){
+			$right = &get_cmp_key($diff->[2],1);
+			$tag = '>';
+		}elsif($type eq '-'){
+			$left = &get_cmp_key($diff->[1],1);
+			$tag = '<';
+		}elsif($type eq 'u'){
+			$left = &get_cmp_key($diff->[1],1);
+			$right = &get_cmp_key($diff->[2],1);
+		}elsif($type eq 'c'){
+			$left = &get_cmp_key($diff->[1],1);
+			$right = &get_cmp_key($diff->[2],1);
+			$tag = '|';
 		}
 
-	}
-	else {
-
-		# last component was a non-match, adjust non-matching component count
-		if ( $nomatch->{$R_chr} ) {
-
-			my $c = scalar( @{ $nomatch->{$R_chr} } ) - 1;
-			$nomatch->{$R_chr}->[$c]->[2] =
-			  scalar(@A_components) - $nomatch->{$R_chr}->[$c]->[2];
-			$nomatch->{$R_chr}->[$c]->[5] =
-			  scalar(@R_components) - $nomatch->{$R_chr}->[$c]->[5];
-
-		}
+		$support->log(sprintf("%-40s\t%-10s %-40s\n",$left,$tag,$right));
 
 	}
+
+	my $c;
+
 
 	# filter single assembly inserts from non-aligned blocks (i.e. cases where
 	# a block has components only in one assembly, not in the other) - there is
@@ -557,7 +395,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		$support->log(
 			"Adding assembly entries for directly aligned blocks...\n", 1 );
 
-		foreach my $c ( 0 .. $number_aligned_blocks - 1 ) {
+		foreach $c ( 0 .. $number_aligned_blocks - 1 ) {
 			$sth1->execute(
 				$R_sa->get_seq_region_id($R_slice),
 				$R_sa->get_seq_region_id($A_slice_ref),
@@ -586,7 +424,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			$support->log( "Storing non-aligned blocks in tmp_align table...\n",
 				1 );
 
-			foreach my $c ( 0 .. $number_nonaligned_blocks - 1 ) {
+			foreach $c ( 0 .. $number_nonaligned_blocks - 1 ) {
 				$sth2->execute(
 					$nomatch->{$R_chr}->[$c]->[6],
 					$nomatch->{$R_chr}->[$c]->[0],
@@ -613,7 +451,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	  scalar(@A_components) - $stats_chr{'identical'} - $stats_chr{'mismatch'};
 	$stats_chr{'R_only'} =
 	  scalar(@R_components) - $stats_chr{'identical'} - $stats_chr{'mismatch'};
-	for ( my $c = 0 ; $c < scalar( @{ $match->{$R_chr} || [] } ) ; $c++ ) {
+	for ( $c = 0 ; $c < scalar( @{ $match->{$R_chr} || [] } ) ; $c++ ) {
 		$stats_chr{'A_matchlength'} +=
 		  $match->{$R_chr}->[$c]->[1] - $match->{$R_chr}->[$c]->[0];
 		$stats_chr{'R_matchlength'} +=
@@ -683,7 +521,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		);
 		$support->log( ( '-' x 71 ) . "\n", 2 );
 
-		for ( my $c = 0 ; $c < scalar( @{ $match->{$R_chr} } ) ; $c++ ) {
+		for ( $c = 0 ; $c < scalar( @{ $match->{$R_chr} } ) ; $c++ ) {
 
 			$support->log( sprintf( $fmt4, @{ $match->{$R_chr}->[$c] } ), 2 );
 
@@ -711,7 +549,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		);
 		$support->log( ( '-' x 71 ) . "\n", 2 );
 
-		for ( my $c = 0 ; $c < scalar( @{ $nomatch->{$R_chr} } ) ; $c++ ) {
+		for ( $c = 0 ; $c < scalar( @{ $nomatch->{$R_chr} } ) ; $c++ ) {
 
 			$support->log( sprintf( $fmt4, @{ $nomatch->{$R_chr}->[$c] } ), 2 );
 
@@ -771,28 +609,32 @@ $support->finish_log;
 
 ### end main
 
+sub get_cmp_key {
+	my ($cmp, $flag) = @_;
+	my $slice = $cmp->to_Slice;
+	my $key = $slice->seq_region_name . ":". $slice->start . "-". $slice->end . ":". $slice->strand;
+	$key.= ":".$cmp->from_start."-".$cmp->from_end.":".($cmp->from_end-$cmp->from_start+1) if $flag;
+	return $key;
+}
+
 =head2 found_match
 
   Arg[1]      : String $R_chr - reference chromosome name
   Arg[2]      : String $A_chr - alternative chromosome name
-  Arg[3]      : Hashref $match - datastructure to store aligned blocks
-  Arg[4]      : Hashref $nomatch - datastructure to store non-aligned blocks
-  Arg[5]      : Bio::EnsEMBL::ProjectionSegment $A_seg - current alternative
+  Arg[3]      : Bio::EnsEMBL::ProjectionSegment $R_seg - current reference
                 segment
-  Arg[6]      : Bio::EnsEMBL::ProjectionSegment $last_A_seg - last alternative
+  Arg[4]      : Bio::EnsEMBL::ProjectionSegment $A_seg - current alternative
                 segment
-  Arg[7]      : Bio::EnsEMBL::ProjectionSegment $R_seg - current reference
-                segment
-  Arg[8]      : Bio::EnsEMBL::ProjectionSegment $last_R_seg - last reference
-                segment
+  Arg[5]      : Boolean $i - indicates if there is a reference component
+  Arg[6]      : Boolean $j - indicates if there is an alternative component
+  Arg[7]      : Hashref $match - datastructure to store aligned blocks
+  Arg[8]      : Hashref $nomatch - datastructure to store non-aligned blocks
   Arg[9]      : Boolean $match_flag - flag indicating if last component was a match
-  Arg[10]     : Int $i - reference component count
-  Arg[11]     : Int $j - alternative component count
+
   Description : This function is called when two components match (i.e. have the
-                same name.version in both assemblies). Depending on the state
+                same name.version and seq_reg start and end in both assemblies). Depending on the state
                 of the last component (match or nomatch), it extends aligned blocks
-                or finishes the non-aligned block and creates a new aligned
-                block.
+                or creates a new aligned block.
   Return type : none
   Exceptions  : none
   Caller      : internal
@@ -801,104 +643,75 @@ $support->finish_log;
 
 sub found_match {
 	my (
-		$R_chr,      $A_chr,      $match, $nomatch,
-		$A_seg,      $last_A_seg, $R_seg, $last_R_seg,
-		$match_flag, $i,          $j
+		$R_chr, $A_chr, $R_seg, $A_seg,
+		$i, $j, $match, $nomatch, $match_flag
 	  )
 	  = @_;
+
+	$R_start = $R_seg->from_start;
+	$R_end = $R_seg->from_end;
+	$A_start = $A_seg->from_start;
+	$A_end = $A_seg->from_end;
 
 	# last component was a match
 	if ($match_flag) {
 
 		# adjust align block end
 		if ( $match->{$R_chr} ) {
-
+			# check that there is no single gap in the block
 			my $c = scalar( @{ $match->{$R_chr} } ) - 1;
+			my $A_gap = $A_start-$match->{$R_chr}->[$c]->[1];
+			my $R_gap = $R_start-$match->{$R_chr}->[$c]->[4];
 
-		  # if the gaps between this component and the last are different, start
-		  # a new block
-			if ( ( $A_seg->from_start - $match->{$R_chr}->[$c]->[1] ) !=
-				( $R_seg->from_start - $match->{$R_chr}->[$c]->[4] ) )
-			{
+			if($A_gap == $R_gap){
+				$support->log("adjust align block end\n");
 
-				$support->log(
-					"Gap size mismatch at A:$A_chr:"
-					  . $match->{$R_chr}->[$c]->[1] . '-'
-					  . $A_seg->from_start
-					  . ", R:$R_chr:"
-					  . $match->{$R_chr}->[$c]->[4] . '-'
-					  . $R_seg->from_start . "\n",
-					2
-				);
-
-				# finish the last align block
-				$match->{$R_chr}->[$c]->[1] = $last_A_seg->from_end;
-				$match->{$R_chr}->[$c]->[2] = $j - $match->{$R_chr}->[$c]->[2];
-				$match->{$R_chr}->[$c]->[4] = $last_R_seg->from_end;
-				$match->{$R_chr}->[$c]->[5] = $i - $match->{$R_chr}->[$c]->[5];
-
-				# start a new align block
+				$match->{$R_chr}->[$c]->[1] = $A_end;
+				$match->{$R_chr}->[$c]->[2]++ if $j;
+				$match->{$R_chr}->[$c]->[4] = $R_end;
+				$match->{$R_chr}->[$c]->[5]++ if $i;
+			} else {
+				$support->log("start a new align block (because of gap)\n");
 				push @{ $match->{$R_chr} },
 				  [
-					$A_seg->from_start, $A_seg->from_end,
-					$j,                 $R_seg->from_start,
-					$R_seg->from_end,   $i,
+					$A_start, $A_end, $j,
+					$R_start, $R_end, $i,
 					$A_chr,
 				  ];
-
-				# adjust align block end
-			}
-			else {
-				$match->{$R_chr}->[$c]->[1] = $A_seg->from_end;
-				$match->{$R_chr}->[$c]->[4] = $R_seg->from_end;
 			}
 		}
 
-		# last component was a non-match
 	}
+	# last component was a non-match
 	else {
 
 		# start a new align block
+		$support->log("start a new align block\n");
 		push @{ $match->{$R_chr} },
 		  [
-			$A_seg->from_start, $A_seg->from_end, $j,
-			$R_seg->from_start, $R_seg->from_end, $i,
+			$A_start, $A_end, $j,
+			$R_start, $R_end, $i,
 			$A_chr,
 		  ];
-
-		# finish the last non-align block
-		if ( $nomatch->{$R_chr} ) {
-			my $c = scalar( @{ $nomatch->{$R_chr} } ) - 1;
-			$nomatch->{$R_chr}->[$c]->[1] = $last_A_seg->from_end;
-			$nomatch->{$R_chr}->[$c]->[2] = $j - $nomatch->{$R_chr}->[$c]->[2];
-			$nomatch->{$R_chr}->[$c]->[4] = $last_R_seg->from_end;
-			$nomatch->{$R_chr}->[$c]->[5] = $i - $nomatch->{$R_chr}->[$c]->[5];
-		}
 	}
 }
 
 =head2 found_nomatch
-
   Arg[1]      : String $R_chr - reference chromosome name
   Arg[2]      : String $A_chr - alternative chromosome name
-  Arg[3]      : Hashref $match - datastructure to store aligned blocks
-  Arg[4]      : Hashref $nomatch - datastructure to store non-aligned blocks
-  Arg[5]      : Bio::EnsEMBL::ProjectionSegment $A_seg - current alternative
+  Arg[3]      : Bio::EnsEMBL::ProjectionSegment $R_seg - current reference
                 segment
-  Arg[6]      : Bio::EnsEMBL::ProjectionSegment $last_A_seg - last alternative
+  Arg[4]      : Bio::EnsEMBL::ProjectionSegment $A_seg - current alternative
                 segment
-  Arg[7]      : Bio::EnsEMBL::ProjectionSegment $R_seg - current reference
-                segment
-  Arg[8]      : Bio::EnsEMBL::ProjectionSegment $last_R_seg - last reference
-                segment
+  Arg[5]      : Boolean $i - indicates if there is a reference component
+  Arg[6]      : Boolean $j - indicates if there is an alternative component
+  Arg[7]      : Hashref $match - datastructure to store aligned blocks
+  Arg[8]      : Hashref $nomatch - datastructure to store non-aligned blocks
   Arg[9]      : Boolean $match_flag - flag indicating if last component was a match
-  Arg[10]     : Int $i - reference component count
-  Arg[11]     : Int $j - alternative component count
   Description : This function is called when two components don't match (either
                 different name.version or length mismatch in the two
                 assemblies). Depending on the state of the last component (nomatch
-                or match), it extends non-aligned blocks or finishes the
-                aligned block and creates a new non-aligned block.
+                or match), it extends non-aligned blocks or creates a new non-aligned block.
   Return type : none
   Exceptions  : none
   Caller      : internal
@@ -907,48 +720,50 @@ sub found_match {
 
 sub found_nomatch {
 	my (
-		$R_chr,      $A_chr,      $match, $nomatch,
-		$A_seg,      $last_A_seg, $R_seg, $last_R_seg,
-		$match_flag, $i,          $j
+		$R_chr, $A_chr, $R_seg, $A_seg,
+		$i, $j, $match, $nomatch, $match_flag
 	  )
 	  = @_;
+	my ($R_start, $R_end, $A_start, $A_end) = (0,0,0,0);
+
+	if($i) {
+		$R_start = $R_seg->from_start;
+		$R_end = $R_seg->from_end;
+	}
+	if($j) {
+		$A_start = $A_seg->from_start;
+		$A_end = $A_seg->from_end;
+	}
 
 	# last component was a match
 	if ($match_flag) {
-		print STDOUT "last component was a match $R_chr ".$A_seg->from_start." ".$A_seg->from_end." ".$j." ".
-			$R_seg->from_start." ".$R_seg->from_end." ".$i." ".
-			$A_chr."\n";
 		# start a new non-align block
+		$support->log("start a new non-align block\n");
 		push @{ $nomatch->{$R_chr} },
 		  [
-			$A_seg->from_start, $A_seg->from_end, $j,
-			$R_seg->from_start, $R_seg->from_end, $i,
+			$A_start, $A_end, $j,
+			$R_start, $R_end, $i,
 			$A_chr,
 		  ];
-
-		# finish the last align block
-		if ( $nomatch->{$R_chr} ) {
-			my $c = scalar( @{ $match->{$R_chr} || [] } ) - 1;
-			$match->{$R_chr}->[$c]->[1] = $last_A_seg->from_end;
-			$match->{$R_chr}->[$c]->[2] = $j - $match->{$R_chr}->[$c]->[2];
-			$match->{$R_chr}->[$c]->[4] = $last_R_seg->from_end;
-			$match->{$R_chr}->[$c]->[5] = $i - $match->{$R_chr}->[$c]->[5];
-		}
-
-		# last component was a non-match
 	}
+	# last component was a non-match
 	else {
-		print STDOUT "adjust non-align block end $nomatch->{$R_chr}\n";
 		# adjust non-align block end
 		if ( $nomatch->{$R_chr} ) {
+			$support->log("adjust non-align block end\n");
 			my $c = scalar( @{ $nomatch->{$R_chr} || [] } ) - 1;
-			$nomatch->{$R_chr}->[$c]->[1] = $A_seg->from_end;
-			$nomatch->{$R_chr}->[$c]->[4] = $R_seg->from_end;
+			$nomatch->{$R_chr}->[$c]->[0] ||=  $A_start;
+			$nomatch->{$R_chr}->[$c]->[1] = $A_end if $A_end;
+			$nomatch->{$R_chr}->[$c]->[2]++ if $j;
+			$nomatch->{$R_chr}->[$c]->[3] ||= $R_start;
+			$nomatch->{$R_chr}->[$c]->[4] = $R_end if $R_end;
+			$nomatch->{$R_chr}->[$c]->[5]++ if $i;
 		} else {
+			$support->log("start a new non-align block\n");
 					push @{ $nomatch->{$R_chr} },
 		  [
-			$A_seg->from_start, $A_seg->from_end, $j,
-			$R_seg->from_start, $R_seg->from_end, $i,
+			$A_start, $A_end, $j,
+			$R_start, $R_end, $i,
 			$A_chr,
 		  ];
 		}
