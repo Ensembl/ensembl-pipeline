@@ -23,7 +23,7 @@ here is an example commandline
 -description 'chromosome 11'
 -host otterpipe2
 -port 3352
--name pipe_human
+-dbname pipe_human
 -user pipuser
 -pass *****
 
@@ -35,7 +35,9 @@ here is an example commandline
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
-	-cs_name (default:chromosome) the name of the coordinate system being stored
+    -ensembl to load all types of clones found in the AGP (A=Active Finishing, F=Finished, D=Draft HTG,
+      W=Whole Genome shutgun, U=gap of unknown size) by default load only A, U and F.
+    -cs_name (default:chromosome) the name of the coordinate system being stored
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	the sequence set name
     -description the sequence set description
@@ -73,6 +75,7 @@ my $cs_version = 'Otter';
 my $set;
 my $description;
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
+my $ensembl;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -86,6 +89,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'cs_version:s' 			=> \$cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
+	'ensembl!'                 => \$ensembl,
 	'submit!'                 => \$do_submit,
 	'h|help!'                 => $usage
   )
@@ -449,13 +453,14 @@ sub make_slice {
 sub check_line {
 	my ($line) = @_;
 	my $input_type;
+	my $type = $ensembl ? "^[AUFWD]\$" : "^[AUF]\$";
 
 # 0       1       2       3       4       5               6       7       8     9
 # chr_20  2808333 2934911 29      F       AL121905.0      101     126679  +     Optional comment
 # splits each line into its component parts - puts line in a temporary array (splits the line on whitespace)
 	my @line_in_array = split /\s+/, $line, 10;
 
-	if ( $line_in_array[4] && $line_in_array[4] =~ /^[AUF]$/ ) {
+	if ( $line_in_array[4] && $line_in_array[4] =~ /$type/ ) {
 		$input_type = "AGP";
 	}
 	else {
