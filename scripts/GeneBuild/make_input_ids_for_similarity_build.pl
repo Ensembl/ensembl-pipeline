@@ -10,48 +10,6 @@ make_input_ids_for_similarity_build.pl
 
 =head1 DESCRIPTION
 
-This script generates input ids for the similarity gene build, allowing
-more effective distribition of similarity jobs across a compute farm.
-
-The overall aim is to align a set of proteins (determined by a sequence seeding 
-strategy that is performed at raw compute stage, most commonly by BLASTing the
-genscan peptides against SWALL) against a chromosome. There are two ways of 
-distributing this work:
-
-1. Splitting the chromosome up into chunks. This is the classical method. The
-drawback is that (a) it is difficult to know in advance what the granulatity 
-of the split should be; too large and the jobs may take too long to complete; 
-too small and we increase the chances of a split occurring in the middle of a 
-gene. The idea would be to split the chromosomes (by way of input_id construction)
-heuristically in the hope of arriving at an effective distribution of work. 
-
-2. Partitioning the chromosomes based on the protein features. In the past, 
-this has been difficult to do due to the way that Runnables/RunnableDBs work.
-However, I have added functionality to the FPC_BlastMiniGenewise runnabledb (to
-start with) that is able to make use of a more heavily loaded input id. 
-Specifically, input_ids of the form
-
-chr_name.start-end:10:3
-
-are now supported. A single job receiving this input id will only align the
-3rd subset of 10 (in this case) of the proteins hitting the genomic slice. 
-The RunnableDB determinisitcally sorts all the protein ids in hitting this 
-region, divides the list onto 10 bins, and considers only the 3rd bin. By
-construction, for a given genomic slice, there will be X ids of the form 
-slice_id.start.end:X:Y, ranging from slice_id.start.end:X:1 to slice_id.start.end:X:X. 
-X can be different for each slice, and is chosen heuristically in this script based on 
-the number of proteins hitting the slice. 
-
-NOTE: The current version of this script adopts strategy (2); the 
-standard raw compute pipeline currently generates sequence seeds that 
-are not exhaustive enough at the level of individual alignments for
-(1) to be performed with any accuracy.  A comprehensive BLAST search at 
-the raw compute stage would allow (1); currently being investigated. 
-
-NOTE: The user can supply a file of pre-prepared slice names (a simple 
-list of names separated by carriage returns), in which case the script will
-act as before - retrieving and partioning the full set of seed-protein-features -
-for only the supplied list of slices.
 
 =head1 OPTIONS
 
@@ -59,120 +17,92 @@ for only the supplied list of slices.
 
 =cut
 
+use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
-
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
-
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Similarity qw (
-  GB_SIMILARITY_DATABASES
-  GB_SIMILARITY_GENETYPEMASKED
-);
-
-#needs to be fixed
-#use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Scripts qw (
-#  GB_KILL_LIST
-#);
-my $GB_KILL_LIST;
-
+use Bio::EnsEMBL::Analysis::Tools::Utilities qw(parse_config);
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::BlastMiniGenewise qw(GENEWISE_CONFIG_BY_LOGIC);
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases qw(DATABASES);
 use strict;
 use Getopt::Long;
-use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
-my ( $write, $help, $verbose, $max_slice_size, $logic_name, $slice_name_file ,$number_of_prot_per_job);
+use SimilarityInputIdConfig;
+
+my $logic_name;
+my $write;
+my $help;
+my $max_slice_size;
+my $verbose;
 my $coord_system = 'toplevel';
-my @restrict_to_proteins ;
+my $slice_name_file;
+my $protein_count;
+my @restricted_prots;
+my $pipeline_dbname = 'REFERENCE_DB';
+my $output_logic_name;
 
 &GetOptions(
-             'logic_name=s'      => \$logic_name,
-             'write!'            => \$write,
-             'help'              => \$help,
-             'max_slice=s'       => \$max_slice_size,
-             'verbose'           => \$verbose,
-             'coord_system=s'    => \$coord_system,
-             'slice_name_file:s' => \$slice_name_file,
-             'number_of_proteins_per_job:i' => \$number_of_prot_per_job , 
-             'restrict_to_proteins:s@'      => \@restrict_to_proteins, 
-);
+            'output_logic_name=s' => \$output_logic_name,
+            'bmg_logic_name=s'      => \$logic_name,
+            'write!'            => \$write,
+            'help'              => \$help,
+            'max_slice=s'       => \$max_slice_size,
+            'verbose'           => \$verbose,
+            'coord_system=s'    => \$coord_system,
+            'slice_name_file:s' => \$slice_name_file,
+            'number_of_proteins_per_job:i' => \$protein_count , 
+            'pipeline_dbname:s' => \$pipeline_dbname,
+           );
+
 exec( 'perldoc', $0 ) if $help;
 
-die "Could must give a logic name with -logic_name\n" if not $logic_name;
 
-@restrict_to_proteins = map {split/\,/} @restrict_to_proteins ; 
+my $config_object = SimilarityInputIdConfig->new();
 
-my %test_db;  
-@test_db{map {$_->{type}} @{$GB_SIMILARITY_DATABASES}}=1; 
-print "\n\n" ;
-if(scalar(@restrict_to_proteins!=0)) { 
-  foreach  my $db (@restrict_to_proteins) {  
-    throw("db does not exist : $db") unless (exists $test_db{$db});
-    print STDERR "\tRESTRICTING proteins to database : $db\n" ;
-  }    
-  sleep(2); 
-} else {  
-  print STDERR "You did not use the -restrict_to_proteins option so I'm using all databases...\n" ; 
-  foreach my $href ( @{$GB_SIMILARITY_DATABASES} ) { 
-    print "\t-". $href->{type}."\n" ; 
-  }
-  sleep(2);
+parse_config($config_object, $GENEWISE_CONFIG_BY_LOGIC, $logic_name);
+
+if(!$protein_count){
+  $protein_count = 20;
+  print "Using default protein number per job 20\n";
 }
 
-unless ( $number_of_prot_per_job ) { 
-  warning("you haven't used the\n\t-number_of_proteins_per_job - option\nto set the set the number of proteins per job - using default (20) ")  ;
-  $number_of_prot_per_job = 20 ; 
-}
-foreach my $arg ( $$DATABASES{REFERENCE_DB}{"-dbname"}, $$DATABASES{REFERENCE_DB}{"-host"}, $$DATABASES{REFERENCE_DB}{"-user"} ) {
-  if ( $arg eq '' ) {
-    print STDERR "You need to define database parameters in Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases.\n";
-    exit(1);
-  }
-}
+my $pipeline_db = create_db($pipeline_dbname, 1);
+my $aa = $pipeline_db->get_AnalysisAdaptor;
 
-my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
-  '-dbname' => $$DATABASES{REFERENCE_DB}{"-dbname"},
-  '-host'   => $$DATABASES{REFERENCE_DB}{"-host"},
-  '-user'   => $$DATABASES{REFERENCE_DB}{"-user"},
-  '-pass'   => $$DATABASES{REFERENCE_DB}{"-pass"},
-  '-port'   => $$DATABASES{REFERENCE_DB}{"-port"}
-) or die "Could not connect to the pipeline database; check config\n";
-
-my $genewise_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-  '-dbname' => $$DATABASES{GENEWISE_DB}{"-dbname"},
-  '-host'   => $$DATABASES{GENEWISE_DB}{"-host"},
-  '-user'   => $$DATABASES{GENEWISE_DB}{"-user"},
-  '-pass'   => $$DATABASES{GENEWISE_DB}{"-pass"},
-  '-port'   => $$DATABASES{GENEWISE_DB}{"-port"}
-) or die "Could not connect to the genewise database; check config\n";
-
-my $analysis = $db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
+my $analysis = $aa->fetch_by_logic_name($logic_name);
 if ( not $analysis ) {
-  die "Could not find analysis for $logic_name\n";
+  throw "Could not find analysis for $logic_name\n";
 }
+
 my ( $ana_id, $ana_type ) = ( $analysis->dbID, $analysis->input_id_type );
 if ( not $ana_type ) {
-  die "Could not find dbID/input_id_type for $logic_name\n";
+  throw "Could not find dbID/input_id_type for $logic_name\n";
 }
 
-if (!$max_slice_size) { 
-   print "\n\n\tYou need to set the maximum slice size-value.\n".
-         "\tSuggestion for dog || rat is 1meg, the old default slice-size is 5meg\n".
-         "\tbut this maybe is too much (jobs might take really long\n" ;  
-   sleep(5) ;
-   $max_slice_size = 5000000 ; 
- }
-         
-print "Using max_slice - size : $max_slice_size\n" ; 
+my $output_analysis = $aa->fetch_by_logic_name($output_logic_name);
+throw("Failed to fetch an analysis for ".$output_logic_name." from ".$pipeline_db->dbc->dbname) if(!$output_analysis);
+throw("Can't store input ids on ".$output_analysis." for ".$analysis->logic_name.
+      " because input id types are mismatched") 
+  if($output_analysis->input_id_type ne $analysis->input_id_type);
 
-$verbose and print STDERR "Generating Initial input ids...\n";
+if(!$max_slice_size){
+  $max_slice_size = 1000000;
+  print "Using default max slice size of 1000000\n";
+}
+
+print "Generating initial input ids\n" if($verbose);
+
 
 my @slice_names;
 if ($slice_name_file) {
-  open( SLICES, "<$slice_name_file" ) or die "could not open file with slice $slice_name_file";
+  open( SLICES, "<$slice_name_file" ) or throw "could not open file with slice $slice_name_file";
   while (<SLICES>) {
     /^(\S+):(\S*):(\S+):(\d*):(\d*):/ and do {
       my $inputIDFactory = Bio::EnsEMBL::Pipeline::Utils::InputIDFactory->
           new(
-              -db                   => $db,
+              -db                   => $pipeline_db,
               -slice                => 1,
               -slice_size           => $max_slice_size,
               -coord_system         => $1,
@@ -189,7 +119,7 @@ if ($slice_name_file) {
 } else {
   my $inputIDFactory = Bio::EnsEMBL::Pipeline::Utils::InputIDFactory->
       new(
-          -db           => $db,
+          -db           => $pipeline_db,
           -slice        => 1,
           -slice_size   => $max_slice_size,
           -coord_system => $coord_system,
@@ -200,70 +130,80 @@ if ($slice_name_file) {
 
 
 
-my $sl_adp = $db->get_SliceAdaptor;
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'protein');
+my $kill_list = $kill_list_object->get_kill_list;
 
-my %kill_list = %{&fill_kill_list};
-my @iids_to_write;
+my @input_ids;
 
-# at the moment, we generate slices according to the input slice size. In a later
-# version, slices will be generated according to the most appropriate split point
-# (determined by examining the protein/cDNA hits to the genome)
-
-$verbose and print STDERR "Retrieved " . @slice_names . " slice names; now working...\n";
-
-my @generated_iids;
-foreach my $slice_id (@slice_names) {
-  my @ids =  get_iids_from_slice($slice_id);
-  # print "have " . scalar(@ids) . " for slice $slice_id \n" if $verbose ; 
-
-  push @generated_iids,@ids ; # get_iids_from_slice($slice_id);
+foreach my $slice_name(@slice_names){
+  my @iids = get_input_ids_from_slice($slice_name, $config_object, $protein_count, $kill_list);
+  print "Have ".@iids." from ".$slice_name."\n";
+  foreach my $input_id(@iids){
+    if(!$input_id){
+      throw("Seem to have an undefined input_id");
+      print $input_id."\n";
+    }
+  }
+  push(@input_ids, @iids);
+  print "Have ".@iids." from ".$slice_name."\n" if($verbose);
 }
 
-foreach my $iid (@generated_iids) {
-
-  if ($write) {
-    my $s_inf_cont = $db->get_StateInfoContainer;
-
-    eval { 
-      $db->get_StateInfoContainer->
-               store_input_id_analysis( $iid, $analysis, '' ); 
+foreach my $input_id(@input_ids){
+  my $sic = $pipeline_db->get_StateInfoContainer;
+  if($write){
+    eval{
+      print "Storing ".$input_id." with ".$output_analysis->logic_name."\n" if($verbose);
+      $sic->store_input_id_analysis($input_id, $output_analysis, '');
     };
-    if ($@) {
-      print STDERR "Input id $iid already present\n";
-    } else {
-      print STDERR "Stored input id $iid\n";
+    if($@){
+      print "Problem with ".$input_id." store $@\n";
     }
-  } else {
-    print "INSERT into input_id_analysis values ('$iid', '$ana_type', $ana_id, now(), '', '', 0);\n";
   }
 }
 
-#######################################
+sub create_db{
+  my ($string, $pipeline) = @_;
+  
+  my $constructor_args = $DATABASES->{$string}; 
+  
+  foreach my $arg ( qw ( -user -port -host -dbname) ) {  
+    unless ( $$constructor_args{$arg}){ 
+      throw ("Database-connection-details not properly configured : Arguemnt : $arg missing in Databases.pm\n") ; 
+    }
+  }
+  
+  my $db;
+  if($pipeline){
+    $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
+                                                        %$constructor_args,
+                                                       );
+  }else{
+    $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+                                              %$constructor_args,
+                                             );
+  }
+  return $db;
+}
 
 
-sub get_iids_from_slice { 
-  my ($slice_id) = @_;
-  my @iids_from_slice;
+sub get_input_ids_from_slice{
+  my ($name, $config, $protein_count, $kill_list) = @_;
 
-  my $chr_slice    = $sl_adp->fetch_by_name($slice_id);
-  my $chr_gw_slice = $genewise_db->get_SliceAdaptor->fetch_by_name($slice_id);
+  my $paf_db = create_db($config->PAF_SOURCE_DB);
+  my $gw_db = create_db($config->GENE_SOURCE_DB);
 
-  $verbose and print STDERR "Getting hits for $slice_id\n";
-
+  my $paf_slice = $paf_db->get_SliceAdaptor->fetch_by_name($name);
+  my $gw_slice = $gw_db->get_SliceAdaptor->fetch_by_name($name);
+  my @iids;
   my @mask_exons;
-
-  # remove masked and killed hits as will be done in the build itself
-  foreach my $type ( @{$GB_SIMILARITY_GENETYPEMASKED} ) {
-    foreach my $mask_genes ( @{ $chr_gw_slice->get_all_Genes_by_type($type) } ) {
-      foreach my $mask_exon ( @{ $mask_genes->get_all_Exons } ) {
-	if ( $mask_exon->seqname eq $chr_gw_slice->id ) {
-	  push @mask_exons, $mask_exon;
-	}
+  foreach my $type(@{$config->BIOTYPES_TO_MASK}){
+    print "Getting genes of type ".$type." from ".$gw_slice->name."\n" if($verbose);
+    foreach my $gene(@{$gw_slice->get_all_Genes_by_type($type)}){
+      foreach my $mask_exon(@{$gene->get_all_Exons}){
+        push(@mask_exons, $mask_exon);
       }
     }
   }
-
-  # make the mask list non-redundant. Much faster when checking against features
   my @mask_regions;
   foreach my $mask_exon ( sort { $a->start <=> $b->start } @mask_exons ) {
     if ( @mask_regions and $mask_regions[-1]->{'end'} > $mask_exon->start ) {
@@ -274,119 +214,67 @@ sub get_iids_from_slice {
       push @mask_regions, { start => $mask_exon->start, end => $mask_exon->end }
     }
   }
-
-  #printf STDERR "Mask region list is %d\n", scalar(@mask_regions);
-
-  my $num_seeds = 0; 
-  my %features; 
-
-  # hslice
-  my %pdb; @pdb{@restrict_to_proteins}=1; 
-
-  foreach my $db ( @{$GB_SIMILARITY_DATABASES} ) {   
-    if ( scalar(@restrict_to_proteins) > 0) { 
-      if (exists $pdb{$db->{type}}) {  
-        #print "\n\tUsing " . $db->{type}."\n";   
-        foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {  
-          if ( not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'} ) {
-            push @{ $features{ $f->hseqname } }, $f; 
+  my $num_seeds = 0;
+   foreach my $logicname(@{$config->PAF_LOGICNAMES}) {
+    my %features;
+    my @features = @{$paf_slice->get_all_ProteinAlignFeatures($logicname)};
+      FEATURE:foreach my $f(@features){
+        next FEATURE if($config->PAF_MIN_SCORE_THRESHOLD && $f->score < $config->PAF_MIN_SCORE_THRESHOLD);
+        next FEATURE if($config->PAF_UPPER_SCORE_THRESHOLD && $f->score > $config->PAF_UPPER_SCORE_THRESHOLD);
+        push(@{$features{$f->hseqname}}, $f);
+    }
+    
+    my @ids_to_ignore;
+  SEQID: foreach my $sid ( keys %features ) {
+      my $ex_idx = 0;
+      my $count  = 0;
+      
+      #print STDERR "Looking at $sid\n";
+    FEAT: foreach my $f ( sort { $a->start <=> $b->start } @{ $features{$sid} } ) {
+        
+        #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
+        for ( ; $ex_idx < @mask_regions ; ) {
+          my $mask_exon = $mask_regions[$ex_idx];
+          
+          #printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
+          if ( $mask_exon->{'start'} > $f->end ) {
+            
+            # no exons will overlap this feature
+            next FEAT;
+          } elsif ( $mask_exon->{'end'} >= $f->start ) {
+            
+            # overlap
+            push @ids_to_ignore, $f->hseqname;
+            
+            #printf STDERR "Ignoring %s\n", $f->hseqname;
+            next SEQID;
+          } else {
+            $ex_idx++;
           }
         }
       }
-    } else {  # don't restrict to any database, use all 
-      #print "\n\tAll dbs:" . $db->{type}."\n";   
-      foreach my $f ( @{ $chr_slice->get_all_ProteinAlignFeatures( $db->{'type'}, $db->{'threshold'} ) } ) {
-        if ( not $db->{'upper_threshold'} or $f->score <= $db->{'upper_threshold'} ) {
-          push @{ $features{ $f->hseqname } }, $f;
-        }
+    }
+    print "Ignoring ".@ids_to_ignore." features\n";
+    foreach my $dud_id ( @ids_to_ignore, keys %{$kill_list} ) {
+      if ( exists $features{$dud_id} ) {
+        delete $features{$dud_id};
       }
     }
+    
+    $num_seeds += scalar( keys %features );
   }
-  # print "have " . scalar(keys %features ) . " features \n" ; 
-  my @ids_to_ignore;
- SEQID: foreach my $sid ( keys %features ) {
-    my $ex_idx = 0;
-    my $count  = 0;
-    # print $sid."\n" ; 
-    #print STDERR "Looking at $sid\n";
-  FEAT: foreach my $f ( sort { $a->start <=> $b->start } @{ $features{$sid} } ) {
-
-      #printf STDERR "Feature: %d %d\n", $f->start, $f->end;
-      for ( ; $ex_idx < @mask_regions ; ) {
-	my $mask_exon = $mask_regions[$ex_idx];
-
-	#printf STDERR " Mask exon %d %d\n", $mask_exon->{'start'}, $mask_exon->{'end'};
-	if ( $mask_exon->{'start'} > $f->end ) {
-	  
-	  # no exons will overlap this feature
-	  next FEAT;
-	} elsif ( $mask_exon->{'end'} >= $f->start ) {
-
-	  # overlap
-	  push @ids_to_ignore, $f->hseqname;
-
-#	  printf STDERR "Ignoring %s\n", $f->hseqname;
-	  next SEQID;
-	} else {
-	  $ex_idx++;
-	}
-      }
-    }
-  }
-
-  foreach my $dud_id ( @ids_to_ignore, keys %kill_list ) {
-    if ( exists $features{$dud_id} ) {
-#     print STDERR "Killing $dud_id from kill or mask list\n";
-      delete $features{$dud_id};
-    }
-  }
-
-# Addition to allow kill list identifiers without a sequence version to match hit_names with a sv
-  foreach my $hit (keys %features) {
-    if ($hit  =~ /^(\w+)\.\d/) {	
-      my $hit_trimmed = $1;
-      if (exists $kill_list{$hit_trimmed}) {
-#	print STDERR "Killing $hit after removing .sv with $hit_trimmed from kill list\n";
-	delete $features{$hit};
-      }
-    }
-  }
-
-  $num_seeds += scalar( keys %features );
-
-  return () if $num_seeds == 0;
-
-  my @iids;
-
   # rule of thumb; split data so that each job constitutes one piece of
   # genomic DNA against ~20 proteins.
+  #
+  return () if($num_seeds == 0);
 
-  my $num_chunks = int( $num_seeds / $number_of_prot_per_job ) + 1;
+  my $num_chunks = int( $num_seeds / $protein_count ) 
+    + 1;
   for ( my $x = 1 ; $x <= $num_chunks ; $x++ ) {
-
-    # generate input id : $chr_name.1-$chr_length:$num_chunks:$x
-    my $new_iid = $slice_id . ":$num_chunks:$x";
+    
+    #generate input id : $chr_name.1-$chr_length:$num_chunks:$x
+    my $new_iid = $paf_slice->name . ":$num_chunks:$x";
     push @iids, $new_iid;
   }
-
   return @iids;
-}
-
-
-sub fill_kill_list {
-  my %kill_list;
-
-  if ( defined($GB_KILL_LIST) && $GB_KILL_LIST ne '' ) {
-    open( KILL_LIST, "< $GB_KILL_LIST" ) or die "can't open $GB_KILL_LIST";
-    while (<KILL_LIST>) {
-
-      chomp;
-      my @list = split;
-      next unless scalar(@list);    # blank or empty line
-      $kill_list{ $list[0] } = 1;
-    }
-
-    close KILL_LIST or die "error closing $GB_KILL_LIST\n";
-  }
-  return \%kill_list;
 }
