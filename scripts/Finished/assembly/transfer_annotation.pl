@@ -22,6 +22,8 @@ Optional arguments:
 
   --chromosomes, --chr=LIST           only process LIST chromosomes
   --altchromosomes, --altchr=LIST     supply alternative chromosome names (the two lists must agree)
+  --write							  to write the changes
+  --author							  author login used to lock the assemblies (must be set to write the changes)
   --ref_start                         start coordinate on reference chromosomes
   --ref_end                           end coordinate on reference chromosomes
   --alt_start                         start coordinate on alternative chromosomes
@@ -56,11 +58,14 @@ ml6@sanger.ac.uk
 
 use strict;
 use Bio::Vega::DBSQL::DBAdaptor;
+use Bio::Vega::ContigLockBroker;
+use Bio::Vega::Author;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 
 use FindBin qw($Bin);
 use Getopt::Long;
 use Pod::Usage;
+use Sys::Hostname;
 use Bio::EnsEMBL::Utils::ConversionSupport;
 
 $| = 1;
@@ -71,8 +76,9 @@ my $support = new Bio::EnsEMBL::Utils::ConversionSupport("$Bin/../../..");
 $support->parse_common_options(@_);
 $support->parse_extra_options(
 	'assembly=s',         'altassembly=s',
-	'chromosomes|chr=s@', 'altchromosomes|altchr=s@',
-	'reverse!', 'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i', 'alt_end=i'
+	'chromosomes|chr=s@', 'altchromosomes|altchr=s@', 'write!',
+	'reverse!', 'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
+	'alt_end=i', 'author=s', 'email=s'
 );
 $support->allowed_params( $support->get_common_params, 'assembly',
 	'altassembly', 'chromosomes', 'altchromosomes', );
@@ -99,12 +105,18 @@ my $dbh = $vega_db->dbc->db_handle;
 
 my $assembly    = $support->param('assembly');
 my $altassembly = $support->param('altassembly');
+my $write 		= $support->param('write');
+my $author 		= $support->param('author');
+my $email 		= $support->param('email') || $author;
 my $haplo 		= $support->param('haplotype');
 
 my $R_start = $support->param('ref_start') || undef;
 my $R_end = $support->param('ref_end') || undef;
 my $A_start = $support->param('alt_start') || undef;
 my $A_end = $support->param('alt_end') || undef;
+
+throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write);
+
 
 my $geneAd   = $vega_db->get_GeneAdaptor;
 my $sliceAd  = $vega_db->get_SliceAdaptor;
@@ -113,7 +125,7 @@ my $sfeat_Ad = $vega_db->get_SimpleFeatureAdaptor();
 # make sure that the coordinate system versions are different
 # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
 my $sql_meta_insert = qq{
-	insert into meta (meta_key, meta_value) values
+	insert ignore into meta (meta_key, meta_value) values
 	('assembly.mapping', 'chromosome:MAPPING|contig'),
 	('assembly.mapping', 'chromosome:MAPPING|contig|clone'),};
 if ( $support->param('reverse') ) {
@@ -128,12 +140,12 @@ my $sql_meta_delete = qq{
 	delete from meta where meta_value like 'chromosome%MAPPING%'};
 
 my $sql_cs_insert = qq{
-	insert into coord_system (coord_system_id, name, version, rank, attrib) values (100, 'chromosome', 'MAPPING', 100, '')};
+	insert ignore into coord_system (coord_system_id, name, version, rank, attrib) values (100, 'chromosome', 'MAPPING', 100, '')};
 my $sql_cs_delete = qq{
 	delete from coord_system where version = 'MAPPING'};
 
 my $sql_mc_insert = qq{
-	insert into meta_coord (table_name, coord_system_id, max_length)
+	insert ignore into meta_coord (table_name, coord_system_id, max_length)
 	values ('exon', 100, 1), ('gene', 100, 1), ('simple_feature', 100, 1), ('transcript', 100, 1)};
 my $sql_mc_delete = qq{
 	delete from meta_coord where coord_system_id = 100};
@@ -146,21 +158,25 @@ my $sql_sr_update = qq{
 	and cs.version = ?};
 
 my $sql_meta_bl_insert = qq{
-	insert into meta (meta_key, meta_value) values
+	insert ignore into meta (meta_key, meta_value) values
 	('simple_featurebuild.level', '1'),
 	('genebuild.level', '1')};
 my $sql_meta_bl_delete =
 qq{delete from meta where meta_key in ('simple_featurebuild.level','genebuild.level')};
 
+my $sql_attrib_type_select =
+qq{SELECT COUNT(*) FROM seq_region_attrib WHERE seq_region_id = ? AND attrib_type_id = 6;};
 my $sql_attrib_type_insert =
 qq{insert into seq_region_attrib (seq_region_id, attrib_type_id, value) values (?, 6, 1)};
 my $sql_attrib_type_delete =
 qq{delete from seq_region_attrib where seq_region_id = ? and attrib_type_id = 6};
 
+my $sth_attrib_type_select = $dbh->prepare($sql_attrib_type_select);
 my $sth_attrib_type_insert = $dbh->prepare($sql_attrib_type_insert);
 my $sth_attrib_type_delete = $dbh->prepare($sql_attrib_type_delete);
 
 my $cs_change = 0;
+my $sql = 0;
 
 if ( $assembly eq $altassembly ) {
 	$cs_change   = 1;
@@ -190,23 +206,60 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $total_sf         = 0;
 	my $transfered_sf    = 0;
 	my $skipped_sf       = 0;
+	my $skipped_g       = 0;
+
+	my $sth_cs = $dbh->prepare($sql_sr_update);
+	$sth_cs->execute( $A_chr, $altassembly ) unless ( !$cs_change );
+
+	my $ref_sl =
+  		$sliceAd->fetch_by_region( 'chromosome', $R_chr, $R_start, $R_end, undef,$assembly );
+	my $alt_sl =
+  		$sliceAd->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef,$altassembly );
+
+	my $alt_seq_region_id = $alt_sl->get_seq_region_id;
+	my $ref_seq_region_id = $ref_sl->get_seq_region_id;
+
+	$sth_attrib_type_select->execute($alt_seq_region_id);
+	my $alt_attrib_set = $sth_attrib_type_select->fetchrow_array;
+	$sth_attrib_type_insert->execute($alt_seq_region_id) unless $alt_attrib_set;
+
+	$sth_attrib_type_select->execute($ref_seq_region_id);
+	my $ref_attrib_set = $sth_attrib_type_select->fetchrow_array;
+	$sth_attrib_type_insert->execute($ref_seq_region_id) unless $ref_attrib_set;
+
+	# Lock the reference and alternative assemblies
+	my ($cb,$author_obj);
+	if($write){
+		my $refslice_locked = 0;
+		eval {
+			$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
+			$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
+			$support->log_verbose("Locking $R_chr\n");
+			$cb->lock_clones_by_slice($ref_sl,$author_obj,$vega_db);
+			$refslice_locked = 1;
+			$support->log_verbose("Locking $A_chr\n");
+			$cb->lock_clones_by_slice($alt_sl,$author_obj,$vega_db);
+		};
+		if($@){
+			warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
+			# remove the stored locks on the reference slice in case alt slice locking fails
+			$cb->remove_by_slice($ref_sl,$author_obj,$vega_db) if $refslice_locked;
+
+			$sth_cs->execute( $A_chr, $support->param('altassembly') )
+			  unless ( !$cs_change );
+			$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+			$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
+
+			next SET;
+		}
+
+	}
 
 	$dbh->begin_work;
 
 	eval {
 		$support->log_verbose("Annotation transfer $R_chr => $A_chr...\n");
-		my $sth_cs = $dbh->prepare($sql_sr_update);
-		$sth_cs->execute( $A_chr, $altassembly ) unless ( !$cs_change );
 
-		my $ref_sl =
-	  		$sliceAd->fetch_by_region( 'chromosome', $R_chr, $R_start, $R_end, undef,$assembly );
-		my $alt_sl =
-	  		$sliceAd->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef,$altassembly );
-
-		my $alt_seq_region_id = $alt_sl->get_seq_region_id;
-		my $ref_seq_region_id = $ref_sl->get_seq_region_id;
-		map ( $sth_attrib_type_insert->execute($_),
-			( $alt_seq_region_id, $ref_seq_region_id ) );
 
 		my @genes;
 		@genes       = @{ $ref_sl->get_all_Genes };
@@ -222,7 +275,8 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			if ( defined $tf ) {
 				$tf->dbID(undef);
 				$tf->adaptor(undef);
-				if ( can_save( $sfeat_Ad, $tf ) ) {
+				my $existing_sf = $sfeat_Ad->fetch_all_by_Slice( $tf->feature_Slice, $tf->analysis->logic_name );
+				if ( ! @$existing_sf ) {
 					push @proj_feat, $tf;
 					$transfered_sf++;
 				}
@@ -239,12 +293,13 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 			}
 			else {
-				warning(
+				$support->log_verbose(
 					sprintf(
 						" %s %d %d %d cannot be transfered on $A_chr\n",
 						$f->display_label, $f->start, $f->end, $f->strand
 					)
 				);
+				$skipped_sf++;
 
 			}
 
@@ -268,8 +323,9 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			);
 
 			my @proj_trans;
+			my $transcript = $g->get_all_Transcripts;
 
-		  TRANSCRIPT: foreach my $t ( @{ $g->get_all_Transcripts } ) {
+		  TRANSCRIPT: foreach my $t ( @{ $transcript } ) {
 				my $tt = $t->transfer($alt_sl);    # ori
 				if ( defined $tt ) {
 					push @proj_trans, $tt;
@@ -285,7 +341,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					&log_compare_transcripts( $t, $tt );
 				}
 				else {
-					warning(
+					$support->log_verbose(
 						sprintf(
 							"\t%s %s %d %d cannot be transfered on $A_chr\n",
 							$t->stable_id, $t->biotype, $t->start, $t->end
@@ -299,11 +355,13 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					"\tSummary for %s : %d out of %d transcripts transferred\n",
 					$g->stable_id,
 					scalar(@proj_trans),
-					scalar( @{ $g->get_all_Transcripts } )
+					scalar( @{ $transcript } )
 				)
 			);
 
-			if (@proj_trans) {
+			my $missing_transcript = scalar(@{ $transcript }) - scalar(@proj_trans);
+
+			if (  $missing_transcript == 0 ) {
 
 			   # essential for loading attribute list so that get_all_Attributes
 			   # won't return empty list
@@ -313,16 +371,54 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 				&write_gene($tg);
 
+				my $existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
+							$tg->analysis->logic_name );
+
+				if($haplo && @$existing_gene) {
+					$support->log_verbose(
+						sprintf(
+							"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+							$tg->stable_id, $tg->biotype, $R_chr,
+							$g->start,      $g->end,      $A_chr,
+							$tg->start,     $tg->end
+						));
+
+					print STDOUT "Transfered gene: ".join("\t",
+					$tg->analysis->logic_name,
+					$tg->biotype,
+					$tg->status,
+					$tg->source,
+					$tg->stable_id,
+					$tg->gene_author->name,
+					$tg->description,
+					scalar(@{$tg->get_all_Transcripts}))."\n";
+					foreach my $eg (@$existing_gene){
+						print STDOUT "Existing gene: ".join("\t",
+						$eg->analysis->logic_name,
+						$eg->biotype,
+						$eg->status,
+						$eg->source,
+						$eg->stable_id,
+						$eg->gene_author->name,
+						$eg->description,
+						scalar(@{$eg->get_all_Transcripts}))."\n";
+					}
+
+					$skipped_g++;
+					next GENE;
+				}
+
 				if ( $geneAd->store($tg) ) {
 					$transfered_genes++;
 					$support->log_verbose(
 						sprintf(
-"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
+						"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
 							$tg->stable_id, $tg->biotype, $R_chr,
 							$g->start,      $g->end,      $A_chr,
 							$tg->start,     $tg->end
 						)
 					);
+					&print_sql($g, $tg, $ref_seq_region_id, $alt_seq_region_id, $R_chr, $A_chr) if $sql;
 				}
 				else {
 					throw(
@@ -334,40 +430,77 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						)
 					);
 				}
+			} else {
+				$support->log_verbose(
+					sprintf(
+								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
+								$tg->stable_id, $tg->biotype, $R_chr,
+								$g->start,      $g->end,      $A_chr,
+								$tg->start,     $tg->end, $missing_transcript
+							)
+				);
+
 			}
 		}
 
 		# save polyA features if gene transfered
 		$sfeat_Ad->store(@proj_feat) if ( @proj_feat && $transfered_genes );
 
-		$sth_cs->execute( $A_chr, $support->param('altassembly') )
-		  unless ( !$cs_change );
-		map ( $sth_attrib_type_delete->execute($_),
-			( $alt_seq_region_id, $ref_seq_region_id ) );
-
-		$dbh->commit;
+		$write ? $dbh->commit : $dbh->rollback;
 	};
 
 	if ($@) {
 		$dbh->rollback;
-		warning(
+		$support->log_verbose(
 			    "UNABLE TO TRANSFER ANNOTATION FROM $R_chr:$assembly to $A_chr:"
 			  . $support->param('altassembly')
 			  . "\n[$@]\n" );
+
+		$sth_cs->execute( $A_chr, $support->param('altassembly') )
+		  unless ( !$cs_change );
+		$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+		$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
+
 		next SET;
 	}
-
 	# print annotation transfer stats
 	$support->log_verbose(
 		sprintf(
-"Annotation transfer %s:%s => %s:%s\ntransfered Gene: %d/%d\ntransfered PolyA features: %d/%d\nskipped PolyA features: %d/%d\n",
+"Annotation transfer %s:%s => %s:%s\ntransfered Gene: %d/%d\nskipped Gene: %d/%d\ntransfered PolyA features: %d/%d\nskipped PolyA features: %d/%d\n",
 			$R_chr,            $assembly,
 			$A_chr,            $support->param('altassembly'),
 			$transfered_genes, $total_genes,
+			$skipped_g, $total_genes,
 			$transfered_sf,    $total_sf,
 			$skipped_sf,       $total_sf
 		)
 	);
+
+	# remove the assemblies locks
+	if($write){
+		eval {
+			$support->log_verbose("Removing $R_chr Locks\n");
+			$cb->remove_by_slice($ref_sl,$author_obj,$vega_db);
+			$support->log_verbose("Removing $A_chr Locks\n");
+			$cb->remove_by_slice($alt_sl,$author_obj,$vega_db);
+		};
+		if($@){
+			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
+
+			$sth_cs->execute( $A_chr, $support->param('altassembly') )
+			  unless ( !$cs_change );
+			$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+			$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
+
+			next SET;
+		}
+
+	}
+
+	$sth_cs->execute( $A_chr, $support->param('altassembly') )
+	  unless ( !$cs_change );
+	$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+	$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 }
 
 # remove temporary 'MAPPING' cs from meta and cs table
@@ -380,12 +513,66 @@ if ($cs_change) {
 
 # check if feature is already on alt slice
 sub can_save {
-	my ( $sfeat_Ad, $f ) = @_;
+	my ( $feat_Ad, $f ) = @_;
 	my $a =
-	  $sfeat_Ad->fetch_all_by_Slice( $f->feature_Slice,
+	  $feat_Ad->fetch_all_by_Slice( $f->feature_Slice,
 		$f->analysis->logic_name );
-
+	print STDOUT "can save ? [@$a]\n";
 	return @$a ? 0 : 1;
+}
+
+sub print_sql {
+	my ($g,$tg, $ref_sid, $alt_sid, $R_chr, $A_chr) = @_;
+
+	my $update_filename = "update_${R_chr}_${A_chr}.sql";
+	my $update_back_filename = "update_${R_chr}_${A_chr}_back.sql";
+
+	open(OUT, ">>$update_filename") or die "cannot create file $update_filename\n";
+	open(BACK, ">>$update_back_filename") or die "cannot create file $update_back_filename\n";
+
+	# Gene SQL updates
+	print OUT sprintf qq{
+ UPDATE gene SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d
+ WHERE gene_id = %d AND seq_region_id = %d;
+    },$alt_sid,$tg->start,$tg->end,$tg->strand,$g->dbID,$ref_sid;
+    print BACK sprintf qq{
+ UPDATE gene SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d
+ WHERE gene_id = %d AND seq_region_id = %d;
+    },$ref_sid,$g->start,$g->end,$g->strand,$g->dbID,$alt_sid;
+
+    # Transcrit SQL updates
+    my ($trans,$ttrans);
+	map($trans->{$_->stable_id} = $_ , @{ $g->get_all_Transcripts });
+	map($ttrans->{$_->stable_id} = $_ , @{ $tg->get_all_Transcripts });
+	foreach my $stable_id (sort keys %$trans) {
+		my $t = $trans->{$stable_id};
+		my $tt = $ttrans->{$stable_id};
+		print OUT sprintf qq{
+   UPDATE transcript SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d
+   WHERE transcript_id = %d AND seq_region_id = %d;
+        },$alt_sid,$tt->start,$tt->end,$tt->strand,$t->dbID,$ref_sid;
+        print BACK sprintf qq{
+   UPDATE transcript SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d
+   WHERE transcript_id = %d AND seq_region_id = %d;
+        },$ref_sid,$t->start,$t->end,$t->strand,$t->dbID,$alt_sid;
+
+        # Exon SQL updates
+		my ($exon,$texon);
+		map($exon->{$_->stable_id} = $_ , @{ $t->get_all_Exons() });
+		map($texon->{$_->stable_id} = $_ , @{ $tt->get_all_Exons() });
+		foreach my $sid (sort keys %$exon) {
+			my $e = $exon->{$sid};
+			my $te = $texon->{$sid};
+			print OUT sprintf qq{
+     UPDATE exon SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d, phase = %d, end_phase = %d
+     WHERE exon_id = %d AND seq_region_id = %d;
+            },$alt_sid,$te->start,$te->end,$te->strand,$te->phase,$te->end_phase,$e->dbID,$ref_sid;
+            print BACK sprintf qq{
+     UPDATE exon SET seq_region_id = %d,seq_region_start = %d,seq_region_end = %d,seq_region_strand = %d, phase = %d, end_phase = %d
+     WHERE exon_id = %d AND seq_region_id = %d;
+            },$ref_sid,$e->start,$e->end,$e->strand,$e->phase,$e->end_phase,$e->dbID,$alt_sid;
+		}
+	}
 }
 
 sub remove_all_db_ids {
