@@ -404,7 +404,7 @@ sub make_seq_set_attribute {
 	my @attrib;
 
 	$hide = defined($hide) ? $hide : 1;
-	$write = defined($write) ? $write : 1;
+	$write = defined($write) ? $write : 0;
 
 	push @attrib,
 	  &make_attribute(
