@@ -370,8 +370,14 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 				my $existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
 							$tg->analysis->logic_name );
+				my $exist = 0;
+				my $tg_key = join(":",($tg->end-$tg->start),$tg->biotype,$tg->status,$tg->source);
+				foreach (@$existing_gene) {
+					my $existing_gkey = join(":",($_->end-$_->start),$_->biotype,$_->status,$_->source);
+					$exist = 1 if $tg_key eq $existing_gkey;
+				}
 
-				if($haplo && @$existing_gene) {
+				if($haplo && $exist) {
 					$support->log_verbose(
 						sprintf(
 							"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
@@ -452,26 +458,20 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			    "UNABLE TO TRANSFER ANNOTATION FROM $R_chr:$assembly to $A_chr:"
 			  . $support->param('altassembly')
 			  . "\n[$@]\n" );
-
-		$sth_cs->execute( $A_chr, $support->param('altassembly') )
-		  unless ( !$cs_change );
-		$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
-		$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
-
-		next SET;
+	} else {
+		# print annotation transfer stats
+		$support->log_verbose(
+			sprintf(
+	"Annotation transfer %s:%s => %s:%s\ntransfered Gene: %d/%d\nskipped Gene: %d/%d\ntransfered PolyA features: %d/%d\nskipped PolyA features: %d/%d\n",
+				$R_chr,            $assembly,
+				$A_chr,            $support->param('altassembly'),
+				$transfered_genes, $total_genes,
+				$skipped_g, $total_genes,
+				$transfered_sf,    $total_sf,
+				$skipped_sf,       $total_sf
+			)
+		);
 	}
-	# print annotation transfer stats
-	$support->log_verbose(
-		sprintf(
-"Annotation transfer %s:%s => %s:%s\ntransfered Gene: %d/%d\nskipped Gene: %d/%d\ntransfered PolyA features: %d/%d\nskipped PolyA features: %d/%d\n",
-			$R_chr,            $assembly,
-			$A_chr,            $support->param('altassembly'),
-			$transfered_genes, $total_genes,
-			$skipped_g, $total_genes,
-			$transfered_sf,    $total_sf,
-			$skipped_sf,       $total_sf
-		)
-	);
 
 	# remove the assemblies locks
 	if($write){
@@ -483,13 +483,6 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		};
 		if($@){
 			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
-
-			$sth_cs->execute( $A_chr, $support->param('altassembly') )
-			  unless ( !$cs_change );
-			$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
-			$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
-
-			next SET;
 		}
 
 	}
@@ -500,22 +493,12 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 }
 
-# remove temporary 'MAPPING' cs from meta and cs table
+# remove temporary 'MAPPING' coordinate system from meta and coord_system table
 if ($cs_change) {
 	$dbh->do($sql_meta_delete);
 	$dbh->do($sql_cs_delete);
 	$dbh->do($sql_mc_delete);
 	$dbh->do($sql_meta_bl_delete);
-}
-
-# check if feature is already on alt slice
-sub can_save {
-	my ( $feat_Ad, $f ) = @_;
-	my $a =
-	  $feat_Ad->fetch_all_by_Slice( $f->feature_Slice,
-		$f->analysis->logic_name );
-	print STDOUT "can save ? [@$a]\n";
-	return @$a ? 0 : 1;
 }
 
 sub print_sql {
