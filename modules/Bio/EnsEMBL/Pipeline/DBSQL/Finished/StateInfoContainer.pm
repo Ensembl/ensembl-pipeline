@@ -22,7 +22,7 @@ $sic = $dbobj->get_StateInfoContainer;
 
 =head1 DESCRIPTION
 
-Module which inherits from StateInfoContainer and overrides specific methods to implement the incremental 
+Module which inherits from StateInfoContainer and overrides specific methods to implement the incremental
 updating of the Blast analysis used in the Finished Pipeline.
 
 =head1 FEEDBACK
@@ -67,10 +67,10 @@ Throws an exception if the analysis object does not have a type.
 sub fetch_db_version {
 	my ( $self, $inputId, $analysis) = @_;
 	my $db_version = '';
-	
+
 	throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
 	  unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
-	
+
 	my $sth = $self->prepare(
 	q {
 	    SELECT db_version
@@ -79,11 +79,11 @@ sub fetch_db_version {
     	AND analysis_id = ? }
 	);
 	$sth->execute($inputId,$analysis->dbID);
-	
+
 	while ( my $row = $sth->fetchrow_arrayref ) {
 		$db_version = $row->[0];
 	}
-	
+
 	return $db_version;
 }
 
@@ -105,7 +105,7 @@ sub fetch_analysis_by_input_id {
 	my $anaAd = $self->db->get_AnalysisAdaptor();
 
 	my $sth = $self->prepare(
-		q {
+		q{
     SELECT analysis_id , db_version
     FROM input_id_analysis
     WHERE input_id = ? }
@@ -134,9 +134,9 @@ sub fetch_analysis_by_input_id {
 =head2 store_input_id_analysis
 
 Stores an input ID, type, analysis and db version searched [optionally runtime info].
-Takes an input ID (as string), Bio::EnsEMBL::Analysis object, is_dbversion_saved Boolean 
+Takes an input ID (as string), Bio::EnsEMBL::Analysis object, is_dbversion_saved Boolean
 and [optionally runtime_info as string].
-Throws an exception if any of the inputs are invalid or if 
+Throws an exception if any of the inputs are invalid or if
 the analysis object does not have a type.
  called by: Job->run_module
 
