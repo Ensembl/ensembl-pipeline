@@ -31,11 +31,11 @@ sub store {
      "INSERT INTO $tablename (seq_region_id, seq_region_start, seq_region_end,
                              seq_region_strand, hit_start, hit_end,
                              hit_strand, hit_name, cigar_line,
-                             analysis_id, score, evalue, perc_ident)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, ?)");
-     
+                             analysis_id, score, evalue, perc_ident, external_db_id, hcoverage)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?, ?, ?, ?, ?)");
+
   my $sth_history = $self->prepare(
-  	 "INSERT INTO $history_table (seq_region_id, analysis_id, align_feature_id_start, 
+  	 "INSERT INTO $history_table (seq_region_id, analysis_id, align_feature_id_start,
 	 							align_feature_id_end, db_version , date)
 	 VALUES (?,?,?,?,?,NOW())");
 
@@ -89,23 +89,25 @@ sub store {
     $sth->bind_param(7,$hstrand,{ TYPE => 'SQL_TINYINT' });
     $sth->bind_param(8,$hseqname,{ TYPE => 'SQL_VARCHAR' });
     $sth->bind_param(9,$cigar_string,{ TYPE => 'SQL_LONGVARCHAR' });
-    $sth->bind_param(10,$feat->analysis->dbID,{ TYPE => 'SQL_INTEGER' });
+    $sth->bind_param(10,$analysis_id,{ TYPE => 'SQL_INTEGER' });
     $sth->bind_param(11,$feat->score,{ TYPE => 'SQL_DOUBLE' });
     $sth->bind_param(12,$feat->p_value,{ TYPE => 'SQL_DOUBLE' });
     $sth->bind_param(13,$feat->percent_id,{ TYPE => 'SQL_FLOAT' });
+    $sth->bind_param(14,$feat->external_db_id,{ TYPE => 'SQL_INTEGER' });
+    $sth->bind_param(15,$feat->hcoverage,{ TYPE => 'SQL_DOUBLE' });
 
     $sth->execute();
     $original->dbID($sth->{'mysql_insertid'});
     $original->adaptor($self);
-    
+
     $first_dbID ||= $original->dbID;
     $last_dbID = $original->dbID;
   }
-  # save dbIDs, time and db version into history table	
-  $sth_history->execute($seq_region_id, 
-  						$analysis_id, 
-  						$first_dbID, 
-  						$last_dbID, 
+  # save dbIDs, time and db version into history table
+  $sth_history->execute($seq_region_id,
+  						$analysis_id,
+  						$first_dbID,
+  						$last_dbID,
   						$self->db_version);
   $sth_history->finish();
   $sth->finish();

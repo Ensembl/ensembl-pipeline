@@ -89,10 +89,12 @@ sub store{
    $sth->bind_param(6,$feat->hend,{ TYPE => 'SQL_INTEGER' });
    $sth->bind_param(7,$feat->hseqname,{ TYPE => 'SQL_VARCHAR' });
    $sth->bind_param(8,$feat->cigar_string,{ TYPE => 'SQL_LONGVARCHAR' });
-   $sth->bind_param(9,$feat->analysis->dbID,{ TYPE => 'SQL_INTEGER' });
+   $sth->bind_param(9,$analysis_id,{ TYPE => 'SQL_INTEGER' });
    $sth->bind_param(10,$feat->score,{ TYPE => 'SQL_DOUBLE' });
    $sth->bind_param(11,$feat->p_value,{ TYPE => 'SQL_DOUBLE' });
    $sth->bind_param(12,$feat->percent_id,{ TYPE => 'SQL_FLOAT' });
+   $sth->bind_param(13,$feat->external_db_id,{ TYPE => 'SQL_INTEGER' });
+   $sth->bind_param(14,$feat->hcoverage,{ TYPE => 'SQL_DOUBLE' });
 
    $sth->execute();
    $original->dbID($sth->{'mysql_insertid'});
