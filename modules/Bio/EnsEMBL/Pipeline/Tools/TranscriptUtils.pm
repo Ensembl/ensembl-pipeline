@@ -112,6 +112,14 @@ sub _check_Transcript{
 	last EXON;
       }
 
+      #check strand consistency between exon & transcript
+      if($exons[0]->strand != $transcript->strand){
+	warn("Strands are inconsistent between the ".
+	     "first exon and the transcript for ");
+	$valid = 0;
+	last EXON;
+      }
+
       if ( $i>0 ){
 	# check strand consistency:
 	if($exons[$i]->strand != $exons[$i-1]->strand){
