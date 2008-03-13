@@ -219,7 +219,7 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	join(" , ",map($_->seq_region_name,@from_chrs))."]\n[".
 	join(" , ",map($_->seq_region_name,@to_chrs))."]\n") unless $R_chr eq $A_chr;
 
-	print STDOUT "$R_sr_name	=>	$A_sr_name\n";
+	$support->log("$R_sr_name	=>	$A_sr_name\n");
 }
 
 my @R_chr_list = map $_->seq_region_name , @from_chrs;
@@ -417,7 +417,7 @@ eval {
 							$tg->start,     $tg->end
 						));
 
-					print STDOUT "Transfered gene: ".join("\t",
+					$support->log_verbose("Transfered gene: ".join("\t",
 					$tg->analysis->logic_name,
 					$tg->biotype,
 					$tg->status,
@@ -425,9 +425,9 @@ eval {
 					$tg->stable_id,
 					$tg->gene_author->name,
 					$tg->description,
-					scalar(@{$tg->get_all_Transcripts}))."\n";
+					scalar(@{$tg->get_all_Transcripts}))."\n");
 					foreach my $eg (@$existing_gene){
-						print STDOUT "Existing gene: ".join("\t",
+						$support->log_verbose("Existing gene: ".join("\t",
 						$eg->analysis->logic_name,
 						$eg->biotype,
 						$eg->status,
@@ -435,7 +435,7 @@ eval {
 						$eg->stable_id,
 						$eg->gene_author->name,
 						$eg->description,
-						scalar(@{$eg->get_all_Transcripts}))."\n";
+						scalar(@{$eg->get_all_Transcripts}))."\n");
 					}
 
 					$skipped_g++;

@@ -162,7 +162,7 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	join(" , ",map($_->seq_region_name,@from_chrs))."]\n[".
 	join(" , ",map($_->seq_region_name,@to_chrs))."]\n") unless $R_chr eq $A_chr;
 
-	print STDOUT "$R_sr_name	=>	$A_sr_name\n";
+	$support->log_verbose("$R_sr_name	=>	$A_sr_name\n");
 }
 
 my @R_chr_list = map $_->seq_region_name , @from_chrs;
