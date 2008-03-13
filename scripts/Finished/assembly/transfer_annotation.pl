@@ -234,8 +234,6 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			$support->log_verbose("Locking $R_chr\n");
 			$cb->lock_clones_by_slice($ref_sl,$author_obj,$vega_db);
 			$refslice_locked = 1;
-			$support->log_verbose("Locking $A_chr\n");
-			$cb->lock_clones_by_slice($alt_sl,$author_obj,$vega_db);
 		};
 		if($@){
 			warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
@@ -323,8 +321,10 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			my $transcript = $g->get_all_Transcripts;
 
 		  TRANSCRIPT: foreach my $t ( @{ $transcript } ) {
-				my $tt = $t->transfer($alt_sl);    # ori
+				my $tt = $t->transfer($alt_sl);
 				if ( defined $tt ) {
+					#my $status = 'CLEAN_TRANSFER';
+        			#add_trans_remark($R_chr, $status, $tt);
 					push @proj_trans, $tt;
 					$support->log_verbose(
 						sprintf(
@@ -334,10 +334,68 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					);
 					$tt->status( $t->status );
 					&remove_all_db_ids($tt);
-
 					&log_compare_transcripts( $t, $tt );
-				}
-				else {
+				} elsif($haplo) {
+					if(&transcript_is_missed($t,$alt_sl)) {
+						$support->log_verbose(
+			          		sprintf("\t%s %s %d %d did not transfer; completely missing in haplotype\n",
+			                $t->stable_id,
+			                $t->biotype,
+			                $t->start,
+			                $t->end)
+						);
+			        } else {
+						if ($t->translation) {
+							my $cds_t = &get_coding_part_of_transcript($t);
+				            my $tt = $cds_t->transfer($alt_sl);
+				            if (defined $tt) {
+				            	$tt->status( $t->status );
+				              	#my $status = 'CLEAN_CDS_ONLY_TRANSFER';
+				              	#add_trans_remark($R_chr, $status, $tt);
+				              	push @proj_trans, $tt;
+								$support->log_verbose(
+					              	sprintf("\t%s %s %d %d CDS transferred cleanly:\n",
+					                	$t->stable_id,
+					                    $t->biotype,
+					                    $t->start,
+					                    $t->end)
+								);
+				            	&log_compare_transcripts($cds_t, $tt);
+				            	&remove_all_db_ids($tt);
+				            } else {
+				            	my $new_t = &project_transcript_the_hard_way($t, $alt_sl);
+				              	$new_t->status( $t->status );
+				              	#my $status = 'COMPLEX_CODING_WITHOUT_CDS';
+				              	#add_trans_remark($R_chr, $status, $new_t);
+				              	push @proj_trans, $new_t;
+								$support->log_verbose(
+				              		sprintf("\t%s %s %d %d complex transfer of coding without CDS\n",
+				                    	$t->stable_id,
+				                     	$t->biotype,
+				                     	$t->start,
+				                     	$t->end)
+				                );
+				                &remove_all_db_ids($new_t);
+				              	&log_summarise_projection_by_exon($cds_t, $alt_sl);
+				            }
+						} else {
+							my $new_t = &project_transcript_the_hard_way($t, $alt_sl );
+							$new_t->status( $t->status );
+				            #my $status = 'COMPLEX_CODING_WITHOUT_CDS';
+				            #add_trans_remark($ref_set, $status, $new_t);
+							push @proj_trans, $new_t;
+							$support->log_verbose(
+			              		sprintf("\t%s %s %d %d complex transfer of non-coding\n",
+			                     $t->stable_id,
+			                     $t->biotype,
+			                     $t->start,
+			                     $t->end)
+							);
+							&remove_all_db_ids($new_t);
+			              	&log_summarise_projection_by_exon($t, $alt_sl);
+						}
+			        }
+				} else {
 					$support->log_verbose(
 						sprintf(
 							"\t%s %s %d %d cannot be transfered on $A_chr\n",
@@ -359,21 +417,24 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			my $missing_transcript = scalar(@{ $transcript }) - scalar(@proj_trans);
 
 			if (  $missing_transcript == 0 ) {
-
 			   # essential for loading attribute list so that get_all_Attributes
 			   # won't return empty list
 				$tg->add_Attributes( @{ $g->get_all_Attributes() } );
-
 				map( $tg->add_Transcript($_), @proj_trans );
-
 				&write_gene($tg);
-
-				my $existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
-							$tg->analysis->logic_name );
+				my $existing_gene;
+				eval {
+					$existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
+								$tg->analysis->logic_name );
+				};
+				if($@) {
+					$support->log_verbose($@);
+					next GENE;
+				}
 				my $exist = 0;
-				my $tg_key = join(":",($tg->end-$tg->start),$tg->biotype,$tg->status,$tg->source);
+				my $tg_key = join(":",$tg->start,$tg->end,$tg->biotype,$tg->status,$tg->source);
 				foreach (@$existing_gene) {
-					my $existing_gkey = join(":",($_->end-$_->start),$_->biotype,$_->status,$_->source);
+					my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
 					$exist = 1 if $tg_key eq $existing_gkey;
 				}
 
@@ -478,8 +539,6 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		eval {
 			$support->log_verbose("Removing $R_chr Locks\n");
 			$cb->remove_by_slice($ref_sl,$author_obj,$vega_db);
-			$support->log_verbose("Removing $A_chr Locks\n");
-			$cb->remove_by_slice($alt_sl,$author_obj,$vega_db);
 		};
 		if($@){
 			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
@@ -578,7 +637,7 @@ sub transcript_is_missed {
 
 	foreach my $e ( @{ $t->get_all_Exons } ) {
 		my $alt_e = $e->transfer($alt_sl);
-		if ( $alt_e && scalar @{$alt_e} ) {
+		if ( defined $alt_e ) {
 			return 0;
 		}
 	}
@@ -590,81 +649,34 @@ sub get_coding_part_of_transcript {
 	my ($t) = @_;
 
 	my @cds = @{ $t->get_all_translateable_Exons };
-	print STDOUT $t;
-	print STDOUT $t->stable_id;
-	foreach my $e ( @{ $t->get_all_Exons } ) {
-
-		#    print STDOUT "EXON: $e", " ", $e->stable_id;
-	}
 	$t->{_trans_exon_array} = [];
-	foreach my $e (@cds) {
-
-		#   print STDOUT "CODING $e", " ", $e->stable_id;
-		$t->add_Exon($e);
-	}
-
+	foreach my $e (@cds) { $t->add_Exon($e); }
 	my $tr = $t->translation;
-
-	#map { print STDOUT "$_ ", $tr->{$_} } keys %$tr; die;
-
 	$tr->start_Exon( $cds[0] );
 	$tr->start(1);
 	$tr->end_Exon( $cds[-1] );
 	$tr->end( $tr->end_Exon->length );
 	$t->translation($tr);
-
 	$t->stable_id( $t->stable_id . "_CDS" );
+
 	return $t;
-
-	#  #my $cds_t = Bio::EnsEMBL::Transcript->new();
-##  my $cds_t = Bio::Vega::Transcript->new();
-
-	#  for(my $i=0; $i < @cds; $i++) {
-	#    $cds_t->add_Exon($cds[$i]);
-	#  }
-
-	#  $cds_t->analysis($t->analysis);
-	#  $cds_t->biotype($t->biotype);
-	#  $cds_t->slice($t->slice);
-	#  $cds_t->status($t->status);
-	# # my $tr = Bio::EnsEMBL::Translation->new;
-	#  my $tr = Bio::Vega::Translation->new;
-
-	#  $tr->start_Exon($cds[0]);
-	#  $tr->start(1);
-	#  $tr->end_Exon($cds[-1]);
-	#  $tr->end($tr->end_Exon->length);
-	#  $cds_t->translation($tr);
-
-	#  $cds_t->stable_id($t->stable_id . "_CDS");
-
-	#  return $cds_t;
 }
 
 sub project_transcript_the_hard_way {
-	my ( $t, $cs_name, $cs_version, $alt_sl ) = @_;
-
-	#map { print STDOUT "$_: ", $t->{$_} } keys %$t;die;
-	#  my $new_t = Bio::EnsEMBL::Transcript->new();
-	#  my $new_t = Bio::Vega::Transcript->new();
-
-	#  $new_t->analysis($t->analysis);
-	#  $new_t->stable_id($t->stable_id);
-	#  $new_t->biotype($t->biotype);
-	#  $new_t->status($t->status);
+	my ( $t, $alt_sl ) = @_;
 
 	my @new_e;
+	$t->{'translation'} = undef;
+	my $cs = $alt_sl->coord_system;
 	foreach my $e ( @{ $t->get_all_Exons } ) {
-		my $te = $e->transform($alt_sl);
+		my $te = $e->transfer($alt_sl);
 
 		if ( defined $te ) {
 			push @new_e, $te;
 		}
 		else {
-			my @bits = @{ $e->project( $cs_name, $cs_version ) };
-
+			my @bits = @{ $e->project( $cs->name, $cs->version) };
 			if (@bits) {
-
 				# need to make a new exon from the bits
 				my ( $ex_st, $ex_en, $strand );
 				foreach my $bit (@bits) {
@@ -683,17 +695,15 @@ sub project_transcript_the_hard_way {
 					}
 				}
 				if ( defined $ex_st and defined $ex_en ) {
-
 					#my $new_e = Bio::EnsEMBL::Exon->new;
 					my $new_e = Bio::Vega::Exon->new;
-
 					$new_e->start($ex_st);
 					$new_e->end($ex_en);
 					$new_e->strand($strand);
 					$new_e->phase(-1);
 					$new_e->end_phase(-1);
 					$new_e->slice($alt_sl);
-					$new_e->stable_id( $e->stable_id );
+					#$new_e->stable_id( $e->stable_id );
 					push @new_e, $new_e;
 				}
 			}
@@ -704,15 +714,25 @@ sub project_transcript_the_hard_way {
 	foreach my $e (@new_e) {
 		$t->add_Exon($e);
 	}
-	return $t;
 
-	#  map { $new_t->add_Exon($_) } @new_e;
-	#  return $new_t;
+	return $t;
+}
+
+sub add_trans_remark {
+  my ($ref_set, $status, $trans) = @_;
+
+  my $remark = "Annotation_remark- automatic annotation transfer from $ref_set: $status";
+  my $t_at = Bio::EnsEMBL::Attribute->new(-VALUE => $remark,
+                                          -CODE  => 'remark',
+                                          -NAME  => 'Remark',
+                                         );
+  $trans->add_Attributes($t_at);
 }
 
 sub log_summarise_projection_by_exon {
-	my ( $t, $cs_name, $cs_version ) = @_;
+	my ( $t, $alt_sl ) = @_;
 
+	my $cs = $alt_sl->coord_system;
 	my $exons_total       = 0;
 	my $exons_transferred = 0;
 	my $exons_missed      = 0;
@@ -722,13 +742,13 @@ sub log_summarise_projection_by_exon {
 	foreach my $e ( @{ $t->get_all_Exons } ) {
 		$exons_total++;
 
-		my $te = $e->transform( $cs_name, $cs_version );
+		my $te = $e->transfer( $alt_sl );
 
 		if ( defined $te ) {
 			$exons_transferred++;
 		}
 		else {
-			my @bits = @{ $e->project( $cs_name, $cs_version ) };
+			my @bits = @{ $e->project( $cs->name, $cs->version ) };
 
 			if ( not @bits ) {
 				$exons_missed++;
@@ -746,7 +766,7 @@ sub log_summarise_projection_by_exon {
 
 	$support->log_verbose(
 		sprintf(
-" %d exons; %d transferred, %d missed, %d part missed, %d over indel\n",
+			"\t%d exons; %d transferred, %d missed, %d part missed, %d over indel\n",
 			$exons_total,       $exons_transferred, $exons_missed,
 			$exons_part_missed, $exons_over_indel
 		)
