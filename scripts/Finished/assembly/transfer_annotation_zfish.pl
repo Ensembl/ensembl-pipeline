@@ -104,6 +104,8 @@ if ( $support->param('help') or $support->error ) {
 	pod2usage(1);
 }
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
 
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
