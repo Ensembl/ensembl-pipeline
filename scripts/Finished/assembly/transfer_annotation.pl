@@ -57,20 +57,32 @@ ml6@sanger.ac.uk
 =cut
 
 use strict;
+use warnings;
+no warnings 'uninitialized';
+
+use FindBin qw($Bin);
+use vars qw($SERVERROOT);
+BEGIN {
+    $SERVERROOT = "$Bin/../../../..";
+    unshift(@INC, "$Bin");
+    unshift(@INC, "$SERVERROOT/ensembl/modules");
+    unshift(@INC, "/software/anacode/otter/otter_production_main/ensembl-otter/modules/");
+    unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
+    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
+}
+
+use Getopt::Long;
+use Pod::Usage;
+use Sys::Hostname;
+use Bio::EnsEMBL::Utils::ConversionSupport;
 use Bio::Vega::DBSQL::DBAdaptor;
 use Bio::Vega::ContigLockBroker;
 use Bio::Vega::Author;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 
-use FindBin qw($Bin);
-use Getopt::Long;
-use Pod::Usage;
-use Sys::Hostname;
-use Bio::EnsEMBL::Utils::ConversionSupport;
-
 $| = 1;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport("$Bin/../../..");
+my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
 # parse options
 $support->parse_common_options(@_);
@@ -87,6 +99,9 @@ if ( $support->param('help') or $support->error ) {
 	print STDOUT $support->error if $support->error;
 	pod2usage(1);
 }
+
+$support->param('verbose', 1);
+$support->param('interactive', 0);
 
 $support->comma_to_list( 'chromosomes', 'altchromosomes' );
 
@@ -154,6 +169,11 @@ my $sql_sr_update = qq{
 	and cs.name = 'chromosome'
 	and cs.version = ?};
 
+# 1 and 2 below must be specifically set in order to
+# fetch the features on a particular seq_region and disable
+# the use of the mapping mechanism (used to test duplicates)
+
+# 1. sql queries to enable gene/simple_feature build
 my $sql_meta_bl_insert = qq{
 	insert ignore into meta (meta_key, meta_value) values
 	('simple_featurebuild.level', '1'),
@@ -161,6 +181,7 @@ my $sql_meta_bl_insert = qq{
 my $sql_meta_bl_delete =
 qq{delete from meta where meta_key in ('simple_featurebuild.level','genebuild.level')};
 
+# 2. attrib_type_id 6 is a Top Level Non-Redundant Sequence Region
 my $sql_attrib_type_select =
 qq{SELECT COUNT(*) FROM seq_region_attrib WHERE seq_region_id = ? AND attrib_type_id = 6;};
 my $sql_attrib_type_insert =
