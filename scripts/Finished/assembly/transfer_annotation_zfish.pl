@@ -483,12 +483,12 @@ eval {
 		$sfeat_Ad->store(@proj_feat) if ( @proj_feat && $transfered_genes );
 
 		$support->log_verbose(
-			sprintf(
-				"INFO: Annotation transfer %s:%s => %s\n
-				 INFO: transfered Gene: %d/%d\n
-				 INFO: skipped Gene: %d/%d\n
-				 INFO: transfered PolyA features: %d/%d\n
-				 INFO: skipped PolyA features: %d/%d\n",
+sprintf(
+"INFO: Annotation transfer %s:%s => %s
+INFO: transfered Gene: %d/%d
+INFO: skipped Gene: %d/%d
+INFO: transfered PolyA features: %d/%d
+INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$to_assembly,
 				$transfered_genes, $total_genes,
