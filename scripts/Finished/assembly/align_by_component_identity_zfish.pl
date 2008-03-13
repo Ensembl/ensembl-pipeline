@@ -235,7 +235,7 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 		   . join( " , ", map( $_->seq_region_name, @to_chrs ) )
 		   . "]\n" )
 	  unless $R_chr eq $A_chr;
-	print STDOUT "$R_sr_name	=>	$A_sr_name\n";
+	$support->log("$R_sr_name	=>	$A_sr_name\n");
 	$seq_region_id->{$R_sr_name} = $sa->get_seq_region_id( $from_chrs[$i] );
 	$seq_region_id->{$A_sr_name} = $sa->get_seq_region_id( $to_chrs[$i] );
 }
@@ -392,7 +392,6 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 							foreach my $block (@$blocks) {
 								my ( $R_s, $R_e, $A_s, $A_e, $tag, $ori ) =
 								  @$block;
-								print STDOUT "block is @$block\n";
 								if ($ori) {
 									$support->log("start a new align block\n");
 									push @{ $match->{$R_chr} },
