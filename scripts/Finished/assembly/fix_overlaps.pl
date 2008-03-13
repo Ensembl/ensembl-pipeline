@@ -79,13 +79,22 @@ use warnings;
 no warnings 'uninitialized';
 
 use FindBin qw($Bin);
+use vars qw($SERVERROOT);
+BEGIN {
+    $SERVERROOT = "$Bin/../../../..";
+    unshift(@INC, "$Bin");
+    unshift(@INC, "$SERVERROOT/ensembl/modules");
+    unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
+    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
+}
+
 use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Utils::ConversionSupport;
 
 $| = 1;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport("$Bin/../../..");
+my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
 # parse options
 $support->parse_common_options(@_);
@@ -100,6 +109,9 @@ if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
 	pod2usage(1);
 }
+
+$support->param('verbose', 1);
+$support->param('interactive', 0);
 
 $support->comma_to_list( 'chromosomes', 'altchromosomes' );
 

@@ -1,5 +1,4 @@
-#!/usr/local/bin/perl
-
+#!/software/bin/perl
 
 =head1 NAME
 
@@ -103,17 +102,18 @@ no warnings 'uninitialized';
 
 use FindBin qw($Bin);
 use vars qw($SERVERROOT);
-
 BEGIN {
-    $SERVERROOT = "$Bin/../../..";
-    unshift(@INC, ".");
-    unshift(@INC, "$SERVERROOT/ensembl_HEAD/modules");
-    unshift(@INC, "$SERVERROOT/bioperl-live");
+    $SERVERROOT = "$Bin/../../../..";
+    unshift(@INC, "$Bin");
+    unshift(@INC, "$SERVERROOT/ensembl/modules");
+    unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
+    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
 }
 
 use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Utils::ConversionSupport;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 use AssemblyMapper::BlastzAligner;
 
 $| = 1;
@@ -147,10 +147,10 @@ if ($support->param('help') or $support->error) {
   pod2usage(1);
 }
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
 
 
-# $support->param('verbose', 0);     # throw away all that garbage
-$support->param('interactive', 0); # stop that garbage from coming up
 
 
 # ask user to confirm parameters to proceed
