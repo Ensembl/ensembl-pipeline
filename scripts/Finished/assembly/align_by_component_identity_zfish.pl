@@ -91,6 +91,7 @@ BEGIN {
     $SERVERROOT = "$Bin/../../../..";
     unshift(@INC, "$Bin");
     unshift(@INC, "$SERVERROOT/ensembl/modules");
+    unshift(@INC, "$SERVERROOT/extra");
     unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
     unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
 }
@@ -100,7 +101,7 @@ use Pod::Usage;
 use Bio::EnsEMBL::Utils::ConversionSupport;
 use Bio::EnsEMBL::Attribute;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
-use Algorithm::Diff qw(diff sdiff LCS);
+use Algorithm::Diff qw(sdiff);
 
 $| = 1;
 
