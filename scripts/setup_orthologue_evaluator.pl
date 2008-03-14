@@ -22,7 +22,33 @@ perl setup_orthologue_evaluator.pl -dbname <dbname> -dbuser -write
 
  The script will re-write your Exonerate2Genes.pm file if you use the -write option. 
 
- This script depends on PPI and List::MoreUtils 
+   The setup script requires some additonal libs :  
+
+       Data::Dumper FindBin  PPI  Clone  List::MoreUtils 
+
+   If you like to install these libs be aware that MoreUtils v. 1.18 is not compatible with 
+   Utils v. 1.14. 
+
+   Sanger-internals can add these modules (compiled for linux) to their PERL5LIB by 
+   sourcing this file :
+
+                     /nfs/acari/jhv/lib/set_orth_path.sh  
+  
+   Run setup script to set up the analysis and the input_ids in the reference database and 
+   to store rules and conditions. This script also re-writes the Exonerte2Genes config 
+   in Bio/EnsEMBL/Analysis/Config and backs up your old config - you need to run the setup
+   script with the -write option to rewrite the Exonerate2Genes.pm config ( this is for the 
+   Exonerate runs in the second stage of the analysis). Your existing Exonerate2Genes-file 
+   file will backed up to Exonerate2Genes.pm.bak.0 and there will be a timestamp added 
+   in the top when the file has been backed up - Sorry to say but all the comments in your 
+   original file can't be transferred to the new file. 
+
+
+   You find the whole documentation for the OrthologueEvaluation in 
+
+        ensembl-doc/pipeline_docs/orthologue_evaluator_setup.txt 
+
+
 
 =head1 CONTACT
 
