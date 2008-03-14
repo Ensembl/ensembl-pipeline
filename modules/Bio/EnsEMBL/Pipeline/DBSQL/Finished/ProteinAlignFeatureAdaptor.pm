@@ -31,11 +31,11 @@ sub store{
      "INSERT INTO $tablename (seq_region_id, seq_region_start, seq_region_end,
                              seq_region_strand, hit_start, hit_end,
                              hit_name, cigar_line,
-                             analysis_id, score, evalue, perc_ident)
-     VALUES (?,?,?,?,?,?,?,?,?,?, ?, ?)");
+                             analysis_id, score, evalue, perc_ident,external_db_id, hcoverage)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)");
 
   my $sth_history = $self->prepare(
-  	 "INSERT INTO $history_table (seq_region_id, analysis_id, align_feature_id_start, 
+  	 "INSERT INTO $history_table (seq_region_id, analysis_id, align_feature_id_start,
 	 							align_feature_id_end, db_version , date)
 	 VALUES (?,?,?,?,?,NOW())");
 
@@ -103,11 +103,11 @@ sub store{
     $first_dbID ||= $original->dbID;
     $last_dbID = $original->dbID;
   }
-  # save dbIDs, time and db version into history table	
-  $sth_history->execute($seq_region_id, 
-  						$analysis_id, 
-  						$first_dbID, 
-  						$last_dbID, 
+  # save dbIDs, time and db version into history table
+  $sth_history->execute($seq_region_id,
+  						$analysis_id,
+  						$first_dbID,
+  						$last_dbID,
   						$self->db_version);
   $sth_history->finish();
  $sth->finish();
