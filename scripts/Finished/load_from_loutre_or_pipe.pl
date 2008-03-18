@@ -421,7 +421,7 @@ sub make_clone_attribute {
 		'htg',                              'htg',
 		'High Throughput phase attribute', '3'
 	);
-	my ($acc,$ver) = split('.',$acc_ver);
+	my ($acc,$ver) = split(/\./,$acc_ver);
 	push @attrib, $attrib;
 	push @attrib,
 	  &make_attribute( 'embl_acc', 'EMBL accession', '', $acc );
