@@ -92,8 +92,8 @@ BEGIN {
     unshift(@INC, "$Bin");
     unshift(@INC, "$SERVERROOT/ensembl/modules");
     unshift(@INC, "$SERVERROOT/extra");
+	unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
     unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
-    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
 }
 
 use Getopt::Long;
