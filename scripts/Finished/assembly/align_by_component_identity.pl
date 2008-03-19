@@ -121,8 +121,8 @@ BEGIN {
     unshift(@INC, "$Bin");
     unshift(@INC, "$SERVERROOT/ensembl/modules");
     unshift(@INC, "$SERVERROOT/extra");
+	unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
     unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
-    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
 }
 
 use Getopt::Long;
@@ -239,8 +239,6 @@ if ( $support->param('skipcomponents') ) {
 }
 $support->log("Done.\n\n");
 
-my $match   = {};
-my $nomatch = {};
 my %stats_total;
 my @block_length;
 
@@ -295,6 +293,8 @@ elsif ( scalar(@R_chr_list) != scalar(@A_chr_list) ) {
 for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $R_chr = $R_chr_list[$i];
 	my $A_chr = $A_chr_list[$i];
+	my $match   = {};
+	my $nomatch = {};
 
 	$support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
 
@@ -652,10 +652,10 @@ sub found_match {
 	  )
 	  = @_;
 
-	$R_start = $R_seg->from_start;
-	$R_end = $R_seg->from_end;
-	$A_start = $A_seg->from_start;
-	$A_end = $A_seg->from_end;
+	my $R_start = $R_seg->from_start;
+	my $R_end = $R_seg->from_end;
+	my $A_start = $A_seg->from_start;
+	my $A_end = $A_seg->from_end;
 
 	# last component was a match
 	if ($match_flag) {

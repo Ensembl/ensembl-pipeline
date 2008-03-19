@@ -106,8 +106,8 @@ BEGIN {
     $SERVERROOT = "$Bin/../../../..";
     unshift(@INC, "$Bin");
     unshift(@INC, "$SERVERROOT/ensembl/modules");
+	unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
     unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
-    unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
 }
 
 use Getopt::Long;
@@ -187,11 +187,6 @@ my $A_dba = $support->get_database('core', 'alt');
 my $A_sa = $A_dba->get_SliceAdaptor;
 my $A_asm = $support->param('altassembly');
 
-# create BlastzAligner object
-my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
-
-# create tmpdir to store input and output
-$aligner->create_tempdir($support->param('tmpdir'));
 
 # loop over non-aligned regions in tmp_align table
 $support->log_stamped("Looping over non-aligned blocks...\n");
@@ -233,6 +228,12 @@ $sth = $R_dbh->prepare($sql);
 $sth->execute;
 
 while (my $row = $sth->fetchrow_hashref) {
+
+  # create BlastzAligner object
+	my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
+
+	# create tmpdir to store input and output
+	$aligner->create_tempdir($support->param('tmpdir'));
 
   my $id = $row->{'tmp_align_id'};
   $aligner->id($id);
@@ -316,25 +317,26 @@ while (my $row = $sth->fetchrow_hashref) {
 
   $support->log_stamped("Done with block $id.\n", 1);
 
+  # filter overlapping Vega alignment regions
+	$support->log_stamped("Filtering overlapping reference alignment regions...\n");
+	$aligner->filter_overlaps;
+	$support->log_stamped("Done.\n");
+
+	# write alignments to assembly table
+	$aligner->write_assembly($R_dba, [$row->{'ref_seq_region_name'}], [$row->{'alt_seq_region_name'}]);
+
+	# overall stats
+	$aligner->log_overall_stats;
+
+	# cleanup
+	$support->log_stamped("\nRemoving tmpdir...\n");
+	$aligner->remove_tempdir;
+
 } # while ($row = fetchrow...)
 
-$support->log_stamped("Done.\n");
 
-# filter overlapping Vega alignment regions
-$support->log_stamped("Filtering overlapping reference alignment regions...\n");
-$aligner->filter_overlaps;
-$support->log_stamped("Done.\n");
 
-# write alignments to assembly table
-$aligner->write_assembly($R_dba, \@R_chr_list, \@A_chr_list);
-
-# cleanup
-$support->log_stamped("\nRemoving tmpdir...\n");
-$aligner->remove_tempdir;
 $support->log_stamped("Done.\n\n");
-
-# overall stats
-$aligner->log_overall_stats;
 
 # remind to drop tmp_align
 $support->log("\nDon't forget to drop the tmp_align table when all is done!\n\n");

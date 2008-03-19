@@ -67,8 +67,8 @@ BEGIN {
     unshift(@INC, "$Bin");
     unshift(@INC, "$SERVERROOT/ensembl/modules");
     unshift(@INC, "/software/anacode/otter/otter_production_main/ensembl-otter/modules/");
-    unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
     unshift(@INC, "$SERVERROOT/bioperl-0.7.2");
+	unshift(@INC, "$SERVERROOT/bioperl-1.2.3-patched");
 }
 
 use Getopt::Long;
@@ -218,6 +218,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $R_chr = $R_chr_list[$i];
 	my $A_chr = $A_chr_list[$i];
 
+
 	# for stats
 	my $total_genes      = 0;
 	my $transfered_genes = 0;
@@ -233,6 +234,8 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
   		$sliceAd->fetch_by_region( 'chromosome', $R_chr, $R_start, $R_end, undef,$assembly );
 	my $alt_sl =
   		$sliceAd->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef,$altassembly );
+
+  	$vega_db->get_AssemblyMapperAdaptor()->delete_cache();
 
 	my $alt_seq_region_id = $alt_sl->get_seq_region_id;
 	my $ref_seq_region_id = $ref_sl->get_seq_region_id;
@@ -544,7 +547,11 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		# print annotation transfer stats
 		$support->log_verbose(
 			sprintf(
-	"Annotation transfer %s:%s => %s:%s\ntransfered Gene: %d/%d\nskipped Gene: %d/%d\ntransfered PolyA features: %d/%d\nskipped PolyA features: %d/%d\n",
+"INFO: Annotation transfer %s:%s => %s/%s
+INFO: transfered Gene: %d/%d
+INFO: skipped Gene: %d/%d
+INFO: transfered PolyA features: %d/%d
+INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$A_chr,            $support->param('altassembly'),
 				$transfered_genes, $total_genes,
@@ -580,6 +587,11 @@ if ($cs_change) {
 	$dbh->do($sql_mc_delete);
 	$dbh->do($sql_meta_bl_delete);
 }
+
+$support->log_stamped("\nDone.\n");
+
+# finish logfile
+$support->finish_log;
 
 sub print_sql {
 	my ($g,$tg, $ref_sid, $alt_sid, $R_chr, $A_chr) = @_;
