@@ -215,7 +215,7 @@ foreach my $entry (@genbank ){
 #}
 #
 ###########################################
-# write chromsome if it is not already there
+# write chromosome if it is not already there
 
 my $dbe_adaptor = $output_db->get_DBEntryAdaptor;
 my $slice_adaptor = $output_db->get_SliceAdaptor;
@@ -244,6 +244,38 @@ from the genbank file?(Y/N) ";
   }
 }
 
+#########################################
+#Check that there are not genes in the MT chromosome before uploading the new ones.
+
+my @mt_genes = @{$slice->get_all_Genes}; 
+
+if (@mt_genes && scalar(@mt_genes) > 0){
+  print "There are already ",scalar(@mt_genes)," genes in $MIT_NAME chromosome\n";
+
+  print "Do you want to remove them?(Y/N)\n";
+  my $g_answer = <>;
+  chomp $g_answer;
+  if ($g_answer eq "y" or $g_answer eq "Y"){
+    my $gene_adaptor = $output_db->get_GeneAdaptor;
+    foreach my $mt_gene(@mt_genes){  
+      print "Removing gene: ",$mt_gene->dbID,"\n";
+      $gene_adaptor->remove($mt_gene);
+    }
+    print "Genes removed succesfully, moving to new genes load\n";
+  }else{
+    print "You choose not to remove the genes\n";
+    print "Do you want to keep loading the MT genes?(This may create duplicated entries)(Y/N)?\n";
+    my $load_answer = <>;
+    chomp $load_answer;
+    if ($load_answer eq "y" or $load_answer eq "Y"){
+      print "Loading genes without removing existing ones, Thanks\n";
+    }else{
+      print "You choose to abort gene loading. Program exiting\n";
+      exit 0;
+    }
+  }
+}
+  
 #########################################
 #Fetch analysis object
 
