@@ -62,11 +62,12 @@ sub get_available_adaptors {
 
   my $pairs = $self->SUPER::get_available_adaptors();
 
-  $pairs->{'Analysis'}           = 'Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor';
-  $pairs->{'Job'}                = 'Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor';
-  $pairs->{'PmatchFeature'}      = 'Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor';
-  $pairs->{'Rule'}               = 'Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor';
-  $pairs->{'StateInfoContainer'} = 'Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer';
+  $pairs->{'Analysis'}                  = 'Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor';
+  $pairs->{'Job'}                       = 'Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor';
+  $pairs->{'PmatchFeature'}             = 'Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor';
+  $pairs->{'Rule'}                      = 'Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor';
+  $pairs->{'StateInfoContainer'}        = 'Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer';
+  $pairs->{'CompressedDnaAlignFeature'} = 'Bio::EnsEMBL::Pipeline::DBSQL::CompressedDnaAlignFeatureAdaptor';
 
   return $pairs; 
 }
