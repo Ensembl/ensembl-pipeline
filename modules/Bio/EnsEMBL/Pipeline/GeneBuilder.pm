@@ -317,7 +317,7 @@ sub _prune_redundant_transcripts {
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
     $blessed_genetypes{$bgt->{'type'}} = 1;
   }
-
+  $blessed_genetypes{$GB_BLESSED_COMBINED_GENETYPE} = 1;
 # For each gene
   foreach my $gene (@$genes) {
 
@@ -424,6 +424,7 @@ sub _prune_redundant_CDS {
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
     $blessed_genetypes{$bgt->{'type'}} = 1;
   }
+  $blessed_genetypes{$GB_BLESSED_COMBINED_GENETYPE} = 1;
 
 # For each gene
   foreach my $gene (@$genes) {
@@ -466,6 +467,11 @@ sub _prune_redundant_CDS {
       CDS_TRANS: foreach my $cds_trans (@trans_without_utrs) {
         my $cds_trans_cds_exons = $cds_exon_hash{$cds_trans};
 
+        if ($cds_trans->type eq $GB_SIMILARITY_GENETYPE){
+          $nremoved++;
+          $self->_remove_transcript_from_gene($gene,$cds_trans);
+        }
+
         if (scalar(@$cds_trans_cds_exons) != scalar(@$utr_trans_cds_exons)) {
           # print "Different numbers of exons\n";
           next CDS_TRANS;
@@ -497,6 +503,40 @@ sub _prune_redundant_CDS {
         $self->_remove_transcript_from_gene($gene,$cds_trans);
       }
     }
+#Get the number of transcript in the @trans_with_utrs 
+    my $num_of_utr_trans = scalar(@trans_with_utrs);
+   # print "NUM OF UTR TRANS: ",$num_of_utr_trans,"\n";
+
+# Extra paranoid test to check if any similarity overlaps targetted models and get rid of them
+   foreach my $known_utr_trans (@trans_with_utrs) {
+
+      my @utr_evidence = @{$known_utr_trans->get_all_supporting_features};
+      foreach my $evidence (@utr_evidence){
+        if ($evidence->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
+         # print "EVIDENCE: ", $evidence,"\n";
+          if ($evidence->analysis->logic_name =~ m/Similarity/){
+            print $evidence->analysis->logic_name ," is ok this time\n";
+          }else{
+            UTR_CDS_TRANS: for (my $ut = 0; $ut < $num_of_utr_trans; $ut++){
+              my @next_utr_evidence = @{$trans_with_utrs[$ut]->get_all_supporting_features};
+              foreach my $next_evidence (@next_utr_evidence){
+                if ($next_evidence->isa("Bio::EnsEMBL::DnaPepAlignFeature")){
+                  # print "EVIDENCE: ", $next_evidence,"\n";
+                  if ($next_evidence->analysis->logic_name =~ m/Similarity/){
+                    print "UPSSS: ",$next_evidence->analysis->logic_name ,"\n";
+                    $nremoved++;
+                    $self->_remove_transcript_from_gene($gene,$trans_with_utrs[$ut]);                    
+                  }else{ 
+                    next UTR_CDS_TRANS;
+                  }
+                }          
+              }
+            }
+          }
+        }
+      }
+    }
+
   }
   print STDERR "Removed $nremoved transcripts because of redundant CDS\n";
 }
@@ -538,6 +578,7 @@ sub _select_best_transcripts{
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
     $blessed_genetypes{$bgt->{'type'}} = 1;
   }
+  $blessed_genetypes{$GB_BLESSED_COMBINED_GENETYPE} = 1;
 
  GENE:
   foreach my $gene ( @genes ){
@@ -549,7 +590,7 @@ sub _select_best_transcripts{
     foreach my $transcript( @sorted_transcripts ){
       $count++;
       unless (exists $blessed_genetypes{$transcript->type}){
-	next GENE if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
+	next TRAN if ($count > $GB_MAX_TRANSCRIPTS_PER_GENE);
       }
       push ( @selected_transcripts, $transcript );
     }
@@ -754,7 +795,7 @@ sub prune_Transcripts {
   foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
     $blessed_genetypes{$bgt->{'type'}} = 1;
   }
-
+  $blessed_genetypes{$GB_BLESSED_COMBINED_GENETYPE} = 1;
   my $cluster_count = 0;
  CLUSTER:
   foreach my $transcript_cluster ( @transcript_clusters ){
@@ -1097,7 +1138,7 @@ sub _bin_sort_transcripts{
 #  foreach my $bgt(@{$GB_BLESSED_GENETYPES}){
 #    $blessed_genetypes{$bgt->{'type'}} = 1;
 #  }
-#
+#  $blessed_genetypes{$GB_BLESSED_COMBINED_GENETYPE} = 1;
 #  my @blessed_transcripts;
 #  my @heathen_transcripts;
 #  foreach my $transcript(@transcripts){
