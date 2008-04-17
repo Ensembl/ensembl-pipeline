@@ -477,10 +477,9 @@ sub parse_results {
 			$q_strand, $q_length, \@align_components
 		);
 
-		# now we have extracted the exons and the coordinates are with
-		# reference to the forward strand of the query and target, we can
-		# use the gene_orienation to flip the strands if necessary
-		if ( $gene_orientation == -1 and $t_strand == 1 ) {
+		# now we have extracted the exons we can use 
+		# the gene_orienation to flip the strands if necessary
+		if ( $gene_orientation == -1 ) {
 			$t_strand *= -1;
 			$q_strand *= -1;
 		}
