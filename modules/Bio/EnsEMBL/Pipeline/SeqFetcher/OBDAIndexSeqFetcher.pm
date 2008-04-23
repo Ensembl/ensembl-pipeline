@@ -316,5 +316,51 @@ sub index_name{
   return $self->{index_name};
 }
 
+=head2 secondary_namespaces 
+
+  Function: Retrieves secondary_namespaces using OBDAIndex module
+  Returns : Arrayref 
+
+=cut
+sub secondary_namespaces {
+  my ($self) = @_;
+
+  my @seqfetchers = $self->_seqfetcher;
+  my @secondary_namespaces = undef;
+
+  foreach my $seqfetcher (@seqfetchers) {
+    if ($seqfetcher->secondary_namespaces) {
+      push @secondary_namespaces, $seqfetcher->secondary_namespaces;
+    }
+  }
+  return \@secondary_namespaces;
+}
+
+=head2 get_entry_by_acc 
+
+  Function: Does the entry retrieval via the OBDAIndex module using the primary index key
+  Returns : String 
+
+=cut
+sub get_entry_by_acc {
+ my ($self, $acc)  = @_;
+  my $entry;
+
+  if (!$acc) {
+    throw("No accession");
+  }
+
+  my @entries;
+  my @seqfetchers = $self->_seqfetcher;
+  foreach my $seqfetcher (@seqfetchers) {
+    eval {
+     $entry = $seqfetcher->get_entry_by_id($acc);
+    };
+    if ( $@ ) {
+      warning("problem fetching entry for $acc");
+    }
+  }
+  return $entry;
+}
 
 1;
