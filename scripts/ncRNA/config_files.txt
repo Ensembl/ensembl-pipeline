@@ -186,8 +186,8 @@ use vars qw(%Config);
     LOGGER_VERBOSITY => 'OFF',
 );
 
->>Bio/EnsEMBL/Analysis/Config/GeneBuild/Databases.pm
-package Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
+>>Bio/EnsEMBL/Analysis/Config/Databases.pm
+package Bio::EnsEMBL::Analysis::Config::Databases;
 
 
 use strict;
