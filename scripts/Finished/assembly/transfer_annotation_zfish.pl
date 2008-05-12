@@ -22,7 +22,7 @@ Required arguments:
 Optional arguments:
 
 
-  -n, --dry_run, --dry=0|1            don't write results to database (default: true)
+  --dry=0|1                           don't write results to database (default: false)
 
   --assembly=ASSEMBLY                 assembly version ASSEMBLY (default: Otter)
   --altassembly=ASSEMBLY              alternative assembly version ASSEMBLY (default: assembly)
@@ -83,6 +83,7 @@ use Getopt::Long;
 use Pod::Usage;
 use Sys::Hostname;
 use Bio::EnsEMBL::Utils::ConversionSupport;
+use Bio::EnsEMBL::Attribute;
 use Bio::Vega::DBSQL::DBAdaptor;
 use Bio::Vega::ContigLockBroker;
 use Bio::Vega::Author;
@@ -277,6 +278,7 @@ eval {
 		# for stats
 		my $total_genes      = 0;
 		my $transfered_genes = 0;
+		my $created_genes	 = 0;
 		my $total_sf         = 0;
 		my $transfered_sf    = 0;
 		my $skipped_sf       = 0;
@@ -393,78 +395,85 @@ eval {
 			   # essential for loading attribute list so that get_all_Attributes
 			   # won't return empty list
 				$tg->add_Attributes( @{ $g->get_all_Attributes() } );
-				map( $tg->add_Transcript($_), @proj_trans );
-				&write_gene($tg);
-				my $existing_gene;
-				eval {
-					$existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
-								$tg->analysis->logic_name );
-				};
-				if($@) {
-					$support->log_verbose($@);
-					next GENE;
-				}
-				my $exist = 0;
-				my $tg_key = join(":",$tg->start,$tg->end,$tg->biotype,$tg->status,$tg->source);
-				foreach (@$existing_gene) {
-					my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
-					$exist = 1 if $tg_key eq $existing_gkey;
-				}
 
-				if($exist) {
-					$support->log_verbose(
-						sprintf(
-							"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $tg->seq_region_name,
-							$tg->start,     $tg->end
-						));
+				my $genes = &transcripts2genes($tg,\@proj_trans);
 
-					$support->log_verbose("Transfered gene: ".join("\t",
-					$tg->analysis->logic_name,
-					$tg->biotype,
-					$tg->status,
-					$tg->source,
-					$tg->stable_id,
-					$tg->gene_author->name,
-					$tg->description,
-					scalar(@{$tg->get_all_Transcripts}))."\n");
-					foreach my $eg (@$existing_gene){
-						$support->log_verbose("Existing gene: ".join("\t",
-						$eg->analysis->logic_name,
-						$eg->biotype,
-						$eg->status,
-						$eg->source,
-						$eg->stable_id,
-						$eg->gene_author->name,
-						$eg->description,
-						scalar(@{$eg->get_all_Transcripts}))."\n");
+				foreach my $gene (@$genes) {
+					&write_gene($gene);
+					my $existing_gene;
+					eval {
+						$existing_gene = $geneAd->fetch_all_by_Slice( $gene->feature_Slice,
+									$gene->analysis->logic_name );
+					};
+					if($@) {
+						$support->log_verbose($@);
+						next GENE;
+					}
+					my $exist = 0;
+					my $tg_key = join(":",$gene->start,$gene->end,$gene->biotype,$gene->status,$gene->source);
+					foreach (@$existing_gene) {
+						my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
+						$exist = 1 if $tg_key eq $existing_gkey;
 					}
 
-					$skipped_g++;
-					next GENE;
+					if($exist) {
+						$support->log_verbose(
+							sprintf(
+								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							));
+
+						$support->log_verbose("Transfered gene: ".join("\t",
+						$gene->analysis->logic_name,
+						$gene->biotype,
+						$gene->status,
+						$gene->source,
+						$gene->stable_id,
+						$gene->gene_author->name,
+						$gene->description,
+						scalar(@{$gene->get_all_Transcripts}))."\n");
+						foreach my $eg (@$existing_gene){
+							$support->log_verbose("Existing gene: ".join("\t",
+							$eg->analysis->logic_name,
+							$eg->biotype,
+							$eg->status,
+							$eg->source,
+							$eg->stable_id,
+							$eg->gene_author->name,
+							$eg->description,
+							scalar(@{$eg->get_all_Transcripts}))."\n");
+						}
+
+						$skipped_g++;
+						next GENE;
+					}
 				}
 
-				if ( $geneAd->store($tg) ) {
-					$transfered_genes++;
-					$support->log_verbose(
-						sprintf(
-						"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $tg->seq_region_name,
-							$tg->start,     $tg->end
-						)
-					);
-				}
-				else {
-					throw(
-						sprintf(
-							"GENE %s %s cannot be saved (%s:%d-%d => %s:%d-%d)",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $tg->seq_region_name,
-							$tg->start,     $tg->end
-						)
-					);
+				$created_genes += (scalar(@$genes) -1);
+
+				foreach my $gene (@$genes) {
+					if ( $geneAd->store($gene) ) {
+						$transfered_genes++;
+						$support->log_verbose(
+							sprintf(
+							"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							)
+						);
+					} else {
+						throw(
+							sprintf(
+								"GENE %s %s cannot be saved (%s:%d-%d => %s:%d-%d)",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							)
+						);
+					}
 				}
 			} else {
 				$support->log_verbose(
@@ -475,7 +484,6 @@ eval {
 								$missing_transcript
 							)
 				);
-
 			}
 		}
 
@@ -486,18 +494,20 @@ eval {
 sprintf(
 "INFO: Annotation transfer %s:%s => %s
 INFO: transfered Gene: %d/%d
+INFO: created Gene:	%d
 INFO: skipped Gene: %d/%d
 INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$to_assembly,
-				$transfered_genes, $total_genes,
+				$transfered_genes, ($total_genes+$created_genes),
+				$created_genes,
 				$skipped_g, $total_genes,
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)
 		);
-		$support->log_stamped("INFO: Done with $R_chr");
+		$support->log_stamped("INFO: Done with $R_chr\n");
 
 	}
 
@@ -545,6 +555,85 @@ foreach my $slice (@from_chrs, @to_chrs) {
 # finish logfile
 $support->finish_log;
 ### end main
+
+
+sub transcripts2genes {
+	my ($tg,$trans) = @_;
+	my @genes;
+	# cluster the transcripts set by chromosome
+	my $hash_trans;
+	for (@$trans) {
+		$hash_trans->{$_->seq_region_name} ||= [];
+		push @{$hash_trans->{$_->seq_region_name}},$_;
+	}
+
+	# sort the sets by translatable transcripts number, total exons length and transcript number
+	my @gene_transcripts = sort sort_method values(%$hash_trans);
+	my $number = scalar @gene_transcripts;
+
+	my $gt = shift @gene_transcripts;
+
+	my $set = 2;
+	# loop over the remaining transcript sets and create new gene without stable id
+	foreach my $nt (@gene_transcripts) {
+		my $ng = Bio::Vega::Gene->new;
+		$ng->analysis( $tg->analysis );
+		$ng->biotype( $tg->biotype );
+		$ng->status( $tg->status );
+		$ng->source( $tg->source );
+		$ng->gene_author( $tg->gene_author );
+		$ng->description( $tg->description );
+		$ng->add_Attributes( @{ $tg->get_all_Attributes() } );
+		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+		my $attribute = Bio::EnsEMBL::Attribute->new
+	       (-CODE => 'hidden_remark',
+	        -NAME => 'Hidden Remark',
+	        -VALUE => $remark);
+		$ng->add_Attributes($attribute);
+		map( $ng->add_Transcript($_), @$nt );
+		push @genes,$ng;
+		$set++;
+	}
+
+	# create the main gene here with same stable id
+	map( $tg->add_Transcript($_), @$gt );
+	my $remark = "Gene 1/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+	my $attribute = Bio::EnsEMBL::Attribute->new
+       (-CODE => 'hidden_remark',
+        -NAME => 'Hidden Remark',
+        -VALUE => $remark);
+	$tg->add_Attributes($attribute) if(@gene_transcripts);
+	push @genes,$tg;
+
+
+	return \@genes;
+}
+
+sub sort_method {
+
+	&get_translatable_trans($b) <=> &get_translatable_trans($a)
+								||
+		  &get_exons_length($b) <=> &get_exons_length($a)
+								||
+					scalar(@$b) <=> scalar(@$a);
+}
+
+sub get_translatable_trans {
+	my ($trans_arr) = @_;
+	my $i;
+	foreach (@$trans_arr) { $i++ if($_->translate); }
+
+	return $i;
+}
+
+sub get_exons_length {
+	my ($trans_arr) = @_;
+	my $l;
+	foreach (@$trans_arr) { $l += $_->length; }
+
+	return $l;
+}
+
 
 sub remove_all_db_ids {
 	my $t = shift;
