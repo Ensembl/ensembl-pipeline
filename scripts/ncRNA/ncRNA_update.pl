@@ -78,22 +78,22 @@ foreach my $species (@speciess){
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild";
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline/Config";
   # set up batchqueue output dirs
+  # start the db set up if required
+  foreach my $species (@speciess){	
+    DB_setup($species,
+	     $CONFIG->{$species}->{"WRITEHOST"},
+	     $CONFIG->{$species}->{"WRITEPORT"},
+	     $WRITEUSER,
+	     $pass,
+	     $CONFIG->{$species}->{"DBHOST"},
+	     $CONFIG->{$species}->{"DBPORT"},
+	     $CONFIG->{$species}->{"DBNAME"},
+	     $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
+  }
   print "Checking config\n";
-  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST
-			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME);
+  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST 
+			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME );
   config_setup(\@localconfigvars,$species);
-}
-# once all config files have been set up for all species, start the db set up
-foreach my $species (@speciess){	
-  DB_setup($species,
-	   $CONFIG->{$species}->{"WRITEHOST"},
-	   $CONFIG->{$species}->{"WRITEPORT"},
-	   $WRITEUSER,
-	   $pass,
-	   $CONFIG->{$species}->{"DBHOST"},
-	   $CONFIG->{$species}->{"DBPORT"},
-	   $CONFIG->{$species}->{"DBNAME"},
-	   $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
 }
 # once thats all done sucessfully start the rule managers
 my $perlpath = $ENV{"PERL5LIB"};
@@ -143,6 +143,7 @@ sub config_setup{
   my $status = 0;
   my $filecount = 0;
   my ($header, $filename, $path, $tempdir);
+  my $db;
   #set env var to avoid warnings
   if(!defined $ENV{"OSTYPE"} ){
     $ENV{"OSTYPE"} = "";
@@ -172,22 +173,40 @@ sub config_setup{
 
   check_vars($vars,$species);
   #check existence of source databases
-			print "$species\n";
-			print $CONFIG->{$species}->{"DBHOST"}," ".
-		 $CONFIG->{$species}->{"DBPORT"}," ".
-		 $CONFIG->{$species}->{"DBNAME"}," "."\n";
+  print "$species\n";
+  print $CONFIG->{$species}->{"DBHOST"}," ".
+          $CONFIG->{$species}->{"DBPORT"}," ".
+	    $CONFIG->{$species}->{"DBNAME"}," "."\n";
 			
-  if(!connect_db(
+  unless( connect_db(
 		 $CONFIG->{$species}->{"DBHOST"},
 		 $CONFIG->{$species}->{"DBPORT"},
 		 $CONFIG->{$species}->{"DBNAME"},
-		 'ensro'))
-    {
+		 'ensro')){
       die "could not find ".$CONFIG->{$species}->{"DBNAME"}."\n";
+  }
+  $db = connect_db(
+		 $CONFIG->{$species}->{"WRITEHOST"},
+		 $CONFIG->{$species}->{"WRITEPORT"},
+		 $CONFIG->{$species}->{"WRITENAME"},
+		 'ensro');
+
+  unless  ( $db ) {
+      die "could not find ".$CONFIG->{$species}->{"WRITENAME"}."\n";
   }
 # add global variables
   push @$vars,"DATADIR";
-  push @$vars,"species"; 
+  push @$vars,"species";
+  # Numbers of slices vary wildly esp with 2x genomes so I am counting slice number for each db
+  # So I can sumbit 50 Blast RFAM and 25 BLast miRNA jobs per species
+  my $slices = sql("SELECT COUNT(*) FROM input_id_analysis WHERE analysis_id = 7",$db)->[0];
+  my $miRNA_batch = int( $slices / 25 );
+  my $RFAM_batch  = int( $slices / 50 );
+  # don't allow a batch size of 0
+  $miRNA_batch = 1 unless $miRNA_batch;
+  $RFAM_batch  = 1 unless $RFAM_batch;
+  print "Have $slices slices, using a batch size of $RFAM_batch for RFAM and " . 
+     " $miRNA_batch for miRNA\n";
   #go thru config info to create defined files,
   #back-up the original, write version with filled-in variables
   open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
@@ -208,13 +227,15 @@ sub config_setup{
       	$configvarref = $DATADIR;
       } 
       elsif ($configvar eq "species") {
-       	$configvarref = $species;     
+       	$configvarref = $species;
       }
        else {
         $configvarref = $CONFIG->{$species}->{$configvar};
       }
       $content =~ s/\<PASS\>/$pass/g;
       $content =~ s/\<$configvar\>/$configvarref/g;
+      $content =~ s/\<MIRNABATCH\>/$miRNA_batch/;
+      $content =~ s/\<RFAMBATCH\>/$RFAM_batch/;
     }
     #write modified file
     $filename = "$DATADIR/$species/$path/$filename";
@@ -538,4 +559,11 @@ sub prepare_RFAM{
 return 0;
 }
 
+sub sql {
+  my ($query,$db) = @_;
+  my $sth = $db->dbc->prepare($query);
+  $sth->execute();
+  my @array = $sth->fetchrow_array;
+  return \@array;
+}
 __END__

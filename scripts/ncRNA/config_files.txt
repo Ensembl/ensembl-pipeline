@@ -111,7 +111,7 @@ use vars qw(%Config);
   QUEUE_CONFIG => [
     {
       logic_name => 'BlastmiRNA',
-      batch_size => 1000,
+      batch_size => <MIRNABATCH>,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
@@ -123,7 +123,7 @@ use vars qw(%Config);
     },
     {
       logic_name => 'RfamBlast',
-      batch_size => 100,
+      batch_size => <RFAMBATCH>,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',
