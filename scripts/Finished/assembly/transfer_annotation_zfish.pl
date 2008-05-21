@@ -357,7 +357,7 @@ eval {
 			my $transcript = $g->get_all_Transcripts;
 
 		  TRANSCRIPT: foreach my $t ( @{ $transcript } ) {
-				my $tt = $t->transform('chromosome',$altassembly);
+				my $tt = &transform($t);
 				if ( defined $tt ) {
 					push @proj_trans, $tt;
 					$support->log_verbose(
@@ -475,6 +475,10 @@ eval {
 						);
 					}
 				}
+				if(scalar(@$genes) -1) {
+					# print info about splitted gene for the annotators
+					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been splitted into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
+				}
 			} else {
 				$support->log_verbose(
 					sprintf(
@@ -502,7 +506,7 @@ INFO: skipped PolyA features: %d/%d\n",
 				$to_assembly,
 				$transfered_genes, ($total_genes+$created_genes),
 				$created_genes,
-				$skipped_g, $total_genes,
+				$skipped_g, ($total_genes+$created_genes),
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)
@@ -556,19 +560,147 @@ foreach my $slice (@from_chrs, @to_chrs) {
 $support->finish_log;
 ### end main
 
+sub transform {
+	my $self = shift;
+	my @coords = ('chromosome',$altassembly);
+	my $new_transcript;
+	if ( !defined $new_transcript ) {
+		my @segments = $self->project(@coords);
+
+		# if it projects, maybe the exons transform well?
+		# lazy load them here
+		return undef if ( !@segments );
+		$self->get_all_Exons();
+	}
+	if ( exists $self->{'_trans_exon_array'} ) {
+		my @new_exons;
+		my ( $low_start, $hi_end, $slice );
+
+		# we want to check whether the transform preserved 5prime 3prime
+		# ordering. This assumes 5->3 order. No complaints on transsplicing.
+		my ( $last_new_start, $last_old_strand, $last_new_strand, $start_exon,
+			 $end_exon, $last_seq_region_name );
+		my $first        = 1;
+		my $ignore_order = 1;
+		my $order_broken = 0;
+		for my $old_exon ( @{ $self->{'_trans_exon_array'} } ) {
+			my $new_exon = $old_exon->transform(@coords);
+			return undef if ( !defined $new_exon );
+			if ( !defined $new_transcript ) {
+				if ( !$first ) {
+					if ( $old_exon->strand() != $last_old_strand ) {
+
+						# transsplicing, ignore ordering
+						$ignore_order = 1;
+					}
+					if ( $new_exon->slice()->seq_region_name() ne
+						 $last_seq_region_name )
+					{
+						return undef;
+					}
+					if (     $last_new_strand == 1
+						 and $new_exon->start() < $last_new_start )
+					{
+						$order_broken = 1;
+					}
+					if (     $last_new_strand == -1
+						 and $new_exon->start() > $last_new_start )
+					{
+						$order_broken = 1;
+					}
+					if ( $new_exon->start() < $low_start ) {
+						$low_start = $new_exon->start();
+					}
+					if ( $new_exon->end() > $hi_end ) {
+						$hi_end = $new_exon->end();
+					}
+				}
+				else {
+					$first     = 0;
+					$low_start = $new_exon->start();
+					$hi_end    = $new_exon->end();
+				}
+				$last_seq_region_name = $new_exon->slice()->seq_region_name();
+				$last_old_strand      = $old_exon->strand();
+				$last_new_start       = $new_exon->start();
+				$last_new_strand      = $new_exon->strand();
+			}
+			if ( defined $self->{'translation'} ) {
+				if ( $self->translation()->start_Exon() == $old_exon ) {
+					$start_exon = $new_exon;
+				}
+				if ( $self->translation()->end_Exon() == $old_exon ) {
+					$end_exon = $new_exon;
+				}
+			}
+			push( @new_exons, $new_exon );
+		}
+		if ( $order_broken && !$ignore_order ) {
+			warning( "Order of exons broken in transform of " . $self->dbID() );
+			return undef;
+		}
+		if ( !defined $new_transcript ) {
+			%$new_transcript = %$self;
+			bless $new_transcript, ref($self);
+			$new_transcript->start($low_start);
+			$new_transcript->end($hi_end);
+			$new_transcript->slice( $new_exons[0]->slice() );
+			$new_transcript->strand( $new_exons[0]->strand() );
+		}
+		$new_transcript->{'_trans_exon_array'} = \@new_exons;
+
+		# should be ok to do inside exon array loop
+		# translations only exist together with the exons ...
+		if ( defined $self->{'translation'} ) {
+			my $new_translation;
+			%$new_translation = %{ $self->{'translation'} };
+			bless $new_translation, ref( $self->{'translation'} );
+			$new_transcript->{'translation'} = $new_translation;
+			$new_translation->start_Exon($start_exon);
+			$new_translation->end_Exon($end_exon);
+		}
+	}
+	if ( exists $self->{'_supporting_evidence'} ) {
+		my @new_features;
+		for my $old_feature ( @{ $self->{'_supporting_evidence'} } ) {
+			my $new_feature = $old_feature->transform(@coords);
+			if ( defined $new_feature ) {
+				push @new_features, $new_feature;
+			}
+		}
+		$new_transcript->{'_supporting_evidence'} = \@new_features;
+	}
+
+	# flush cached internal values that depend on the exon coords
+	$new_transcript->{'transcript_mapper'}   = undef;
+	$new_transcript->{'coding_region_start'} = undef;
+	$new_transcript->{'coding_region_end'}   = undef;
+	$new_transcript->{'cdna_coding_start'}   = undef;
+	$new_transcript->{'cdna_coding_end'}     = undef;
+	return $new_transcript;
+}
+
 
 sub transcripts2genes {
 	my ($tg,$trans) = @_;
 	my @genes;
-	# cluster the transcripts set by chromosome
+	# group the transcripts by seq_region_name and minus/plus strand
 	my $hash_trans;
 	for (@$trans) {
-		$hash_trans->{$_->seq_region_name} ||= [];
-		push @{$hash_trans->{$_->seq_region_name}},$_;
+		$hash_trans->{$_->seq_region_name} ||= {};
+		&parsenpush_trans($hash_trans->{$_->seq_region_name},$_);
 	}
 
+	# Use a hash to split genes that have:
+	# 1. transcripts on different chromosomes
+	# 2. transcripts on different strands
+	# 3. transcript with exons on different strands
+
+
 	# sort the sets by translatable transcripts number, total exons length and transcript number
-	my @gene_transcripts = sort sort_method values(%$hash_trans);
+	my @gene_transcripts;
+	map (push(@gene_transcripts, values %$_), values(%$hash_trans));
+	@gene_transcripts = sort sort_transcripts @gene_transcripts;
 	my $number = scalar @gene_transcripts;
 
 	my $gt = shift @gene_transcripts;
@@ -583,13 +715,27 @@ sub transcripts2genes {
 		$ng->source( $tg->source );
 		$ng->gene_author( $tg->gene_author );
 		$ng->description( $tg->description );
-		$ng->add_Attributes( @{ $tg->get_all_Attributes() } );
+		# add gene attributes and change gene name
+		foreach (@{ $tg->get_all_Attributes() }) {
+			if($_->code eq 'name') {
+				my $attrib = new Bio::EnsEMBL::Attribute->new
+			       (-CODE => $_->code,
+			        -NAME => $_->name,
+			        -DESCRIPTION => $_->description,
+			        -VALUE => $_->value."_$set");
+				$ng->add_Attributes($attrib);
+			} else {
+				$ng->add_Attributes($_);
+			}
+
+		}
 		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
 		my $attribute = Bio::EnsEMBL::Attribute->new
 	       (-CODE => 'hidden_remark',
 	        -NAME => 'Hidden Remark',
 	        -VALUE => $remark);
 		$ng->add_Attributes($attribute);
+
 		map( $ng->add_Transcript($_), @$nt );
 		push @genes,$ng;
 		$set++;
@@ -603,16 +749,25 @@ sub transcripts2genes {
         -NAME => 'Hidden Remark',
         -VALUE => $remark);
 	$tg->add_Attributes($attribute) if(@gene_transcripts);
+	my ($name_attrib) = @{ $tg->get_all_Attributes('name') };
+	# change main gene name
+	$name_attrib->value($name_attrib->value."_1") if(@gene_transcripts);;
 	push @genes,$tg;
-
 
 	return \@genes;
 }
 
-sub sort_method {
+sub sort_transcripts {
 
 	&get_translatable_trans($b) <=> &get_translatable_trans($a)
 								||
+		  &get_exons_length($b) <=> &get_exons_length($a)
+								||
+					scalar(@$b) <=> scalar(@$a);
+}
+
+sub sort_exons {
+
 		  &get_exons_length($b) <=> &get_exons_length($a)
 								||
 					scalar(@$b) <=> scalar(@$a);
@@ -627,11 +782,77 @@ sub get_translatable_trans {
 }
 
 sub get_exons_length {
-	my ($trans_arr) = @_;
+	my ($object_arr) = @_;
 	my $l;
-	foreach (@$trans_arr) { $l += $_->length; }
+	foreach (@$object_arr) { $l += $_->length; }
 
 	return $l;
+}
+
+sub parsenpush_trans{
+	my ($hash,$trans) = @_;
+	my $exon_hash = {};
+	foreach my $exon (@{$trans->get_all_Exons}) {
+		$exon_hash->{$exon->strand} ||= [];
+		push @{$exon_hash->{$exon->strand}}, $exon;
+	}
+
+	if(scalar(keys %{$exon_hash}) == 1) {
+		$hash->{$trans->strand} ||= [];
+		push @{$hash->{$trans->strand}}, $trans;
+	} else {
+		# split transcript with trans splice exons
+		my $translation_stable_id;
+		if ( defined $trans->translation ) {
+			$translation_stable_id = $trans->translation->stable_id;
+			my $remark = "Lost translation $translation_stable_id after transfer of transcript ".$trans->stable_id;
+			my $attribute = Bio::EnsEMBL::Attribute->new
+		       (-CODE => 'hidden_remark',
+		        -NAME => 'Hidden Remark',
+		        -VALUE => $remark);
+		    $trans->add_Attributes($attribute);
+		}
+		my @transcript_exons = sort sort_exons values(%$exon_hash);
+
+		# create two transcripts, 1 on each strand
+		my @attribs = @{$trans->get_all_Attributes()};
+
+		# 2nd transcript
+		my $new_trans;
+		%$new_trans = %$trans;
+		bless $new_trans, ref($trans);
+		$new_trans->{'attributes'} = undef;
+		$new_trans->{'_trans_exon_array'} = pop @transcript_exons;
+		$new_trans->{'stable_id'} = undef;
+		$new_trans->{'translation'} = undef;
+		# Add transcript attribs and change transcript name
+		foreach (@attribs) {
+			if($_->code eq 'name') {
+				my $attrib = new Bio::EnsEMBL::Attribute->new
+			       (-CODE => $_->code,
+			        -NAME => $_->name,
+			        -DESCRIPTION => $_->description,
+			        -VALUE => $_->value.'_2');
+				$new_trans->add_Attributes($attrib);
+			} else {
+				$new_trans->add_Attributes($_);
+			}
+		}
+
+		# 1st transcript
+		$trans->{'_trans_exon_array'} = pop @transcript_exons;
+		$trans->{'translation'} = undef;
+		# Change transcript name
+		foreach (@attribs) { $_->value($_->value.'_1') if($_->code eq 'name'); }
+
+		$trans->recalculate_coordinates();
+		$new_trans->recalculate_coordinates();
+
+		foreach ($trans,$new_trans) {
+			$hash->{$_->strand} ||= [];
+			push @{$hash->{$_->strand}}, $_;
+		}
+	}
 }
 
 
@@ -722,6 +943,9 @@ sub write_gene {
 
 	printf( "\t$seq_id\tgene\t%s\t%s\t%s\n",
 		$g->stable_id, $g->biotype, $g->status );
+#	foreach my $a (@{ $g->get_all_Attributes })	{
+#		printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
+#	}
 
 	my %exon_hash;
 
@@ -748,22 +972,20 @@ sub write_gene {
 				$count++;
 			}
 		}
-		foreach my $key ( keys %{ $exon_hash{$sid} } ) {
-			my ($e) = @{ $exon_hash{$sid}->{$key} };
-
-			printf( "\t$seq_id\texon\t%s\t%d\t%d\t%d\t%d\t%d\n",
-				$e->stable_id, $e->start, $e->end, $e->strand, $e->phase,
-				$e->end_phase );
-		}
 	}
 
 	foreach my $t ( @{ $g->get_all_Transcripts } ) {
-		printf( "\t$seq_id\ttranscript\t%s\t%s\t%s\n",
-			$t->stable_id, $t->biotype, $t->status );
+		printf( "\t$seq_id\ttranscript\t%s\t%s\t%s\t%d\t%d\t%d\n",
+			$t->stable_id, $t->biotype, $t->status, $t->start, $t->end, $t->strand );
 
-		foreach my $e ( @{ $t->get_all_Exons } ) {
-			printf( "\t$seq_id\texon_transcript\t%s\t%s\n",
-				$e->stable_id, $t->stable_id );
+#		foreach my $a (@{ $t->get_all_Attributes })	{
+#			printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
+#		}
+
+		foreach my $e ( @{ $t->get_all_Exons } ) { #sort { $a->start cmp $b->start }
+			printf( "\t$seq_id\texon_transcript\t%s\t%d\t%d\t%d\t%d\t%d\n",
+				$e->stable_id, $e->start, $e->end, $e->strand, $e->phase,
+				$e->end_phase );
 		}
 		eval {
 			if ( $t->translation )
