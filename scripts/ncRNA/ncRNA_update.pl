@@ -79,17 +79,16 @@ foreach my $species (@speciess){
   system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline/Config";
   # set up batchqueue output dirs
   # start the db set up if required
-  foreach my $species (@speciess){	
-    DB_setup($species,
-	     $CONFIG->{$species}->{"WRITEHOST"},
-	     $CONFIG->{$species}->{"WRITEPORT"},
-	     $WRITEUSER,
-	     $pass,
-	     $CONFIG->{$species}->{"DBHOST"},
-	     $CONFIG->{$species}->{"DBPORT"},
-	     $CONFIG->{$species}->{"DBNAME"},
-	     $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
-  }
+  DB_setup($species,
+	   $CONFIG->{$species}->{"WRITEHOST"},
+	   $CONFIG->{$species}->{"WRITEPORT"},
+	   $WRITEUSER,
+	   $pass,
+	   $CONFIG->{$species}->{"DBHOST"},
+	   $CONFIG->{$species}->{"DBPORT"},
+	   $CONFIG->{$species}->{"DBNAME"},
+	   $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
+
   print "Checking config\n";
   my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST 
 			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME );

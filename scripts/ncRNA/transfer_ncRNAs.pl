@@ -133,13 +133,13 @@ my $sdb = new Bio::EnsEMBL::DBSQL::DBAdaptor
 # and the server is quieter generally
 
 # old data base on livemirror - useful to have sometimes
-#my $olddb = new Bio::EnsEMBL::DBSQL::DBAdaptor
-#  (
-#   -host   => $dnahost,
-#   -user   => 'ensro',
-#   -port   => 3306,
-#   -dbname => $dnadbname,
-#  );
+my $olddb = new Bio::EnsEMBL::DBSQL::DBAdaptor
+  (
+   -host   => $dnahost,
+   -user   => 'ensro',
+   -port   => 3306,
+   -dbname => $dnadbname,
+  );
 
 
 my $final_db = new Bio::EnsEMBL::DBSQL::DBAdaptor
@@ -162,7 +162,8 @@ my $sga = $sdb->get_GeneAdaptor;
 my $ssa = $sdb->get_SliceAdaptor;
 my $saa = $sdb->get_AnalysisAdaptor;
 my $final_sa = $final_db->get_SliceAdaptor;
-#my $old_sa =   $olddb->get_SliceAdaptor;
+my $old_sa = $olddb->get_SliceAdaptor;
+my $old_ga = $olddb->get_GeneAdaptor;
 my $final_aa = $final_db->get_AnalysisAdaptor;
 my $analysis;
 # just dump the xrefs
@@ -180,8 +181,9 @@ check_meta($sdb,$final_db);
 print "fetching and lazy-loading new predictions...\n";
 my $new_hash = fetch_genes($sga,$biotype,$biotype_to_skip,$fbs,\@genestoignore);
 print "\nfetching and lazy-loading old predictions...\n";
-#my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
 my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
+#my $old_hash = fetch_genes($old_ga,$biotype,$fbs);
+
 
 print "\nFound ".scalar(keys %$new_hash)." new predictions\n";
 print "Found ".scalar(keys %$old_hash)." old predictions\n";

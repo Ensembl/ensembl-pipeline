@@ -147,7 +147,7 @@ use vars qw(%Config);
     }, 
        {
       logic_name => 'ncRNA',
-      batch_size => 50,
+      batch_size => 500,
       resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
       retries    => 3,
       sub_args   => '',

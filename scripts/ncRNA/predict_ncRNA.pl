@@ -134,7 +134,7 @@ SPECIES:  foreach my $species (@speciess){
       # fetch them by familly!!!!!!!!!
       my %thr;
       my @domcount =  @{sql("select count(*) , LEFT(hit_name,7) from dna_align_feature where  analysis_id = ". $RFanalysis->dbID .
-			    " group by LEFT(hit_name,7) limit 10 ;",$sdb)};
+			    " group by LEFT(hit_name,7) ;",$sdb)};
       foreach my $dom (@domcount){
 	$thr{$dom->[1]} = $dom->[0];
       }
@@ -143,7 +143,7 @@ SPECIES:  foreach my $species (@speciess){
       my $complete;
       my $last;
       print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
-      foreach my $domain (keys %thr){
+      foreach my $domain (sort keys %thr){
 	$count ++;
 	my @dafs;
 	if ($thr{$domain} > 2000){
@@ -170,7 +170,6 @@ SPECIES:  foreach my $species (@speciess){
 	  push @{$rfam_blasts{$domain}},$daf;
 	}
     }
-    
       print "\nGenerating Flags\n";
       
       foreach my $domain(keys %rfam_blasts){
