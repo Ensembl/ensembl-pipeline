@@ -226,8 +226,12 @@ generate_new_ids($new_hash,$final_ga,$blacklist,$mapping_session) unless ($no_st
 
 # delete
 delete_genes($old_hash,$final_ga,$merge_set ) if $delete;
-
-
+ 
+# need to clear out the xrefs as miRBase complicted things by changing the xref names without 
+# changing the accessions which causes the API to go a little nuts
+print "Deleting old unused ncRNA xrefs\n" if $write;
+delete_sql("DELETE xref FROM xref LEFT JOIN object_xref ON xref.xref_id = object_xref.xref_id
+WHERE external_db_id in(3300, 4200) and object_xref.xref_id is null",$final_db) if $write;
 
 # write
 write_genes($new_hash,$blacklist,$final_ga) if $write;
@@ -484,18 +488,16 @@ sub generate_new_ids{
   my ($ncRNAs,$ga,$list,$last_session) = @_;
   my ($gsp,$gsi,$tsp,$tsi,$esp,$esi);
   # ensembl_ids all have 11 numbers at the end and an indeterminate number of letters at the start
-  # this gets around a problem with the tetroadon dataset which has some weird stable ids...
-  my $tetroadon_hack ;
-  $tetroadon_hack = " WHERE stable_id like 'GSTEN%' " if $final_dbname =~ /tetraodon_nigroviridis_core/;
-  if (sql("SELECT max(stable_id) from gene_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+
+  if (sql("SELECT max(stable_id) from gene_stable_id;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $gsp = $1;
     $gsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from transcript_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from transcript_stable_id;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $tsp = $1;
     $tsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from exon_stable_id $tetroadon_hack;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from exon_stable_id;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $esp = $1;
     $esi = $2;
   }
@@ -664,6 +666,13 @@ sub sql {
   return \@array;
 }
 
+sub delete_sql {
+  my ($query,$db) = @_;
+  my $sth = $db->dbc->prepare($query);
+  $sth->execute();
+  return;
+}
+
 sub fetch_genes {
   my ($ga,$biotype,$biotype_to_skip,$slice,$genestoignore) = @_;
   my %ncRNA_hash;
@@ -690,6 +699,9 @@ sub fetch_genes {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
 	next if  $ncRNA->description =~ /RNAI/;
+	# we get these following types in human - want to keep them
+	next if  $ncRNA->biotype =~ /pseudogene/;
+	next if  $ncRNA->biotype eq 'scRNA';
 	#skip selected genes
 	foreach my $genestoignore (@$genestoignore){
 	  next if  $ncRNA->description =~ /$genestoignore/;
@@ -709,6 +721,9 @@ sub fetch_genes {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	next if  $ncRNA->biotype =~ /Mt_/;
 	next if  $ncRNA->description =~ /RNAI/;
+	# we get these following types in human - want to keep them
+	next if  $ncRNA->biotype =~ /pseudogene/;
+	next if  $ncRNA->biotype eq 'scRNA';
 	foreach my $genestoignore (@$genestoignore){
 	  next if  $ncRNA->description =~ /$genestoignore/;
 	}
