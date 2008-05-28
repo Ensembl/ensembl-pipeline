@@ -183,7 +183,8 @@ my $seqset_info     = {};
 				$end_value{$set} = $chr_end;
 			}
 		}
-		$contigs_hashref->{ $acc . $sv . $set } = [
+		my $contig_key = $acc.$sv.$ctg_start.$ctg_end.$set;
+		$contigs_hashref->{ $contig_key } = [
 			$agp_chr_name, $chr_start, $chr_end,
 			$ctg_start,    $ctg_end,   $ctg_ori,
 			$acc,          $sv,        $set
@@ -206,7 +207,7 @@ my $seqset_info     = {};
 }
 
 #
-# Load the sequence data set into the Pipeline database
+# Load the sequence data set into the target database
 #
 {
 	print STDOUT
@@ -256,11 +257,8 @@ my $seqset_info     = {};
 				undef, $cs_version );
 		};
 		if ($slice) {
-			print STDOUT "Sequence set <$set_name> is already in database <$name>\n";
-			throw(  "There is a difference in size for $set_name: stored ["
-				  . $slice->length. "] =! new [". $endv. "]" )
-			unless ( $slice->length eq $endv );
-			$asm_seq_reg_id{$set_name} = $slice->get_seq_region_id;
+			$dbh->rollback;
+			throw("Sequence set $set_name is already in database <".$target_dbc->dbname.">");
 		}
 		else {
 			$slice = &make_slice( $set_name, 1, $endv, $endv, 1, $super_cs );
@@ -283,38 +281,32 @@ my $seqset_info     = {};
 		my $sequence_set = $_->[8];
 		my $chr_start    = $_->[1];
 		my $chr_end      = $_->[2];
-		my $ctg_start    = $_->[3];
-		my $ctg_end      = $_->[4];
-		my $ctg_ori      = $_->[5];
+		my $contig_start = $_->[3];
+		my $contig_end   = $_->[4];
+		my $contig_ori   = $_->[5];
 		my $acc          = $_->[6];
 		my $ver          = $_->[7];
 		my $acc_ver      = $acc . "." . $ver;
 
 		my $clone;
+		my $clone_length;
 		my $clone_seq_reg_id;
 		my $contig;
-		my $contig_name = $acc_ver . "." . "1" . ".";
+		my $contig_name = $acc_ver . ".1.";
 		my $ctg_seq_reg_id;
-		my $seqlen;
+
+
 		eval {
 			$clone = $slice_a->fetch_by_region( 'clone', $acc_ver );
-			$seqlen = $clone->length;
-			$contig_name .= $seqlen;
+			$clone_length = $clone->length;
+			$contig_name .= $clone_length;
 			$contig = $slice_a->fetch_by_region( 'contig', $contig_name );
 		};
 		if ( $clone && $contig ) {
-			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in the database\n";
+			print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in database\n";
 			$clone_seq_reg_id = $clone->get_seq_region_id;
 			$ctg_seq_reg_id   = $contig->get_seq_region_id;
-		}
-		elsif ( $clone && !$contig ) {
-			$dbh->rollback;
-			### code to be added to create contigs related to the clone
-			throw(
-				"Missing contig entry in the database for clone ${acc_ver}"
-			);
-		}
-		else {
+		} else {
 			##fetch the dna sequence from pfetch server with acc_ver id
 			my $seqobj;
 			eval {
@@ -324,42 +316,48 @@ my $seqset_info     = {};
 				$dbh->rollback;
 				throw($@);
 			}
-			my $seq = $seqobj->seq;
-			$seqlen = $seqobj->length;
-			$contig_name .= $seqlen;
+			$clone_length = $seqobj->length;
+			$contig_name .= $clone_length unless $clone;
+			my $contig_seq = $seqobj->seq;
 
-			##make clone and insert clone to seq_region table
-			$clone = &make_slice( $acc_ver, 1, $seqlen, $seqlen, 1, $clone_cs );
-			$clone_seq_reg_id = $slice_a->store($clone);
-			if(!$clone_seq_reg_id) {
-				$dbh->rollback;
-				throw("clone seq_region_id has not been returned for the accession $acc_ver");
+
+			if(! $clone){
+				##make clone and insert clone to seq_region table
+				$clone = &make_slice( $acc_ver, 1, $clone_length, $clone_length, 1, $clone_cs );
+				$clone_seq_reg_id = $slice_a->store($clone);
+				if(!$clone_seq_reg_id) {
+					$dbh->rollback;
+					throw("clone seq_region_id has not been returned for the accession $acc_ver");
+				}
+				##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
+				$attr_a->store_on_Slice( $clone,
+					&make_clone_attribute( $acc, $ver ) );
+			} else {
+				print STDOUT "\tclone < ${acc_ver} > is already in database\n";
+				$clone_seq_reg_id = $clone->get_seq_region_id;
 			}
 
-			##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
-			$attr_a->store_on_Slice( $clone,
-				&make_clone_attribute( $acc, $ver ) );
-
-			##make contig and insert contig, and associated dna sequence to seq_region & dna table
-			$contig =
-			  &make_slice( $contig_name, 1, $seqlen, $seqlen, 1, $contig_cs );
-			$ctg_seq_reg_id = $slice_a->store( $contig, \$seq );
-			if(!$ctg_seq_reg_id){
-				$dbh->rollback;
-				throw("contig seq_region_id has not been returned for the contig $contig_name");
+			if(!$contig) {
+				##make contig and insert contig, and associated dna sequence to seq_region & dna table
+				$contig = &make_slice( $contig_name, 1, $clone_length,$clone_length, 1, $contig_cs );
+				$ctg_seq_reg_id = $slice_a->store( $contig, \$contig_seq );
+				if(!$ctg_seq_reg_id){
+					$dbh->rollback;
+					throw("contig seq_region_id has not been returned for the contig $contig_name");
+				}
 			}
 		}
+
 		##insert super cs to contig assembly data into assembly table
 		$insert_sth->execute( $asm_seq_reg_id{$sequence_set}, $ctg_seq_reg_id,
-			$chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori );
+			$chr_start, $chr_end, $contig_start, $contig_end, $contig_ori );
 		##insert clone to contig assembly data into assembly table
-		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $seqlen, 1,
-			$seqlen, 1 );
+		$insert_sth->execute( $clone_seq_reg_id, $ctg_seq_reg_id, 1, $clone_length, 1,
+			$clone_length, 1 );
 
 		##prime the input_id_analysis table
 		$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' )
 			if($do_submit && $name =~ /pipe_/);
-
 	}
 	$dbh->commit;
 
@@ -392,7 +390,7 @@ sub make_seq_set_attribute {
 	my @attrib;
 
 	$hide = defined($hide) ? $hide : 1;
-	$write = defined($write) ? $write : 1;
+	$write = defined($write) ? $write : 0;
 
 	push @attrib,
 	  &make_attribute(
