@@ -42,6 +42,7 @@ my $merge_set;
 my @genestoignore = ();
 my $makewhitelist = 0;
 my $new_release;
+my $use_old_ncRNAs;
 
 $| = 1;
 
@@ -64,6 +65,7 @@ $| = 1;
 	    'makewhitelist!' => \$makewhitelist,
 	    'release:s'  => \$new_release,
 	    'merge!'     => \$merge,
+	    'use_old_ncRNAs!'  => \$use_old_ncRNAs
 	   );
 
 die("transfer_ncRNAs\n-pass $pass  * 
@@ -83,6 +85,7 @@ die("transfer_ncRNAs\n-pass $pass  *
 -no_ids $no_stable_ids (do the load without any stable ids)
 -release $new_release ( the number of the release ie 44 )*
 -merge ( special case for human where there are Sean Eddys genes that we want to keep except for where we have a better prediction )
+-use_old_ncRNAs  Fetch the old ncRNAs from the dna db on livemirror ( usually ) useful if the core db on staging has no ncRNAs in it
 * = essential\n")
   unless ($pass && $final_port && $final_host && $final_dbname &&  $new_release);
 
@@ -157,7 +160,7 @@ $sdb->dnadb($final_db);
 print "$species: Using data in $final_dbname\@$final_host:$final_port\n" ; 
 die ("Cannot find databases ") unless $final_db  && $sdb;
 my $final_ga = $final_db->get_GeneAdaptor;
-#my $old_ga =   $olddb->get_GeneAdaptor;
+my $old_ga =   $olddb->get_GeneAdaptor;
 my $sga = $sdb->get_GeneAdaptor;
 my $ssa = $sdb->get_SliceAdaptor;
 my $saa = $sdb->get_AnalysisAdaptor;
@@ -178,12 +181,16 @@ if ($dump){
 check_exdb($final_db);
 check_meta($sdb,$final_db);
 
-print "fetching and lazy-loading new predictions...\n";
-my $new_hash = fetch_genes($sga,$biotype,$biotype_to_skip,$fbs,\@genestoignore);
-print "\nfetching and lazy-loading old predictions...\n";
-my $old_hash = fetch_genes($final_ga,$biotype,$fbs);
-#my $old_hash = fetch_genes($old_ga,$biotype,$fbs);
-
+print "fetching and lazy-loading new predictions from $dbname @ $host....\n";
+my $new_hash = fetch_genes($sga,$biotype,$biotype_to_skip,$fbs,\@genestoignore,$ssa);
+my $old_hash;
+if ($use_old_ncRNAs){
+  print "Fetching old ncRNAs from previous release $dnadbname @ $dnahost....\n";
+  $old_hash = fetch_genes($old_ga,$biotype_to_skip,$biotype,$fbs,\@genestoignore,$old_sa);
+} else {
+  print "Fetching old ncRNAs from previous release $final_dbname @ $final_host....\n";
+  $old_hash = fetch_genes($final_ga,$biotype,$biotype_to_skip,$fbs,\@genestoignore,$final_sa);
+}
 
 print "\nFound ".scalar(keys %$new_hash)." new predictions\n";
 print "Found ".scalar(keys %$old_hash)." old predictions\n";
@@ -212,7 +219,11 @@ my $repeats = at_content( $new_hash );
 
 print "Overlaps\n";
 # non-coding overlaps
+if ($use_old_ncRNAs){
+($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $old_sa , $old_ga);
+} else {
 ($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $final_sa , $final_ga);
+}
 
 # make blacklist of genes to drop
 my $blacklist = blacklist($overhangs,$duplications,$coding_overlaps,$repeats);
@@ -643,7 +654,7 @@ sub dump_xrefs {
       my @xrefs = @{$trans->get_all_DBEntries};
       if (@xrefs){
 	foreach my $xref (@xrefs) {
-	  next unless ($xref->dbname eq 'miRBase' or $xref->dbname eq 'RFAM');
+	  next unless ($xref->dbname eq 'miRBase' or $xref->dbname eq 'RFAM' or $xref->dbname eq 'HGNC');
 	  print XREFS $gene->dbID."\t";
 	  print XREFS $trans->dbID."\t";
 	  print XREFS $xref->dbname."\t"; 
@@ -674,12 +685,13 @@ sub delete_sql {
 }
 
 sub fetch_genes {
-  my ($ga,$biotype,$biotype_to_skip,$slice,$genestoignore) = @_;
+  my ($ga,$biotype,$biotype_to_skip,$slice,$genestoignore,$sa) = @_;
   my %ncRNA_hash;
   my @ncRNAs;
+  my %ignored_ncRNAs;
   throw("Cannot fetch genes without gene adaptor $ga") unless $ga;
   if ($slice){
-    my @slices = @{$final_sa->fetch_all('toplevel')};
+    my @slices = @{$sa->fetch_all('toplevel')};
     my $inc = scalar(@slices) / 20;
     print STDERR "|------------------|\r|";
     foreach my $slice (@slices){
@@ -697,11 +709,15 @@ sub fetch_genes {
       }
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
-	next if  $ncRNA->biotype =~ /Mt_/;
+	unless ($ncRNA->biotype eq 'miRNA' or
+		$ncRNA->biotype eq 'misc_RNA' or
+		$ncRNA->biotype eq 'snRNA' or
+		$ncRNA->biotype eq 'snoRNA' or
+		$ncRNA->biotype eq 'rRNA') {
+	  $ignored_ncRNAs{$ncRNA->biotype} ++;
+	  next;
+	}
 	next if  $ncRNA->description =~ /RNAI/;
-	# we get these following types in human - want to keep them
-	next if  $ncRNA->biotype =~ /pseudogene/;
-	next if  $ncRNA->biotype eq 'scRNA';
 	#skip selected genes
 	foreach my $genestoignore (@$genestoignore){
 	  next if  $ncRNA->description =~ /$genestoignore/;
@@ -719,18 +735,26 @@ sub fetch_genes {
       }      
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
-	next if  $ncRNA->biotype =~ /Mt_/;
+	unless ($ncRNA->biotype eq 'miRNA' or
+		$ncRNA->biotype eq 'misc_RNA' or
+		$ncRNA->biotype eq 'snRNA' or
+		$ncRNA->biotype eq 'snoRNA' or
+		$ncRNA->biotype eq 'rRNA') {
+	  $ignored_ncRNAs{$ncRNA->biotype} ++;
+	  next;
+	}
 	next if  $ncRNA->description =~ /RNAI/;
-	# we get these following types in human - want to keep them
-	next if  $ncRNA->biotype =~ /pseudogene/;
-	next if  $ncRNA->biotype eq 'scRNA';
 	foreach my $genestoignore (@$genestoignore){
 	  next if  $ncRNA->description =~ /$genestoignore/;
 	}
 	$ncRNA_hash{$ncRNA->dbID} = lazy_load($ncRNA);
-      } 
+      }
     }
   print STDERR  "\n";
+  print "Ignoring the following ncRNAs:\n";
+  foreach my $key ( keys %ignored_ncRNAs ) {
+    print "\t$key\t" . $ignored_ncRNAs{$key} . "\n";
+  }
   return \%ncRNA_hash;
 }
 
