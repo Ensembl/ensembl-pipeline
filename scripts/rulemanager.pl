@@ -372,7 +372,7 @@ sub setup_pipeline{
       $accumulator_analyses, $always_incomplete_accumulators, 
       $ids_to_run, $ids_to_skip, $types_to_run, $types_to_skip,
       $starts_from, $rulemanager) = @_;
-
+  print "***SETTING UP PIPELINE*****\n";
   $rulemanager->rules_setup($analyses_to_run, $analyses_to_skip, 
                             $all_rules, $accumulator_analyses, 
                             $always_incomplete_accumulators);

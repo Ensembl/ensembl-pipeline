@@ -66,7 +66,7 @@ use strict;
 sub new{
   my ($class, @args) = @_;
   my $self = $class->SUPER::new(@args);
-
+  #print "CREATING ".$self." with ".join(" ", @args)."\n";
   $self->{'bsub'} = undef;
   
   return $self;
@@ -123,7 +123,7 @@ sub construct_command_line{
   }
   $bsub_line .= " -q ".$self->queue    if $self->queue;
   $bsub_line .= " -J ".$self->jobname  if $self->jobname;
-  $bsub_line .= " ".$self->parameters." "  if defined $self->parameters;
+  $bsub_line .= " ".$self->parameters." "  if ($self->parameters);
   if($stderr){
     $bsub_line .= " -e ".$stderr;
   }else{

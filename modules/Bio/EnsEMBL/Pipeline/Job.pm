@@ -329,7 +329,7 @@ sub flush_runs {
       $parameters = $queue->{retry_sub_args} if($queue->{retry_sub_args});
       $resources = $queue->{retry_resource} if($queue->{retry_resource});
     }
-
+    #print "HAVE PARAMETERS ".$parameters."\n";
     my $batch_job = $batch_q_module->new
       (
        -STDOUT     => $lastjob->stdout_file,
@@ -661,7 +661,6 @@ sub set_status {
     warning("No database connection.  Can't set status to $arg");
     return;
   }
-  
   return $self->adaptor->set_status( $self, $arg );
 }
 
@@ -959,11 +958,12 @@ sub set_up_queues {
 
   foreach my $queue (@$QUEUE_CONFIG) {
     my $ln = $queue->{logic_name};
-
+    #print "LOOKING AT ".$ln."\n";
     next unless $ln;
 
     while (my($k, $v) = each %$queue) {
       next if $k eq 'logic_name';
+      #print "PREPARING ".$k." ".$v." entry\n";
       $q{$ln}{$k}     = $v;
     }
     $q{$ln}{jobs} = [];
@@ -981,6 +981,7 @@ sub set_up_queues {
     $q{$ln}{retry_queue}     ||= $DEFAULT_RETRY_QUEUE;
     $q{$ln}{retry_resource}  ||= $DEFAULT_RETRY_RESOURCE;
     $q{$ln}{retry_sub_args}  ||= $DEFAULT_RETRY_SUB_ARGS;
+    #print "HAVE SUB ARGS ".$q{$ln}{sub_args}."\n";
   }
 
   # a default queue for everything else

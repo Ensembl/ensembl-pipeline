@@ -1048,10 +1048,12 @@ sub rules_setup{
   my ($self, $analyses_to_run, $analyses_to_skip, $all_rules,
      $accumulator_analyses, $incomplete_accumulators) =@_;
   my @rules;
-
+  #print "SETTING UP RULES\n";
   if (keys(%$analyses_to_run)) {
     foreach my $rule (@$all_rules) {
+      #print "CHECKING RULE ".$rule->goalAnalysis->logic_name."\n";
       if (exists($analyses_to_run->{$rule->goalAnalysis->dbID})) {
+        #print "ADDING RULE\n";
         push (@rules, $rule);
       } elsif ($accumulator_analyses->{$rule->goalAnalysis->logic_name}) {
         $incomplete_accumulators->{$rule->goalAnalysis->logic_name} = 1;

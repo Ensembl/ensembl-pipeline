@@ -105,6 +105,7 @@ foreach my $id (@ARGV) {
       $submission_id_not = 1;
       $job->submission_id($ENV{'LSB_JOBID'});
     }
+    #print "SETTING STATUS to WAITING\n";
     $job->set_status('WAITING');
     push(@jobs, $job);
 }
