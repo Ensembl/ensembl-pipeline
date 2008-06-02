@@ -500,20 +500,20 @@ sub generate_new_ids{
   my ($gsp,$gsi,$tsp,$tsi,$esp,$esi);
   # ensembl_ids all have 11 numbers at the end and an indeterminate number of letters at the start
   # The stable id not like SIN% is to fix a problem with the old stable ids that were retired in fugu
-  if (sql("SELECT max(stable_id) from gene_stable_id WHERE stable_id not like 'SIN%' ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if (sql("SELECT max(stable_id) from gene_stable_id WHERE left(stable_id,3) not in ('SIN','NEW') ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $gsp = $1;
     $gsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from transcript_stable_id WHERE stable_id not like 'SIN%' ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from transcript_stable_id WHERE left(stable_id,3) not in ('SIN','NEW') ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $tsp = $1;
     $tsi = $2;
   }
-  if ( sql("SELECT max(stable_id) from exon_stable_id WHERE stable_id not like 'SIN%' ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(stable_id) from exon_stable_id WHERE left(stable_id,3) not in ('SIN','NEW');",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     $esp = $1;
     $esi = $2;
   }
   # check stable ids of dead genes are not higher than the maximum in the gene stable id table
-  if (sql("SELECT max(gene_stable_id) from gene_archive WHERE gene_stable_id not like 'SIN%' ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if (sql("SELECT max(gene_stable_id) from gene_archive WHERE left(gene_stable_id,3) not in ('SIN','NEW') ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     if ($2 > $gsi){
       print "dead gene with higher id $gsp$gsi\n";
       $gsp = $1;
@@ -521,7 +521,7 @@ sub generate_new_ids{
       print " becomes $gsp$gsi\n";
     }
   }
-  if ( sql("SELECT max(transcript_stable_id) from gene_archive  WHERE transcript_stable_id not like 'SIN%' ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
+  if ( sql("SELECT max(transcript_stable_id) from gene_archive  WHERE  left(transcript_stable_id,3) not in ('SIN','NEW') ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     if ($2 > $tsi){
       print "dead trans with higher id $tsp$tsi";
       $tsp = $1;
