@@ -225,7 +225,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $total_sf         = 0;
 	my $transfered_sf    = 0;
 	my $skipped_sf       = 0;
-	my $skipped_g       = 0;
+	my $skipped_g        = 0;
 
 	my $sth_cs = $dbh->prepare($sql_sr_update);
 	$sth_cs->execute( $A_chr, $altassembly ) unless ( !$cs_change );
@@ -250,28 +250,25 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 	# Lock the reference and alternative assemblies
 	my ($cb,$author_obj);
-	if($write){
-		my $refslice_locked = 0;
-		eval {
-			$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
-			$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
-			$support->log_verbose("Locking $R_chr\n");
-			$cb->lock_clones_by_slice($ref_sl,$author_obj,$vega_db);
-			$refslice_locked = 1;
-		};
-		if($@){
-			warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
-			# remove the stored locks on the reference slice in case alt slice locking fails
-			$cb->remove_by_slice($ref_sl,$author_obj,$vega_db) if $refslice_locked;
+	my $refslice_locked = 0;
+	eval {
+		$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
+		$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
+		$support->log_verbose("Locking $R_chr\n");
+		$cb->lock_clones_by_slice($ref_sl,$author_obj,$vega_db);
+		$refslice_locked = 1;
+	};
+	if($@){
+		warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
+		# remove the stored locks on the reference slice in case alt slice locking fails
+		$cb->remove_by_slice($ref_sl,$author_obj,$vega_db) if $refslice_locked;
 
 			$sth_cs->execute( $A_chr, $support->param('altassembly') )
-			  unless ( !$cs_change );
-			$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
-			$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
+		  unless ( !$cs_change );
+		$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+		$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 
 			next SET;
-		}
-
 	}
 
 	$dbh->begin_work;
@@ -563,15 +560,12 @@ INFO: skipped PolyA features: %d/%d\n",
 	}
 
 	# remove the assemblies locks
-	if($write){
-		eval {
-			$support->log_verbose("Removing $R_chr Locks\n");
-			$cb->remove_by_slice($ref_sl,$author_obj,$vega_db);
-		};
-		if($@){
-			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
-		}
-
+	eval {
+		$support->log_verbose("Removing $R_chr Locks\n");
+		$cb->remove_by_slice($ref_sl,$author_obj,$vega_db);
+	};
+	if($@){
+		warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
 	}
 
 	$sth_cs->execute( $A_chr, $support->param('altassembly') )
