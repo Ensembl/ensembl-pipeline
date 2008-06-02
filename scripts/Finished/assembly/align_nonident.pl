@@ -317,10 +317,6 @@ while (my $row = $sth->fetchrow_hashref) {
 
   $support->log_stamped("Done with block $id.\n", 1);
 
-  # filter overlapping Vega alignment regions
-	$support->log_stamped("Filtering overlapping reference alignment regions...\n");
-	$aligner->filter_overlaps;
-	$support->log_stamped("Done.\n");
 
 	# write alignments to assembly table
 	$aligner->write_assembly($R_dba, [$row->{'ref_seq_region_name'}], [$row->{'alt_seq_region_name'}]);
