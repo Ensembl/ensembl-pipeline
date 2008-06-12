@@ -160,8 +160,6 @@ $support->param( 'interactive', 0 );    # stop that garbage from coming up
 
 my $write_db = not $support->param('dry_run');
 
-my $exctype = $support->param('exctype') || '';
-
 # ask user to confirm parameters to proceed
 $support->confirm_params;
 
@@ -250,15 +248,7 @@ my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
 
 my $sth1 = $R_dbh->prepare(
-	$exctype
-	? qq{
-    INSERT IGNORE INTO assembly_exception (exc_seq_region_id, seq_region_id,
-                                           exc_seq_region_start, exc_seq_region_end,
-                                           seq_region_start, seq_region_end,
-                                           ori, exc_type)
-    VALUES (?, ?, ?, ?, ?, ?, 1, '$exctype')
-}
-	: qq{
+	qq{
     INSERT IGNORE INTO assembly (asm_seq_region_id, cmp_seq_region_id,
                                  asm_start, asm_end, cmp_start, cmp_end, ori)
     VALUES (?, ?, ?, ?, ?, ?, 1)
@@ -295,6 +285,10 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $A_chr = $A_chr_list[$i];
 	my $match   = {};
 	my $nomatch = {};
+	my ($i,$j)  = (0,0);
+	my ($left,$right,$type,$tag);
+	my $match_flag = 0;
+	my %stats_chr;
 
 	$support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
 
@@ -325,19 +319,27 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		map ($_->[1] += ($R_start-1) , @R_components);
 	}
 
-	my $i          = 0;
-	my $j          = 0;
-	my ($left,$right,$type,$tag);
-	my $match_flag = 0;
-	my %stats_chr;
-
 	my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
 
 	# loop over sdiff results
-	foreach my $diff (@assembly_diffs)  {
+	DIFF: foreach my $diff (@assembly_diffs)  {
 		$type = $diff->[0];
 		($left,$right,$tag) = ('-','-','');
 		($i,$j) = (0,0);
+		if($type eq '+'){
+			$right = &get_cmp_key($diff->[2],1);
+			$tag = '>';
+		}elsif($type eq '-'){
+			$left = &get_cmp_key($diff->[1],1);
+			$tag = '<';
+		}elsif($type eq 'u'){
+			$left = &get_cmp_key($diff->[1],1);
+			$right = &get_cmp_key($diff->[2],1);
+		}elsif($type eq 'c'){
+			$left = &get_cmp_key($diff->[1],1);
+			$right = &get_cmp_key($diff->[2],1);
+			$tag = '|';
+		}
 
 		if($type eq 'u') {
 			($i,$j) = (1,1);
@@ -357,25 +359,60 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				($i,$j) = (1,1);
 				my ($R_acc, $R_sv) = split '.',$diff->[1]->to_Slice->seq_region_name;
 				my ($A_acc, $A_sv) = split '.',$diff->[2]->to_Slice->seq_region_name;
-				$stats_chr{'mismatch'}++ if ($R_acc eq $A_acc && $R_sv eq $A_sv);
+
+				if ( $R_acc eq $A_acc && $R_sv eq $A_sv ) {
+
+					$stats_chr{$R_chr}->{'mismatch'}++;
+
+					my ( $R_chr_start, $R_chr_end ) =
+					  ( $diff->[1]->from_start, $diff->[1]->from_end );
+					my ( $R_ctg_start, $R_ctg_end ) =
+					  ( $diff->[1]->to_Slice->start,
+						$diff->[1]->to_Slice->end );
+					my $R_ctg_strand = $diff->[1]->to_Slice->strand;
+					my $R_coords = [
+									 $R_ctg_start, $R_ctg_end, $R_chr_start,
+									 $R_chr_end,   $R_ctg_strand
+					];
+
+					my ( $A_chr_start, $A_chr_end ) =
+					  ( $diff->[2]->from_start, $diff->[2]->from_end );
+					my ( $A_ctg_start, $A_ctg_end ) =
+					  ( $diff->[2]->to_Slice->start,
+						$diff->[2]->to_Slice->end );
+					my $A_ctg_strand = $diff->[2]->to_Slice->strand;
+					my $A_coords = [
+									 $A_ctg_start, $A_ctg_end, $A_chr_start,
+									 $A_chr_end,   $A_ctg_strand
+					];
+
+					my $blocks = &parse_projections( $R_coords, $A_coords );
+
+					foreach my $block (@$blocks) {
+						my ( $R_s, $R_e, $A_s, $A_e, $tag, $ori ) = @$block;
+						if ($ori) {
+							$support->log("start a new align block\n");
+							push @{ $match->{$R_chr} },
+							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr, $ori ];
+						}
+						else {
+							if ( $tag == -1 ) {
+								$support->log(
+									   "start a new overlap non-align block\n");
+								push @{ $nomatch->{$R_chr} },
+								  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr ];
+							}
+						}
+					}
+					$match_flag = 2;
+					$support->log(       sprintf( "%-40s\t%-10s %-40s\n", $left, $tag, $right )
+					);
+					next DIFF;
+				}
+
 			}
 			found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
 			$match_flag = 0;
-		}
-
-		if($type eq '+'){
-			$right = &get_cmp_key($diff->[2],1);
-			$tag = '>';
-		}elsif($type eq '-'){
-			$left = &get_cmp_key($diff->[1],1);
-			$tag = '<';
-		}elsif($type eq 'u'){
-			$left = &get_cmp_key($diff->[1],1);
-			$right = &get_cmp_key($diff->[2],1);
-		}elsif($type eq 'c'){
-			$left = &get_cmp_key($diff->[1],1);
-			$right = &get_cmp_key($diff->[2],1);
-			$tag = '|';
 		}
 
 		$support->log(sprintf("%-40s\t%-10s %-40s\n",$left,$tag,$right));
@@ -658,7 +695,7 @@ sub found_match {
 	my $A_end = $A_seg->from_end;
 
 	# last component was a match
-	if ($match_flag) {
+	if ( $match_flag == 1 ) {
 
 		# adjust align block end
 		if ( $match->{$R_chr} ) {
@@ -773,4 +810,165 @@ sub found_nomatch {
 		}
 	}
 }
+
+sub parse_projections {
+	my ( $R, $A ) = @_;
+	my ( $R_ctg_start, $R_ctg_end, $R_chr_start, $R_chr_end, $R_ctg_strand ) =
+	  @$R;
+	my ( $A_ctg_start, $A_ctg_end, $A_chr_start, $A_chr_end, $A_ctg_strand ) =
+	  @$A;
+	my $blocks = [];
+	my $ori    = $R_ctg_strand * $A_ctg_strand;
+
+	# check that contig slices overlap
+	if ( $A_ctg_end < $R_ctg_start || $R_chr_end < $A_ctg_start ) {
+		return $blocks;
+	}
+	my $start_offset = $R_ctg_start - $A_ctg_start;
+	my $end_offset   = $R_ctg_end - $A_ctg_end;
+	my ( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e );
+
+	# create the 1st non-align block if exists
+	if ($start_offset) {
+		if ( $R_ctg_strand == 1 ) {
+			if ( $start_offset < 0 ) {
+				$R_chr_s = $R_chr_start;
+				$R_chr_e = $R_chr_start - $start_offset - 1;
+			}
+			else {
+				$R_chr_s = $R_chr_start - $start_offset;
+				$R_chr_e = $R_chr_start - 1;
+			}
+		}
+		else {
+			if ( $start_offset < 0 ) {
+				$R_chr_s = $R_chr_end + $start_offset + 1;
+				$R_chr_e = $R_chr_end;
+			}
+			else {
+				$R_chr_s = $R_chr_end + 1;
+				$R_chr_e = $R_chr_end + $start_offset;
+			}
+		}
+		if ( $A_ctg_strand == 1 ) {
+			if ( $start_offset < 0 ) {
+				$A_chr_s = $A_chr_start + $start_offset;
+				$A_chr_e = $A_chr_start - 1;
+			}
+			else {
+				$A_chr_s = $A_chr_start;
+				$A_chr_e = $A_chr_start + $start_offset - 1;
+			}
+		}
+		else {
+			if ( $start_offset < 0 ) {
+				$A_chr_s = $A_chr_end + 1;
+				$A_chr_e = $A_chr_end - $start_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_end - $start_offset + 1;
+				$A_chr_e = $A_chr_end;
+			}
+		}
+		push @$blocks,
+		  [
+			$R_chr_s, $R_chr_e,
+			$A_chr_s, $A_chr_e,
+			$start_offset < 0 ? -1 : 1, 0
+		  ];
+	}
+
+	# create the overlapping block
+	( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e ) =
+	  ( $R_chr_start, $R_chr_end, $A_chr_start, $A_chr_end );
+	if ($start_offset) {
+		if ( $start_offset < 0 ) {
+			if ( $R_ctg_strand == 1 ) {
+				$R_chr_s = $R_chr_start - $start_offset;
+			}
+			else {
+				$R_chr_e = $R_chr_end + $start_offset;
+			}
+		}
+		else {
+			if ( $A_ctg_strand == 1 ) {
+				$A_chr_s = $A_chr_start + $start_offset;
+			}
+			else {
+				$A_chr_e = $A_chr_end - $start_offset;
+			}
+		}
+	}
+	if ($end_offset) {
+		if ( $end_offset < 0 ) {
+			if ( $A_ctg_strand == 1 ) {
+				$A_chr_e = $A_chr_end + $end_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_start - $end_offset;
+			}
+		}
+		else {
+			if ( $R_ctg_strand == 1 ) {
+				$R_chr_e = $R_chr_end - $end_offset;
+			}
+			else {
+				$R_chr_s = $R_chr_start + $end_offset;
+			}
+		}
+	}
+	push @$blocks, [ $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e, 0, $ori ];
+
+	# create the 2nd non-align block if exists
+	if ($end_offset) {
+		if ( $R_ctg_strand == 1 ) {
+			if ( $end_offset > 0 ) {
+				$R_chr_s = $R_chr_end - $end_offset + 1;
+				$R_chr_e = $R_chr_end;
+			}
+			else {
+				$R_chr_s = $R_chr_end + 1;
+				$R_chr_e = $R_chr_end - $end_offset;
+			}
+		}
+		else {
+			if ( $end_offset > 0 ) {
+				$R_chr_s = $R_chr_start;
+				$R_chr_e = $R_chr_start + $end_offset - 1;
+			}
+			else {
+				$R_chr_s = $R_chr_start + $end_offset;
+				$R_chr_e = $R_chr_start - 1;
+			}
+		}
+		if ( $A_ctg_strand == 1 ) {
+			if ( $end_offset > 0 ) {
+				$A_chr_s = $A_chr_end + 1;
+				$A_chr_e = $A_chr_end + $end_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_end + $end_offset + 1;
+				$A_chr_e = $A_chr_end;
+			}
+		}
+		else {
+			if ( $end_offset > 0 ) {
+				$A_chr_s = $A_chr_start - $end_offset;
+				$A_chr_e = $A_chr_start - 1;
+			}
+			else {
+				$A_chr_s = $A_chr_start;
+				$A_chr_e = $A_chr_start - $end_offset - 1;
+			}
+		}
+		push @$blocks,
+		  [
+			$R_chr_s, $R_chr_e,
+			$A_chr_s, $A_chr_e,
+			$end_offset > 0 ? -1 : 1, 0
+		  ];
+	}
+	return $blocks;
+}
+
 
