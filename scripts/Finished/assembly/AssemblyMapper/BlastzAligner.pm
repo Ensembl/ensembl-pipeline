@@ -103,7 +103,7 @@ sub new {
     $self->support($support);
 
     # set bindir
-    $self->bindir($self->support->param('bindir') || '/usr/local/ensembl/bin');
+    $self->bindir($self->support->param('bindir') || '/software/farm/bin');
 
     return $self;
 }
