@@ -223,6 +223,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $total_genes      = 0;
 	my $transfered_genes = 0;
 	my $total_sf         = 0;
+	my $created_genes	 = 0;
 	my $transfered_sf    = 0;
 	my $skipped_sf       = 0;
 	my $skipped_g        = 0;
@@ -356,17 +357,20 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					$tt->status( $t->status );
 					&remove_all_db_ids($tt);
 					&log_compare_transcripts( $t, $tt );
-				} elsif($haplo) {
+				} else {
 					if(&transcript_is_missed($t,$alt_sl)) {
 						$support->log_verbose(
-			          		sprintf("\t%s %s %d %d did not transfer; completely missing in haplotype\n",
-			                $t->stable_id,
-			                $t->biotype,
-			                $t->start,
-			                $t->end)
+							sprintf(
+								"\t%s %s %d %d cannot be transfered on $A_chr\n",
+								$t->stable_id, $t->biotype, $t->start, $t->end
+							)
 						);
+						&add_hidden_remark(	$t->slice->seq_region_name,
+						    				sprintf("transcript %s cannot be transfered",$t->stable_id),
+						    				$tg );
+
 			        } else {
-						if ($t->translation) {
+						if ($t->translation and $haplo) {
 							my $cds_t = &get_coding_part_of_transcript($t);
 				            my $tt = $cds_t->transfer($alt_sl);
 				            if (defined $tt) {
@@ -384,7 +388,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				            	&log_compare_transcripts($cds_t, $tt);
 				            	&remove_all_db_ids($tt);
 				            } else {
-				            	my $new_t = &project_transcript_the_hard_way($t, $alt_sl);
+				            	my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl);
 				              	$new_t->status( $t->status );
 				              	#my $status = 'COMPLEX_CODING_WITHOUT_CDS';
 				              	#add_trans_remark($R_chr, $status, $new_t);
@@ -397,12 +401,12 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				                     	$t->end)
 				                );
 				                &remove_all_db_ids($new_t);
-				              	&log_summarise_projection_by_exon($cds_t, $alt_sl);
+				              	&log_summarise_projection_by_exon($t, $alt_sl);
 				            }
 						} else {
-							my $new_t = &project_transcript_the_hard_way($t, $alt_sl );
+							my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl );
 							$new_t->status( $t->status );
-				            #my $status = 'COMPLEX_CODING_WITHOUT_CDS';
+				            #my $status = 'COMPLEX_NONCODING';
 				            #add_trans_remark($ref_set, $status, $new_t);
 							push @proj_trans, $new_t;
 							$support->log_verbose(
@@ -416,13 +420,6 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			              	&log_summarise_projection_by_exon($t, $alt_sl);
 						}
 			        }
-				} else {
-					$support->log_verbose(
-						sprintf(
-							"\t%s %s %d %d cannot be transfered on $A_chr\n",
-							$t->stable_id, $t->biotype, $t->start, $t->end
-						)
-					);
 				}
 			}
 
@@ -437,83 +434,94 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 			my $missing_transcript = scalar(@{ $transcript }) - scalar(@proj_trans);
 
-			if (  $missing_transcript == 0 ) {
+			if (  scalar(@proj_trans) ) {
 			   # essential for loading attribute list so that get_all_Attributes
 			   # won't return empty list
 				$tg->add_Attributes( @{ $g->get_all_Attributes() } );
-				map( $tg->add_Transcript($_), @proj_trans );
-				&write_gene($tg);
-				my $existing_gene;
-				eval {
-					$existing_gene = $geneAd->fetch_all_by_Slice( $tg->feature_Slice,
-								$tg->analysis->logic_name );
-				};
-				if($@) {
-					$support->log_verbose($@);
-					next GENE;
-				}
-				my $exist = 0;
-				my $tg_key = join(":",$tg->start,$tg->end,$tg->biotype,$tg->status,$tg->source);
-				foreach (@$existing_gene) {
-					my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
-					$exist = 1 if $tg_key eq $existing_gkey;
-				}
 
-				if($haplo && $exist) {
-					$support->log_verbose(
-						sprintf(
-							"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $A_chr,
-							$tg->start,     $tg->end
-						));
+				my $genes = &transcripts2genes($tg,\@proj_trans);
 
-					print STDOUT "Transfered gene: ".join("\t",
-					$tg->analysis->logic_name,
-					$tg->biotype,
-					$tg->status,
-					$tg->source,
-					$tg->stable_id,
-					$tg->gene_author->name,
-					$tg->description,
-					scalar(@{$tg->get_all_Transcripts}))."\n";
-					foreach my $eg (@$existing_gene){
-						print STDOUT "Existing gene: ".join("\t",
-						$eg->analysis->logic_name,
-						$eg->biotype,
-						$eg->status,
-						$eg->source,
-						$eg->stable_id,
-						$eg->gene_author->name,
-						$eg->description,
-						scalar(@{$eg->get_all_Transcripts}))."\n";
+				foreach my $gene (@$genes) {
+					&write_gene($gene);
+					my $existing_gene;
+					eval {
+						$existing_gene = $geneAd->fetch_all_by_Slice( $gene->feature_Slice,
+									$gene->analysis->logic_name );
+					};
+					if($@) {
+						$support->log_verbose($@);
+						next GENE;
+					}
+					my $exist = 0;
+					my $tg_key = join(":",$gene->start,$gene->end,$gene->biotype,$gene->status,$gene->source);
+					foreach (@$existing_gene) {
+						my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
+						$exist = 1 if $tg_key eq $existing_gkey;
 					}
 
-					$skipped_g++;
-					next GENE;
+					if($exist) {
+						$support->log_verbose(
+							sprintf(
+								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							));
+
+						$support->log_verbose("Transfered gene: ".join("\t",
+						$gene->analysis->logic_name,
+						$gene->biotype,
+						$gene->status,
+						$gene->source,
+						$gene->stable_id,
+						$gene->gene_author->name,
+						$gene->description,
+						scalar(@{$gene->get_all_Transcripts}))."\n");
+						foreach my $eg (@$existing_gene){
+							$support->log_verbose("Existing gene: ".join("\t",
+							$eg->analysis->logic_name,
+							$eg->biotype,
+							$eg->status,
+							$eg->source,
+							$eg->stable_id,
+							$eg->gene_author->name,
+							$eg->description,
+							scalar(@{$eg->get_all_Transcripts}))."\n");
+						}
+
+						$skipped_g++;
+						next GENE;
+					}
 				}
 
-				if ( $geneAd->store($tg) ) {
-					$transfered_genes++;
-					$support->log_verbose(
-						sprintf(
-						"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $A_chr,
-							$tg->start,     $tg->end
-						)
-					);
-					&print_sql($g, $tg, $ref_seq_region_id, $alt_seq_region_id, $R_chr, $A_chr) if $sql;
+				$created_genes += (scalar(@$genes) -1);
+
+				foreach my $gene (@$genes) {
+					if ( $geneAd->store($gene) ) {
+						$transfered_genes++;
+						$support->log_verbose(
+							sprintf(
+							"GENE %s %s successfully TRANSFERED (%s:%d-%d => %s:%d-%d)\n",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							)
+						);
+						$support->log_verbose(sprintf("WARNING: Check Gene %s with %d missing transcripts\n",$gene->stable_id,$missing_transcript)) if $missing_transcript;
+					} else {
+						throw(
+							sprintf(
+								"GENE %s %s cannot be saved (%s:%d-%d => %s:%d-%d)",
+								$gene->stable_id, $gene->biotype, $R_chr,
+								$g->start,      $g->end,      $gene->seq_region_name,
+								$gene->start,     $gene->end
+							)
+						);
+					}
 				}
-				else {
-					throw(
-						sprintf(
-							"GENE %s %s cannot be saved (%s:%d-%d => %s:%d-%d)",
-							$tg->stable_id, $tg->biotype, $R_chr,
-							$g->start,      $g->end,      $A_chr,
-							$tg->start,     $tg->end
-						)
-					);
+				if(scalar(@$genes) -1) {
+					# print info about splitted gene for the annotators
+					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been splitted into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
 			} else {
 				$support->log_verbose(
@@ -521,10 +529,10 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
 								$tg->stable_id, $tg->biotype, $R_chr,
 								$g->start,      $g->end,      $A_chr,
-								$tg->start,     $tg->end, $missing_transcript
+								$tg->start,     $tg->end,
+								$missing_transcript
 							)
 				);
-
 			}
 		}
 
@@ -546,13 +554,15 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			sprintf(
 "INFO: Annotation transfer %s:%s => %s/%s
 INFO: transfered Gene: %d/%d
+INFO: created Gene:	%d
 INFO: skipped Gene: %d/%d
 INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$A_chr,            $support->param('altassembly'),
-				$transfered_genes, $total_genes,
-				$skipped_g, $total_genes,
+				$transfered_genes, ($total_genes+$created_genes),
+				$created_genes,
+				$skipped_g, ($total_genes+$created_genes),
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)
@@ -650,10 +660,12 @@ sub remove_all_db_ids {
 	if ( $t->translation ) {
 		$t->translation->dbID(undef);
 		$t->translation->adaptor(undef);
+		$t->translation->stable_id(undef) if $haplo;
 	}
 	foreach my $e ( @{ $t->get_all_Exons } ) {
 		$e->dbID(undef);
 		$e->adaptor(undef);
+		$e->stable_id(undef) if $haplo;
 	}
 
 	return $t;
@@ -684,18 +696,27 @@ sub get_coding_part_of_transcript {
 	$tr->end_Exon( $cds[-1] );
 	$tr->end( $tr->end_Exon->length );
 	$t->translation($tr);
-	$t->stable_id( $t->stable_id . "_CDS" );
+	$t->stable_id( $t->stable_id );
 
 	return $t;
 }
 
 sub project_transcript_the_hard_way {
-	my ( $t, $alt_sl ) = @_;
+	my ( $g, $t, $alt_sl ) = @_;
+
+	my $new_trans;
+	%$new_trans = %$t;
+	bless $new_trans, ref($t);
+	$new_trans->{'translation'} = undef;
+	if ( defined $t->translation ) {
+		&add_hidden_remark(	$t->slice->seq_region_name,
+						    sprintf("transcript %s has lost its translation %s",$t->stable_id,$t->translation->stable_id),
+						    $new_trans);
+	}
 
 	my @new_e;
-	$t->{'translation'} = undef;
 	my $cs = $alt_sl->coord_system;
-	foreach my $e ( @{ $t->get_all_Exons } ) {
+	foreach my $e ( @{ $new_trans->get_all_Exons } ) {
 		my $te = $e->transfer($alt_sl);
 
 		if ( defined $te ) {
@@ -705,56 +726,244 @@ sub project_transcript_the_hard_way {
 			my @bits = @{ $e->project( $cs->name, $cs->version) };
 			if (@bits) {
 				# need to make a new exon from the bits
-				my ( $ex_st, $ex_en, $strand );
+				my ( $coord, $start, $end, $strand );
 				foreach my $bit (@bits) {
-					if ( not defined $ex_st
-						or $bit->to_Slice->start < $ex_st )
+					$strand = $bit->to_Slice->strand;
+					$start = $bit->to_Slice->start;
+					$end = $bit->to_Slice->end;
+					$coord->{$strand} ||= {};
+					$coord->{$strand}->{length} +=  ($end-$start);
+					if ( not defined $coord->{$strand}->{start}
+					or $start < $coord->{$strand}->{start} )
 					{
-						$ex_st = $bit->to_Slice->start;
+						$coord->{$strand}->{start} = $start;
 					}
-					if ( not defined $ex_en
-						or $bit->to_Slice->end > $ex_en )
+					if ( not defined $coord->{$strand}->{end}
+						or $end > $coord->{$strand}->{end} )
 					{
-						$ex_en = $bit->to_Slice->end;
-					}
-					if ( not defined $strand ) {
-						$strand = $bit->to_Slice->strand;
+						$coord->{$strand}->{end} = $end;
 					}
 				}
-				if ( defined $ex_st and defined $ex_en ) {
-					#my $new_e = Bio::EnsEMBL::Exon->new;
+				my $flag = 0;
+				foreach ( sort { $coord->{$b}->{length} <=> $coord->{$a}->{length} } keys  %$coord ) {
 					my $new_e = Bio::Vega::Exon->new;
-					$new_e->start($ex_st);
-					$new_e->end($ex_en);
-					$new_e->strand($strand);
+					$new_e->start($coord->{$_}->{start});
+					$new_e->end($coord->{$_}->{end});
+					$new_e->strand($_);
 					$new_e->phase(-1);
 					$new_e->end_phase(-1);
 					$new_e->slice($alt_sl);
-					#$new_e->stable_id( $e->stable_id );
+					$new_e->stable_id( $e->stable_id ) unless $flag;
 					push @new_e, $new_e;
+					$flag = 1;
 				}
+				&add_hidden_remark($e->slice->seq_region_name,
+									    sprintf("exon %s has been altered",$e->stable_id),
+									    $new_trans);
+				$support->log_verbose(sprintf("WARNING: Check altered Exon %s in Transcript %s of Gene %s\n",$e->stable_id,$t->stable_id,$g->stable_id));
+
+
+			} else {
+				&add_hidden_remark($e->slice->seq_region_name,
+								    sprintf("exon %s %d-%d:%d cannot be transfered",$e->stable_id,$e->start,$e->end,$e->strand),
+								    $new_trans);
 			}
 		}
 	}
 
-	$t->{_trans_exon_array} = [];
+	$new_trans->{_trans_exon_array} = [];
 	foreach my $e (@new_e) {
-		$t->add_Exon($e);
+		$new_trans->add_Exon($e);
 	}
 
-	return $t;
+	return $new_trans;
 }
 
-sub add_trans_remark {
-  my ($ref_set, $status, $trans) = @_;
+sub add_hidden_remark {
+  my ($ref_set, $status, $obj) = @_;
 
-  my $remark = "Annotation_remark- automatic annotation transfer from $ref_set: $status";
+  my $remark = "Automatic annotation transfer from $ref_set: $status";
   my $t_at = Bio::EnsEMBL::Attribute->new(-VALUE => $remark,
-                                          -CODE  => 'remark',
-                                          -NAME  => 'Remark',
+                                          -CODE  => 'hidden_remark',
+                                          -NAME  => 'Hidden Remark',
                                          );
-  $trans->add_Attributes($t_at);
+  $obj->add_Attributes($t_at);
 }
+
+sub transcripts2genes {
+	my ($tg,$trans) = @_;
+	my @genes;
+	# group the transcripts by seq_region_name and minus/plus strand
+	my $hash_trans;
+	for (@$trans) {
+		$hash_trans->{$_->seq_region_name} ||= {};
+		&parsenpush_trans($hash_trans->{$_->seq_region_name},$_);
+	}
+
+	# Use a hash to split genes that have:
+	# 1. transcripts on different chromosomes
+	# 2. transcripts on different strands
+	# 3. transcript with exons on different strands
+
+
+	# sort the sets by translatable transcripts number, total exons length and transcript number
+	my @gene_transcripts;
+	map (push(@gene_transcripts, values %$_), values(%$hash_trans));
+	@gene_transcripts = sort sort_transcripts @gene_transcripts;
+	my $number = scalar @gene_transcripts;
+
+	my $gt = shift @gene_transcripts;
+
+	my $set = 2;
+	# loop over the remaining transcript sets and create new gene without stable id
+	foreach my $nt (@gene_transcripts) {
+		my $ng = Bio::Vega::Gene->new;
+		$ng->analysis( $tg->analysis );
+		$ng->biotype( $tg->biotype );
+		$ng->status( $tg->status );
+		$ng->source( $tg->source );
+		$ng->gene_author( $tg->gene_author );
+		$ng->description( $tg->description );
+		# add gene attributes and change gene name
+		foreach (@{ $tg->get_all_Attributes() }) {
+			if($_->code eq 'name') {
+				my $attrib = new Bio::EnsEMBL::Attribute->new
+			       (-CODE => $_->code,
+			        -NAME => $_->name,
+			        -DESCRIPTION => $_->description,
+			        -VALUE => $_->value."_$set");
+				$ng->add_Attributes($attrib);
+			} else {
+				$ng->add_Attributes($_);
+			}
+
+		}
+		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+		my $attribute = Bio::EnsEMBL::Attribute->new
+	       (-CODE => 'hidden_remark',
+	        -NAME => 'Hidden Remark',
+	        -VALUE => $remark);
+		$ng->add_Attributes($attribute);
+
+		map( $ng->add_Transcript($_), @$nt );
+		push @genes,$ng;
+		$set++;
+	}
+
+	# create the main gene here with same stable id
+	map( $tg->add_Transcript($_), @$gt );
+	my $remark = "Gene 1/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+	my $attribute = Bio::EnsEMBL::Attribute->new
+       (-CODE => 'hidden_remark',
+        -NAME => 'Hidden Remark',
+        -VALUE => $remark);
+	$tg->add_Attributes($attribute) if(@gene_transcripts);
+	my ($name_attrib) = @{ $tg->get_all_Attributes('name') };
+	# change main gene name
+	$name_attrib->value($name_attrib->value."_1") if(@gene_transcripts);;
+	push @genes,$tg;
+
+	return \@genes;
+}
+
+sub sort_transcripts {
+
+	&get_translatable_trans($b) <=> &get_translatable_trans($a)
+								||
+		  &get_exons_length($b) <=> &get_exons_length($a)
+								||
+					scalar(@$b) <=> scalar(@$a);
+}
+
+sub sort_exons {
+
+		  &get_exons_length($b) <=> &get_exons_length($a)
+								||
+					scalar(@$b) <=> scalar(@$a);
+}
+
+sub get_translatable_trans {
+	my ($trans_arr) = @_;
+	my $i;
+	foreach (@$trans_arr) { $i++ if($_->translate); }
+
+	return $i;
+}
+
+sub get_exons_length {
+	my ($object_arr) = @_;
+	my $l;
+	foreach (@$object_arr) { $l += $_->length; }
+
+	return $l;
+}
+
+sub parsenpush_trans{
+	my ($hash,$trans) = @_;
+	my $exon_hash = {};
+	foreach my $exon (@{$trans->get_all_Exons}) {
+		$exon_hash->{$exon->strand} ||= [];
+		push @{$exon_hash->{$exon->strand}}, $exon;
+	}
+
+	if(scalar(keys %{$exon_hash}) == 1) {
+		$hash->{$trans->strand} ||= [];
+		push @{$hash->{$trans->strand}}, $trans;
+	} else {
+		# split transcript with trans splice exons
+		my $translation_stable_id;
+		if ( defined $trans->translation ) {
+			$translation_stable_id = $trans->translation->stable_id;
+			my $remark = "Lost translation $translation_stable_id after transfer of transcript ".$trans->stable_id;
+			my $attribute = Bio::EnsEMBL::Attribute->new
+		       (-CODE => 'hidden_remark',
+		        -NAME => 'Hidden Remark',
+		        -VALUE => $remark);
+		    $trans->add_Attributes($attribute);
+		}
+		my @transcript_exons = sort sort_exons values(%$exon_hash);
+
+		# create two transcripts, 1 on each strand
+		my @attribs = @{$trans->get_all_Attributes()};
+
+		# 2nd transcript
+		my $new_trans;
+		%$new_trans = %$trans;
+		bless $new_trans, ref($trans);
+		$new_trans->{'attributes'} = undef;
+		$new_trans->{'_trans_exon_array'} = pop @transcript_exons;
+		$new_trans->{'stable_id'} = undef;
+		$new_trans->{'translation'} = undef;
+		# Add transcript attribs and change transcript name
+		foreach (@attribs) {
+			if($_->code eq 'name') {
+				my $attrib = new Bio::EnsEMBL::Attribute->new
+			       (-CODE => $_->code,
+			        -NAME => $_->name,
+			        -DESCRIPTION => $_->description,
+			        -VALUE => $_->value.'_2');
+				$new_trans->add_Attributes($attrib);
+			} else {
+				$new_trans->add_Attributes($_);
+			}
+		}
+
+		# 1st transcript
+		$trans->{'_trans_exon_array'} = pop @transcript_exons;
+		$trans->{'translation'} = undef;
+		# Change transcript name
+		foreach (@attribs) { $_->value($_->value.'_1') if($_->code eq 'name'); }
+
+		$trans->recalculate_coordinates();
+		$new_trans->recalculate_coordinates();
+
+		foreach ($trans,$new_trans) {
+			$hash->{$_->strand} ||= [];
+			push @{$hash->{$_->strand}}, $_;
+		}
+	}
+}
+
 
 sub log_summarise_projection_by_exon {
 	my ( $t, $alt_sl ) = @_;
@@ -870,44 +1079,17 @@ sub write_gene {
 
 	printf( "\t$seq_id\tgene\t%s\t%s\t%s\n",
 		$g->stable_id, $g->biotype, $g->status );
-
-	my %exon_hash;
-
-	foreach my $t ( @{ $g->get_all_Transcripts } ) {
-
-		foreach my $e ( @{ $t->get_all_Exons } ) {
-			my $hash_key = sprintf( "\t%d:%d:%d:%d",
-				$e->start, $e->end, $e->strand, $e->phase, $e->end_phase );
-			push @{ $exon_hash{ $e->stable_id }->{$hash_key} }, $e;
-		}
-	}
-	foreach my $sid ( keys %exon_hash ) {
-		if ( scalar( keys %{ $exon_hash{$sid} } ) > 1 ) {
-
-			# different projections for same exon; we
-			# need to give them all distinct stable ids
-			my $count = 1;
-			foreach my $key ( keys %{ $exon_hash{$sid} } ) {
-				my $elist = $exon_hash{$sid}->{$key};
-
-				foreach my $mem (@$elist) {
-					$mem->stable_id( $mem->stable_id . "_" . $count );
-				}
-				$count++;
-			}
-		}
-		foreach my $key ( keys %{ $exon_hash{$sid} } ) {
-			my ($e) = @{ $exon_hash{$sid}->{$key} };
-
-			printf( "\t$seq_id\texon\t%s\t%d\t%d\t%d\t%d\t%d\n",
-				$e->stable_id, $e->start, $e->end, $e->strand, $e->phase,
-				$e->end_phase );
-		}
-	}
+#	foreach my $a (@{ $g->get_all_Attributes })	{
+#		printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
+#	}
 
 	foreach my $t ( @{ $g->get_all_Transcripts } ) {
 		printf( "\t$seq_id\ttranscript\t%s\t%s\t%s\n",
 			$t->stable_id, $t->biotype, $t->status );
+
+#		foreach my $a (@{ $t->get_all_Attributes })	{
+#			printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
+#		}
 
 		foreach my $e ( @{ $t->get_all_Exons } ) {
 			printf( "\t$seq_id\texon_transcript\t%s\t%s\n",
