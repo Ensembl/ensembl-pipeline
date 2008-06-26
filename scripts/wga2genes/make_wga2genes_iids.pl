@@ -255,7 +255,10 @@ foreach my $sl (@slices) {
         my $qga = $block->reference_genomic_align;
         my ($tga) = @{$block->get_all_non_reference_genomic_aligns};
         
-        my $chain_id =  $qga->genomic_align_group_id_by_type("chain");
+#        my $chain_id =  $qga->genomic_align_group_id_by_type("chain");
+        my $chain_id =  $block->group_id;
+        print "Group id = " . $block->group_id . "\n";
+        next if !$block->group_id;
         
         if ($block->reference_genomic_align->dnafrag_strand < 0) {
           $block->reverse_complement;
@@ -329,6 +332,7 @@ foreach my $sl (@slices) {
       my $s_inf_cont = $db->get_StateInfoContainer;
       
       eval {
+         print $iid . "\n";
         $db->get_StateInfoContainer->
             store_input_id_analysis( $iid, $ana, '' );
       };
