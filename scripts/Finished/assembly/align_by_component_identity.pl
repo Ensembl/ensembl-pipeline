@@ -357,8 +357,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			$j = 1 if $type eq '+';
 			if($type eq 'c') {
 				($i,$j) = (1,1);
-				my ($R_acc, $R_sv) = split '.',$diff->[1]->to_Slice->seq_region_name;
-				my ($A_acc, $A_sv) = split '.',$diff->[2]->to_Slice->seq_region_name;
+				my ($R_acc, $R_sv) = split /\./,$diff->[1]->to_Slice->seq_region_name;
+				my ($A_acc, $A_sv) = split /\./,$diff->[2]->to_Slice->seq_region_name;
 
 				if ( $R_acc eq $A_acc && $R_sv eq $A_sv ) {
 
