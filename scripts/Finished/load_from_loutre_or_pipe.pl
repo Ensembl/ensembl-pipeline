@@ -130,8 +130,11 @@ if ( !$tname ) {
 	print STDERR "-thost $thost -tuser $tuser -tpass $tpass\n";
 }
 
+my @sets;
 if ( !scalar(@seq_sets) ) {
 	print STDERR "Need chr|set to be able to run\n";
+} else {
+	map ( push( @sets , split(/,/, $_)) , @seq_sets);
 }
 
 my $source_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -163,7 +166,7 @@ my $seqset_info     = {};
 #
 {
 	print STDOUT
-"Getting Sequence set @seq_sets from source database: $sname ($shost:$sport)\n";
+"Getting Sequence set @sets from source database: $sname ($shost:$sport)\n";
 	my $contigs_sth = $source_dbc->prepare(
 		qq{
 		SELECT	a.asm_start, a.asm_end,
@@ -202,7 +205,7 @@ my $seqset_info     = {};
 			AND s.name =  ?
 		}
 	);
-	SET:foreach my $sequence_set (@seq_sets) {
+	SET:foreach my $sequence_set (@sets) {
 		my $contig_number = 0;
 
 		# fetch all the contigs for this sequence set
