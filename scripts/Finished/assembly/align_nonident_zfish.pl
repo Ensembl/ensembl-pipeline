@@ -205,6 +205,9 @@ if(@A_chr_list) {
 if(scalar(@where)) {
     $sql .= ' WHERE '.join(' AND ', @where);
 }
+
+$sql .= ' ORDER BY (alt_end - alt_start) ASC';
+
 $sth = $R_dbh->prepare($sql);
 $sth->execute;
 
