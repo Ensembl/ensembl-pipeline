@@ -241,6 +241,13 @@ sub write_into_db{
       }
       $a->dbID($analysis_id);
       $a->adaptor($analysis_adaptor);
+      if ($update) {
+        my $created_sql = "SELECT NOW();";
+        my $created_sth = $db->prepare($created_sql);
+        $created_sth->execute();
+        my ($current_time) = $created_sth->fetchrow;
+        $a->created($current_time);
+      }
       $analysis_adaptor->update($a) if($update);
       next ANALYSIS;
     }else{
