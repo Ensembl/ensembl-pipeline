@@ -2,7 +2,7 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch;
 
 use strict;
 use DBI;
-use Bio::DB::Flat::OBDAIndex;
+use Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;
 use Bio::EnsEMBL::Analysis::Config::General;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
@@ -62,11 +62,11 @@ sub fetch_descriptions {
 	my $query;
 	my $dbs;
 
-	# Get sequence length and description from local OBDA index
+	# Get sequence length and description from local XDF database
 	# if an Analysis object is set
 	if($self->analysis) {
 		$self->is_light_fetch(1);
-		print STDOUT "Fetching ".@$id_list." sequences from OBDA index\n" if $verbose;
+		print STDOUT "Fetching ".@$id_list." sequences from XDF database\n" if $verbose;
 		SEQ :
 		foreach (@$id_list) {
 			my $seq = $self->get_Seq_by_acc($_);
@@ -279,12 +279,10 @@ sub  get_Seq_by_acc {
 
   my $seq;
   my @seqfetchers = $self->_seqfetcher;
-  my $have_secondary;
+
   foreach my $seqfetcher (@seqfetchers){
-    $have_secondary = 1 if($seqfetcher->secondary_namespaces);
     eval{
-      # note that this only works for OBDAIndex.pm
-      $seq = $seqfetcher->get_Seq_by_id($acc);
+      $seq = $seqfetcher->get_Seq_by_acc($acc);
     };
     if ( $@ ){
       warning("problem fetching sequence for $acc");
@@ -295,40 +293,7 @@ sub  get_Seq_by_acc {
     }
   }
 
-  if(!defined $seq){
-    my ($p, $f, $l) = caller;
-    warning("OBDAIndexSeqFetcher: could not find sequence for primary key $acc $f:$l\n") if(!$have_secondary);
-
-	FETCHER:
-		foreach my $seqfetcher ( $self->_seqfetcher ){
-			my @secondary_namespaces = $seqfetcher->secondary_namespaces;
-			foreach my $name ( @secondary_namespaces ){
-				my @seqs;
-				eval{
-					# this returns potentially an array of Bio::Seq
-					@seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
-				};
-				if ( $@ ){
-					warning("problem fetching sequence for secondary key $acc $@");
-				}
-				if ( @seqs > 1 ){
-					warning("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
-					next;
-				}
-
-				if ( defined $seqs[0] ){
-					$seqs[0]->display_id( $acc );
-					$seq = $seqs[0];
-					last FETCHER;
-				}
-			}
-		}
-		unless ($seq){
-			warning("could not find sequence for secondary key $acc");
-		}
-	}
-
-	return $seq;
+  return $seq;
 }
 
 
@@ -360,33 +325,32 @@ sub analysis{
 	throw("db_file or db must be defined in Analysis object") unless ($analysis->db || $analysis->db_file);
 	my $db_files = $analysis->db || $analysis->db_file;
 
-	# Create the OBDA seqfetcher objects from the db index
+	# Create the xdget seqfetcher
 	$db_files =~ s/\s//g;
-	foreach my $database ( split( ",", $db_files ) ){
+	my @databases;
+
+	foreach my $database ( split( ",", $db_files ) ) {
 		if ( $database !~ /^\// ){
 		      $database = $BLAST_DIR . "/" . $database;
 		}
-		if ( $database =~/(\S+)\/$/ ){
-			$database = $1;
-		}
-		my @path = split /\//, $database;
-		my $db_name = pop( @path );
-		if ( $db_name =~/(\S+)\.fa/){
-			$db_name = $1;
-		}
-		throw("Cannot define db_name") unless ( $db_name );
-		my $index_dir = join '/', @path;
-		throw("Cannot define index_dir") unless ( $index_dir );
-		my $format = 'FASTA';
-		#print STDOUT "$index_dir => $db_name\n";
-		my $OBDAfetcher = new Bio::DB::Flat::OBDAIndex(
-			-index_dir => $index_dir,
-			-dbname    => $db_name,
-			-format    => $format
-		);
 
-	    $self->_seqfetcher($OBDAfetcher);
+		if ( -f $database ) {
+			push( @databases, $database );
+		} else {
+			my $count = 1;
+			my $db_filename;
+			while ( -f ( $db_filename = "${database}-${count}" ) ) {
+				push( @databases, $db_filename );
+				$count++;
+			}
+		}
 	}
+
+	my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::xdget->new(
+		-db => \@databases,
+        -executable => '/software/farm/bin/xdget');
+	$self->_seqfetcher($seqfetcher);
+
   }
 
   return $self->{'analysis'};
