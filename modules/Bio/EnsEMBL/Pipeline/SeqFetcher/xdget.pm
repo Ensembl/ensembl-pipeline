@@ -7,7 +7,7 @@
 #
 # POD documentation - main docs before the code
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -40,7 +40,7 @@ B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -48,6 +48,8 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;
 
 use strict;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
@@ -60,7 +62,7 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my ($exe, $options, $db) = $self->_rearrange([qw(
+  my ($exe, $options, $db) = rearrange([qw(
     EXECUTABLE OPTIONS DB
   )], @args);
 
@@ -68,7 +70,7 @@ sub new {
   $self->executable($exe);
   $self->options($options) if defined $options;
   $self->db($db) if defined $db;
-  
+
   return $self;
 }
 
@@ -87,7 +89,7 @@ sub executable {
   if ($exe) {
       $self->{'_exe'} = $exe;
   }
-  return $self->{'_exe'};  
+  return $self->{'_exe'};
 }
 
 =head2 db
@@ -105,19 +107,20 @@ sub db {
 
   if ($dbref) {
       foreach my $db (@$dbref) {
-          if (glob "$db.xp?") {
-	      $self->_moltype($db, 'p');
-          }
-          elsif (glob "$db.xn?") {
-	      $self->_moltype($db, 'n');
-          }
-          else {
-	      $self->throw("XDF database appears to be missing files");
-          }
-	  push @{$self->{'_db'}}, $db;
+      	my @f = glob "$db.x??";
+      	my @p = grep (/\.xp./,@f);
+      	my @n = grep (/\.xn./,@f);
+		if (@p) {
+			$self->_moltype($db, 'p');
+		} elsif (@n) {
+			$self->_moltype($db, 'n');
+		} else {
+			throw("XDF database $db appears to be missing files");
+		}
+	  	push @{$self->{'_db'}}, $db;
       }
   }
-  return $self->{'_db'};  
+  return $self->{'_db'};
 }
 
 =head2 options
@@ -137,7 +140,7 @@ sub options {
   if ($options) {
       $self->{'_options'} = $options;
   }
-  return $self->{'_options'};  
+  return $self->{'_options'};
 
 }
 
@@ -153,15 +156,16 @@ sub options {
 
 sub get_Seq_by_acc {
   my ($self, $acc) = @_;
-  
-  $self->throw("No accession input") unless $acc;
-  $self->throw("No database defined") unless $self->db;
-  
+
+  throw("No accession input") unless $acc;
+  throw("No database defined") unless $self->db;
+
   my $xdget   = $self->executable;
   my $db      = $self->db;
   local       *FH;
   my $seq;
   my $seqstr;
+  my $desc;
   my $command;
   my @out;
 
@@ -181,24 +185,25 @@ sub get_Seq_by_acc {
 
     $command = "$xdget $options $db $acc";
 
-    open FH, "$command 2>&1 |" or $self->throw("Error retrieving $acc from $db with $xdget");
+    open FH, "$command 2>&1 |" or throw("Error retrieving $acc from $db with $xdget");
     @out = <FH>;
     close FH;
 
     last DB if $out[0] !~ /Not found/;
   }
 
-  shift @out;
-  my $seqstr = join(" ", @out);
+  $desc = shift @out;
+  $seqstr = join(" ", @out);
+  $desc =~ s/^>//;
   $seqstr =~ s/\s//g;
 
   $seq = Bio::Seq->new(
     -seq              => $seqstr,
     -display_id       => $acc,
     -accession_number => $acc,
-    -desc             => ""
+    -desc             => $desc
   );
-     
+
 
   return $seq;
 }
