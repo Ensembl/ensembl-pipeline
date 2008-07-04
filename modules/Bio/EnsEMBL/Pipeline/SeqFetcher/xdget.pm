@@ -194,7 +194,7 @@ sub get_Seq_by_acc {
 
   $desc = shift @out;
   $seqstr = join(" ", @out);
-  $desc =~ s/^>//;
+  $desc =~ s/^>//;chomp $desc;
   $seqstr =~ s/\s//g;
 
   $seq = Bio::Seq->new(
