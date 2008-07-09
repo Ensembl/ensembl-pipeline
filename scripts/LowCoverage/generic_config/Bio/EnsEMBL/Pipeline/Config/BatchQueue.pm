@@ -109,9 +109,15 @@ use vars qw(%Config);
   MIN_JOB_SLEEP      => 120, # the minimum time to sleep for when job limit reached
   SLEEP_PER_JOB      => 30, # the amount of time to sleep per job when job limit 
                             # reached
-  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',      
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',      
 
   DEFAULT_RUNNER => '',
+
+  DEFAULT_RETRY_QUEUE => 'long',
+  DEFAULT_RETRY_SUB_ARGS => '',
+  DEFAULT_RETRY_RESOURCE => 'linux',
+
+  DEFAULT_SUB_ARGS => '',
 
   QUEUE_CONFIG       => [
     {

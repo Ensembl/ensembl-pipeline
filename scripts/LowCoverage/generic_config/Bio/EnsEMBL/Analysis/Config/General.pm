@@ -47,8 +47,17 @@ use vars qw(%Config);
     DATA_DIR => '/usr/local/ensembl/data',
     LIB_DIR  => '/usr/local/ensembl/lib',
 
+    # Path where the parser and parameter files for FirstEF program are allocated
+    PARAMETERS_DIR => '/vol/software/linux-i386/farm/lib/firstef/parameters/',
+    PARSE_SCRIPT => '/vol/software/linux-i386/farm/lib/firstef/FirstEF_parser.pl',
+
     ANALYSIS_WORK_DIR => '/tmp',
+    # LC_REPMASK_CHOICE will be something like [ 'RepeatMask' ]
     ANALYSIS_REPEAT_MASKING => $LC_REPMASK_CHOICE,
+
+    CORE_VERBOSITY => 'WARNING',
+    LOGGER_VERBOSITY => 'OFF',
+
 
 );
 
