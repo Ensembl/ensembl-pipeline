@@ -111,7 +111,7 @@ my $cvsDIR               = '/nfs/acari/ba1/cvs_co/';
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
 
-my $dataDIR              = '/lustre/work1/ensembl/ba1/cDNA_update_hum_Nov07/'; 
+my $dataDIR              = '/lustre/work1/ensembl/ba1/cDNA_update_hum_Jul08/'; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
@@ -134,7 +134,7 @@ my $host                 = "bc-9-1-03";
 my $genebuild_id         = "4";
 
 
-my $gss                  = "/nfs/acari/sd3/perl_code/ensembl-personal/sd3/mouse_cdna_update/gss_acc.txt";
+my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt";
 
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
@@ -154,27 +154,27 @@ my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_48_36j"; 
+my $WB_REF_DBNAME        = "homo_sapiens_core_50_36l"; 
 my $WB_REF_DBHOST        = "ens-staging"; 
 my $WB_REF_DBPORT        = "3306"; 
 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = "ba1_hum_cdna1107_ref";
+my $WB_PIPE_DBNAME       = "ba1_hum_cdna0708_ref";
 my $WB_PIPE_DBHOST       = "genebuild7";
 my $WB_PIPE_DBPORT       = "3306";
 
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = "ba1_hum_cdna1107_update";
-my $WB_TARGET_DBHOST     = "genebuild5";
+my $WB_TARGET_DBNAME     = "ba1_hum_cdna0708_update";
+my $WB_TARGET_DBHOST     = "genebuild6";
 my $WB_TARGET_DBPORT     = "3306";
 
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_47_36i"; 
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_49_36k"; 
 my $WB_LAST_DBHOST       = "ens-livemirror"; 
 my $WB_LAST_DBPORT       = "3306"; 
 
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_47_36i"; 
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_49_36k"; 
 my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
 my $WB_LAST_DNADBPORT    = "3306"; 
 
