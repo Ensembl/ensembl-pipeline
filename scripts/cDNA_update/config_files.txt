@@ -159,8 +159,8 @@ use vars qw( %Config );
   },
 );
 
->>ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config/GeneBuild/Databases.pm
-package Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases ;
+>>ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config/Databases.pm
+package Bio::EnsEMBL::Analysis::Config::Databases ;
 
 use strict;
 use vars qw(%Config);
