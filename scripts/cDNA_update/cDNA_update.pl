@@ -107,7 +107,7 @@ ensembl-dev@ebi.ac.uk
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = '/nfs/acari/ba1/cvs_co/';
+my $cvsDIR               = '/nfs/acari/ba1/cvs_co_14Jul08/';
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
 
@@ -641,7 +641,7 @@ sub fastafiles{
 
                 # now get the kill_list
                 #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'DEFAULT');
+                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
                 my %kill_list = %{$kill_list_object->get_kill_list()};
 
                 open(LIST, "<", $gss) or die("can't open gss list $gss");
