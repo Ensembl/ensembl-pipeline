@@ -27,7 +27,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
-#use MitConf;
+
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
 

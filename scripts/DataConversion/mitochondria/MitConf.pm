@@ -6,13 +6,13 @@ use vars qw( %MitConf );
 
 %MitConf = (
 	    #location of genbank file
-	    MIT_GENBANK_FILE => 'my/dir/NC_001234.genbank',
+	    MIT_GENBANK_FILE => '/nfs/acari/sw4/cvs_checkout/ensembl-personal/sw4/Builds/Guineapig/Data/NC_000884.gb',
 	    # database to put sequnece and genes into
-	    MIT_DBNAME => '',
-	    MIT_DBHOST => '',
-	    MIT_DBUSER => '',
-	    MIT_DBPASS => '',
-	    MIT_DBPORT => '',
+	    MIT_DBNAME => 'sw4_cavia_core',
+	    MIT_DBHOST => 'genebuild5',
+	    MIT_DBUSER => 'ensadmin',
+	    MIT_DBPASS => 'ensembl',
+	    MIT_DBPORT => '3306',
 	    # logic name of analysis object to be assigned to coding genes
 	    # Non coding genes are assigned ncRNA
 	    MIT_LOGIC_NAME => 'ensembl',
@@ -28,7 +28,7 @@ use vars qw( %MitConf );
 	    MIT_SUPERCONTIG_SEQNAME => '',
 	    MIT_CLONE_SEQNAME => '',
 	    # Name of top level in coord system
-	    MIT_TOPLEVEL => 'chromosome',
+	    MIT_TOPLEVEL => 'scaffold',
 	    # Different oganisms use different mitochondial codons:
 	    # Vertebrate Mitochondrial (2)
 	    # Yeast Mitochondrial (3)
@@ -47,8 +47,8 @@ use vars qw( %MitConf );
 	    MIT_CODON_TABLE  =>  '2',
 	    # Types
 	    MIT_GENE_TYPE => 'protein_coding',
-	    MIT_TRNA_TYPE => 'Mt-tRNA',
-	    MIT_RRNA_TYPE => 'Mt-rRNA',
+	    MIT_TRNA_TYPE => 'Mt_tRNA',
+	    MIT_RRNA_TYPE => 'Mt_rRNA',
 	   );
 
 sub import {
