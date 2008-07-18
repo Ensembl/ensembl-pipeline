@@ -180,7 +180,7 @@ while (my $hit = $q1->fetchrow_array){
 #now have done other analyses need to check whether the reason we have no output is because
 #cdnas are on the kill list
 
-my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'DEFAULT');
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
 my %kill_list = %{$kill_list_object->get_kill_list()};
 
 foreach my $k (keys %kill_list){

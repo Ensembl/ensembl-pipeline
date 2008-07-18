@@ -189,7 +189,7 @@ while (my $hit = $q1->fetchrow_array){
 #cdnas are on the kill list
 
 #re-create the kill_list hash, from the file dumped by new_cDNA_upadte.pl 
-my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'DEFAULT');
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
 my %kill_list = %{$kill_list_object->get_kill_list()};
 
 foreach my $k (keys %kill_list){
