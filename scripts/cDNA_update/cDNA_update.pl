@@ -111,23 +111,23 @@ my $cvsDIR               = '/nfs/acari/ba1/cvs_co_14Jul08/';
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
 
-my $dataDIR              = '/lustre/work1/ensembl/ba1/cDNA_update_hum_Jul08/'; 
+my $dataDIR              = '/lustre/scratch1/ensembl/ba1/cDNA_updates/mouse_Jul08/'; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi4"; 
 my $sourceDIR            = "/data/blastdb/";
-my $assembly_version     = "NCBI36"; #"NCBIM37"; #NCBI36
+my $assembly_version     = "NCBIM37"; #"NCBIM37"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
-my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
-#my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
+#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
 
 my $user                 = "ba1";
 my $host                 = "bc-9-1-03";
@@ -139,7 +139,7 @@ my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/g
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
 
-my $chunknum             = 5500;   #1500 for mouse, 4300 for human otherwise get AWOL jobs in first run
+my $chunknum             = 1500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
 
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
@@ -154,28 +154,28 @@ my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 
 # reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_50_36l"; 
+my $WB_REF_DBNAME        = "mus_musculus_core_50_37c"; 
 my $WB_REF_DBHOST        = "ens-staging"; 
 my $WB_REF_DBPORT        = "3306"; 
 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = "ba1_hum_cdna0708_ref";
-my $WB_PIPE_DBHOST       = "genebuild7";
+my $WB_PIPE_DBNAME       = "ba1_mus_cdna0107_ref";
+my $WB_PIPE_DBHOST       = "genebuild4";
 my $WB_PIPE_DBPORT       = "3306";
 
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = "ba1_hum_cdna0708_update";
-my $WB_TARGET_DBHOST     = "genebuild6";
+my $WB_TARGET_DBNAME     = "ba1_mus_cdna0107_update";
+my $WB_TARGET_DBHOST     = "genebuild5";
 my $WB_TARGET_DBPORT     = "3306";
 
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_49_36k"; 
-my $WB_LAST_DBHOST       = "ens-livemirror"; 
+my $WB_LAST_DBNAME       = "mus_musculus_cdna_50_37c"; 
+my $WB_LAST_DBHOST       = "ens-staging"; 
 my $WB_LAST_DBPORT       = "3306"; 
 
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_49_36k"; 
-my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
+my $WB_LAST_DNADBNAME    = "mus_musculus_core_50_37c"; 
+my $WB_LAST_DNADBHOST    = "ens-staging"; 
 my $WB_LAST_DNADBPORT    = "3306"; 
 
 #taxonomy db for loading meta_table - should not need to change:
@@ -184,9 +184,9 @@ my $TAXONDBHOST          = "ens-livemirror";
 my $TAXONDBPORT          = "3306"; 
 
 #set the species
-my $common_species_name  = "human"; #"human"; #"mouse";
-my $species              = "Homo sapiens"; #"Homo sapiens"; #"Mus musculus";  
-my $taxonomy_id          = "9606"; # 9606 for human # 10090 for mouse
+my $common_species_name  = "mouse"; #"human"; #"mouse";
+my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
+my $taxonomy_id          = "10090"; # 9606 for human # 10090 for mouse
 my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
 
@@ -523,210 +523,210 @@ sub checkdir{
 # fetch fasta files, combine them, chop them up
 
 sub fastafiles{
-        $status = 0;
-        my %EMBL_ids;
-        my $header;
-        my $vertrna_ver     = 1;
-        my $vertrna_upd_ver = 1;
-        my $refseq_ver      = 1;
-        my $update          = 0; #set to 1 if want to redo clipping and chunks regardless of changes in vertna etc
-        my @filestamp;
+  $status = 0;
+  my %EMBL_ids;
+  my $header;
+  my $vertrna_ver     = 1;
+  my $vertrna_upd_ver = 1;
+  my $refseq_ver      = 1;
+  my $update          = 0; #set to 1 if want to redo clipping and chunks regardless of changes in vertna etc
+  my @filestamp;
 
-        eval{
-            #check file versions, copy only if changed
-                $cmd  = "cd $sourceDIR; ls -n ".$vertrna." ".$vertrna_update." ".$refseq;
-                sshopen2("$user\@$host", *READER, *WRITER, "$cmd") || die "ssh: $!";
-                while(<READER>){
-                        @filestamp = split(" ", $_);
-                        my $stampA = join("-", @filestamp[5..7]);
-                        $cmd  = "cd ".$dataDIR."; "."ls -n ".$filestamp[8];
-                        @filestamp = split(" ", `$cmd`);
-                        my $stampB = join("-", @filestamp[5..7]);
-                        if($stampA eq $stampB){
-                            #no changes...
-                                if($filestamp[8] eq $vertrna){ $vertrna_ver = 0; }
-                                elsif($filestamp[8] eq $vertrna_update){ $vertrna_upd_ver = 0; }
-                                elsif($filestamp[8] eq $refseq){ $refseq_ver = 0; }
-                        }
+  eval{
+    #check file versions, copy only if changed
+    $cmd  = "cd $sourceDIR; ls -n ".$vertrna." ".$vertrna_update." ".$refseq;
+    sshopen2("$user\@$host", *READER, *WRITER, "$cmd") || die "ssh: $!";
+    while(<READER>){
+      @filestamp = split(" ", $_);
+      my $stampA = join("-", @filestamp[5..7]);
+      $cmd  = "cd ".$dataDIR."; "."ls -n ".$filestamp[8];
+      @filestamp = split(" ", `$cmd`);
+      my $stampB = join("-", @filestamp[5..7]);
+      if($stampA eq $stampB){
+        #no changes...
+        if($filestamp[8] eq $vertrna){ $vertrna_ver = 0; }
+        elsif($filestamp[8] eq $vertrna_update){ $vertrna_upd_ver = 0; }
+        elsif($filestamp[8] eq $refseq){ $refseq_ver = 0; }
+      }
                 
-           }    
-       close(READER);
-       close(WRITER);
-       #copy files
-       if($vertrna_ver){
-         $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna . " " . $dataDIR."/".$vertrna;
-         $status += system($cmd);
-       }
-       if($vertrna_upd_ver){
-         $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna_update . " " . $dataDIR."/".$vertrna_update;
-         $status += system($cmd);
-       }
-       if($refseq_ver){
-         $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$refseq . " " . $dataDIR."/".$refseq;
-         $status += system($cmd);
-       }
-       if($status){ die("Error while copying files.\n") }
-       print "copied necessary files.\n";
+    }    
+    close(READER);
+    close(WRITER);
+    #copy files
+    if($vertrna_ver){
+      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna . " " . $dataDIR."/".$vertrna;
+      $status += system($cmd);
+    }
+    if($vertrna_upd_ver){
+      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna_update . " " . $dataDIR."/".$vertrna_update;
+      $status += system($cmd);
+    }
+    if($refseq_ver){
+      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$refseq . " " . $dataDIR."/".$refseq;
+      $status += system($cmd);
+    }
+    if($status){ die("Error while copying files.\n") }
+      print "copied necessary files.\n";
 
-       if($vertrna_upd_ver or $vertrna_ver or $refseq_ver){
-            $update = 1;
-                #get entries for species of interest, combine base file & update file
-                #read update file
-                local $/ = "\n>";
-                open(RP, "<", $dataDIR."/".$vertrna_update) or die("can t read $vertrna_update\n");
-                open(WP, ">", $dataDIR."/".$newfile) or die("can t create $newfile\n");
-                #<RP>;
-                while (my $entry = <RP>){
-                        $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-                                if($entry =~ m/$species/){
-                                        #extract & save id
-                                        $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-                                        if(!$1){ die "\n$vertrna_update: unmatched id pattern:\n$entry\n"; }
-                                        #else {print STDERR "$1\n$entry\n";}
-                                        $EMBL_ids{$1} = 1;
-                                        #re-write fasta entry
-                                        $entry =~ s/\>//g;
-                                        print WP '>'.$entry;
-                                }
-                }
-                close(RP);
-                print "read update $vertrna_update EMBL file.\n";
-
-            #read base file
-                open(RP, "<", $dataDIR."/".$vertrna) or die("can t read $vertrna\n");
-                #<RP>;
-                while (my $entry = <RP>){
-                        $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-                                if($entry =~ m/$species/){
-                                        #extract & save id
-                                        $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
-                                        if(!$1){ die "\n$vertrna: unmatched id pattern:\n$entry\n"; }
-                                        if( !defined($EMBL_ids{$1}) ){
-                                        #add fasta entry for unchanged id
-                                        $entry =~ s/\>//g;
-                                        print WP '>'.$entry;
-                                        }
-                                }
-                }
-                close(RP);
-                print "read base $vertrna EMBL file.\n";
-
-                #read RefSeq file
-                open(RP, "<", $dataDIR."/".$refseq) or die("can t read $refseq.\n");
-                #<RP>;
-                while (my $entry = <RP>){
-                        $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-                                #we're not using 'predicted' XM entries for now
-                                if($entry =~ m/^gi.+ref\|(NM_.+)\| $species.*/){
-                                    $header = $1;
-                                }
-                                elsif($entry =~ m/^gi.+ref\|(NR_.+)\| $species.*/){
-                                    $header = $1;
-                                }
-                                else{
-                                    next;
-                                }
-                                $entry =~ s/\>//g;
-                                if($header){
-                                  #reduce header to accession number
-                                  $entry =~ s/^gi.+\n{1}?/$header\n/g;
-                                  print WP '>'.$entry;
-                                }
-                }
-                print "read RefSeq file.\n";
-                close(RP);
-                close(WP);
-                local $/ = "\n";
-        }    
-
-                # now get the kill_list
-                #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-                my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
-                my %kill_list = %{$kill_list_object->get_kill_list()};
-
-                open(LIST, "<", $gss) or die("can't open gss list $gss");
-                my %gss;
-                while (<LIST>){
-                        my @tmp = split/\s+/, $_;
-                        $gss{$tmp[1]} = 1;
-                }
-                close LIST;
-
-                #go through file removing any seqs which appear on the kill list
-                local $/ = "\n>";
-                my $newfile2 = $newfile.".seqs";
-                open(SEQS, "<", $dataDIR."/".$newfile) or die("can't open seq file $newfile");  
-                open(OUT, ">", $dataDIR."/".$newfile2) or die("can't open seq file $newfile2"); 
-                while(<SEQS>){
-                        s/>//g;
-
-                        my @tmp = split/\n/, $_;
-                        my $acc; #store the accession number
-                        if ($tmp[0]=~/(\w+)\./){
-                                $acc = $1;
-                        }
-                        if ((!exists $kill_list{$acc}) && !exists $gss{$acc}){
-                                print OUT ">$_";
-                        }
-                } #while
-                local $/ = "\n";
-                close OUT;
-                close SEQS;
-
-        if($update){
-                #clip ployA tails
-                        print "performing polyA clipping...\n";
-                        my $newfile3 = $dataDIR."/".$newfile2.".clipped";
-                $cmd = "perl ".$polyA_clipping ." ".$dataDIR."/".$newfile2." ".$newfile3;
-                        #$cmd = "$polyA_clipping -mRNA ".$dataDIR."/".$newfile2." -out ".$newfile3." -clip"; #old polyAclipping command
-                if(system($cmd)){
-                           die("couldn t clip file.$@\n");
-                } 
-
-                #split fasta files, store into CHUNKDIR
-                print "splitting fasta file.\n";
-                $cmd = "$fastasplit $newfile3 $chunknum $chunkDIR";
-                if(system($cmd)){
-                          die("couldn t split file.$@\n");
-                }
-
-                #isolate biggest sequences
-                check_chunksizes();
-
-                print "\nchopped up file.\n";
-                } #update
-        }; #eval   
-
-
-        if($@){
-        print STDERR "\nERROR: $@";
-        return 0;
+      if($vertrna_upd_ver or $vertrna_ver or $refseq_ver){
+        $update = 1;
+        #get entries for species of interest, combine base file & update file
+        #read update file
+        local $/ = "\n>";
+        open(RP, "<", $dataDIR."/".$vertrna_update) or die("can t read $vertrna_update\n");
+        open(WP, ">", $dataDIR."/".$newfile) or die("can t create $newfile\n");
+        #<RP>;
+        while (my $entry = <RP>){
+          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
+          if($entry =~ m/$species/){
+            #extract & save id
+            $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
+            if(!$1){ die "\n$vertrna_update: unmatched id pattern:\n$entry\n"; }
+            #else {print STDERR "$1\n$entry\n";}
+            $EMBL_ids{$1} = 1;
+            #re-write fasta entry
+            $entry =~ s/\>//g;
+            print WP '>'.$entry;
+          }
         }
-        return 1;
+        close(RP);
+        print "read update $vertrna_update EMBL file.\n";
+
+        #read base file
+        open(RP, "<", $dataDIR."/".$vertrna) or die("can t read $vertrna\n");
+        #<RP>;
+        while (my $entry = <RP>){
+          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
+          if($entry =~ m/$species/){
+            #extract & save id
+            $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
+            if(!$1){ die "\n$vertrna: unmatched id pattern:\n$entry\n"; }
+            if( !defined($EMBL_ids{$1}) ){
+              #add fasta entry for unchanged id
+              $entry =~ s/\>//g;
+              print WP '>'.$entry;
+            }
+          }
+        }
+        close(RP);
+        print "read base $vertrna EMBL file.\n";
+
+        #read RefSeq file
+        open(RP, "<", $dataDIR."/".$refseq) or die("can t read $refseq.\n");
+        #<RP>;
+        while (my $entry = <RP>){
+          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
+          #we're not using 'predicted' XM entries for now
+          if($entry =~ m/^gi.+ref\|(NM_.+)\| $species.*/){
+            $header = $1;
+          }
+          elsif($entry =~ m/^gi.+ref\|(NR_.+)\| $species.*/){
+            $header = $1;
+          }
+          else{
+            next;
+          }
+          $entry =~ s/\>//g;
+          if($header){
+            #reduce header to accession number
+            $entry =~ s/^gi.+\n{1}?/$header\n/g;
+            print WP '>'.$entry;
+          }
+        }
+        print "read RefSeq file.\n";
+        close(RP);
+        close(WP);
+        local $/ = "\n";
+      }    
+
+      # now get the kill_list
+      #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
+      my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
+      my %kill_list = %{$kill_list_object->get_kill_list()};
+
+      open(LIST, "<", $gss) or die("can't open gss list $gss");
+      my %gss;
+      while (<LIST>){
+        my @tmp = split/\s+/, $_;
+        $gss{$tmp[1]} = 1;
+      }
+      close LIST;
+
+      #go through file removing any seqs which appear on the kill list
+      local $/ = "\n>";
+      my $newfile2 = $newfile.".seqs";
+      open(SEQS, "<", $dataDIR."/".$newfile) or die("can't open seq file $newfile");  
+      open(OUT, ">", $dataDIR."/".$newfile2) or die("can't open seq file $newfile2"); 
+      while(<SEQS>){
+        s/>//g;
+
+        my @tmp = split/\n/, $_;
+        my $acc; #store the accession number
+        if ($tmp[0]=~/(\w+)\./){
+          $acc = $1;
+        }
+        if ((!exists $kill_list{$acc}) && !exists $gss{$acc}){
+          print OUT ">$_";
+        }
+      } #while
+      local $/ = "\n";
+      close OUT;
+      close SEQS;
+
+      if($update){
+        #clip ployA tails
+        print "performing polyA clipping...\n";
+        my $newfile3 = $dataDIR."/".$newfile2.".clipped";
+        $cmd = "perl ".$polyA_clipping ." ".$dataDIR."/".$newfile2." ".$newfile3;
+        #$cmd = "$polyA_clipping -mRNA ".$dataDIR."/".$newfile2." -out ".$newfile3." -clip"; #old polyAclipping command
+        if(system($cmd)){
+          die("couldn t clip file.$@\n");
+        } 
+
+        #split fasta files, store into CHUNKDIR
+        print "splitting fasta file.\n";
+        $cmd = "$fastasplit $newfile3 $chunknum $chunkDIR";
+        if(system($cmd)){
+          die("couldn t split file.$@\n");
+        }
+
+        #isolate biggest sequences
+        check_chunksizes();
+
+        print "\nchopped up file.\n";
+      } #update
+    }; #eval   
+
+
+    if($@){
+      print STDERR "\nERROR: $@";
+      return 0;
+    }
+  return 1;
 }
 
 sub remake_fasta_files{
 
-        #have already made the sequence file from the previously clipped seqs: 
-        #just need to rechunk it:         
+  #have already made the sequence file from the previously clipped seqs: 
+  #just need to rechunk it:         
         
-        my $file = $dataDIR."/missing_cdnas.fasta"; #from sub find_missing_cdnas
+  my $file = $dataDIR."/missing_cdnas.fasta"; #from sub find_missing_cdnas
+     
+  #how many files do we want? automatically adjust chunk_num, don't wnat >20 seqs/file because softmasktarget = false
+  my $chunk_num = int ($num_missing_cdnas / 20);
         
-        #how many files do we want? automatically adjust chunk_num, don't wnat >20 seqs/file because softmasktarget = false
-        my $chunk_num = int ($num_missing_cdnas / 20);
-        
-        #split fasta files, store into new CHUNKDIR
-    print "splitting new fasta file.\n";
+  #split fasta files, store into new CHUNKDIR
+  print "splitting new fasta file.\n";
 
-    $cmd = "$fastasplit $file $chunk_num $chunkDIR";
-    if(system($cmd)){
-                die("couldn t split file.$@\n");
-    }
+  $cmd = "$fastasplit $file $chunk_num $chunkDIR";
+  if(system($cmd)){
+    die("couldn t split file.$@\n");
+  }
 
-    #isolate biggest sequences
-    check_chunksizes();
+  #isolate biggest sequences
+  check_chunksizes();
 
-    print "\nchopped up file.\n";
+  print "\nchopped up file.\n";
 }
 
 
@@ -945,153 +945,153 @@ sub run_analysis{
 #identify cdnas which did not align to the genome:
 sub find_missing_cdnas{
 
-        #find all the cdnas which have hits in the database:
-        my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                     -host    => $WB_TARGET_DBHOST,
-                                                     -port    => $WB_TARGET_DBPORT,
-                                                     -user    => $WB_DBUSER,
-                                                     -dbname  => $WB_TARGET_DBNAME,
-                                                         -pass    => $WB_DBPASS
-                                                    );
+  #find all the cdnas which have hits in the database:
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                               -host    => $WB_TARGET_DBHOST,
+                                               -port    => $WB_TARGET_DBPORT,
+                                               -user    => $WB_DBUSER,
+                                               -dbname  => $WB_TARGET_DBNAME,
+                                                   -pass    => $WB_DBPASS
+                                              );
 
-        my $sql = ("select distinct hit_name from dna_align_feature");                  
+  my $sql = ("select distinct hit_name from dna_align_feature");                  
 
-        my $q1 = $db->dbc->prepare($sql) or die "sql error";
-        $q1->execute();
-        my (%cdna_hits);
-        
-        #make list of cdnas with hits in the database
-        while (my $cdna = $q1->fetchrow_array){
-                $cdna_hits{$cdna} = 1;
-        }       
+  my $q1 = $db->dbc->prepare($sql) or die "sql error";
+  $q1->execute();
+  my (%cdna_hits);
+  
+  #make list of cdnas with hits in the database
+  while (my $cdna = $q1->fetchrow_array){
+    $cdna_hits{$cdna} = 1;
+  }       
 
-        #now go through clipped sequence file and extract those sequences which do not have any hits in the database
+  #now go through clipped sequence file and extract those sequences which do not have any hits in the database
 
-        open (OUT, ">".$dataDIR."/missing_cdnas.fasta") or die("can t open file missing_cdnas.fasta");
-        local $/ = "\n>";
-        my $cdna_file = $dataDIR."/".$newfile.".seqs.clipped";
-        open(IN, "<$cdna_file") or die("can t open file $cdna_file.");
-        while(<IN>){
-                my $seq = $_;
-                
-                if ($seq=~/(\w+\.\d+)\n/){
-                        
-                        if(!exists $cdna_hits{$1}){
-                                $seq =~ s/>//g;
-                                print OUT ">$seq\n";
-                        }       
-                }
-        }                       
-        close IN;
-        close OUT;
-        
-        $num_missing_cdnas = `grep ">" $dataDIR/missing_cdnas.fasta | wc -l`;
-        chomp $num_missing_cdnas;
-        return $num_missing_cdnas;
+  open (OUT, ">".$dataDIR."/missing_cdnas.fasta") or die("can t open file missing_cdnas.fasta");
+  local $/ = "\n>";
+  my $cdna_file = $dataDIR."/".$newfile.".seqs.clipped";
+  open(IN, "<$cdna_file") or die("can t open file $cdna_file.");
+  while(<IN>){
+    my $seq = $_;
+          
+    if ($seq=~/(\w+\.\d+)\n/){
+               
+      if(!exists $cdna_hits{$1}){
+        $seq =~ s/>//g;
+        print OUT ">$seq\n";
+      }       
+    }
+  }                       
+  close IN;
+  close OUT;
+  
+  $num_missing_cdnas = `grep ">" $dataDIR/missing_cdnas.fasta | wc -l`;
+  chomp $num_missing_cdnas;
+  return $num_missing_cdnas;
 }
 
 #run a check to see if there are any unfinished jobs in the database:
 sub chase_jobs{
 
-        #incase have skipped previous sections, reset variables:
-        $rerun_flag = 1;
-        $chunkDIR = $dataDIR."/chunks2";
+  #incase have skipped previous sections, reset variables:
+  $rerun_flag = 1;
+  $chunkDIR = $dataDIR."/chunks2";
  
 
-        my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                         -host    => $WB_PIPE_DBHOST,
-                                                         -port    => $WB_PIPE_DBPORT,
-                                                         -user    => $WB_DBUSER,
-                                                         -dbname  => $WB_PIPE_DBNAME,
-                                                                 -pass    => $WB_DBPASS
-                                                        );
+  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
+                                                   -host    => $WB_PIPE_DBHOST,
+                                                   -port    => $WB_PIPE_DBPORT,
+                                                   -user    => $WB_DBUSER,
+                                                   -dbname  => $WB_PIPE_DBNAME,
+                                                           -pass    => $WB_DBPASS
+                                                  );
 
-        #want to find the list of input files which did not finish running in the db
-        my $sql = ("select input_id from job as j, job_status as s where j.job_id = s.job_id && s.is_current = 'y'");                   
+  #want to find the list of input files which did not finish running in the db
+  my $sql = ("select input_id from job as j, job_status as s where j.job_id = s.job_id && s.is_current = 'y'");                   
 
-       my $q1 = $db->dbc->prepare($sql) or die "sql error";
-        $q1->execute();
-        my %chunks;
-        while (my $file = $q1->fetchrow_array){
-                $chunks{$file} = 1;
-        }       
+  my $q1 = $db->dbc->prepare($sql) or die "sql error";
+  $q1->execute();
+  my %chunks;
+  while (my $file = $q1->fetchrow_array){
+    $chunks{$file} = 1;
+  }       
 
-        my $n = keys %chunks;
+  my $n = keys %chunks;
+  
+  if ($n){
+    print "$n chunks did not finish\n";
         
-        if ($n){
-                print "$n chunks did not finish\n";
-                
-                #store the chunks into a single file:
-                open (OUT, ">".$dataDIR."/single_file.out") or die("can t open file single_file.out");
-                open (LIST, ">".$chunkDIR."/went_awol.txt") or die("can t open file went_awol.txt"); #store the list incase need to rerun
-                my $seq_count = 0;
-                foreach my $file (keys %chunks){
-                        print LIST "$file\n";
-                        open IN, $chunkDIR."/".$file  or die "can't open ".$chunkDIR."/$file $!\n";
+    #store the chunks into a single file:
+    open (OUT, ">".$dataDIR."/single_file.out") or die("can t open file single_file.out");
+    open (LIST, ">".$chunkDIR."/went_awol.txt") or die("can t open file went_awol.txt"); #store the list incase need to rerun
+    my $seq_count = 0;
+    foreach my $file (keys %chunks){
+      print LIST "$file\n";
+      open IN, $chunkDIR."/".$file  or die "can't open ".$chunkDIR."/$file $!\n";
 
-                        while (<IN>){
-                                if ($_=~/>/){
-                                        $seq_count++;
-                                }
-                                print OUT "$_";
-                        }
-                        close IN;
-                }
-                close OUT;
-                close LIST;
-                
-                print "There were $seq_count cdnas in the files which didn't run\n";
-                print "Would you like to try with smaller chunk files?(y/n)\n";
-                my $ans = "";
-                if ( get_input_arg() ) { 
-                  print "please specify number of chunk files to make (maximum = 1 file per cdna): ";
-                  my $ans = "";
+      while (<IN>){
+        if ($_=~/>/){
+          $seq_count++;
+        }
+        print OUT "$_";
+      }
+      close IN;
+    }
+    close OUT;
+    close LIST;
+          
+    print "There were $seq_count cdnas in the files which didn't run\n";
+    print "Would you like to try with smaller chunk files?(y/n)\n";
+    my $ans = "";
+    if ( get_input_arg() ) { 
+      print "please specify number of chunk files to make (maximum = 1 file per cdna): ";
+      my $ans = "";
 
-                  chomp($ans = <STDIN>);
-                  if ($ans > $seq_count){
-                          print "this would give less than 1 sequence per file\n";
-                          exit;
-                  }elsif ($ans <= $n){
-                          print "this is the same number of chunk files as last time - it would be better to increase the number of files\n";
-                          exit;
-                  }else{
-                    if ($newFeatureName=~/_2/){
-                      $newFeatureName =~s/_2/_3/; #to show different run
-                    }else{
-                      $newFeatureName = $newFeatureName."_3"; #if have restarted from point after the second run
-                    }
-                    $configvars{"newFeatureName"} = $newFeatureName; 
-                    $chunkDIR           = $dataDIR."/chunks3";
-                    $configvars{"chunkDIR"} = $chunkDIR;
-                    $outDIR             = $dataDIR."/output3";
-                    $configvars{"outDIR"} = $outDIR;
+      chomp($ans = <STDIN>);
+      if ($ans > $seq_count){
+        print "this would give less than 1 sequence per file\n";
+        exit;
+      }elsif ($ans <= $n){
+        print "this is the same number of chunk files as last time - it would be better to increase the number of files\n";
+        exit;
+      }else{
+        if ($newFeatureName=~/_2/){
+          $newFeatureName =~s/_2/_3/; #to show different run
+        }else{
+          $newFeatureName = $newFeatureName."_3"; #if have restarted from point after the second run
+        }
+        $configvars{"newFeatureName"} = $newFeatureName; 
+        $chunkDIR           = $dataDIR."/chunks3";
+        $configvars{"chunkDIR"} = $chunkDIR;
+        $outDIR             = $dataDIR."/output3";
+        $configvars{"outDIR"} = $outDIR;
 #                   
-#                    #check that the new exonerate parameters are set
-                    config_setup();
+#      #check that the new exonerate parameters are set
+        config_setup();
 #                        
-                    $chunknum = $ans;
-                    $chunkDIR = $dataDIR."/chunks3";
-                    print "splitting into $chunknum chunks.\n";
+        $chunknum = $ans;
+        $chunkDIR = $dataDIR."/chunks3";
+        print "splitting into $chunknum chunks.\n";
  
-                    $cmd = "$fastasplit $dataDIR/single_file.out $chunknum $chunkDIR";
-                    if(system($cmd)){
-                      die("couldn t split file.$@\n");
-                    }
-                    #isolate biggest sequences
-                    check_chunksizes();
+        $cmd = "$fastasplit $dataDIR/single_file.out $chunknum $chunkDIR";
+        if(system($cmd)){
+          die("couldn t split file.$@\n");
+        }
+        #isolate biggest sequences
+        check_chunksizes();
 
-                    print "\nchopped up file.\n";
-                    print "\nset databases for next run?(y/n) ";
-                    if ( get_input_arg() ) { 
-                      $rerun_flag = 1;
-                      if(! DB_setup()   ){ unclean_exit(); }
-                        print "\n\nFinished setting up the analysis.\n";
-                      }
-                   run_analysis();
-                    print "you should check for any AWOL jobs now, hopefully there won't be any \n";
-                   }
-                }       
-        }       
+        print "\nchopped up file.\n";
+        print "\nset databases for next run?(y/n) ";
+        if ( get_input_arg() ) { 
+          $rerun_flag = 1;
+          if(! DB_setup()   ){ unclean_exit(); }
+          print "\n\nFinished setting up the analysis.\n";
+        }
+        run_analysis();
+        print "you should check for any AWOL jobs now, hopefully there won't be any \n";
+       }
+    }       
+  }       
 }
 
 #check the database for those cDNAS which hit many times - might be worth adding these to the kill list
