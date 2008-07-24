@@ -287,7 +287,7 @@ sub duplicates {
   foreach my $key (keys %$genes) {
     my $gene = $genes->{$key};
     # duplicate genes
-    my @duplications = @{$ga->fetch_all_by_Slice($gene->feature_Slice)};
+    my @duplications = @{$ga->fetch_all_by_Slice_constraint($gene->feature_Slice,'biotype like "%RNA%" ')};
     if (scalar(@duplications > 1)) {
       print "Genes ";
       @duplications = sort {$a->dbID <=> $b->dbID} @duplications;
