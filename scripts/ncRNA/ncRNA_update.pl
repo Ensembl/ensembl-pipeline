@@ -201,6 +201,9 @@ sub config_setup{
   my $slices = sql("SELECT COUNT(*) FROM input_id_analysis WHERE analysis_id = 7",$db)->[0];
   my $miRNA_batch = int( $slices / 25 );
   my $RFAM_batch  = int( $slices / 50 );
+  # put a hard limit on it - batches can be *too* big
+  $RFAM_batch  = 5000 if  $RFAM_batch  > 5000;
+  $miRNA_batch = 5000 if  $miRNA_batch > 5000;  
   # don't allow a batch size of 0
   $miRNA_batch = 1 unless $miRNA_batch;
   $RFAM_batch  = 1 unless $RFAM_batch;
