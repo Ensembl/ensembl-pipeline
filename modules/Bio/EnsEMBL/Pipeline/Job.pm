@@ -803,6 +803,13 @@ sub stdout_file {
 
   if (defined($arg)) {
     $self->{'_stdout_file'} = $arg;
+
+     # modification for find_false_introns to shorten long file-names to deal with long input_ids 
+     #my @tmp = split /\:/,$arg ; 
+     #if ( @tmp > 7 ) {
+     #   @tmp  = splice(@tmp, 0, 7 );
+     #   $self->{'_stderr_file'} = join(":",@tmp).".out" ;
+     #} 
   }
   return $self->{'_stdout_file'};
 }
@@ -821,12 +828,20 @@ sub stdout_file {
 sub stderr_file {
   my ($self, $arg) = @_;
 
-  if ($arg) {
+  if ($arg) {  
+    $self->{'_stderr_file'} = $arg;
+
+     # modification for find_false_introns to shorten long file-names to deal with long input_ids 
+     #my @tmp = split /\:/,$arg ; 
+     #if ( @tmp > 7 ) {
+     #   @tmp  = splice(@tmp, 0, 7 );
+     #   $self->{'_stderr_file'} = join(":",@tmp).".err" ;
+     #} 
+
     if ($arg !~ /err/){
       my ($p, $f, $l) = caller;
       throw("You can't set stderr file to ".$arg." $f:$l\n");
     }
-    $self->{'_stderr_file'} = $arg;
   }
   return $self->{'_stderr_file'};
 }
