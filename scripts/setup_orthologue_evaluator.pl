@@ -70,7 +70,8 @@ use Bio::EnsEMBL::Registry;
 
 use FindBin;  
 use lib "$FindBin::Bin" ;   
-use Data::Dumper;  
+use Data::Dumper;   
+use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg ) ; 
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::OrthologueEvaluatorExonerate;
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::OrthologueEvaluator;
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
@@ -285,6 +286,8 @@ for my $analysis_type ( keys %main_analysis_setup ) {
          " -dbpass $opt{dbpass} -dbport $opt{dbport} -analysis $logic_name ".
          " -input_id $$input_ids[0]\n" ;   
 
+        modify_pipeline_tables($pa); 
+
         upload_input_ids ( $input_ids, $pa, $submit) ; 
      }
   
@@ -315,7 +318,44 @@ join(",", @initial_analysis_to_run) . "\n\n" ;
 
 
 
+sub modify_pipeline_tables { 
+  my ( $pipe_adaptor ) = @_ ; 
 
+  print "\n\n\tThe setup of FindFalseIntrons needs some additional modifications to the following tabels \n" ; 
+  print "\n\n\t- job-table\n"; 
+  print "\n\n\t- simple_feature-table\n"; 
+  print "\n\n\t- input_id_analysis-table\n";  
+  print "\n\n\t These modifiations are needed as the ffi-intron analysis uses much longer input_ids as usual analysis\nas the post analysis needs more information\n" ; 
+  print "\n\n\tShould i do the modifications for you now ? (y/n) ??  \n" ;    
+  my $modify = 0 ; 
+  while (defined (my $line=<STDIN>)){
+   chomp($line) ;
+   if ( $line=~m/y/i){  
+    print "\n\tOK i will modify the tables for you.\n" ; sleep(2); 
+    my $sth ; 
+    $sth = $pipe_adaptor->prepare("alter table job change input_id input_id varchar(949);"); 
+    $sth->execute();  
+    $sth = $pipe_adaptor->prepare("alter table input_id_analysis change input_id input_id varchar(949);");
+    $sth->execute();  
+    $sth = $pipe_adaptor->prepare(" alter table simple_feature  modify display_label varchar(949);");
+    $sth->execute();   
+    print "\n *modifications done*\n" ;  
+   }elsif( $line =~m/n/i){ 
+      print " not modifying tables. please do it manually : \n\n" ; 
+      print " alter table job change input_id input_id varchar(950) ;\n" ; 
+      print " alter table input_id_analysis change input_id input_id varchar(950) ; \n" ; 
+      print " alter table simple_feature  modify display_label varchar(950); \n" ;  
+   }
+  }
+  print "\n\n"; 
+  print "You also need to modify the Job.pm module in ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Job.pm\n" ; 
+  print "to enable the pipeline / lsf to deal with long input_ids but to shorten the output *err and *out file names \n" ;  
+  print " you find notes in the Job.pm file in the sub stderr_file and sub stdout_file routines \n" ; 
+  print "\n\n"; 
+  sleep(3) ; 
+     
+  
+}
 
 #
 # some subroutines follow .....
