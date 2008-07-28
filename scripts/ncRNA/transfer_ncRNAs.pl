@@ -272,10 +272,12 @@ sub drop_overhangs {
   my %blacklist;
   foreach my $key (keys %$genes) {
     my $gene = $genes->{$key};
-    # some genes lie over the end of the seq region, get rid of them
-    if ($gene->seq_region_start <= 0 or $gene->seq_region_end > $gene->seq_region_length) {
-      print "Dropping ".$gene->dbID." as it falls of the edge of the slice\n";
-      $blacklist{$gene->dbID} = 1;
+    foreach my $exon ( @{$gene->get_all_Exons} ) {
+      # some genes lie over the end of the seq region, get rid of them
+      if ($exon->seq_region_start <= 0 or $exon->seq_region_end > $gene->seq_region_length) {
+	print "Dropping ".$gene->dbID." as it falls of the edge of the slice\n";
+	$blacklist{$gene->dbID} = 1;
+      }
     }
   }
   return \%blacklist;
