@@ -62,7 +62,6 @@ Internal methods are usually preceded with a '_'
 =cut
 
  
-
 use strict;
 use warnings;
 use Getopt::Long;
@@ -86,6 +85,7 @@ use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory; 
 verbose('WARNING') ; 
 $! = 1;
+
 
 my %opt = (
     dbname => '',
@@ -146,7 +146,7 @@ my $oa_ex = Bio::EnsEMBL::Analysis::Tools::ConfigUtils->new(
                  -config => "Bio::EnsEMBL::Analysis::Config::GeneBuild::OrthologueEvaluatorExonerate");   
 
 my $dbs = Bio::EnsEMBL::Analysis::Tools::ConfigUtils->new(
-                 -config => "Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases"); 
+                 -config => "Bio::EnsEMBL::Analysis::Config::Databases"); 
 
 #
 # extract the configuration for the default exonerate run out of 
