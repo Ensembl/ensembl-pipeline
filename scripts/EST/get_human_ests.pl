@@ -84,14 +84,9 @@ while( my $cdna = $seqin->next_seq ){
   # GenBank
   if ( $display_id =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ || $description =~/gi\|\S+\|\S+\|(\S+\.\d+)\|/ ){
     $display_id = $1;
-  }
-  # EMBL vert-RNA
-  else{
-    my @labels = split /\s+/, $description;
-    $display_id = $labels[0];
+    $cdna->display_id($display_id);
   }
   
-  $cdna->display_id($display_id);
   $cdna->desc("");
   
   if($@){
