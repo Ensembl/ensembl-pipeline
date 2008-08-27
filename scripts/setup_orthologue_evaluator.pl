@@ -592,7 +592,7 @@ sub setup_config {
        my %merged_config = %{$basic_xrate_param} ;  
   
        #
-       # get OUTDB parameters out of Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases
+       # get OUTDB parameters out of Bio::EnsEMBL::Analysis::Config::Databases
        # and add it to the default OrthologueEvaluatorExonerate Config 
        #
   
