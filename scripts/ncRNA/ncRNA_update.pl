@@ -326,7 +326,7 @@ sub DB_setup{
     # dont automatically run rfam jobs uless specifically requested
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT -dbpass $pass".
-	" -logic_name ncRNA -program cmsearch -program_file /software/ensembl/bin/cmsearch -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
+	" -logic_name ncRNA -program cmsearch -program_file /software/ensembl/bin/cmsearch_0.72 -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
 	  " -module Bio::EnsEMBL::Analysis::RunnableDB::Infernal".
 	    " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type FLAG";
     $status += system($cmd);
@@ -432,7 +432,6 @@ sub connect_db{
 }
 
 sub prepare_RFAM{
-  die ("Cannot see /pfam directory, run from a farm node\n") unless -e "/pfam";
   # high copy domains
   my %high_copy = 
     (RF00001 => 1,
@@ -483,7 +482,6 @@ sub prepare_RFAM{
   $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.fa.gz");
   die ("Error with obtaining hairpin.fa  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa\n") if $exit > 0;
   print "done\n";
-  # need to make a blast formatted file of miRNAs coz the one in /pfam/db/miRNA/BLASTDB/hairpin.fa seems to be out of date
   # use bioperl to parse it
     my $miRNA = Bio::SeqIO-> new
     (
