@@ -147,10 +147,10 @@ SPECIES:  foreach my $species (@speciess){
 	$count ++;
 	my @dafs;
 	if ($thr{$domain} > 2000){
-	  my @top_scores = @{sql("SELECT score FROM dna_align_feature WHERE analysis_id = ". $RFanalysis->dbID .
-				 " AND LEFT(hit_name,7) = '".$domain."' ORDER BY  score DESC limit 2000;",$sdb)};
+	  my @top_scores = @{sql("SELECT evalue FROM dna_align_feature WHERE analysis_id = ". $RFanalysis->dbID .
+				 " AND LEFT(hit_name,7) = '".$domain."' ORDER BY  evalue ASC limit 2000;",$sdb)};
 	  my $cutoff = pop (@top_scores)->[0];
-	  @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" AND score >= $cutoff")};
+	  @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" AND evalue <= $cutoff")};
 	} else {
 	  @dafs = @{$dafa->generic_fetch("left(hit_name,7) = \"$domain\" ")};
 	}
@@ -164,7 +164,7 @@ SPECIES:  foreach my $species (@speciess){
 	$last = $complete;
 	@dafs = sort {$a->p_value <=> $b->p_value} @dafs if (scalar(@dafs) > 2000 );
       DAF:  foreach my $daf(@dafs){
-	  next if ($daf->score < 20);
+	  next if ($daf->p_value > 0.01);
 	  #    print $daf->p_value." ";
 	  last DAF if ($rfam_blasts{$domain} &&  scalar(@{$rfam_blasts{$domain}}) >= 2000 );
 	  push @{$rfam_blasts{$domain}},$daf;
