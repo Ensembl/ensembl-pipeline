@@ -663,9 +663,6 @@ my $first_entry = 0  ;
   else { 
     if ($comment =~ /reference,sequence,was,derived,from,(\w+)./){
       $assembly{'contig'} = "$1.".@{$entries[1]{'start'}}[0].".".@{$entries[1]{'end'}}[0];  
-
-
-      $assembly{contig} ="AY172335" ; 
     }
   }
   return \@entries,\%assembly;
