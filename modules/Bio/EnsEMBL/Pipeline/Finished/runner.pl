@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl 
+#!/software/bin/perl
 
 # default Finished pipeline runner script
 # this script is passed as part of the batch submission request
@@ -61,7 +61,7 @@ if( $check ) {
 
 $queue_manager = $QUEUE_MANAGER unless($queue_manager);
 
-my $batch_q_module = 
+my $batch_q_module =
   "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
 
@@ -129,17 +129,17 @@ if($cleanup){
 
 sub run_jobs_with_selfcopy{
   my ($jobs, $host) = @_;
- 
+
  JOB:foreach my $job(@$jobs) {
-    
+
     my $job_id = $job->dbID;
-    
+
     $job->execution_host($host);
-    
+
     eval{
       $job_adaptor->update($job);
     };
-    
+
     if($@){
       print STDERR "Job $job_id failed: [$@]";
       if($batch_q_object->can('copy_output')){
@@ -161,7 +161,7 @@ sub run_jobs_with_selfcopy{
     print STDERR "Input id is " . $job->input_id . "\n";
     print STDERR "Analysis is ".$job->analysis->logic_name."\n";
     print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
-    
+
     eval {
       $job->run_module;
     };
@@ -188,16 +188,16 @@ sub run_jobs_with_lsfcopy{
   my ($jobs, $host) = @_;
 
  JOB:foreach my $job(@$jobs) {
-    
+
     my $job_id = $job->dbID;
-    
+
     $job->execution_host($host);
-    
+
     eval{
       $job_adaptor->update($job);
     };
     if($@){
-      print STDERR "Job update ".$job->dbID." failed: [$@]";  
+      print STDERR "Job update ".$job->dbID." failed: [$@]";
     }
     print STDERR "Running job $job_id\n";
     print STDERR "Module is " . $job->analysis->module . "\n";
@@ -205,20 +205,20 @@ sub run_jobs_with_lsfcopy{
     print STDERR "Analysis is ".$job->analysis->logic_name."\n";
     print STDERR "Files are " . $job->stdout_file . " " .
       $job->stderr_file . "\n";
-    
+
     eval {
       $job->run_module;
     };
     $pants = $@;
-    
+
     if ($pants) {
       print STDERR "Job $job_id failed: [$pants]";
     }
-    
+
     print STDERR "Finished job $job_id\n";
     if ($job->current_status->status eq "SUCCESSFUL" || $job->current_status->status eq "VOID"){
       $job->adaptor->remove( $job );
     }
   }
-  
+
 }
