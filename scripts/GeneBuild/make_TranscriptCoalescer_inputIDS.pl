@@ -1,13 +1,14 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/ensembl/bin/perl
 
 use strict;
+use warnings;
 
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;
 use Bio::EnsEMBL::Analysis::Tools::Algorithms::GeneCluster;
 use Bio::EnsEMBL::Analysis::Config::GeneBuild::TranscriptCoalescer;
-use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases;
+use Bio::EnsEMBL::Analysis::Config::Databases;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 use Bio::EnsEMBL::Analysis::Tools::Algorithms::ClusterUtils;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
