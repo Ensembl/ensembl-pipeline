@@ -63,6 +63,8 @@ this script allows input_ids to be generated and written to the input_id_analysi
      the database this may produce ids which are a mixture of different
      coordinate systems, if -coord_system_version is specified it will
      be ignored
+    -hap_pair this will generate an input_id that is the relation between a haplotype
+     and the reference chromosome
 =head1 EXAMPLES
 
 
@@ -159,6 +161,7 @@ my $seq_level;
 my $top_level;
 my $include_non_reference;
 my $insert_analysis = 0;
+my $hap_pair;
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -184,6 +187,7 @@ my $insert_analysis = 0;
             'include_non_reference!' => \$include_non_reference,
             'h|help'            => \$help,
             'insert_analysis!' => \$insert_analysis,
+            'hap_pair'        => \$hap_pair,
             'seqregionname:s' => \$seq_region_name,
            );
 
@@ -215,11 +219,14 @@ if($seq_level){
 }elsif($top_level){
   $slice = 1;
   $coord_system = 'toplevel';
+}elsif($hap_pair){
+#  $slice = 0;
+#  $coord_system = 'toplevel';
 }
 
-if (!($slice) && !($single) && !($file) && !($translation_id)) {
+if (!($slice) && !($single) && !($file) && !($translation_id) && !($hap_pair)) {
   throw("Must define input as either contig, slice, file, translation_id ".
-  "single, seq_level or top_level");
+  "single, seq_level or top_level or hap_pair");
   exec('perldoc', $0);
 }
 
@@ -250,6 +257,7 @@ my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
    -slice_size => $slice_size,
    -slice_overlaps => $slice_overlap,
    -seq_region_name => $seq_region_name,
+   -hap_pair => $hap_pair,
   );
 
 

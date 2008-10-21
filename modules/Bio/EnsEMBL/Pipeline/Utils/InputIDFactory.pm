@@ -58,6 +58,7 @@ sub new{
       $seq_region_name,
       $seq_region_start,
       $seq_region_end,
+      $hap_pair,
       $include_non_reference)=rearrange([qw(DB 
                                             SLICE 
                                             SINGLE 
@@ -79,12 +80,14 @@ sub new{
                                             SEQ_REGION_NAME
                                             SEQ_REGION_START
                                             SEQ_REGION_END
+                                            HAP_PAIR
  					    INCLUDE_NON_REFERENCE
                                            )], @_);
 
   $slice = 0 unless ($slice);
   $single = 0 unless ($single);
   $file = 0 unless ($file);
+  $hap_pair = 0 unless ($hap_pair);
   $include_non_reference = 0 unless ($include_non_reference);
   $translation_id = 0 unless($translation_id);
 
@@ -92,13 +95,20 @@ sub new{
     throw("You can't create and store input_ids without a dbadaptor\n");
   }
   $self->db($db);
-  if(!$slice && !$file && !$translation_id && !$single){
-    throw("You must define one of these options SLICE, FILE, SINGLE".
-          "TRANSLATION_ID for the input id factory to work");
+  if(!$slice && !$file && !$translation_id && !$single && !$hap_pair){
+    throw("You must define one of these options SLICE, FILE, SINGLE ".
+          "TRANSLATION_ID, HAP_PAIR for the input id factory to work");
   }
-  if(($slice+$file+$translation_id+$single) > 1){
-    throw("You must only specify on of these options SLICE, FILE, SINGLE".
-          "TRANSLATION_ID for the input id factory to work");
+  print "slice: ",$slice,"\n";
+print "file: ",$file,"\n";
+print "translation_id: ",$translation_id,"\n";
+print "single: ",$single,"\n";
+print "hap_pair: ",$hap_pair,"\n";
+  print "SUM: ",$slice+$file+$translation_id+$single+$hap_pair,"\n";
+
+  if(($slice+$file+$translation_id+$single+$hap_pair) > 1){
+    throw("You must only specify one of these options SLICE, FILE, SINGLE ".
+          "TRANSLATION_ID, HAP_PAIR for the input id factory to work");
   }
   $self->slice($slice) if($slice);
   $self->top_level($top_level) if($top_level);
@@ -108,6 +118,11 @@ sub new{
       throw("You must specify a coordinate system if you want slice ".
             "input ids created\n");
   }
+#  if($hap_pair && !$self->coord_system){
+#    throw("You must specify a coordinate system if you want slice ".
+#          "input ids created\n");
+#  }
+
   $self->coord_system_version($coord_system_version) 
       if($coord_system_version);
   $self->seq_region_name($seq_region_name)
@@ -121,6 +136,7 @@ sub new{
   $self->single($single) if($single);
   $self->include_non_reference($include_non_reference) if($include_non_reference);
   $self->translation_id($translation_id) if($translation_id);
+  $self->hap_pair($hap_pair) if($hap_pair);
   if(!$logic_name){
     throw("Must have a logic_name otherwise don't know which analysis to ".
           "store the input ids under");
@@ -202,6 +218,12 @@ sub single{
   my $self = shift;
   $self->{'single'} = shift if(@_);
   return $self->{'single'};
+}
+
+sub hap_pair{
+  my $self = shift;
+  $self->{'hap_pair'} = shift if(@_);
+  return $self->{'hap_pair'};
 }
 
 sub include_non_reference{
@@ -348,6 +370,8 @@ sub generate_input_ids{
     $ids = $self->get_single;
   }elsif($self->translation_id){
     $ids = $self->get_translation_id;
+  }elsif($self->hap_pair){
+    $ids = $self->get_hap_pairs;
   }else{
     throw("Reaching this point means you haven't created InputIDFactory ".
           "without selecting what type of input_id to create this won't ".
@@ -401,7 +425,37 @@ sub get_slice_names{
   return \@ids;
 }
 
+sub get_hap_pairs{
+  my ($self) = @_;
 
+  my @ids;
+
+  my $assembly_exception_feature_adaptor =$self->db->get_AssemblyExceptionFeatureAdaptor(); 
+  my @assembly_exception_features = @{$assembly_exception_feature_adaptor->fetch_all};
+
+  $self->coord_system_version('') if(!$self->coord_system_version);
+  
+  foreach my $aef(@assembly_exception_features){
+    if ($aef->type eq 'HAP'){
+       
+      my $sname = sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:",
+                          $aef->slice->coord_system->name,
+                          $aef->slice->coord_system->version,
+                          $aef->slice->seq_region_name,
+                          $aef->start,
+                          $aef->end,
+                          $aef->alternate_slice->coord_system->name,
+                          $aef->alternate_slice->coord_system->version,
+                          $aef->alternate_slice->seq_region_name,
+                          $aef->alternate_slice->start,
+                          $aef->alternate_slice->end,);
+          
+      push(@ids, $sname);
+      
+    }
+  }
+  return \@ids;
+}
 
 sub get_filenames{
   my ($self) = @_;
