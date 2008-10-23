@@ -65,6 +65,11 @@ The steps the script performs:
      extended version: look for new hits, track missing hits.
  10. cleanup: post-process result DB, restore config files, remove tmp files and dbs
 
+Note that run_analysis is called 3 times:
+ . First it runs jobs with normal exonerate parameters and the sepcified chunk size
+ . Second it runs exonerat with more exhaustive parameters
+ . Last it rechunks into smaller chunk s and runs exonerate with the same parameters as second run
+
 What YOU will need to do:
   1. Fill in the config variables in this script (just below this) and
      in /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm.
@@ -194,6 +199,7 @@ my $oldFeatureName       = "cDNA_update"; #for the comparison only
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be necessary below this
 my $option = $ARGV[0];
+$| = 1;
 use Bio::EnsEMBL::KillList::KillList; # add later after perldocs made
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor; 
 use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg ) ; 
@@ -540,6 +546,7 @@ sub fastafiles{
       @filestamp = split(" ", $_);
       my $stampA = join("-", @filestamp[5..7]);
       $cmd  = "cd ".$dataDIR."; "."ls -n ".$filestamp[8];
+      # this check doesn't seem to work
       @filestamp = split(" ", `$cmd`);
       my $stampB = join("-", @filestamp[5..7]);
       if($stampA eq $stampB){
