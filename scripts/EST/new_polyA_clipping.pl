@@ -133,8 +133,16 @@ sub trim_if_possible {
       # we need to trim if it doesn't make seq too short
       if ($stop <= $seq->length) {
         if ($stop-$start+1 < $min_length) {
-          print STDERR "Not trimming seq ".$seq->display_id.
-                       " which would trim to length " . ($stop-$start+1) . "\n";
+          # sometimes ESTs are all low-quality
+          # in this case, both 'high quality sequence start'
+          # and 'high quality sequence stop' have value = 1
+          # so we should skip the sequence altogether
+          if ($stop == $start) {
+            return (undef, undef, undef);
+          } else {
+            print STDERR "Not trimming seq ".$seq->display_id.
+                         " which would trim to length " . ($stop-$start+1) . "\n";
+          }
         } else {
           # do the trim
           $seq->seq($seq->subseq($start,$stop));
