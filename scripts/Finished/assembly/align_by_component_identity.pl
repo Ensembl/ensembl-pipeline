@@ -251,7 +251,7 @@ my $sth1 = $R_dbh->prepare(
 	qq{
     INSERT IGNORE INTO assembly (asm_seq_region_id, cmp_seq_region_id,
                                  asm_start, asm_end, cmp_start, cmp_end, ori)
-    VALUES (?, ?, ?, ?, ?, ?, 1)
+    VALUES (?, ?, ?, ?, ?, ?, ? )
 }
 );
 
@@ -443,7 +443,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				$match->{$R_chr}->[$c]->[3],
 				$match->{$R_chr}->[$c]->[4],
 				$match->{$R_chr}->[$c]->[0],
-				$match->{$R_chr}->[$c]->[1]
+				$match->{$R_chr}->[$c]->[1],
+				$match->{$R_chr}->[$c]->[7]
 			);
 		}
 
