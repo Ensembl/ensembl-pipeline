@@ -242,8 +242,10 @@ my @block_length;
 
 my $fmt1 = "%-40s%10.0f\n";
 my $fmt2 = "%-40s%9.2f%%\n";
-my $fmt3 = "%-12s%-12s%-12s%-12s%-12s%-9s\n";
+my $fmt3 = "%-12s%-12s%-15s%-12s%-12s%-12s\n";
+my $fmt33 = "%-12s%-12s%-15s%-12s%-12s%-15s%-12s\n";
 my $fmt4 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f\n";
+my $fmt44 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f %7.0f\n";
 my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
 
@@ -556,16 +558,16 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 		$support->log( "\nDirectly aligned blocks:\n\n", 1 );
 		$support->log(
-			sprintf( $fmt3,
-				qw(ALT_START ALT_END ALT_COMPONENTS REF_START REF_END REF_COMPONENTS)
+			sprintf( $fmt33,
+				qw(ALT_START ALT_END ALT_COMPONENTS REF_START REF_END REF_COMPONENTS ORIENTATION)
 			),
 			2
 		);
-		$support->log( ( '-' x 71 ) . "\n", 2 );
+		$support->log( ( '-' x 80 ) . "\n", 2 );
 
 		for ( $c = 0 ; $c < scalar( @{ $match->{$R_chr} } ) ; $c++ ) {
 
-			$support->log( sprintf( $fmt4, @{ $match->{$R_chr}->[$c] } ), 2 );
+			$support->log( sprintf( $fmt44, @{$match->{$R_chr}->[$c]}[0..5,7] ), 2 );
 
 			# sanity check: aligned region pairs must have same length
 			my $e_len =
