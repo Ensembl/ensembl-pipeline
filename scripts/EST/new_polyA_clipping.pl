@@ -42,8 +42,11 @@ my (
     $trim,
     $hqs_comment_file,
     $min_length,
-   );
-
+   ); 
+#
+# NOTE : This script is used in production code ( cdna_update ) - please do not 
+# change the calls / options, otherewise the cDNA update code breaks ...
+#
 &GetOptions(
             'readfile:s'   => \$data, # = '/path/to/unclipped/cdnas_unclipped.fa';
             'outfile:s'    => \$clipped_cdnas, # = '/path/to/clipped/cdnas_clipped.fa';
