@@ -683,9 +683,10 @@ sub fastafiles{
       if($update){
         #clip ployA tails
         print "performing polyA clipping...\n";
-        my $newfile3 = $dataDIR."/".$newfile2.".clipped";
-        $cmd = "perl ".$polyA_clipping ." ".$dataDIR."/".$newfile2." ".$newfile3;
-        #$cmd = "$polyA_clipping -mRNA ".$dataDIR."/".$newfile2." -out ".$newfile3." -clip"; #old polyAclipping command
+        my $newfile3 = $dataDIR."/".$newfile2.".clipped"; 
+
+        $cmd = "perl ".$polyA_clipping ." -readfile ".$dataDIR."/".$newfile2." -outfile ".$newfile3;
+
         if(system($cmd)){
           die("couldn t clip file.$@\n");
         } 
