@@ -55,6 +55,12 @@ my (
             'min_length:s' => \$min_length,
            );
 
+# this is for backwards compatibility as options changed in r 1.10 
+$data = $ARGV[0] if $ARGV[0]; 
+$clipped_cdnas = $ARGV[1] if $ARGV[1] ; 
+
+
+
 if ($trim && !defined $hqs_comment_file) {
   die "Please enter -comment file path if you'd like to trim sequences\n";
 }
