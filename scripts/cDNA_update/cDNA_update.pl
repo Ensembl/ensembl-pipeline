@@ -962,7 +962,8 @@ sub find_missing_cdnas{
                                                    -pass    => $WB_DBPASS
                                               );
 
-  my $sql = ("select distinct hit_name from dna_align_feature");                  
+  
+  my $sql = ("select hit_name from dna_align_feature");                  
 
   my $q1 = $db->dbc->prepare($sql) or die "sql error";
   $q1->execute();
