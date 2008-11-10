@@ -40,7 +40,7 @@ use vars qw(%Config);
   MAX_JOB_SLEEP       => 3600,
   MIN_JOB_SLEEP => 120,
   SLEEP_PER_JOB => 30,
-  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
+  DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',
   DEFAULT_RUNNER => '',
   DEFAULT_RETRY_QUEUE => 'long',
   DEFAULT_RETRY_SUB_ARGS => '',
