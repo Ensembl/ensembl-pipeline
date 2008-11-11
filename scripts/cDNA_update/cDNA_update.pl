@@ -105,38 +105,38 @@ ensembl-dev@ebi.ac.uk
 
 =cut
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 
 # configuration variables, adjust to your needs:
 # all directories without trailing '/'
 
 # personal base DIR for ensembl perl libs
 # expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = '/nfs/acari/ba1/cvs_co_14Jul08/';
+my $cvsDIR               = "/nfs/acari/jhv/cvs_checkout/ensembl-trunk-2008-10/" ; 
 
 # personal data dir (for temporary & result/error files) eg. scratch DIR
 
-my $dataDIR              = '/lustre/scratch1/ensembl/ba1/cDNA_updates/mouse_Jul08/'; 
+my $dataDIR              = '/lustre/scratch1/ensembl/jhv/cDNA_updates/human_2008_10'; 
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
 my $vertrna              = "embl_vertrna-1";
 my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
+my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi4"; 
 my $sourceDIR            = "/data/blastdb/";
-my $assembly_version     = "NCBIM37"; #"NCBIM37"; #NCBI36
+my $assembly_version     = "NCBI36"; #"NCBIM37"; #NCBI36
 
 #WARNING!!!
 #When using a new assembly containing haplotype regions eg Human DR sequences - 
 #make sure that the header contains chromosomal coordinates!!
 
 #my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
-my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
+my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa");
 
-my $user                 = "ba1";
+my $user                 = "jhv";
 my $host                 = "bc-9-1-03";
-my $genebuild_id         = "4";
+my $genebuild_id         = "2";
 
 
 my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt";
@@ -144,7 +144,7 @@ my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/g
 # external programs needed (absolute paths):
 my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
 
-my $chunknum             = 1500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
+my $chunknum             = 5500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
 
 my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
 my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
@@ -159,28 +159,28 @@ my $WB_DBUSER            = "ensadmin";
 my $WB_DBPASS            = "ensembl";
 
 # reference db (current build)
-my $WB_REF_DBNAME        = "mus_musculus_core_50_37c"; 
+my $WB_REF_DBNAME        = "homo_sapiens_core_52_36n"; 
 my $WB_REF_DBHOST        = "ens-staging"; 
 my $WB_REF_DBPORT        = "3306"; 
 
 # new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = "ba1_mus_cdna0107_ref";
+my $WB_PIPE_DBNAME       = "jhv_human_cdna_52_ref";
 my $WB_PIPE_DBHOST       = "genebuild4";
 my $WB_PIPE_DBPORT       = "3306";
 
 # new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = "ba1_mus_cdna0107_update";
+my $WB_TARGET_DBNAME     = "jhv_human_cdna_52_update";
 my $WB_TARGET_DBHOST     = "genebuild5";
 my $WB_TARGET_DBPORT     = "3306";
 
 # older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "mus_musculus_cdna_50_37c"; 
-my $WB_LAST_DBHOST       = "ens-staging"; 
+my $WB_LAST_DBNAME       = "homo_sapiens_cdna_51_36m";
+my $WB_LAST_DBHOST       = "ens-livemirror"; 
 my $WB_LAST_DBPORT       = "3306"; 
 
 # reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "mus_musculus_core_50_37c"; 
-my $WB_LAST_DNADBHOST    = "ens-staging"; 
+my $WB_LAST_DNADBNAME    = "homo_sapiens_core_51_36m"; 
+my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
 my $WB_LAST_DNADBPORT    = "3306"; 
 
 #taxonomy db for loading meta_table - should not need to change:
@@ -189,12 +189,104 @@ my $TAXONDBHOST          = "ens-livemirror";
 my $TAXONDBPORT          = "3306"; 
 
 #set the species
-my $common_species_name  = "mouse"; #"human"; #"mouse";
-my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
-my $taxonomy_id          = "10090"; # 9606 for human # 10090 for mouse
+my $common_species_name  = "human"; #"human"; #"mouse";
+my $species              = "Homo sapiens"; #"Mus musculus";  
+my $taxonomy_id          = "9606"; # 9606 for human # 10090 for mouse
 my $oldFeatureName       = "cDNA_update"; #for the comparison only
 
 
+
+#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+###_NO_
+###_NO_# configuration variables, adjust to your needs:
+###_NO_# all directories without trailing '/'
+###_NO_
+###_NO_# personal base DIR for ensembl perl libs
+###_NO_# expects to find directories 'ensembl' & 'ensembl-analysis' here
+###_NO_my $cvsDIR               = '/nfs/acari/ba1/cvs_co_14Jul08/';
+###_NO_
+###_NO_# personal data dir (for temporary & result/error files) eg. scratch DIR
+###_NO_
+###_NO_my $dataDIR              = '/lustre/scratch1/ensembl/ba1/cDNA_updates/mouse_Jul08/'; 
+###_NO_
+###_NO_# sequence data files, which are used for the update
+###_NO_# if in doubt, ask Hans where to find new files
+###_NO_my $vertrna              = "embl_vertrna-1";
+###_NO_my $vertrna_update       = "emnew_vertrna-1";
+###_NO_my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
+###_NO_my $sourceHost           = "cbi4"; 
+###_NO_my $sourceDIR            = "/data/blastdb/";
+###_NO_my $assembly_version     = "NCBIM37"; #"NCBIM37"; #NCBI36
+###_NO_
+###_NO_#WARNING!!!
+###_NO_#When using a new assembly containing haplotype regions eg Human DR sequences - 
+###_NO_#make sure that the header contains chromosomal coordinates!!
+###_NO_
+###_NO_#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
+###_NO_my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
+###_NO_
+###_NO_my $user                 = "ba1";
+###_NO_my $host                 = "bc-9-1-03";
+###_NO_my $genebuild_id         = "4";
+###_NO_
+###_NO_
+###_NO_my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt";
+###_NO_
+###_NO_# external programs needed (absolute paths):
+###_NO_my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
+###_NO_
+###_NO_my $chunknum             = 1500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
+###_NO_
+###_NO_my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
+###_NO_my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
+###_NO_my $reasons_prog         = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
+###_NO_my $reasons_file         = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
+###_NO_my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
+###_NO_
+###_NO_
+###_NO_# db parameters
+###_NO_#admin rights required
+###_NO_my $WB_DBUSER            = "ensadmin";
+###_NO_my $WB_DBPASS            = "ensembl";
+###_NO_
+###_NO_# reference db (current build)
+###_NO_my $WB_REF_DBNAME        = "mus_musculus_core_50_37c"; 
+###_NO_my $WB_REF_DBHOST        = "ens-staging"; 
+###_NO_my $WB_REF_DBPORT        = "3306"; 
+###_NO_
+###_NO_# new source db (PIPELINE)
+###_NO_my $WB_PIPE_DBNAME       = "ba1_mus_cdna0107_ref";
+###_NO_my $WB_PIPE_DBHOST       = "genebuild4";
+###_NO_my $WB_PIPE_DBPORT       = "3306";
+###_NO_
+###_NO_# new target db (ESTGENE)
+###_NO_my $WB_TARGET_DBNAME     = "ba1_mus_cdna0107_update";
+###_NO_my $WB_TARGET_DBHOST     = "genebuild5";
+###_NO_my $WB_TARGET_DBPORT     = "3306";
+###_NO_
+###_NO_# older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
+###_NO_my $WB_LAST_DBNAME       = "mus_musculus_cdna_50_37c"; 
+###_NO_my $WB_LAST_DBHOST       = "ens-staging"; 
+###_NO_my $WB_LAST_DBPORT       = "3306"; 
+###_NO_
+###_NO_# reference db (last build, needed for comparison only) 
+###_NO_my $WB_LAST_DNADBNAME    = "mus_musculus_core_50_37c"; 
+###_NO_my $WB_LAST_DNADBHOST    = "ens-staging"; 
+###_NO_my $WB_LAST_DNADBPORT    = "3306"; 
+###_NO_
+###_NO_#taxonomy db for loading meta_table - should not need to change:
+###_NO_my $TAXONDBNAME          = "ncbi_taxonomy";       
+###_NO_my $TAXONDBHOST          = "ens-livemirror";
+###_NO_my $TAXONDBPORT          = "3306"; 
+###_NO_
+###_NO_#set the species
+###_NO_my $common_species_name  = "mouse"; #"human"; #"mouse";
+###_NO_my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
+###_NO_my $taxonomy_id          = "10090"; # 9606 for human # 10090 for mouse
+###_NO_my $oldFeatureName       = "cDNA_update"; #for the comparison only
+###_NO_
+###_NO_
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 #no changes should be necessary below this
@@ -300,22 +392,36 @@ if($option eq "prepare"){
 elsif($option eq "run"){
  
   print "\nDo we need to set re-set the configs?(y/n) "; 
-  if ( get_input_arg() ) { 
+  if ( get_input_arg() ) {  
+       print "Are you sure you want to reset the configs ?\n".
+       " If you're in the second stage you need to \n".
+        "edit BatchQueue.pm as well as Exonerate2Genes.pm !!! \n\n" ;
+       if ( get_input_arg() ) {
+         config_setup()
+      } else {
+          print "not resetting config.\n" ;
+      }
     config_setup()
   }
 
- 
-  run_analysis();
 
-  find_missing_cdnas();
+  print "\nDo you want to start the initial ( first )  analysis ? (y/n) " ;
+  if ( get_input_arg() ) {
+     run_analysis();
+  } 
+
   
-  print "\n$num_missing_cdnas have not aligned to the genome.\n".
-                "Would you like to rerun these cdnas with adjusted Exonerate parameters:\n".
-                "\tmax_intron = 400,000 and\n".
-                "\tsoftmasktarget = FALSE? (y/n) ";
+  print "\nDo you want to look for MISSING cDNA's and set up a 2nd run ?? (y/n) " ; 
   if ( get_input_arg() ) { 
+     print "Finding missing cDNA's ...\n" ; 
+     find_missing_cdnas(); 
+
+     print "\n$num_missing_cdnas have not aligned to the genome.\n".
+        "Would you like to rerun these cdnas with adjusted Exonerate parameters:\n".
+           "\tmax_intron = 400,000 and\n".
+              "\tsoftmasktarget = FALSE? (y/n) "; 
+     if ( get_input_arg() ) { 
         $rerun_flag = 1;
-        
         #change the logic_name and directories:
         $newFeatureName = $newFeatureName."_2"; #to show different params
         $configvars{"newFeatureName"} = $newFeatureName;
@@ -325,34 +431,36 @@ elsif($option eq "run"){
         $configvars{"outDIR"} = $outDIR;
         
         config_setup();
-        
-    remake_fasta_files();
+        remake_fasta_files();
 
-
-        print "\nset databases for next run?(y/n) ";
+        print "\nset databases for next run? (y/n) ";
         if ( get_input_arg() ) { 
                 $rerun_flag = 1;
                 if(! DB_setup()   ){ unclean_exit(); }
                 print "\n\nFinished setting up the analysis.\n";
+        } 
 
-
-        }
-        
-        run_analysis();
-        
+        print "Should we start the 2nd run ? (y/n) ";
+        if ( get_input_arg() ) {
+          run_analysis();
+        } 
+     } 
   }     
   
-  print "checking for AWOL jobs...\n";
-  chase_jobs();
+  print "Do you want to check for AWOL jobs ? (y/n) "; 
+  if ( get_input_arg() ) {
+    print "checking for AWOL jobs...\n";
+    chase_jobs(); 
+  }
   
-  print "Would you like to check for cDNAs which have hit many places in the genome?(y/n)";
+  print "Would you like to check for cDNAs which have hit many places in the genome? (y/n) ";
   if ( get_input_arg() ) { 
-          find_many_hits();
+       find_many_hits();
   }
 
-  print "Would you like to store the cDNAs which have not aligned as unmapped_objects?(y/n)";
+  print "Would you like to store the cDNAs which have not aligned as unmapped_objects? (y/n) ";
   if ( get_input_arg() ) { 
-          why_cdnas_missed();
+      why_cdnas_missed();
   }
   
   print "updating meta_coord table...\n";
@@ -361,9 +469,21 @@ elsif($option eq "run"){
   print "sorting out the meta table...\n";
   fix_metatable();
   
-  print "you should now change the analysis_ids of the cdnas in your database so that they ". 
+     print "you should now change the analysis_ids of the cdnas in your database so that they ". 
                 "all have the same logic name, otherwise the comparison script won't work;\n".
-                "you will need to change both the gene and dna_align_feature tables\n";
+                "you will need to change both the gene and dna_align_feature tables\n\n"; 
+ 
+     print "\nUseful sql : \n\n" ;    
+ 
+     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
+            " -e\"update dna_align_feature set analysis_id = 1\" \n\n" ;  
+    
+     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
+            " -e\"update gene set analysis_id = 1\" \n\n" ;   
+    
+     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
+            " -e\"update analysis set analysis_id = 1 where logic_name = 'cDNA_update\"\n\n" ; 
+     
 
 }
 elsif($option eq "clean"){
@@ -1090,15 +1210,18 @@ sub chase_jobs{
         check_chunksizes();
 
         print "\nchopped up file.\n";
-        print "\nset databases for next run?(y/n) ";
+        print "\nset databases for next (third) run?(y/n) ";
         if ( get_input_arg() ) { 
           $rerun_flag = 1;
           if(! DB_setup()   ){ unclean_exit(); }
           print "\n\nFinished setting up the analysis.\n";
         }
-        run_analysis();
-        print "you should check for any AWOL jobs now, hopefully there won't be any \n";
-       }
+        print "\nStart 3rd run ? (y/n) ";
+        if ( get_input_arg() ) {  
+          run_analysis(); 
+          print "you should check for any AWOL jobs now, hopefully there won't be any \n";
+        }
+      }
     }       
   }       
 }
@@ -1154,16 +1277,28 @@ sub why_cdnas_missed{
         #first need to create no_hits.txt
         #make a file containing all of the relevant lines from ExonerateTranscriptFilter.pm outputs
         my @output = ("output2", "output3");
+        my $concat_file = $dataDIR."/concatenated_output_files.out"; 
+
+        if ( -e $concat_file ) {
+         system("rm $concat_file") ;
+        }
+
         my $file = $dataDIR."/failed_hits.out";
         
         open (OUT, ">$file") or die("can t open file $file"); #to empty it
-        close OUT;
-        for my $output (@output){
-                `find $dataDIR/$output/. | xargs -l1 grep "rpp" >> $file`;
-                `find $dataDIR/$output/. | xargs -l1 grep "only" >> $file`;
-                `find $dataDIR/$output/. | xargs -l1 grep "reject" >> $file`;
-                `find $dataDIR/$output/. | xargs -l1 grep "max_coverage" >> $file`;
-        }
+        close OUT; 
+
+        for my $output (@output){ 
+           print "processing *out files in :  $dataDIR/$output \n" ; 
+           # i know this is not ideal but it's much faster than the individual greps .. 
+           my $cmd = "find $dataDIR/$output/ -name \"*out\"  -exec cat {} \\; >> $concat_file ";
+           system($cmd) ;
+         } 
+
+          ` grep "rpp" $concat_file >> $file`;
+          ` grep "only" $concat_file >> $file`;
+          ` grep "reject" $concat_file >> $file`;
+          ` grep "max_coverage" $concat_file >> $file`;
 
         #need to pass all the variables to the script:
 
