@@ -354,7 +354,7 @@ sub overlaps {
 	       $gene->dbID." ".$gene->seq_region_name." ".$gene->start.":".$gene->end.":".$gene->strand.
 	       " overlaps\nA: ".$noncoding{$gene->dbID}->dbID." ".$noncoding{$gene->dbID}->biotype."\nB: ".
 	       $overlap->dbID." ".$overlap->biotype."\n");
-	  print "Do you want to transfer the stable id of A or B?";
+	  print STDERR "Do you want to transfer the stable id of A or B?";
 	  my $reply = <>;
 	  chomp $reply;
 	  next GENE if $reply eq "A" or $reply eq "a";
@@ -514,6 +514,28 @@ sub generate_new_ids{
     $esp = $1;
     $esi = $2;
   }
+  
+  # check if the ncRNAs we have loaded already have higher ids ie: if they were from the old db on livemirror
+  foreach my $ncRNA_id (keys %$ncRNAs){
+    next if $list->{$ncRNA_id};
+    my $gene = $ncRNAs->{$ncRNA_id};
+    if ( $gene->stable_id ) {
+      if ($gene->stable_id =~ /^(\D+0+)(\d+)$/){
+	$gsi = $2 if $2 > $gsi;
+      }
+      foreach my $trans ( @{$gene->get_all_Transcripts} ) {
+	if ($trans->stable_id =~ /^(\D+0+)(\d+)$/){
+	  $tsi = $2 if $2 > $tsi;
+	}	
+      }
+      foreach my $exon ( @{$gene->get_all_Exons} ) {
+	if ($exon->stable_id =~ /^(\D+0+)(\d+)$/){
+	  $esi = $2 if $2 > $esi;
+	}	
+      }
+    }
+  }
+  
   # check stable ids of dead genes are not higher than the maximum in the gene stable id table
   if (sql("SELECT max(gene_stable_id) from gene_archive WHERE left(gene_stable_id,3) not in ('SIN','NEW') ;",$ga)->[0] =~ /^(\D+0+)(\d+)$/){
     if ($2 > $gsi){
