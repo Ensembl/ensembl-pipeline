@@ -130,7 +130,7 @@ sub accumulator_sanity_check{
         if(!@ids){
           my $logic_names = join(",", @{$input_id_type{$type}});
           print STDERR "can't run with accumulators on as ".
-            $rule->goalAnalysis." depends on $logic_names with type ".
+            $rule->goalAnalysis->logic_name." depends on $logic_names with type ".
               $type." which has no entries in the input_id_".
                 "analysis table\n";
           $accumulators = 0;
