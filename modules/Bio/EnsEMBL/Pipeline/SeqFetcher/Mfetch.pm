@@ -240,7 +240,7 @@ sub  get_Entry_Fields {
   if ( scalar(@acc_to_fetch) > 500 ) {   
     # more than 500 acc to fetch - make strings of 500 acc which is faster.
     while ( @acc_to_fetch ) {  
-      my @tmp =  splice (@acc_to_fetch, 0, 5 ) ;   
+      my @tmp =  splice (@acc_to_fetch, 0, 300 ) ;   
       push @fetch_strings, join ( " ", @tmp) ;  
       #print $fetch_strings[-1]."\n" ; 
     }  
@@ -262,10 +262,11 @@ sub  get_Entry_Fields {
 
     my $acc;  
     my %entry_hash ;   
-    my $accPointer = -1 ;
+    my $accPointer = -1 ; 
+    my $last_field ="";   
 
-    LINE: while  (my $line=<IN>){ 
-        chomp($line) ;   
+    LINE: while  (my $line=<IN>){  
+        chomp($line) ;    
         #print "pointer : $nr_acc[$accPointer] $accPointer\n" ; 
         if ( $line =~m/no match/ ) {  
           #print  "no entry found for $nr_acc[$accPointer] - exiting\n" ;  
@@ -274,42 +275,64 @@ sub  get_Entry_Fields {
           push @entries_not_found, $nr_acc[$accPointer] ; 
           next LINE;  
         } 
-        # rule :  -> each entry HAS to start with AC ....   
         my @l = split /\s+/, $line;    
         my $field = shift @l ;    
+        print "last_field : $last_field  VS $field\n" ;  
+        # result can contain more than one line begining with same field identifier , ie  
+        #   AC Q4589; 
+        #   AC Q0999;
+        #   not sure how this works if we only get AC's ....   but why would we do this anyway ? 
+        #   
+        
+        if ($field =~m/AC/ ) {      
+          if ( $field eq $last_field ) {  
+             print "we got more than one line starting with AC ... wthis means it's not a new entry. \n" ; 
+             # as we don't store/process the multipe acc returned we just ignore this line. this will caus 
+             # trouble if we only have acc's returned.   
+             $last_field = $field ; 
+             next LINE; 
+             
+          } else {  
+             print "NEW ENTRY : " . join ( " " , @l ) ;  
+             $acc = $l[0];  
+             $acc=~s/\;//; 
 
-        if ($field =~m/AC/ ) {     
-          print "NEW ENTRY : " . join ( " " , @l ) ;  
-          $acc = $l[0];  
-          $accPointer++;  
-          print "increment pointer : $accPointer\n" ;  
-          print "test : $acc vs $nr_acc[$accPointer]\n" ; 
-          if ( scalar(@l) > 1 ) {  
-            #warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
-          } 
-          # move date to all_entries hash  
-          if ( $entry_hash{AC} ) {  
-            # entry is defined  
-            my @acc_for_entry = @{$entry_hash{AC}} ; 
-            for my $acc(@acc_for_entry) { 
-              for my $f ( keys %entry_hash ) { 
-                 $all_entries{$acc}{$f}= $entry_hash{$f}; 
-              }    
-            }
-          }
-          undef %entry_hash; 
-          # $entry_hash{AC} = \@l;    
-          print "pointer val is : $accPointer\n" ;  
-          my $tmp_acc = $nr_acc[$accPointer] ;  
-          $acc=~s/\;//;
-          unless ($tmp_acc =~m/$acc/ ) {  
-            throw  " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;  
-          } 
-          #$entry_hash{AC} = [$acc];    
-          $entry_hash{AC} = [$tmp_acc];    
-           next LINE ; 
-        } 
-        $entry_hash{$field}.= join (" ", @l); 
+             $accPointer++;  
+             print "increment pointer : $accPointer\n" ;  
+             print "test : $acc vs $nr_acc[$accPointer]\n" ;  
+   
+             #if ( scalar(@l) > 1 ) {  
+             #  warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
+             #}  
+             
+             # this moves all already read information into the big hash before we 
+             # read the new entry . 
+             if ( $entry_hash{AC} ) {  
+               # entry is defined so we already read all AC .... 
+               my @acc_for_entry = @{$entry_hash{AC}} ; 
+               for my $acc(@acc_for_entry) { 
+                 for my $f ( keys %entry_hash ) { 
+                    $all_entries{$acc}{$f}= $entry_hash{$f}; 
+                 }    
+               }
+             } 
+             undef %entry_hash;  
+            
+             # we now got a clean new entry_hash  for present entry  
+             # $entry_hash{AC} = \@l;    
+             print "pointer val is : $accPointer\n" ;  
+             my $tmp_acc = $nr_acc[$accPointer] ;  
+             unless ($tmp_acc =~m/$acc/ ) {  
+               throw  " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;  
+             } 
+             #$entry_hash{AC} = [$acc];    
+             $entry_hash{AC} = [$tmp_acc];    
+             $last_field = $field ; 
+              next LINE ; 
+           }  
+        }
+        $entry_hash{$field}.= join (" ", @l);  
+        $last_field = $field ; 
      }   
      close IN or throw("Error running mfetch for accession [$acc_string]: $mfetch");  
   } 
