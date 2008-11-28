@@ -39,6 +39,8 @@ See the Net::Netrc module for more details.
   			analyses which won't be submit
   	-pipeline	only dequeue jobs stored in this pipeline(s)
   	-skip_pipeline	don't dequeue jobs stored in this pipeline(s)
+  	-host	only dequeue jobs stored on this host(s)
+  	-skip_host	don't dequeue jobs stored on this host(s)
 
 These arguments are overridable configurations
 options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
@@ -83,6 +85,8 @@ my @analyses_to_run;
 my @analyses_to_skip;
 my @pipeline_to_run;
 my @pipeline_to_skip;
+my @host_to_run;
+my @host_to_skip;
 my $db_adaptors;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
@@ -103,6 +107,8 @@ GetOptions(
 	'skip_analysis=s@'       => \@analyses_to_skip,
 	'pipeline=s@'		=> \@pipeline_to_run,
 	'skip_pipeline=s@'       => \@pipeline_to_skip,
+	'host=s@'		=> \@host_to_run,
+	'skip_host=s@'       => \@host_to_skip,
 	'h|help!'         => $usage
 
   )
@@ -117,6 +123,8 @@ $queue_name    = $QUEUE_NAME    unless ($queue_name);
 @analyses_to_skip = map {split/,/} @analyses_to_skip ;
 @pipeline_to_run = map {split/,/} @pipeline_to_run ;
 @pipeline_to_skip = map {split/,/} @pipeline_to_skip ;
+@host_to_run = map {split/,/} @host_to_run ;
+@host_to_skip = map {split/,/} @host_to_skip ;
 
 # Job fetch statement handle
 my $sql_fetch = qq(SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue);
@@ -136,6 +144,14 @@ if(@pipeline_to_run) {
 if(@pipeline_to_skip) {
   my $skip_pipe_string = join("', '", @pipeline_to_skip);
   push @where, "pipeline NOT IN ('$skip_pipe_string')";
+}
+if(@host_to_run) {
+  my $host_string = join("', '", @host_to_run);
+  push @where, "host IN ('$host_string')";
+}
+if(@host_to_skip) {
+  my $skip_host_string = join("', '", @host_to_skip);
+  push @where, "host NOT IN ('$skip_host_string')";
 }
 if(scalar(@where)) {
     $sql_fetch .= ' WHERE '.join(' AND ', @where);
