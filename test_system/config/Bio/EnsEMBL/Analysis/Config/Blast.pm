@@ -48,8 +48,10 @@ requirements. Any constructor args should be specified in the hash.
 FeatureFilter can take min_score, max_pvalue coverage prune and hardprune
 
 blast_params is any constructor parameters for which ever blast module
-you are using note these will be overridden by values got from the 
-parameters column of the analysis table
+you are using. sequence ID format sometimes changes in the Uniprot, Unigene
+etc databases used in BLAST, so modify the regex if necessary.  note all
+constructor parameters will be overridden by values got from the
+parameters column of the analysis table.
 
 AB_INITIO_LOGICNAME if for BlastGenscanPep/DNA runnabledbs for which
 ab initio predictions to use when running the blast and they currently 
@@ -68,133 +70,119 @@ package Bio::EnsEMBL::Analysis::Config::Blast;
 use strict;
 use vars qw(%Config);
 
-# Analysis  Query type  Database type
-#  blastp    pep          pep
-#  blastn    dna          dna
-#  blastx    dna          pep
-# tblastn    pep          dna
-# tblastx    dna          dna
+
+# Analysis  Query type  Database typeRSER_PARAMS-table for Blast-Configuration (below):
+#
+# Analysis  query_type    database_type
+#-------------------------------------
+#  blastp     pep            pep        ("standard" Uniprot-run using module BlastGenscanPep.pm)
+#  blastn     dna            dna
+#  blastx     dna            pep        (i.e.Uniprot-wublastx with module Blast.pm)
+# tblastn     pep            dna
+# tblastx     dna            dna
+#
+#
+#    ########  Example-configuration for a 'standard' Uniprot run which uses
+#    ########  the program wublastp and the module BlastGenscanPep.pm
+#
+#    Uniprot =>
+#            {
+#             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+#             PARSER_PARAMS => {
+#                               -regex => '(^\w+\W\d+)',    # Modify if seq ID format has changed in Uniprot DB
+#                               -query_type => 'pep',       # see PARSER_PARAMS-table
+#                               -database_type => 'pep',    # see PARSER_PARAMS-table
+#                               -threshold_type => 'PVALUE',
+#                               -threshold => 0.01,
+#                              },
+#             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+#             FILTER_PARAMS => { },
+#             BLAST_PARAMS => {
+#                              -unknown_error_string => 'FAILED',
+#                              -type => 'wu',
+#                             },
 
 %Config = (
-           BLAST_CONFIG =>
-           {
-            #below is an Uniprot
-            #example => 
-            #{
-            #BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-            #PARSER_PARAMS => {
-            #                   -regex => '^\w+\s+(\w+)',
-            #                   -query_type => 'pep',
-            #                   -database_type => 'pep',
-            #                   -threshold_type => 'PVALUE',
-            #                   -threshold => 0.01,
-            #                  },
-            #BLAST_FILTER =>'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-            #FILTER_PARAMS => {
-            #                  -min_score => 200,
-            #                  -prune => 1,
-            #                 },
-            #BLAST_PARAMS => {
-            #                 -unknown_error_string => 'FAILED',
-            #                 -type => 'wu',
-            #                },
-            #},
-            DEFAULT => 
-            {
-             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
-             PARSER_PARAMS => {
-                               -regex => '^(\w+)',
-                               -query_type => undef,
-                               -database_type => undef,
-                              },
-             BLAST_FILTER => undef,
-             FILTER_PARAMS => {},
-             BLAST_PARAMS => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
-                             }
-            },
-            Uniprot => 
-            {
-             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             PARSER_PARAMS => {
-                               -regex => '^\w+\s+(\w+)',
-                               -query_type => 'pep',
-                               -database_type => 'pep',
-                               -threshold_type => 'PVALUE',
-                               -threshold => 0.01,
-                              },
-             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             FILTER_PARAMS => {
-                               -min_score => 200,
-                               -prune => 1,
-                              },
-             BLAST_PARAMS => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
+           BLAST_CONFIG => {
+                
+                 DEFAULT =>  {
+                             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::BPliteWrapper',
+                             PARSER_PARAMS => {
+                                               -regex => '^(\w+)',
+                                               -query_type => undef,
+                                               -database_type => undef,
+                                              },
+                             BLAST_FILTER => undef,
+                             FILTER_PARAMS => {},
+                             BLAST_PARAMS => {
+                                              -unknown_error_string => 'FAILED',
+                                              -type => 'wu',
+                                             },
                              },
-            },
-            Swall => 
-            {
-             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             PARSER_PARAMS => {
-                               -regex => '^\w+\s+(\w+)',
-                               -query_type => 'pep',
-                               -database_type => 'pep',
-                               -threshold_type => 'PVALUE',
-                               -threshold => 0.01,
+            
+                Uniprot =>  {
+                             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+                             PARSER_PARAMS => {
+                                            -regex => '^(\w+\W\d+)',
+                                            -query_type => 'pep',
+                                            -database_type => 'pep',
+                                            -threshold_type => 'PVALUE',
+                                            -threshold => 0.01,
+                                             },
+                             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+                             FILTER_PARAMS => {
+                                             -min_score => 200,
+                                              -prune => 1,
+                                               },        
+                             BLAST_PARAMS => {
+                                              -unknown_error_string => 'FAILED',
+                                              -type => 'wu',
+                                              },
                               },
-             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             FILTER_PARAMS => {
-                               -min_score => 200,
-                               -prune => 1,
-                              },
-             BLAST_PARAMS => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
+
+                 Vertrna => {
+                             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+                             PARSER_PARAMS => {
+                                               -regex => '^(\w+\W\d+)', 
+                                               -query_type => 'pep',
+                                               -database_type => 'dna',
+                                               -threshold_type => 'PVALUE',
+                                               -threshold => 0.001,
+                                              },
+                             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+
+                             FILTER_PARAMS => {
+                                               -prune => 1,
+                                              },
+                             BLAST_PARAMS => {
+                                              -unknown_error_string => 'FAILED',
+                                              -type => 'wu',
+                                             },
+                            },
+
+                 Unigene => {
+                             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
+                             PARSER_PARAMS => {
+                                               -regex => '\/ug\=([\w\.]+)',
+                                               -query_type => 'pep',
+                                               -database_type => 'dna',
+                                               -threshold_type => 'PVALUE',
+                                               -threshold => 0.001,
+                                              },
+                             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
+                             FILTER_PARAMS => {
+                                               -prune => 1,
+                                              },
+                             BLAST_PARAMS => {
+                                              -unknown_error_string => 'FAILED',
+                                              -type => 'wu',
+                                             },
                              },
-            },
-            Vertrna => 
-            {
-             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             PARSER_PARAMS => {
-                               -regex => '\w+\s+(\w+)',
-                               -query_type => 'pep',
-                               -database_type => 'dna',
-                               -threshold_type => 'PVALUE',
-                               -threshold => 0.001,
-                              },
-             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             FILTER_PARAMS => {
-                               -prune => 1,
-                              },
-             BLAST_PARAMS => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
-                             },
-            },
-            Unigene =>
-            {
-             BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
-             PARSER_PARAMS => {
-                               -regex => '\/ug\=([\w\.]+)',
-                               -query_type => 'pep',
-                               -database_type => 'dna',
-                               -threshold_type => 'PVALUE',
-                               -threshold => 0.001,
-                              },
-             BLAST_FILTER => 'Bio::EnsEMBL::Analysis::Tools::FeatureFilter',
-             FILTER_PARAMS => {
-                               -prune => 1,
-                              },
-             BLAST_PARAMS => {
-                              -unknown_error_string => 'FAILED',
-                              -type => 'wu',
-                             },
-            },
-           },
+           }, # End of BLAST config
+           
            BLAST_AB_INITIO_LOGICNAME => 'Genscan',
-          );
+
+); # End of %config
 
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
