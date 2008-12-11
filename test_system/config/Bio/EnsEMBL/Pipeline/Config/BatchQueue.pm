@@ -138,14 +138,14 @@ use vars qw(%Config);
     },
 
     {
-      logic_name => 'CPG',
+      logic_name => 'CpG',
       batch_size => 50,
       resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/CPG',
+      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/CpG',
       cleanup => 'no',
       verbosity => 'INFO',
       runnable_path => '',
