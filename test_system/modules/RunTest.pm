@@ -32,10 +32,10 @@ use vars qw(@ISA);
   created
   Function  : create a RunTest object 
   Returntype: RunTest
-  Exceptions: throws if not passed in a TestDB object or it isnt a TestDB
-  object, if not passed in an Environment object or it isnt an Environemt
-  object, throws if it cant require the queue manager, or if not passed any
-  tables to import or if the variable passed isnt an array ref
+  Exceptions: throws (1) if not passed in a TestDB object or it isn't a TestDB
+  object; (2) if not passed in an Environment object or it isn't an Environemt
+  object; (3) if it can't require the queue manager; or (4) if not passed any
+  tables to import or if the variable passed isn't an array ref.
   Example   : my $runtest = RunTest->new
   (
    -TESTDB => $testdb,
@@ -71,9 +71,11 @@ sub new{
     throw("Can't run without an Environment object or with a ".
           $environment);
   }
+
   if(!$output_dir){
     $output_dir = $DEFAULT_OUTPUT_DIR;
   }
+
   if(!$queue_manager){
     $queue_manager = $QUEUE_MANAGER; #found in BatchQueue.pm
   }
@@ -85,7 +87,7 @@ sub new{
     require "$file";
   };
   if($@){
-    $self->exception("Can't find $file [$@]");
+    $self->exception("Can't find $file [$@]");  
   }
   if(!$batch_q_module->can('job_stats')){
     $self->exception($batch_q_module." doesn't have the job_stats method ".
@@ -192,9 +194,10 @@ sub comparison_conf{
 
 =head2 job_submission_command
 
-  Arg [1]   : RunTest
+  Arg [1]   : RunTest                                                    
   Arg [2]   : string, logic_name of analysis to be run
-  Arg [3]   : int, toggle for script verbosity
+  Arg [3]   : string, directory to store the job output
+  Arg [4]   : int, toggle for script verbosity
   Function  : constructs a job_submission_command with the standard 
   options for database, logic_name and -force so it ignores the rules
   system
@@ -207,7 +210,7 @@ sub comparison_conf{
 
 
 sub job_submission_command{
-  my ($self, $logic_name, $verbose) = @_;
+  my ($self, $logic_name, $output_dir, $verbose) = @_;                  
 
   my $db_conf = $self->testdb->conf_hash;
   my $dbport = $db_conf->{'port'};
@@ -224,7 +227,8 @@ sub job_submission_command{
   my $cmd = "perl ".$job_submission." ";
   $cmd .= $db_args." ";
   $cmd .= "-logic_name $logic_name ";
-  $cmd .= "-force";
+  $cmd .= "-output_dir $output_dir ";                                     
+  $cmd .= "-force ";
   $cmd .= "-verbose" if($verbose);
   return $cmd;
 }
@@ -298,7 +302,7 @@ sub cleanup{
   Arg [1]   : RunTest
   Arg [2]   : string, logic_name
   Arg [3]   : string, table_name
-  Function  : prints out statistics about the run, how much should of been
+  Function  : prints out statistics about the run, how much should have been
   run, what has run sucessfully, what is left in the job table and how
   many results there are in total
   Returntype: none
@@ -332,7 +336,7 @@ sub analysis_stats{
   my $results_count = $self->count_rows_by_analysis($db, $table, 
                                                     $analysis->dbID);
   print "\n\nThere were ".@$total_input_ids." input ids to analyse\n";
-  print @$analysis_input_ids." input_ids where analysed sucessfully\n";
+  print @$analysis_input_ids." input_ids were analysed successfully\n";
   print "This produced ".$results_count." results\n\n";
   $self->job_details($ja);
 }
@@ -434,14 +438,14 @@ sub count_rows_by_analysis {
 
   Arg [1]   : RunTest
   Arg [2]   : TestDB, if not provided takes the testdb the object holds
-  Arg [3]   : arrayref, list of tables or table groups, if not provided
-  tables the are taken from the object container
-  Function  : To insert to the listed tables into the given database
-  the mehtod first checks to see if the name if a table_group as TestDB
-  has a method for inserting all the tables in the group. If TestDB doesnt
-  have a method which fits the load_tablename_tables the tablename is 
-  assumed to be an actual table an put on a list to be passed to the
-  TestDB::load_tables method
+  Arg [3]   : arrayref, list of tables or table groups. If not provided,
+  they are taken from the object container.
+  Function  : To insert the listed tables into the given database.
+  The method first checks to see if the name of a table_group has been
+  provided, as TestDB has a method for inserting all the tables in the group. 
+  If TestDB doesn't have a method which fits the load_tablename_tables, then the 
+  tablename is assumed to be an actual table name and is put on a list to be 
+  passed to the TestDB::load_tables method.
   Returntype: none
   Exceptions: none
   Example   : 
@@ -451,7 +455,7 @@ sub count_rows_by_analysis {
 
 
 sub setup_database{
-  my ($self, $testdb, $tables) = @_;
+  my ($self, $testdb, $tables) = @_;  #$tables are the tables TO LOAD
   if(!$testdb){
     $testdb = $self->testdb;
   }
@@ -460,13 +464,15 @@ sub setup_database{
   }
   my @unloaded;
   foreach my $table(@{$tables}){
-    my $method = "load_".$table."_tables";
+    my $method = "load_".$table."_tables";  #loading predifined set of tables
     if($testdb->can($method)){
       $testdb->$method;
     }else{
       push(@unloaded, $table);
     }
   }
+  
+  # tables not loaded using "load_tableGroup_tables" method are loaded individually
   if(@unloaded >= 1){
     my $data_dir = $self->testdb->curr_dir."/".$self->testdb->species;
     $testdb->load_tables(\@unloaded, $data_dir);
@@ -513,7 +519,7 @@ sub check_output_dir{
   Function  : sets up the environment, runs job_submission, checks
   if jobs are running. Once the system contains no more jobs
   a set of stats are produced about the analysis run using the 
-  analysis_stats method. If a comparison database conf if passed in the
+  analysis_stats method. If a comparison database conf if passed in, the
   results would also be compared to the data in the reference database
   Returntype: none
   Exceptions: throws if fails run the job_submission command
@@ -530,9 +536,11 @@ sub run_single_analysis{
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->setup_paths($logic_name, $self->testdb->species);
   $self->environment->change_blastdb($self->blastdb);
-  $self->setup_database;
+  $self->setup_database;  #load the tables required by the analysis
 
-  my $cmd = $self->job_submission_command($logic_name, $verbose);
+  my $output_dir = $self->output_dir;
+  
+  my $cmd = $self->job_submission_command($logic_name, $output_dir, $verbose);
 
   print $cmd."\n" if($self->verbosity || $verbose);
 
@@ -554,6 +562,7 @@ sub run_single_analysis{
     my $ref_testdb = TestDB->new(
                                  -SPECIES => $self->testdb->species, 
                                  -VERBOSE => $self->verbosity,
+                                 
                                  -CONF_FILE => $self->comparison_conf,
                                 );
     my $tables_to_fill = $self->tables;
@@ -566,15 +575,16 @@ sub run_single_analysis{
     }else{
       print "No comparison can be made as ".$method." doesn't exist\n";
     }
-    $ref_testdb->cleanup unless($self->dont_cleanup_tests);
+    $ref_testdb->cleanup unless($self->dont_cleanup_tests); #rm data dir + drop testDB
     if($self->dont_cleanup_tests){
-      $self->cleanup_command($ref_testdb);
+      $self->cleanup_command($ref_testdb); #returns a clean up command to run manually later if
+                                           #the analysis output is to be kept for a while
     }
   }
   $self->cleanup() unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
-    $self->environment->return_environment;
+    $self->environment->return_environment; #reset PERL5LIB & BLASTDB even if dont_cleanup_tests
   }
 }
 
@@ -659,8 +669,8 @@ sub cleanup_command{
   print "You have specifed -dont_cleanup when running your test \n".
     "If you want to delete your output you can run this script ".
       "ensembl-pipeline/test_system/cleanup_output.pl\n".
-        "this is the command you should use \n".$cleanup_command."\n".
-            "If you don't want any of the data sets deleted remove either".
+        "this is the command you should use: \n".$cleanup_command."\n".
+            "If you don't want any of the data sets deleted, remove either".
               " -dbname, -sql_data_dir or -output_dir options from the ".
                 "commandline\n";
 }
@@ -695,7 +705,7 @@ sub database_args{
   $db_args .= " -dbpass ".$dbpass if($dbpass);
   $db_args .= " -dbport ".$dbport if($dbport);
   $db_args .= " -dbname ".$dbname." ";
-  return $db_args;
+  return $db_args;             
 }
 
 
