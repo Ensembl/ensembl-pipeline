@@ -29,7 +29,15 @@ use vars qw( %Config );
            PMATCH_BY_LOGIC =>
            {
             DEFAULT =>{
-                       PROTEIN_FILE => '/lustre/scratch1/ensembl/at6/test_proteins/pmatch_proteins.fa',
+                       # Before testing Pmatch analysis in pipeline test system, modify the protein file path, which should look like
+                       # something like this:
+                       #
+                       # PROTEIN_FILE => '/your/working/directory/for/running/the/test/homo_sapiens/data/pmatch_proteins.fa.',
+                       #
+                       # PROTEIN_FILE must always be specified. The "working directory" will always be in ensembl-pipeline/test_system as you'll 
+                       # have to be in that directory to run ANY test in the first place.
+                       
+                       PROTEIN_FILE => '/nfs/acari/at6/cvs_checkout/ensembl-pipeline/test_system/homo_sapiens/data/pmatch_proteins.fa',
                        MIN_COVERAGE => 25,
                        BINARY_LOCATION => '/usr/local/ensembl/bin/pmatch',
                        REPEAT_MASKING => [],
