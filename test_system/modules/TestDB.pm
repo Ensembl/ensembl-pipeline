@@ -390,7 +390,7 @@ sub load_core_tables{
   my ($self, $data_dir) = @_;
   my @tables = ('meta', 'meta_coord', 'coord_system', 'analysis', 
                 'attrib_type', 'seq_region', 'assembly', 'dna', 
-                'seq_region_attrib', 'marker');
+                'seq_region_attrib');                                                        
   if(!$data_dir){
     $data_dir = $self->curr_dir."/".$self->species;
   }
@@ -409,38 +409,7 @@ sub load_pipeline_tables{
     $data_dir = $self->curr_dir."/".$self->species;
   }
   if(! -d $data_dir){
-    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
-  }
-  $self->load_tables(\@tables, $data_dir);
-}
-
-sub load_gene_tables{
-  my ($self, $data_dir) = @_;
-  my @tables = ('gene', 'exon', 'transcript', 'translation',
-                'exon_transcript', 'supporting_feature',
-                'protein_align_feature', 'dna_align_feature',
-                'gene_stable_id', 'exon_stable_id',
-                'translation_stable_id', 'transcript_stable_id');
-  if(!$data_dir){
-    $data_dir = $self->curr_dir."/".$self->species;
-  }
-  if(! -d $data_dir){
-    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
-  }
-  $self->load_tables(\@tables, $data_dir);
-}
-
-sub load_raw_compute_tables{
-  my ($self, $data_dir) = @_;
-  my @tables = ('repeat_consensus', 'repeat_feature',
-                'prediction_exon', 'prediction_transcript',
-                'dna_align_feature', 'protein_align_feature',
-                'simple_feature');
-  if(!$data_dir){
-    $data_dir = $self->curr_dir."/".$self->species;
-  }
-  if(! -d $data_dir){
-    $self->exception("Can't import core tables if ".$data_dir." doesnt exist");
+    $self->exception("Can't import pipeline tables if ".$data_dir." doesnt exist");
   }
   $self->load_tables(\@tables, $data_dir);
 }
@@ -466,7 +435,7 @@ sub load_tables{
     my $file = $data_dir."/".$table;
     #print STDERR "Trying to load ".$file."\n";
     if(! -e $file){
-      $self->exception("Can't load ".$data_dir."/".$table." it doesn't exist");
+      $self->exception("Can't load ".$data_dir."/".$table." because it doesn't exist");
     }else{
       $self->load_data($file);
     }
