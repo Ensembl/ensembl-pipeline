@@ -21,7 +21,7 @@ only on certain nodes.
 It imports and sets a number of standard global variables into the
 calling package. Without arguments all the standard variables are set,
 and with a list, only those variables whose names are provided are set.
-The module will die if a variable which doesn\'t appear in its
+The module will die if a variable which doesn't appear in its
 C<%Config> hash is asked to be set.
 
 The variables can also be references to arrays or hashes.
@@ -88,13 +88,21 @@ use vars qw(%Config);
                                 # use LSF, you can also use 'Local' 
                                 # for more info look into 
                                 # /ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/BatchSubmission 
-                                # 
+                                
   DEFAULT_BATCH_SIZE  => '',
   DEFAULT_RETRIES     => 3,
-  DEFAULT_BATCH_QUEUE => 'normal', # put in the queue  of your choice, eg. 'normal'
+  DEFAULT_BATCH_QUEUE => 'normal', # put in the queue of your choice, eg. 'normal'         
   DEFAULT_RESOURCE    => 'linux',
   DEFAULT_SUB_ARGS => '',
-  DEFAULT_OUTPUT_DIR  => '/lustre/scratch1/ensembl/at6/test_system/analysis_output',
+  
+  # DEFAULT_OUTPUT_DIR should be defined BEFORE running the pipeline test system, unless output_dir is
+  # explicitly specified on the command line when running ensembl-pipeline/test_system/test_single_analysis.pl i
+  # or ensembl-pipeline/test_system/test_whole_pipeline.pl.
+
+  # For example: DEFAULT_OUTPUT_DIR => 'the/path/to/your/pipeline/output/files',
+
+  DEFAULT_OUTPUT_DIR => '',       
+  
   DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
   JOB_LIMIT           => 10000, # at this number of jobs RuleManager will sleep for 
@@ -122,13 +130,13 @@ use vars qw(%Config);
   QUEUE_CONFIG => [
     {
       logic_name => 'RepeatMask',
-      batch_size => 50,
+      batch_size => 5,
       resource   => '',
       retries    => 3,
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/RepeatMask',
+      output_dir => '',
       cleanup => 'no',        
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -144,8 +152,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/CpG',
+      queue => 'small',                     
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnable_path => '',
@@ -162,8 +170,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Dust',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -179,8 +187,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Eponine',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -192,12 +200,12 @@ use vars qw(%Config);
     {
       logic_name => 'marker',
       batch_size => 10,
-      resource   => 'linux',
+      resource   => '',
       retries    => 4,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/markers',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -213,8 +221,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/TRF',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -231,8 +239,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/tRNAscan',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -244,13 +252,13 @@ use vars qw(%Config);
 
     {
       logic_name => 'FirstEF',
-      batch_size => 20,
+      batch_size => 50,
       resource   => '',
       retries    => 10,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/FirstEF',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -267,7 +275,7 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Genscan',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -284,7 +292,7 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Vertrna',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -301,7 +309,7 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Unigene',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -318,7 +326,7 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/raw_computes/Uniprot',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -334,8 +342,8 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/Pmatch',
+      queue => 'small',
+      output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
       runnabledb_path => '',
@@ -352,7 +360,7 @@ use vars qw(%Config);
       sub_args   => '',
       runner     => '',
       queue      => '',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_out/Pmatch_Wait',
+      output_dir => '',
       runnabledb_path => '',
     },
    
@@ -363,9 +371,9 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => '',
+      queue      => 'small',
       cleanup    => 'no',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/BestPmatch',
+      output_dir => '',
       runnabledb_path => '',
     },
 
@@ -378,7 +386,7 @@ use vars qw(%Config);
       runner     => '',
       queue => '',
       cleanup => 'no',
-      output_dir => '/lustre/scratch1/ensembl/at6/test_system/analysis_output/Best_Wait',
+      output_dir => '',
       runnabledb_path => '',
     },
 
