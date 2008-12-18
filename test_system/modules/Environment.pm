@@ -22,12 +22,15 @@ sub new{
 
 
 #containers
+
+# resetting PERL5LIB to original state after test, if desired
 sub old_perl5lib{
   my $self = shift;
   $self->{'old_perl5lib'} = shift if(@_);
   return $self->{'old_perl5lib'};
 }
 
+# resetting BLASTDB to original state after test, if desired
 sub old_blastdb{
   my $self = shift;
   $self->{'old_blastdb'} = shift if(@_);
@@ -53,36 +56,6 @@ sub change_blastdb{
 }
 
 
-sub setup_paths{
-  my ($self, $logic_name, $species) = @_;
-  my $method = "setup_".$logic_name."_paths";
-  if($self->can($method)){
-    $self->$method($species);
-  }
-}
-
-
-sub setup_BestPmatch_paths{
-  my ($self, $species) = @_;
-  $self->setup_Pmatch_paths($species);
-}
-
-sub setup_Pmatch_paths{
-  my ($self, $species) = @_;
-  my $pwd = $ENV{PWD};
-  my $pmatch_fasta_path = $pwd."/".$species."/data/pmatch_proteins.fa";
-  if(! -e $pmatch_fasta_path){
-    throw("Can't setup environment for pmatch config ".$pmatch_fasta_path.
-          " doesn't exist");
-  }else{
-    $ENV{PMATCH_FASTA} = $pmatch_fasta_path;
-  }
-}
-
-sub setup_all_paths{
-  my ($self, $species) = @_;
-  $self->setup_Pmatch_paths($species);
-}
 
 sub return_environment{
   my ($self) = @_;
