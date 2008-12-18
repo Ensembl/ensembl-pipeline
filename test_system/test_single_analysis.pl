@@ -21,13 +21,25 @@ returned to their previous state after the script is run though.
 =head1 OPTIONS
 
   -species              the species you are running the test on and this tells
-   the TestDB object which zip file in reference_data to use
+        the TestDB object which zip file in reference_data to use
 
   -verbose              toggle to indicate whether to be verbose
 
   -logic_name           logic_name of the analysis you wish to run
 
-  -feature_table        name of the table which should be filled by this analysis                     #at6 (8 Dec): what happens if >1 table filled!?
+  -feature_table        name of the table which should be filled by this analysis.
+        The specified table should always have a column named "analysis_id" as 
+        the system relies on the analysis_id to work out which rows in the table
+        were actually generated during the test and then reports the count of 
+        number of results from the test. This helps the system to distinguish 
+        test_generated results from those which had been loaded from text files 
+        prior to the test.  Most of the appropriate tables for this option will
+        have names like xxxx_feature, e.g. repeat_feature, simple_feature, 
+        marker_feature, etc.
+        
+        For RepeatMask, choose "repeat_feature" (NOT "repeat_consensus").
+        For Genscan, choose "prediction_transcript" (NOT "prediction_exon").
+        
 
   -table_to_load        names of the tables which should be filled before this
         analysis can run. As standard the core and pipeline tables
@@ -39,22 +51,26 @@ returned to their previous state after the script is run though.
         you don't need to give any tables in 'table_to_load'
 
   -output_dir           the directory the job output will be written to. 
-   Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm is used
+        Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm will be used. Analysis-
+        specific output directories in BatchQueue.pm will NOT be used even if
+        specified. When using this flag, make sure the path to a "ghost" or "dummy"
+        directory has been specified for DEFAULT_OUTPUT_DIR in BatchQueue.pm.
+
 
   -queue_manager        the BatchSubmission module to use otherwise the
-   QUEUE_MANAGER from BatchQueue.pm is used
+        QUEUE_MANAGER from BatchQueue.pm is used
 
   -run_comparison       toggle to indicate to run comparison with reference data
-   set
+        set
 
   -conf_file            the name of the conf file to use when setting up the test DB to
-   run the analysis.  By default TestDB.conf is used
+        run the analysis.  By default TestDB.conf is used
 
   -comparison_conf      the name of the conf file to use when setting up the
-   database containing reference data for comparison. RefDB.conf is used by default
+        database containing reference data for comparison. RefDB.conf is used by default
 
-  -dont_cleanup         a toggle to indicate not to delete the database and output
-   directories
+  -dont_cleanup         a toggle to indicate not to delete the database, the unzipped
+        reference data directory and test output directories
 
   -blastdb              a string to change the blastdb to
 
@@ -187,7 +203,7 @@ sub table_groups{
                         'prediction_transcript'];
   $tables{'firstef'} = ['core', 'pipeline', 'repeat_feature',
                          'repeat_consensus'];
-  $tables{'marker'} = ['core', 'pipeline','marker', 
+  $tables{'marker'} = ['core', 'pipeline','marker','map', 
                         'marker_synonym', 'marker_map_location'];
   $tables{'bestpmatch'} = ['core', 'pipeline', 
                             'protein_align_feature.Pmatch'];
