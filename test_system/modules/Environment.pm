@@ -11,9 +11,6 @@ use vars qw(@ISA);
 @ISA = qw(Bio::EnsEMBL::Root);
 
 
-
-
-
 sub new{
   my ($class) = @_;
   my $self = bless {}, $class;
@@ -23,21 +20,21 @@ sub new{
 
 #containers
 
-# resetting PERL5LIB to original state after test, if desired
+# store info about "old" PERL5LIB to "return_environment" later
 sub old_perl5lib{
   my $self = shift;
   $self->{'old_perl5lib'} = shift if(@_);
   return $self->{'old_perl5lib'};
 }
 
-# resetting BLASTDB to original state after test, if desired
+# store info about "old" BLASTDB for "return_environment" later
 sub old_blastdb{
   my $self = shift;
   $self->{'old_blastdb'} = shift if(@_);
   return $self->{'old_blastdb'};
 }
 
-
+# methods to alter PERL5LIB and BLASTDB
 
 sub add_to_perl5lib{
   my ($self, $addition) = @_;
@@ -56,6 +53,8 @@ sub change_blastdb{
 }
 
 
+# methods for resetting PERL5LIB and BLASTDB to original state 
+# after running test 
 
 sub return_environment{
   my ($self) = @_;
