@@ -1,70 +1,177 @@
-Note is no path is specifed the files mentioned live in 
+=============
+RUNNING TESTS
+=============
+
+***************************** NOTE **************************************
+If no path is specifed, the files mentioned in this doc live in 
 ensembl-pipeline/test_system
+**************************************************************************
 
-To run the tests there a couple of things you must first do
++++++++++++++++++++++++++++
+| BEFORE RUNNING THE TEST |
++++++++++++++++++++++++++++
 
-First fill out the two conf files
+Before running the tests, there are a couple of configs files you must edit:
+
+(1) Database config files
+-------------------------
 
 TestDB.conf (an example is found at TestDB.conf.example) and
 RefDB.conf (an example is found at RefDB.conf.example)
 
-These files contain settings for where the test databases are to be created
-whay sql files to use to load the table structures, where the directory
-where the zip file all the data is in is located (the file itself is named
-for the species you are running tests against). There are also other
-settings to do with loaded data into the database and how long the RunTest
-module should sleep for between checking if there are jobs running when
-testing single analyses
+Edit the content of the example file, then save a copy of it without
+the ".example" extension.
 
-When running the tests the perl5lib is modified to point at some prefilled
-config files which live here
+Fill in TestDB.conf if running analysis test without comparison with a 
+standard set of reference data. Otherwise, fill in both TestDB.conf and
+RefDB.conf.
 
-config/Bio/EnsEMBL/Pipeline/Config
+These files are specific to the pipeline test system, including settings for 
+where the new DB are to be created, what sql files to use to load the 
+table structures, and where to find the the zipped file containing all 
+the dumped out text files of reference data. The zipped file is named after 
+the species you are running tests against. 
 
-Prior to running you will need to fill out these options
+There are also other settings to specify if 
+        
+        the DB + table schema has already been created previously 
+        (hence no need to make a new one);
 
-BatchQueue.pm, DEFAULT_OUTPUT_DIR
+        if the data have been preloaded into the database (hence no need 
+        to import data from text files to the DB);
+
+        if the zipped file of text files have already been unzipped (so
+        "don't_unzip"); and
+
+        how long the RunTest module should sleep for between checking if 
+        there are jobs running when testing single analyses.
 
 
-there are two different types of test
+(2) Analysis and Pipeline config files
+--------------------------------------
 
-test_single_analysis.pl this takes a species and single logic_name
-and uses the job_submission script to run that analyses then if the
-correct options are specified the results are compared to the reference set
-of data. The script reports how many jobs were sucessful what statuses the
-jobs remaining in the pipeline have, how many results were produced etc
+These files are similar to those used in a normal GeneBuild process and 
+are found in ./config, including both 
 
-test_whole_pipeline.pl this uses the rule tables defined in the dump to
-run the pipeline with RuleManager, This test will take longer to run as
-it runs all the analyses for the specified species from start to finish
+        config/Bio/EnsEMBL/Pipeline/Config   and
+        config/Bio/EnsEMBL/Analysis/Config
 
+When running the tests, the PERL5LIB is automatically modified to point at 
+these prefilled config files. When the test is finished, the PERL5LIB is
+automatically reset to its prior value.
+
+Most of the files do not need much editing if the test is run from within
+Ensembl. However, there are several parameters that you must check/define
+before running any tests:
+
+ (i) Fill out the DEFAULT_OUTPUT_DIR in Pipeline/Config/BatchQueue.pm. 
+     This will be the output_dir used unless another directory is
+     explicitly specified on the command line when running test_single_analysis.pl
+     or test_whole_pipeline.pl.  See the doc in the test system version of
+     BatchQueue.pm for more details on how to control where the output
+     data go.
+
+(ii) Fill in REFERENCE_DB in Analysis/Config/Databases.pm. This is especially
+     important for tests involving Pmatch or BestPmatch analyses, either
+     when testing them alone or in the entire pipeline.
+
+Settings specific to individual analyses:
+
+ (i) For Pmatch/BestPmatch analysis --- update the path to the protein seq
+     file in Analysis/Config/GeneBuild/Pmatch.pm.  The file lives in 
+     ./homo_sapiens/data/human_proteins.fa, where the homo_sapiens dir is
+     created by unzipping the reference data at the beginning of the test.
+     Note that path provided in Pmatch.pm will have to be ABSOLUTE, so the 
+     relative path "./homo_sapiens/data/human_proteins.fa" will NOT work.
+
+(ii) For marker analysis when running test_single_analysis --- the human.markers 
+     file required by the analysis lives in ./homo_sapiens/data/human.markers.  
+     To allow the EPCR module to find this file, you must modify DATA_DIR in 
+     Analysis/Config/General.pm  to "./homo_sapiens/data". Again the path provided 
+     needs to be ABSOLUTE. 
+     
+     *** Remember to reset DATA_DIR back to its previous value when you  ***
+     *** finish running marker analysis or else other analyses may fail. ***
+
+(iii)For marker analysis/Genscan analysis when testing the whole pipeline                            #at6 (18Dec) write about this later
+
+
+
+
+
+
+
+A note about empty directories in ./config/Bio/EnsEMBL/Pipeline/Config:
+
+Directories containing no files are relics from the previous test system. They 
+cannot be removed from the CVS but do not affect the current test system. Below
+is a list of those empty directories:
+
+GeneBuild
+Protein_Annotation
+PseudoGenes
+cDNA_ESTs
+
+
++++++++++++++++++++++++
+| HOW TO RUN THE TEST |
++++++++++++++++++++++++
+
+There are two different types of test:
+
+(1) test_single_analysis.pl --- this takes a species and single logic_name
+and uses the job_submission script to run that analysis.  If no species is
+specified, "homo_sapiens" is used by default. Then if the correct options 
+are specified, the results are compared to the reference set of data. 
+The script reports how many input ids to analyse, how many jobs were 
+successful, and how many results were produced.
+
+(2) test_whole_pipeline.pl --- this uses the rule_goal and rule_condition
+tables defined in the dumped out reference data to run the pipeline with 
+RuleManager. This test will take longer to run as it runs all the analyses 
+for the specified species from start to finish.
 
 Currently there is data for testing the raw computes in human.
-These are the analyses and modules which can be tested and the tables they
-write their data to
 
-RepeatMask      RepeatMasker     repeat_feature
-Dust            Dust             repeat_feature
-TRF             TRF              repeat_feature
+These are the analyses and modules which can be tested and the tables they
+write their data to:
+
+ ANALYSIS          MODULE                 TABLES TO BE WRITTEN TO
+----------      ------------     --------------------------------------
+RepeatMask      RepeatMasker     repeat_feature, repeat_consensus
+Dust            Dust             repeat_feature, repeat_consensus
+TRF             TRF              repeat_feature, repeat_consensus
 Eponine         EponineTSS       simple_feature     
 FirstEF         FirstEF          simple_feature
 tRNAscan        tRNAscan_SE      simple_feature
 CpG             CPG              simple_feature
-Genscan         Genscan          prediction_transcript
+Genscan         Genscan          prediction_transcript, prediction_exon
 Vertrna         BlastGenscanDNA  dna_align_feature
 Unigene         BlastGenscanDNA  dna_align_feature
-Swall           BlastGenscanPep  protein_align_feature
+Uniprot         BlastGenscanPep  protein_align_feature
 marker          EPCR             marker_feature
+Pmatch          pmatch           protein_align_feature
+BestPmatch                       protein_align_feature                                   #at6 (19Dec) check this
 
-To run these tests individually you need a commandline like this
+To run these tests individually you need a commandline like this:
 
 ./test_single_analysis.pl -logic_name CpG -feature_table simple_feature
 
-if you want the data compared to the reference data you all need to 
-pass the commandline option -run_comparison
+If you want the data compared to the reference data you will need to 
+pass the commandline option -run_comparison (and also have RefDB.conf
+filled in beforehand).
 
-if you don't want the output files or databases deleted after the test is
-run you can specify the -dont_cleanup option
+If you don't want the output files/dir and databases deleted after the test 
+is run, you can specify the -dont_cleanup option. 
 
-If you run with the don't cleanup option the script should print out
-commandlines for the cleanup
+If you run with the don't cleanup option the script will print out
+commandlines for the cleanup.  Cleanup is done with the cleanup_output.pl
+script in the test_system directory.
+
+For other possible options, see documentation of test_single_analysis.pl.
+
+To run the whole pipeline in one go, use a commandline like this:
+
+./test_whole_pipeline.pl 
+
+None of the commandline options are compulsory.
