@@ -200,7 +200,7 @@ sub load_databases {
     my $sql = "CREATE DATABASE $dbname";
     print "Creating database ".$sql."\n" if($self->verbosity);
     unless($self->dbi_connection->do("CREATE DATABASE $dbname")) {
-      $self->exception("Couldn't not create database");
+      $self->exception("Couldn't create database");
     }
   }
   $db->do("use $dbname");
@@ -530,10 +530,11 @@ sub _create_db_name {
 
 
 
-sub cleanup{
+sub cleanup {
   my ($self) = @_;
   my $data_dir = $self->curr_dir."/".$self->species;
-  print "Deleting data from ".$data_dir."\n" if($self->verbosity);
+ 
+  print "Deleting data from ".$data_dir."\n" if($self->verbosity && !$self->conf_hash->{'dont_unzip'});
   rmtree($data_dir) unless($self->conf_hash->{'dont_unzip'});
   print "Dropping database ".$self->conf_hash->{'dbname'}."\n" 
     if($self->verbosity);
