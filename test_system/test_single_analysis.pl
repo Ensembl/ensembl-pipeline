@@ -14,14 +14,25 @@ database with data and how to invoke the job_submission script to run
 the specified analysis. At the end of a run the RunTest can compare
 the results to a reference set of results if specifed.
 
-Note currently the script must be run in this directory. To run the test properly,
-you will have to alter your perl5lib and blastdb settings. They should always be 
-returned to their previous state after the script is run though.
+Note currently the script must be run in this directory (ensembl-pipeline/test_system).
+When the script starts running the test, PERL5LIB is automatically altered to include 
+ensembl-pipeline/test_system/config as the first place to look for PERL modules. If
+-blastdb is used on the commandline to specify a particular dir for BLASTDB location, 
+BLASTDB will be altered too for the duration of the test. Once the test has finished
+running, the test system will automatically reset the PERL5LIB and BLASTDB settings.
+All these changes in the environment variables (PERL5LIB and BLASTDB) were done by
+./modules/Environment.pm while using the "run_single_analysis" method in RunTest.pm.
+
 
 =head1 OPTIONS
 
+
+The compulsory options are "-logic_name" and "-feature_table".  The rest are optional.
+
+
   -species              the species you are running the test on and this tells
-        the TestDB object which zip file in reference_data to use
+        the TestDB object which zip file in reference_data to use. "homo sapiens"
+        is used by default if it's not specified.
 
   -verbose              toggle to indicate whether to be verbose
 
@@ -32,7 +43,7 @@ returned to their previous state after the script is run though.
         the system relies on the analysis_id to work out which rows in the table
         were actually generated during the test and then reports the count of 
         number of results from the test. This helps the system to distinguish 
-        test_generated results from those which had been loaded from text files 
+        test-generated results from those which had been loaded from text files 
         prior to the test.  Most of the appropriate tables for this option will
         have names like xxxx_feature, e.g. repeat_feature, simple_feature, 
         marker_feature, etc.
@@ -42,13 +53,14 @@ returned to their previous state after the script is run though.
         
 
   -table_to_load        names of the tables which should be filled before this
-        analysis can run. As standard the core and pipeline tables
-        are filled (see TestDB::load_core_tables method). If other tables need
-        to be filled they need to be specified using this option which can
-        appear multiple times on the commandline. Note there is a method
-        table_groups which contains a list of tables to fill for specific
-        analyses based on logic_name. If your analysis appears in this method
-        you don't need to give any tables in 'table_to_load'
+        analysis can run.  Note that for every analysis, the core and pipeline
+        tables are loaded by default(e.g. see TestDB::load_core_tables method).
+        Also, there is a method "table_groups" which contains a list of tables 
+        to fill for specific analyses based on logic_name. If your analysis appears 
+        in "table_groups", you don't need to give any tables in 'table_to_load' either.
+        Use this option ONLY IF any other tables need to be filled (i.e. not core,
+        not pipeline, not in "table_groups" method). This option can appear multiple 
+        times on the commandline, e.g. -table_to_load table1 -table_to_load table2
 
   -output_dir           the directory the job output will be written to. 
         Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm will be used. Analysis-
@@ -79,9 +91,9 @@ returned to their previous state after the script is run though.
 
 =head1 EXAMPLES
 
-./test_single_analysis -logic_name CpG -run_comparison
+./test_single_analysis.pl -logic_name CpG -run_comparison
 
-./test_single_analysis -logic_name Genscan (will get the correct tables
+./test_single_analysis.pl -logic_name Genscan (will get the correct tables
 from the table_groups method)
 
 
@@ -102,7 +114,7 @@ use lib './config';
 
 use strict;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning verbose);
-use Bio::EnsEMBL::Pipeline::Config::BatchQueue;  # BatchQueue.pm from "./config" dir
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use TestDB;
 use Environment; 
 use RunTest;
@@ -175,9 +187,9 @@ my $test_runner = RunTest->new(
                                -BLASTDB => $blastdb,
                                -TABLES => \@tables_to_load,
                                -QUEUE_MANAGER => $QUEUE_MANAGER,
-                               -DONT_CLEANUP => $dont_cleanup,
+                               -DONT_CLEANUP => $dont_cleanup,                       
+                               -VERBOSE => $verbose,
                                );
-
 
 if($run_comparison){
   $test_runner->comparison_conf($comparison_conf);
