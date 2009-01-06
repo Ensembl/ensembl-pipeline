@@ -46,6 +46,7 @@ use vars qw(@ISA);
    -TABLES => \@tables_to_load,
    -QUEUE_MANAGER => $QUEUE_MANAGER,
    -DONT_CLEANUP => $dont_cleanup,
+   -VERBOSE => $verbose,
   );
 
 =cut
@@ -263,6 +264,8 @@ sub rulemanager_command{
   my $cmd = "perl ".$job_submission." ";
   $cmd .= $db_args." ";
   $cmd .= "-verbose" if($verbose);
+  print "the command is: ", $cmd,"\n";
+
   return $cmd;
 }
 
@@ -434,7 +437,7 @@ sub count_rows_by_analysis {
 }
 
 
-=head2 setup_databases
+=head2 setup_database
 
   Arg [1]   : RunTest
   Arg [2]   : TestDB, if not provided takes the testdb the object holds
@@ -534,7 +537,6 @@ sub run_single_analysis{
 
   $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
-  $self->environment->setup_paths($logic_name, $self->testdb->species);
   $self->environment->change_blastdb($self->blastdb);
   $self->setup_database;  #load the tables required by the analysis
 
@@ -542,7 +544,7 @@ sub run_single_analysis{
   
   my $cmd = $self->job_submission_command($logic_name, $output_dir, $verbose);
 
-  print $cmd."\n" if($self->verbosity || $verbose);
+  print "The job submission command is: ".$cmd."\n" if($self->verbosity || $verbose);
 
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
 
@@ -562,7 +564,6 @@ sub run_single_analysis{
     my $ref_testdb = TestDB->new(
                                  -SPECIES => $self->testdb->species, 
                                  -VERBOSE => $self->verbosity,
-                                 
                                  -CONF_FILE => $self->comparison_conf,
                                 );
     my $tables_to_fill = $self->tables;
@@ -763,24 +764,11 @@ sub compare_simple_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);                     #at6 5 Jan 09 DEBUG. this worked. need to add to the rest of this module.
     $feature_comparison->compare;
   }
 }
 
-
-sub compare_pmatch_feature{
-  my ($self, $ref_db, $logic_name) = @_;
-  my $data_dir = $self->testdb->curr_dir."/".$self->testdb->species;
-  $ref_db->load_tables(['protein'], $data_dir);
-  my $test_pfa = $self->testdb->db->get_PmatchFeatureAdaptor;
-  my @query_fs = $test_pfa->fetch_by_logic_name($logic_name);
-  my $ref_pfa = $ref_db->db->get_PmatchFeatureAdaptor;
-  my @target_fs = $ref_pfa->fetch_by_logic_name($logic_name);
-  my $feature_comparison = $self->feature_comparison;
-  $feature_comparison->query(\@query_fs);
-  $feature_comparison->target(\@target_fs);
-  $feature_comparison->pmatch_compare;
-}
 
 sub compare_prediction_transcript{
   my ($self, $ref_db, $logic_name) = @_;
@@ -819,7 +807,8 @@ sub compare_prediction_transcript{
     }
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
-    $feature_comparison->target($target_fs);
+    $feature_comparison->target($target_fs);i
+    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09  ADDED
     $feature_comparison->compare;
   }
 }
@@ -863,6 +852,7 @@ sub compare_repeat_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
     $feature_comparison->compare;
   }
 }
@@ -906,6 +896,7 @@ sub compare_dna_align_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
     $feature_comparison->compare;
   }
 }
@@ -948,6 +939,7 @@ sub compare_protein_align_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);             #at6 6 Jan 09 ADDED
     $feature_comparison->compare;
   }
 }
@@ -989,6 +981,7 @@ sub compare_marker_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
     $feature_comparison->compare;
   }
 }
@@ -1110,12 +1103,14 @@ sub fetch_features_by_slice_name{
 sub fetch_features_by_dbID{
   my ($self, $db, $fetch_adaptor_method, $logic_name) = @_;
   my @features;
-  my $sa = $db->get_SliceAdaptor;
   my $fa = $db->$fetch_adaptor_method;
   my $dbIDs = $fa->list_dbIDs;
+
   if(@$dbIDs <= 1000){
-    @features = @{$fa->fetch_by_dbID_list($dbIDs)};
-  }else{
+      @features = @{$fa->fetch_all_by_dbID_list($dbIDs)}; 
+  }
+  
+  else{
     my $num_in_list = 1000;
     my @list_of_lists;
     while(@$dbIDs){
@@ -1123,7 +1118,7 @@ sub fetch_features_by_dbID{
       push(@list_of_lists, \@list);
     }
     foreach my $list(@list_of_lists){
-      my @chunk = @{$fa->fetch_by_dbID_list($list)};
+      my @chunk = @{$fa->fetch_all_by_dbID_list($list)}; 
       push(@features, @chunk);
     }
   }
@@ -1133,7 +1128,7 @@ sub fetch_features_by_dbID{
       push(@analysis_features, $f);
     }
   }
-  return(@analysis_features);
+  return(\@analysis_features);
 }
 
 
