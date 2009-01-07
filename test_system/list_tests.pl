@@ -21,7 +21,7 @@ $conf_file = 'TestDB.conf' if(!$conf_file);
 
 if($help){
   print "list_tests.pl is a script for displaying what tests can be run ".
-    "for a given species this is what the commandline should look like\n ".
+    "for a given species. This is what the commandline should look like:\n ".
       "./list_tests.pl -species homo_sapiens -conf_file TestDB.conf\n";
   exit;
 }
@@ -54,7 +54,7 @@ if(! -d $dest_dir){
 
 
 
-my $analysis_file = $dest_dir."/analysis.sql";
+my $analysis_file = $dest_dir."/analysis";
 
 open(FH, $analysis_file) or throw("Can't open ".$analysis_file);
 printf("%-15s %-15s\n", 'logic_name', 'module');
