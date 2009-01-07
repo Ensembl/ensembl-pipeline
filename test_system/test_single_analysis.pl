@@ -34,7 +34,8 @@ The compulsory options are "-logic_name" and "-feature_table".  The rest are opt
         the TestDB object which zip file in reference_data to use. "homo sapiens"
         is used by default if it's not specified.
 
-  -verbose              toggle to indicate whether to be verbose
+  -verbose              toggle to indicate whether to be verbose. See also notes on
+        the "-run_comparison" flag below.
 
   -logic_name           logic_name of the analysis you wish to run
 
@@ -73,7 +74,12 @@ The compulsory options are "-logic_name" and "-feature_table".  The rest are opt
         QUEUE_MANAGER from BatchQueue.pm is used
 
   -run_comparison       toggle to indicate to run comparison with reference data
-        set
+        set. Please note in some cases, where the analysis generates thousands of 
+        features in the results, the comparsion will take quite a while as every 
+        single query feature has to be checked against the reference. Also, if the
+        -verbose flag is also used, all the query-target matching pairs (a large
+        number of them) will be printed on screen.  Unless the details of each
+        matching pair are required, or else it's recommended to turn "verbose" off.
 
   -conf_file            the name of the conf file to use when setting up the test DB to
         run the analysis.  By default TestDB.conf is used
