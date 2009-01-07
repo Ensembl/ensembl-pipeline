@@ -1,3 +1,19 @@
+#This script's functionality is to make cleaning up databases and 
+#directories left behind after a test run easier. 
+
+#To clean up only the DB:
+#cleanup_output.pl  -dbhost xxx -dbuser xxx -dbpass xxx -dbport xxx -dbname xxx
+
+#To clean up only the test output directory (and the files it contains):
+#cleanup_output.pl  -output_dir xxx
+
+#To clean up only the directory where the unzipped reference data files are:
+#cleanup_output.pl -sql_data_dir /path/to/the/data/directory
+
+#For cleaning up any combination of the above, just use the relevant flags and
+#provide the required information.
+
+
 #!/usr/local/ensembl/bin/perl -w
 
 use strict;
@@ -39,10 +55,3 @@ if($data_dir){
 if($output_dir){
   rmtree($output_dir);
 }
-
-
-#this script's functionality is to make cleaning up databases and 
-#directories left behind after a test run easier. It can optionally be 
-#given database arguments in the standard form and drop the database
-#a directory path for where the output was written or where the
-#table data was unzipped to
