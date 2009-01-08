@@ -1,30 +1,49 @@
+# All lines started with the hash sign "#" will not be read as config.
+
+# This is an example file of RefDB.conf, a file which is read by the
+# test_single_analysis.pl or test_whole_pipeline.pl script in
+# enesmbl-pipeline/test_system directory to create a RefDB object.
+         
+
 { 
- #database details
+ #database details (Only use quotes for strings, not numbers)
+
  'port'   => 3306,
  'driver' => 'mysql',
  'user'   => '',
  'pass'   => '',
  'host'   => 'ecs1c',
  'dbname' => '',
-  #where the table structure files are
- 'sql_files' => ['../../ensembl-pipeline/sql/table.sql', 
-                 '../../ensembl-pipeline/sql/pmatch.sql', 
+
+ #where the table structure files are:
+ 'sql_files' => ['../../ensembl-pipeline/sql/table.sql',
                  '../../ensembl/sql/table.sql'],
-  #where the zip file containing all the tab files is
+
+ #where the zip file containing all the tab files is
  'data_dir' => 'reference_data',
+
+ #for the following three options, set to '0' for 'false', '1' for 'true':
+
  #the database already exists and the tables don't need loaded
  'preloaded_tables' => 0,
+
  #the data doesn't need loaded 
  'preloaded_data' => 0,
- #don't need to unzip the zip file the directory will already exist
+
+ #don't need to unzip the zipped file; the directory will already exist:
+ #(this is usually set to "1" because the data would have been unzipped
+ #during the test to fill in the tables in TestDB. There's no need to 
+ #unzip the file again.)
  'dont_unzip' => 1,
+
  'job_stats_sleep' => 60,
 }
 
 
-#Note if don't unzip is marked the path still needs to be
-# {CWD}/species_name/*.sql files and this won't be deleted by this
-# TestDB object if cleanup is called
-# If preloaded tables is specified dbname must be specified and
-# the database won't be deleted by TestDB cleanup preloaded_data must 
-# only be true if preloaded_tables is also true
+#Note if "don't unzip" is marked the path still needs to be
+#{CWD}/species_name/* files. Files in this path won't be deleted by this
+#RefDB object even if the object calls the cleanup method.
+
+# If preloaded tables is specified, dbname must be specified and
+# the database won't be deleted by RefDB cleanup. Preloaded_data must 
+# only be true if preloaded_tables is also true.
