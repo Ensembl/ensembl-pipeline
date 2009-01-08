@@ -76,17 +76,19 @@ use vars qw(%Config);
 
 
   DATABASES => { 
+                 # MUST AT LEAST FILL IN REFERENCE_DB DETAILS. THEY SHOULD BE THE SAME AS THOSE
+                 # SPECIFIED IN ensembl-pipeline/test_system/TestDB.conf
                   
                  # The REFERENCE_DB (formely known as GB_DB) holds sequence + repeats + features 
                  # from raw computes (e.g. ab-inito predictions, dna- or protein alignments ) 
                   
                  REFERENCE_DB => 
                                  { 
-                                   -dbname => 'at6_system_test',
-                                   -host => 'genebuild2',
-                                   -port => '3306',
-                                   -user => 'ensadmin',
-                                   -pass => 'ensembl',
+                                   -dbname => '',
+                                   -host => '',
+                                   -port => '',
+                                   -user => '',
+                                   -pass => '',
                                   },
   
  
