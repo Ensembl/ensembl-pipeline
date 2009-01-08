@@ -73,7 +73,7 @@ Running on hosts of host_group bc_hosts with not more than 200 active connection
 
 =head1 CONTACT
 
-B<ensembl-dev@ebi.ac.uk>
+<ensembl-dev@ebi.ac.uk>
 
 =cut
 
@@ -95,24 +95,32 @@ use vars qw(%Config);
   DEFAULT_RESOURCE    => 'linux',
   DEFAULT_SUB_ARGS => '',
   
-  # DEFAULT_OUTPUT_DIR should be defined BEFORE running the pipeline test system, unless output_dir is
-  # explicitly specified on the command line when running ensembl-pipeline/test_system/test_single_analysis.pl i
-  # or ensembl-pipeline/test_system/test_whole_pipeline.pl.
+  # When running the ensembl pipeline test system using ensembl-pipeline/test_system/test_single_analysis.pl or 
+  # ensembl-pipeline/test_system/test_whole_pipeline.pl, DEFAULT_OUTPUT_DIR *must* be defined, even if output_dir 
+  # option has been explicitly specified on the command line when running the scripts.
+   
+  # If the output is to be written to DEFAULT_OUTPUT_DIR, provide a genuine path.
+  # For example: DEFAULT_OUTPUT_DIR => 'the/path/to/your/pipeline/output/files'.
+  #
+  # If the output is intended to be written to the output_dir specified on the command line, provide the
+  # path to a ghost directory. No data will be written to the ghost directory but it stops the system from
+  # complaining that "Your output directory does not exist, I'll create it now".
+  #
+  # Note also that when output_dir is explicitly specified on the command line, even if analysis-specific output dirs
+  # are defined in this module, no data will be written to them as the command line option overrides them too.
 
-  # For example: DEFAULT_OUTPUT_DIR => 'the/path/to/your/pipeline/output/files',
 
-  DEFAULT_OUTPUT_DIR => '',       
-  
+  DEFAULT_OUTPUT_DIR => '/your/default/output/dir/path',
+
   DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
-  JOB_LIMIT           => 10000, # at this number of jobs RuleManager will sleep for 
-                                # a certain period of time if you effectively want this never to run set 
-                                # the value to very high ie 100000 for a certain period of time
-				# this is important for queue managers which cannot cope with large numbers
-				# of pending jobs (e.g. early LSF versions and SGE)
+  JOB_LIMIT           => 10000, # at this number of jobs, RuleManager will sleep for 
+                                # a certain period of time. If you effectively want this never to run, 
+                                # set the value to very high (e.g.100000) for a certain period of time.
+				# This is important for queue managers which cannot cope with large numbers
+				# of pending jobs (e.g. early LSF versions and SGE).
 
-  JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be
-                                     # counted
+  JOB_STATUSES_TO_COUNT => ['PEND'], # these are the jobs which will be counted.
                                      # valid statuses for this array are RUN, PEND, SSUSP, EXIT, DONE
   MARK_AWOL_JOBS      => 1,
   MAX_JOB_SLEEP       => 3600,# the maximun time to sleep for when job limit 
@@ -130,7 +138,7 @@ use vars qw(%Config);
   QUEUE_CONFIG => [
     {
       logic_name => 'RepeatMask',
-      batch_size => 5,
+      batch_size => 2,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -274,7 +282,7 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue => '',
+      queue => 'small',
       output_dir => '',
       cleanup => 'no',
       verbosity => 'INFO',
