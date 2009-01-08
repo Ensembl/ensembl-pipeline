@@ -1,3 +1,68 @@
+=pod
+
+=head1 NAME
+
+This is a script which will test running a whole pipeline start to end. 
+It does this by running the rulemanager script.
+
+=head1 SYNOPSIS
+
+The test_whole_pipeline script invokes first a TestDB object which sets up
+a test database, and then a RunTest object which knows how to fill the
+database with data and how to invoke the rulemanager script to run
+the pipeline.
+
+Note currently the script must be run in this directory 
+(ensembl-pipeline/test_system). When the script starts running the test, 
+PERL5LIB is automatically altered to include ensembl-pipeline/test_system/config 
+as the first place to look for Perl modules. If -blastdb is used on the 
+commandline to specify a particular dir for BLASTDB location, BLASTDB will be 
+altered too for the duration of the test. Once the test has finished running,
+the test system will automatically reset the PERL5LIB and BLASTDB settings. 
+All these changes in the environment variables (PERL5LIB and BLASTDB) were 
+done by ./modules/Environment.pm while using the "run_pipeline" method in 
+RunTest.pm 
+
+
+=head1 OPTIONS
+
+  -species         this is the species you are running the test on and this tells
+   the TestDB object which zip file in reference_data to use
+
+  -verbose         toggle to indicate whether to be verbose
+
+  -output_dir   the directory the job output will be written to. 
+   Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm will be used. Note 
+   if output_dir is specified on the command line, output will NOT be sent to 
+   analysis-specific output directories specified in BatchQueue.pm either.
+   However, DEFAULT_OUTPUT_DIR and analysis-specific directories in
+   BatchQueue.pm will still be created by the system if they don't exist. See
+   doc in ./config/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm for more info.
+   
+  -queue_manager   the BatchSubmission module to use otherwise the 
+   QUEUE_MANAGER from BatchQueue.pm
+
+  -conf_file       the name of the conf file to use when running the analysis.
+   By default TestDB.conf is used
+
+  -dont_cleanup    a toggle to indicate not to delete the database, the unzipped
+   reference data directory and test output directories
+  
+  -blastdb         a string to change the blastdb to
+
+  -job_submission_verbose    whether to make the job submission script verbose
+
+
+=head1 SEE ALSO
+
+test_single_analysis.pl
+docs/running_tests.txt
+ensembl-pipeline/scripts/job_submission.pl
+
+any questions pass to ensembl-dev@ebi.ac.uk
+
+=cut
+
 #!/usr/local/ensembl/bin/perl -w
 
 use lib './modules';
@@ -14,7 +79,7 @@ use Getopt::Long;
 my $species;
 our $verbose;
 my $feature_table;
-my @tables_to_load = ('core', 'pipeline');
+my @tables_to_load = ('core', 'pipeline', 'marker','map', 'marker_synonym', 'marker_map_location');
 my $output_dir;
 my $queue_manager;
 my $conf_file;
@@ -66,12 +131,13 @@ my $extra_perl = $testdb->curr_dir."/config";
 my $test_runner = RunTest->new(
                                -TESTDB => $testdb,
                                -ENVIRONMENT => $environment,
-                               -OUTPUT_DIR => $DEFAULT_OUTPUT_DIR,
+                               -OUTPUT_DIR => $output_dir,
                                -EXTRA_PERL => $extra_perl,
                                -BLASTDB => $blastdb,
                                -TABLES => \@tables_to_load,
                                -QUEUE_MANAGER => $QUEUE_MANAGER,
                                -DONT_CLEANUP => $dont_cleanup,
+                               -VERBOSE => $verbose,
                                );
 
 if($run_comparison){
@@ -85,49 +151,3 @@ sub perldoc{
 	exit(0);
 }
 
-=pod
-
-=head1 NAME
-
-test_whole_pipeline.pl, This is a script which will test running a 
-whole pipeline start to end. It does this by running the rulemanager
-script
-
-=head1 SYNOPSIS
-
-The test_whole_pipeline script invokes first a TestDB object which sets up
-a test database then a RunTest object which knows how to fill the
-database with data and how to invoke the rulemanager script to run
-the pipeline. 
-
-Note currently the script must be run in this directory. This script
-also has to alter your perl5lib and blastdb to run the test properly
-they should always be returned to their previous state after the script
-is run though
-
-=head1 OPTIONS
-
-  -species, this is the species you are running the test on and this tells
-   the TestDB object which zip file in reference_data to us
-  -verbose toggle to indicate whether to be verbose
-  -output_dir the directory the job output will be written to
-   otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm is used
-  -queue_manager the BatchSubmission module to use otherwise the 
-   QUEUE_MANAGER from BatchQueue.pm
-  -conf_file the name of the conf file to use when running the analysis
-   by default TestDB.conf is used
-  -dont_cleanup a toggle to indicate not to delete the database and output
-   directories
-  -blastdb what string to change the blastdb to
-  -job_submission_verbose whether to make the job submission script verbose
-
-
-=head1 SEE ALSO
-
-test_single_analysis.pl
-docs/running_tests.txt
-ensembl-pipeline/scripts/job_submission.pl
-
-any questions pass to ensembl-dev@ebi.ac.uk
-
-=cut
