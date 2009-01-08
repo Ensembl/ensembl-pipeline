@@ -29,6 +29,9 @@
  'preloaded_data' => 0,
 
  #don't need to unzip the zip file, the directory will already exist:
+ #(this is usually set to "0" because the data usually have not been 
+ #unzipped, unless you have performed this pipeline test recently with
+ #the option "-dont_cleanup")
  'dont_unzip' => 0,
 
  'job_stats_sleep' => 60,
