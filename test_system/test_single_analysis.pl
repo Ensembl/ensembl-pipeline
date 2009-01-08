@@ -63,12 +63,13 @@ The compulsory options are "-logic_name" and "-feature_table".  The rest are opt
         not pipeline, not in "table_groups" method). This option can appear multiple 
         times on the commandline, e.g. -table_to_load table1 -table_to_load table2
 
-  -output_dir           the directory the job output will be written to. 
-        Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm will be used. Analysis-
-        specific output directories in BatchQueue.pm will NOT be used even if
-        specified. When using this flag, make sure the path to a "ghost" or "dummy"
-        directory has been specified for DEFAULT_OUTPUT_DIR in BatchQueue.pm.
-
+  -output_dir   the directory the job output will be written to. 
+        Otherwise the DEFAULT_OUTPUT_DIR from BatchQueue.pm will be used. Note 
+         if output_dir is specified on the command line, output will NOT be sent to 
+         analysis-specific output directories specified in BatchQueue.pm either.
+         However, DEFAULT_OUTPUT_DIR and analysis-specific directories in
+         BatchQueue.pm will still be created by the system if they don't exist. See
+         doc in ./config/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm for more info.
 
   -queue_manager        the BatchSubmission module to use otherwise the
         QUEUE_MANAGER from BatchQueue.pm is used
