@@ -42,7 +42,9 @@ use vars qw(%Config);
 
            # binaries, libraries and data files
            BIN_DIR  => '/usr/local/ensembl/bin',
-           DATA_DIR => '/usr/local/ensembl/data',
+           
+           ###### Modify DATA_DIR before running the pipeline test!!! #####
+           DATA_DIR => '/your/cvs/checkout/dir/ensembl-pipeline/test_system/homo_sapiens/data',
            LIB_DIR  => '/usr/local/ensembl/lib',
 
            # Path where the parser and parameter files for FirstEF program are allocated
