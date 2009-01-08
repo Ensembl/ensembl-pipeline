@@ -37,7 +37,7 @@ use vars qw( %Config );
                        # PROTEIN_FILE must always be specified. The "working directory" will always be in ensembl-pipeline/test_system as you'll 
                        # have to be in that directory to run ANY test in the first place.
                        
-                       PROTEIN_FILE => '/nfs/acari/at6/cvs_checkout/ensembl-pipeline/test_system/homo_sapiens/data/pmatch_proteins.fa',
+                       PROTEIN_FILE => '/your/cvs/checkout/dir/ensembl-pipeline/test_system/homo_sapiens/data/pmatch_proteins.fa',
                        MIN_COVERAGE => 25,
                        BINARY_LOCATION => '/usr/local/ensembl/bin/pmatch',
                        REPEAT_MASKING => [],
