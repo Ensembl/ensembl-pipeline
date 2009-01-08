@@ -75,31 +75,14 @@ before running any tests:
      important for tests involving Pmatch or BestPmatch analyses, either
      when testing them alone or in the entire pipeline.
 
-Settings specific to individual analyses:
+Settings specific for Pmatch and BestPmatch:
 
- (i) For Pmatch/BestPmatch analysis --- update the path to the protein seq
-     file in Analysis/Config/GeneBuild/Pmatch.pm.  The file lives in 
+     You'll need to update the path to the protein seq file in
+     Analysis/Config/GeneBuild/Pmatch.pm.  The protein seq file lives in 
      ./homo_sapiens/data/human_proteins.fa, where the homo_sapiens dir is
      created by unzipping the reference data at the beginning of the test.
      Note that path provided in Pmatch.pm will have to be ABSOLUTE, so the 
      relative path "./homo_sapiens/data/human_proteins.fa" will NOT work.
-
-(ii) For marker analysis when running test_single_analysis --- the human.markers 
-     file required by the analysis lives in ./homo_sapiens/data/human.markers.  
-     To allow the EPCR module to find this file, you must modify DATA_DIR in 
-     Analysis/Config/General.pm  to "./homo_sapiens/data". Again the path provided 
-     needs to be ABSOLUTE. 
-     
-     *** Remember to reset DATA_DIR back to its previous value when you  ***
-     *** finish running marker analysis or else other analyses may fail. ***
-
-(iii)For marker analysis/Genscan analysis when testing the whole pipeline                            #at6 (18Dec) write about this later
-
-
-
-
-
-
 
 A note about empty directories in ./config/Bio/EnsEMBL/Pipeline/Config:
 
@@ -129,7 +112,9 @@ successful, and how many results were produced.
 (2) test_whole_pipeline.pl --- this uses the rule_goal and rule_condition
 tables defined in the dumped out reference data to run the pipeline with 
 RuleManager. This test will take longer to run as it runs all the analyses 
-for the specified species from start to finish.
+for the specified species from start to finish. Depending on the availability
+of farm resources and batch size/queue choice, the test may take about 3 hours 
+or longer.
 
 Currently there is data for testing the raw computes in human.
 
@@ -151,7 +136,7 @@ Unigene         BlastGenscanDNA  dna_align_feature
 Uniprot         BlastGenscanPep  protein_align_feature
 marker          EPCR             marker_feature
 Pmatch          pmatch           protein_align_feature
-BestPmatch                       protein_align_feature                                   #at6 (19Dec) check this
+BestPmatch      bestpmatch       protein_align_feature
 
 To run these tests individually you need a commandline like this:
 
@@ -174,4 +159,4 @@ To run the whole pipeline in one go, use a commandline like this:
 
 ./test_whole_pipeline.pl 
 
-None of the commandline options are compulsory.
+None of the commandline options are compulsory when testing the whole pipeline.
