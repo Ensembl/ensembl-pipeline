@@ -74,7 +74,7 @@ sub verbosity{
 sub query{
   my ($self, $query) = @_;
   if($query){
-    throw("query ust be an array ref not a ".$query) 
+    throw("query must be an array ref not a ".$query) 
       unless(ref($query) eq 'ARRAY'); 
     $self->{'query'} = $query;
   }
@@ -238,8 +238,8 @@ sub pipeline_compare{
   $self->db_type_check($query_db);
   $self->db_type_check($ref_db);
   if(@$table_names == 0){
-    print "FeatureComparison:pipeline_compare you passed in no tables ".
-      "we can't make any comparisons\n";
+    print "FeatureComparison:pipeline_compare --- you passed in no tables ".
+      "so we can't make any comparisons\n";
     return;
   }
   my $query_numbers = {};
@@ -251,15 +251,16 @@ sub pipeline_compare{
     $query_numbers = $self->run_query($sql, $query_db, $query_numbers);
     $ref_numbers = $self->run_query($sql, $ref_db, $ref_numbers);
   }
-  print "There are ".keys(%$query_numbers)." analysis in the query database ".
+  print "\nThere are ".keys(%$query_numbers)." analysis in the query database ".
     $query_db->dbname." and ".keys(%$ref_numbers)." analysis in the reference ".
-      "database ".$ref_db->dbname." all from ".@$table_names." tables\n";
+      "database ".$ref_db->dbname.", all from ".@$table_names." tables\n\n";
   printf("%-15s %-15s %-15s\n", 'logic_name', 'query_count', 'ref_count');
   printf("%-15s %-15s %-15s\n", '----------', '-----------', '---------');
   foreach my $logic_name(keys(%$query_numbers)){
     printf("%-15s %-15s %-15s\n", $logic_name, $query_numbers->{$logic_name},
            $ref_numbers->{$logic_name});
   }
+  print "\n";
 }
 
 
