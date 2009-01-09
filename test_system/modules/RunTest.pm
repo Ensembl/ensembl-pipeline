@@ -505,7 +505,7 @@ sub check_output_dir{
     eval{
       mkdir($self->output_dir);
       warning("Your command line-specified test output directory " . $self->output_dir .
-       " does not exist - it's being created now.\n") ;   #at6 9Jan debug
+       " does not exist - it's being;
     };
     if($@){
       $self->exception("Failed to create ".$self->output_dir." $@");
@@ -609,7 +609,7 @@ sub run_single_analysis{
 
 sub run_pipeline{
   my ($self, $verbose) = @_;
-  my $cleanup_dir = $self->check_output_dir;      #at6 7Jan09 Do we need this?? 8Jan09 looks like we do as dir wasn't cleaned up
+  my $cleanup_dir = $self->check_output_dir;
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->change_blastdb($self->blastdb);
   $self->setup_database;
@@ -641,7 +641,7 @@ sub run_pipeline{
       $self->cleanup_command($ref_testdb);
     }
   }
-   $self->cleanup ($self->testdb)   #at6 8 Jan took away 1st arg $cleanup_dir in ()
+   $self->cleanup ($self->testdb)
             unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
