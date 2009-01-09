@@ -228,7 +228,7 @@ sub job_submission_command{
   my $cmd = "perl ".$job_submission." ";
   $cmd .= $db_args." ";
   $cmd .= "-logic_name $logic_name ";
-  $cmd .= "-output_dir $output_dir ";                                     
+  $cmd .= "-output_dir $output_dir ";
   $cmd .= "-force ";
   $cmd .= "-verbose" if($verbose);
   return $cmd;
@@ -247,7 +247,7 @@ sub job_submission_command{
 =cut
 
 sub rulemanager_command{
-  my ($self, $verbose) = @_;
+  my ($self, $output_dir, $verbose) = @_;
 
   my $db_conf = $self->testdb->conf_hash;
   my $dbport = $db_conf->{'port'};
@@ -263,9 +263,9 @@ sub rulemanager_command{
   my $db_args = $self->database_args($self->testdb);
   my $cmd = "perl ".$job_submission." ";
   $cmd .= $db_args." ";
+  $cmd .= "-output_dir $output_dir ";
   $cmd .= "-verbose" if($verbose);
-  print "the command is: ", $cmd,"\n";
-
+  print "the rulemanager command is: ", $cmd,"\n";
   return $cmd;
 }
 
@@ -370,7 +370,7 @@ sub whole_pipeline_stats{
   }
   print "\n";
   my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
-  $monitor->show_current_status_summary;
+  $monitor->show_current_status; 
   $monitor->show_finished_summary(1);
 }
 
@@ -467,7 +467,7 @@ sub setup_database{
   }
   my @unloaded;
   foreach my $table(@{$tables}){
-    my $method = "load_".$table."_tables";  #loading predifined set of tables
+    my $method = "load_".$table."_tables";  #loading predefined set of tables
     if($testdb->can($method)){
       $testdb->$method;
     }else{
@@ -504,6 +504,8 @@ sub check_output_dir{
   }else{
     eval{
       mkdir($self->output_dir);
+      warning("Your command line-specified test output directory " . $self->output_dir .
+       " does not exist - it's being created now.\n") ;   #at6 9Jan debug
     };
     if($@){
       $self->exception("Failed to create ".$self->output_dir." $@");
@@ -576,13 +578,15 @@ sub run_single_analysis{
     }else{
       print "No comparison can be made as ".$method." doesn't exist\n";
     }
-    $ref_testdb->cleanup unless($self->dont_cleanup_tests); #rm data dir + drop testDB
+    $ref_testdb->cleanup unless($self->dont_cleanup_tests); #drop testDB
     if($self->dont_cleanup_tests){
       $self->cleanup_command($ref_testdb); #returns a clean up command to run manually later if
                                            #the analysis output is to be kept for a while
     }
   }
-  $self->cleanup() unless($self->dont_cleanup_tests);
+  $self->cleanup() unless($self->dont_cleanup_tests);#delete output dir, calls cleanup in TestDB.pm 
+                                                     #(delete DB), calls Environment.pm to reset PERL5LIB
+
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
     $self->environment->return_environment; #reset PERL5LIB & BLASTDB even if dont_cleanup_tests
@@ -605,13 +609,16 @@ sub run_single_analysis{
 
 sub run_pipeline{
   my ($self, $verbose) = @_;
-  my $cleanup_dir = $self->check_output_dir;
+  my $cleanup_dir = $self->check_output_dir;      #at6 7Jan09 Do we need this?? 8Jan09 looks like we do as dir wasn't cleaned up
   $self->environment->add_to_perl5lib($self->extra_perl);
   $self->environment->change_blastdb($self->blastdb);
-  $self->environment->setup_all_paths($self->testdb->species);
   $self->setup_database;
-  my $cmd = $self->rulemanager_command();
-  print $cmd."\n" if($self->verbosity || $verbose);
+  
+  my $output_dir = $self->output_dir;
+  
+  my $cmd = $self->rulemanager_command($output_dir, $verbose);
+  # note: rulemanager command is printed out regardless of $verbose
+ 
   system($cmd) == 0 or $self->exception("Failed to run ".$cmd);
   $self->whole_pipeline_stats();
   if($self->comparison_conf){
@@ -634,8 +641,8 @@ sub run_pipeline{
       $self->cleanup_command($ref_testdb);
     }
   }
-  $self->cleanup($cleanup_dir, $self->testdb) 
-    unless($self->dont_cleanup_tests);
+   $self->cleanup ($self->testdb)   #at6 8 Jan took away 1st arg $cleanup_dir in ()
+            unless($self->dont_cleanup_tests);
   if($self->dont_cleanup_tests){
     $self->cleanup_command;
     $self->environment->return_environment;
@@ -668,12 +675,13 @@ sub cleanup_command{
   $cleanup_command .= " -output_dir ".$self->output_dir;
     $cleanup_command .= " -sql_data_dir ".$data_dir;
   print "You have specifed -dont_cleanup when running your test \n".
-    "If you want to delete your output you can run this script ".
-      "ensembl-pipeline/test_system/cleanup_output.pl\n".
-        "this is the command you should use: \n".$cleanup_command."\n".
-            "If you don't want any of the data sets deleted, remove either".
-              " -dbname, -sql_data_dir or -output_dir options from the ".
-                "commandline\n";
+    "If you want to delete your output you can run this script: ".
+    "ensembl-pipeline/test_system/cleanup_output.pl\n".
+    "This is the command you should use: \n".$cleanup_command."\n".
+    "If you want to delete only the DB, only the unzipped data dir, ".
+    "only the analysis output dir, or the combination of any of these, remove ".
+    "the unwanted options (-dbname, -sql_data_dir or -output_dir) from the ".
+    "commandline\n";
 }
 
 
@@ -764,7 +772,7 @@ sub compare_simple_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
-    $feature_comparison->verbose($self->verbosity);                     #at6 5 Jan 09 DEBUG. this worked. need to add to the rest of this module.
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
@@ -807,8 +815,8 @@ sub compare_prediction_transcript{
     }
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
-    $feature_comparison->target($target_fs);i
-    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09  ADDED
+    $feature_comparison->target($target_fs);
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
@@ -852,7 +860,7 @@ sub compare_repeat_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
-    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
@@ -896,7 +904,7 @@ sub compare_dna_align_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
-    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
@@ -939,7 +947,7 @@ sub compare_protein_align_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
-    $feature_comparison->verbose($self->verbosity);             #at6 6 Jan 09 ADDED
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
@@ -981,7 +989,7 @@ sub compare_marker_feature{
     my $feature_comparison = $self->feature_comparison;
     $feature_comparison->query($query_fs);
     $feature_comparison->target($target_fs);
-    $feature_comparison->verbose($self->verbosity);                     #at6 6 Jan 09 ADDED
+    $feature_comparison->verbose($self->verbosity);
     $feature_comparison->compare;
   }
 }
