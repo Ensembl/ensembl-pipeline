@@ -123,8 +123,8 @@ use vars qw(%Config);
            }
 );
 
->>ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-package Bio::EnsEMBL::Pipeline::Config::GeneBuild::KillListFilter;
+>>ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config/GeneBuild/KillListFilter.pm
+package Bio::EnsEMBL::Analysis::Config::GeneBuild::KillListFilter;
 
 use strict;
 use vars qw( %Config );
