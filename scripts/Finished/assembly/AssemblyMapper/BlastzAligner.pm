@@ -1,5 +1,7 @@
 package AssemblyMapper::BlastzAligner;
 
+use File::Basename;
+
 =head1 NAME
 
 BlastzAligner.pm - module to do a whole genome alignment between two closely
@@ -219,8 +221,8 @@ sub run_lastz {
 
     my $tmpdir = $self->tempdir;
     my $id = $self->id;
-
-    my $blastz_cmd = qq(/software/anacode/bin/lastz $tmpdir/$A_basename.fa $tmpdir/$R_basename.fa Q=lastz_matrix.txt T=0 L=10000 H=2200 Y=3400 --format=axt > $tmpdir/blastz.$id.axt);
+    my $dir_name =  dirname $0;
+    my $blastz_cmd = qq(/software/anacode/bin/lastz $tmpdir/$A_basename.fa $tmpdir/$R_basename.fa Q=${dir_name}/lastz_matrix.txt T=0 L=10000 H=2200 Y=3400 --format=axt > $tmpdir/blastz.$id.axt);
 	print "lastz command $blastz_cmd\n";
     unless (-e "$tmpdir/blastz.$id.axt") {
       system($blastz_cmd) == 0 or
