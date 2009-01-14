@@ -720,7 +720,7 @@ sub found_match {
 				  [
 					$A_start, $A_end, $j,
 					$R_start, $R_end, $i,
-					$A_chr,
+					$A_chr, 1
 				  ];
 			}
 		}
@@ -735,7 +735,7 @@ sub found_match {
 		  [
 			$A_start, $A_end, $j,
 			$R_start, $R_end, $i,
-			$A_chr,
+			$A_chr, 1
 		  ];
 	}
 }
