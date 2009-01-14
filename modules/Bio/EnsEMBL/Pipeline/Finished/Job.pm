@@ -94,7 +94,7 @@ sub priority {
 	return $self->{priority};
 }
 
-# update values: 0 no update, new clone analysis; 1 update only patch file; 2 update patch and release files; 
+# update values: 0 no update, new clone analysis; 1 update only patch file; 2 update patch and release files;
 sub set_update_value {
 	my ($self) = @_;
 	my $update_value = 0;
@@ -109,17 +109,17 @@ sub set_update_value {
 		my ($patch_cv,$release_cv) = $db_version_current =~ /^(\S+)\s+\((\d+)\)$/;
 		if($release_sv && ($release_sv eq $release_cv)){
 			$update_value = 1;
-		}	
+		}
 	}
 	$self->{update} = $update_value;
-}   
+}
 
 sub update {
 	my ($self,$update) = @_;
 	if ($update) {
     	$self->{update} = $update;
   	}
-  	
+
 	return $self->{update} || 0;
 }
 
@@ -300,7 +300,7 @@ sub run_module {
   Title   : batch_runRemote
   Usage   : $job->batch_runRemote
   Function: see parent class
-  Returns : 
+  Returns :
   Args    : Is static, private function, dont call with arrow notation.
 
 =cut
@@ -329,7 +329,7 @@ sub batch_runRemote {
 	} else {
 		$batch_size = @$batch_size[0];
 	}
-	
+
 	if (
 		scalar( @{ $batch_jobs->{$host}->{$dbname} } ) >= $batch_size )
 	{
@@ -337,7 +337,7 @@ sub batch_runRemote {
 	} else {
 		$submitted = 0;
 	}
-	
+
 	return $submitted;
 }
 
@@ -345,9 +345,9 @@ sub batch_runRemote {
 
   Title   : flush_runs
   Usage   : $job->flush_runs( jobadaptor, [queue] );
-  Function: Methode extended to handle the failed 'out of memory' Jobs and use the big memory queue. 
-  Returns : 
-  Args    : 
+  Function: Methode extended to handle the failed 'out of memory' Jobs and use the big memory queue.
+  Returns :
+  Args    :
 
 =cut
 
@@ -390,7 +390,7 @@ sub flush_runs {
 	for my $anal (@analyses) {
 		my $queue = $BATCH_QUEUES{$anal};
 		my @job_ids;
-		@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} } 
+		@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} }
 				if ($queue->{'jobs'}->{$host}->{$dbname});
 		if ( !@job_ids ) {
 			next ANAL;
@@ -400,34 +400,41 @@ sub flush_runs {
 		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
 
 		my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
-		
+
 		while( !$lastjob && @job_ids) {
 			pop @job_ids;
 			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] ) if($job_ids[-1]);
 		}
-		
+
 		if ( !$lastjob ) {
 			next ANAL;
 		}
 
-			my $pre_exec =
+		my $pre_exec =
 		  $this_runner . " -check -output_dir " . $self->output_dir;
 
 		my $farm_queue    = $queue->{'queue'};
 		my $farm_resource = $queue->{'resource'};
 		my $param = $queue->{'sub_args'}.' -sp '.$self->priority.' ';
-		
+
 		if ( $self->priority == $BIG_MEM_PRIORITY ) {
 			$farm_queue    = $BIG_MEM_QUEUE;
 			$farm_resource = $BIG_MEM_RESOURCE;
-			$param 		  .= $BIG_MEM_PARAM; 
+			$param 		  .= $BIG_MEM_PARAM;
 		}
-		
+
 		if ( $self->priority == $LONG_JOB_PRIORITY ) {
 			$farm_queue    = $LONG_JOB_QUEUE;
 		}
 
-			my $batch_job = $batch_q_module->new(
+		# change job mysql load ressource
+		if($host eq 'otterpipe1') {
+			$farm_resource =~ s/otterp2/otterp1/;
+		} else {
+			$farm_resource =~ s/otterp1/otterp2/;
+		}
+
+		my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
 			-PARAMETERS => $param,
 			-PRE_EXEC   => $pre_exec,
@@ -439,7 +446,7 @@ sub flush_runs {
 
 			my $cmd;
 
-			if ( !$self->cleanup ) {
+		if ( !$self->cleanup ) {
 			$batch_job->stderr_file( $lastjob->stderr_file );
 		}
 
@@ -447,7 +454,7 @@ sub flush_runs {
 		# "connect" command line accordingly otherwise -pass gets the
 		# first job id as password, instead of remaining undef
 
-			if ($pass) {
+		if ($pass) {
 			$cmd = $runner
 			  . " -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
 		}
