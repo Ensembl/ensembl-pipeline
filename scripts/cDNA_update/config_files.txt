@@ -156,6 +156,31 @@ use vars qw( %Config );
         -for_species          => ['<taxonomy_id>'], # ['10090'] = mouse, ['9606'] = human
       },
     },
+    CDNA_UPDATE => {
+      GB_REF_DB => {
+        -dbname => '',
+        -host   => '',
+        -port   => '3306',
+        -user   => 'ensro',
+      },
+      KILL_LIST_DB => {
+        -dbname => 'ba1_ensembl_kill_list',
+        -host   => 'genebuild6',
+        -port   => '3306',
+        -user   => 'ensro',
+        -pass   => '',
+      },
+      FILTER_PARAMS    => {
+        #can only be protein, cDNA, EST.
+        -only_mol_type        => 'cDNA',
+        #kill_list will not return entries that have an entry in the kill_object_analysis table for these analysis_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these analyses below
+        -for_analyses         => ['cDNA_update'],
+        #kill_list will not return accessions that have an entry in the kill_object_species table for these species_ids
+        #ie. accession removed from the kill-list will have been set to 'allowed' for these species below
+        -for_species          => ['<taxonomy_id>'], # ['10090'] = mouse, ['9606'] = human
+      },
+    },
   },
 );
 
