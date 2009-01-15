@@ -436,6 +436,7 @@ sub flush_runs {
 
 		my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
+			-STDERR     => $lastjob->stderr_file,
 			-PARAMETERS => $param,
 			-PRE_EXEC   => $pre_exec,
 			-QUEUE      => $farm_queue,
@@ -445,10 +446,6 @@ sub flush_runs {
 		);
 
 			my $cmd;
-
-		if ( !$self->cleanup ) {
-			$batch_job->stderr_file( $lastjob->stderr_file );
-		}
 
 			# check if the password has been defined, and write the
 		# "connect" command line accordingly otherwise -pass gets the
