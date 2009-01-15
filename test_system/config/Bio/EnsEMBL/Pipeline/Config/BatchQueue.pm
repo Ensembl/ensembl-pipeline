@@ -110,7 +110,7 @@ use vars qw(%Config);
   # are defined in this module, no data will be written to them as the command line option overrides them too.
 
 
-  DEFAULT_OUTPUT_DIR => '/your/default/output/dir/path',
+  DEFAULT_OUTPUT_DIR => '/lustre/scratch1/ensembl/at6/ghost_output_dir_for_test_system',
 
   DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
@@ -138,7 +138,7 @@ use vars qw(%Config);
   QUEUE_CONFIG => [
     {
       logic_name => 'RepeatMask',
-      batch_size => 2,
+      batch_size => 5,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -155,7 +155,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'CpG',
-      batch_size => 50,
+      batch_size => 108,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -173,7 +173,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Dust',
-      batch_size => 50,
+      batch_size => 108,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -190,7 +190,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Eponine',
-      batch_size => 20,
+      batch_size => 54,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -207,7 +207,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'marker',
-      batch_size => 10,
+      batch_size => 108,
       resource   => '',
       retries    => 4,
       sub_args   => '',
@@ -224,7 +224,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'TRF',
-      batch_size => 50,
+      batch_size => 108, 
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -242,7 +242,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'tRNAscan',
-      batch_size => 50,
+      batch_size => 108, 
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -260,7 +260,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'FirstEF',
-      batch_size => 50,
+      batch_size => 108,
       resource   => '',
       retries    => 10,
       sub_args   => '',
@@ -277,7 +277,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Genscan',
-      batch_size => 50,
+      batch_size => 54,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -294,7 +294,7 @@ use vars qw(%Config);
    
     {
       logic_name => 'Vertrna',
-      batch_size => 1,
+      batch_size => 4,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -311,7 +311,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Unigene',
-      batch_size => 1,
+      batch_size => 4,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -328,7 +328,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Uniprot',
-      batch_size => 1,
+      batch_size => 4,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -345,7 +345,7 @@ use vars qw(%Config);
 
     {
       logic_name => 'Pmatch',
-      batch_size => 50,
+      batch_size => 108,
       resource   => '',
       retries    => 3,
       sub_args   => '',
@@ -367,7 +367,7 @@ use vars qw(%Config);
       retries    => 1,
       sub_args   => '',
       runner     => '',
-      queue      => '',
+      queue      => 'small',
       output_dir => '',
       runnabledb_path => '',
     },
@@ -392,7 +392,7 @@ use vars qw(%Config);
       retries    => 1,
       sub_args   => '',
       runner     => '',
-      queue => '',
+      queue => 'small',
       cleanup => 'no',
       output_dir => '',
       runnabledb_path => '',
