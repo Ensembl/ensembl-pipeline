@@ -13,11 +13,11 @@ Bio::EnsEMBL::Pipeline::Finished::RuleManager.pm
 
 =head1 DESCRIPTION
 
-Finished group specific RuleManager module. 
-Allow a better job submission handling through a priority queue 
-and limit the number of submitted jobs. Note that a ~/.netrc 
+Finished group specific RuleManager module.
+Allow a better job submission handling through a priority queue
+and limit the number of submitted jobs. Note that a ~/.netrc
 file is necessary to fetch the priority queue connexion parameters.
-See Net::Netrc module for more details. 
+See Net::Netrc module for more details.
 
 
 =head1 FEEDBACK
@@ -60,7 +60,7 @@ use DBI;
 
 =head2 _job_db_queue
 
-  Function  : Gets the database connection to the RuleManager queue. 
+  Function  : Gets the database connection to the RuleManager queue.
   Exceptions: none
 
 =cut
@@ -86,7 +86,7 @@ sub push_job {
 	my $dbq    = $self->_job_db_queue;
 	my $insert = $dbq->prepare(
 		qq {
-			INSERT INTO queue (created, priority, job_id, host, pipeline, analysis, is_update) 
+			INSERT INTO queue (created, priority, job_id, host, pipeline, analysis, is_update)
 			VALUES ( NOW() , ? , ? , ? , ? , ? , ?)
 		}
 	);
@@ -100,7 +100,7 @@ sub push_job {
 	$job_priority = $URGENT_JOB_PRIORITY
 	  if ( $self->urgent_input_id->{ $job->input_id } );
 	my $update = $job->update;
-	
+
 	return $insert->execute( $job_priority, $job_id, $host, $dbname, $analysis, $update );
 }
 
@@ -112,13 +112,13 @@ sub push_job {
   Arg [4]   : string, runner script path (optional)
   Arg [5]   : int, for a boolean flag to mark verbosity (optional)
   Function  : Check if a job can be created for an input_id and analysis
-              If a job already exists check if it needs to be retried, 
+              If a job already exists check if it needs to be retried,
               then push the job in a priority queue.
   Returntype: int
   Exceptions: throws if not passed an input_id or an analysis object and
-              if fails to submit the job 
+              if fails to submit the job
   Example   : $rulemanager->can_run_job('filename', $analysis
-                                        'path/to/dir', 
+                                        'path/to/dir',
                                         'path/to/runner', 1);
 
 =cut
@@ -157,6 +157,7 @@ sub can_job_run {
 			}
 			$cj->set_status('CREATED');
 			$job = $cj;
+			$job->output_dir($self->output_dir) if $self->output_dir;
 		}
 	}
 	else {
@@ -211,7 +212,7 @@ sub create_and_store_job {
   Arg [2]   : array_ref to array of Bio::EnsEMBL::Pipeline::Job objects
   (optional)
   Function  : gets statistics from BatchSubmission module about what
-  jobs are running and what their status is then take action on this 
+  jobs are running and what their status is then take action on this
   information. job_stats will mark awol and out_of_memory jobs as well
   Return : number of free job slots in the farm. It depends on the JOB_LIMIT set in BatchQeue.pm
   Returntype: int
@@ -308,7 +309,7 @@ sub valid_statuses_for_awol {
 
   Arg : None
   Function  : gets a hash reference of the input_id that need to be completed at short notice.
-  			  The path to the file that contains the list of urgent input_ids 
+  			  The path to the file that contains the list of urgent input_ids
   			  is set in the BatchQueue configuration file.
   			  (see variable URGENT_INPUTID_FILE)
   Returntype: Hash reference
@@ -352,7 +353,7 @@ sub read_input_file {
 =head2 status_from_output
 
   Arg : Job object
-  Function  : Read the job's output file and return the exception status if system exception. 
+  Function  : Read the job's output file and return the exception status if system exception.
   			  OUT_OF_MEMORY for MEMORY LIMIT and RUNTIME_LIMIT for RUNTIME LIMIT.
   Returntype: string
 
@@ -406,7 +407,7 @@ sub get_db_param {
 		  . " (should be used to set the port number)"
 	  )
 	  unless ( $dbuser && $dbpass && $dbport );
-	  
+
 	  return ($dbuser, $dbpass, $dbport);
 }
 
@@ -416,7 +417,7 @@ sub check_if_done {
   my @jobs = $self->job_adaptor->fetch_all;
   my $continue;
 
- JOB: 
+ JOB:
   foreach my $job (@jobs) {
     my $status = $job->current_status->status;
 
