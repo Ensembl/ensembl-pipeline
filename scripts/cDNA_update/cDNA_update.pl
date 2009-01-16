@@ -120,7 +120,7 @@ my $dataDIR              = '/lustre/scratch1/ensembl/jhv/cDNA_updates/human_2008
 
 # sequence data files, which are used for the update
 # if in doubt, ask Hans where to find new files
-my $vertrna              = "embl_vertrna-1";
+my $vertrna              = "embl_vertrna-[0-9]"; # pattern matches any digit. Currently 2 files matched.
 my $vertrna_update       = "emnew_vertrna-1";
 my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
 my $sourceHost           = "cbi4"; 
@@ -671,7 +671,7 @@ sub fastafiles{
       my $stampB = join("-", @filestamp[5..7]);
       if($stampA eq $stampB){
         #no changes...
-        if($filestamp[8] eq $vertrna){ $vertrna_ver = 0; }
+        if($filestamp[8] =~ m/$vertrna/){ $vertrna_ver = 0; }
         elsif($filestamp[8] eq $vertrna_update){ $vertrna_upd_ver = 0; }
         elsif($filestamp[8] eq $refseq){ $refseq_ver = 0; }
       }
@@ -681,7 +681,7 @@ sub fastafiles{
     close(WRITER);
     #copy files
     if($vertrna_ver){
-      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna . " " . $dataDIR."/".$vertrna;
+      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna . " " . $dataDIR."/";
       $status += system($cmd);
     }
     if($vertrna_upd_ver){
@@ -719,24 +719,38 @@ sub fastafiles{
         close(RP);
         print "read update $vertrna_update EMBL file.\n";
 
-        #read base file
-        open(RP, "<", $dataDIR."/".$vertrna) or die("can t read $vertrna\n");
-        #<RP>;
-        while (my $entry = <RP>){
-          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-          if($entry =~ m/$species/){
-            #extract & save id
-            $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
-            if(!$1){ die "\n$vertrna: unmatched id pattern:\n$entry\n"; }
-            if( !defined($EMBL_ids{$1}) ){
-              #add fasta entry for unchanged id
-              $entry =~ s/\>//g;
-              print WP '>'.$entry;
-            }
+        # we're not sure how many embl files there are. We know there are at least 2 files
+        # read all embl_vertrna-* files from datadir
+        # and store them in an array
+        my @embl_vertrna_files;
+        opendir DIR, "$dataDIR" || die "Cannot opendir $dataDIR $!";
+        while ( my $filename = readdir(DIR) ) {
+          if ($filename=~/$vertrna/){
+            push @embl_vertrna_files, $filename;
           }
         }
-        close(RP);
-        print "read base $vertrna EMBL file.\n";
+
+        # now loop through all embl_vertna files
+        #read base file
+        foreach my $embl_vert (@embl_vertrna_files) {
+          open(RP, "<", $dataDIR."/".$embl_vert) or die("can t read $embl_vert\n");
+          #<RP>;
+          while (my $entry = <RP>){
+            $entry =~s/^>//; #need this to include the first record when using $/='\n>'
+            if($entry =~ m/$species/){
+              #extract & save id
+              $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
+              if(!$1){ die "\n$embl_vert: unmatched id pattern:\n$entry\n"; }
+              if( !defined($EMBL_ids{$1}) ){
+                #add fasta entry for unchanged id
+                $entry =~ s/\>//g;
+                print WP '>'.$entry;
+              }
+            }
+          }
+          close(RP);
+          print "read base $embl_vert EMBL file.\n";
+        }
 
         #read RefSeq file
         open(RP, "<", $dataDIR."/".$refseq) or die("can t read $refseq.\n");
@@ -1430,9 +1444,20 @@ sub clean_up{
 
   if(!$option){
     #remove files (fasta, chunks, sql)
-    if(-e $dataDIR."/".$vertrna){
-      $cmd = "rm " . $dataDIR."/".$vertrna;
-      $status += system($cmd);
+    opendir DIR, "$dataDIR" || die "Cannot opendir $dataDIR $!";
+    my @embl_vertrna_files;
+    while ( my $filename = readdir(DIR) ) {
+      if ($filename=~/$vertrna/){
+        push @embl_vertrna_files, $filename;
+      }
+    }
+    closedir DIR;
+    foreach my $embl_vert (@embl_vertrna_files) {
+      if(-e $dataDIR."/".$embl_vert){
+        $cmd = "rm " . $dataDIR."/".$embl_vert;
+        print STDERR "$cmd\n";
+        $status += system($cmd);
+      }
     }
     if(-e $dataDIR."/".$vertrna_update){
       $cmd = "rm " . $dataDIR."/".$vertrna_update;
