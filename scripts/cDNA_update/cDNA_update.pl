@@ -1314,12 +1314,19 @@ sub why_cdnas_missed{
           ` grep "reject" $concat_file >> $file`;
           ` grep "max_coverage" $concat_file >> $file`;
 
+    # need to replace "[" and "]" with
+    # "\[" and "\]" otherwise GetOpt::Long doesn't
+    # parse it correctly on the commandline 
+    my $vertrna_fix = $vertrna;
+    $vertrna_fix =~ s/\[/\\[/;
+    $vertrna_fix =~ s/\]/\\]/;
+
         #need to pass all the variables to the script:
 
     $cmd = "perl ".$reasons_prog.
            " -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user $WB_DBUSER".
            " -pass $WB_DBPASS -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
-           " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna." -refseq ".$dataDIR."/".$refseq.
+           " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna_fix." -refseq ".$dataDIR."/".$refseq.
            " -vertrna_update ".$dataDIR."/".$vertrna_update." -infile ".$file.
                    " -findN_prog ".$findN_prog." -reasons_file ".$reasons_file;
 
