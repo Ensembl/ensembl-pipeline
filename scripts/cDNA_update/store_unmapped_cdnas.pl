@@ -32,7 +32,6 @@ my ($reasons_file);
 			'reasons_file=s'    => \$reasons_file
 	   );
 
-
 my $db1 = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						     -host    => $host,
 						     -port    => $port,
@@ -101,7 +100,21 @@ close IN;
 #get entries for species of interest, combine base file & update file
 #read update file
 
-my @files = ($vertrna_update, $vertrna);
+# remember that $vertrna is not a filename; it is a pattern
+# eg. embl_vertrna-[0-9] 
+# first get the dataDIR
+my @dirlist = split("/", $vertrna);
+my $dataDIR = join('/', @dirlist[0 .. $#dirlist - 1]);
+
+# get all filenames matching the pattern
+my @files = ($vertrna_update);
+opendir DIR, "$dataDIR" || die "Cannot opendir $dataDIR $!";
+while ( my $filename = readdir(DIR) ) {
+  if ($filename=~/$dirlist[-1]/){
+    push @files, $dataDIR."/".$filename;
+  }
+}
+
 my (%EMBL_ids);
 
 
