@@ -561,18 +561,18 @@ $support->finish_log;
 ### end main
 
 sub transform {
-	my $self = shift;
+	my $transcript = shift;
 	my @coords = ('chromosome',$altassembly);
 	my $new_transcript;
 	if ( !defined $new_transcript ) {
-		my @segments = $self->project(@coords);
+		my @segments = $transcript->project(@coords);
 
 		# if it projects, maybe the exons transform well?
 		# lazy load them here
 		return undef if ( !@segments );
-		$self->get_all_Exons();
+		$transcript->get_all_Exons();
 	}
-	if ( exists $self->{'_trans_exon_array'} ) {
+	if ( exists $transcript->{'_trans_exon_array'} ) {
 		my @new_exons;
 		my ( $low_start, $hi_end, $slice );
 
@@ -583,7 +583,7 @@ sub transform {
 		my $first        = 1;
 		my $ignore_order = 1;
 		my $order_broken = 0;
-		for my $old_exon ( @{ $self->{'_trans_exon_array'} } ) {
+		for my $old_exon ( @{ $transcript->{'_trans_exon_array'} } ) {
 			my $new_exon = $old_exon->transform(@coords);
 			return undef if ( !defined $new_exon );
 			if ( !defined $new_transcript ) {
@@ -625,23 +625,23 @@ sub transform {
 				$last_new_start       = $new_exon->start();
 				$last_new_strand      = $new_exon->strand();
 			}
-			if ( defined $self->{'translation'} ) {
-				if ( $self->translation()->start_Exon() == $old_exon ) {
+			if ( defined $transcript->{'translation'} ) {
+				if ( $transcript->translation()->start_Exon() == $old_exon ) {
 					$start_exon = $new_exon;
 				}
-				if ( $self->translation()->end_Exon() == $old_exon ) {
+				if ( $transcript->translation()->end_Exon() == $old_exon ) {
 					$end_exon = $new_exon;
 				}
 			}
 			push( @new_exons, $new_exon );
 		}
 		if ( $order_broken && !$ignore_order ) {
-			warning( "Order of exons broken in transform of " . $self->dbID() );
+			warning( "Order of exons broken in transform of " . $transcript->dbID() );
 			return undef;
 		}
 		if ( !defined $new_transcript ) {
-			%$new_transcript = %$self;
-			bless $new_transcript, ref($self);
+			%$new_transcript = %$transcript;
+			bless $new_transcript, ref($transcript);
 			$new_transcript->start($low_start);
 			$new_transcript->end($hi_end);
 			$new_transcript->slice( $new_exons[0]->slice() );
@@ -651,18 +651,18 @@ sub transform {
 
 		# should be ok to do inside exon array loop
 		# translations only exist together with the exons ...
-		if ( defined $self->{'translation'} ) {
+		if ( defined $transcript->{'translation'} ) {
 			my $new_translation;
-			%$new_translation = %{ $self->{'translation'} };
-			bless $new_translation, ref( $self->{'translation'} );
+			%$new_translation = %{ $transcript->{'translation'} };
+			bless $new_translation, ref( $transcript->{'translation'} );
 			$new_transcript->{'translation'} = $new_translation;
 			$new_translation->start_Exon($start_exon);
 			$new_translation->end_Exon($end_exon);
 		}
 	}
-	if ( exists $self->{'_supporting_evidence'} ) {
+	if ( exists $transcript->{'_supporting_evidence'} ) {
 		my @new_features;
-		for my $old_feature ( @{ $self->{'_supporting_evidence'} } ) {
+		for my $old_feature ( @{ $transcript->{'_supporting_evidence'} } ) {
 			my $new_feature = $old_feature->transform(@coords);
 			if ( defined $new_feature ) {
 				push @new_features, $new_feature;
