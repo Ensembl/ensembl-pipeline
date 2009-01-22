@@ -58,6 +58,7 @@ ml6@sanger.ac.uk
 
 use strict;
 use warnings;
+use List::Util qw[min max];
 no warnings 'uninitialized';
 
 use FindBin qw($Bin);
@@ -287,7 +288,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		my @proj_feat;
 		my @simple_features = @{ $sfeat_Ad->fetch_all_by_Slice($ref_sl) };
 		$total_sf = scalar @simple_features;
-		foreach my $f (@simple_features) {
+		SF: foreach my $f (@simple_features) {
 			my $tf = $f->transfer($alt_sl);
 			if ( defined $tf ) {
 				$tf->dbID(undef);
@@ -389,6 +390,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				            	&remove_all_db_ids($tt);
 				            } else {
 				            	my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl);
+				            	next TRANSCRIPT unless $new_t;
 				              	$new_t->status( $t->status );
 				              	#my $status = 'COMPLEX_CODING_WITHOUT_CDS';
 				              	#add_trans_remark($R_chr, $status, $new_t);
@@ -405,6 +407,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				            }
 						} else {
 							my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl );
+							next TRANSCRIPT unless $new_t;
 							$new_t->status( $t->status );
 				            #my $status = 'COMPLEX_NONCODING';
 				            #add_trans_remark($ref_set, $status, $new_t);
@@ -716,7 +719,7 @@ sub project_transcript_the_hard_way {
 
 	my @new_e;
 	my $cs = $alt_sl->coord_system;
-	foreach my $e ( @{ $new_trans->get_all_Exons } ) {
+	EXON: foreach my $e ( @{ $new_trans->get_all_Exons } ) {
 		my $te = $e->transfer($alt_sl);
 
 		if ( defined $te ) {
@@ -754,6 +757,26 @@ sub project_transcript_the_hard_way {
 					$new_e->end_phase(-1);
 					$new_e->slice($alt_sl);
 					$new_e->stable_id( $e->stable_id ) unless $flag;
+					# Check here that the exon doesn't overlap with those already in the list
+					if(&features_overlap($new_e,\@new_e)){
+						$support->log_verbose(
+							sprintf("WARNING: Exons overlap found on strand %d, discard Exon %s in Transcript %s of Gene %s\n",
+								$_,
+								$e->stable_id,
+								$t->stable_id,
+								$g->stable_id)
+						);
+						&add_hidden_remark($e->slice->seq_region_name,
+								    sprintf("exon %s %d-%d:%d cannot be transfered",$e->stable_id,$e->start,$e->end,$e->strand),
+								    $new_trans);
+						# if exon projected on two strands
+						# and if the longest bit of exon already saved in the list
+						# should remove it from the list
+						pop @new_e if $flag;
+
+						next EXON;
+					}
+
 					push @new_e, $new_e;
 					$flag = 1;
 				}
@@ -776,7 +799,17 @@ sub project_transcript_the_hard_way {
 		$new_trans->add_Exon($e);
 	}
 
-	return $new_trans;
+	return @new_e ? $new_trans : undef ;
+}
+
+sub features_overlap {
+	my ($f,$list) = @_;
+	foreach my $lf ( sort { $a->start <=> $b->start } grep($_->strand == $f->strand,@$list) ) {
+		my $v = max($f->start,$lf->start) - min($f->end,$lf->end);
+		return 1 unless $v >= 0;
+	}
+
+	return 0;
 }
 
 sub add_hidden_remark {
