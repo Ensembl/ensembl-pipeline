@@ -306,6 +306,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	  $A_sa->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef,
 		$A_asm );
 
+	my $R_length = $R_slice->length;
+	my $A_length = $A_slice->length;
+
 
 	my @A_components = @{ $A_slice->project($component_cs) };
 	$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
@@ -345,15 +348,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 		if($type eq 'u') {
 			($i,$j) = (1,1);
-			if( $skip{ $diff->[1]->to_Slice->seq_region_name } ) {
-				found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
-				$stats_chr{'skipped'}++;
-				$match_flag = 0;
-			} else {
-				found_match($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
-				$stats_chr{'identical'}++;
-				$match_flag = 1;
-			}
+			found_match($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+			$stats_chr{'identical'}++;
+			$match_flag = 1;
 		}else{
 			$i = 1 if $type eq '-';
 			$j = 1 if $type eq '+';
@@ -423,14 +420,6 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 	my $c;
 
-
-	# filter single assembly inserts from non-aligned blocks (i.e. cases where
-	# a block has components only in one assembly, not in the other) - there is
-	# nothing to be done with them
-	@{ $nomatch->{$R_chr} } =
-	  grep { $_->[2] > 0 and $_->[5] > 0 } @{ $nomatch->{$R_chr} }
-	  if ( $nomatch->{$R_chr} );
-
 	# store directly aligned blocks in assembly table
 	my $number_aligned_blocks = scalar( @{ $match->{$R_chr} || [] } );
 	if ($write_db) {
@@ -458,6 +447,50 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			1
 		);
 	}
+
+	# loop through the directly aligned blocks and fill in the non-aligned block hash
+	# sort the match blocks by ref chromosome start
+	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_gap, $alt_gap );
+	my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
+	my $last = [ $A_length + 1, 0, 0, $R_length + 1, 0, 0, $A_chr ];
+	foreach ( sort { $a->[3] <=> $b->[3] } @{ $match->{$R_chr} }, $last ) {
+		$a_start = $_->[0];
+		$a_end   = $_->[1];
+		$r_start = $_->[3];
+		$r_end   = $_->[4];
+		$a_chr   = $_->[6];
+
+		$ref_gap = $r_start - $sr_end - 1;
+		$alt_gap = $a_start - $sa_end - 1;
+		if (    ( $ref_gap > 0 && $alt_gap > 0 )
+			 && ( $ref_gap < 1000000 && $alt_gap < 1000000 ) )
+		{
+			push @{ $nomatch->{$R_chr} },
+			  [
+				$sa_end + 1,
+				$a_start - 1,
+				1,
+				$sr_end + 1,
+				$r_start - 1,
+				1,
+				$a_chr,
+			  ];
+		}
+
+		$sa_start = $_->[0];
+		$sa_end   = $_->[1];
+		$sr_start = $_->[3];
+		$sr_end   = $_->[4];
+	}
+
+	# filter single assembly inserts from non-aligned blocks (i.e. cases where
+	# a block has components only in one assembly, not in the other) - there is
+	# nothing to be done with them
+	@{ $nomatch->{$R_chr} } =
+	  grep { $_->[2] > 0 and $_->[5] > 0 } @{ $nomatch->{$R_chr} }
+	  if ( $nomatch->{$R_chr} );
+
+
 
 	# store non-aligned blocks in tmp_align table
 	my $number_nonaligned_blocks = scalar( @{ $nomatch->{$R_chr} || [] } );
