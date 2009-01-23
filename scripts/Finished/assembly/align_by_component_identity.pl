@@ -410,7 +410,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				}
 
 			}
-			found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+			#found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
 			$match_flag = 0;
 		}
 
