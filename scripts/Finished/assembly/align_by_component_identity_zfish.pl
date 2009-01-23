@@ -516,165 +516,6 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	}
 }
 
-sub parse_projections {
-	my ( $R, $A ) = @_;
-	my ( $R_ctg_start, $R_ctg_end, $R_chr_start, $R_chr_end, $R_ctg_strand ) =
-	  @$R;
-	my ( $A_ctg_start, $A_ctg_end, $A_chr_start, $A_chr_end, $A_ctg_strand ) =
-	  @$A;
-	my $blocks = [];
-	my $ori    = $R_ctg_strand * $A_ctg_strand;
-
-	# check that contig slices overlap
-	if ( $A_ctg_end < $R_ctg_start || $R_chr_end < $A_ctg_start ) {
-		return $blocks;
-	}
-	my $start_offset = $R_ctg_start - $A_ctg_start;
-	my $end_offset   = $R_ctg_end - $A_ctg_end;
-	my ( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e );
-
-	# create the 1st non-align block if exists
-	if ($start_offset) {
-		if ( $R_ctg_strand == 1 ) {
-			if ( $start_offset < 0 ) {
-				$R_chr_s = $R_chr_start;
-				$R_chr_e = $R_chr_start - $start_offset - 1;
-			}
-			else {
-				$R_chr_s = $R_chr_start - $start_offset;
-				$R_chr_e = $R_chr_start - 1;
-			}
-		}
-		else {
-			if ( $start_offset < 0 ) {
-				$R_chr_s = $R_chr_end + $start_offset + 1;
-				$R_chr_e = $R_chr_end;
-			}
-			else {
-				$R_chr_s = $R_chr_end + 1;
-				$R_chr_e = $R_chr_end + $start_offset;
-			}
-		}
-		if ( $A_ctg_strand == 1 ) {
-			if ( $start_offset < 0 ) {
-				$A_chr_s = $A_chr_start + $start_offset;
-				$A_chr_e = $A_chr_start - 1;
-			}
-			else {
-				$A_chr_s = $A_chr_start;
-				$A_chr_e = $A_chr_start + $start_offset - 1;
-			}
-		}
-		else {
-			if ( $start_offset < 0 ) {
-				$A_chr_s = $A_chr_end + 1;
-				$A_chr_e = $A_chr_end - $start_offset;
-			}
-			else {
-				$A_chr_s = $A_chr_end - $start_offset + 1;
-				$A_chr_e = $A_chr_end;
-			}
-		}
-		push @$blocks,
-		  [
-			$R_chr_s, $R_chr_e,
-			$A_chr_s, $A_chr_e,
-			$start_offset < 0 ? -1 : 1, 0
-		  ];
-	}
-
-	# create the overlapping block
-	( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e ) =
-	  ( $R_chr_start, $R_chr_end, $A_chr_start, $A_chr_end );
-	if ($start_offset) {
-		if ( $start_offset < 0 ) {
-			if ( $R_ctg_strand == 1 ) {
-				$R_chr_s = $R_chr_start - $start_offset;
-			}
-			else {
-				$R_chr_e = $R_chr_end + $start_offset;
-			}
-		}
-		else {
-			if ( $A_ctg_strand == 1 ) {
-				$A_chr_s = $A_chr_start + $start_offset;
-			}
-			else {
-				$A_chr_e = $A_chr_end - $start_offset;
-			}
-		}
-	}
-	if ($end_offset) {
-		if ( $end_offset < 0 ) {
-			if ( $A_ctg_strand == 1 ) {
-				$A_chr_e = $A_chr_end + $end_offset;
-			}
-			else {
-				$A_chr_s = $A_chr_start - $end_offset;
-			}
-		}
-		else {
-			if ( $R_ctg_strand == 1 ) {
-				$R_chr_e = $R_chr_end - $end_offset;
-			}
-			else {
-				$R_chr_s = $R_chr_start + $end_offset;
-			}
-		}
-	}
-	push @$blocks, [ $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e, 0, $ori ];
-
-	# create the 2nd non-align block if exists
-	if ($end_offset) {
-		if ( $R_ctg_strand == 1 ) {
-			if ( $end_offset > 0 ) {
-				$R_chr_s = $R_chr_end - $end_offset + 1;
-				$R_chr_e = $R_chr_end;
-			}
-			else {
-				$R_chr_s = $R_chr_end + 1;
-				$R_chr_e = $R_chr_end - $end_offset;
-			}
-		}
-		else {
-			if ( $end_offset > 0 ) {
-				$R_chr_s = $R_chr_start;
-				$R_chr_e = $R_chr_start + $end_offset - 1;
-			}
-			else {
-				$R_chr_s = $R_chr_start + $end_offset;
-				$R_chr_e = $R_chr_start - 1;
-			}
-		}
-		if ( $A_ctg_strand == 1 ) {
-			if ( $end_offset > 0 ) {
-				$A_chr_s = $A_chr_end + 1;
-				$A_chr_e = $A_chr_end + $end_offset;
-			}
-			else {
-				$A_chr_s = $A_chr_end + $end_offset + 1;
-				$A_chr_e = $A_chr_end;
-			}
-		}
-		else {
-			if ( $end_offset > 0 ) {
-				$A_chr_s = $A_chr_start - $end_offset;
-				$A_chr_e = $A_chr_start - 1;
-			}
-			else {
-				$A_chr_s = $A_chr_start;
-				$A_chr_e = $A_chr_start - $end_offset - 1;
-			}
-		}
-		push @$blocks,
-		  [
-			$R_chr_s, $R_chr_e,
-			$A_chr_s, $A_chr_e,
-			$end_offset > 0 ? -1 : 1, 0
-		  ];
-	}
-	return $blocks;
-}
 for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# get the chromosome slices
@@ -713,8 +554,8 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 		);
 	}
 
-# loop through the directly aligned blocks and fill in the non-aligned block hash
-# sort the match blocks by ref chromosome start
+	# loop through the directly aligned blocks and fill in the non-aligned block hash
+	# sort the match blocks by ref chromosome start
 	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_gap, $alt_gap );
 	my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
 	my $last = [ $A_length + 1, 0, 0, $R_length + 1, 0, 0, $A_chr ];
@@ -955,7 +796,169 @@ $support->log_stamped("\nDone.\n");
 
 # finish logfile
 $support->finish_log;
+
 ### end main
+
+sub parse_projections {
+	my ( $R, $A ) = @_;
+	my ( $R_ctg_start, $R_ctg_end, $R_chr_start, $R_chr_end, $R_ctg_strand ) =
+	  @$R;
+	my ( $A_ctg_start, $A_ctg_end, $A_chr_start, $A_chr_end, $A_ctg_strand ) =
+	  @$A;
+	my $blocks = [];
+	my $ori    = $R_ctg_strand * $A_ctg_strand;
+
+	# check that contig slices overlap
+	if ( $A_ctg_end < $R_ctg_start || $R_chr_end < $A_ctg_start ) {
+		return $blocks;
+	}
+	my $start_offset = $R_ctg_start - $A_ctg_start;
+	my $end_offset   = $R_ctg_end - $A_ctg_end;
+	my ( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e );
+
+	# create the 1st non-align block if exists
+	if ($start_offset) {
+		if ( $R_ctg_strand == 1 ) {
+			if ( $start_offset < 0 ) {
+				$R_chr_s = $R_chr_start;
+				$R_chr_e = $R_chr_start - $start_offset - 1;
+			}
+			else {
+				$R_chr_s = $R_chr_start - $start_offset;
+				$R_chr_e = $R_chr_start - 1;
+			}
+		}
+		else {
+			if ( $start_offset < 0 ) {
+				$R_chr_s = $R_chr_end + $start_offset + 1;
+				$R_chr_e = $R_chr_end;
+			}
+			else {
+				$R_chr_s = $R_chr_end + 1;
+				$R_chr_e = $R_chr_end + $start_offset;
+			}
+		}
+		if ( $A_ctg_strand == 1 ) {
+			if ( $start_offset < 0 ) {
+				$A_chr_s = $A_chr_start + $start_offset;
+				$A_chr_e = $A_chr_start - 1;
+			}
+			else {
+				$A_chr_s = $A_chr_start;
+				$A_chr_e = $A_chr_start + $start_offset - 1;
+			}
+		}
+		else {
+			if ( $start_offset < 0 ) {
+				$A_chr_s = $A_chr_end + 1;
+				$A_chr_e = $A_chr_end - $start_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_end - $start_offset + 1;
+				$A_chr_e = $A_chr_end;
+			}
+		}
+		push @$blocks,
+		  [
+			$R_chr_s, $R_chr_e,
+			$A_chr_s, $A_chr_e,
+			$start_offset < 0 ? -1 : 1, 0
+		  ];
+	}
+
+	# create the overlapping block
+	( $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e ) =
+	  ( $R_chr_start, $R_chr_end, $A_chr_start, $A_chr_end );
+	if ($start_offset) {
+		if ( $start_offset < 0 ) {
+			if ( $R_ctg_strand == 1 ) {
+				$R_chr_s = $R_chr_start - $start_offset;
+			}
+			else {
+				$R_chr_e = $R_chr_end + $start_offset;
+			}
+		}
+		else {
+			if ( $A_ctg_strand == 1 ) {
+				$A_chr_s = $A_chr_start + $start_offset;
+			}
+			else {
+				$A_chr_e = $A_chr_end - $start_offset;
+			}
+		}
+	}
+	if ($end_offset) {
+		if ( $end_offset < 0 ) {
+			if ( $A_ctg_strand == 1 ) {
+				$A_chr_e = $A_chr_end + $end_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_start - $end_offset;
+			}
+		}
+		else {
+			if ( $R_ctg_strand == 1 ) {
+				$R_chr_e = $R_chr_end - $end_offset;
+			}
+			else {
+				$R_chr_s = $R_chr_start + $end_offset;
+			}
+		}
+	}
+	push @$blocks, [ $R_chr_s, $R_chr_e, $A_chr_s, $A_chr_e, 0, $ori ];
+
+	# create the 2nd non-align block if exists
+	if ($end_offset) {
+		if ( $R_ctg_strand == 1 ) {
+			if ( $end_offset > 0 ) {
+				$R_chr_s = $R_chr_end - $end_offset + 1;
+				$R_chr_e = $R_chr_end;
+			}
+			else {
+				$R_chr_s = $R_chr_end + 1;
+				$R_chr_e = $R_chr_end - $end_offset;
+			}
+		}
+		else {
+			if ( $end_offset > 0 ) {
+				$R_chr_s = $R_chr_start;
+				$R_chr_e = $R_chr_start + $end_offset - 1;
+			}
+			else {
+				$R_chr_s = $R_chr_start + $end_offset;
+				$R_chr_e = $R_chr_start - 1;
+			}
+		}
+		if ( $A_ctg_strand == 1 ) {
+			if ( $end_offset > 0 ) {
+				$A_chr_s = $A_chr_end + 1;
+				$A_chr_e = $A_chr_end + $end_offset;
+			}
+			else {
+				$A_chr_s = $A_chr_end + $end_offset + 1;
+				$A_chr_e = $A_chr_end;
+			}
+		}
+		else {
+			if ( $end_offset > 0 ) {
+				$A_chr_s = $A_chr_start - $end_offset;
+				$A_chr_e = $A_chr_start - 1;
+			}
+			else {
+				$A_chr_s = $A_chr_start;
+				$A_chr_e = $A_chr_start - $end_offset - 1;
+			}
+		}
+		push @$blocks,
+		  [
+			$R_chr_s, $R_chr_e,
+			$A_chr_s, $A_chr_e,
+			$end_offset > 0 ? -1 : 1, 0
+		  ];
+	}
+	return $blocks;
+}
+
 sub get_cmp_key {
 	my ( $cmp, $flag ) = @_;
 	my $slice = $cmp->to_Slice;
