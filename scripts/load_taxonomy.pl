@@ -182,7 +182,8 @@ sub load_taxonomy_in_core {
     print "Loading species.ensembl_alias_name = ",$node->get_tagvalue('ensembl alias name'),"\n";
   }
   my @classification = split(",",$node->classification(",", 1));
-  foreach my $level (@classification) {
+  LEVEL: foreach my $level (@classification) {
+    next LEVEL if ($level =~ /\s+/);
     print "Loading species.classification = ",$level,"\n";
     $mc->store_key_value('species.classification',$level);
   }
