@@ -476,8 +476,8 @@ eval {
 					}
 				}
 				if(scalar(@$genes) -1) {
-					# print info about splitted gene for the annotators
-					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been splitted into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
+					# print info about split gene for the annotators
+					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
 			} else {
 				$support->log_verbose(
@@ -729,7 +729,7 @@ sub transcripts2genes {
 			}
 
 		}
-		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically split by the annotation transfer script";
 		my $attribute = Bio::EnsEMBL::Attribute->new
 	       (-CODE => 'hidden_remark',
 	        -NAME => 'Hidden Remark',
@@ -743,7 +743,7 @@ sub transcripts2genes {
 
 	# create the main gene here with same stable id
 	map( $tg->add_Transcript($_), @$gt );
-	my $remark = "Gene 1/$number (".$tg->stable_id.") automatically splitted by the annotation transfer script";
+	my $remark = "Gene 1/$number (".$tg->stable_id.") automatically split by the annotation transfer script";
 	my $attribute = Bio::EnsEMBL::Attribute->new
        (-CODE => 'hidden_remark',
         -NAME => 'Hidden Remark',
