@@ -229,25 +229,17 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 my @R_chr_list = map $_->seq_region_name , @from_chrs;
 my @A_chr_list = map $_->seq_region_name , @to_chrs;
 
-# Lock only the old assembly as the new one is supposed to be hidden
+# Lock only old and new assembly contigs
 my ($cb,$author_obj);
 
-my $locked_slices = [];
 eval {
 	$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
 	$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
-	foreach my $slice (@from_chrs) {
-		$support->log_verbose("Locking ".$slice->seq_region_name."\n");
-		$cb->lock_clones_by_slice($slice,$author_obj,$vega_db);
-		push @$locked_slices, $slice;
-	}
+	$support->log_verbose("Locking $from_assembly and $to_assembly assemblies\n");
+	$cb->lock_clones_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
 };
 if($@){
-	# remove the stored locks on the locked slices
-	foreach my $slice (@$locked_slices) {
-		$cb->remove_by_slice($slice,$author_obj,$vega_db);
-	}
-	throw("Problem locking assembly $from_assembly chromosomes with author name $author\n$@\n");
+	throw("Problem locking $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
 }
 
 # set the top level attribute on old and new assembly
@@ -540,13 +532,11 @@ if($cs_change) {
 
 # remove the assemblies locks
 eval {
-	foreach my $slice (@$locked_slices) {
-		$support->log_verbose("Unlocking ".$slice->seq_region_name."\n");
-		$cb->remove_by_slice($slice,$author_obj,$vega_db);
-	}
+	$support->log_verbose("Unlocking $from_assembly and $to_assembly assemblies\n");
+	$cb->remove_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
 };
 if($@){
-	warning("Cannot remove locks from assembly $from_assembly chromosomes with author name $author\n$@\n");
+	warning("Cannot remove locks from $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
 }
 
 # remove the top level attribute on old and new assembly
