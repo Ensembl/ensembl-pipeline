@@ -252,18 +252,15 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 	# Lock the reference and alternative assemblies
 	my ($cb,$author_obj);
-	my $refslice_locked = 0;
+	my $slices = [$ref_sl,$alt_sl];
 	eval {
 		$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
 		$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
-		$support->log_verbose("Locking $R_chr\n");
-		$cb->lock_clones_by_slice($ref_sl,$author_obj,$vega_db);
-		$refslice_locked = 1;
+		$support->log_verbose("Locking $R_chr and $A_chr\n");
+		$cb->lock_clones_by_slice($slices,$author_obj,$vega_db);
 	};
 	if($@){
 		warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
-		# remove the stored locks on the reference slice in case alt slice locking fails
-		$cb->remove_by_slice($ref_sl,$author_obj,$vega_db) if $refslice_locked;
 
 			$sth_cs->execute( $A_chr, $support->param('altassembly') )
 		  unless ( !$cs_change );
@@ -574,8 +571,8 @@ INFO: skipped PolyA features: %d/%d\n",
 
 	# remove the assemblies locks
 	eval {
-		$support->log_verbose("Removing $R_chr Locks\n");
-		$cb->remove_by_slice($ref_sl,$author_obj,$vega_db);
+		$support->log_verbose("Removing $R_chr and $A_chr Locks\n");
+		$cb->remove_by_slice($slices,$author_obj,$vega_db);
 	};
 	if($@){
 		warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
