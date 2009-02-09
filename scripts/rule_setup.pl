@@ -98,7 +98,7 @@ my $pipeline = 1;
 	    'dbuser=s'      => \$dbuser,
 	    'dbpass=s'      => \$dbpass,
 	    'dbport=s'      => \$dbport,
-	    'read!'         => \$read,
+	    'read|insert!'         => \$read,
 	    'write!'        => \$write,
 	    'file=s'        => \$file,
 	    'h|help!'       => \$help,
