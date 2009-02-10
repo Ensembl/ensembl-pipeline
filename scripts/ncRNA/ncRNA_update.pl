@@ -460,7 +460,7 @@ sub prepare_RFAM{
   die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.tar.gz");
   die ("Error decompressing Rfam.tar.gz\n") if $exit > 0;
-  $exit =  system ("tar -xf $BLASTDIR/Rfam.tar -C $BLASTDIR");
+  $exit =  system ("tar -xf $BLASTDIR/Rfam.tar -U -C $BLASTDIR");
   die ("Error extracting Rfam covariance models  file from $BLASTDIR/Rfam.tar\n") if $exit > 0;
   $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
   die ("Error with obtaining Rfam.seed file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz\n") if $exit > 0;
