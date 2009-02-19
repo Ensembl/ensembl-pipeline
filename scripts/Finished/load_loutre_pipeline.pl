@@ -79,7 +79,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'dbname:s'                => \$name,
 	'user:s'                => \$user,
 	'pass:s'                => \$pass,
-	'chromosome_cs_version:s' => \$cs_version,
+	'cs_version:s' => \$cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
 	'submit!'                 => \$do_submit,
