@@ -21,6 +21,7 @@ Required arguments:
 
 Optional arguments:
 
+	--from_cs_version					coordinate system version, this option will overwrite from_assembly
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
     --logfile, --log=FILE               log to FILE (default: *STDOUT)
@@ -109,8 +110,8 @@ my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
 # parse options
 $support->parse_common_options(@_);
-$support->parse_extra_options( 'from_assembly=s', 'to_assembly=s' );
-$support->allowed_params( $support->get_common_params, 'from_assembly',
+$support->parse_extra_options( 'from_cs_version=s','from_assembly=s', 'to_assembly=s' );
+$support->allowed_params( $support->get_common_params, 'from_cs_version', 'from_assembly',
 						  'to_assembly' );
 if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
@@ -119,10 +120,11 @@ if ( $support->param('help') or $support->error ) {
 $support->param( 'verbose',     1 );
 $support->param( 'interactive', 0 );
 my $write_db      = not $support->param('dry_run');
+my $from_cs_version = $support->param('from_cs_version');
 my $from_assembly = $support->param('from_assembly');
 my $to_assembly   = $support->param('to_assembly');
 
-throw("Must set from/to_assembly!\n") unless($from_assembly && $to_assembly);
+throw("Must set from_assembly or from_cs_version and to_assembly parameters!\n") unless(($from_assembly || $from_cs_version) && $to_assembly);
 
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
@@ -139,6 +141,7 @@ for my $prm (qw(host port user pass dbname)) {
 my $dba = $support->get_database( 'ensembl', '' );
 my $dbh = $dba->dbc->db_handle;
 my $sa  = $dba->get_SliceAdaptor;
+my $csa  = $dba->get_CoordSystemAdaptor;
 #####
 # create temporary table for storing non-aligned blocks
 #
@@ -195,30 +198,40 @@ my $sth2 = $dbh->prepare(
   INSERT INTO tmp_align values(NULL, ?, ?, ?, ?, ?, ?)
 }
 );
-my $sth3 = $dbh->prepare(
-	qq{
-		SELECT sa.name AS R_chr,  sc.name AS A_chr, a.*
-		FROM assembly a, seq_region sa, seq_region sc, coord_system ca, coord_system cc
-		WHERE a.asm_seq_region_id = sa.seq_region_id
-		AND a.cmp_seq_region_id = sc.seq_region_id
-		AND sa.coord_system_id = ca.coord_system_id
-		AND sc.coord_system_id = cc.coord_system_id
-		AND cc.name = 'chromosome'
-		AND ca.name = 'chromosome'
-		AND sa.name = ?
-		ORDER BY a.asm_start ASC
-	}
-);
+
 $support->log_stamped("Looping over chromosomes...\n");
+
 my $chr_list  = $sa->fetch_all('chromosome');
-my @from_chrs =
-  sort { lc( $a->seq_region_name ) cmp lc( $b->seq_region_name ) }
-  grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
+if($from_cs_version) {
+	foreach my $cs (@{$csa->fetch_all}) {
+		push @$chr_list, @{$sa->fetch_all($cs->name,$cs->version)} if $cs->version eq $from_cs_version;
+	}
+}
+
+my $sr_name_to_chr;
+foreach my $chr_slice (@$chr_list) {
+	my ($chr) = $chr_slice->seq_region_name =~ /chr(.*)_/;
+	$chr = $chr_slice->seq_region_name unless $chr;
+	$sr_name_to_chr->{$chr_slice->seq_region_name} = $chr;
+}
+
+
+my @from_chrs;
+if($from_cs_version) {
+	@from_chrs =
+	sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+	grep ( $_->coord_system->version eq $from_cs_version, @$chr_list );
+} else {
+	@from_chrs =
+	sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+	grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
+}
+
 my @to_chrs =
-  sort { lc( $a->seq_region_name ) cmp lc( $b->seq_region_name ) }
+  sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
   grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
 
-if ( scalar(@from_chrs) != scalar(@to_chrs) ) {
+if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
 	throw(   "Chromosome lists do not match by length:\n["
 		   . join( " ", map( $_->seq_region_name, @from_chrs ) ) . "]\n["
 		   . join( " ", map( $_->seq_region_name, @to_chrs ) )
@@ -228,31 +241,37 @@ if ( scalar(@from_chrs) != scalar(@to_chrs) ) {
 # Check that the chromosome names match
 for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	my $R_sr_name = $from_chrs[$i]->seq_region_name;
-	my $A_sr_name = $to_chrs[$i]->seq_region_name;
-	my ($R_chr) = $R_sr_name =~ /(.*)_$from_assembly/;
-	my ($A_chr) = $A_sr_name =~ /(.*)_$to_assembly/;
+	my $A_sr_name = $to_chrs[$i] ? $to_chrs[$i]->seq_region_name : "undef";
+	my $R_chr = $sr_name_to_chr->{$R_sr_name};
+	my $A_chr = $sr_name_to_chr->{$A_sr_name};
+
 	throw(   "chromosome names don't match $R_chr != $A_chr\n["
 		   . join( " , ", map( $_->seq_region_name, @from_chrs ) ) . "]\n["
 		   . join( " , ", map( $_->seq_region_name, @to_chrs ) )
 		   . "]\n" )
-	  unless $R_chr eq $A_chr;
+	  unless(($R_chr eq $A_chr) || $from_cs_version);
 	$support->log_verbose("$R_sr_name	=>	$A_sr_name\n");
-	$seq_region_id->{$R_sr_name} = $sa->get_seq_region_id( $from_chrs[$i] );
-	$seq_region_id->{$A_sr_name} = $sa->get_seq_region_id( $to_chrs[$i] );
+	$seq_region_id->{$R_sr_name} = $sa->get_seq_region_id( $from_chrs[$i] ) if $from_chrs[$i];
+	$seq_region_id->{$A_sr_name} = $sa->get_seq_region_id( $to_chrs[$i] ) if $to_chrs[$i];
 }
+
 CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# get the chromosome slices
 	my $R_slice = $from_chrs[$i];
 	my $R_chr   = $R_slice->seq_region_name;
 
-	my $A_slice = $to_chrs[$i];
-	my $A_chr   = $A_slice->seq_region_name;
+	my $A_slice = $to_chrs[$i] ? $to_chrs[$i] : undef;
+	my $A_chr   = $A_slice ? $A_slice->seq_region_name : "undef";
 
-	$support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
+	$support->log_stamped( $R_slice->coord_system_name." $R_chr/ chromosome $A_chr ...\n", 1 );
 	my @R_components = @{ $R_slice->project($component_cs) };
 	$dba->get_AssemblyMapperAdaptor()->delete_cache();
-	my @A_components = @{ $A_slice->project($component_cs) };
+	my @A_components = ();
+	if($A_slice) {
+		@A_components = @{ $A_slice->project($component_cs) };
+	}
+
 	$stats_chr{$R_chr}->{'A_cmp_number'} = scalar(@A_components);
 	$stats_chr{$R_chr}->{'R_cmp_number'} = scalar(@R_components);
 	my $i = 0;
@@ -516,15 +535,15 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	}
 }
 
-for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
+REF: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# get the chromosome slices
 	my $R_slice  = $from_chrs[$i];
 	my $R_chr    = $R_slice->seq_region_name;
 	my $R_length = $R_slice->length;
-	my $A_slice  = $to_chrs[$i];
-	my $A_chr    = $A_slice->seq_region_name;
-	my $A_length = $A_slice->length;
+	my $A_slice  = $to_chrs[$i] ? $to_chrs[$i] : undef ;
+	my $A_chr    = $A_slice ? $A_slice->seq_region_name : undef;
+	my $A_length = $A_slice ? $A_slice->length : undef;
 	my $c;
 	next unless $match->{$R_chr};
 
@@ -553,6 +572,8 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 			1
 		);
 	}
+
+	next REF unless $A_slice;
 
 	# loop through the directly aligned blocks and fill in the non-aligned block hash
 	# sort the match blocks by ref chromosome start

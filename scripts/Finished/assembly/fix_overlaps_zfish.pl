@@ -21,6 +21,7 @@ Required arguments:
 
 Optional arguments:
 
+	--from_cs_version					coordinate system version, this option will overwrite from_assembly
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
     --logfile, --log=FILE               log to FILE (default: *STDOUT)
@@ -82,6 +83,7 @@ BEGIN {
 use Getopt::Long;
 use Pod::Usage;
 use Bio::EnsEMBL::Utils::ConversionSupport;
+use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
 
 $| = 1;
 
@@ -90,9 +92,9 @@ my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
-	'from_assembly=s', 'to_assembly=s'
+	'from_cs_version=s','from_assembly=s', 'to_assembly=s'
 );
-$support->allowed_params( $support->get_common_params, 'from_assembly=s', 'to_assembly=s' );
+$support->allowed_params( $support->get_common_params, 'from_cs_version=s','from_assembly=s', 'to_assembly=s' );
 
 if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
@@ -102,10 +104,11 @@ if ( $support->param('help') or $support->error ) {
 $support->param('verbose', 1);
 $support->param('interactive', 0);
 
+my $from_cs_version = $support->param('from_cs_version');
 my $from_assembly = $support->param('from_assembly');
 my $to_assembly = $support->param('to_assembly');
 
-throw("Must set from/to_assembly!\n") unless($from_assembly && $to_assembly);
+throw("Must set from_assembly or from_cs_version and to_assembly parameters!\n") unless(($from_assembly || $from_cs_version) && $to_assembly);
 
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
@@ -113,6 +116,8 @@ $support->init_log;
 # database connection
 my $dba = $support->get_database('ensembl');
 my $dbh = $dba->dbc->db_handle;
+my $sa  = $dba->get_SliceAdaptor;
+my $csa  = $dba->get_CoordSystemAdaptor;
 
 
 
@@ -124,8 +129,11 @@ my $select = qq(
   AND a.cmp_seq_region_id = sr2.seq_region_id
   AND sr1.coord_system_id = cs1.coord_system_id
   AND sr2.coord_system_id = cs2.coord_system_id
-  AND cs1.name = 'chromosome'
-  AND cs2.name = 'chromosome'
+  AND cs1.name IN ('chromosome','scaffold')
+  AND cs2.name IN ('chromosome','scaffold')
+);
+$select .= " AND cs1.version = '$from_cs_version' " if $from_cs_version;
+$select .= qq(
   AND sr1.name = ?
   AND sr2.name LIKE '%$to_assembly'
   ORDER BY a.asm_start
@@ -138,15 +146,38 @@ my $sth_insert = $dbh->prepare($sql_insert);
 
 my $fmt1 = "%10s %10s %10s %10s %3s\n";
 
-$support->log_stamped("Looping over chromosomes...\n");
+$support->log_stamped("Looping over chromosomes/scaffold...\n");
 
-my $chr_list = $dba->get_SliceAdaptor->fetch_all('chromosome');
+my $chr_list = $sa->fetch_all('chromosome');
+if($from_cs_version) {
+	foreach my $cs (@{$csa->fetch_all}) {
+		push @$chr_list, @{$sa->fetch_all($cs->name,$cs->version)} if $cs->version eq $from_cs_version;
+	}
+}
 
-my @from_chrs = sort {lc($a->seq_region_name) cmp lc($b->seq_region_name)}  grep ($_->seq_region_name =~ /$from_assembly/, @$chr_list);
-my @to_chrs = sort {lc($a->seq_region_name) cmp lc($b->seq_region_name)} grep ($_->seq_region_name =~ /$to_assembly/, @$chr_list);
+my $sr_name_to_chr;
+foreach my $chr_slice (@$chr_list) {
+	my ($chr) = $chr_slice->seq_region_name =~ /chr(.*)_/;
+	$chr = $chr_slice->seq_region_name unless $chr;
+	$sr_name_to_chr->{$chr_slice->seq_region_name} = $chr;
+}
 
+my @from_chrs;
+if($from_cs_version) {
+	@from_chrs =
+	sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+	grep ( $_->coord_system->version eq $from_cs_version, @$chr_list );
+} else {
+	@from_chrs =
+	sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+	grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
+}
 
-if( scalar(@from_chrs) != scalar(@to_chrs) ) {
+my @to_chrs =
+  sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+  grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
+
+if( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
 	throw("Chromosome lists do not match by length:\n[".
 	join(" ",map($_->seq_region_name,@from_chrs))."]\n[".
 	join(" ",map($_->seq_region_name,@to_chrs))."]\n");
@@ -155,12 +186,14 @@ if( scalar(@from_chrs) != scalar(@to_chrs) ) {
 # Check that the chromosome names match
 for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	my $R_sr_name = $from_chrs[$i]->seq_region_name;
-	my $A_sr_name = $to_chrs[$i]->seq_region_name;
-	my ($R_chr) = $R_sr_name =~ /(.*)_$from_assembly/;
-	my ($A_chr) = $A_sr_name =~ /(.*)_$to_assembly/;
+	my $A_sr_name = $to_chrs[$i] ? $to_chrs[$i]->seq_region_name : "undef";
+	my $R_chr = $sr_name_to_chr->{$R_sr_name};
+	my $A_chr = $sr_name_to_chr->{$A_sr_name};
+
 	throw("chromosome names don't match $R_chr != $A_chr\n[".
 	join(" , ",map($_->seq_region_name,@from_chrs))."]\n[".
-	join(" , ",map($_->seq_region_name,@to_chrs))."]\n") unless $R_chr eq $A_chr;
+	join(" , ",map($_->seq_region_name,@to_chrs))."]\n") unless
+	( $R_chr eq $A_chr || $from_cs_version);
 
 	$support->log_verbose("$R_sr_name	=>	$A_sr_name\n");
 }
@@ -173,7 +206,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $A_chr = $A_chr_list[$i];
 	my @rows  = ();
 
-	$support->log_stamped( "Chromosome $R_chr/$to_assembly ...\n", 1 );
+	$support->log_stamped( "Chromosome/scaffold $R_chr/$to_assembly ...\n", 1 );
 
 	$sth_select->execute( $R_chr );
 
@@ -336,20 +369,23 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	else {
 
 		# delete all current mappings from the db and insert the corrected ones
-		my $c = $dbh->do(
-			qq(
+		my $delete = qq(
     DELETE a
     FROM assembly a, seq_region sr1, seq_region sr2,
          coord_system cs1, coord_system cs2
     WHERE a.asm_seq_region_id = sr1.seq_region_id
     AND a.cmp_seq_region_id = sr2.seq_region_id
     AND sr1.coord_system_id = cs1.coord_system_id
-    AND sr2.coord_system_id = cs2.coord_system_id
-    AND cs1.name = 'chromosome'
-    AND cs2.name = 'chromosome'
+    AND sr2.coord_system_id = cs2.coord_system_id);
+    $delete .= " AND cs1.version = '$from_cs_version' " if $from_cs_version;
+    $delete .= qq(
+    AND cs1.name IN ('chromosome','scaffold')
+    AND cs2.name IN ('chromosome','scaffold')
     AND sr1.name = '$R_chr'
-  	AND sr2.name LIKE '%$to_assembly' )
-		);
+  	AND sr2.name LIKE '%$to_assembly' );
+
+		my $c = $dbh->do($delete);
+
 		$support->log(
 			"\n$R_chr/$to_assembly: Deleted $c entries from the assembly table.\n");
 
