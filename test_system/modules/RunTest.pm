@@ -505,7 +505,7 @@ sub check_output_dir{
     eval{
       mkdir($self->output_dir);
       warning("Your command line-specified test output directory " . $self->output_dir .
-       " does not exist - it's being;
+       " does not exist - it's being created";
     };
     if($@){
       $self->exception("Failed to create ".$self->output_dir." $@");
@@ -576,7 +576,7 @@ sub run_single_analysis{
     if($self->can($method)){
       $self->$method($ref_testdb, $logic_name);
     }else{
-      print "No comparison can be made as ".$method." doesn't exist\n";
+      print "No comparison can be made as ".$method." doesnt exist\n";
     }
     $ref_testdb->cleanup unless($self->dont_cleanup_tests); #drop testDB
     if($self->dont_cleanup_tests){
