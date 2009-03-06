@@ -59,6 +59,7 @@ my $component_name;
 my $component_version;
 my $agpfile;
 my $help;
+my $name_file;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -71,6 +72,7 @@ my $help;
             'component_name:s' => \$component_name,
             'component_version:s' => \$component_version,
             'agp_file:s' => \$agpfile,
+            'name_file:s' => \$name_file,
             'h|help'     => \$help,
             ) or ($help = 1);
 
@@ -91,6 +93,18 @@ if(!$agpfile || !$assembled_name || !$component_name){
 
 if ($help) {
     exec('perldoc', $0);
+}
+
+my %acc_to_name;
+
+if ($name_file){
+  open(NF, $name_file) or throw("Can't open ".$name_file." ".$!);
+  while(<NF>){   
+    chomp;
+    my @name_values = split(/\s+/,$_);
+    $acc_to_name{$name_values[1]}=$name_values[0];
+
+  }
 }
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
@@ -118,10 +132,14 @@ LINE:while(<FH>){
   next if /^\#/;
 
   chomp;
+
+  #CM000686.1  28033929  28215811  243 F AC007965.3  1 181883  +
+  #CM000686.1  28215812  28388853  244 F AC006991.3  1 173042  +
   #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
   #cb25.fpc4250	151062	152023	14	N	962	fragment	yes
-  my ($a_name, $a_start, $a_end, $ordinal, $type, $c_name, $c_start, 
+  my ($a_name_init, $a_start, $a_end, $ordinal, $type, $c_name, $c_start, 
       $c_end, $ori) = split;
+
   if($type eq 'N'){
     next LINE; #skipping gaps as not stored in db
   }
@@ -133,6 +151,16 @@ LINE:while(<FH>){
     $strand = -1;
   }
   
+  my $a_name;
+  if ($acc_to_name{$a_name_init}){
+    $a_name = $acc_to_name{$a_name_init};
+  }else{
+    $a_name = $a_name_init;
+  }
+
+  #print "THIS IS YOUR A NAME : ",$a_name,"\n";
+  #exit;
+
   my ($a_id, $c_id);
   if(!$assembled_ids{$a_name}){
     if($a_name =~ /^chr(\S+)/){

@@ -89,6 +89,7 @@ my $fasta;
 my $rank;
 my $verbose = 0;
 my $regex;
+my $name_file;
 
 &GetOptions(
             'dbhost:s'   => \$host,
@@ -105,6 +106,7 @@ my $regex;
             'fasta_file:s' => \$fasta,
             'verbose!' => \$verbose,
             'regex:s' => \$regex,
+            'name_file:s' => \$name_file,
             'h|help'     => \$help,
            ) or ($help = 1);
 
@@ -165,17 +167,29 @@ $csa->store($cs);
 
 my $sa  = $db->get_SliceAdaptor();
 
+my %acc_to_name;
+
+if ($name_file){
+  open(NF, $name_file) or throw("Can't open ".$name_file." ".$!);
+  while(<NF>){   
+    chomp;
+    my @name_values = split(/\s+/,$_);
+    $acc_to_name{$name_values[1]}=$name_values[0];
+
+  }
+}
+
 
 if($fasta){
-  &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex);
+  &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
 }
 
 if($agp){
-  &parse_agp($agp, $cs, $sa);
+  &parse_agp($agp, $cs, $sa,%acc_to_name);
 }
 
 sub parse_fasta{
-  my ($filename, $cs, $sa, $store_seq,$regex) = @_;
+  my ($filename, $cs, $sa, $store_seq,$regex,) = @_;
 
   my $seqio = new Bio::SeqIO(
                              -format=>'Fasta',
@@ -185,7 +199,7 @@ sub parse_fasta{
   while ( my $seq = $seqio->next_seq ) {
     
     #NOTE, the code used to generate the name very much depends on the 
-    #format of yuor fasta headers and what id you want to use
+    #format of your fasta headers and what id you want to use
     #In this case we use the first word of the sequences description as
     #parseed by SeqIO but you may want the id or you may want to use a
     #regular experssion to get the sequence you will need to check what 
@@ -193,8 +207,11 @@ sub parse_fasta{
     #you are getting you may want to comment out the warning about this
     #print STDERR "id ".$seq->id." ".$seq->desc."\n";
     #my @values = split /\s+/, $seq->desc;
+    #my @name_vals = split /\|/, $seq->id;
     my $name = $seq->id;
 
+    #my $name = $name_vals[3]; 
+       
     if ($regex) {
       ($name) = $name =~ /$regex/;
     }
@@ -211,20 +228,35 @@ sub parse_fasta{
 
 
 sub parse_agp{
-  my ($agp_file, $cs, $sa) = @_;
-
+  my ($agp_file, $cs, $sa,%acc_to_name) = @_;
   my %end_value;
   open(FH, $agp_file) or throw("Can't open ".$agp_file." ".$!);
  LINE:while(<FH>){   
     chomp;
     next if /^\#/;
+
+    #GL000001.1      1       615     1       F       AP006221.1      36117   36731   -
+    #GL000001.1      616     167417  2       F       AL627309.15     103     166904  +
+    #GL000001.1      167418  217417  3       N       50000   clone   yes
+
     #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
     #cb25.fpc4250	151062	152023	14	N	962	telomere	yes
     my @values = split;
     #if($values[4] eq 'N'){
     #  next LINE; 
     #}
-    my $name = $values[0];
+    my $initial_name = $values[0];
+   
+    my $name;
+
+    if ($acc_to_name{$initial_name}){
+      $name = $acc_to_name{$initial_name};
+    }else{
+      $name =$initial_name;
+    }
+
+    print "Name: ",$name,"\n";
+    
     my $end = $values[2];
     if(!$end_value{$name}){
       $end_value{$name} = $end;
