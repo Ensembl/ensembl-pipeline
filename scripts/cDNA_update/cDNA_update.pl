@@ -1,15 +1,23 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/ensembl/bin/perl
 
-use strict;
+#$Id: cDNA_update.pl,v 1.39 2009-03-18 11:59:05 amonida Exp $
 
-#original version cDNA_update.pl for human cDNAs
-#adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
-#uses new polyAclipping, stop list for gene trap cdnas (gss) and cdnas which hit too many times (kill list)
+# Original version cDNA_update.pl for human cDNAs
+# Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
 
-#will make three different logic names, eg mouse_cDNA_update, mouse_cDNA_update_2 and mouse_cDNA_update_3
-#mouse_cDNA_update_2 and mouse_cDNA_update_3 are the same 
-
-#mouse jobs can run in BatchQueue normal, human needs BatchQueue long
+# Uses new polyAclipping, stop list for gene trap cdnas (gss) and
+# cdnas which hit too many times (kill list).
+#
+# Will make three different logic names, eg mouse_cDNA_update,
+# mouse_cDNA_update_2 and mouse_cDNA_update_3 mouse_cDNA_update_2 and
+# mouse_cDNA_update_3 are the same.
+#
+# Mouse jobs can run in BatchQueue normal, human needs BatchQueue long
+#
+# TODO:
+# 1/ signal capturing would be useful when a user interrupts a step.
+# 2/ use Mole for getting the sequences instead of downloading the
+# fasta files directly.
 
 =pod
 
@@ -17,87 +25,147 @@ use strict;
 
 cDNA_setup
 
-Procedure for getting the latest cDNAs aligned to an existing build
-in an automated fashion.
+Procedure for getting the latest human or mouse cDNAs aligned to an
+existing build in an automated fashion.
 
-=head1 SYNOPSIS / OPTIONS
+=head1 SYNOPSIS
 
-  A. Fill in config variables, start script with argument 'prepare':
-     "perl cDNA_update.pl prepare". Fill in /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-  B. Start script again with argument 'run' to start the pipeline.
-  B. Check the results by comparing them to the previous alignment
-     by calling "perl cDNA_update.pl compare"
-  C. Start script again after finishing the pipeline run to clean up:
-     "perl cDNA_update.pl clean", removing tmp files, etc.
+cDNA_update.pl [ prepare | test-run | run | compare | clean ]
+
+=head1 OPTIONS
+
+The options should be run in the above order.
+
+prepare     Read the configuration file cDNAUpdate.pm.
+            Pipeline and target databases are created and configured. Sequence
+            files are also downloaded and kill-list objects removed from
+            the set. Analyses are added and input_ids made.
+
+test-run    (optional but recommended) Run a test_Runnable.
+
+run         Start the analysis.
+
+compare     Compare the number of alignments per chromosome with the
+            previous cDNA_update.
+
+clean       Remove temporary files, output directories, sql dumps etc.
 
 =head1 DESCRIPTION
 
-This is a set-up script for generating new cDNA alignments as an isolated step of the
-build process with the Ensembl pipeline. We re using the current build as a basis to add
-the latest cDNA information as an additional track. This is done using exonerate in
-the pipeline, fasta files and repeat-masked genome files.
-The configuration variables at the beginning of the script must ALL be filled in.
-The whole process usually finishes in ~24h if there are no complications.
-The results are dna_align_features in an ESTGENE-type database.
-Use the clean-up option when finished to leave the system in the original state.
-Check out the latest code to match the database to be updated, for example:
-   cvs co -r branch-ensembl-32 ensembl
-   cvs co -r branch-ensembl-32 ensembl-pipeline
-   cvs co -r branch-ensembl-32 ensembl-analysis
-   cvs co -r branch-ensembl-32 ensembl-compara
+Please read the configuration POD along with this POD.
+
+This is a set-up script for generating new human or mouse cDNA
+alignments as an isolated step of the build process with the Ensembl
+pipeline. We are using the current build as a basis to add the latest
+cDNA information as an additional track. This is done using exonerate
+in the pipeline, fasta files and repeat-masked genome files. The
+results are dna_align_features in an ESTGENE-type database.
+
+Check out the latest code to match the database to be updated, for
+example:
+
+   cvs co -r branch-ensembl-53 ensembl
+   cvs co -r branch-ensembl-53 ensembl-pipeline
+   cvs co -r branch-ensembl-53 ensembl-analysis
+   cvs co -r branch-ensembl-53 ensembl-compara
+   cvs co -r branch-ensembl-53 ensembl-killlist
 
 *MAKE SURE THAT YOU HAVE THE LATEST ensembl/sql/table.sql FILE*
 
-The steps the script performs:
-  1. config_setup: check config variables & files
-  2. DB_setup: partly copy current db (PIPELINE database),
-     insert analysis etc., create TARGET database, synchronise
-  3. fastafiles: get & read input files
-  4. chop off the polyA tails and chunk the fasta files into smaller pieces
-  5. run_analysis: run exonerate using the pipeline
-  6. (optional) rerun cDNAs which did not align using different Exonerate parameters
-  7. find_many_hits: identify those cDNAs which aligned to many places in the genome
-  8. why_cdnas_missed: compile a list of reasons why hits were rejected
+=head2 The steps the script performs
 
- 9. comparison: health-check by comparing the results to previous alignments
-     quicker version: get number of alignments for each chromosome from previous
-     and new db version.
+  1. config_setup: check config variables & files.
+  2. DB_setup: partly copy current db (PIPELINE database),
+     insert analysis etc., create TARGET database, synchronise.
+  3. fastafiles: get & read input files, kill-list objects are removed
+     at this stage.
+  4. chop off the polyA tails and chunk the fasta files into smaller
+     pieces.
+  5. (optional) test-run: run a test_Runnable.
+  5. run_analysis: run exonerate using the pipeline.
+  6. rerun cDNAs which did not align using different Exonerate
+     parameters this step is usually repeated twice.
+  7. find_many_hits: identify those cDNAs which aligned to many places
+     in the genome.
+  8. why_cdnas_missed: compile a list of reasons why hits were rejected.
+  9. comparison: health-check by comparing the results to previous
+     alignments.
+     quicker version: get number of alignments for each chromosome
+     from previous and new db version.
      extended version: look for new hits, track missing hits.
- 10. cleanup: post-process result DB, restore config files, remove tmp files and dbs
+ 10. cleanup: post-process result DB, restore config files, remove tmp
+     files and dbs.
 
 Note that run_analysis is called 3 times:
- . First it runs jobs with normal exonerate parameters and the sepcified chunk size
- . Second it runs exonerat with more exhaustive parameters
- . Last it rechunks into smaller chunk s and runs exonerate with the same parameters as second run
+  . First it runs jobs with normal exonerate parameters and the
+    specified chunk size
+  . Second it runs exonerat with more exhaustive parameters
+  . Last it rechunks into smaller chunk s and runs exonerate with
+    the same parameters as second run
 
-What YOU will need to do:
-  1. Fill in the config variables in this script (just below this) and
-     in /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm.
-  2. Check for the existance of two additional programs needed:
-       fastasplit (splitting a fasta file into a number of chunks)
-       polyA_clipping (removing poly-A tails from sequences)
-  3. Ask systems to push the genome files across the farm
+=head2 Check points
+
+The check points (progress_status) are introduced at various steps for
+easy tracking of which steps have been done. The progress_status can
+be reset to a previous step if the process was interrupted and rerun
+from that point onwards.
+
+The check points have been set after the following steps:
+
+  1. Databases have been setup
+  2. Fasta files have been downloaded and kill-list objects
+     removed.
+  3. Test-run
+  4. The first run
+  5. Finding missing cDNAs
+  6. Resetting the configuration and remaking the fasta files
+  7. AWOL jobs
+  8. Finding cDNAs with many hits to genome
+  9. Storing cDNAs as unmapped objects
+  10. Updating the meta coordinate table
+  11. Updating the meta table
+  12. Comparison with previous analysis
+
+You would need to remove the progress_status entry from the meta table
+before handind the database over.
+
+=head2 What YOU will need to do
+
+  1. Fill in the configuration file (cDNAUpdate.pm)
+     for the species that you will be using along with
+     /Bio/EnsEMBL/Analysis/Config/GeneBuild/KillListFilter.pm.
+  2. Ask systems to push the genome files across the farm
      (after the prepare step) if necessary.
-  4. Run it; check the set-up and re-run if there are errors.
-  5. Check the results directly and by running 'compare'.
-  6. Clean up any mess by running 'clean'.
-  7. Hand over target-database (patch to new version if necessary).
+  3. Run it; check the set-up and re-run if there are errors.
+  4. Check the results directly by querying the target db.
+  5. Hand over target-database (patch to new version if necessary).
 
-If there is an error and the script dies, the original config files are restored
-without removing the data files and databases, allowing the re-run of the script.
-You might want to run only the config_setup function again, without having to re-fetch the 
-fasta files and to re-build the db, etc.
+=head2 Potential error handling
 
-The setup of scripts and databases runs for ~ 15 min, the exonerate pipeline needs
-around 24 h for human cDNAs, depending on farm usage.
-Change specifications manually in BatchQueue.pm and re-run the pipeline command 
-if jobs fail or take too long:
+If there is an error and the script dies, the original config files
+are restored without removing the data files and databases, allowing
+the re-run of the script. The tracking system in place as well which
+keeps record of which steps have been run can be used for rerunning
+any steps that did not finish properly.
+
+=head2 Consumed time
+
+The setup of scripts and databases runs for ~ 15 min, the exonerate
+pipeline needs around 24 h for the first round of human cDNAs,
+depending on farm sage.
+
+Change specifications manually in BatchQueue.pm and re-run the
+pipeline command if jobs fail or take too long:
   resource => 'select[mem>2500] rusage[mem=2500]',
   queue    => 'bugmem'
 
-Run the healthchecks:
-run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type cdna post_genebuild
-and hand-over target db.
+=head2 Run the healthchecks
+
+Run the healthchecks as below:
+
+  run-healthcheck.sh -d <user>_cDNA_update -output problem -species homo_sapiens -type cdna post_genebuild
+
+Hand-over target db.
 
 =head1 CONTACT
 
@@ -105,399 +173,495 @@ ensembl-dev@ebi.ac.uk
 
 =cut
 
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ 
 
-# configuration variables, adjust to your needs:
-# all directories without trailing '/'
+use strict;
+use warnings;
+use Carp;
+use File::Copy;
+use Data::Dumper;
+use DBI;
+use DBD::mysql;
 
-# personal base DIR for ensembl perl libs
-# expects to find directories 'ensembl' & 'ensembl-analysis' here
-my $cvsDIR               = "/nfs/acari/jhv/cvs_checkout/ensembl-trunk-2008-10/" ; 
-
-# personal data dir (for temporary & result/error files) eg. scratch DIR
-
-my $dataDIR              = '/lustre/scratch1/ensembl/jhv/cDNA_updates/human_2008_10'; 
-
-# sequence data files, which are used for the update
-# if in doubt, ask Hans where to find new files
-my $vertrna              = "embl_vertrna-[0-9]"; # pattern matches any digit. Currently 2 files matched.
-my $vertrna_update       = "emnew_vertrna-1";
-my $refseq               = "hs.fna"; #"mouse.fna"; #hs.fna
-my $sourceHost           = "cbi4"; 
-my $sourceDIR            = "/data/blastdb/";
-my $assembly_version     = "NCBI36"; #"NCBIM37"; #NCBI36
-
-#WARNING!!!
-#When using a new assembly containing haplotype regions eg Human DR sequences - 
-#make sure that the header contains chromosomal coordinates!!
-
-#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
-my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa");
-
-my $user                 = "jhv";
-my $host                 = "bc-9-1-03";
-my $genebuild_id         = "2";
-
-
-my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt";
-
-# external programs needed (absolute paths):
-my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
-
-my $chunknum             = 5500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
-
-my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
-my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
-my $reasons_prog         = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
-my $reasons_file         = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
-my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
-
-
-# db parameters
-#admin rights required
-my $WB_DBUSER            = "ensadmin";
-my $WB_DBPASS            = "ensembl";
-
-# reference db (current build)
-my $WB_REF_DBNAME        = "homo_sapiens_core_52_36n"; 
-my $WB_REF_DBHOST        = "ens-staging"; 
-my $WB_REF_DBPORT        = "3306"; 
-
-# new source db (PIPELINE)
-my $WB_PIPE_DBNAME       = "jhv_human_cdna_52_ref";
-my $WB_PIPE_DBHOST       = "genebuild4";
-my $WB_PIPE_DBPORT       = "3306";
-
-# new target db (ESTGENE)
-my $WB_TARGET_DBNAME     = "jhv_human_cdna_52_update";
-my $WB_TARGET_DBHOST     = "genebuild5";
-my $WB_TARGET_DBPORT     = "3306";
-
-# older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-my $WB_LAST_DBNAME       = "homo_sapiens_cdna_51_36m";
-my $WB_LAST_DBHOST       = "ens-livemirror"; 
-my $WB_LAST_DBPORT       = "3306"; 
-
-# reference db (last build, needed for comparison only) 
-my $WB_LAST_DNADBNAME    = "homo_sapiens_core_51_36m"; 
-my $WB_LAST_DNADBHOST    = "ens-livemirror"; 
-my $WB_LAST_DNADBPORT    = "3306"; 
-
-#taxonomy db for loading meta_table - should not need to change:
-my $TAXONDBNAME          = "ncbi_taxonomy";       
-my $TAXONDBHOST          = "ens-livemirror";
-my $TAXONDBPORT          = "3306"; 
-
-#set the species
-my $common_species_name  = "human"; #"human"; #"mouse";
-my $species              = "Homo sapiens"; #"Mus musculus";  
-my $taxonomy_id          = "9606"; # 9606 for human # 10090 for mouse
-my $oldFeatureName       = "cDNA_update"; #for the comparison only
-
-
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-
-###_NO_
-###_NO_# configuration variables, adjust to your needs:
-###_NO_# all directories without trailing '/'
-###_NO_
-###_NO_# personal base DIR for ensembl perl libs
-###_NO_# expects to find directories 'ensembl' & 'ensembl-analysis' here
-###_NO_my $cvsDIR               = '/nfs/acari/ba1/cvs_co_14Jul08/';
-###_NO_
-###_NO_# personal data dir (for temporary & result/error files) eg. scratch DIR
-###_NO_
-###_NO_my $dataDIR              = '/lustre/scratch1/ensembl/ba1/cDNA_updates/mouse_Jul08/'; 
-###_NO_
-###_NO_# sequence data files, which are used for the update
-###_NO_# if in doubt, ask Hans where to find new files
-###_NO_my $vertrna              = "embl_vertrna-1";
-###_NO_my $vertrna_update       = "emnew_vertrna-1";
-###_NO_my $refseq               = "mouse.fna"; #"mouse.fna"; #hs.fna
-###_NO_my $sourceHost           = "cbi4"; 
-###_NO_my $sourceDIR            = "/data/blastdb/";
-###_NO_my $assembly_version     = "NCBIM37"; #"NCBIM37"; #NCBI36
-###_NO_
-###_NO_#WARNING!!!
-###_NO_#When using a new assembly containing haplotype regions eg Human DR sequences - 
-###_NO_#make sure that the header contains chromosomal coordinates!!
-###_NO_
-###_NO_#my @target_masked_genome = ("/data/blastdb/Ensembl/Human/NCBI36//genome/softmasked_dusted.fa");
-###_NO_my @target_masked_genome = ("/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa");
-###_NO_
-###_NO_my $user                 = "ba1";
-###_NO_my $host                 = "bc-9-1-03";
-###_NO_my $genebuild_id         = "4";
-###_NO_
-###_NO_
-###_NO_my $gss                  = $cvsDIR."/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt";
-###_NO_
-###_NO_# external programs needed (absolute paths):
-###_NO_my $fastasplit           = "/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit";
-###_NO_
-###_NO_my $chunknum             = 1500;   #1500 for mouse, 5500 for human otherwise get AWOL jobs in first run
-###_NO_
-###_NO_my $polyA_clipping       = $cvsDIR."/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl";
-###_NO_my $findN_prog           = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/find_N.pl";
-###_NO_my $reasons_prog         = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl";
-###_NO_my $reasons_file         = $cvsDIR."/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt";
-###_NO_my $load_taxonomy_prog   = $cvsDIR."/ensembl-pipeline/scripts/load_taxonomy.pl";
-###_NO_
-###_NO_
-###_NO_# db parameters
-###_NO_#admin rights required
-###_NO_my $WB_DBUSER            = "ensadmin";
-###_NO_my $WB_DBPASS            = "ensembl";
-###_NO_
-###_NO_# reference db (current build)
-###_NO_my $WB_REF_DBNAME        = "mus_musculus_core_50_37c"; 
-###_NO_my $WB_REF_DBHOST        = "ens-staging"; 
-###_NO_my $WB_REF_DBPORT        = "3306"; 
-###_NO_
-###_NO_# new source db (PIPELINE)
-###_NO_my $WB_PIPE_DBNAME       = "ba1_mus_cdna0107_ref";
-###_NO_my $WB_PIPE_DBHOST       = "genebuild4";
-###_NO_my $WB_PIPE_DBPORT       = "3306";
-###_NO_
-###_NO_# new target db (ESTGENE)
-###_NO_my $WB_TARGET_DBNAME     = "ba1_mus_cdna0107_update";
-###_NO_my $WB_TARGET_DBHOST     = "genebuild5";
-###_NO_my $WB_TARGET_DBPORT     = "3306";
-###_NO_
-###_NO_# older cDNA db (needed for comparison only) - check schema is up to date!!!!!!
-###_NO_my $WB_LAST_DBNAME       = "mus_musculus_cdna_50_37c"; 
-###_NO_my $WB_LAST_DBHOST       = "ens-staging"; 
-###_NO_my $WB_LAST_DBPORT       = "3306"; 
-###_NO_
-###_NO_# reference db (last build, needed for comparison only) 
-###_NO_my $WB_LAST_DNADBNAME    = "mus_musculus_core_50_37c"; 
-###_NO_my $WB_LAST_DNADBHOST    = "ens-staging"; 
-###_NO_my $WB_LAST_DNADBPORT    = "3306"; 
-###_NO_
-###_NO_#taxonomy db for loading meta_table - should not need to change:
-###_NO_my $TAXONDBNAME          = "ncbi_taxonomy";       
-###_NO_my $TAXONDBHOST          = "ens-livemirror";
-###_NO_my $TAXONDBPORT          = "3306"; 
-###_NO_
-###_NO_#set the species
-###_NO_my $common_species_name  = "mouse"; #"human"; #"mouse";
-###_NO_my $species              = "Mus musculus"; #"Homo sapiens"; #"Mus musculus";  
-###_NO_my $taxonomy_id          = "10090"; # 9606 for human # 10090 for mouse
-###_NO_my $oldFeatureName       = "cDNA_update"; #for the comparison only
-###_NO_
-###_NO_
-
-#~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
-#no changes should be necessary below this
-my $option = $ARGV[0];
-$| = 1;
-use Bio::EnsEMBL::KillList::KillList; # add later after perldocs made
-use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor; 
-use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg ) ; 
+use Bio::EnsEMBL::KillList::KillList;
+use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
+use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
-use Data::Dumper;
-use File::Copy;
 
-#we need the Net::SSH module from somewhere:
+# We need the Net::SSH module from somewhere:
 use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
-use Net::SSH qw(sshopen2); 
+use Net::SSH qw(sshopen2);
 
-my $newFeatureName     = "cDNA_update"; #the analysis name!
-#when comparing to a previously updated cdna db $oldFeatureName = $newFeatureName
+my $species;
+
+BEGIN {
+    print "Which species are you running, human or mouse? ";
+    $species = <STDIN>;
+    chomp $species;
+
+    if ( ($species ne 'human') and ($species ne 'mouse') ){
+        print("Please specify either human or mouse!\n");
+        exit;
+    }
+    eval { require cDNAUpdate; import cDNAUpdate ('DEFAULT', $species ) };
+}
+
+
+$| = 1;
+
+# Variables from configuration
+
+my $GSS                 = $CVS_DIR . $GSS_PATH;
+my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
+my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
+my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
+my $UNMAPPED_REASONS    = $CVS_DIR . $UNMAPPED_REASONS_PATH;
+my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
+
+# When comparing to a previously updated cdna db
+# $oldFeatureName = $newFeatureName
+my $newFeatureName  = "cDNA_update"; # the analysis name!
+
 my %saved_files;
 my $cmd;
 my $status;
-#temp. dirs & files:
-my $config_file        = $cvsDIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
-my $newfile            = "cdna_update";
-my $configDIR          = $dataDIR."/configbackup";
-my $chunkDIR           = $dataDIR."/chunks";
-my $outDIR             = $dataDIR."/output";
-my @masked_genome      = @target_masked_genome;
-my $submitName         = "SubmitcDNAChunk";
 
-my $genomelist = join "\',\'", @masked_genome; 
+# Temp. dirs & files:
+my $config_file     = $CVS_DIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
+my $newfile         = "cdna_update";
+my $configDIR       = $DATA_DIR."/configbackup";
+my $chunkDIR        = $DATA_DIR."/chunks";
+my $outDIR          = $DATA_DIR."/output";
+my @masked_genome   = $GENOMICSEQS;
+my $submitName      = "SubmitcDNAChunk";
 
+my $genomelist      = join "\',\'", @masked_genome;
 
+my %configvars = (
+                 "CVS_DIR"          => $CVS_DIR,             # from cDNAUpdate
+                 "DATA_DIR"         => $DATA_DIR,            # from cDNAUpdate
+                 "VERTRNA"          => $VERTRNA,             # from cDNAUpdate
+                 "VERTRNA_UPDATE"   => $VERTRNA_UPDATE,      # from cDNAUpdate
+                 "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
+                 "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
+                 "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
+                 "WB_DBUSER"        => $WB_DBUSER,           # from cDNAUpdate
+                 "WB_DBPASS"        => $WB_DBPASS,           # from cDNAUpdate
+                 "WB_REF_DBNAME"    => $WB_REF_DBNAME,       # from cDNAUpdate
+                 "WB_REF_DBHOST"    => $WB_REF_DBHOST,       # from cDNAUpdate
+                 "WB_REF_DBPORT"    => $WB_REF_DBPORT,       # from cDNAUpdate
+                 "WB_PIPE_DBNAME"   => $WB_PIPE_DBNAME,      # from cDNAUpdate
+                 "WB_PIPE_DBHOST"   => $WB_PIPE_DBHOST,      # from cDNAUpdate
+                 "WB_PIPE_DBPORT"   => $WB_PIPE_DBPORT,      # from cDNAUpdate
+                 "WB_TARGET_DBNAME" => $WB_TARGET_DBNAME,    # from cDNAUpdate
+                 "WB_TARGET_DBHOST" => $WB_TARGET_DBHOST,    # from cDNAUpdate
+                 "WB_TARGET_DBPORT" => $WB_TARGET_DBPORT,    # from cDNAUpdate
+                 "taxonomy_id"      => $TAX_ID,              # from cDNAUpdate
+                 "PROGRAM_NAME"     => $PROGRAM_NAME,        # from cDNAUpdate
+                 "PROGRAM_VERSION"  => $PROGRAM_VERSION,     # from cDNAUpdate
+                 "PROGRAM_FILE"     => $PROGRAM_FILE,        # from cDNAUpdate
+                 "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
+                 "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
+                 "chunkDIR"         => $chunkDIR,
+                 "outDIR"           => $outDIR,
+                 "configDIR"        => $configDIR,
+                 "newfile"          => $newfile,
+                 "config_file"      => $config_file,
+                 "masked_genome"    => $genomelist,
+                 "newFeatureName"   => $newFeatureName );
 
-my %configvars      = (
-         "cvsDIR" => $cvsDIR,
-         "dataDIR" => $dataDIR,
-         "chunkDIR" => $chunkDIR,
-         "outDIR" => $outDIR,
-         "vertrna" => $vertrna,
-         "vertrna_update" => $vertrna_update,
-         "refseq" => $refseq,
-         "configDIR" => $configDIR,
-         "sourceDIR" => $sourceDIR,
-         "newfile" => $newfile,
-         "config_file" => $config_file,
-         "masked_genome" => $genomelist,
-         "fastasplit" => $fastasplit,
-         "polyA_clipping" => $polyA_clipping,
-         "WB_DBUSER" => $WB_DBUSER,
-         "WB_DBPASS" => $WB_DBPASS,
-         "WB_REF_DBNAME" => $WB_REF_DBNAME,
-         "WB_REF_DBHOST" => $WB_REF_DBHOST,
-         "WB_REF_DBPORT" => $WB_REF_DBPORT,
-         "WB_PIPE_DBNAME" => $WB_PIPE_DBNAME,
-         "WB_PIPE_DBHOST" => $WB_PIPE_DBHOST,
-         "WB_PIPE_DBPORT" => $WB_PIPE_DBPORT, 
-         "WB_TARGET_DBNAME" => $WB_TARGET_DBNAME,
-         "WB_TARGET_DBHOST" => $WB_TARGET_DBHOST,
-         "WB_TARGET_DBPORT" => $WB_TARGET_DBPORT,
-         "newFeatureName" => $newFeatureName,
-         "taxonomy_id" => $taxonomy_id,
-);
-
-
-#fasta chunk specifications:
-my $maxseqlength    = 17000;
-my $tmp_masked_genome  = $dataDIR."/genome";
-#program specifications:
-my $program_name    = "exonerate";
-my $program_version = "0.9.0";
-my $program_file    = "/usr/local/ensembl/bin/exonerate-0.9.0";
-my $module_name     = "Exonerate2Genes";
-my $ans             = "";
+# Fasta chunk specifications:
+my $maxseqlength      = 17000;
 my $num_missing_cdnas = 0;
-my $rerun_flag = 0;
+my $rerun_flag        = 0;
 
-if(!$option or ($option ne "prepare" and $option ne "run" and $option ne "clean" and $option ne "compare")){
+my $option = $ARGV[0];
+if ( !$option or
+            ( $option ne "set-species"
+#            ( $option ne "prepare"
+          and $option ne "prepare"
+          and $option ne "test-run"
+          and $option ne "run"
+          and $option ne "clean"
+          and $option ne "compare" ) ) {
    exec('perldoc', $0);
-   exit 1;
 }
 
-if($option eq "prepare"){
-  print "\nstarting cDNA-update procedure.\n";
 
-  config_setup();
+my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                     $WB_PIPE_DBNAME, $WB_DBUSER,
+                     $WB_DBPASS );
 
-  print "\nGet fasta files?(y/n) "; 
-  if ( get_input_arg() ) { 
-    if(! fastafiles() ){
-       unclean_exit(); 
-    }
-  }
-  print "\nset-up the databases?(y/n) "; 
-  if ( get_input_arg() ) { 
-    if(! DB_setup()   ) { 
-      unclean_exit(); 
-     }
-     print "\n\nFinished setting up the analysis.\n";
-  }
-}
-elsif($option eq "run"){
- 
-  print "\nDo we need to set re-set the configs?(y/n) "; 
-  if ( get_input_arg() ) {  
-       print "Are you sure you want to reset the configs ?\n".
-       " If you're in the second stage you need to \n".
-        "edit BatchQueue.pm as well as Exonerate2Genes.pm !!! \n\n" ;
-       if ( get_input_arg() ) {
-         config_setup()
-      } else {
-          print "not resetting config.\n" ;
-      }
-    config_setup()
-  }
+my $progress_status = undef;
 
+if ( $option eq "prepare" ) {
 
-  print "\nDo you want to start the initial ( first )  analysis ? (y/n) " ;
-  if ( get_input_arg() ) {
-     run_analysis();
-  } 
+#if ( $option eq "prepare" ) {
+    print("\nStarting cDNA-update procedure.\n");
 
-  
-  print "\nDo you want to look for MISSING cDNA's and set up a 2nd run ?? (y/n) " ; 
-  if ( get_input_arg() ) { 
-     print "Finding missing cDNA's ...\n" ; 
-     find_missing_cdnas(); 
+    if ( !defined($progress_status) ) {
 
-     print "\n$num_missing_cdnas have not aligned to the genome.\n".
-        "Would you like to rerun these cdnas with adjusted Exonerate parameters:\n".
-           "\tmax_intron = 400,000 and\n".
-              "\tsoftmasktarget = FALSE? (y/n) "; 
-     if ( get_input_arg() ) { 
-        $rerun_flag = 1;
-        #change the logic_name and directories:
-        $newFeatureName = $newFeatureName."_2"; #to show different params
-        $configvars{"newFeatureName"} = $newFeatureName;
-        $chunkDIR           = $dataDIR."/chunks2";
-        $configvars{"chunkDIR"} = $chunkDIR;
-        $outDIR             = $dataDIR."/output2";
-        $configvars{"outDIR"} = $outDIR;
-        
-        config_setup();
-        remake_fasta_files();
+        my $ref_db = connect_db( $WB_REF_DBHOST, $WB_REF_DBPORT,
+                                 $WB_REF_DBNAME, "ensro" );
 
-        print "\nset databases for next run? (y/n) ";
-        if ( get_input_arg() ) { 
-                $rerun_flag = 1;
-                if(! DB_setup()   ){ unclean_exit(); }
-                print "\n\nFinished setting up the analysis.\n";
-        } 
+        # Check existence of source databases
+        if ( !$ref_db ) {
+            croak("could not find $WB_REF_DBNAME.");
+        }
 
-        print "Should we start the 2nd run ? (y/n) ";
+        # Disconnect from the database
+        $ref_db->dbc->disconnect_if_idle();
+
+        print("Shall we set the configuration? (y/n) ");
         if ( get_input_arg() ) {
-          run_analysis();
-        } 
-     } 
-  }     
-  
-  print "Do you want to check for AWOL jobs ? (y/n) "; 
-  if ( get_input_arg() ) {
-    print "checking for AWOL jobs...\n";
-    chase_jobs(); 
-  }
-  
-  print "Would you like to check for cDNAs which have hit many places in the genome? (y/n) ";
-  if ( get_input_arg() ) { 
-       find_many_hits();
-  }
+            config_setup();
+        }
 
-  print "Would you like to store the cDNAs which have not aligned as unmapped_objects? (y/n) ";
-  if ( get_input_arg() ) { 
-      why_cdnas_missed();
-  }
-  
-  print "updating meta_coord table...\n";
-  update_metacoord();
-  
-  print "sorting out the meta table...\n";
-  fix_metatable();
-  
-     print "you should now change the analysis_ids of the cdnas in your database so that they ". 
-                "all have the same logic name, otherwise the comparison script won't work;\n".
-                "you will need to change both the gene and dna_align_feature tables\n\n"; 
- 
-     print "\nUseful sql : \n\n" ;    
- 
-     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
-            " -e\"update dna_align_feature set analysis_id = 1\" \n\n" ;  
-    
-     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
-            " -e\"update gene set analysis_id = 1\" \n\n" ;   
-    
-     print "mysql -u $WB_DBUSER -p$WB_DBPASS -h $WB_TARGET_DBHOST -D$WB_TARGET_DBNAME \\\n".
-            " -e\"update analysis set analysis_id = 1 where logic_name = 'cDNA_update\"\n\n" ; 
-     
+        print "\nSet-up the databases?(y/n) ";
 
+        if ( get_input_arg() ) {
+            if ( !DB_setup() ) {
+                unclean_exit();
+            }
+
+            my $progress = get_status($pipe_db->dbc());
+            if ( !defined($progress) ) {
+                print "No progress_status, setting it to 1!\n";
+                $progress_status = 1;
+
+                # Set progress_status
+                my $sql = "INSERT INTO meta (meta_key, meta_value) "
+                        . "VALUES ('progress_status', $progress_status)";
+                my $sth = $pipe_db->dbc->prepare($sql);
+                $sth->execute;
+            } else {
+                croak(   "Something is wrong, progress_status shouldn't be "
+                       . "set yet, rerun the prepare step again. "
+                       . "progress_status = $progress\n" );
+            }
+        } else {
+
+            my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                                      $WB_PIPE_DBNAME, $WB_DBUSER,
+                                      $WB_DBPASS );
+
+            my $target_db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                                        $WB_TARGET_DBNAME, "ensro" );
+
+            if ( $pipe_db->dbc->dbname() && $target_db->dbc->dbname() ) {
+                print("\nDatabases exist, good! so we continue with the process.\n");
+
+                $target_db->dbc->disconnect_if_idle();
+
+                my $progress = get_status($pipe_db->dbc());
+                if ( defined($progress) ) {
+                    $progress_status = $progress;
+                    print("progress_status is already set ($progress_status), "
+                        . "jumping to the next step.\n");
+                } else {
+                    croak("The progress_status should have already been set. "
+                        . "Perhaps you didn't set the databases correctly?\n"
+                        . "\nPlease rerun the prepare step now.\n");
+                }
+            } else {
+                carp(  "The databases have not been set up, "
+                     . "please do this now.\n" );
+                unclean_exit();
+            }
+        } ## end else [ if ( get_input_arg() )
+    } ## end if ( !defined($progress_status...
+
+    $progress_status = get_status($pipe_db->dbc());
+    print("\n\nAfter DB setup progress_status is: $progress_status\n\n");
+
+    if ( $progress_status == 1 ) {
+        print(   "\nGet fasta files? "
+               . "kill-list objects will be removed as well. (y/n) " );
+        if ( get_input_arg() ) {
+            if ( !fastafiles() ) {
+                unclean_exit();
+            }
+        } else {
+            print "\nYou said don't fetch files, checking if files exist...\n\n";
+            if (    -e $DATA_DIR . "/" . $REFSEQ
+                 && -e $DATA_DIR . "/" . $VERTRNA ) {
+                print(   "Files are present in the directory, "
+                       . "removing sequences on the kill-list.\n\n" );
+
+                my $trim_file = remove_kill_list_object();
+                polya_clipping($trim_file);
+            } else {
+                carp("\nThe files don't exist, exiting the program.\n\n");
+                unclean_exit();
+            }
+        }
+
+        # Create analysis, set the rule and make the input_ids
+        setup_analysis();
+
+        $progress_status = 2;
+        update_progress_status($progress_status);
+
+        print(   "\n\nFinished setting up the analysis.\n\n"
+               . "NEXT: If you want to run a test use the 'test-run' "
+               . "option. Alternatively, start the analysis itself "
+               . "using the 'run' option.\n\n" );
+
+    } ## end if ( $progress_status ...
+} ## end if ( $option eq "prepare")
+
+elsif ( $option eq "test-run" ) {
+
+    $progress_status = get_status($pipe_db->dbc());
+    print("\tprogress_status is: $progress_status\n\n");
+
+    if ( $progress_status == 2 ) {
+
+        print("\nDo we need to set/re-set the configs? (y/n) ");
+        if ( get_input_arg() ) {
+            config_setup();
+        }
+
+        test_run();
+
+        $progress_status = 3;
+        update_progress_status($progress_status);
+    }
+    print("NEXT: start the analysis using the 'run' option.\n\n");
+} ## end elsif ( $option eq "test-run")
+
+elsif ( $option eq "run" ) {
+
+#    print "\t\t$rerun_flag <-- rerun flag in run\n";
+    print("\nDo we need to set/re-set the configs? (y/n) ");
+    if ( get_input_arg() ) {
+
+        # Is this needed? The options are set by the script, so user doesn't
+        # have to change the configuration.
+        print(   "Are you sure you want to reset the configs?\n"
+               . "\tIf you're in the second stage you need to "
+               . "\tedit BatchQueue.pm as well as Exonerate2Genes.pm!\n"
+               . "Shall we set the configs? (y/n) " );
+
+        if ( get_input_arg() ) {
+            config_setup();
+        } else {
+            print "Not resetting config.\n\n" ;
+        }
+    } #else {
+      #  print "Not resetting config.\n\n" ;
+    #}
+
+    $progress_status = get_status($pipe_db->dbc());
+#    print "\t\t$progress_status <-- in run\n";
+    if ( $progress_status >= 2 && $progress_status < 6 ) {
+
+        if ( $progress_status == 2 || $progress_status == 3 ) {
+            if ( !run_analysis() ) {
+
+                # Set status to 2 (fasta files & kill list removal are done).
+                $progress_status = 2;
+                update_progress_status($progress_status);
+                unclean_exit();
+            }
+
+            # Have run analysis and it was successful so update the
+            # status.
+            $progress_status = 4;
+            update_progress_status($progress_status);
+        }
+
+        $progress_status = get_status($pipe_db->dbc());
+#        print "\t\t$progress_status <-- before finding missing cdnas\n";
+
+        if ( $progress_status == 4 ) {
+
+            $num_missing_cdnas = find_missing_cdnas();
+
+            $progress_status = 5;
+            update_progress_status($progress_status);
+
+            print(   "\n$num_missing_cdnas have not aligned to the genome.\n"
+                . "Would you like to rerun these cdnas with "
+                . "adjusted Exonerate parameters:\n"
+                . "\tmax_intron     = 400,000 and\n"
+                . "\tsoftmasktarget = FALSE? (y/n) " );
+        }
+
+        # move this to further down!
+#        print("\t\t$newFeatureName <-- which analysis\n");
+#        print("\t\t$rerun_flag <-- rerun flag just before resetting it\n");
+
+        # Rerunning the analysis
+        if ( $progress_status >= 5 && get_input_arg() ) {
+            $rerun_flag = 1;
+
+#            print "\t\t$newFeatureName <-- which analysis, rerunning now\n";
+
+            # Change the logic_name and directories
+
+            # To show different params
+            $newFeatureName               = $newFeatureName . "_2";
+
+#           print("\n\tjust reset the analysis name to $newFeatureName\n");
+
+            $configvars{"newFeatureName"} = $newFeatureName;
+            $chunkDIR                     = $DATA_DIR . "/chunks2";
+            $configvars{"chunkDIR"}       = $chunkDIR;
+            $outDIR                       = $DATA_DIR . "/output2";
+            $configvars{"outDIR"}         = $outDIR;
+
+            $progress_status = get_status($pipe_db->dbc());
+#            print "\t\t$progress_status <-- before remaking fasta files\n";
+
+            # Remaking fasta files
+            if ( $progress_status == 5 ) {
+
+                print "\n>>> remaking fasta files!\n";
+
+                config_setup();
+                remake_fasta_files();
+
+                $progress_status = 6;
+                update_progress_status($progress_status);
+
+                print("\nSet databases for next run? (y/n) ");
+                if ( get_input_arg() ) {
+                    $rerun_flag = 1;
+                    if ( !DB_setup() ) {
+                        unclean_exit();
+                    }
+                    print(   "\n\nFinished setting up the analysis "
+                           . "for next round.\n\n" );
+                }
+                print("Should we start the 2nd run ? (y/n) ");
+                if ( get_input_arg() ) {
+                    if ( !run_analysis() ) {
+
+                        # If run_analysis is not successful, return to
+                        # the step before the config setup, need to
+                        # recalulate the missing cdnas.
+                        $progress_status = 4;
+                        update_progress_status($progress_status);
+                        carp("Analysis didn't go well, "
+                            . "resetting progress_status to step before.\n"
+                            . "progress_status is now set to: $progress_status. "
+                            . "You'll need to rerun the analysis.\n\n");
+                        unclean_exit();
+                    }
+                }
+            # maybe need to increment the status here...
+            }
+        }
+    }
+
+    elsif ( $progress_status >= 6 ) {
+#        my $progress= get_status($pipe_db->dbc());
+#        print ">>> here!!!\n";
+
+        if ( $progress_status == 6 ) {
+            print("Do you want to check for AWOL jobs ? (y/n) ");
+            if ( get_input_arg() ) {
+                print "checking for AWOL jobs...\n";
+                chase_jobs();
+
+                $progress_status = 7;
+                update_progress_status($progress_status);
+            }
+        }
+
+        # Checking cDNAs with many hits to the genome
+        if ( $progress_status == 7 ) {
+#            print ">>> progress = 7\n";
+
+            print(   "Would you like to check for cDNAs which "
+                   . "have hit many places in the genome? (y/n) " );
+
+            if ( get_input_arg() ) {
+
+                find_many_hits();
+
+                $progress_status = 8;
+                update_progress_status($progress_status);
+            }
+        }
+
+        # Storing cDNAs as unmapped_objects
+        if ( $progress_status == 8 ) {
+
+            print(   "Would you like to store the cDNAs which "
+                   . "have not aligned as unmapped_objects?(y/n) " );
+
+            if ( get_input_arg() ) {
+
+                why_cdnas_missed();
+
+                $progress_status = 9;
+                update_progress_status($progress_status);
+            }
+        }
+
+        # Updating the meta_coord table
+        if ( $progress_status == 9 ) {
+            print("updating meta_coord table...\n");
+
+            update_metacoord();
+
+            $progress_status = 10;
+            update_progress_status($progress_status);
+        }
+
+        # Sorting out the meta table
+        if ( $progress_status == 10 ) {
+
+            print("sorting out the meta table...\n");
+
+            fix_metatable();
+
+            $progress_status = 11;
+            update_progress_status($progress_status);
+        }
+    } ## end elsif ( $progress >= 6 )
+
+    print(   "\n\nNOTE!!! You should now change the analysis_ids "
+            . "of the cdnas in your database\n"
+            . "so that they all have the same logic name, "
+            . "otherwise the comparison script won't work;\n"
+            . "you will need to change both the gene and "
+            . "dna_align_feature tables.\n\n" );
 }
-elsif($option eq "clean"){
-  print "\ncleaning up after cDNA-update.\n";
 
-  clean_up(0);
-}
-elsif($option eq "compare"){
-  print "\nrunning checks after cDNA-update.\n".
-        "checking through alignments & genes.\n";
+elsif ( $option eq "compare" ) {
+    print("\nHave you changed the analysis_id for the runs? (y/n) ");
 
-  check_vars();
-  compare();
+    if ( get_input_arg() ) {
+        $progress_status = get_status($pipe_db->dbc());
+
+        if ( $progress_status == 11 ) {
+            print(   "\nRunning checks after cDNA-update.\n"
+                . "checking through alignments & genes.\n" );
+
+            check_vars();
+            compare();
+
+            $progress_status = 12;
+            update_progress_status($progress_status);
+        }
+    } else {
+        croak("\nChange the analysis_ids first before running "
+            ." the comparison step.\n\n");
+    }
 }
+
+elsif ( $option eq "clean" ) {
+
+    $progress_status = get_status($pipe_db->dbc());
+    if ( $progress_status == 12 ) {
+        print("\nCleaning up after cDNA-update.\n");
+        clean_up(0);
+    }
+}
+
 
 #~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -507,1255 +671,1905 @@ elsif($option eq "compare"){
 # The required config values are written into placeholders in the config skeleton file (config_files.txt)
 #  using the variables defined above.
 
-sub config_setup{
-  $status = 0;
-  my $filecount = 0;
-  my ($header, $filename, $path);
-  #set env var to avoid warnings
-  if(!defined $ENV{"OSTYPE"} ){
-    $ENV{"OSTYPE"} = "";
-  }
-  #import function, to be included in all config files
-  my $import_sub = '
-  sub import {
-    my ($callpack) = caller(0);
-    my $pack = shift;
-    my @vars = @_ ? @_ : keys(%Config);
-    return unless @vars;
-    eval "package $callpack; use vars qw(".
-      join(\' \', map { \'$\'.$_ } @vars) . ")";
-    die $@ if $@;
-    foreach (@vars) {
-      if (defined $Config{ $_ }) {
-        no strict \'refs\';
-        *{"${callpack}::$_"} = \$Config{ $_ };
-      }else {
-        die "Error: Config: $_ not known\n";
-      }
-    }
-  }
-  1;
-  ';
-  check_vars();
+sub config_setup {
+    $status = 0;
+    my $filecount = 0;
+    my ( $header, $filename, $path );
 
-  #check existence of source databases
-  if(!connect_db($WB_REF_DBHOST, $WB_REF_DBPORT, $WB_REF_DBNAME, $WB_DBUSER, $WB_DBPASS)){
-    die "could not find $WB_REF_DBNAME.";
-  }
-  #go through config info to create defined files,
-  #back-up the original, write version with filled-in variables
-  open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
-  local $/ = '>>';
-  <RP>;
+#    print "in config_setup()\n";
 
-  while(my $content = <RP>){
-       
-    #get specific config-file name
-    $content  =~ s/([\w\/_\-\.]+)\n//;
-    $header   = $1;
-    $header   =~ m/(.+\/)([\w\._\-]*)$/g;
-    $path     = $1;
-    $filename = $2;
-    $content  =~ s/>>//;
-    #replace variables in config file
+    # Set env var to avoid warnings
+    if ( !defined $ENV{"OSTYPE"} ) {
+        $ENV{"OSTYPE"} = "";
+    }
+    # import function, to be included in all config files
+    my $import_sub = '
+        sub import {
+            my ($callpack) = caller(0);
+            my $pack = shift;
+            my @vars = @_ ? @_ : keys(%Config);
+            return unless @vars;
+            eval "package $callpack; use vars qw(".
+            join(\' \', map { \'$\'.$_ } @vars) . ")";
+            die $@ if $@;
+            foreach (@vars) {
+            if (defined $Config{ $_ }) {
+                no strict \'refs\';
+                *{"${callpack}::$_"} = \$Config{ $_ };
+            }else {
+                die "Error: Config: $_ not known\n";
+            }
+            }
+        }
+        1;
+        ';
+    check_vars();
+#    print "out of check_vars()\n";
 
-    foreach my $configvarref (keys %configvars){
-      $content =~ s/\<$configvarref\>/$configvars{$configvarref}/g;
-    }
-    
-        #if rerunning seqs change Exonerate options:
-        if (($filename=~/Exonerate2Genes/ ) && ($rerun_flag == 1 )){
-                $content =~s/-verbosity => 0/-verbosity => 1/; #because only interested in those which don't align after new parameters
-                $content =~s/--softmasktarget TRUE/--maxintron 400000 --bestn 10 --softmasktarget FALSE/;
-        }       
-      
-    #backup file if exists
-    if(-e $cvsDIR."/".$header){
-    print $cvsDIR."/".$header." exists\n";
-      #$cmd = "mv ".$cvsDIR."/".$header." ".$configDIR."/".$filecount;
-    eval{
-         move($cvsDIR."/".$header, $configDIR."/".$filecount);
-     };
-    if($@){
-       die("Failed to move ".$cvsDIR."/".$header." to ".$configDIR."/".$filecount." $@");
-    }
+    # Check existence of source databases
+    if ( !connect_db( $WB_REF_DBHOST, $WB_REF_DBPORT,
+                      $WB_REF_DBNAME, "ensro" ) ) {
+        croak("Could not find $WB_REF_DBNAME.");
     }
 
-        #store file location
-    $saved_files{$filecount} = $header;
-        #write modified file
-    $filename = $cvsDIR."/".$path.$filename;
-    open(WP, ">", $filename) or die("can't create new config file $filename.\n");
-    print WP $content."\n".$import_sub;
-    close WP;
-    $filecount++;
-  }
-  close(RP);
-  #save data dump with config paths
-  $Data::Dumper::Purity = 1;
-  open(WP, "> config_paths.perldata") or die "\ncan't create file for data dumping!\n";
-  print WP Data::Dumper->Dump([\%saved_files], ['*saved_files']);
-  close(WP);
-  $/ = "\n";
-  print "created backup of current config files, new config files written.\n";
-  
+    # Go through config info to create defined files,
+    # back-up the original, write version with filled-in variables
+    open( RP, "<", "$config_file" )
+      or croak("Can't open config file definitions $config_file.");
+
+    local $/ = '>>';
+    <RP>;
+
+    while ( my $content = <RP> ) {
+
+        # Get specific config-file name
+        $content =~ s/([\w\/_\-\.]+)\n//;
+        $header = $1;
+
+        $header =~ m/(.+\/)([\w\._\-]*)$/g;
+        $path     = $1;
+        $filename = $2;
+        $content =~ s/>>//;
+
+        # Replace variables in config file
+        foreach my $configvarref ( keys %configvars ) {
+            $content =~ s/\<$configvarref\>/$configvars{$configvarref}/g;
+        }
+
+        # If rerunning seqs change Exonerate options:
+        if (   ( $filename =~ /Exonerate2Genes/ )
+            && ( $rerun_flag == 1 ) ) {
+            # Because only interested in those which don't align after new parameters
+            $content =~ s/-verbosity => 0/-verbosity => 1/;
+
+            my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
+            $content =~ s/--softmasktarget TRUE/$substitute/;
+        }
+
+        # Backup file if exists
+        if ( -e $CVS_DIR . "/" . $header ) {
+            print $CVS_DIR. "/" . $header . " exists\n";
+            eval {
+                move( $CVS_DIR      . "/" . $header,
+                      $configDIR    . "/" . $filecount );
+            };
+            if ($@) {
+                croak( "Failed to move "
+                     . $CVS_DIR     . "/" . $header
+                     . " to "
+                     . $configDIR   . "/" . $filecount
+                     . ". $@" );
+            }
+        }
+
+        # Store file location
+        $saved_files{$filecount} = $header;
+
+        # Write modified file
+        $filename = $CVS_DIR . "/" . $path . $filename;
+
+        open( WP, ">", $filename )
+          or croak("Can't create new config file $filename.\n");
+        print WP $content . "\n" . $import_sub;
+        close WP;
+        $filecount++;
+    } ## end while ( my $content = <RP>)
+
+    close(RP);
+
+    # Save data dump with config paths
+    $Data::Dumper::Purity = 1;
+    open( WP, "> config_paths.perldata" )
+      or croak("\nCan't create file for data dumping!\n");
+    print WP Data::Dumper->Dump( [ \%saved_files ], ['*saved_files'] );
+    close(WP);
+    $/ = "\n";
+    print(   "Created backup of current config files, "
+           . "new config files written.\n" );
+} ## end sub config_setup
+
+
+# Check files & directories, create if necessary
+sub check_vars {
+#    print "in check_vars!\n";
+    foreach my $configvarref ( keys %configvars ) {
+        if ( !$configvarref ) {
+            croak(   "Please define all configuration variables! "
+                   . "[$configvarref]\n" );
+        }
+
+        if ( $configvarref =~ m/.+DIR.*/ ) {
+            if ( !-e $configvars{$configvarref} ) {
+                if ( system("mkdir $configvars{$configvarref}") ) {
+                    croak(   "Could not create directory! "
+                           . "[$configvars{$configvarref}]. $!\n" );
+                }
+            }
+            if ( !-r $configvars{$configvarref} ) {
+                croak(   "Directory not accessible! "
+                       . "[$configvars{$configvarref}]. $!\n" );
+            }
+        }
+    }
 }
 
-
-#check files & directories, create if necessary
-
-sub check_vars{
-  foreach my $configvarref (keys %configvars){
-    if(!$configvarref){ die "please define all configuration variables! [$configvarref]\n"; }
-    if($configvarref =~ m/.+DIR.*/){
-          if(!-e $configvars{$configvarref}){
-                if(system("mkdir $configvars{$configvarref}")){ die "could not create directory! [$configvars{$configvarref}]\n"; }
-      }
-      if(!-r $configvars{$configvarref}){ die "directory not accessible! [$configvars{$configvarref}]";}
-    }
-  }
-}
-
-
-# delete old content if any for a given directory
+# Delete old content if any for a given directory
 # (recursively, as some tmp-dir get pretty crowded...)
+sub checkdir {
+    my $dirname = shift;
+    my $option  = shift;
 
-sub checkdir{
-  my $dirname = shift;
-  my $option  = shift;
-  #go through dirs recursively
-  unless (opendir(DIR, $dirname)) {
+    # Go through dirs recursively
+    unless ( opendir( DIR, $dirname ) ) {
+        closedir(DIR);
+        print "\ncan't open $dirname.\n";
+        return 0;
+    }
+
+    my @files = grep ( !/^\.\.?$/, readdir(DIR) );
+    foreach my $file (@files) {
+        if ( -f "$dirname/$file" ) {
+            system("rm $dirname/$file");
+        }
+        if ( -d "$dirname/$file" ) {
+            checkdir("$dirname/$file");
+        }
+    }
     closedir(DIR);
-    print "\ncan't open $dirname.\n";
-    return 0;
-  }
-  my @files = grep (!/^\.\.?$/, readdir(DIR));
-  foreach my $file (@files) {
-    if( -f "$dirname/$file") {
-      system("rm $dirname/$file");
+    if ( !$option ) {
+        eval { system("rmdir $dirname"); };
     }
-    if( -d "$dirname/$file") {
-      checkdir("$dirname/$file");
-    }
-  }
-  closedir(DIR);
-  if(!$option){
-    eval{ system("rmdir $dirname"); };
-  }
-  return 1;
-}
+    return 1;
+} ## end sub checkdir
 
 
-# fetch fasta files, combine them, chop them up
+# Fetch fasta files, combine them, chop them up
+sub fastafiles {
+    $status = 0;
 
-sub fastafiles{
-  $status = 0;
-  my %EMBL_ids;
-  my $header;
-  my $vertrna_ver     = 1;
-  my $vertrna_upd_ver = 1;
-  my $refseq_ver      = 1;
-  my $update          = 0; #set to 1 if want to redo clipping and chunks regardless of changes in vertna etc
-  my @filestamp;
+    my $vertrna_ver     = 1;
+    my $vertrna_upd_ver = 1;
+    my $refseq_ver      = 1;
 
-  eval{
-    #check file versions, copy only if changed
-    $cmd  = "cd $sourceDIR; ls -n ".$vertrna." ".$vertrna_update." ".$refseq;
-    sshopen2("$user\@$host", *READER, *WRITER, "$cmd") || die "ssh: $!";
-    while(<READER>){
-      @filestamp = split(" ", $_);
-      my $stampA = join("-", @filestamp[5..7]);
-      $cmd  = "cd ".$dataDIR."; "."ls -n ".$filestamp[8];
-      # this check doesn't seem to work
-      @filestamp = split(" ", `$cmd`);
-      my $stampB = join("-", @filestamp[5..7]);
-      if($stampA eq $stampB){
-        #no changes...
-        if($filestamp[8] =~ m/$vertrna/){ $vertrna_ver = 0; }
-        elsif($filestamp[8] eq $vertrna_update){ $vertrna_upd_ver = 0; }
-        elsif($filestamp[8] eq $refseq){ $refseq_ver = 0; }
-      }
-                
-    }    
-    close(READER);
-    close(WRITER);
-    #copy files
-    if($vertrna_ver){
-      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna . " " . $dataDIR."/";
-      $status += system($cmd);
-    }
-    if($vertrna_upd_ver){
-      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$vertrna_update . " " . $dataDIR."/".$vertrna_update;
-      $status += system($cmd);
-    }
-    if($refseq_ver){
-      $cmd = "scp -p " . $sourceHost.":".$sourceDIR."/".$refseq . " " . $dataDIR."/".$refseq;
-      $status += system($cmd);
-    }
-    if($status){ die("Error while copying files.\n") }
-      print "copied necessary files.\n";
+    # Set to 1 if want to redo clipping and chunks regardless of
+    # changes in vertna etc
+    my $update = 0;
 
-      if($vertrna_upd_ver or $vertrna_ver or $refseq_ver){
-        $update = 1;
-        #get entries for species of interest, combine base file & update file
-        #read update file
-        local $/ = "\n>";
-        open(RP, "<", $dataDIR."/".$vertrna_update) or die("can t read $vertrna_update\n");
-        open(WP, ">", $dataDIR."/".$newfile) or die("can t create $newfile\n");
-        #<RP>;
-        while (my $entry = <RP>){
-          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-          if($entry =~ m/$species/){
-            #extract & save id
+    my @filestamp;
+
+    eval {
+        # Check file versions, copy only if changed
+        $cmd = "cd $SOURCE_DIR; ls -n "
+                . $VERTRNA . " "
+                . $VERTRNA_UPDATE . " "
+                . $REFSEQ;
+
+#        print $cmd, " <-- cd'ing to SOURCE_DIR\n";
+        sshopen2( "$USER\@$HOST", *READER, *WRITER, "$cmd" ) || croak "ssh: $!";
+        while (<READER>) {
+            @filestamp = split( " ", $_ );
+            my $stampA = join( "-", @filestamp[ 5 .. 7 ] );
+#            print( $stampA, " <-- stampA\n" );
+            $cmd = "cd " . $DATA_DIR . "; " . "ls -n " . $filestamp[8];
+            @filestamp = split( " ", `$cmd` );
+            my $stampB = join( "-", @filestamp[ 5 .. 7 ] );
+#            print( $stampB, " <-- stampB\n" );
+            if ( $stampA eq $stampB ) {
+                # No changes...
+                if ( $filestamp[8] eq $VERTRNA ) {
+#                    print( $filestamp[8] . "\t" . $VERTRNA,
+#                           " <-- filestamp[8] & VERTRNA\n" );
+                    $vertrna_ver = 0;
+                } elsif ( $filestamp[8] eq $VERTRNA_UPDATE ) {
+#                    print( $filestamp[8] . "\t" . $VERTRNA_UPDATE,
+#                           " <-- filestamp[8] & VERTRNA_UPDATE\n" );
+                    $vertrna_upd_ver = 0;
+                } elsif ( $filestamp[8] eq $REFSEQ ) {
+#                    print( $filestamp[8] . "\t" . $REFSEQ,
+#                           " <-- filestamp[8] & REFSEQ\n" );
+                    $refseq_ver = 0;
+                }
+            }
+        } ## end while (<READER>)
+        close(READER);
+        close(WRITER);
+
+#        print $vertrna_ver, " <-- vertrna_ver\n";
+        # Copy files
+        if ($vertrna_ver) {
+#            print "\$vertrna_ver = $vertrna_ver\n";
+            $cmd = "scp -p " . $SOURCE_HOST . ":"
+                . $SOURCE_DIR . "/" . $VERTRNA . " "
+                . $DATA_DIR   . "/" . $VERTRNA;
+
+            print $cmd, "\n";
+
+            $status += system($cmd);
+#            print "status = $status . \t\t \$update vertrna = $update\n";
+        }
+        if ($vertrna_upd_ver) {
+            $cmd = "scp -p " . $SOURCE_HOST . ":"
+                . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
+                . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
+
+            print $cmd, "\n";
+            $status += system($cmd);
+#            print "status = $status . \t\t \$update vertrna_update = $update\n";
+        }
+        if ($refseq_ver) {
+            $cmd = "scp -p " . $SOURCE_HOST . ":"
+                . $SOURCE_DIR . "/" . $REFSEQ . " "
+                . $DATA_DIR   . "/" . $REFSEQ;
+
+            print $cmd, "\n";
+            $status += system($cmd);
+#            print "status = $status . \t\t \$update refseq = $update\n";
+        }
+        if ($status) { croak("Error while copying files.\n"); }
+        print "Copied necessary files.\n";
+        my $file = $DATA_DIR . $newfile;
+        if ( $vertrna_upd_ver or $vertrna_ver or $refseq_ver ) {
+            $update = 1;
+            write_to_file();
+        }
+#        print("\t\$update = $update <<<-- just after write_to_file & before remove_kill_list_object\n");
+
+        my $newfile2 = remove_kill_list_object();
+        if ($update) {
+            polya_clipping($newfile2);
+        }
+        # This can go in a subroutine as well...
+#        if ($update) {
+#            # Clip ployA tails
+#            print("\nPerforming polyA clipping...\n");
+#            my $newfile3 = $DATA_DIR . "/" . $newfile2 . ".clipped";
+#            $cmd = "perl " . $POLYA_CLIPPING . " "
+#                . $DATA_DIR . "/" . $newfile2 . " "
+#                . $newfile3;
+#
+#            print $cmd, "\n";
+#
+#            if ( system($cmd) ) {
+#                croak("Couldn't clip file.$@\n");
+#            }
+#
+#            # Split fasta files, store into CHUNKDIR
+#            print("Splitting fasta file.\n");
+#            $cmd = "$FASTA_SPLIT $newfile3 $CHUNK $chunkDIR";
+#            if ( system($cmd) ) {
+#                croak("Couldn't split file.$@\n");
+#            }
+#
+#            # Isolate biggest sequences
+#            check_chunksizes();
+#
+#            print "\nChopped up file.\n";
+#        } ## end if ($update)
+#        print "End of fastafiles():\t\$update = $update\n";
+    };
+    if ($@) {
+        print STDERR "\nERROR: $@";
+        return 0;
+    }
+    return 1;
+} ## end sub fastafiles
+
+sub write_to_file {
+#    print "\t>>> in write_to_file\n";
+    my $update;
+
+#    $status = 0;
+
+    my %EMBL_ids;
+    my $header;
+    my @filestamp;
+
+    # Get entries for species of interest, combine base file and
+    # update file.
+    # Read update file.
+    local $/ = "\n>";
+    open( RP, "<", $DATA_DIR . "/" . $VERTRNA_UPDATE )
+      or croak("can't read $VERTRNA_UPDATE\n");
+    open( WP, ">", $DATA_DIR . "/" . $newfile )
+      or croak("can't create $newfile\n");
+    while ( my $entry = <RP> ) {
+        # Need this to include the first record when using $/='\n>'
+        $entry =~ s/^>//;
+        if ( $entry =~ m/$SPECIES/ ) {
+            # Extract & save id
             $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-            if(!$1){ die "\n$vertrna_update: unmatched id pattern:\n$entry\n"; }
+            if ( !$1 ) {
+                croak(   "\n$VERTRNA_UPDATE: "
+                       . "unmatched id pattern:\n$entry\n" );
+            }
             #else {print STDERR "$1\n$entry\n";}
             $EMBL_ids{$1} = 1;
-            #re-write fasta entry
+            # Re-write fasta entry
             $entry =~ s/\>//g;
-            print WP '>'.$entry;
-          }
+            print WP '>' . $entry;
         }
-        close(RP);
-        print "read update $vertrna_update EMBL file.\n";
-
-        # we're not sure how many embl files there are. We know there are at least 2 files
-        # read all embl_vertrna-* files from datadir
-        # and store them in an array
-        my @embl_vertrna_files;
-        opendir DIR, "$dataDIR" || die "Cannot opendir $dataDIR $!";
-        while ( my $filename = readdir(DIR) ) {
-          if ($filename=~/$vertrna/){
-            push @embl_vertrna_files, $filename;
-          }
-        }
-
-        # now loop through all embl_vertna files
-        #read base file
-        foreach my $embl_vert (@embl_vertrna_files) {
-          open(RP, "<", $dataDIR."/".$embl_vert) or die("can t read $embl_vert\n");
-          #<RP>;
-          while (my $entry = <RP>){
-            $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-            if($entry =~ m/$species/){
-              #extract & save id
-              $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/; 
-              if(!$1){ die "\n$embl_vert: unmatched id pattern:\n$entry\n"; }
-              if( !defined($EMBL_ids{$1}) ){
-                #add fasta entry for unchanged id
-                $entry =~ s/\>//g;
-                print WP '>'.$entry;
-              }
-            }
-          }
-          close(RP);
-          print "read base $embl_vert EMBL file.\n";
-        }
-
-        #read RefSeq file
-        open(RP, "<", $dataDIR."/".$refseq) or die("can t read $refseq.\n");
-        #<RP>;
-        while (my $entry = <RP>){
-          $entry =~s/^>//; #need this to include the first record when using $/='\n>'
-          #we're not using 'predicted' XM entries for now
-          if($entry =~ m/^gi.+ref\|(NM_.+)\| $species.*/){
-            $header = $1;
-          }
-          elsif($entry =~ m/^gi.+ref\|(NR_.+)\| $species.*/){
-            $header = $1;
-          }
-          else{
-            next;
-          }
-          $entry =~ s/\>//g;
-          if($header){
-            #reduce header to accession number
-            $entry =~ s/^gi.+\n{1}?/$header\n/g;
-            print WP '>'.$entry;
-          }
-        }
-        print "read RefSeq file.\n";
-        close(RP);
-        close(WP);
-        local $/ = "\n";
-      }    
-
-      # now get the kill_list
-      #Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
-      my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
-      my %kill_list = %{$kill_list_object->get_kill_list()};
-
-      open(LIST, "<", $gss) or die("can't open gss list $gss");
-      my %gss;
-      while (<LIST>){
-        my @tmp = split/\s+/, $_;
-        $gss{$tmp[1]} = 1;
-      }
-      close LIST;
-
-      #go through file removing any seqs which appear on the kill list
-      local $/ = "\n>";
-      my $newfile2 = $newfile.".seqs";
-      open(SEQS, "<", $dataDIR."/".$newfile) or die("can't open seq file $newfile");  
-      open(OUT, ">", $dataDIR."/".$newfile2) or die("can't open seq file $newfile2"); 
-      while(<SEQS>){
-        s/>//g;
-
-        my @tmp = split/\n/, $_;
-        my $acc; #store the accession number
-        if ($tmp[0]=~/(\w+)\./){
-          $acc = $1;
-        }
-        if ((!exists $kill_list{$acc}) && !exists $gss{$acc}){
-          print OUT ">$_";
-        }
-      } #while
-      local $/ = "\n";
-      close OUT;
-      close SEQS;
-
-      if($update){
-        #clip ployA tails
-        print "performing polyA clipping...\n";
-        my $newfile3 = $dataDIR."/".$newfile2.".clipped"; 
-
-        $cmd = "perl ".$polyA_clipping ." -readfile ".$dataDIR."/".$newfile2." -outfile ".$newfile3;
-
-        if(system($cmd)){
-          die("couldn t clip file.$@\n");
-        } 
-
-        #split fasta files, store into CHUNKDIR
-        print "splitting fasta file.\n";
-        $cmd = "$fastasplit $newfile3 $chunknum $chunkDIR";
-        if(system($cmd)){
-          die("couldn t split file.$@\n");
-        }
-
-        #isolate biggest sequences
-        check_chunksizes();
-
-        print "\nchopped up file.\n";
-      } #update
-    }; #eval   
-
-
-    if($@){
-      print STDERR "\nERROR: $@";
-      return 0;
-    }
-  return 1;
-}
-
-sub remake_fasta_files{
-
-  #have already made the sequence file from the previously clipped seqs: 
-  #just need to rechunk it:         
-        
-  my $file = $dataDIR."/missing_cdnas.fasta"; #from sub find_missing_cdnas
-     
-  #how many files do we want? automatically adjust chunk_num, don't wnat >20 seqs/file because softmasktarget = false
-  my $chunk_num = int ($num_missing_cdnas / 20);
-        
-  #split fasta files, store into new CHUNKDIR
-  print "splitting new fasta file.\n";
-
-  $cmd = "$fastasplit $file $chunk_num $chunkDIR";
-  if(system($cmd)){
-    die("couldn t split file.$@\n");
-  }
-
-  #isolate biggest sequences
-  check_chunksizes();
-
-  print "\nchopped up file.\n";
-}
-
-
-
-
-
-#find the really big sequences & put them into separate chunks
-
-sub check_chunksizes{
-  local $/ = '>';
-  my $allseqs;
-  my $file;
-  my $toolongs;
-  my $seqname;
-  my $newfile;
-
-  unless ( opendir( DIR, $chunkDIR ) ) {
-    die "can t read $chunkDIR";
-  }
-  foreach( readdir(DIR) ){
-    if(($_ =~ /^\.+$/) or ($_ =~ /^newchunk.+$/)){ next; }
-      $file = $chunkDIR."/".$_;
-      $toolongs = 0;
-      $allseqs = "";
-
-      open(CHUNKFILE, "<$file") or die("can t open file $file.");
-      <CHUNKFILE>; #skipping the first one as it just contains ">"
-
-      while(my $seq = <CHUNKFILE>){
-        $seq =~ s/\>//;
-        $seq =~ m/(.+)\n/;
-        $seqname = $1;
-        if(length($seq) > $maxseqlength){
-                  print "\nTOO LONG: $seqname";
-                  if(!$toolongs){
-                        $toolongs = 1;
-                  }
-                  $newfile = $chunkDIR."/newchunk_".$seqname;
-                  open(NEWFILE, ">$newfile") or die "can t create new fasta file $newfile!";
-                  print NEWFILE ">".$seq;
-                  close(NEWFILE);
-        }
-        else{
-                  $allseqs .= ">".$seq;
-        }
-      }
-      close(CHUNKFILE);
-
-    if($toolongs){
-      open(CHUNKFILE, ">$file") or die("can t open file $file.");
-      print CHUNKFILE $allseqs;
-      close(CHUNKFILE);
-    }
-  }
-  closedir(DIR);
-  local $/ = "\n";
-}
-
-
-# prepare required databases: pipe DB, result DB,
-# fill required tables with data
-
-sub DB_setup{
-  $status = 0;
-
-  eval{
-    
-        if ($rerun_flag == 0){
-        
-                #create dbs, deleting if existing
-        $status  = system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_PIPE_DBNAME;\"");
-        if($status && $status != 256){ die("couldnt drop old database $WB_PIPE_DBNAME!\n"); }
-        $status  = system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"CREATE DATABASE $WB_PIPE_DBNAME;\"");
-        $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
-        $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$cvsDIR."/ensembl-pipeline/sql/table.sql");
-        print ".";
-        $status  = system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"DROP DATABASE IF EXISTS $WB_TARGET_DBNAME;\"");
-        if($status && $status != 256){ die("couldnt drop old database $WB_TARGET_DBNAME!\n"); }
-        $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"CREATE DATABASE $WB_TARGET_DBNAME;\"");
-        $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$cvsDIR."/ensembl/sql/table.sql");
-        print ".";
-        #copy defined db tables from current build #removed analysis table
-                  
-                $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT -t $WB_REF_DBNAME".
-          " assembly assembly_exception attrib_type coord_system meta seq_region seq_region_attrib ".
-          " > ".$dataDIR."/import_tables.sql";
-
-        $status += system($cmd);
-        print ".";
-        $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e  '".
-                   "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM assembly_exception; DELETE FROM attrib_type; DELETE FROM coord_system;" .
-                   "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region_attrib;' $WB_PIPE_DBNAME ";
-
-        $status += system($cmd);
-        print ".";
-        $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".$dataDIR."/import_tables.sql");
-        print ".";
-        #copy dna table from current build
-        $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_REF_DBHOST -P$WB_REF_DBPORT".
-                   " -t $WB_REF_DBNAME dna"." > ".$dataDIR."/import_tables2.sql";
-        $status += system($cmd);
-        print ".";
-        $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_PIPE_DBNAME < ".
-                $dataDIR."/import_tables2.sql";
-        $status += system($cmd);
-        print  ".";
-                $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME -e \"LOAD DATA LOCAL INFILE \'$cvsDIR".
-                       "/ensembl/misc-scripts/external_db/external_dbs.txt\' INTO TABLE external_db\"";
-                $status += system($cmd);
-                print  ".";
-                $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME -e \"LOAD DATA LOCAL INFILE \'$cvsDIR".
-                       "/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt\' INTO TABLE unmapped_reason\"";
-                $status += system($cmd);           
-                
-                if($status){ die("couldnt create databases!\n"); }
-        print "created databases.\n";
-
-        }else{
-                #if rerunning without rebuilding databases - clear out jobs tables first:
-        $cmd = "mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e  '".
-            "DELETE FROM job; DELETE FROM job_status; DELETE FROM rule_goal; DELETE FROM rule_conditions;" .
-        "DELETE FROM input_id_analysis; DELETE FROM input_id_type_analysis; DELETE from analysis where logic_name = \"$newFeatureName\";".
-            "DELETE from analysis where logic_name = \"$submitName\";' $WB_PIPE_DBNAME ";
-        $status += system($cmd);
-   } 
-        
-        #insert analysis entries
-    $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/add_Analysis ".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
-           " -logic_name $newFeatureName -program $program_name -program_version $program_version".
-           " -program_file $program_file -module $module_name".
-           " module_version 1 -gff_source Exonerate -gff_feature similarity -input_id_type FILENAME";
-    $status += system($cmd);
-    $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/add_Analysis ".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
-           " -logic_name $submitName -module dummy -input_id_type FILENAME";
-    $status += system($cmd);
-    $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/RuleHandler.pl".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
-           " -insert -goal $newFeatureName -condition $submitName";
-    $status += system($cmd);
-    $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/make_input_ids".
-           " -dbhost $WB_PIPE_DBHOST -dbname $WB_PIPE_DBNAME -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbport $WB_PIPE_DBPORT".
-           " -file -dir $chunkDIR -logic_name $submitName";
-    $status += system($cmd);
-    if($status){ die("Error while setting up the database.\n") }
-    print "database set up.\n";
-    #copy analysis entries (and others, just to make sure)
-    $cmd = "mysqldump -u$WB_DBUSER -p$WB_DBPASS -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -t $WB_PIPE_DBNAME".
-           " analysis assembly assembly_exception attrib_type coord_system meta seq_region seq_region_attrib ".
-           "> ".$dataDIR."/import_tables3.sql";
-
-    $status += system($cmd);
-    $cmd = "mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e '".
-           "DELETE FROM analysis; DELETE FROM assembly; DELETE FROM attrib_type; DELETE FROM coord_system; ".
-           "DELETE FROM meta; DELETE FROM meta_coord; DELETE FROM seq_region; DELETE FROM seq_region_attrib; ".
-           "DELETE FROM assembly_exception;' $WB_TARGET_DBNAME";
-    $status += system($cmd);
-
-    $status += system("mysql -h$WB_TARGET_DBHOST -P$WB_TARGET_DBPORT -u$WB_DBUSER -p$WB_DBPASS $WB_TARGET_DBNAME < ".$dataDIR."/import_tables3.sql");
-    if($status){ die("Error while synchronising databases.\n") }
-    print "databases in sync.\n";
-  };
-  if($@){
-    print STDERR "\nERROR: $@";
-    return 0;
-  }
-  return 1;
-}
-
-
-# call rulemanager to start the exonerate run, leaving the set-up script
-
-sub run_analysis{
-  #running a test first
-  print "\nRunning the test-RunnablDB first.\nPlease monitor the output.\nShould we start? (y/n)";
-  my $ans = "";
-
-  if ( get_input_arg() ) { 
-    #get one input id for testing
-    my $db = db_connector($WB_PIPE_DBHOST, $WB_PIPE_DBPORT, $WB_PIPE_DBNAME, "ensro");
-    my $sql = 'SELECT input_id FROM input_id_analysis i, analysis a WHERE i.analysis_id=a.analysis_id '.
-              'AND a.logic_name="'.$submitName.'" LIMIT 1;';
-    my $sth = $db->prepare($sql) or die "sql error getting an input-id!";
-    $sth->execute();
-    my ($input_id) = $sth->fetchrow_array;
-    if(!$input_id){
-      die "\nCould not get an input id from database!\nQuery used: $sql\n\n";
-    }
-    $cmd = "perl ".$cvsDIR."/ensembl-analysis/scripts/test_RunnableDB ".
-           "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME ".
-           "-input_id $input_id -logic_name $newFeatureName -verbose -nowrite";
-    print $cmd."\n";
-    system($cmd);
-    print "\nDid the test_RunnableDB cmd ".$cmd." produce any results?\n".
-      "If you answer no to this question the script will exit (y/n)";
-    if(!get_input_arg()){
-      print $cmd." did not produce any results, this probably means there are issues".
-        "This script will exit you need to investigate\n";
-      exit;
-    }
-  }
-  #start the real process
-  print "\n\nShould we start the actual analysis? (y/n)";
-  if ( get_input_arg() ) { 
-    $cmd = "perl ".$cvsDIR."/ensembl-pipeline/scripts/rulemanager.pl ".
-           "-dbhost $WB_PIPE_DBHOST -dbport $WB_PIPE_DBPORT -dbuser $WB_DBUSER -dbpass $WB_DBPASS -dbname $WB_PIPE_DBNAME";
-    print "\nSTARTING PIPELINE.\nusing the command:\n".$cmd."\n\nPlease monitor results/errors of the pipeline.\n\n";
-    system($cmd);
-  }
-  else{
-    print "\nProcess interrupted. Not running pipeline.\n\n";
-  }
-}
-
-#identify cdnas which did not align to the genome:
-sub find_missing_cdnas{
-
-  #find all the cdnas which have hits in the database:
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                               -host    => $WB_TARGET_DBHOST,
-                                               -port    => $WB_TARGET_DBPORT,
-                                               -user    => $WB_DBUSER,
-                                               -dbname  => $WB_TARGET_DBNAME,
-                                                   -pass    => $WB_DBPASS
-                                              );
-
-  
-  my $sql = ("select hit_name from dna_align_feature");                  
-
-  my $q1 = $db->dbc->prepare($sql) or die "sql error";
-  $q1->execute();
-  my (%cdna_hits);
-  
-  #make list of cdnas with hits in the database
-  while (my $cdna = $q1->fetchrow_array){
-    $cdna_hits{$cdna} = 1;
-  }       
-
-  #now go through clipped sequence file and extract those sequences which do not have any hits in the database
-
-  open (OUT, ">".$dataDIR."/missing_cdnas.fasta") or die("can t open file missing_cdnas.fasta");
-  local $/ = "\n>";
-  my $cdna_file = $dataDIR."/".$newfile.".seqs.clipped";
-  open(IN, "<$cdna_file") or die("can t open file $cdna_file.");
-  while(<IN>){
-    my $seq = $_;
-          
-    if ($seq=~/(\w+\.\d+)\n/){
-               
-      if(!exists $cdna_hits{$1}){
-        $seq =~ s/>//g;
-        print OUT ">$seq\n";
-      }       
-    }
-  }                       
-  close IN;
-  close OUT;
-  
-  $num_missing_cdnas = `grep ">" $dataDIR/missing_cdnas.fasta | wc -l`;
-  chomp $num_missing_cdnas;
-  return $num_missing_cdnas;
-}
-
-#run a check to see if there are any unfinished jobs in the database:
-sub chase_jobs{
-
-  #incase have skipped previous sections, reset variables:
-  $rerun_flag = 1;
-  $chunkDIR = $dataDIR."/chunks2";
- 
-
-  my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                   -host    => $WB_PIPE_DBHOST,
-                                                   -port    => $WB_PIPE_DBPORT,
-                                                   -user    => $WB_DBUSER,
-                                                   -dbname  => $WB_PIPE_DBNAME,
-                                                           -pass    => $WB_DBPASS
-                                                  );
-
-  #want to find the list of input files which did not finish running in the db
-  my $sql = ("select input_id from job as j, job_status as s where j.job_id = s.job_id && s.is_current = 'y'");                   
-
-  my $q1 = $db->dbc->prepare($sql) or die "sql error";
-  $q1->execute();
-  my %chunks;
-  while (my $file = $q1->fetchrow_array){
-    $chunks{$file} = 1;
-  }       
-
-  my $n = keys %chunks;
-  
-  if ($n){
-    print "$n chunks did not finish\n";
-        
-    #store the chunks into a single file:
-    open (OUT, ">".$dataDIR."/single_file.out") or die("can t open file single_file.out");
-    open (LIST, ">".$chunkDIR."/went_awol.txt") or die("can t open file went_awol.txt"); #store the list incase need to rerun
-    my $seq_count = 0;
-    foreach my $file (keys %chunks){
-      print LIST "$file\n";
-      open IN, $chunkDIR."/".$file  or die "can't open ".$chunkDIR."/$file $!\n";
-
-      while (<IN>){
-        if ($_=~/>/){
-          $seq_count++;
-        }
-        print OUT "$_";
-      }
-      close IN;
-    }
-    close OUT;
-    close LIST;
-          
-    print "There were $seq_count cdnas in the files which didn't run\n";
-    print "Would you like to try with smaller chunk files?(y/n)\n";
-    my $ans = "";
-    if ( get_input_arg() ) { 
-      print "please specify number of chunk files to make (maximum = 1 file per cdna): ";
-      my $ans = "";
-
-      chomp($ans = <STDIN>);
-      if ($ans > $seq_count){
-        print "this would give less than 1 sequence per file\n";
-        exit;
-      }elsif ($ans <= $n){
-        print "this is the same number of chunk files as last time - it would be better to increase the number of files\n";
-        exit;
-      }else{
-        if ($newFeatureName=~/_2/){
-          $newFeatureName =~s/_2/_3/; #to show different run
-        }else{
-          $newFeatureName = $newFeatureName."_3"; #if have restarted from point after the second run
-        }
-        $configvars{"newFeatureName"} = $newFeatureName; 
-        $chunkDIR           = $dataDIR."/chunks3";
-        $configvars{"chunkDIR"} = $chunkDIR;
-        $outDIR             = $dataDIR."/output3";
-        $configvars{"outDIR"} = $outDIR;
-#                   
-#      #check that the new exonerate parameters are set
-        config_setup();
-#                        
-        $chunknum = $ans;
-        $chunkDIR = $dataDIR."/chunks3";
-        print "splitting into $chunknum chunks.\n";
- 
-        $cmd = "$fastasplit $dataDIR/single_file.out $chunknum $chunkDIR";
-        if(system($cmd)){
-          die("couldn t split file.$@\n");
-        }
-        #isolate biggest sequences
-        check_chunksizes();
-
-        print "\nchopped up file.\n";
-        print "\nset databases for next (third) run?(y/n) ";
-        if ( get_input_arg() ) { 
-          $rerun_flag = 1;
-          if(! DB_setup()   ){ unclean_exit(); }
-          print "\n\nFinished setting up the analysis.\n";
-        }
-        print "\nStart 3rd run ? (y/n) ";
-        if ( get_input_arg() ) {  
-          run_analysis(); 
-          print "you should check for any AWOL jobs now, hopefully there won't be any \n";
-        }
-      }
-    }       
-  }       
-}
-
-#check the database for those cDNAS which hit many times - might be worth adding these to the kill list
-#depending on what they are eg LINEs
-sub find_many_hits{
-        #mysql queries involving temporary tables 
-        my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                         -host    => $WB_TARGET_DBHOST,
-                                                         -port    => $WB_TARGET_DBPORT,
-                                                         -user    => $WB_DBUSER,
-                                                         -dbname  => $WB_TARGET_DBNAME,
-                                                                 -pass    => $WB_DBPASS
-                                                        );
-
-                
-        #make a table containing each transcript matchign a cDNA
-        my $sql1 = ("create temporary table tmp1 ".
-                "select hit_name, exon_transcript.transcript_id ".
-                "from dna_align_feature, supporting_feature, exon_transcript ".
-                "where dna_align_feature_id = feature_id and supporting_feature.exon_id = exon_transcript.exon_id ".
-                "group by hit_name, exon_transcript.transcript_id");            
-
-        my $q1 = $db->dbc->prepare($sql1) or die "sql error 1";
-        $q1->execute();
-        
-        #group these to find the number of hits per cDNA
-        my $sql2 = ("create temporary table tmp2 select hit_name, count(*) as hits from tmp1 group by hit_name");               
-
-        my $q2 = $db->dbc->prepare($sql2) or die "sql error 2";
-        $q2->execute();
-        
-        #examine those which hit more than 20 places
-        my $sql3 = ("select * from tmp2 where hits > 20 order by hits desc");           
-
-        my $q3 = $db->dbc->prepare($sql3) or die "sql error 3";
-        $q3->execute();
-        my $many_hits_flag = 0;
-        while (my ($cdna, $hits)  = $q3->fetchrow_array){
-                print "$cdna\t$hits\n";
-                $many_hits_flag = 1;
-        }       
-        
-        if ($many_hits_flag){
-                print "It might be worth investigating these sequences to see whether these are likely to be genuine hits.\n".
-                "If we don't want them in the database you should add them to the kill list\n";
-        }
-}
-
-#run the script to parse output from ExonerateTranscriptFilter to identify reasons for failures
-sub why_cdnas_missed{
-        #first need to create no_hits.txt
-        #make a file containing all of the relevant lines from ExonerateTranscriptFilter.pm outputs
-        my @output = ("output2", "output3");
-        my $concat_file = $dataDIR."/concatenated_output_files.out"; 
-
-        if ( -e $concat_file ) {
-         system("rm $concat_file") ;
-        }
-
-        my $file = $dataDIR."/failed_hits.out";
-        
-        open (OUT, ">$file") or die("can t open file $file"); #to empty it
-        close OUT; 
-
-        for my $output (@output){ 
-           print "processing *out files in :  $dataDIR/$output \n" ; 
-           # i know this is not ideal but it's much faster than the individual greps .. 
-           my $cmd = "find $dataDIR/$output/ -name \"*out\"  -exec cat {} \\; >> $concat_file ";
-           system($cmd) ;
-         } 
-
-          ` grep "rpp" $concat_file >> $file`;
-          ` grep "only" $concat_file >> $file`;
-          ` grep "reject" $concat_file >> $file`;
-          ` grep "max_coverage" $concat_file >> $file`;
-
-    # need to replace "[" and "]" with
-    # "\[" and "\]" otherwise GetOpt::Long doesn't
-    # parse it correctly on the commandline 
-    my $vertrna_fix = $vertrna;
-    $vertrna_fix =~ s/\[/\\[/;
-    $vertrna_fix =~ s/\]/\\]/;
-
-        #need to pass all the variables to the script:
-
-    $cmd = "perl ".$reasons_prog.
-           " -gss ".$gss." -seq_file ".$dataDIR."/missing_cdnas.fasta -user $WB_DBUSER".
-           " -pass $WB_DBPASS -host ".$WB_TARGET_DBHOST." -port ".$WB_TARGET_DBPORT." -dbname ".$WB_TARGET_DBNAME.
-           " -species \"".$species."\" -vertrna ".$dataDIR."/".$vertrna_fix." -refseq ".$dataDIR."/".$refseq.
-           " -vertrna_update ".$dataDIR."/".$vertrna_update." -infile ".$file.
-                   " -findN_prog ".$findN_prog." -reasons_file ".$reasons_file;
-
-
-        #print "$cmd\n";
-    if(system($cmd)){
-                 warn " some error occurred when running $reasons_prog!\n$cmd\n "; 
-        }else{
-                print "unmapped objects stored\n";
-        }
-}
-
-#update the meta-coord table
-sub update_metacoord{
-  my @table_names = qw(gene
-                     exon
-                     dna_align_feature
-                     transcript);
-
-  my $dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
-                                                     -host    => $WB_TARGET_DBHOST,
-                                                     -port    => $WB_TARGET_DBPORT,
-                                                     -user    => $WB_DBUSER,
-                                                         -pass    => $WB_DBPASS,
-                                                     -dbname  => $WB_TARGET_DBNAME
-                                                    );
-
-  my $sql = "truncate meta_coord";
-  my $sth = $dbc->prepare($sql);
-  $sth->execute;
-  $sth->finish;
-  
-  foreach my $table_name (@table_names) {
-  
-        my $sql = "insert into meta_coord select '$table_name',s.coord_system_id, max(t.seq_region_end-t.seq_region_start+1) ".
-           "from $table_name t, seq_region s where t.seq_region_id=s.seq_region_id group by s.coord_system_id";
-        my $sth = $dbc->prepare($sql);
-        $sth->execute;
-        $sth->finish;
-        
-  }
-  
-  print STDERR "Finished updating meta_coord table\n";
-
-}
-
-
-#To fix various meta table entries
-sub fix_metatable{
-
-  my $dbc = Bio::EnsEMBL::DBSQL::DBConnection->new(
-                                                     -host    => $WB_TARGET_DBHOST,
-                                                     -port    => $WB_TARGET_DBPORT,
-                                                     -user    => $WB_DBUSER,
-                                                         -pass    => $WB_DBPASS,
-                                                     -dbname  => $WB_TARGET_DBNAME
-                                                    );
-
-#remove prev entries  
-  my $sql = "delete from meta where meta_key like 'genebuild%"."id'";
-  my $sth = $dbc->prepare($sql);
-  $sth->execute;
-  $sth->finish;
-
-#set the genebuild id:
-
-  $sql = "insert into meta (meta_key, meta_value) values ('genebuild_id', '$genebuild_id' )";
-  $sth = $dbc->prepare($sql);
-  $sth->execute;
-  $sth->finish;
-
-#set all gene and transcript statuses to putative:
-  $sql = "update gene set status = 'PUTATIVE'";
-  $sth = $dbc->prepare($sql);
-  $sth->execute;
-  $sth->finish;
-
-  $sql = "update transcript set status = 'PUTATIVE'";
-  $sth = $dbc->prepare($sql);
-  $sth->execute;
-  $sth->finish;
-
-
- 
-#reload the taxonomy to make sure it's up to date:
-
-my $cmd = "perl $load_taxonomy_prog ".
-          "-name \"$species\" -taxondbhost $TAXONDBHOST -taxondbport $TAXONDBPORT ".
-                  "-taxondbname $TAXONDBNAME -lcdbhost $WB_TARGET_DBHOST -lcdbport $WB_TARGET_DBPORT ".
-                  "-lcdbname $WB_TARGET_DBNAME -lcdbuser $WB_DBUSER -lcdbpass $WB_DBPASS";
-
-if(system($cmd)){
-     warn " some error occurred when running $load_taxonomy_prog \n$cmd\n "; 
-  }else{
-     print "meta table fixed\n";
-  }
-}
-
-# remove files and database leftovers after analysis,
-# restore original config files
-
-sub clean_up{
-  my $option = shift;
-  my $ans = "";
-  $status = 0;
-  #read data dump
-  open(RP, "< config_paths.perldata") or $status = 1;
-  if(!$status){
-    undef $/;
-    eval <RP>;
-    if($@){
-      $/ = "\n";
-      die "\ncant recreate data dump.\n$@\n";
     }
     close(RP);
-    $/ = "\n";
-  }
-  else{
-    warn "\ncan't open data dumping file! Already cleaned?\n";
-    $status = 0;
-  }
+    print("\nRead update $VERTRNA_UPDATE EMBL file.\n");
 
-  if(!$option){
-    #remove files (fasta, chunks, sql)
-    opendir DIR, "$dataDIR" || die "Cannot opendir $dataDIR $!";
     my @embl_vertrna_files;
+    opendir( DIR, "$DATA_DIR" || croak "Cannot opendir $DATA_DIR $!" );
     while ( my $filename = readdir(DIR) ) {
-      if ($filename=~/$vertrna/){
-        push @embl_vertrna_files, $filename;
-      }
+        if ( $filename =~ /$VERTRNA/ ) {
+            push @embl_vertrna_files, $filename;
+        }
     }
-    closedir DIR;
+
+    # now loop through all embl_vertna files
+    #read base file
     foreach my $embl_vert (@embl_vertrna_files) {
-      if(-e $dataDIR."/".$embl_vert){
-        $cmd = "rm " . $dataDIR."/".$embl_vert;
-        print STDERR "$cmd\n";
-        $status += system($cmd);
-      }
+#        print "\t>>> reading $embl_vert\n";
+        open( RP, "<", $DATA_DIR . "/" . $embl_vert )
+          or croak("Can't read $embl_vert\n");
+        #<RP>;
+        while ( my $entry = <RP> ) {
+            # Need this to include the first record when using $/='\n>'
+            $entry =~ s/^>//;
+            if ( $entry =~ m/$SPECIES/ ) {
+                # Extract & save id
+                $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
+                if ( !$1 ) {
+                    croak("\n$embl_vert: unmatched id pattern:\n$entry\n");
+                }
+                if ( !defined( $EMBL_ids{$1} ) ) {
+                    # Add fasta entry for unchanged id
+                    $entry =~ s/\>//g;
+                    print WP '>' . $entry;
+                }
+            }
+        }
+        close(RP);
+        print "Read base $embl_vert EMBL file.\n";
     }
-    if(-e $dataDIR."/".$vertrna_update){
-      $cmd = "rm " . $dataDIR."/".$vertrna_update;
-      $status += system($cmd);
+
+    # Read RefSeq file
+    open( RP, "<", $DATA_DIR . "/" . $REFSEQ )
+      or croak("Can not read $REFSEQ.\n");
+    while ( my $entry = <RP> ) {
+
+        # Need this to include the first record when using $/='\n>'
+        # we're not using 'predicted' XM entries for now
+        $entry =~ s/^>//;
+        if ( $entry =~ m/^gi.+ref\|(NM_.+)\| $SPECIES.*/ ) {
+            $header = $1;
+        } elsif ( $entry =~ m/^gi.+ref\|(NR_.+)\| $SPECIES.*/ ) {
+            $header = $1;
+        } else {
+            next;
+        }
+        $entry =~ s/\>//g;
+        if ($header) {
+            # Reduce header to accession number
+            $entry =~ s/^gi.+\n{1}?/$header\n/g;
+            print WP '>' . $entry;
+        }
     }
-    if(-e $dataDIR."/".$refseq){
-      $cmd = "rm " . $dataDIR."/".$refseq;
-      $status += system($cmd);
+    print "read RefSeq file.\n";
+    close(RP);
+    close(WP);
+    local $/ = "\n";
+
+#    print "End of write_to_files()\n";
+} ## end sub write_to_file
+
+# Now get the kill_list
+# Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
+sub remove_kill_list_object {
+    my $kill_list_object =
+      Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cDNA_update' );
+    my %kill_list = %{ $kill_list_object->get_kill_list() };
+
+    open( LIST, "<", $GSS ) or croak("can't open gss list $GSS");
+    my %gss;
+    while (<LIST>) {
+        my @tmp = split /\s+/, $_;
+        $gss{ $tmp[1] } = 1;
     }
-    print "\n\nshould we remove the clipped fasta files? (y/n)   ";
-    if ( get_input_arg() ) { 
-      if(-e $dataDIR."/".$newfile){
-                $cmd = "rm " . $dataDIR."/".$newfile;
+    close LIST;
+
+    # Go through file removing any seqs which appear on the kill list
+    local $/ = "\n>";
+    if ( !( -e $DATA_DIR . "/" . $newfile ) ) {
+        print("\t>>>newfile not here so need to create it first<<<\n");
+        write_to_file();
+    }
+    my $newfile2 = $newfile . ".seqs";
+    open( SEQS, "<", $DATA_DIR . "/" . $newfile )
+      or croak("Can't open seq file $newfile");
+    open( OUT, ">", $DATA_DIR . "/" . $newfile2 )
+      or croak("Can't open seq file $newfile2");
+    while (<SEQS>) {
+        s/>//g;
+
+        my @tmp = split /\n/, $_;
+
+        # Store the accession number
+        my $acc;
+        if ( $tmp[0] =~ /(\w+)\./ ) {
+            $acc = $1;
+        }
+        if ( ( !exists $kill_list{$acc} ) && ( !exists $gss{$acc} ) ) {
+            print OUT ">$_";
+        }
+    }
+
+    local $/ = "\n";
+    close OUT;
+    close SEQS;
+
+    return $newfile2;
+} ## end sub remove_kill_list_object
+
+
+# Have already made the sequence file from the previously clipped
+# seqs, just need to rechunk it.
+sub remake_fasta_files {
+
+#    print("\t>>> in remake_fasta_files\n");
+    my $file = $DATA_DIR . "/missing_cdnas.fasta";
+
+    # How many files do we want? automatically adjust chunk_num,
+    # don't want >20 seqs/file because softmasktarget = false
+    my $chunk_num = int( $num_missing_cdnas/20 );
+
+    # Split fasta files, store into new CHUNKDIR
+    print("Splitting new fasta file in to chuncks.\n");
+
+    $cmd = "$FASTA_SPLIT $file $chunk_num $chunkDIR";
+    if ( system($cmd) ) {
+       croak("Couldn't split file.$@\n");
+    }
+
+    # Isolate biggest sequences
+    check_chunksizes();
+
+    print "\nChopped up file.\n";
+}
+
+
+# Find the really big sequences & put them into separate chunks
+sub check_chunksizes {
+    local $/ = '>';
+    my $allseqs;
+    my $file;
+    my $toolongs;
+    my $seqname;
+    my $newfile;
+
+    unless ( opendir( DIR, $chunkDIR ) ) {
+        croak("Can't read $chunkDIR");
+    }
+
+    foreach ( readdir(DIR) ) {
+        if ( ( $_ =~ /^\.+$/ ) || ( $_ =~ /^newchunk.+$/ ) ) { next; }
+        $file     = $chunkDIR . "/" . $_;
+        $toolongs = 0;
+        $allseqs  = "";
+
+        open( CHUNKFILE, "<$file" ) or croak("can t open file $file.");
+
+        # Skipping the first one as it just contains ">"
+        <CHUNKFILE>;
+
+        while ( my $seq = <CHUNKFILE> ) {
+            $seq =~ s/\>//;
+            $seq =~ m/(.+)\n/;
+            $seqname = $1;
+            if ( length($seq) > $maxseqlength ) {
+                print "\nTOO LONG: $seqname";
+                if ( !$toolongs ) {
+                    $toolongs = 1;
+                }
+                $newfile = $chunkDIR . "/newchunk_" . $seqname;
+                open( NEWFILE, ">$newfile" )
+                  or croak("Can't create new fasta file $newfile!");
+                print NEWFILE ">" . $seq;
+                close(NEWFILE);
+
+            } else {
+                $allseqs .= ">" . $seq;
+            }
+        }
+
+        close(CHUNKFILE);
+
+        if ($toolongs) {
+            open( CHUNKFILE, ">$file" ) or croak("Can't open file $file.");
+            print CHUNKFILE $allseqs;
+            close(CHUNKFILE);
+        }
+    } ## end foreach ( readdir(DIR) )
+
+    closedir(DIR);
+    local $/ = "\n";
+} ## end sub check_chunksizes
+
+
+# Prepare required databases; pipeline db, target db and fill required
+# tables with data.
+sub DB_setup {
+    $status = 0;
+
+#    print "\t>>> in DB_setup: analysis is $newFeatureName\n\n";
+
+    eval {
+        if ( $rerun_flag == 0 ) {
+
+            # Create the pipeline database
+            # 1 = pipeline db
+            $status = create_db( $WB_PIPE_DBNAME, 1 );
+
+            my $tables_to_delete =  'analysis '           . 'assembly '
+                                  . 'assembly_exception ' . 'attrib_type '
+                                  . 'coord_system '       . 'meta '
+                                  . 'meta_coord '         . 'seq_region_attrib ';
+
+            # Delete unnecessary tables
+            # 1 = pipeline db
+            delete_unwanted_tables( $tables_to_delete, 1 );
+
+            # Copy defined db tables from current build
+            my $tables_to_dump =  'assembly '       . 'assembly_exception '
+                                . 'attrib_type '    . 'coord_system '
+                                . 'meta '           . 'seq_region '
+                                . 'seq_region_attrib ';
+
+            # Dump the tables to import_tables1.sql
+            # 1 = file count
+            $status += dump_tables( $tables_to_dump, 1);
+
+            # Import tables from import_tables1
+            # 1 = file count
+            # 1 = pipeline db
+            $status += import_tables(1, 1);
+
+            # Copy dna table from current build and import it to pipeline
+            my $dna_table = 'dna';
+
+            # Dump the table to import_tables2
+            # 2 = file count
+            $status += dump_tables( $dna_table, 2 );
+
+            # 2 = file count
+            # 1 = pipeline
+            $status += import_tables(2, 1);
+
+            # Create the target database
+            $status += create_db($WB_TARGET_DBNAME);
+
+            # Remove unwanted tables from above plus the seq_region table from
+            # target db.
+            $tables_to_delete .= 'seq_region ';
+
+#            print( "\nTables to delete in targe db:\n" . $tables_to_delete,
+#                   "\n\n" );
+            delete_unwanted_tables( $tables_to_delete );
+
+            # Load the external_db and unmapped_reason tables from
+            # /ensembl/misc-scripts.
+            load_misc_script_files();
+
+            if ($status) { croak("Could not create databases!\n"); }
+
+            print("\nCreated databases.\n\n");
+
+        } else {
+            print ">>> in DB_setup else statement - rerun_flag: " . $rerun_flag . "\n";
+            # If rerunning without rebuilding databases - clear out jobs tables first:
+            print("\n\t>>>\$newFeatureName = $newFeatureName\n"
+                    . "\t>>>\$submitName = $submitName\n");
+
+            my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                                      $WB_PIPE_DBNAME, $WB_DBUSER,
+                                      $WB_DBPASS );
+
+            my $tables_to_remove =  'job '              .   'job_status '
+                                  . 'rule_goal '        .   'rule_conditions '
+                                  . 'input_id_analysis '.   'input_id_type_analysis ';
+
+            my @tables = split(/ /, $tables_to_remove);
+            foreach my $table ( @tables ) {
+                print "\tDeleting table $table\n";
+
+                my $sql = "DELETE FROM $table";
+                my $sth = $pipe_db->dbc->do($sql);
+            }
+
+            $pipe_db->dbc->do( "DELETE from analysis where logic_name = '$submitName'");
+            $pipe_db->dbc->do("DELETE from analysis where logic_name = '$newFeatureName'");
+
+#            print ">>> status in DB_setup: $status\n";
+            # Create analysis, set the rule and make the input_ids
+            print ">>> setting up analysis\n";
+            setup_analysis();
+
+        } ## end else [ if ( $rerun_flag == 0 )
+
+        # Create analysis, set the rule and make the input_ids
+#        setup_analysis();
+
+        # Copy analysis entries (and others, just to make sure)
+        my $tables_to_copy =  'analysis '           . 'assembly '
+                            . 'assembly_exception ' . 'attrib_type '
+                            . 'coord_system '       . 'meta '
+                            . 'meta_coord '         . 'seq_region '
+                            . 'seq_region_attrib';
+
+        # Dump the tables from ref db
+        # 3 = file count
+        # 1 = pipeline db
+        $status += dump_tables( $tables_to_copy, 3, 1 );
+
+        # Delete the unwanted tables in target db
+        delete_unwanted_tables( $tables_to_copy );
+
+        # Import the dumped tables to target db
+        # 3 = count of the output file
+        $status += import_tables(3);
+
+        if ($status) { croak("Error while synchronising databases.\n") }
+
+        print "\n\nDatabases in sync.\n";
+    };    ## end eval
+
+    if ($@) {
+        print STDERR "\nERROR: $@";
+        return 0;
+    }
+    return 1;
+} ## end sub DB_setup
+
+
+# Running a test first
+sub test_run {
+    print("\nRunning the test-RunnablDB.\n");
+
+    # Get one input id for testing
+    my $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                         $WB_PIPE_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    my $sql = "SELECT input_id "
+            . "FROM input_id_analysis i, analysis a "
+            . "WHERE i.analysis_id = a.analysis_id "
+            . "AND a.logic_name = '" . $submitName
+            . "' LIMIT 1;";
+
+    my $sth = $db->dbc->prepare($sql)
+        or croak("Sql error getting an input-id!\n$!");
+
+#    print $sth, "\n";
+
+    $sth->execute();
+    my ($input_id) = $sth->fetchrow_array;
+
+    print "\n$input_id\n";
+
+    if ( !$input_id ) {
+        croak(  "\nCould not get an input id from database!\n"
+              . "Query used: $sql\n\n" );
+    }
+
+    $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+         . " -dbhost "     . $WB_PIPE_DBHOST
+         . " -dbport "     . $WB_PIPE_DBPORT
+         . " -dbuser "     . $WB_DBUSER
+         . " -dbpass "     . $WB_DBPASS
+         . " -dbname "     . $WB_PIPE_DBNAME
+         . " -input_id "   . $input_id
+         . " -logic_name " . $newFeatureName
+         . " -verbose"
+         . " -nowrite";
+
+    print $cmd . "\n";
+    system($cmd);
+
+    print( "\nDid the test_RunnableDB cmd:\n\n"
+         . $cmd
+         . "\n\nproduce any results?\n\n"
+         . "If you answer no to this question the script will exit (y/n) " );
+
+    if ( !get_input_arg() ) {
+        print( $cmd
+             . "\n\nDid not give any results, this probably means "
+             . "there are issues with your set-up. "
+             . "This script will exit you need to investigate.\n\n" );
+        exit;
+    }
+} ## end sub test_run
+
+
+# Call rulemanager to start the exonerate runs, leaving the set-up
+# script.
+sub run_analysis {
+    eval {
+
+        print("\n\nShall we start the actual analysis? (y/n) ");
+
+        if ( get_input_arg() ) {
+            $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
+                 . " -dbhost "   . $WB_PIPE_DBHOST
+                 . " -dbport "   . $WB_PIPE_DBPORT
+                 . " -dbuser "   . $WB_DBUSER
+                 . " -dbpass "   . $WB_DBPASS
+                 . " -dbname "   . $WB_PIPE_DBNAME;
+
+            print(  "\nSTARTING THE PIPELINE.\n"
+                  . "Using command:\n\n"
+                  . $cmd
+                  . "\n\nPlease monitor the output with:\n\n"
+                  . "perl " . $CVS_DIR . "ensembl-pipeline/scripts/monitor"
+                  . " -dbhost "   . $WB_PIPE_DBHOST
+                  . " -dbport "   . $WB_PIPE_DBPORT
+                  . " -dbuser "   . $WB_DBUSER
+                  . " -dbpass "   . $WB_DBPASS
+                  . " -dbname "   . $WB_PIPE_DBNAME
+                  . " -current_summary"
+                  . " -finishedpercent\n\n" );
+
+            system($cmd);
+        }
+        else {
+            print("\nAre you sure you want to interrupt the analysis? (y/n) ");
+            if (get_input_arg() ) {
+                print("\nProcess interrupted. Not running pipeline.\n\n");
+            }
+            else {
+                if ( !run_analysis() ) {
+                    unclean_exit();
+                }
+            }
+        }
+    };  ## end eval
+
+    if ($@) {
+        print STDERR "\nERROR: $@";
+        return 0;
+    }
+    return 1;
+} ## end sub run_analysis
+
+# Identify cdnas which did not align to the genome.
+sub find_missing_cdnas {
+    # Find all the cdnas which have hits in the database.
+    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                         $WB_TARGET_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    my $sql = ("SELECT distinct hit_name FROM dna_align_feature");
+
+    my $q1 = $db->dbc->prepare($sql) or croak("Sql error.$!");
+    $q1->execute();
+
+    # Make list of cdnas with hits in the database.
+    my (%cdna_hits);
+    while ( my $cdna = $q1->fetchrow_array ) {
+        $cdna_hits{$cdna} = 1;
+    }
+
+    # Now go through clipped sequence file and extract those sequences
+    # which do not have any hits in the database.
+    open( OUT, ">" . $DATA_DIR . "/missing_cdnas.fasta" )
+      or croak("Can't open file missing_cdnas.fasta");
+
+    local $/ = "\n>";
+    my $cdna_file = $DATA_DIR . "/" . $newfile . ".seqs.clipped";
+
+    open( IN, "<$cdna_file" ) or croak("Can't open file $cdna_file!\n$!");
+    while (<IN>) {
+        my $seq = $_;
+
+        if ( $seq =~ /(\w+\.\d+)\n/ ) {
+            if ( !exists $cdna_hits{$1} ) {
+                $seq =~ s/>//g;
+                print OUT ">$seq\n";
+            }
+        }
+    }
+    close IN;
+    close OUT;
+
+    $num_missing_cdnas = `grep -c ">" $DATA_DIR/missing_cdnas.fasta`;
+    chomp $num_missing_cdnas;
+    return $num_missing_cdnas;
+
+} ## end sub find_missing_cdnas
+
+# Run a check to see if there are any unfinished jobs in the database.
+sub chase_jobs {
+
+    # In case have skipped previous sections, reset variables:
+    $rerun_flag = 1;
+    $chunkDIR   = $DATA_DIR . "/chunks2";
+
+    my $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                         $WB_PIPE_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    # Want to find the list of input files which did not finish
+    # running in the db.
+    my $sql = (  "SELECT input_id FROM job as j, job_status as s "
+               . "WHERE j.job_id = s.job_id && s.is_current = 'y'" );
+
+    my $q1 = $db->dbc->prepare($sql) or croak("Sql error$!\n");
+    $q1->execute();
+
+    my %chunks;
+    while ( my $file = $q1->fetchrow_array ) {
+        $chunks{$file} = 1;
+    }
+
+    my $chunk_numbers = keys %chunks;
+    if ($chunk_numbers) {
+        print "$chunk_numbers chunks did not finish.\n";
+
+        # Store the chunks into a single file:
+        open( OUT, ">" . $DATA_DIR . "/single_file.out" )
+          or croak("Can't open file single_file.out");
+
+        # Store the list incase need to rerun
+        open( LIST, ">" . $chunkDIR . "/went_awol.txt" )
+          or croak("Can't open file went_awol.txt");
+
+        my $seq_count = 0;
+        foreach my $file ( keys %chunks ) {
+            print LIST "$file\n";
+            open(IN, $chunkDIR . "/" . $file)
+              or croak("Can't open " . $chunkDIR . "/" . $file ."!$!\n");
+
+            while (<IN>) {
+                if ( $_ =~ />/ ) { $seq_count++; }
+                print OUT "$_";
+            }
+            close IN;
+        }
+        close OUT;
+        close LIST;
+
+        print( "\nThere were $seq_count cdnas in the files which didn't run\n"
+             . "Would you like to try with smaller chunk files? (y/n) " );
+
+        my $ans = "";
+        if ( get_input_arg() ) {
+            print(  "Please specify number of chunk files to make "
+                  . "(maximum = 1 cdna per file): " );
+
+                my $ans = "";
+                chomp( $ans = <STDIN> );
+
+                if ( $ans > $seq_count ) {
+                carp("This would give less than 1 sequence per file.\n");
+                exit;
+            } elsif ( $ans <= $chunk_numbers ) {
+                carp("This is the same number of chunk files as last time - "
+                    . "it would be better to increase the number of files\n");
+                exit;
+            } else {
+                if ( $newFeatureName =~ /_2/ ) {
+                    # To show different run
+                    $newFeatureName =~ s/_2/_3/;
+                } else {
+                    # If have restarted from point after the second run
+                    $newFeatureName = $newFeatureName . "_3";
+                }
+                $configvars{"newFeatureName"} = $newFeatureName;
+                $chunkDIR                     = $DATA_DIR . "/chunks3";
+                $configvars{"chunkDIR"}       = $chunkDIR;
+                $outDIR                       = $DATA_DIR . "/output3";
+                $configvars{"outDIR"}         = $outDIR;
+
+                # Check that the new exonerate parameters are set
+                config_setup();
+
+                $CHUNK    = $ans;
+                $chunkDIR = $DATA_DIR . "/chunks3";
+                print("Splitting into $CHUNK chunks.\n");
+
+                $cmd = "$FASTA_SPLIT $DATA_DIR/single_file.out "
+                      . $CHUNK . " " . $chunkDIR;
+
+                if ( system($cmd) ) {
+                    croak("Couldn't split file.$@\n");
+                }
+
+                # Isolate biggest sequences
+                check_chunksizes();
+
+                print("\nChopped up file.\n\n"
+                    . "Set databases for next run? (y/n) ");
+
+                if ( get_input_arg() ) {
+                    $rerun_flag = 1;
+                    if ( !DB_setup() ) { unclean_exit(); }
+                    print("\n\nFinished setting up the analysis.\n");
+                }
+
+                if ( !run_analysis() ) {
+                    unclean_exit();
+                }
+
+                print(  "\nYou should check for any AWOL jobs now, "
+                      . "hopefully there won't be any.\n\n" );
+            } ## end else
+        } ## end if ( get_input_arg() )
+    } ## end if ($chunk_numbers)
+} ## end sub chase_jobs
+
+# Check the database for those cDNAS which hit many times - might be
+# worth adding these to the kill list depending on what they are eg
+# LINEs.
+sub find_many_hits {
+    # Mysql queries involving temporary tables
+    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                         $WB_TARGET_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    # Make a table containing each transcript matching a cDNA
+    my $sql1 =
+      (   "CREATE temporary table tmp1 "
+        . "SELECT hit_name, exon_transcript.transcript_id "
+        . "FROM dna_align_feature, supporting_feature, exon_transcript "
+        . "WHERE dna_align_feature_id = feature_id "
+        . "AND supporting_feature.exon_id = exon_transcript.exon_id "
+        . "GROUP by hit_name, exon_transcript.transcript_id" );
+
+    my $q1 = $db->dbc->prepare($sql1) or croak("Sql error 1.\n$!");
+    $q1->execute();
+
+    # Group these to find the number of hits per cDNA
+    my $sql2 = (  "CREATE temporary table tmp2 SELECT hit_name, "
+                . "count(*) as hits FROM tmp1 GROUP by hit_name" );
+
+    my $q2 = $db->dbc->prepare($sql2) or croak("Sql error 2.\n$!");
+    $q2->execute();
+
+    # Examine those which hit more than 20 places
+    my $sql3 = ("SELECT * FROM tmp2 WHERE hits > 20 ORDER by hits desc");
+
+    my $q3 = $db->dbc->prepare($sql3) or croak("Sql error 3\n$!");
+    $q3->execute();
+
+    my $many_hits_flag = 0;
+    while ( my ( $cdna, $hits ) = $q3->fetchrow_array ) {
+        print "$cdna\t$hits\n";
+        $many_hits_flag = 1;
+    }
+
+    if ($many_hits_flag) {
+        print(  "\nIt might be worth investigating these sequences to "
+              . "see whether these are likely to be genuine hits.\n"
+              . "If we don't want them in the database you "
+              . "should add them to the kill list\n\n" );
+    }
+} ## end sub find_many_hits
+
+# Run the script to parse output from ExonerateTranscriptFilter to
+# identify reasons for failures.
+sub why_cdnas_missed {
+
+    # Make a file containing all of the relevant lines from
+    # ExonerateTranscriptFilter.pm outputs.
+    my @output = ( "output2", "output3" );
+    my $file = $DATA_DIR . "/failed_hits.out";
+
+    open( OUT, ">$file" ) or croak("Can not open file $file");
+    close OUT;
+
+    for my $output (@output) {
+        `find $DATA_DIR/$output/. | xargs -l1 grep "rpp" >> $file`;
+        `find $DATA_DIR/$output/. | xargs -l1 grep "only" >> $file`;
+        `find $DATA_DIR/$output/. | xargs -l1 grep "reject" >> $file`;
+        `find $DATA_DIR/$output/. | xargs -l1 grep "max_coverage" >> $file`;
+    }
+
+    # Need to pass all the variables to the script:
+    $cmd = "perl "              . $STORE_UNMAPPED
+        . " -gss "              . $GSS
+        . " -seq_file "         . $DATA_DIR . "/missing_cdnas.fasta"
+        . " -user "             . $WB_DBUSER
+        . " -pass "             . $WB_DBPASS
+        . " -host "             . $WB_TARGET_DBHOST
+        . " -port "             . $WB_TARGET_DBPORT
+        . " -dbname "           . $WB_TARGET_DBNAME
+        . " -species \""        . $SPECIES  . "\""
+        . " -vertrna "          . $DATA_DIR . "/" . $VERTRNA
+        . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
+        . " -vertrna_update "   . $DATA_DIR . "/" . $VERTRNA_UPDATE
+        . " -infile "           . $file
+        . " -findN_prog "       . $FIND_N
+        . " -reasons_file "     . $UNMAPPED_REASONS;
+
+    print "$cmd\n";
+    if ( system($cmd) ) {
+        carp("Erros when running $STORE_UNMAPPED!\n$cmd\n");
+    }
+    else {
+        print("\nUnmapped objects stored.\n");
+    }
+} ## end sub why_cdnas_missed
+
+# Update the meta-coord table
+sub update_metacoord {
+    my @table_names = qw(gene
+                         exon
+                         dna_align_feature
+                         transcript);
+
+    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                         $WB_TARGET_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    my $sql = "TRUNCATE meta_coord";
+    my $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    foreach my $table_name (@table_names) {
+        my $sql = "INSERT into meta_coord "
+                . "SELECT '$table_name', s.coord_system_id, "
+                . "max(t.seq_region_end-t.seq_region_start+1) "
+                . "FROM $table_name t, seq_region s "
+                . "WHERE t.seq_region_id = s.seq_region_id "
+                . "GROUP by s.coord_system_id";
+        my $sth = $db->dbc->prepare($sql);
+        $sth->execute;
+        $sth->finish;
+    }
+    print STDERR "Finished updating meta_coord table\n";
+} ## end sub update_metacoord
+
+
+# Setting various meta table entries.
+sub fix_metatable {
+
+    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                         $WB_TARGET_DBNAME, $WB_DBUSER,
+                         $WB_DBPASS );
+
+    # Remove previous entries.
+    my $sql = "DELETE FROM meta WHERE meta_key like 'genebuild%" . "id'";
+    my $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # Set the genebuild id.
+    $sql = "INSERT into meta (meta_key, meta_value) "
+         . "VALUES ('genebuild_id', '$GENEBUILD_ID' )";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # Set all gene and transcript statuses to putative.
+    $sql = "UPDATE gene set status = 'PUTATIVE'";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE transcript set status = 'PUTATIVE'";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # Reload the taxonomy to make sure it's up to date.
+    my $cmd = "perl "       . $LOAD_TAX
+      . " -name \""         . $SPECIES . "\""
+      . " -taxondbhost "    . $TAXONDBHOST
+      . " -taxondbport "    . $TAXONDBPORT
+      . " -taxondbname "    . $TAXONDBNAME
+      . " -lcdbhost "       . $WB_TARGET_DBHOST
+      . " -lcdbport "       . $WB_TARGET_DBPORT
+      . " -lcdbname "       . $WB_TARGET_DBNAME
+      . " -lcdbuser "       . $WB_DBUSER
+      . " -lcdbpass "       . $WB_DBPASS;
+
+    if ( system($cmd) ) {
+        carp("Errors occurred when running $LOAD_TAX!\n$cmd\n");
+    } else {
+        print("Meta table fixed.\n");
+    }
+} ## end sub fix_metatable
+
+
+# Remove files and database leftovers after analysis,
+# restore original config files.
+sub clean_up {
+    my $option  = shift;
+    $status     = 0;
+
+    # Read data dump
+    open( RP, "< config_paths.perldata" ) or $status = 1;
+    if ( !$status ) {
+        undef $/;
+        eval <RP>;
+        if ($@) {
+            $/ = "\n";
+            croak("\nCan't recreate data dump.\n$@\n");
+        }
+        close(RP);
+        $/ = "\n";
+    } else {
+        carp("\nCan't open data dumping file! Already cleaned?\n");
+        $status = 0;
+    }
+
+    if ( !$option ) {
+        # Remove files (fasta, chunks, sql)
+        if ( -e $DATA_DIR . "/" . $VERTRNA ) {
+            $cmd     = "rm " . $DATA_DIR . "/" . $VERTRNA;
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/" . $VERTRNA_UPDATE ) {
+            $cmd     = "rm " . $DATA_DIR . "/" . $VERTRNA_UPDATE;
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/" . $REFSEQ ) {
+            $cmd     = "rm " . $DATA_DIR . "/" . $REFSEQ;
+            $status += system($cmd);
+        }
+        print("\n\nShould we remove the clipped fasta files? (y/n) ");
+        if ( get_input_arg() ) {
+            if ( -e $DATA_DIR . "/" . $newfile ) {
+                $cmd     = "rm " . $DATA_DIR . "/" . $newfile;
                 $status += system($cmd);
-      }
-          if(-e $dataDIR."/$newfile".".seqs"){
-        $cmd = "rm " . $dataDIR."/$newfile".".seqs";
-        $status += system($cmd);
-      }
-          if(-e $dataDIR."/$newfile".".seqs.clipped"){
-        $cmd = "rm " . $dataDIR."/$newfile".".seqs.clipped";
-        $status += system($cmd);
-      }
-          
-    }
-    if(-e $dataDIR."/import_tables.sql"){
-      $cmd = "rm " . $dataDIR."/import_tables.sql";
-      $status += system($cmd);
-    }
-    if(-e $dataDIR."/import_tables2.sql"){
-      $cmd = "rm " . $dataDIR."/import_tables2.sql";
-      $status += system($cmd);
-    }
-    if(-e $dataDIR."/import_tables3.sql"){
-      $cmd = "rm " . $dataDIR."/import_tables3.sql";
-      $status += system($cmd);
-    }
-    #clean output directories
-    if(!checkdir($chunkDIR, 0)){ warn "could not prepare directory! [".$chunkDIR."]";}
-        if(!checkdir($chunkDIR."2", 0)){ warn "could not prepare directory! [".$chunkDIR."2]";}
-        if(!checkdir($chunkDIR."3", 0)){ warn "could not prepare directory! [".$chunkDIR."3]";}
-    
-        if(!checkdir($outDIR, 0))  { warn "could not prepare directory! [".$outDIR."]";}
-        if(!checkdir($outDIR."2", 0))  { warn "could not prepare directory! [".$outDIR."2]";}
-        if(!checkdir($outDIR."3", 0))  { warn "could not prepare directory! [".$outDIR."3]";}
+            }
+            if ( -e $DATA_DIR . "/$newfile" . ".seqs" ) {
+                $cmd     = "rm " . $DATA_DIR . "/$newfile" . ".seqs";
+                $status += system($cmd);
+            }
+            if ( -e $DATA_DIR . "/$newfile" . ".seqs.clipped" ) {
+                $cmd     = "rm " . $DATA_DIR . "/$newfile" . ".seqs.clipped";
+                $status += system($cmd);
+            }
+        }
+        if ( -e $DATA_DIR . "/import_tables1.sql" ) {
+            $cmd     = "rm " . $DATA_DIR . "/import_tables1.sql";
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/import_tables2.sql" ) {
+            $cmd     = "rm " . $DATA_DIR . "/import_tables2.sql";
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/import_tables3.sql" ) {
+            $cmd     = "rm " . $DATA_DIR . "/import_tables3.sql";
+            $status += system($cmd);
+        }
+        # Clean output directories
+        if ( !checkdir( $chunkDIR, 0 ) ) {
+            carp("Could not prepare directory! [" . $chunkDIR . "]");
+        }
+        if ( !checkdir( $chunkDIR . "2", 0 ) ) {
+            carp("Could not prepare directory! [" . $chunkDIR . "2]");
+        }
+        if ( !checkdir( $chunkDIR . "3", 0 ) ) {
+            carp("Could not prepare directory! [" . $chunkDIR . "3]");
+        }
+        if ( !checkdir( $outDIR, 0 ) ) {
+            carp("Could not prepare directory! [" . $outDIR . "]");
+        }
+        if ( !checkdir( $outDIR . "2", 0 ) ) {
+            carp("Could not prepare directory! [" . $outDIR . "2]");
+        }
+        if ( !checkdir( $outDIR . "3", 0 ) ) {
+            carp("Could not prepare directory! [" . $outDIR . "3]");
+        }
 
         #remove the other temporary output files:
-        
-        if(-e $dataDIR."/missing_cdnas.fasta"){
-      $cmd = "rm " . $dataDIR."/missing_cdnas.fasta";
-      $status += system($cmd);
-    }
-        if(-e $dataDIR."/single_file.out"){
-      $cmd = "rm " . $dataDIR."/single_file.out";
-      $status += system($cmd);
-    }
-        if(-e $dataDIR."/failed_hits.out"){
-      $cmd = "rm " . $dataDIR."/failed_hits.out";
-      $status += system($cmd);
-    }
 
-        if($status){ warn("Error deleting files.\n"); $status = 0; }
+        if ( -e $DATA_DIR . "/missing_cdnas.fasta" ) {
+            $cmd     = "rm " . $DATA_DIR . "/missing_cdnas.fasta";
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/single_file.out" ) {
+            $cmd     = "rm " . $DATA_DIR . "/single_file.out";
+            $status += system($cmd);
+        }
+        if ( -e $DATA_DIR . "/failed_hits.out" ) {
+            $cmd     = "rm " . $DATA_DIR . "/failed_hits.out";
+            $status += system($cmd);
+        }
 
-    #remove dbs
-    print "\n\nshould we remove the pipeline database? (y/n)   ";
-    if ( get_input_arg() ) { 
-      $status += system("mysql -h$WB_PIPE_DBHOST -P$WB_PIPE_DBPORT -u$WB_DBUSER -p$WB_DBPASS -e\"drop database IF EXISTS $WB_PIPE_DBNAME;\"");
+        if ($status) {
+            carp("Error deleting files.\n");
+            $status = 0;
+        }
+
+        # Remove dbs
+        print("\n\nShould we remove the pipeline database? (y/n) ");
+        if ( get_input_arg() ) {
+            drop_create_database( $WB_PIPE_DBNAME, $WB_PIPE_DBHOST,
+                                  $WB_PIPE_DBPORT );
+        }
+
+        print "Cleaned out databases, removed temporary files.\n";
+    } ## end if ( !$option )
+
+    if (%saved_files) {
+
+        # Restore original config files
+        foreach my $config_file ( keys %saved_files ) {
+            if ( $saved_files{$config_file} ) {
+
+                print $saved_files{$config_file}, "\n";
+
+                $cmd = "mv "
+                  . $DATA_DIR
+                  . "/configbackup/"
+                  . $config_file . " "
+                  . $CVS_DIR . "/"
+                  . $saved_files{$config_file};
+            } else {
+                $cmd = "rm " . $configDIR . "/" . $config_file;
+            }
+            $status += system($cmd);
+        }
     }
-    if($status){ warn("Error deleting databases.\n"); $status = 0; }
-
-    print "cleaned out databases, removed temporary files.\n";
-  }
-
-  if(%saved_files){
-    #restore original config files
-    foreach my $config_file (keys %saved_files){
-      if($saved_files{$config_file}){
-                $cmd = "mv ".$dataDIR."/configbackup/".$config_file." ".$cvsDIR."/".$saved_files{$config_file};
-      }
-      else{
-                $cmd = "rm ".$configDIR."/".$config_file;
-      }
-      $status += system($cmd);
+    if ($status) { carp("Error restoring config files.\n") }
+    print "restored original config files.\n\n";
+    if (     ( -e "config_paths.perldata" )
+         and ( system("rm config_paths.perldata") ) )
+    {
+        carp("\ncould not remove perldata file.\n");
     }
-  }
-  if($status){ warn("Error restoring config files.\n") }
-  print "restored original config files.\n\n";
-  if((-e "config_paths.perldata") and (system("rm config_paths.perldata"))){
-    warn "\ncould not remove perldata file.\n";
-  }
+} ## end sub clean_up
+
+
+# Partly clean-up after error
+sub unclean_exit {
+    clean_up(1);
+    print(   "\nRestored original config files.\n"
+           . "Check for errors and restart script.\n\n" );
+    exit 1;
 }
 
 
-#partly clean-up after error
+# Compare results to previous data as a health-check
+# can also bsub a further function call for every chromosome
+sub compare {
+    my ( %chromosomes_1,    %chromosomes_2 );
+    my ( $sql,              $sql2, $sth1, $sth2 );
+    my ( %hits_per_chrom_1, %hits_per_chrom_2 );
+    my $hitcount1 = 0;
+    my $hitcount2 = 0;
 
-sub unclean_exit{
-  clean_up(1);
-  print "\n Restored original config files.\n Check for errors and restart script.\n";
-  exit 1;
-}
+    # Should we exclude all the NT_x-regions?
+    my $exclude_NT = 1;
 
+    # Pld alignments
+    my $db1 = connect_db( $WB_LAST_DBHOST, $WB_LAST_DBPORT,
+                          $WB_LAST_DBNAME, "ensro" );
+    # New alignments
+    my $db2 = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                          $WB_TARGET_DBNAME, "ensro" );
 
-#compare results to previous data as a health-check
-#can also bsub a further function call for every chromosome
+    # Get chromosome names / ids
+    $sql = "SELECT coord_system_id "
+         . "FROM coord_system "
+         . "WHERE name='chromosome' && attrib='default_version'";
+    $sth1 = $db1->dbc->prepare($sql) or croak("Sql error!$!\n");
+    $sth1->execute();
+    my ($coord_system_id1) = $sth1->fetchrow_array;
+    $sth2 = $db2->dbc->prepare($sql) or croak("Sql error!$!\n");
+    $sth2->execute();
+    my ($coord_system_id2) = $sth2->fetchrow_array;
 
-sub compare{
-  my (%chromosomes_1, %chromosomes_2);
-  my ($sql, $sql2, $sth1, $sth2);
-  my (%hits_per_chrom_1, %hits_per_chrom_2);
-  my $hitcount1 = 0;
-  my $hitcount2 = 0;
-  my $ans = "";
-
-  #should we exclude all the NT_x-regions?
-  my $exclude_NT = 1;
-
-  #get db connectors
-  #old alignments
-  my $db1 = db_connector($WB_LAST_DBHOST, $WB_LAST_DBPORT, $WB_LAST_DBNAME, "ensro");
-  #new alignments
-  my $db2 = db_connector($WB_TARGET_DBHOST, $WB_TARGET_DBPORT, $WB_TARGET_DBNAME, "ensro");
-
-  #get chromosome names / ids
-  $sql  = 'select coord_system_id from coord_system where name="chromosome" && attrib="default_version"';
-  $sth1 = $db1->prepare($sql) or die "sql error!";
-  $sth1->execute();
-  my ($coord_system_id1) = $sth1->fetchrow_array;
-  $sth2 = $db2->prepare($sql) or die "sql error!";
-  $sth2->execute();
-  my ($coord_system_id2) = $sth2->fetchrow_array;
-  
-  $sql  = 'select seq_region_id, name from seq_region where coord_system_id = '.$coord_system_id1;
-  if ($exclude_NT) {
-    $sql .= ' and name not like "%NT%"';
-  }
-  $sth1 = $db1->prepare($sql) or die "sql error!";
-  $sth1->execute();
-  while (my ($seq_region_id, $name) = $sth1->fetchrow_array) {
-    $chromosomes_1{$name} = $seq_region_id;
-  }
-  
-  $sql  = 'select seq_region_id, name from seq_region where coord_system_id = '.$coord_system_id2;
-  if ($exclude_NT) {
-    $sql .= ' and name not like "%NT%"';
-  }
-  $sth2 = $db2->prepare($sql) or die "sql error!";
-  $sth2->execute();
-  while (my ($seq_region_id, $name) = $sth2->fetchrow_array) {
-    $chromosomes_2{$name} = $seq_region_id;
-  }
-
-
-  print "Do you want to start the detailed analysis? (y/n) ";
-  if ( get_input_arg() ) { 
-    #create LSF jobs for in-depth analysis
-    print "\nSubmitting jobs for detailed analysis.\n\n";
-    foreach my $chromosome (keys %chromosomes_1){
-      
-      $cmd = "bsub -q normal -o ".$dataDIR."/".$chromosome.".out perl ".$cvsDIR.
-             "/ensembl-pipeline/scripts/cDNA_update/comparison.pl ".
-             " -chrom ".$chromosome." -oldname ".$oldFeatureName." -newname ".$newFeatureName." -dir ".$dataDIR.
-             " -olddbhost ".$WB_LAST_DBHOST." -olddbport ".$WB_LAST_DBPORT." -olddbname ".$WB_LAST_DBNAME.
-             " -newdbhost ".$WB_TARGET_DBHOST." -newdbport ".$WB_TARGET_DBPORT." -newdbname ".$WB_TARGET_DBNAME.
-             " -olddnadbhost ".$WB_LAST_DNADBHOST." -olddnadbport ".$WB_LAST_DNADBPORT." -olddnadbname ".$WB_LAST_DNADBNAME.
-             " -newdnadbhost ".$WB_PIPE_DBHOST." -newdnadbport ".$WB_PIPE_DBPORT." -newdnadbname ".$WB_PIPE_DBNAME;
-      #print $cmd."\n";
-      if(system($cmd)){ warn " some error occurred when submitting job!\n$cmd\n "; }
+    $sql = "SELECT seq_region_id, name "
+         . "FROM seq_region "
+         . "WHERE coord_system_id = " . $coord_system_id1;
+    if ($exclude_NT) {
+        $sql .= " and name not like '%NT%'";
     }
-  }
+    $sth1 = $db1->dbc->prepare($sql) or croak("Sql error!$!\n");
+    $sth1->execute();
+    while ( my ( $seq_region_id, $name ) = $sth1->fetchrow_array ) {
+        $chromosomes_1{$name} = $seq_region_id;
+    }
 
-  print "\nGetting hits per chromosome\n".
-        "\told\tnew\tdiff\n";
-  #check hits per chromosome
-  $sql = "select count(distinct hit_name) from  dna_align_feature daf, analysis a where a.logic_name='".
-         $oldFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
-  $sth1 = $db1->prepare($sql) or die "sql error!";
-  $sql = "select count(distinct hit_name) from  dna_align_feature daf, analysis a where a.logic_name='".
-         $newFeatureName."' and a.analysis_id=daf.analysis_id and daf.seq_region_id=?";
+    $sql = "SELECT seq_region_id, name "
+         . "FROM seq_region "
+         . "WHERE coord_system_id = " . $coord_system_id2;
+    if ($exclude_NT) {
+        $sql .= " and name not like '%NT%'";
+    }
+    $sth2 = $db2->dbc->prepare($sql) or croak("Sql error!$!\n");
+    $sth2->execute();
+    while ( my ( $seq_region_id, $name ) = $sth2->fetchrow_array ) {
+        $chromosomes_2{$name} = $seq_region_id;
+    }
 
-  $sth2 = $db2->prepare($sql) or die "sql error!";
+    print "Do you want to start the detailed analysis? (y/n) ";
+    if ( get_input_arg() ) {
 
-  my @sorted_chromosomes = sort bychrnum keys %chromosomes_1;
-  foreach my $chromosome (@sorted_chromosomes) {
-    $sth1->execute($chromosomes_1{$chromosome});
-    $sth2->execute($chromosomes_2{$chromosome});
-    $hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
-    $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
-    my $diff = $hits_per_chrom_2{$chromosome} - $hits_per_chrom_1{$chromosome};
-    print "\n$chromosome:".
-      "\t".$hits_per_chrom_1{$chromosome}.
-      "\t".$hits_per_chrom_2{$chromosome}."\t".$diff;
-    $hitcount1 += $hits_per_chrom_1{$chromosome};
-    $hitcount2 += $hits_per_chrom_2{$chromosome};
-  }
+        # Create LSF jobs for in-depth analysis
+        print "\nSubmitting jobs for detailed analysis.\n\n";
+        foreach my $chromosome ( keys %chromosomes_1 ) {
 
-  print "\n\nsum:".
-      "\t".$hitcount1.
-      "\t".$hitcount2."\n\n";
-}
+            $cmd = "bsub -q normal "
+                 . "-o "                . $DATA_DIR . "/" . $chromosome . ".out "
+                 . "perl "              . $CVS_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
+                 . " -chrom "           . $chromosome
+                 . " -oldname "         . $OLD_FEATURE_NAME
+                 . " -newname "         . $newFeatureName
+                 . " -dir "             . $DATA_DIR
+                 . " -olddbhost "       . $WB_LAST_DBHOST
+                 . " -olddbport "       . $WB_LAST_DBPORT
+                 . " -olddbname "       . $WB_LAST_DBNAME
+                 . " -newdbhost "       . $WB_TARGET_DBHOST
+                 . " -newdbport "       . $WB_TARGET_DBPORT
+                 . " -newdbname "       . $WB_TARGET_DBNAME
+                 . " -olddnadbhost "    . $WB_LAST_DNADBHOST
+                 . " -olddnadbport "    . $WB_LAST_DNADBPORT
+                 . " -olddnadbname "    . $WB_LAST_DNADBNAME
+                 . " -newdnadbhost "    . $WB_PIPE_DBHOST
+                 . " -newdnadbport "    . $WB_PIPE_DBPORT
+                 . " -newdnadbname "    . $WB_PIPE_DBNAME;
+            #print $cmd."\n";
+            if ( system($cmd) ) {
+                carp(" some error occurred when submitting job!\n$cmd\n\n");
+            }
+        } ## end foreach my $chromosome ( keys...
+    } ## end if ( get_input_arg() )
+
+    print "\nGetting hits per chromosome\n" . "\told\tnew\tdiff\n";
+
+    # Check hits per chromosome
+    $sql = "SELECT COUNT(distinct hit_name) "
+         . "FROM dna_align_feature daf, analysis a "
+         . "WHERE a.logic_name = '" . $OLD_FEATURE_NAME
+         . "' and a.analysis_id = daf.analysis_id "
+         . "and daf.seq_region_id = ?";
+    $sth1 = $db1->dbc->prepare($sql) or croak("Sql error!$!\n");
+    $sql = "SELECT COUNT(distinct hit_name) "
+         . "FROM dna_align_feature daf, analysis a "
+         ."WHERE a.logic_name = '" . $newFeatureName
+         . "' and a.analysis_id = daf.analysis_id "
+         . "and daf.seq_region_id = ?";
+
+    $sth2 = $db2->dbc->prepare($sql) or croak("Sql error!$!\n");
+
+    my @sorted_chromosomes = sort bychrnum keys %chromosomes_1;
+    foreach my $chromosome (@sorted_chromosomes) {
+        $sth1->execute( $chromosomes_1{$chromosome} );
+        $sth2->execute( $chromosomes_2{$chromosome} );
+        $hits_per_chrom_1{$chromosome} = $sth1->fetchrow_array;
+        $hits_per_chrom_2{$chromosome} = $sth2->fetchrow_array;
+        my $diff =
+          $hits_per_chrom_2{$chromosome} - $hits_per_chrom_1{$chromosome};
+        print "\n$chromosome:" . "\t"
+          . $hits_per_chrom_1{$chromosome} . "\t"
+          . $hits_per_chrom_2{$chromosome} . "\t"
+          . $diff;
+        $hitcount1 += $hits_per_chrom_1{$chromosome};
+        $hitcount2 += $hits_per_chrom_2{$chromosome};
+    }
+
+    print "\n\nsum:" . "\t" . $hitcount1 . "\t" . $hitcount2 . "\n\n";
+} ## end sub compare
 
 
-#sort chroms by name
-
+# Sort chroms by name
 sub bychrnum {
-  my @awords = split /_/,$a;
-  my @bwords = split /_/,$b;
+    my @awords = split /_/, $a;
+    my @bwords = split /_/, $b;
 
-  my $anum = $awords[0];
-  my $bnum = $bwords[0];
+    my $anum = $awords[0];
+    my $bnum = $bwords[0];
 
-  $anum =~ s/chr//;
-  $bnum =~ s/chr//;
+    $anum =~ s/chr//;
+    $bnum =~ s/chr//;
 
-  if ($anum !~ /^[0-9]*$/) {
-    if ($bnum !~ /^[0-9]*$/) {
-      return $anum cmp $bnum;
-    } else {
-      return 1;
+    if ( $anum !~ /^[0-9]*$/ ) {
+        if ( $bnum !~ /^[0-9]*$/ ) {
+            return $anum cmp $bnum;
+        } else {
+            return 1;
+        }
     }
-  }
-  if ($bnum !~ /^[0-9]*$/) {
-    return -1;
-  }
-
-  if ($anum <=> $bnum) {
-    return $anum <=> $bnum;
-  } else {
-    if ($#awords == 0) {
-      return -1;
-    } elsif ($#bwords == 0) {
-      return 1;
-    } else {
-      return $awords[1] cmp $bwords[1];
+    if ( $bnum !~ /^[0-9]*$/ ) {
+        return -1;
     }
-  }
+
+    if ( $anum <=> $bnum ) {
+        return $anum <=> $bnum;
+    } else {
+        if ( $#awords == 0 ) {
+            return -1;
+        } elsif ( $#bwords == 0 ) {
+            return 1;
+        } else {
+            return $awords[1] cmp $bwords[1];
+        }
+    }
+} ## end sub bychrnum
+
+# Update the progress status in meta table
+sub update_progress_status {
+    my $progress_status = shift;
+
+    my $sql = "UPDATE meta set meta_value = '"
+            . $progress_status
+            . "' WHERE meta_key = 'progress_status'";
+    my $sth = $pipe_db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+    print(   "\n\nprogress_status has been updated to "
+           . "$progress_status.\n\n" );
 }
 
+# Create a generic databse
+sub create_db {
+    my ( $db_name, $is_pipeline ) = ( $_[0], $_[1] );
+    my $status = 0;
+    my $cmd;
 
-#get a db connection
+#    print ">>>in create_db\n";
 
-sub db_connector{
-  my $host       = shift;
-  my $port       = shift;
-  my $dbname     = shift;
-  my $user       = shift;
-  my $dbCon      = new Bio::EnsEMBL::DBSQL::DBConnection(
-                                                        -host    => $host,
-                                                        -port    => $port,
-                                                        -user    => $user,
-                                                        -dbname  => $dbname
-                                                       );
-  if(!$dbCon){ die "\ncould not connect to \"$dbname\".\n"; }
-  return $dbCon;
+    my $mysql_cmd;
+    my ($host, $port);
+    if ($is_pipeline) {
+        print("Creating a pipeline db\n");
+        $host = $WB_PIPE_DBHOST;
+        $port = $WB_PIPE_DBPORT;
+
+        $mysql_cmd =  "mysql "
+            . "-h $host "
+            . "-P $port "
+            . "-u $WB_DBUSER "
+            . "-p$WB_DBPASS ";
+
+    } else {
+        print("Creating a target db\n");
+        $host = $WB_TARGET_DBHOST;
+        $port = $WB_TARGET_DBPORT;
+
+        $mysql_cmd =  "mysql "
+            . "-h $host "
+            . "-P $port "
+            . "-u $WB_DBUSER "
+            . "-p$WB_DBPASS ";
+    }
+
+    # Drop the database if exists and then create it
+    # 1 = drop AND create
+    drop_create_database($db_name, $host, $port, 1);
+
+    $cmd     = $mysql_cmd . " " . $db_name . " < "
+             . $CVS_DIR . "/ensembl/sql/table.sql";
+    $status += system($cmd);
+
+    # If it's a pipeline db, add the pipeline tables.
+    if ($is_pipeline) {
+        $cmd     = $mysql_cmd . "$db_name < "
+                 . $CVS_DIR . "/ensembl-pipeline/sql/table.sql";
+        $status += system($cmd);
+    }
+
+#    print ".";
+
+    if($status) { croak("Couldn't create databases!\n"); }
+
+    return $status;
 }
 
+# Delete unwanted tables from a database
+sub delete_unwanted_tables {
+    my ($tables_to_delete, $is_pipeline) = ($_[0], $_[1]);
 
-#connect to a given database, optional with attached DNA db
+#    print ">>> in delete_unwanted_tables\n";
+    # Get an array separator
+    my @tables = split(/ /, $tables_to_delete);
+    $" = "\n";
+    print "\nDeleting the following tables:\n"
+        . "@tables\n";
 
-sub connect_db{
-  my $host       = shift;
-  my $port       = shift;
-  my $dbname     = shift;
-  my $user       = shift;
-  my $pass       = shift;
-  my $dnadb      = shift;
-  my $dbObj;
+    my $db;
+    if ($is_pipeline) {
+#        print "\t>>> \$is_pipeline: $is_pipeline\n";
+        $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
+                          $WB_PIPE_DBNAME, $WB_DBUSER,
+                          $WB_DBPASS );
+    } else {
+        $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                          $WB_TARGET_DBNAME, $WB_DBUSER,
+                          $WB_DBPASS );
+    }
 
-  if($dnadb){
-    $dbObj      = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                     -host   => $host,
-                                                     -port   => $port,
-                                                     -user   => $user,
-                                                     -pass   => $pass,
-                                                     -dbname => $dbname,
-                                                     -dnadb  => $dnadb
-                                                    );
-  }
-  else{
-    $dbObj      = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-                                                     -host    => $host,
-                                                     -port    => $port,
-                                                     -user    => $user,
-                                                     -pass    => $pass,
-                                                     -dbname  => $dbname
-                                                    );
-  }
-  if(!$dbObj){
-    return 0;
-  }
-  return $dbObj;
+    foreach my $table ( @tables ) {
+        $db->dbc->do("DELETE FROM $table");
+    }
 }
+
+# Dump tables from reference or pipeline db
+sub dump_tables {
+    my ( $tables_to_dump, $count, $is_pipeline ) = ( $_[0], $_[1], $_[2] );
+
+#    print ">>> in dump_tables\t$tables_to_dump\n";
+
+    my $mysql_dump;
+    if ($is_pipeline) {
+        $mysql_dump = "mysqldump "
+                    . "-h $WB_PIPE_DBHOST "
+                    . "-P $WB_PIPE_DBPORT "
+                    . "-u $WB_DBUSER "
+                    . "-p$WB_DBPASS "
+                    . "-t $WB_PIPE_DBNAME ";
+        print("\nDumping from pipeline db.\n");
+    }
+    else {
+        # Dumping from the reference db
+        $mysql_dump = "mysqldump "
+                    . "-h $WB_REF_DBHOST "
+                    . "-P $WB_REF_DBPORT "
+                    . "-u $WB_DBUSER "
+                    . "-p$WB_DBPASS "
+                    . "-t $WB_REF_DBNAME ";
+        print("\nDumping from ref db.\n");
+    }
+
+    # Copy defined db tables from current build
+    # (removed analysis table)
+    my $file_name = $DATA_DIR . "/import_tables" . $count . ".sql";
+
+    my $cmd;
+    if ( -e $file_name ) {
+        print(   "\n$file_name exists, "
+               . "do you still want to dump the tables? (y/n) " );
+
+        if ( get_input_arg() ) {
+            $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
+            print $cmd, "\n";
+            $status += system($cmd);
+#            print ".";
+        }
+        else {
+            print("\nNot dumping the tables again.\n\n");
+        }
+    }
+    else {
+        $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
+        print $cmd, "\n";
+        $status += system($cmd);
+#        print ".";
+    }
+
+#    print ">>> status in dump_tables = $status\n";
+    return $status;
+}
+
+# Import tables to pipeline or target db
+sub import_tables {
+    my ( $count, $is_pipeline ) = ( $_[0], $_[1] );
+
+    $status = 0;
+
+#    print ">>> in import_tables\n";
+
+    my $mysql_query;
+    if ($is_pipeline) {
+        $mysql_query = "mysql "
+            . "-h $WB_PIPE_DBHOST "
+            . "-P $WB_PIPE_DBPORT "
+            . "-u $WB_DBUSER "
+            . "-p$WB_DBPASS "
+            . "-D $WB_PIPE_DBNAME";
+        print("\nImporting tables to pipeline db.\n");
+    } else {
+        $mysql_query = "mysql "
+            . "-h $WB_TARGET_DBHOST "
+            . "-P $WB_TARGET_DBPORT "
+            . "-u $WB_DBUSER "
+            . "-p$WB_DBPASS "
+            . "-D $WB_TARGET_DBNAME";
+        print("\nImporting tables to target db.\n");
+    }
+
+    print "\nLoading the tables from file...\n";
+    my $cmd = $mysql_query . " < "
+            . $DATA_DIR . "/import_tables" . $count . ".sql";
+
+    print $cmd, "\n";
+    $status += system($cmd);
+
+#    print ".";
+    return $status;
+}
+
+# Load the external_dbs and unmapped_reason tables from
+# /ensembl/misc-scripts.
+sub load_misc_script_files {
+
+    my $dir = $CVS_DIR . "/ensembl/misc-scripts/";
+    my %table_files = (
+            'external_db'     => 'external_db/external_dbs.txt',
+            'unmapped_reason' => 'unmapped_reason/unmapped_reason.txt'
+    );
+
+    my $target_db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
+                                $WB_TARGET_DBNAME, $WB_DBUSER,
+                                $WB_DBPASS );
+
+    foreach my $table ( keys %table_files ) {
+        my $prepare =  "LOAD DATA LOCAL INFILE \'"
+                     . $dir . $table_files{$table}
+                     . "\' INTO TABLE " . $table;
+
+        my $target_sth = $target_db->dbc->prepare($prepare);
+        $target_sth->execute();
+        $target_sth->finish();
+    }
+}
+
+# Add analysis, rule and create the input ids
+sub setup_analysis {
+    print("Adding analyses and making input_ids...\n\n");
+
+    $status = 0;
+#    print "status at start of setup_analysis: $status\n";
+    my $sql_pipe = " -dbname " . $WB_PIPE_DBNAME
+                 . " -dbhost " . $WB_PIPE_DBHOST
+                 . " -dbuser " . $WB_DBUSER
+                 . " -dbpass " . $WB_DBPASS
+                 . " -dbport " . $WB_PIPE_DBPORT;
+
+    my $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+            . $sql_pipe
+            . " -logic_name "      . $newFeatureName
+            . " -program "         . $PROGRAM_NAME
+            . " -program_version " . $PROGRAM_VERSION
+            . " -program_file "    . $PROGRAM_FILE
+            . " -module "          . $MODULE_NAME
+            . " -module_version "  . "1 "
+            . " -gff_source "      . "Exonerate "
+            . " -gff_feature "     . "similarity "
+            . " -input_id_type "   . "FILENAME";
+
+    $status += system($cmd);
+#    print ">>> status after adding $newFeatureName: $status\n";
+    print $cmd, "\n";
+
+    $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+         . $sql_pipe
+         . " -logic_name "      . $submitName
+         . " -module "          . "dummy"
+         . " -input_id_type "   . "FILENAME";
+
+    $status += system($cmd);
+#    print ">>> status after adding $submitName: $status\n";
+    print $cmd, "\n";
+
+    $cmd =  "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/RuleHandler.pl "
+          . $sql_pipe
+          . " -goal "       . $newFeatureName
+          . " -condition "  . $submitName
+          . " -insert";
+
+    $status += system($cmd);
+#    print ">>> status after adding rule: $status\n";
+    print $cmd, "\n";
+
+    $cmd =  "perl ".$CVS_DIR."/ensembl-pipeline/scripts/make_input_ids "
+          . $sql_pipe
+          . " -file "
+          . " -dir "        . $chunkDIR
+          . " -logic_name " . $submitName;
+
+    print $cmd, "\n";
+    $status += system($cmd);
+#    print ">>> status after making input_ids: $status\n";
+
+    if ($status) { croak("Error while setting up the database.\n"); }
+    print "\nDatabase is set up now.\n\n";
+} ## end sub setup_analysis
+
+# Drop and create a database
+sub drop_create_database {
+    my ($db_name, $host, $port, $create) = @_;
+
+    my $serverh = DBI->connect( "DBI:mysql:mysql"
+                              . ";host="      . $host
+                              . ":port="      . $port
+                              . ";user="      . $WB_DBUSER
+                              . ";password="  . $WB_DBPASS )
+                            or croak($DBI::errstr);
+
+    my $drop_sql = "DROP DATABASE IF EXISTS " . $db_name;
+    $serverh->do($drop_sql);
+#    print(">>> dropped the new db\n");
+
+    if ($create) {
+        my $create_sql = "CREATE DATABASE " . $db_name;
+        $serverh->do($create_sql);
+#        print(">>> created the new db\n");
+    }
+
+    $serverh->disconnect();
+}
+
+# Get the progress_status
+sub get_status {
+    my ($dbc) = @_;
+
+    my $status_sql = "SELECT meta_value FROM meta "
+        . "WHERE meta_key = 'progress_status'";
+    my $sth = $dbc->prepare($status_sql);
+    $sth->execute;
+    my $status = $sth->fetchrow_array;
+
+    return $status;
+}
+
+# Clipping the polyA tail
+sub polya_clipping {
+    my ($trim_file) = @_;
+
+    # Clip ployA tails
+    print("\nPerforming polyA clipping...\n");
+    my $newfile3 = $DATA_DIR . "/" . $trim_file. ".clipped";
+    $cmd = "perl " . $POLYA_CLIPPING . " "
+        . $DATA_DIR . "/" . $trim_file . " "
+        . $newfile3;
+
+    print $cmd, "\n";
+
+    if ( system($cmd) ) {
+        croak("Couldn't clip file.$@\n");
+    }
+
+    # Split fasta files, store into CHUNKDIR
+    print("Splitting fasta file.\n");
+    $cmd = "$FASTA_SPLIT $newfile3 $CHUNK $chunkDIR";
+    if ( system($cmd) ) {
+        croak("Couldn't split file.$@\n");
+    }
+
+    # Isolate biggest sequences
+    check_chunksizes();
+
+    print "\nChopped up the file.\n";
+}
+
+# Connect to a given database, optional with attached DNA db
+sub connect_db {
+    my $host   = shift;
+    my $port   = shift;
+    my $dbname = shift;
+    my $user   = shift;
+    my $pass   = shift;
+    my $dnadb  = shift;
+    my $dbObj;
+
+    if ($dnadb) {
+        $dbObj =
+          new Bio::EnsEMBL::DBSQL::DBAdaptor( -host   => $host
+                                                -port => $port,
+                                              -dbname => $dbname,
+                                              -user   => $user,
+                                              -pass   => $pass,
+                                              -dnadb  => $dnadb );
+    } else {
+        $dbObj =
+          new Bio::EnsEMBL::DBSQL::DBAdaptor( -host   => $host,
+                                              -port   => $port,
+                                              -dbname => $dbname,
+                                              -user   => $user,
+                                              -pass   => $pass );
+    }
+    if ( !$dbObj ) {
+        return 0;
+    }
+    return $dbObj;
+} ## end sub connect_db
+
+# From Bio::EnsEMBL::Analysis::RunnableDB
+#sub read_and_check_config {
+#   my ($self, $var_hash) = @_;
+#        parse_config($self, $var_hash, $self->analysis->logic_name);
+#}
+
+#sub parse_config {
+#    #my ( $CDNA_UPDATE_BY_LOGIC, $species) = @_;
+#    my ( $CDNA_UPDATE_BY_LOGIC ) = @_;
+#
+#    my $species = 'human';
+#    if ( !$species ) {
+#        throw(   "Can't parse the "
+#            . $CDNA_UPDATE_BY_LOGIC
+#            . " if we are give no species" );
+#    }
+#
+#    my $DEFAULT_ENTRY_KEY = 'DEFAULT';
+#    if ( !$CDNA_UPDATE_BY_LOGIC || ref($CDNA_UPDATE_BY_LOGIC) ne 'HASH' ) {
+#        my $err = "Must pass read_and_check_config a hashref with the config "
+#          . "in ";
+#        $err .= " not a " . $CDNA_UPDATE_BY_LOGIC if ($CDNA_UPDATE_BY_LOGIC);
+#        $err .= " Utilities::read_and_and_check_config";
+#        throw($err);
+#    }
+#
+#    my %check;
+#    foreach my $conf_key ( keys %{ $CDNA_UPDATE_BY_LOGIC } ) {
+#        my $uc_key = uc($conf_key);
+#        if ( exists $check{$uc_key} ) {
+#            throw("You have two entries in your config with the same name (ignoring case)\n" );
+#        }
+#        $check{$uc_key} = $conf_key;
+#        print Dumper(\%check);
+#    }
+#    # replace entries in config has with lower case versions.
+#    foreach my $key ( keys %check ) {
+#        my $old_k = $check{$key};
+#        my $entry = $CDNA_UPDATE_BY_LOGIC->{$old_k};
+#        delete $CDNA_UPDATE_BY_LOGIC->{$old_k};
+#
+#        $CDNA_UPDATE_BY_LOGIC->{$key} = $entry;
+#    }
+#
+#    if ( not exists( $CDNA_UPDATE_BY_LOGIC->{$DEFAULT_ENTRY_KEY} ) ) {
+#        throw("You must define a $DEFAULT_ENTRY_KEY entry in your config");
+#    }
+#
+#    my $default_entry = $CDNA_UPDATE_BY_LOGIC->{$DEFAULT_ENTRY_KEY};
+    # the following will fail if there are config variables that
+    # do not have a corresponding method here
+#    foreach my $config_var ( keys %{$default_entry} ) {
+#        if ( $obj->can($config_var) ) {
+#            $obj->$config_var( $default_entry->{$config_var} );
+#        } else {
+#            throw("no method defined in Utilities for config variable '$config_var'" );
+#        }
+#    }
+
+    #########################################################
+    # read values of config variables for this logic name into
+    # instance variable, set by method
+    #########################################################
+#    my $uc_logic = uc($species);
+#    if ( exists $CDNA_UPDATE_BY_LOGIC->{$uc_logic} ) {
+#        # entry contains more specific values for the variables
+#        my $entry = $CDNA_UPDATE_BY_LOGIC->{$uc_logic};
+#    }
+#        foreach my $config_var ( keys %{$entry} ) {
+#            $self_config->{ $config_var } = $entry->{ $config_var };
+#        }
+#
+#            if ( $obj->can($config_var) ) {
+#
+#                $obj->$config_var( $entry->{$config_var} );
+#            } else {
+#                throw("no method defined in Utilities for config variable '$config_var'" );
+#            }
+#        }
+#    } else {
+#        throw("Your logic_name "
+#            . $uc_logic
+#            . " doesn't appear in your config file hash - using default settings\n"
+#            . $CDNA_UPDATE_BY_LOGIC );
+#    }
+#} ## end sub parse_config
 
 
 1;
