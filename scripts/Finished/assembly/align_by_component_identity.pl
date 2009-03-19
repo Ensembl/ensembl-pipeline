@@ -21,13 +21,14 @@ Required arguments:
     --dbname, db_name=NAME              database name NAME
     --assembly=ASSEMBLY                 assembly version ASSEMBLY
     --altassembly=ASSEMBLY              alternative assembly version ASSEMBLY
+    --chromosomes, --chr=LIST           only process LIST chromosomes
+    --altchromosomes, --altchr=LIST     supply alternative chromosome names (the two lists must agree)
 
 Optional arguments:
 
+    --ncbi								compare with an NCBI chromosome
     --altdbname=NAME                    alternative database NAME
 
-    --chromosomes, --chr=LIST           only process LIST chromosomes
-    --altchromosomes, --altchr=LIST     supply alternative chromosome names (the two lists must agree)
     --ref_start                         start coordinate on reference chromosomes
     --ref_end                           end coordinate on reference chromosomes
     --alt_start                         start coordinate on alternative chromosomes
@@ -142,10 +143,12 @@ $support->parse_extra_options(
 	'assembly=s',               'altdbname=s',
 	'altassembly=s',            'chromosomes|chr=s@',
 	'altchromosomes|altchr=s@', 'skipcomponents|skip_components=s',
-	'exctype=s', 'ref_start=i', 'ref_end=i', 'alt_start=i', 'alt_end=i'
+	'exctype=s', 'ref_start=i', 'ref_end=i', 'alt_start=i', 'alt_end=i',
+	'ncbi!'
 );
 $support->allowed_params( $support->get_common_params, 'assembly', 'altdbname',
 	'altassembly', 'chromosomes', 'altchromosomes', 'skipcomponents', 'exctype',
+	'ncbi'
 );
 
 if ( $support->param('help') or $support->error ) {
@@ -159,6 +162,7 @@ $support->param( 'verbose',     1 );    # throw away all that garbage
 $support->param( 'interactive', 0 );    # stop that garbage from coming up
 
 my $write_db = not $support->param('dry_run');
+my $ncbi =  $support->param('ncbi');
 
 # ask user to confirm parameters to proceed
 $support->confirm_params;
@@ -394,7 +398,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 							push @{ $match->{$R_chr} },
 							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr, $ori ];
 						}
-						else {
+						elsif(!$ncbi) {
 							if ( $tag == -1 ) {
 								$support->log(
 									   "start a new overlap non-align block\n");
