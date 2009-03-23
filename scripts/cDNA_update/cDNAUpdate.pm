@@ -37,15 +37,15 @@ use vars qw(%Config);
         WB_REF_DBPORT => 3306,
 
         # Path to gss file
-        GSS_PATH => 'ensembl-personal/genebuilders/cDNA_update/gss_acc.txt',
+        GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt',
 
         # Various scripts required by the process.
         FASTA_SPLIT             => '/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit',
-        POLYA_CLIPPING_PATH     => 'ensembl-pipeline/scripts/EST/new_polyA_clipping.pl',
-        FIND_N_PATH             => 'ensembl-pipeline/scripts/cDNA_update/find_N.pl',
-        STORE_UNMAPPED_PATH     => 'ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
-        UNMAPPED_REASONS_PATH   => 'ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt',
-        LOAD_TAX_PATH           => 'ensembl-pipeline/scripts/load_taxonomy.pl',
+        POLYA_CLIPPING_PATH     => '/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl',
+        FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
+        STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
+        UNMAPPED_REASONS_PATH   => '/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt',
+        LOAD_TAX_PATH           => '/ensembl-pipeline/scripts/load_taxonomy.pl',
 
         # Exonerate specifications
         PROGRAM_NAME    => "exonerate",
@@ -129,7 +129,7 @@ use vars qw(%Config);
         GENEBUILD_ID => 25,
 
         WB_REF_DBNAME => 'amonida_human_core_55',
-        WB_REF_DBHOST => 'genebuild6',
+        WB_REF_DBHOST => 'genebuild7',
 
         WB_PIPE_DBNAME => 'amonida_homo_cdna0509_ref',
         WB_PIPE_DBHOST => 'genebuild1',
