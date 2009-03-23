@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.39 2009-03-18 11:59:05 amonida Exp $
+#$Id: cDNA_update.pl,v 1.40 2009-03-23 22:03:30 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -277,8 +277,7 @@ my $rerun_flag        = 0;
 
 my $option = $ARGV[0];
 if ( !$option or
-            ( $option ne "set-species"
-#            ( $option ne "prepare"
+            ( $option ne "prepare"
           and $option ne "prepare"
           and $option ne "test-run"
           and $option ne "run"
@@ -296,7 +295,6 @@ my $progress_status = undef;
 
 if ( $option eq "prepare" ) {
 
-#if ( $option eq "prepare" ) {
     print("\nStarting cDNA-update procedure.\n");
 
     if ( !defined($progress_status) ) {
@@ -398,6 +396,9 @@ if ( $option eq "prepare" ) {
 
         # Create analysis, set the rule and make the input_ids
         setup_analysis();
+
+        # Synchronise reference and target databases
+        sync_databases();
 
         $progress_status = 2;
         update_progress_status($progress_status);
@@ -517,8 +518,6 @@ elsif ( $option eq "run" ) {
             # Remaking fasta files
             if ( $progress_status == 5 ) {
 
-                print "\n>>> remaking fasta files!\n";
-
                 config_setup();
                 remake_fasta_files();
 
@@ -556,8 +555,6 @@ elsif ( $option eq "run" ) {
     }
 
     elsif ( $progress_status >= 6 ) {
-#        my $progress= get_status($pipe_db->dbc());
-#        print ">>> here!!!\n";
 
         if ( $progress_status == 6 ) {
             print("Do you want to check for AWOL jobs ? (y/n) ");
@@ -572,7 +569,6 @@ elsif ( $option eq "run" ) {
 
         # Checking cDNAs with many hits to the genome
         if ( $progress_status == 7 ) {
-#            print ">>> progress = 7\n";
 
             print(   "Would you like to check for cDNAs which "
                    . "have hit many places in the genome? (y/n) " );
@@ -791,7 +787,7 @@ sub config_setup {
 
 # Check files & directories, create if necessary
 sub check_vars {
-#    print "in check_vars!\n";
+    print "in check_vars!\n";
     foreach my $configvarref ( keys %configvars ) {
         if ( !$configvarref ) {
             croak(   "Please define all configuration variables! "
@@ -938,34 +934,6 @@ sub fastafiles {
         if ($update) {
             polya_clipping($newfile2);
         }
-        # This can go in a subroutine as well...
-#        if ($update) {
-#            # Clip ployA tails
-#            print("\nPerforming polyA clipping...\n");
-#            my $newfile3 = $DATA_DIR . "/" . $newfile2 . ".clipped";
-#            $cmd = "perl " . $POLYA_CLIPPING . " "
-#                . $DATA_DIR . "/" . $newfile2 . " "
-#                . $newfile3;
-#
-#            print $cmd, "\n";
-#
-#            if ( system($cmd) ) {
-#                croak("Couldn't clip file.$@\n");
-#            }
-#
-#            # Split fasta files, store into CHUNKDIR
-#            print("Splitting fasta file.\n");
-#            $cmd = "$FASTA_SPLIT $newfile3 $CHUNK $chunkDIR";
-#            if ( system($cmd) ) {
-#                croak("Couldn't split file.$@\n");
-#            }
-#
-#            # Isolate biggest sequences
-#            check_chunksizes();
-#
-#            print "\nChopped up file.\n";
-#        } ## end if ($update)
-#        print "End of fastafiles():\t\$update = $update\n";
     };
     if ($@) {
         print STDERR "\nERROR: $@";
@@ -975,7 +943,6 @@ sub fastafiles {
 } ## end sub fastafiles
 
 sub write_to_file {
-#    print "\t>>> in write_to_file\n";
     my $update;
 
 #    $status = 0;
@@ -1023,7 +990,6 @@ sub write_to_file {
     # now loop through all embl_vertna files
     #read base file
     foreach my $embl_vert (@embl_vertrna_files) {
-#        print "\t>>> reading $embl_vert\n";
         open( RP, "<", $DATA_DIR . "/" . $embl_vert )
           or croak("Can't read $embl_vert\n");
         #<RP>;
@@ -1095,7 +1061,7 @@ sub remove_kill_list_object {
     # Go through file removing any seqs which appear on the kill list
     local $/ = "\n>";
     if ( !( -e $DATA_DIR . "/" . $newfile ) ) {
-        print("\t>>>newfile not here so need to create it first<<<\n");
+        print("\tNewfile not here so need to create it first.\n");
         write_to_file();
     }
     my $newfile2 = $newfile . ".seqs";
@@ -1130,7 +1096,6 @@ sub remove_kill_list_object {
 # seqs, just need to rechunk it.
 sub remake_fasta_files {
 
-#    print("\t>>> in remake_fasta_files\n");
     my $file = $DATA_DIR . "/missing_cdnas.fasta";
 
     # How many files do we want? automatically adjust chunk_num,
@@ -1215,8 +1180,6 @@ sub check_chunksizes {
 sub DB_setup {
     $status = 0;
 
-#    print "\t>>> in DB_setup: analysis is $newFeatureName\n\n";
-
     eval {
         if ( $rerun_flag == 0 ) {
 
@@ -1279,8 +1242,8 @@ sub DB_setup {
             print("\nCreated databases.\n\n");
 
         } else {
-            print ">>> in DB_setup else statement - rerun_flag: " . $rerun_flag . "\n";
             # If rerunning without rebuilding databases - clear out jobs tables first:
+
             print("\n\t>>>\$newFeatureName = $newFeatureName\n"
                     . "\t>>>\$submitName = $submitName\n");
 
@@ -1303,38 +1266,14 @@ sub DB_setup {
             $pipe_db->dbc->do( "DELETE from analysis where logic_name = '$submitName'");
             $pipe_db->dbc->do("DELETE from analysis where logic_name = '$newFeatureName'");
 
-#            print ">>> status in DB_setup: $status\n";
             # Create analysis, set the rule and make the input_ids
-            print ">>> setting up analysis\n";
             setup_analysis();
 
         } ## end else [ if ( $rerun_flag == 0 )
 
-        # Create analysis, set the rule and make the input_ids
-#        setup_analysis();
+        # Synchronise reference and target databases
+        sync_databases();
 
-        # Copy analysis entries (and others, just to make sure)
-        my $tables_to_copy =  'analysis '           . 'assembly '
-                            . 'assembly_exception ' . 'attrib_type '
-                            . 'coord_system '       . 'meta '
-                            . 'meta_coord '         . 'seq_region '
-                            . 'seq_region_attrib';
-
-        # Dump the tables from ref db
-        # 3 = file count
-        # 1 = pipeline db
-        $status += dump_tables( $tables_to_copy, 3, 1 );
-
-        # Delete the unwanted tables in target db
-        delete_unwanted_tables( $tables_to_copy );
-
-        # Import the dumped tables to target db
-        # 3 = count of the output file
-        $status += import_tables(3);
-
-        if ($status) { croak("Error while synchronising databases.\n") }
-
-        print "\n\nDatabases in sync.\n";
     };    ## end eval
 
     if ($@) {
@@ -2126,8 +2065,6 @@ sub create_db {
     my $status = 0;
     my $cmd;
 
-#    print ">>>in create_db\n";
-
     my $mysql_cmd;
     my ($host, $port);
     if ($is_pipeline) {
@@ -2179,7 +2116,7 @@ sub create_db {
 sub delete_unwanted_tables {
     my ($tables_to_delete, $is_pipeline) = ($_[0], $_[1]);
 
-#    print ">>> in delete_unwanted_tables\n";
+    print ">>> in delete_unwanted_tables\n";
     # Get an array separator
     my @tables = split(/ /, $tables_to_delete);
     $" = "\n";
@@ -2188,7 +2125,6 @@ sub delete_unwanted_tables {
 
     my $db;
     if ($is_pipeline) {
-#        print "\t>>> \$is_pipeline: $is_pipeline\n";
         $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
                           $WB_PIPE_DBNAME, $WB_DBUSER,
                           $WB_DBPASS );
@@ -2207,7 +2143,7 @@ sub delete_unwanted_tables {
 sub dump_tables {
     my ( $tables_to_dump, $count, $is_pipeline ) = ( $_[0], $_[1], $_[2] );
 
-#    print ">>> in dump_tables\t$tables_to_dump\n";
+    print ">>> in dump_tables\t$tables_to_dump\n";
 
     my $mysql_dump;
     if ($is_pipeline) {
@@ -2243,7 +2179,6 @@ sub dump_tables {
             $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
             print $cmd, "\n";
             $status += system($cmd);
-#            print ".";
         }
         else {
             print("\nNot dumping the tables again.\n\n");
@@ -2253,10 +2188,8 @@ sub dump_tables {
         $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
         print $cmd, "\n";
         $status += system($cmd);
-#        print ".";
     }
 
-#    print ">>> status in dump_tables = $status\n";
     return $status;
 }
 
@@ -2266,7 +2199,7 @@ sub import_tables {
 
     $status = 0;
 
-#    print ">>> in import_tables\n";
+    print ">>> in import_tables\n";
 
     my $mysql_query;
     if ($is_pipeline) {
@@ -2348,7 +2281,6 @@ sub setup_analysis {
             . " -input_id_type "   . "FILENAME";
 
     $status += system($cmd);
-#    print ">>> status after adding $newFeatureName: $status\n";
     print $cmd, "\n";
 
     $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
@@ -2358,7 +2290,6 @@ sub setup_analysis {
          . " -input_id_type "   . "FILENAME";
 
     $status += system($cmd);
-#    print ">>> status after adding $submitName: $status\n";
     print $cmd, "\n";
 
     $cmd =  "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/RuleHandler.pl "
@@ -2368,7 +2299,6 @@ sub setup_analysis {
           . " -insert";
 
     $status += system($cmd);
-#    print ">>> status after adding rule: $status\n";
     print $cmd, "\n";
 
     $cmd =  "perl ".$CVS_DIR."/ensembl-pipeline/scripts/make_input_ids "
@@ -2379,7 +2309,6 @@ sub setup_analysis {
 
     print $cmd, "\n";
     $status += system($cmd);
-#    print ">>> status after making input_ids: $status\n";
 
     if ($status) { croak("Error while setting up the database.\n"); }
     print "\nDatabase is set up now.\n\n";
@@ -2398,12 +2327,10 @@ sub drop_create_database {
 
     my $drop_sql = "DROP DATABASE IF EXISTS " . $db_name;
     $serverh->do($drop_sql);
-#    print(">>> dropped the new db\n");
 
     if ($create) {
         my $create_sql = "CREATE DATABASE " . $db_name;
         $serverh->do($create_sql);
-#        print(">>> created the new db\n");
     }
 
     $serverh->disconnect();
@@ -2452,6 +2379,35 @@ sub polya_clipping {
     print "\nChopped up the file.\n";
 }
 
+# Synchronise reference and target databases
+sub sync_databases {
+
+    $status = 0;
+
+    # Copy analysis entries (and others, just to make sure)
+    my $tables_to_copy =  'analysis '           . 'assembly '
+                        . 'assembly_exception ' . 'attrib_type '
+                        . 'coord_system '       . 'meta '
+                        . 'meta_coord '         . 'seq_region '
+                        . 'seq_region_attrib';
+
+    # Dump the tables from ref db
+    # 3 = file count
+    # 1 = pipeline db
+    $status += dump_tables( $tables_to_copy, 3, 1 );
+
+    # Delete the unwanted tables in target db
+    delete_unwanted_tables( $tables_to_copy );
+
+    # Import the dumped tables to target db
+    # 3 = count of the output file
+    $status += import_tables(3);
+
+    if ($status) { croak("Error while synchronising databases.\n") }
+
+    print "\n\nDatabases in sync.\n";
+}
+
 # Connect to a given database, optional with attached DNA db
 sub connect_db {
     my $host   = shift;
@@ -2483,93 +2439,6 @@ sub connect_db {
     }
     return $dbObj;
 } ## end sub connect_db
-
-# From Bio::EnsEMBL::Analysis::RunnableDB
-#sub read_and_check_config {
-#   my ($self, $var_hash) = @_;
-#        parse_config($self, $var_hash, $self->analysis->logic_name);
-#}
-
-#sub parse_config {
-#    #my ( $CDNA_UPDATE_BY_LOGIC, $species) = @_;
-#    my ( $CDNA_UPDATE_BY_LOGIC ) = @_;
-#
-#    my $species = 'human';
-#    if ( !$species ) {
-#        throw(   "Can't parse the "
-#            . $CDNA_UPDATE_BY_LOGIC
-#            . " if we are give no species" );
-#    }
-#
-#    my $DEFAULT_ENTRY_KEY = 'DEFAULT';
-#    if ( !$CDNA_UPDATE_BY_LOGIC || ref($CDNA_UPDATE_BY_LOGIC) ne 'HASH' ) {
-#        my $err = "Must pass read_and_check_config a hashref with the config "
-#          . "in ";
-#        $err .= " not a " . $CDNA_UPDATE_BY_LOGIC if ($CDNA_UPDATE_BY_LOGIC);
-#        $err .= " Utilities::read_and_and_check_config";
-#        throw($err);
-#    }
-#
-#    my %check;
-#    foreach my $conf_key ( keys %{ $CDNA_UPDATE_BY_LOGIC } ) {
-#        my $uc_key = uc($conf_key);
-#        if ( exists $check{$uc_key} ) {
-#            throw("You have two entries in your config with the same name (ignoring case)\n" );
-#        }
-#        $check{$uc_key} = $conf_key;
-#        print Dumper(\%check);
-#    }
-#    # replace entries in config has with lower case versions.
-#    foreach my $key ( keys %check ) {
-#        my $old_k = $check{$key};
-#        my $entry = $CDNA_UPDATE_BY_LOGIC->{$old_k};
-#        delete $CDNA_UPDATE_BY_LOGIC->{$old_k};
-#
-#        $CDNA_UPDATE_BY_LOGIC->{$key} = $entry;
-#    }
-#
-#    if ( not exists( $CDNA_UPDATE_BY_LOGIC->{$DEFAULT_ENTRY_KEY} ) ) {
-#        throw("You must define a $DEFAULT_ENTRY_KEY entry in your config");
-#    }
-#
-#    my $default_entry = $CDNA_UPDATE_BY_LOGIC->{$DEFAULT_ENTRY_KEY};
-    # the following will fail if there are config variables that
-    # do not have a corresponding method here
-#    foreach my $config_var ( keys %{$default_entry} ) {
-#        if ( $obj->can($config_var) ) {
-#            $obj->$config_var( $default_entry->{$config_var} );
-#        } else {
-#            throw("no method defined in Utilities for config variable '$config_var'" );
-#        }
-#    }
-
-    #########################################################
-    # read values of config variables for this logic name into
-    # instance variable, set by method
-    #########################################################
-#    my $uc_logic = uc($species);
-#    if ( exists $CDNA_UPDATE_BY_LOGIC->{$uc_logic} ) {
-#        # entry contains more specific values for the variables
-#        my $entry = $CDNA_UPDATE_BY_LOGIC->{$uc_logic};
-#    }
-#        foreach my $config_var ( keys %{$entry} ) {
-#            $self_config->{ $config_var } = $entry->{ $config_var };
-#        }
-#
-#            if ( $obj->can($config_var) ) {
-#
-#                $obj->$config_var( $entry->{$config_var} );
-#            } else {
-#                throw("no method defined in Utilities for config variable '$config_var'" );
-#            }
-#        }
-#    } else {
-#        throw("Your logic_name "
-#            . $uc_logic
-#            . " doesn't appear in your config file hash - using default settings\n"
-#            . $CDNA_UPDATE_BY_LOGIC );
-#    }
-#} ## end sub parse_config
 
 
 1;
