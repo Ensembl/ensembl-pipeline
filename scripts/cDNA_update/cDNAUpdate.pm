@@ -128,32 +128,35 @@ use vars qw(%Config);
         HOST         => 'bc-9-1-01',
         GENEBUILD_ID => 25,
 
-        WB_REF_DBNAME => 'amonida_human_core_54',
+        WB_REF_DBNAME => 'amonida_human_core_55',
         WB_REF_DBHOST => 'genebuild6',
 
-        WB_PIPE_DBNAME => 'amonida_test_hum_cdna0209_ref',
+        WB_PIPE_DBNAME => 'amonida_homo_cdna0509_ref',
         WB_PIPE_DBHOST => 'genebuild1',
         WB_PIPE_DBPORT => 3306,
 
-        WB_TARGET_DBNAME => 'amonida_test_hum_cdna0209_update',
+        WB_TARGET_DBNAME => 'amonida_homo_cdna0509_update',
         WB_TARGET_DBHOST => 'genebuild1',
         WB_TARGET_DBPORT => 3306,
 
-        WB_LAST_DBNAME => 'homo_sapiens_cdna_52_36n',
-        WB_LAST_DBHOST => 'ensdb-archiveblabla',
-        WB_LAST_DBPORT => 5304,
+        WB_LAST_DBNAME => 'homo_sapiens_cdna_54_36p',
+        WB_LAST_DBHOST => 'ens-livemirror',
+        WB_LAST_DBPORT => 3306,
 
-        WB_LAST_DNADBHOST => 'ensdb-archiveblabla',
-        WB_LAST_DNADBPORT => 5304,
+        WB_LAST_DNADBNAME => 'homo_sapiens_core_54_36p',
+        WB_LAST_DNADBHOST => 'ens-livemirror',
+        WB_LAST_DNADBPORT => 3306,
 
-        DATA_DIR => "$ENV{SCRATCH}",
+        CVS_DIR => "$ENV{CVSDIR}",
+
+        DATA_DIR => "$ENV{WORK}",
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Human/NCBI36/genome/softmasked_dusted.fa',
+        GENOMICSEQS => '/data/blastdb/Ensembl/Human/GRCh37/genome/softmasked/softmasked_dusted.fa',
 
         # Chunk size recommendations: 5500 for human
         # otherwise get AWOL jobs in first run
