@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.40 2009-03-23 22:03:30 amonida Exp $
+#$Id: cDNA_update.pl,v 1.41 2009-03-24 14:09:30 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1362,7 +1362,7 @@ sub run_analysis {
                   . "Using command:\n\n"
                   . $cmd
                   . "\n\nPlease monitor the output with:\n\n"
-                  . "perl " . $CVS_DIR . "ensembl-pipeline/scripts/monitor"
+                  . "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/monitor"
                   . " -dbhost "   . $WB_PIPE_DBHOST
                   . " -dbport "   . $WB_PIPE_DBPORT
                   . " -dbuser "   . $WB_DBUSER
