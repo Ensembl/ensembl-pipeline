@@ -153,15 +153,15 @@ my $sql_meta_delete = qq{
 	delete from meta where meta_value like 'chromosome%MAPPING%'};
 
 my $sql_cs_insert = qq{
-	insert ignore into coord_system (coord_system_id, name, version, rank, attrib) values (100, 'chromosome', 'MAPPING', 100, '')};
+	insert ignore into coord_system (coord_system_id, name, version, rank, attrib) values (1000, 'chromosome', 'MAPPING', 1000, '')};
 my $sql_cs_delete = qq{
 	delete from coord_system where version = 'MAPPING'};
 
 my $sql_mc_insert = qq{
 	insert ignore into meta_coord (table_name, coord_system_id, max_length)
-	values ('exon', 100, 1), ('gene', 100, 1), ('simple_feature', 100, 1), ('transcript', 100, 1)};
+	values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1)};
 my $sql_mc_delete = qq{
-	delete from meta_coord where coord_system_id = 100};
+	delete from meta_coord where coord_system_id = 1000};
 
 my $sql_sr_update = qq{
 	update seq_region s, coord_system cs
