@@ -359,8 +359,8 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					if(&transcript_is_missed($t,$alt_sl)) {
 						$support->log_verbose(
 							sprintf(
-								"\t%s %s %d %d cannot be transfered on $A_chr\n",
-								$t->stable_id, $t->biotype, $t->start, $t->end
+								"WARNING: %s %s %d %d in gene %s cannot be transfered on %s\n",
+								$t->stable_id, $t->biotype, $t->start, $t->end, $g->stable_id,$A_chr
 							)
 						);
 						&add_hidden_remark(	$t->slice->seq_region_name,
@@ -404,7 +404,12 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				            }
 						} else {
 							my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl );
-							next TRANSCRIPT unless $new_t;
+							if(!$new_t) {
+								$support->log_verbose(sprintf("WARNING: %s %s %d %d in gene %s cannot be transfered on %s\n",
+															   $t->stable_id, $t->biotype, $t->start, $t->end, $g->stable_id,$A_chr));
+								next TRANSCRIPT;
+							}
+
 							$new_t->status( $t->status );
 				            #my $status = 'COMPLEX_NONCODING';
 				            #add_trans_remark($ref_set, $status, $new_t);
@@ -439,7 +444,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			   # won't return empty list
 				$tg->add_Attributes( @{ $g->get_all_Attributes() } );
 
-				my $genes = &transcripts2genes($tg,\@proj_trans);
+				my $genes = &transcripts2genes($g,$tg,\@proj_trans);
 
 				foreach my $gene (@$genes) {
 					&write_gene($gene);
@@ -462,7 +467,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					if($exist) {
 						$support->log_verbose(
 							sprintf(
-								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+								"WARNING: SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
 								$gene->stable_id, $gene->biotype, $R_chr,
 								$g->start,      $g->end,      $gene->seq_region_name,
 								$gene->start,     $gene->end
@@ -526,7 +531,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			} else {
 				$support->log_verbose(
 					sprintf(
-								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
+								"WARNING: SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
 								$tg->stable_id, $tg->biotype, $R_chr,
 								$g->start,      $g->end,      $A_chr,
 								$tg->start,     $tg->end,
@@ -705,6 +710,7 @@ sub project_transcript_the_hard_way {
 	my ( $g, $t, $alt_sl ) = @_;
 
 	my $new_trans;
+	my $warnings = '';
 	%$new_trans = %$t;
 	bless $new_trans, ref($t);
 	$new_trans->{'translation'} = undef;
@@ -712,6 +718,8 @@ sub project_transcript_the_hard_way {
 		&add_hidden_remark(	$t->slice->seq_region_name,
 						    sprintf("transcript %s has lost its translation %s",$t->stable_id,$t->translation->stable_id),
 						    $new_trans);
+		$warnings .= sprintf("WARNING: transcript %s  has lost its translation %s\n",
+							  $t->stable_id, $t->translation->stable_id);
 	}
 
 	my @new_e;
@@ -756,13 +764,11 @@ sub project_transcript_the_hard_way {
 					$new_e->stable_id( $e->stable_id ) unless $flag;
 					# Check here that the exon doesn't overlap with those already in the list
 					if(&features_overlap($new_e,\@new_e)){
-						$support->log_verbose(
-							sprintf("WARNING: Exons overlap found on strand %d, discard Exon %s in Transcript %s of Gene %s\n",
+						$warnings .= sprintf("WARNING: Exons overlap found on strand %d, discard Exon %s in Transcript %s of Gene %s\n",
 								$_,
 								$e->stable_id,
 								$t->stable_id,
-								$g->stable_id)
-						);
+								$g->stable_id);
 						&add_hidden_remark($e->slice->seq_region_name,
 								    sprintf("exon %s %d-%d:%d cannot be transfered",$e->stable_id,$e->start,$e->end,$e->strand),
 								    $new_trans);
@@ -780,13 +786,16 @@ sub project_transcript_the_hard_way {
 				&add_hidden_remark($e->slice->seq_region_name,
 									    sprintf("exon %s has been altered",$e->stable_id),
 									    $new_trans);
-				$support->log_verbose(sprintf("WARNING: Check altered Exon %s in Transcript %s of Gene %s\n",$e->stable_id,$t->stable_id,$g->stable_id));
+				$warnings .= sprintf("WARNING: Check altered Exon %s in Transcript %s of Gene %s\n",
+									  $e->stable_id,$t->stable_id,$g->stable_id);
 
 
 			} else {
 				&add_hidden_remark($e->slice->seq_region_name,
 								    sprintf("exon %s %d-%d:%d cannot be transfered",$e->stable_id,$e->start,$e->end,$e->strand),
 								    $new_trans);
+				$warnings .= sprintf("WARNING: Cannot transfer Exon %s %d-%d:%d in Transcript %s of Gene %s\n",
+								     $e->stable_id,$e->start,$e->end,$e->strand,$t->stable_id,$g->stable_id);
 			}
 		}
 	}
@@ -796,7 +805,12 @@ sub project_transcript_the_hard_way {
 		$new_trans->add_Exon($e);
 	}
 
-	return @new_e ? $new_trans : undef ;
+	if(@new_e) {
+		$support->log_verbose($warnings);
+		return $new_trans;
+	} else {
+		return undef;
+	}
 }
 
 sub features_overlap {
@@ -821,7 +835,7 @@ sub add_hidden_remark {
 }
 
 sub transcripts2genes {
-	my ($tg,$trans) = @_;
+	my ($rg, $tg,$trans) = @_;
 	my @genes;
 	# group the transcripts by seq_region_name and minus/plus strand
 	my $hash_trans;
@@ -869,11 +883,7 @@ sub transcripts2genes {
 
 		}
 		my $remark = "Gene $set/$number (".$tg->stable_id.") automatically split by the annotation transfer script";
-		my $attribute = Bio::EnsEMBL::Attribute->new
-	       (-CODE => 'hidden_remark',
-	        -NAME => 'Hidden Remark',
-	        -VALUE => $remark);
-		$ng->add_Attributes($attribute);
+		&add_hidden_remark($rg->slice->seq_region_name,$remark,$ng);
 
 		map( $ng->add_Transcript($_), @$nt );
 		push @genes,$ng;
@@ -883,11 +893,7 @@ sub transcripts2genes {
 	# create the main gene here with same stable id
 	map( $tg->add_Transcript($_), @$gt );
 	my $remark = "Gene 1/$number (".$tg->stable_id.") automatically split by the annotation transfer script";
-	my $attribute = Bio::EnsEMBL::Attribute->new
-       (-CODE => 'hidden_remark',
-        -NAME => 'Hidden Remark',
-        -VALUE => $remark);
-	$tg->add_Attributes($attribute) if(@gene_transcripts);
+	&add_hidden_remark($rg->slice->seq_region_name,$remark,$tg) if(@gene_transcripts);
 	my ($name_attrib) = @{ $tg->get_all_Attributes('name') };
 	# change main gene name
 	$name_attrib->value($name_attrib->value."_1") if(@gene_transcripts);;
@@ -1108,14 +1114,14 @@ sub write_gene {
 	my $seq_id = $g->slice->seq_region_name;
 
 	printf( "\t$seq_id\tgene\t%s\t%s\t%s\n",
-		$g->stable_id, $g->biotype, $g->status );
+		$g->stable_id || 'undef', $g->biotype, $g->status );
 #	foreach my $a (@{ $g->get_all_Attributes })	{
 #		printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
 #	}
 
 	foreach my $t ( @{ $g->get_all_Transcripts } ) {
 		printf( "\t$seq_id\ttranscript\t%s\t%s\t%s\n",
-			$t->stable_id, $t->biotype, $t->status );
+			$t->stable_id || 'undef', $t->biotype, $t->status );
 
 #		foreach my $a (@{ $t->get_all_Attributes })	{
 #			printf "code %s\tname %s\tvalue %s\n",$a->code,$a->name,$a->value;
@@ -1123,13 +1129,14 @@ sub write_gene {
 
 		foreach my $e ( @{ $t->get_all_Exons } ) {
 			printf( "\t$seq_id\texon_transcript\t%s\t%s\n",
-				$e->stable_id, $t->stable_id );
+				$e->stable_id || 'undef', $t->stable_id || 'undef' );
 		}
 		eval {
 			if ( $t->translation )
 			{
 				printf(
-					"\t$seq_id\ttranslation\t%s\t%d\t%s\t%d\n",
+					"\t$seq_id\ttranslation\t%s\t%s\t%d\t%s\t%d\n",
+					$t->translation->stable_id,
 					$t->translation->start_Exon->stable_id,
 					$t->translation->start,
 					$t->translation->end_Exon->stable_id,
