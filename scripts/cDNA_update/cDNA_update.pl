@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.41 2009-03-24 14:09:30 amonida Exp $
+#$Id: cDNA_update.pl,v 1.42 2009-03-30 15:26:21 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -18,8 +18,22 @@
 # 1/ signal capturing would be useful when a user interrupts a step.
 # 2/ use Mole for getting the sequences instead of downloading the
 # fasta files directly.
-
-=pod
+#
+# The following errors are reported, but can be ignored:
+#
+# "OSTYPE: Undefined variable"
+#
+# "You should also add a rule that has SubmitcDNAChunk as its goal,
+# or this rule will never have its conditions fulfilled."
+#
+#
+# "-------------------- WARNING ----------------------
+# MSG: Some of your analyses don t have entries in the input_id_type_analysis table
+# FILE: Pipeline/Utils/PipelineSanityChecks.pm LINE: 99
+# CALLED BY: Pipeline/Utils/PipelineSanityChecks.pm  LINE: 73
+# ---------------------------------------------------"
+#
+# "MSG: Could not find fasta file for 'MT in '/data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted'"
 
 =head1 NAME
 
@@ -433,7 +447,6 @@ elsif ( $option eq "test-run" ) {
 
 elsif ( $option eq "run" ) {
 
-#    print "\t\t$rerun_flag <-- rerun flag in run\n";
     print("\nDo we need to set/re-set the configs? (y/n) ");
     if ( get_input_arg() ) {
 
@@ -449,12 +462,9 @@ elsif ( $option eq "run" ) {
         } else {
             print "Not resetting config.\n\n" ;
         }
-    } #else {
-      #  print "Not resetting config.\n\n" ;
-    #}
+    }
 
     $progress_status = get_status($pipe_db->dbc());
-#    print "\t\t$progress_status <-- in run\n";
     if ( $progress_status >= 2 && $progress_status < 6 ) {
 
         if ( $progress_status == 2 || $progress_status == 3 ) {
@@ -473,7 +483,6 @@ elsif ( $option eq "run" ) {
         }
 
         $progress_status = get_status($pipe_db->dbc());
-#        print "\t\t$progress_status <-- before finding missing cdnas\n";
 
         if ( $progress_status == 4 ) {
 
@@ -489,22 +498,14 @@ elsif ( $option eq "run" ) {
                 . "\tsoftmasktarget = FALSE? (y/n) " );
         }
 
-        # move this to further down!
-#        print("\t\t$newFeatureName <-- which analysis\n");
-#        print("\t\t$rerun_flag <-- rerun flag just before resetting it\n");
-
         # Rerunning the analysis
         if ( $progress_status >= 5 && get_input_arg() ) {
             $rerun_flag = 1;
-
-#            print "\t\t$newFeatureName <-- which analysis, rerunning now\n";
 
             # Change the logic_name and directories
 
             # To show different params
             $newFeatureName               = $newFeatureName . "_2";
-
-#           print("\n\tjust reset the analysis name to $newFeatureName\n");
 
             $configvars{"newFeatureName"} = $newFeatureName;
             $chunkDIR                     = $DATA_DIR . "/chunks2";
@@ -513,7 +514,6 @@ elsif ( $option eq "run" ) {
             $configvars{"outDIR"}         = $outDIR;
 
             $progress_status = get_status($pipe_db->dbc());
-#            print "\t\t$progress_status <-- before remaking fasta files\n";
 
             # Remaking fasta files
             if ( $progress_status == 5 ) {
@@ -549,7 +549,7 @@ elsif ( $option eq "run" ) {
                         unclean_exit();
                     }
                 }
-            # maybe need to increment the status here...
+            # maybe need to increment the status here?
             }
         }
     }
@@ -672,8 +672,6 @@ sub config_setup {
     my $filecount = 0;
     my ( $header, $filename, $path );
 
-#    print "in config_setup()\n";
-
     # Set env var to avoid warnings
     if ( !defined $ENV{"OSTYPE"} ) {
         $ENV{"OSTYPE"} = "";
@@ -700,7 +698,6 @@ sub config_setup {
         1;
         ';
     check_vars();
-#    print "out of check_vars()\n";
 
     # Check existence of source databases
     if ( !connect_db( $WB_REF_DBHOST, $WB_REF_DBPORT,
@@ -780,14 +777,13 @@ sub config_setup {
     print WP Data::Dumper->Dump( [ \%saved_files ], ['*saved_files'] );
     close(WP);
     $/ = "\n";
-    print(   "Created backup of current config files, "
+    print(   "\nCreated backup of current config files, "
            . "new config files written.\n" );
 } ## end sub config_setup
 
 
 # Check files & directories, create if necessary
 sub check_vars {
-    print "in check_vars!\n";
     foreach my $configvarref ( keys %configvars ) {
         if ( !$configvarref ) {
             croak(   "Please define all configuration variables! "
@@ -818,7 +814,7 @@ sub checkdir {
     # Go through dirs recursively
     unless ( opendir( DIR, $dirname ) ) {
         closedir(DIR);
-        print "\ncan't open $dirname.\n";
+        print "\nCan't open $dirname.\n";
         return 0;
     }
 
@@ -860,29 +856,20 @@ sub fastafiles {
                 . $VERTRNA_UPDATE . " "
                 . $REFSEQ;
 
-#        print $cmd, " <-- cd'ing to SOURCE_DIR\n";
         sshopen2( "$USER\@$HOST", *READER, *WRITER, "$cmd" ) || croak "ssh: $!";
         while (<READER>) {
             @filestamp = split( " ", $_ );
             my $stampA = join( "-", @filestamp[ 5 .. 7 ] );
-#            print( $stampA, " <-- stampA\n" );
             $cmd = "cd " . $DATA_DIR . "; " . "ls -n " . $filestamp[8];
             @filestamp = split( " ", `$cmd` );
             my $stampB = join( "-", @filestamp[ 5 .. 7 ] );
-#            print( $stampB, " <-- stampB\n" );
             if ( $stampA eq $stampB ) {
                 # No changes...
                 if ( $filestamp[8] eq $VERTRNA ) {
-#                    print( $filestamp[8] . "\t" . $VERTRNA,
-#                           " <-- filestamp[8] & VERTRNA\n" );
                     $vertrna_ver = 0;
                 } elsif ( $filestamp[8] eq $VERTRNA_UPDATE ) {
-#                    print( $filestamp[8] . "\t" . $VERTRNA_UPDATE,
-#                           " <-- filestamp[8] & VERTRNA_UPDATE\n" );
                     $vertrna_upd_ver = 0;
                 } elsif ( $filestamp[8] eq $REFSEQ ) {
-#                    print( $filestamp[8] . "\t" . $REFSEQ,
-#                           " <-- filestamp[8] & REFSEQ\n" );
                     $refseq_ver = 0;
                 }
             }
@@ -890,10 +877,8 @@ sub fastafiles {
         close(READER);
         close(WRITER);
 
-#        print $vertrna_ver, " <-- vertrna_ver\n";
         # Copy files
         if ($vertrna_ver) {
-#            print "\$vertrna_ver = $vertrna_ver\n";
             $cmd = "scp -p " . $SOURCE_HOST . ":"
                 . $SOURCE_DIR . "/" . $VERTRNA . " "
                 . $DATA_DIR   . "/" . $VERTRNA;
@@ -901,7 +886,6 @@ sub fastafiles {
             print $cmd, "\n";
 
             $status += system($cmd);
-#            print "status = $status . \t\t \$update vertrna = $update\n";
         }
         if ($vertrna_upd_ver) {
             $cmd = "scp -p " . $SOURCE_HOST . ":"
@@ -910,7 +894,6 @@ sub fastafiles {
 
             print $cmd, "\n";
             $status += system($cmd);
-#            print "status = $status . \t\t \$update vertrna_update = $update\n";
         }
         if ($refseq_ver) {
             $cmd = "scp -p " . $SOURCE_HOST . ":"
@@ -919,7 +902,6 @@ sub fastafiles {
 
             print $cmd, "\n";
             $status += system($cmd);
-#            print "status = $status . \t\t \$update refseq = $update\n";
         }
         if ($status) { croak("Error while copying files.\n"); }
         print "Copied necessary files.\n";
@@ -928,7 +910,6 @@ sub fastafiles {
             $update = 1;
             write_to_file();
         }
-#        print("\t\$update = $update <<<-- just after write_to_file & before remove_kill_list_object\n");
 
         my $newfile2 = remove_kill_list_object();
         if ($update) {
@@ -969,7 +950,6 @@ sub write_to_file {
                 croak(   "\n$VERTRNA_UPDATE: "
                        . "unmatched id pattern:\n$entry\n" );
             }
-            #else {print STDERR "$1\n$entry\n";}
             $EMBL_ids{$1} = 1;
             # Re-write fasta entry
             $entry =~ s/\>//g;
@@ -1040,7 +1020,6 @@ sub write_to_file {
     close(WP);
     local $/ = "\n";
 
-#    print "End of write_to_files()\n";
 } ## end sub write_to_file
 
 # Now get the kill_list
@@ -1244,9 +1223,6 @@ sub DB_setup {
         } else {
             # If rerunning without rebuilding databases - clear out jobs tables first:
 
-            print("\n\t>>>\$newFeatureName = $newFeatureName\n"
-                    . "\t>>>\$submitName = $submitName\n");
-
             my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
                                       $WB_PIPE_DBNAME, $WB_DBUSER,
                                       $WB_DBPASS );
@@ -1301,8 +1277,6 @@ sub test_run {
 
     my $sth = $db->dbc->prepare($sql)
         or croak("Sql error getting an input-id!\n$!");
-
-#    print $sth, "\n";
 
     $sth->execute();
     my ($input_id) = $sth->fetchrow_array;
@@ -1490,7 +1464,7 @@ sub chase_jobs {
         close OUT;
         close LIST;
 
-        print( "\nThere were $seq_count cdnas in the files which didn't run\n"
+        print( "\nThere were $seq_count cdnas in the files which didn't run.\n"
              . "Would you like to try with smaller chunk files? (y/n) " );
 
         my $ans = "";
@@ -1527,7 +1501,7 @@ sub chase_jobs {
 
                 $CHUNK    = $ans;
                 $chunkDIR = $DATA_DIR . "/chunks3";
-                print("Splitting into $CHUNK chunks.\n");
+                print("\nSplitting into $CHUNK chunks.\n");
 
                 $cmd = "$FASTA_SPLIT $DATA_DIR/single_file.out "
                       . $CHUNK . " " . $chunkDIR;
@@ -1643,7 +1617,6 @@ sub why_cdnas_missed {
         . " -findN_prog "       . $FIND_N
         . " -reasons_file "     . $UNMAPPED_REASONS;
 
-    print "$cmd\n";
     if ( system($cmd) ) {
         carp("Erros when running $STORE_UNMAPPED!\n$cmd\n");
     }
@@ -1966,9 +1939,9 @@ sub compare {
                  . " -newdnadbhost "    . $WB_PIPE_DBHOST
                  . " -newdnadbport "    . $WB_PIPE_DBPORT
                  . " -newdnadbname "    . $WB_PIPE_DBNAME;
-            #print $cmd."\n";
+
             if ( system($cmd) ) {
-                carp(" some error occurred when submitting job!\n$cmd\n\n");
+                carp("Error occurred when submitting job!\n$cmd\n\n");
             }
         } ## end foreach my $chromosome ( keys...
     } ## end if ( get_input_arg() )
@@ -1984,7 +1957,7 @@ sub compare {
     $sth1 = $db1->dbc->prepare($sql) or croak("Sql error!$!\n");
     $sql = "SELECT COUNT(distinct hit_name) "
          . "FROM dna_align_feature daf, analysis a "
-         ."WHERE a.logic_name = '" . $newFeatureName
+         . "WHERE a.logic_name = '" . $newFeatureName
          . "' and a.analysis_id = daf.analysis_id "
          . "and daf.seq_region_id = ?";
 
@@ -2105,8 +2078,6 @@ sub create_db {
         $status += system($cmd);
     }
 
-#    print ".";
-
     if($status) { croak("Couldn't create databases!\n"); }
 
     return $status;
@@ -2116,7 +2087,6 @@ sub create_db {
 sub delete_unwanted_tables {
     my ($tables_to_delete, $is_pipeline) = ($_[0], $_[1]);
 
-    print ">>> in delete_unwanted_tables\n";
     # Get an array separator
     my @tables = split(/ /, $tables_to_delete);
     $" = "\n";
@@ -2142,8 +2112,6 @@ sub delete_unwanted_tables {
 # Dump tables from reference or pipeline db
 sub dump_tables {
     my ( $tables_to_dump, $count, $is_pipeline ) = ( $_[0], $_[1], $_[2] );
-
-    print ">>> in dump_tables\t$tables_to_dump\n";
 
     my $mysql_dump;
     if ($is_pipeline) {
@@ -2199,8 +2167,6 @@ sub import_tables {
 
     $status = 0;
 
-    print ">>> in import_tables\n";
-
     my $mysql_query;
     if ($is_pipeline) {
         $mysql_query = "mysql "
@@ -2227,7 +2193,6 @@ sub import_tables {
     print $cmd, "\n";
     $status += system($cmd);
 
-#    print ".";
     return $status;
 }
 
@@ -2261,7 +2226,6 @@ sub setup_analysis {
     print("Adding analyses and making input_ids...\n\n");
 
     $status = 0;
-#    print "status at start of setup_analysis: $status\n";
     my $sql_pipe = " -dbname " . $WB_PIPE_DBNAME
                  . " -dbhost " . $WB_PIPE_DBHOST
                  . " -dbuser " . $WB_DBUSER
@@ -2445,23 +2409,3 @@ sub connect_db {
 
 
 __END__
-
-
-The following errors are reported, but can be ignored:
-
-"OSTYPE: Undefined variable"
-
-"You should also add a rule that has SubmitcDNAChunk as its goal,
-or this rule will never have its conditions fulfilled."
-
-
-"-------------------- WARNING ----------------------
-MSG: Some of your analyses don t have entries in the input_id_type_analysis table
-FILE: Pipeline/Utils/PipelineSanityChecks.pm LINE: 99
-CALLED BY: Pipeline/Utils/PipelineSanityChecks.pm  LINE: 73
----------------------------------------------------"
-
-"MSG: Could not find fasta file for 'MT in '/data/blastdb/Ensembl/Human/NCBI35/softmasked_dusted'"
-
-_________________________________________________________
-
