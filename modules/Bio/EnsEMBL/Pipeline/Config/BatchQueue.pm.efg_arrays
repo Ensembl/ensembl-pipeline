@@ -85,6 +85,8 @@ package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use strict;
 use vars qw(%Config);
 
+#warn "output dir is 
+
 %Config = 
   (
    #New stuff
@@ -102,7 +104,7 @@ use vars qw(%Config);
    #This prevents having to create a dir for each analysis listed
    #even if we aren't using them in a given instance of a pipeline
    #define output_dir in hashes to separate output
-   DEFAULT_CLEANUP     => 'yes',	
+   DEFAULT_CLEANUP     => 'no',#'yes',	
    DEFAULT_VERBOSITY   => 'WARNING',
    JOB_LIMIT           => 10000, # at this number of jobs RuleManager will sleep for 
    # a certain period of time if you effectively want this never to run set 
@@ -201,8 +203,11 @@ use vars qw(%Config);
 		
 	{
 	 logic_name => 'AFFY_UTR_ProbeAlign',
-	 batch_size => 4,
+	 batch_size => 5,
 	 retries    => 3,
+	 #Set temporarily as a few jobs were failing on memory limits implement ALIGN_MEM_FACTOR?
+	 #To generate $AFFY_UTR_ProbeAlign_RESOURCE?
+	 #resource   => '-R"select[mem>8000] rusage[mem=8000]" -M 8000000',
 	 cleanup => 'no',
 	},
 
@@ -212,7 +217,7 @@ use vars qw(%Config);
 				   
 	{
 	 logic_name => 'AFFY_UTR_ProbeTranscriptAlign',
-	 batch_size => 6,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
 	 retries    => 3,
 	 cleanup => 'no',         
 	},
@@ -240,7 +245,7 @@ use vars qw(%Config);
 		
 	{
 	 logic_name => 'AFFY_ST_ProbeAlign',
-	 batch_size => 4,
+	 batch_size => 5,
 	 retries    => 3,
 	 cleanup => 'no',
 	},
@@ -251,12 +256,10 @@ use vars qw(%Config);
 				   
 	{
 	 logic_name => 'AFFY_ST_ProbeTranscriptAlign',
-	 batch_size => 6,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
 	 retries    => 3,
 	 cleanup => 'no',         
 	},
-
-
 
 
 	{
@@ -280,7 +283,7 @@ use vars qw(%Config);
 		
 	{
 	 logic_name => 'ILLUMINA_WG_ProbeAlign',
-	 batch_size => 4,
+	 batch_size => 5,
 	 retries    => 3,
 	 cleanup => 'no',         
 	},
@@ -291,10 +294,172 @@ use vars qw(%Config);
 				   
 	{
 	 logic_name => 'ILLUMINA_WG_ProbeTranscriptAlign',
-	 batch_size => 6,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
 	 retries    => 3,
 	 cleanup => 'no',         
 	},
+
+
+	{
+	 logic_name => 'Import_CODELINK_Arrays',
+	 batch_size => 1,
+	 queue      => $ENV{'IMPORT_ARRAYS_QUEUE'},
+	 #These need to be dynamic dependent on number of and type of arrays
+	 resource   => $ENV{'IMPORT_ARRAYS_RESOURCE'},
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+	
+	{
+	 logic_name => 'Submit_Import_CODELINK_Arrays',
+	},
+
+			   
+	{
+	 logic_name => 'Submit_CODELINK_ProbeAlign',
+	},
+		
+	{
+	 logic_name => 'CODELINK_ProbeAlign',
+	 batch_size => 5,
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+	{
+	 logic_name => 'Submit_CODELINK_ProbeTranscriptAlign',
+	},
+				   
+	{
+	 logic_name => 'CODELINK_ProbeTranscriptAlign',
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+
+	{
+	 logic_name => 'Import_PHALANX_Arrays',
+	 batch_size => 1,
+	 queue      => $ENV{'IMPORT_ARRAYS_QUEUE'},
+	 #These need to be dynamic dependent on number of and type of arrays
+	 resource   => $ENV{'IMPORT_ARRAYS_RESOURCE'},
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+	
+	{
+	 logic_name => 'Submit_Import_PHALANX_Arrays',
+	},
+
+			   
+	{
+	 logic_name => 'Submit_PHALANX_ProbeAlign',
+	},
+		
+	{
+	 logic_name => 'PHALANX_ProbeAlign',
+	 batch_size => 5,
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+	{
+	 logic_name => 'Submit_PHALANX_ProbeTranscriptAlign',
+	},
+				   
+	{
+	 logic_name => 'PHALANX_ProbeTranscriptAlign',
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+
+	{
+	 logic_name => 'Import_AGILENT_Arrays',
+	 batch_size => 1,
+	 queue      => $ENV{'IMPORT_ARRAYS_QUEUE'},
+	 #These need to be dynamic dependent on number of and type of arrays
+	 resource   => $ENV{'IMPORT_ARRAYS_RESOURCE'},
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+	
+	{
+	 logic_name => 'Submit_Import_AGILENT_Arrays',
+	},
+
+			   
+	{
+	 logic_name => 'Submit_AGILENT_ProbeAlign',
+	},
+		
+	{
+	 logic_name => 'AGILENT_ProbeAlign',
+	 batch_size => 5,
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+	{
+	 logic_name => 'Submit_AGILENT_ProbeTranscriptAlign',
+	},
+				   
+	{
+	 logic_name => 'AGILENT_ProbeTranscriptAlign',
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+
+		{
+	 logic_name => 'Import_LEIDEN_Arrays',
+	 batch_size => 1,
+	 queue      => $ENV{'IMPORT_ARRAYS_QUEUE'},
+	 #These need to be dynamic dependent on number of and type of arrays
+	 resource   => $ENV{'IMPORT_ARRAYS_RESOURCE'},
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+	
+	{
+	 logic_name => 'Submit_Import_LEIDEN_Arrays',
+	},
+
+			   
+	{
+	 logic_name => 'Submit_LEIDEN_ProbeAlign',
+	},
+		
+	{
+	 logic_name => 'LEIDEN_ProbeAlign',
+	 batch_size => 5,
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+	{
+	 logic_name => 'Submit_LEIDEN_ProbeTranscriptAlign',
+	},
+				   
+	{
+	 logic_name => 'LEIDEN_ProbeTranscriptAlign',
+	 batch_size => 7,#No point in reducing this as we'll be waiting for the ProbeAlign jobs
+	 retries    => 3,
+	 cleanup => 'no',         
+	},
+
+
+
+
+
+	#Do we need different analyses here for different classes?
+	#AGILENT_G2518A AGILENT_G2519F AgilentProbe AgilentCGH
+	#All 60mers?
+
+
 
    ]
   );
