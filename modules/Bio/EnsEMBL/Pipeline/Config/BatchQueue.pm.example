@@ -95,7 +95,7 @@ use vars qw(%Config);
   DEFAULT_RESOURCE    => '',
   DEFAULT_SUB_ARGS => '',
   DEFAULT_OUTPUT_DIR  => '',
-  DEFAULT_CLEANUP     => 'yes',	
+  DEFAULT_CLEANUP     => 'no',	
   DEFAULT_VERBOSITY   => 'WARNING',
   JOB_LIMIT           => 10000, # at this number of jobs RuleManager will sleep for 
                                 # a certain period of time if you effectively want this never to run set 
@@ -129,7 +129,6 @@ use vars qw(%Config);
       runner     => '',
       queue => 'normal',
       output_dir => '/some_dir/',
-      cleanup => 'yes',        
       verbosity => 'INFO',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
       retry_queue => '',
@@ -143,7 +142,6 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      cleanup => 'yes', 
       retry_queue => '',
       retry_resource => '',
       retry_sub_args => '',        
@@ -155,7 +153,6 @@ use vars qw(%Config);
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      cleanup => 'yes',         
       retry_queue => '',
       retry_resource => '',
       retry_sub_args => '',
