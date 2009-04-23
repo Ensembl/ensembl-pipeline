@@ -18,6 +18,7 @@ file is specified. This file should contain the following columns:
   2./ high quality sequence start or stop
   3./ numeric value
 
+
 clipping:
   the non-A/T sequences at the ends must be <=10bp (set by $buffer)  
   the polyA/T string must be >4bp to be removed
@@ -27,8 +28,12 @@ clipping:
 
 For only polA clipping:
   perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out
-For trimming and polyA clipping 
+
+For trimming and polyA clipping (accepting default min cutoff length of 60 bp for trimmed sequence):
   perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out -trim -comments comments.ls
+
+For trimming and polyA clipping (with specified min length cutoff for trimmed sequence):
+  perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out -trim -comments comments.ls -min_length 50
 
 =cut
 
@@ -62,14 +67,18 @@ $clipped_cdnas = $ARGV[1] if $ARGV[1] ;
 
 
 if ($trim && !defined $hqs_comment_file) {
-  die "Please enter -comment file path if you'd like to trim sequences\n";
+  die "Please enter -comments file path if you'd like to trim sequences\n";
 }
 if (!$trim && defined $hqs_comment_file) {
-  die "You specified -comment file path but not -trim. Please enter both or none of these options.\n";
+  die "You specified -comments file path but not -trim. Please enter both or none of these options.\n";
 }
-if (!defined $min_length) {
+if ($trim && defined $hqs_comment_file && !defined $min_length) {
   $min_length = 60;
   print STDERR "No minimum seq length specified. Using default of 60 bases.\n";
+}
+
+if (!$trim && !defined $hqs_comment_file && defined $min_length) {
+  print STDERR "No -trim and -comments file path provided. -min_length option is not used.\n";
 }
 
 my $seqin  = new Bio::SeqIO( -file   => "<$data",
@@ -108,7 +117,7 @@ while ( my $fullseq = $seqin->next_seq ) {
   # now clip
   my ($clipped, $clip_end, $num_bases_removed) = clip_if_necessary($unclipped);
   if (defined $num_bases_removed) {
-    print STDERR "Clipped $num_bases_removed bases from seq. Writing to file.\n";
+    # print STDERR "Clipped $num_bases_removed bases from seq. Writing to file.\n";
   }
   if (defined $clipped) {
     # we currently do not specify a minimum seq length here, but it might be a good idea
