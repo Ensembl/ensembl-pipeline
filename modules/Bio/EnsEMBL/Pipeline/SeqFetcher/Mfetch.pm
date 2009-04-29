@@ -68,7 +68,7 @@ sub new {
   } 
   # caching of sequences 
   $self->{_seq_cache}={};    
-
+  $self->{verbose} = 0 ; 
   return $self; # success - we hope!
 }
 
@@ -146,7 +146,7 @@ sub  get_Seq_by_acc {
   }
   
   $command .= $acc;
-  print STDERR "$command\n"; 
+  print STDERR "$command\n" if $self->{verbose}; 
   open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc]: $mfetch");  
    
   while  (my $line=<IN>){  
@@ -194,9 +194,9 @@ sub  get_Seq_by_acc {
 
 sub  get_Entry_Fields {
   my ($self, $acc,$fields) = @_;
- 
+
   if ( ref($fields)=~m/ARRAY/ ) {  
-     print "fields to get : " . join ( " " , @$fields )."\n"; 
+     print "fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
   }  
   if (!defined($acc)) {
     throw("No accession input");
@@ -252,32 +252,43 @@ sub  get_Entry_Fields {
 
   my %all_entries; 
   my @entries_not_found;  
-
+  my $last_acc; 
+  my %last_entry ; 
   for my $acc_string ( @fetch_strings ) {  
     $command = $cmd_prefix ." " .  $acc_string;
-    my @nr_acc = split /\s+/, $acc_string ; 
-    print "cmd: $command\n";  
+    my @nr_acc = split /\s+/, $acc_string ;    
+    my @tmp; 
+    for my  $acc_format  ( @nr_acc) {    
+         $acc_format=~s/acc://g;
+         $acc_format=~s/\%//g;
+         $acc_format=~s/\"//g;
+         push @tmp, $acc_format ; 
+     }
+      
+    print "cmd: $command\n" if $self->{verbose}; 
 
     open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $mfetch");  
-
+    @nr_acc = @tmp ; 
     my $acc;  
     my %entry_hash ;   
     my $accPointer = -1 ; 
     my $last_field ="";   
 
     LINE: while  (my $line=<IN>){  
-        chomp($line) ;    
+        chomp($line) ;  
+        #print "line $line\n";   
         #print "pointer : $nr_acc[$accPointer] $accPointer\n" ; 
         if ( $line =~m/no match/ ) {  
-          #print  "no entry found for $nr_acc[$accPointer] - exiting\n" ;  
+          #print  "no entry found for $nr_acc[$accPointer] \n" ;  
           $accPointer++;   
-          print "no -match - pointer val is : $accPointer\n" ;  
+          #print "no -match - pointer val is : $accPointer\n" ;   
+          #print "adding entry_not_found $nr_acc[$accPointer]\n"; 
           push @entries_not_found, $nr_acc[$accPointer] ; 
           next LINE;  
         } 
         my @l = split /\s+/, $line;    
         my $field = shift @l ;    
-        print "last_field : $last_field  VS $field\n" ;  
+        #print "last_field : $last_field  VS $field\n" ;  
         # result can contain more than one line begining with same field identifier , ie  
         #   AC Q4589; 
         #   AC Q0999;
@@ -286,57 +297,102 @@ sub  get_Entry_Fields {
         
         if ($field =~m/AC/ ) {      
           if ( $field eq $last_field ) {  
-             print "we got more than one line starting with AC ... wthis means it's not a new entry. \n" ; 
+             print "we got more than one line starting with AC ... wthis means it's not a new entry. \n" if $self->{verbose};
              # as we don't store/process the multipe acc returned we just ignore this line. this will caus 
              # trouble if we only have acc's returned.   
              $last_field = $field ; 
              next LINE; 
              
           } else {  
-             print "NEW ENTRY : " . join ( " " , @l ) ;  
+             print "NEW ENTRY : " . join ( " " , @l ) if $self->{verbose}; 
              $acc = $l[0];  
              $acc=~s/\;//; 
 
-             $accPointer++;  
-             print "increment pointer : $accPointer\n" ;  
-             print "test : $acc vs $nr_acc[$accPointer]\n" ;  
+             $accPointer++ unless ( length(@nr_acc) == 1 ) ;  
    
              #if ( scalar(@l) > 1 ) {  
              #  warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
              #}  
              
              # this moves all already read information into the big hash before we 
-             # read the new entry . 
+             # read the new entry .  
+             #
+             
              if ( $entry_hash{AC} ) {  
-               # entry is defined so we already read all AC .... 
+               # entry is defined so we already read all AC information and we can add safely. 
+               # problem if there's only one entry as it does not go here . ....  is the last entry always lost ? 
                my @acc_for_entry = @{$entry_hash{AC}} ; 
                for my $acc(@acc_for_entry) { 
                  for my $f ( keys %entry_hash ) { 
-                    $all_entries{$acc}{$f}= $entry_hash{$f}; 
+                    $all_entries{$acc}{$f}= $entry_hash{$f};  
+                     #print "adding $acc $f $entry_hash{$f};\n"; 
                  }    
                }
-             } 
+             }  
+             %last_entry = %entry_hash ; 
              undef %entry_hash;  
             
              # we now got a clean new entry_hash  for present entry  
              # $entry_hash{AC} = \@l;    
-             print "pointer val is : $accPointer\n" ;  
+             #print "pointer val is : $accPointer\n" ;  
              my $tmp_acc = $nr_acc[$accPointer] ;  
-             unless ($tmp_acc =~m/$acc/ ) {  
-               throw  " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;  
+             #print "test : $acc versus $tmp_acc \n" ;    
+
+             $last_acc = $tmp_acc ;  
+
+             my $hit=0; 
+             for my $result ( @l ) { 
+                #print "testing : $result <-->  $tmp_acc .... \n" ;    
+                if ( $result =~m/$tmp_acc/ ) {  
+                    $hit = 1 ;  
+                    last; 
+                } 
              } 
-             #$entry_hash{AC} = [$acc];    
+
+             unless ($tmp_acc =~m/$acc/ ) { 
+                 if ( $hit == 0 ) { 
+                   throw  " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;   
+                 }
+             }
+             #print "entries match - $tmp_acc $acc " ;  
+            # print "other_entries: " . join(" " , @l) . "\n"; 
+               
+             #$entry_hash{AC} = [$acc];     
+            # print "populating $tmp_acc to entry_hash - NOT $acc\n"; 
              $entry_hash{AC} = [$tmp_acc];    
              $last_field = $field ; 
               next LINE ; 
            }  
-        }
+        } 
+       #print "populating $field ... ".join(" ", @l) . "\n";
         $entry_hash{$field}.= join (" ", @l);  
         $last_field = $field ; 
      }   
+     %last_entry = %entry_hash ; 
+
      close IN or throw("Error running mfetch for accession [$acc_string]: $mfetch");  
-  } 
-  if ( 0 ) { 
+  }  
+
+  # add last entry to all_entries .
+  unless ( $all_entries{$last_acc} ) {    
+    # add content of last hash last_ENTRY HERE  - also populate last_entry as well beofre .  
+    #print "need to add last_entry now \n" ;   
+
+    if ( $last_entry{AC} ) { 
+      my @acc_for_entry = @{$last_entry{AC}} ; 
+       for my $acc(@acc_for_entry) { 
+          for my $f ( keys %last_entry ) { 
+             $all_entries{$acc}{$f}= $last_entry{$f};  
+             #print "adding $acc $f $last_entry{$f};\n"; 
+          }    
+       }
+     }  
+   } else { 
+     print "NO_ACC defined for last entry - skipping \n" if $self->{verbose} ; ;  
+   } 
+
+
+  if ( $self->{verbose}  ) { 
     for my $key ( keys %all_entries ) {  
        print "KEY $key\n";  
          my %tmp = %{$all_entries{$key}} ;
@@ -351,9 +407,18 @@ sub  get_Entry_Fields {
     }   
   }
   for ( @entries_not_found ) {  
-     print "no entry found for : $_\n" ; 
+     print "no entry found for : $_\n" if $self->{verbose};  
   } 
   return [\%all_entries , \@entries_not_found ] ; 
+} 
+
+
+
+sub verbose { 
+   my ($self, $arg ) = @_ ; 
+   if ( $arg ) { 
+      $self->{verbose}= $arg ;  
+   }
 } 
 
 ##
