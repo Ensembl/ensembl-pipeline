@@ -193,15 +193,120 @@ sub  get_Seq_by_acc {
 =cut
 
 sub  get_Entry_Fields {
-  my ($self, $acc,$fields) = @_;
+  my ($self, $acc_to_fetch,$fields) = @_; 
 
-  if ( ref($fields)=~m/ARRAY/ ) {  
-     print "fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
-  }  
-  if (!defined($acc)) {
+   print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
+
+  if ( ref($acc_to_fetch)=~m/ARRAY/ ) {   
+    print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
+    return $self->get_Entry_Fields_BatchFetch($acc_to_fetch,$fields); 
+  } 
+ 
+  if (!defined($acc_to_fetch)) {
     throw("No accession input");
   }  
 
+  print " try to fetch $acc_to_fetch\n" ; 
+
+  my $command ;  
+  my %all_entries; 
+  my @entries_not_found;   
+
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);  
+  $command = $cmd_prefix ." " .  $acc_to_fetch; 
+
+  # extract acc if you do a wildcard like mfetch -i  "AJFLD%"  
+
+  my $acc_format = $acc_to_fetch;
+  $acc_format=~s/acc://g;
+  $acc_format=~s/\%//g;
+  $acc_format=~s/\"//g; 
+
+  print "cmd: $command\n"; 
+
+  open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");  
+   my @lines = <IN> ; 
+  close IN or throw("Error running mfetch for accession [$acc_format]: $command ");  
+ 
+  my %entry;  
+
+  for my $line ( @lines ) { 
+        chomp($line) ;    
+
+        print "LINE $line\n" ;  
+        # we're just parsing one entry so if we get a no_match we just return  .... 
+        
+        if ( $line =~m/no match/ ) {    
+           print  "no entry found for $acc_to_fetch with $command\n";
+           push @entries_not_found, $acc_to_fetch; 
+           return [\%all_entries , \@entries_not_found ] ; 
+        }  
+
+        my @l = split /\s+/, $line;     
+        my $key_field = shift @l ;     
+
+        # result can contain more than one line begining with same field identifier , ie  
+        #   AC Q4589; 
+        #   AC Q0999;
+        #   not sure how this works if we only get AC's ....   but why would we do this anyway ?  
+        
+        if ( $key_field =~/AC/) {  
+          if ( scalar(@l) > 1 ) {  
+            warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
+          }   
+        }      
+
+        $entry{$key_field}.= join(" ", @l);    
+        #print "populating $key_field ... ".join(" ", @l) . "\n";
+  }  
+
+  # aim is to return $all_entries{Q4981}{AC}  -> string  
+  # aim is to return $all_entries{Q4981}{org} -> string 
+  # aim is to return $all_entries{ ACC }{ FIELD } -> string 
+ 
+  # populate all_entry-hash 
+  for my $field ( keys %entry ) {  
+    $all_entries{$acc_format}{$field}=$entry{$field}; 
+  }
+        # my $hit=0; 
+        # for my $result ( @l ) { 
+            #print "testing : $result <-->  $tmp_acc .... \n" ;    
+        #    if ( $result =~m/$tmp_acc/ ) {  
+        #         $hit = 1 ;  
+        #         last; 
+        #    } 
+        # } 
+
+
+   for my $key ( keys %all_entries ) {  
+       print "KEY $key\n";  
+         my %tmp = %{$all_entries{$key}} ;
+         for ( keys %tmp ) {   
+            #if ( /AC/ ) { 
+            #  print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";  
+            #}else {  
+              print "\t\t$_ --> $tmp{$_}\n";  
+            #}
+         }  
+         print "\n" ;
+   }    
+  return [\%all_entries , \@entries_not_found ] ; 
+} 
+
+
+=head2 get_Entry_Fields_BatchFetch 
+
+  Title   : batch_fetch
+  Usage   : $self->batch_retrieval(@accession_list);
+  Function: Retrieves multiple sequences via mfetch
+  Returns : reference to a list of Bio::Seq objects
+  Args    : array of accession strings
+
+=cut
+
+sub get_Entry_Fields_BatchFetch { 
+  my ($self, $acc,$fields) = @_;
+  print "using batchFetch\n" ; 
   my @acc_to_fetch ; 
   if ( ref($acc) =~m/ARRAY/ ) {   
     # batch mode - more than 1 acc to fetch 
@@ -210,6 +315,8 @@ sub  get_Entry_Fields {
     #have only single acc to fetch 
     push @acc_to_fetch,$acc; 
   }  
+
+
 
   my $seqstr;
   my $seq;
@@ -236,7 +343,8 @@ sub  get_Entry_Fields {
 
   # we will hand over the acc to fetch as string.  
   # if in batch mode do not submit more than 50 entries / strings to mfetch at one time.  
-  my @fetch_strings ; 
+  my @fetch_strings ;  
+
   if ( scalar(@acc_to_fetch) > 500 ) {   
     # more than 500 acc to fetch - make strings of 500 acc which is faster.
     while ( @acc_to_fetch ) {  
@@ -249,7 +357,6 @@ sub  get_Entry_Fields {
   }   
   
   my $cmd_prefix = $command ;   
-
   my %all_entries; 
   my @entries_not_found;  
   my $last_acc; 
@@ -351,7 +458,7 @@ sub  get_Entry_Fields {
 
              unless ($tmp_acc =~m/$acc/ ) { 
                  if ( $hit == 0 ) { 
-                   throw  " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;   
+                   warning   " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;   
                  }
              }
              #print "entries match - $tmp_acc $acc " ;  
@@ -409,8 +516,15 @@ sub  get_Entry_Fields {
   for ( @entries_not_found ) {  
      print "no entry found for : $_\n" if $self->{verbose};  
   } 
+
+
   return [\%all_entries , \@entries_not_found ] ; 
 } 
+
+
+
+
+
 
 
 
@@ -419,92 +533,38 @@ sub verbose {
    if ( $arg ) { 
       $self->{verbose}= $arg ;  
    }
-} 
+}  
 
-##
-##
-##=head2 batch_fetch
-##
-##  Title   : batch_fetch
-##  Usage   : $self->batch_retrieval(@accession_list);
-##  Function: Retrieves multiple sequences via mfetch
-##  Returns : reference to a list of Bio::Seq objects
-##  Args    : array of accession strings
-##
-##=cut
-##
-##sub  batch_fetch {
-##  my $self = shift @_;
-##
-##  my @sequence_list;
-##  
-##  unless (scalar @_) {
-##    throw("No accession input");
-##  }  
-##
-##  my $accession_concatenation;
-##  my @accession_list;
-##
-##  while (my $acc = shift @_) {
-##    push (@accession_list, $acc);
-##    $accession_concatenation .= $acc . ' ';
-##  }
-##  
-##  my $mfetch = $self->executable;
-##  my $options = $self->options;
-##  if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
-##
-##  my $command = "$mfetch -q ";
-##  if (defined $options){
-##    $command .= "$options ";
-##  }
-##
-##  $command .= $accession_concatenation;
-##
-##  #print STDERR "$command\n";
-##
-##  open(IN,"$command |") or throw("Error opening pipe to mfetch : $mfetch");
-##
-##  my $seq_placemarker = -1;
-##
-## SEQ:
-##  while (my $seqstr = <IN>) {
-##    
-##    $seq_placemarker++;
-##
-##    chomp($seqstr);
-##    
-##    my $seq;
-##    
-##    unless (defined $seqstr && $seqstr eq 'no match') {
-##
-##      eval{
-##	if(defined $seqstr && $seqstr ne "no match") {
-##	  $seq = new Bio::Seq('-seq'               => $seqstr,
-##			      '-accession_number'  => $accession_list[$seq_placemarker],
-##			      '-display_id'        => $accession_list[$seq_placemarker]);
-##	}
-##      };
-##      
-##      if($@){
-##	print STDERR "$@\n";
-##      }
-##    }
-##
-##    unless (defined $seq){
-##      $self->warn("PFetch Error : Could not mfetch sequence for " . 
-##		  $accession_list[$seq_placemarker] . "\n");
-##      next SEQ;
-##    }
-##
-##    push (@sequence_list, $seq);
-##  }
-##  
-##  close IN or throw("Error running mfetch : $mfetch");
-##  
-##  return \@sequence_list;
-##}
-##
-##
-##
+
+ 
+sub _make_mfetch_prefix_command {  
+   my ($self, $f ) = @_ ; 
+   my @fields = @$f ;  
+
+   my $mfetch = $self->executable;  
+   my $options = $self->options;
+   if (defined($options)) { 
+     unless ($options =~ /^-/ ) {
+       $options = '-' . $options; 
+     }
+   }
+  my $command = "$mfetch "; 
+  if ( scalar(@fields) > 0 ) {   
+    my $f = join (" ",@fields) ;  
+    if ( $f=~m/acc/) {  
+      $f =~s/acc//g; 
+    }
+    $f = "acc " .$f; 
+    $command .= " -f \"$f \" "      ;
+  }else {  
+    $command .= " -v  full"  ;   
+  }   
+
+  if (defined $options){
+    $command .= "$options ";
+  }
+  print "PREFIX COMMAND $command\n" ;  
+  return $command ; 
+}  
+
 1;
