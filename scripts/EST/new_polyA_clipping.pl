@@ -19,13 +19,15 @@ file is specified. This file should contain the following columns:
   3./ numeric value
 
 For human ESTs, the -comment file can be created by connecting to the Mole embl database and 
-doing the following query:
+doing the following query:  (change tax_division and data_class as appropriate)
 
    SELECT accession_version,comment_key,comment_value 
    FROM entry e, comment c 
    WHERE e.entry_id = c.entry_id 
    AND e.tax_division = 'HUM' 
    AND e.data_class = 'EST' 
+
+The query takes about 5 mins for 1 million ESTs, depending on how busy the database is.
 
 clipping:
   the non-A/T sequences at the ends must be <=10bp (set by $buffer)  
@@ -46,6 +48,8 @@ For trimming and polyA clipping (with specified min length cutoff for trimmed se
 =cut
 
 use Bio::EnsEMBL::Analysis::Tools::PolyAClipping;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+use Bio::Seq;
 use Bio::SeqIO;
 use Getopt::Long;
 
@@ -121,7 +125,9 @@ while ( my $fullseq = $seqin->next_seq ) {
   } else {
     $unclipped = $fullseq;
   }
-
+  unless ($unclipped) {
+   throw ("Sequence is undefined. Original seq was ". $fullseq->display_id."\n");
+  }
   # now clip
   my ($clipped, $clip_end, $num_bases_removed) = clip_if_necessary($unclipped);
   if (defined $num_bases_removed) {
@@ -158,22 +164,26 @@ sub trim_if_possible {
     if ($start!=1 or $stop!=$seq->length){
       # we need to trim if it doesn't make seq too short
       if ($stop <= $seq->length) {
-        if ($stop-$start+1 < $min_length) {
-          # sometimes ESTs are all low-quality
-          # in this case, both 'high quality sequence start'
-          # and 'high quality sequence stop' have value = 1
-          # so we should skip the sequence altogether
-          if ($stop == $start) {
-            return (undef, undef, undef);
-          } else {
+        if (($stop-$start+1 < $min_length) || ($stop == $start)) {
+          # sometimes ESTs are all low-quality. The sequence after trimming
+          # can become very short (shorter than $min_length), or in some
+          # extreme cases, both 'high quality sequence start'
+          # and 'high quality sequence stop' have the same value, and
+          # trimming will result in a sequence with 1bp only. Therefore,
+          # we should skip trimming and leave the sequence unchanged and
+          # just print a note about it.
+          #
+          # The latter part of the if clause ($stop == $start) here is necessary 
+          # to catch cases which are not worth trimming when $min_length 
+          # is set to 0 by the user.
             print STDERR "Not trimming seq ".$seq->display_id.
                          " which would trim to length " . ($stop-$start+1) . "\n";
-          }
+         # }
         } else {
           # do the trim
           $seq->seq($seq->subseq($start,$stop));
           print STDERR "Trim seq to $start - $stop\n";
-        }
+          }
       } else {
         print STDERR "Not trimming seq ".$seq->display_id." which has invalid ".
                       "hq stop pos " . $start . " " . $stop . " " . $seq->length . "\n";
@@ -183,6 +193,6 @@ sub trim_if_possible {
   } else {
     # no high_quality_seq so we just keep the original seq
     print STDERR "Seq ".$seq->display_id." has no high_quality_seq; cannot trim\n";
-  }
+    }
   return $seq;
 }
