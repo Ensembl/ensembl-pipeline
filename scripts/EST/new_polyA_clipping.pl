@@ -18,6 +18,14 @@ file is specified. This file should contain the following columns:
   2./ high quality sequence start or stop
   3./ numeric value
 
+For human ESTs, the -comment file can be created by connecting to the Mole embl database and 
+doing the following query:
+
+   SELECT accession_version,comment_key,comment_value 
+   FROM entry e, comment c 
+   WHERE e.entry_id = c.entry_id 
+   AND e.tax_division = 'HUM' 
+   AND e.data_class = 'EST' 
 
 clipping:
   the non-A/T sequences at the ends must be <=10bp (set by $buffer)  
