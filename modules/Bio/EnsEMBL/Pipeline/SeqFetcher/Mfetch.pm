@@ -201,7 +201,6 @@ sub  get_Entry_Fields {
     print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
     return $self->get_Entry_Fields_BatchFetch($acc_to_fetch,$fields); 
   } 
- 
   if (!defined($acc_to_fetch)) {
     throw("No accession input");
   }  
@@ -302,203 +301,121 @@ sub  get_Entry_Fields {
   Returns : reference to a list of Bio::Seq objects
   Args    : array of accession strings
 
-=cut
+=cut 
+
+
+sub build_acc_index { 
+   my ($acc) = @_ ;   
+
+   my %tmp ;  
+   my $position = 0 ; 
+   for my $ac ( @$acc ) {   
+     $tmp{$position} = $ac; 
+     $position++;
+   }  
+   return \%tmp ; 
+}
 
 sub get_Entry_Fields_BatchFetch { 
   my ($self, $acc,$fields) = @_;
-  print "using batchFetch\n" ; 
-  my @acc_to_fetch ; 
-  if ( ref($acc) =~m/ARRAY/ ) {   
-    # batch mode - more than 1 acc to fetch 
-     @acc_to_fetch = @$acc; 
-  }else {  
-    #have only single acc to fetch 
-    push @acc_to_fetch,$acc; 
+
+  unless ( ref($acc) =~m/ARRAY/ ) {   
+    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n"); 
   }  
 
+  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields() 
 
 
-  my $seqstr;
-  my $seq;
-  my $mfetch = $self->executable;  
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);  
 
-  my $options = $self->options;
-  if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
+  my %acc_index = %{build_acc_index($acc)};
+  # fetch in batches of 300   
+  my @fetch_strings = @{make_fetch_strings($acc, 300 )};  
 
-  my $command = "$mfetch "; 
-  if ( scalar(@$fields) > 0 ) {   
-    my $f = join (" ",@$fields) ;  
-    if ( $f=~m/acc/) {  
-      $f =~s/acc//g; 
-    }
-    $f = "acc " .$f; 
-    $command .= " -f \"$f \" "      ;
-  }else {  
-    $command .= " -v  full"  ;   
-  }   
-
-  if (defined $options){
-    $command .= "$options ";
-  }
-
-  # we will hand over the acc to fetch as string.  
-  # if in batch mode do not submit more than 50 entries / strings to mfetch at one time.  
-  my @fetch_strings ;  
-
-  if ( scalar(@acc_to_fetch) > 500 ) {   
-    # more than 500 acc to fetch - make strings of 500 acc which is faster.
-    while ( @acc_to_fetch ) {  
-      my @tmp =  splice (@acc_to_fetch, 0, 300 ) ;   
-      push @fetch_strings, join ( " ", @tmp) ;  
-      #print $fetch_strings[-1]."\n" ; 
-    }  
-  } else {  
-    push @fetch_strings, join ( " ", @acc_to_fetch ) ; 
-  }   
-  
-  my $cmd_prefix = $command ;   
+  my $command ;  
+  my %all_entries; 
+  my @entries_not_found;   
   my %all_entries; 
   my @entries_not_found;  
   my $last_acc; 
-  my %last_entry ; 
-  for my $acc_string ( @fetch_strings ) {  
+  my %last_entry ;  
+  my $entry_number = 0;
+  my @lines ;  
+
+  # data fetching + parsing  
+  
+  STRING: for my $acc_string ( @fetch_strings ) {  
     $command = $cmd_prefix ." " .  $acc_string;
     my @nr_acc = split /\s+/, $acc_string ;    
-    my @tmp; 
-    for my  $acc_format  ( @nr_acc) {    
-         $acc_format=~s/acc://g;
-         $acc_format=~s/\%//g;
-         $acc_format=~s/\"//g;
-         push @tmp, $acc_format ; 
-     }
       
-    print "cmd: $command\n" if $self->{verbose}; 
-
-    open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $mfetch");  
-    @nr_acc = @tmp ; 
-    my $acc;  
-    my %entry_hash ;   
-    my $accPointer = -1 ; 
+    # data retrieval  
+    
+    open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
+      my @lines  = <IN> ; 
+    close IN or throw("Error running mfetch for accession [$acc_string]: $command");   
+    
+    my ( %little_hash, %all_entries ) ; 
     my $last_field ="";   
-
-    LINE: while  (my $line=<IN>){  
-        chomp($line) ;  
-        #print "line $line\n";   
-        #print "pointer : $nr_acc[$accPointer] $accPointer\n" ; 
-        if ( $line =~m/no match/ ) {  
-          #print  "no entry found for $nr_acc[$accPointer] \n" ;  
-          $accPointer++;   
-          #print "no -match - pointer val is : $accPointer\n" ;   
-          #print "adding entry_not_found $nr_acc[$accPointer]\n"; 
-          push @entries_not_found, $nr_acc[$accPointer] ; 
-          next LINE;  
-        } 
-        my @l = split /\s+/, $line;    
-        my $field = shift @l ;    
-        #print "last_field : $last_field  VS $field\n" ;  
-        # result can contain more than one line begining with same field identifier , ie  
-        #   AC Q4589; 
-        #   AC Q0999;
-        #   not sure how this works if we only get AC's ....   but why would we do this anyway ? 
-        #   
-        
-        if ($field =~m/AC/ ) {      
-          if ( $field eq $last_field ) {  
-             print "we got more than one line starting with AC ... wthis means it's not a new entry. \n" if $self->{verbose};
-             # as we don't store/process the multipe acc returned we just ignore this line. this will caus 
-             # trouble if we only have acc's returned.   
-             $last_field = $field ; 
-             next LINE; 
-             
-          } else {  
-             print "NEW ENTRY : " . join ( " " , @l ) if $self->{verbose}; 
-             $acc = $l[0];  
-             $acc=~s/\;//; 
-
-             $accPointer++ unless ( length(@nr_acc) == 1 ) ;  
+    my $new_entry = 0;  
+    my $no_match_found = 0 ; 
+    # data parsing  
    
-             #if ( scalar(@l) > 1 ) {  
-             #  warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
-             #}  
-             
-             # this moves all already read information into the big hash before we 
-             # read the new entry .  
-             #
-             
-             if ( $entry_hash{AC} ) {  
-               # entry is defined so we already read all AC information and we can add safely. 
-               # problem if there's only one entry as it does not go here . ....  is the last entry always lost ? 
-               my @acc_for_entry = @{$entry_hash{AC}} ; 
-               for my $acc(@acc_for_entry) { 
-                 for my $f ( keys %entry_hash ) { 
-                    $all_entries{$acc}{$f}= $entry_hash{$f};  
-                     #print "adding $acc $f $entry_hash{$f};\n"; 
-                 }    
-               }
-             }  
-             %last_entry = %entry_hash ; 
-             undef %entry_hash;  
-            
-             # we now got a clean new entry_hash  for present entry  
-             # $entry_hash{AC} = \@l;    
-             #print "pointer val is : $accPointer\n" ;  
-             my $tmp_acc = $nr_acc[$accPointer] ;  
-             #print "test : $acc versus $tmp_acc \n" ;    
+    LINE: for my $line ( @lines ) {  
+      chomp($line) ;   
 
-             $last_acc = $tmp_acc ;  
+      print "entry $entry_number: --> $line \n";  
+      if ( $line =~m/no match/ ) {      
+        $entry_number++;  
+        print "no match for $acc_index{$entry_number}\n" ; 
+        $last_field = "";  
+        $no_match_found++ ; 
+        next LINE;  
+      } 
+      #     $hash{accession}{AC} 
+      #     $hash{accession}{PE}  
+      
+      my @l = split /\s+/, $line;    
+      my $field = shift @l ;     
 
-             my $hit=0; 
-             for my $result ( @l ) { 
-                #print "testing : $result <-->  $tmp_acc .... \n" ;    
-                if ( $result =~m/$tmp_acc/ ) {  
-                    $hit = 1 ;  
-                    last; 
-                } 
-             } 
-
-             unless ($tmp_acc =~m/$acc/ ) { 
-                 if ( $hit == 0 ) { 
-                   warning   " acc does not match - somethings wrong with the pointers to acc. $tmp_acc vs $acc\n" ;   
-                 }
-             }
-             #print "entries match - $tmp_acc $acc " ;  
-            # print "other_entries: " . join(" " , @l) . "\n"; 
-               
-             #$entry_hash{AC} = [$acc];     
-            # print "populating $tmp_acc to entry_hash - NOT $acc\n"; 
-             $entry_hash{AC} = [$tmp_acc];    
-             $last_field = $field ; 
-              next LINE ; 
-           }  
+      # parsing the start of the ENTRY with AC field  .... 
+       
+      if ($field =~m/AC/ ) {       
+        if ( $last_field =~m/AC/)  {    
+             $new_entry = 0 ;   
+         } else {
+             $new_entry = 1; 
+             $last_field = $field ;  
         } 
-       #print "populating $field ... ".join(" ", @l) . "\n";
-        $entry_hash{$field}.= join (" ", @l);  
-        $last_field = $field ; 
-     }   
-     %last_entry = %entry_hash ; 
+      }   
 
-     close IN or throw("Error running mfetch for accession [$acc_string]: $mfetch");  
-  }  
+      if ( $new_entry == 1 ) {  
+         if (scalar(keys %little_hash) > 0 ) { 
+           if ( $field =~/AC/ ) {  
+              print "adding info to big hash ... $field ----- $last_field  -- $entry_number\n" ;   
 
-  # add last entry to all_entries .
-  unless ( $all_entries{$last_acc} ) {    
-    # add content of last hash last_ENTRY HERE  - also populate last_entry as well beofre .  
-    #print "need to add last_entry now \n" ;   
-
-    if ( $last_entry{AC} ) { 
-      my @acc_for_entry = @{$last_entry{AC}} ; 
-       for my $acc(@acc_for_entry) { 
-          for my $f ( keys %last_entry ) { 
-             $all_entries{$acc}{$f}= $last_entry{$f};  
-             #print "adding $acc $f $last_entry{$f};\n"; 
-          }    
-       }
-     }  
-   } else { 
-     print "NO_ACC defined for last entry - skipping \n" if $self->{verbose} ; ;  
-   } 
-
-
+              my $query_acc ; 
+              if ( $no_match_found > 0 ) { 
+                $query_acc = $acc_index{($entry_number-$no_match_found) };  
+                $no_match_found = 0; 
+              } else { 
+                $query_acc = $acc_index{$entry_number}; 
+              }
+              %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
+              undef %little_hash;  
+              $entry_number++; 
+           }
+         }
+      } 
+        # add to little hash  
+        $little_hash{$field}.=join (" " , @l); 
+        $last_field = $field ;   
+    }
+  
+   exit(0); 
+  } # fetch next round .. 
+ 
+  # add last entry to all_entries . 
+  
   if ( $self->{verbose}  ) { 
     for my $key ( keys %all_entries ) {  
        print "KEY $key\n";  
@@ -522,9 +439,73 @@ sub get_Entry_Fields_BatchFetch {
 } 
 
 
+sub _add_information_to_big_hash {
+  my ($all, $little, $query_acc)  = @_ ;  
+
+  my %all_entries = %$all; 
+  my %little_hash = %$little; 
+
+  # $little_hash{AC} =  Q7PYN8; Q01FQ6;
+  # $little_hash{OC} =  Eukaryota; Metazoa; Arthropoda; Hexapoda; Insecta; Pterygota; 
+  # $little_hash{PE} =  4: Predicted;
+ 
+  my $acc_string = $little_hash{AC};
+  $acc_string =~s/\;//g;
+  my @accession_numbers = split /\s+/, $acc_string ;   
+
+  # consistency check - the query acc which we used in the mfetch query should also be in the AC field of the entry returned ....  
+  my $found ; 
+  for my $returned_acc ( @accession_numbers ) {  
+     if ($query_acc =~m/$returned_acc/) {  
+        $found = 1; 
+     } 
+  } 
+  unless ( $found ) {  
+     throw( " the acc $query_acc can't be found in the query returned by mfetch [ " . join (" ", @accession_numbers) . " ]\n");  
+  } 
 
 
+    unless ( exists $all_entries{$query_acc} ) { 
+      $all_entries{$query_acc} = \%little_hash; 
+    }else { 
+      # we already have an entry for this ACC. - check if the entries are the same ...  
+      print "Warning ! The acc. you like to add has already been indexed ...\n" ; 
+    
+      # check if the entries are the same
+      my %new_entry_to_add = %little_hash ; 
+      my %stored_data = %{$all_entries{$query_acc}}; 
 
+      for my $lk ( keys %little_hash ) {    
+          if (  $little_hash{$lk}=~/$stored_data{$lk}/ ) { 
+          } else {  
+            print "DATA INCONSITENCY !!!\n" ; 
+            print "NEW : $lk  --> $little_hash{$lk}\n" ; 
+            print "OLD : $lk  --> $stored_data{$lk}\n" ;  
+          } 
+      } 
+      print "\n\n\n" ; 
+    }  
+  return \%all_entries; 
+}       
+
+
+sub make_fetch_strings {  
+   my ($acc_array, $size ) = @_;  
+
+   my @acc_to_fetch = @$acc_array;  
+   my @fetch_strings ; 
+
+   if ( scalar(@acc_to_fetch) > $size ) {   
+    while ( @acc_to_fetch ) {  
+      my @tmp =  splice (@acc_to_fetch, 0, $size ) ;   
+      push @fetch_strings, join ( " ", @tmp) ;  
+      #print $fetch_strings[-1]."\n" ; 
+    }  
+   } else {  
+     push @fetch_strings, join ( " ", @acc_to_fetch ) ; 
+   }    
+   return \@fetch_strings; 
+}
 
 
 
