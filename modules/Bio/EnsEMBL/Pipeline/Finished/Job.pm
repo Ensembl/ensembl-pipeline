@@ -429,9 +429,9 @@ sub flush_runs {
 
 		# change job mysql load ressource
 		if($host eq 'otterpipe1') {
-			$farm_resource =~ s/otterp2/otterp1/;
+			$farm_resource =~ s/otterp2/otterp1/g;
 		} else {
-			$farm_resource =~ s/otterp1/otterp2/;
+			$farm_resource =~ s/otterp1/otterp2/g;
 		}
 
 		my $batch_job = $batch_q_module->new(
