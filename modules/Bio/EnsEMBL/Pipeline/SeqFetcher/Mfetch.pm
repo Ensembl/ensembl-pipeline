@@ -411,7 +411,6 @@ sub get_Entry_Fields_BatchFetch {
         $last_field = $field ;   
     }
   
-   exit(0); 
   } # fetch next round .. 
  
   # add last entry to all_entries . 
