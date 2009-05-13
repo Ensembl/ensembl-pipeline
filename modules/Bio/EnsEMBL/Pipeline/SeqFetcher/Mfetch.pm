@@ -205,8 +205,7 @@ sub  get_Entry_Fields {
     throw("No accession input");
   }  
 
-  print " try to fetch $acc_to_fetch\n" ; 
-
+  print " try to fetch $acc_to_fetch\n"  if $self->{verbose}; 
   my $command ;  
   my %all_entries; 
   my @entries_not_found;   
@@ -221,8 +220,7 @@ sub  get_Entry_Fields {
   $acc_format=~s/\%//g;
   $acc_format=~s/\"//g; 
 
-  print "cmd: $command\n"; 
-
+  print "cmd: $command\n" if $self->{verbose}; 
   open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");  
    my @lines = <IN> ; 
   close IN or throw("Error running mfetch for accession [$acc_format]: $command ");  
@@ -232,11 +230,11 @@ sub  get_Entry_Fields {
   for my $line ( @lines ) { 
         chomp($line) ;    
 
-        print "LINE $line\n" ;  
+        print "LINE $line\n" if $self->{verbose};
         # we're just parsing one entry so if we get a no_match we just return  .... 
         
         if ( $line =~m/no match/ ) {    
-           print  "no entry found for $acc_to_fetch with $command\n";
+           print  "no entry found for $acc_to_fetch with $command\n" if $self->{verbose};
            push @entries_not_found, $acc_to_fetch; 
            return [\%all_entries , \@entries_not_found ] ; 
         }  
@@ -256,7 +254,7 @@ sub  get_Entry_Fields {
         }      
 
         $entry{$key_field}.= join(" ", @l);    
-        #print "populating $key_field ... ".join(" ", @l) . "\n";
+        print "populating $key_field ... ".join(" ", @l) . "\n" if $self->{verbose};
   }  
 
   # aim is to return $all_entries{Q4981}{AC}  -> string  
@@ -330,7 +328,7 @@ sub get_Entry_Fields_BatchFetch {
 
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 500 )};  
+  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};  
 
   my $command ;  
   my %all_entries; 
@@ -349,12 +347,12 @@ sub get_Entry_Fields_BatchFetch {
   my $new_entry = 0;  
   my $no_match_found = 0 ; 
 
-  STRING: for my $acc_string ( @fetch_strings ) {  
+  STRING: for my $acc_string ( @fetch_strings ) {   
     $command = $cmd_prefix ." " .  $acc_string;
     my @nr_acc = split /\s+/, $acc_string ;    
-     
-    print "\n\n$command \n\n" ;  
-    # data retrieval  
+    print $entry_number . " / " . keys (%acc_index) . " entires fetched\n" ;  
+    print "\n\n$command \n\n" if $self->{verbose} ; 
+    ## data retrieval  
     
 
     open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
@@ -373,15 +371,18 @@ sub get_Entry_Fields_BatchFetch {
 
       if ( $line =~m/no match/ ) {      
         $entry_number++;  
-        print "no match for $entry_number -- $acc_index{$entry_number}\n" ; 
+        print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};; 
         $last_field = "";  
         $no_match_found++ ; 
         next LINE;  
       } 
       #     $hash{accession}{AC} 
-      #     $hash{accession}{PE}  
-      print "Match $acc_index{$entry_number}  --> entry: " ;  
-      print " $entry_number LINE : $line \n";  
+      #     $hash{accession}{PE}    
+      
+      if ( $self->{verbose} ) { 
+        print "Match $acc_index{$entry_number}  --> entry: " ;  
+        print " $entry_number LINE : $line \n";  
+      } 
 
       my @l = split /\s+/, $line;    
       my $field = shift @l ;     
@@ -392,7 +393,7 @@ sub get_Entry_Fields_BatchFetch {
         if ( $last_field =~m/AC/)  {    
              $new_entry = 0 ;   
          } else { 
-             print "\nnew entry found ...\n" ; 
+             print "\nnew entry found ...\n" if $self->{verbose} ; 
              $new_entry = 1; 
              $last_field = $field ;  
         } 
@@ -401,11 +402,11 @@ sub get_Entry_Fields_BatchFetch {
       if ( $new_entry == 1 ) {   
          if (scalar(keys %little_hash) > 0 ) { 
            if ( $field =~/AC/ ) {  
-              print " NEW ENTRY STARTS - adding info to big hash ... $field ----- $last_field  -- $entry_number\n" ;   
+              print " NEW ENTRY STARTS - adding info to big hash ... $field ----- $last_field  -- $entry_number\n" if $self->{verbose}; 
 
               my $query_acc ; 
               if ( $no_match_found > 0 ) {  
-                print "no match found ... $no_match_found \n" ; 
+                print "no match found ... $no_match_found \n" if $self->{verbose}; 
                 $query_acc = $acc_index{($entry_number-$no_match_found) };  
                 $no_match_found = 0; 
               } else { 
@@ -425,20 +426,20 @@ sub get_Entry_Fields_BatchFetch {
  
   # add last entry to all_entries . 
   
-  #if ( $self->{verbose}  ) { 
+  if ( $self->{verbose}  ) { 
     for my $key ( keys %all_entries ) {  
-       print "KEY $key\n";  
+       print "KEY $key\n" ;
          my %tmp = %{$all_entries{$key}} ;
          for ( keys %tmp ) {   
             if ( /AC/ ) { 
-              print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";  
+              print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n"; 
             }else {  
               print "\t\t$_ --> $tmp{$_}\n";  
             }
          }  
          print "\n" ;
     }   
-  #}
+  }
   for ( @entries_not_found ) {  
      print "no entry found for : $_\n" if $self->{verbose};  
   } 
