@@ -330,7 +330,7 @@ sub get_Entry_Fields_BatchFetch {
 
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 300 )};  
+  my @fetch_strings = @{make_fetch_strings($acc, 500 )};  
 
   my $command ;  
   my %all_entries; 
@@ -344,36 +344,45 @@ sub get_Entry_Fields_BatchFetch {
 
   # data fetching + parsing  
   
+  my $last_field ="";     
+  my ( %little_hash, %all_entries ) ; 
+  my $new_entry = 0;  
+  my $no_match_found = 0 ; 
+
   STRING: for my $acc_string ( @fetch_strings ) {  
     $command = $cmd_prefix ." " .  $acc_string;
     my @nr_acc = split /\s+/, $acc_string ;    
-      
+     
+    print "\n\n$command \n\n" ;  
     # data retrieval  
     
+
     open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
       my @lines  = <IN> ; 
     close IN or throw("Error running mfetch for accession [$acc_string]: $command");   
     
-    my ( %little_hash, %all_entries ) ; 
-    my $last_field ="";   
-    my $new_entry = 0;  
-    my $no_match_found = 0 ; 
+#    my ( %little_hash, %all_entries ) ;  
+
+  #  my $new_entry = 0;  
+  #  my $no_match_found = 0 ;  
+  
     # data parsing  
    
     LINE: for my $line ( @lines ) {  
       chomp($line) ;   
 
-      print "entry $entry_number: --> $line \n";  
       if ( $line =~m/no match/ ) {      
         $entry_number++;  
-        print "no match for $acc_index{$entry_number}\n" ; 
+        print "no match for $entry_number -- $acc_index{$entry_number}\n" ; 
         $last_field = "";  
         $no_match_found++ ; 
         next LINE;  
       } 
       #     $hash{accession}{AC} 
       #     $hash{accession}{PE}  
-      
+      print "Match $acc_index{$entry_number}  --> entry: " ;  
+      print " $entry_number LINE : $line \n";  
+
       my @l = split /\s+/, $line;    
       my $field = shift @l ;     
 
@@ -382,19 +391,21 @@ sub get_Entry_Fields_BatchFetch {
       if ($field =~m/AC/ ) {       
         if ( $last_field =~m/AC/)  {    
              $new_entry = 0 ;   
-         } else {
+         } else { 
+             print "\nnew entry found ...\n" ; 
              $new_entry = 1; 
              $last_field = $field ;  
         } 
       }   
 
-      if ( $new_entry == 1 ) {  
+      if ( $new_entry == 1 ) {   
          if (scalar(keys %little_hash) > 0 ) { 
            if ( $field =~/AC/ ) {  
-              print "adding info to big hash ... $field ----- $last_field  -- $entry_number\n" ;   
+              print " NEW ENTRY STARTS - adding info to big hash ... $field ----- $last_field  -- $entry_number\n" ;   
 
               my $query_acc ; 
-              if ( $no_match_found > 0 ) { 
+              if ( $no_match_found > 0 ) {  
+                print "no match found ... $no_match_found \n" ; 
                 $query_acc = $acc_index{($entry_number-$no_match_found) };  
                 $no_match_found = 0; 
               } else { 
@@ -403,19 +414,18 @@ sub get_Entry_Fields_BatchFetch {
               %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
               undef %little_hash;  
               $entry_number++; 
-           }
+           } 
          }
       } 
         # add to little hash  
         $little_hash{$field}.=join (" " , @l); 
         $last_field = $field ;   
-    }
-  
+    } 
   } # fetch next round .. 
  
   # add last entry to all_entries . 
   
-  if ( $self->{verbose}  ) { 
+  #if ( $self->{verbose}  ) { 
     for my $key ( keys %all_entries ) {  
        print "KEY $key\n";  
          my %tmp = %{$all_entries{$key}} ;
@@ -428,7 +438,7 @@ sub get_Entry_Fields_BatchFetch {
          }  
          print "\n" ;
     }   
-  }
+  #}
   for ( @entries_not_found ) {  
      print "no entry found for : $_\n" if $self->{verbose};  
   } 
