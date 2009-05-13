@@ -328,7 +328,7 @@ sub get_Entry_Fields_BatchFetch {
 
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};  
+  my @fetch_strings = @{make_fetch_strings($acc, 250 )};  
 
   my $command ;  
   my %all_entries; 
