@@ -47,9 +47,9 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
-
+use Time::HiRes qw ( gettimeofday ) ; 
 use vars qw(@ISA);
-
+$|=0;
 @ISA = qw(Bio::DB::RandomAccessI);
 
 sub new {
@@ -257,36 +257,25 @@ sub  get_Entry_Fields {
         print "populating $key_field ... ".join(" ", @l) . "\n" if $self->{verbose};
   }  
 
-  # aim is to return $all_entries{Q4981}{AC}  -> string  
-  # aim is to return $all_entries{Q4981}{org} -> string 
-  # aim is to return $all_entries{ ACC }{ FIELD } -> string 
- 
   # populate all_entry-hash 
   for my $field ( keys %entry ) {  
     $all_entries{$acc_format}{$field}=$entry{$field}; 
   }
-        # my $hit=0; 
-        # for my $result ( @l ) { 
-            #print "testing : $result <-->  $tmp_acc .... \n" ;    
-        #    if ( $result =~m/$tmp_acc/ ) {  
-        #         $hit = 1 ;  
-        #         last; 
-        #    } 
-        # } 
 
-
-   for my $key ( keys %all_entries ) {  
-       print "KEY $key\n";  
-         my %tmp = %{$all_entries{$key}} ;
-         for ( keys %tmp ) {   
-            #if ( /AC/ ) { 
-            #  print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";  
-            #}else {  
-              print "\t\t$_ --> $tmp{$_}\n";  
-            #}
-         }  
-         print "\n" ;
-   }    
+   if ( 0 )  { 
+     for my $key ( keys %all_entries ) {  
+         print "KEY $key\n";  
+           my %tmp = %{$all_entries{$key}} ;
+           for ( keys %tmp ) {   
+              #if ( /AC/ ) { 
+              #  print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";  
+              #}else {  
+                print "\t\t$_ --> $tmp{$_}\n";  
+              #}
+           }  
+           print "\n" ;
+     }     
+  }
   return [\%all_entries , \@entries_not_found ] ; 
 } 
 
@@ -334,55 +323,66 @@ sub get_Entry_Fields_BatchFetch {
   my %all_entries; 
   my @entries_not_found;   
   my %all_entries; 
-  my @entries_not_found;  
   my $last_acc; 
   my %last_entry ;  
   my $entry_number = 0;
   my @lines ;  
-
   # data fetching + parsing  
-  
+  my %no_match_index;  
   my $last_field ="";     
   my ( %little_hash, %all_entries ) ; 
   my $new_entry = 0;  
-  my $no_match_found = 0 ; 
+  #my $no_match_found = 0 ; 
 
   STRING: for my $acc_string ( @fetch_strings ) {   
     $command = $cmd_prefix ." " .  $acc_string;
-    my @nr_acc = split /\s+/, $acc_string ;    
-    print $entry_number . " / " . keys (%acc_index) . " entires fetched\n" ;  
-    print "\n\n$command \n\n" if $self->{verbose} ; 
-    ## data retrieval  
+    my @nr_acc = split /\s+/, $acc_string ;     
+    if ( $self->{verbose} ) { 
+      print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ; 
+      print "\n\n$command \n\n" if $self->{verbose} ;  
+    }
     
-
+    my $t0 = gettimeofday() ;  
+    print "starting mfetch \n" ; 
     open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
       my @lines  = <IN> ; 
     close IN or throw("Error running mfetch for accession [$acc_string]: $command");   
-    
-#    my ( %little_hash, %all_entries ) ;  
+    my $t1 = gettimeofday() ; 
+    my $delta_t = $t1 - $t0 ;  
 
-  #  my $new_entry = 0;  
-  #  my $no_match_found = 0 ;  
-  
+    print "time for mfetch : $delta_t\n" ; 
+    
     # data parsing  
    
     LINE: for my $line ( @lines ) {  
       chomp($line) ;   
 
-      if ( $line =~m/no match/ ) {      
-        $entry_number++;  
-        print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};; 
-        $last_field = "";  
-        $no_match_found++ ; 
-        next LINE;  
-      } 
-      #     $hash{accession}{AC} 
-      #     $hash{accession}{PE}    
-      
-      if ( $self->{verbose} ) { 
-        print "Match $acc_index{$entry_number}  --> entry: " ;  
-        print " $entry_number LINE : $line \n";  
-      } 
+      if ( $line =~m/no match/ ) {       
+        print "line contains \"no match\"  \n" if $self->{verbose} ;  
+        $last_field = "";    
+
+        # if we have an entry in memory store it  
+        
+         if (scalar(keys %little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
+              print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose}; 
+              my  $query_acc = $acc_index{$entry_number}; 
+              %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
+              undef %little_hash;  
+              $entry_number++ ;
+              print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
+              $no_match_index{$entry_number}=1; 
+              next LINE;  
+         } 
+          print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};;   
+          if ( exists $no_match_index{$entry_number} ) {  
+            $entry_number++ ; 
+          } 
+          $no_match_index{$entry_number}=1; 
+          push @entries_not_found,  $acc_index{$entry_number}; 
+          $entry_number++ ; 
+          next LINE;  
+      }  
+
 
       my @l = split /\s+/, $line;    
       my $field = shift @l ;     
@@ -390,7 +390,8 @@ sub get_Entry_Fields_BatchFetch {
       # parsing the start of the ENTRY with AC field  .... 
        
       if ($field =~m/AC/ ) {       
-        if ( $last_field =~m/AC/)  {    
+        if ( $last_field =~m/AC/)  {     
+             # we have multiple AC fields in the entry which follow each other  AC xxx AC xxx 
              $new_entry = 0 ;   
          } else { 
              print "\nnew entry found ...\n" if $self->{verbose} ; 
@@ -399,28 +400,36 @@ sub get_Entry_Fields_BatchFetch {
         } 
       }   
 
-      if ( $new_entry == 1 ) {   
-         if (scalar(keys %little_hash) > 0 ) { 
-           if ( $field =~/AC/ ) {  
-              print " NEW ENTRY STARTS - adding info to big hash ... $field ----- $last_field  -- $entry_number\n" if $self->{verbose}; 
-
+      if ( $new_entry == 1 ) {    
+         if (scalar(keys %little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
+           if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...  
+              
+              print " NEW ENTRY STARTS\n" if $self->{verbose} ; 
+              # determine correct entry index 
+              while (  exists $no_match_index{$entry_number} ) { 
+                print $acc_index{$entry_number} . " is recorded as NO MATCH - checking next ...\n" if $self->{verbose} ; 
+                $entry_number++ ; 
+              } 
               my $query_acc ; 
-              if ( $no_match_found > 0 ) {  
-                print "no match found ... $no_match_found \n" if $self->{verbose}; 
-                $query_acc = $acc_index{($entry_number-$no_match_found) };  
-                $no_match_found = 0; 
-              } else { 
+              #if ( $no_match_found > 0 ) {  
+              #  print "no matches found ... $no_match_found \n" if $self->{verbose}; 
+              #  $query_acc = $acc_index{($entry_number-$no_match_found) };  
+              #  $no_match_found = 0; 
+              #} else { 
                 $query_acc = $acc_index{$entry_number}; 
-              }
+              #}
               %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
               undef %little_hash;  
               $entry_number++; 
            } 
-         }
-      } 
-        # add to little hash  
-        $little_hash{$field}.=join (" " , @l); 
-        $last_field = $field ;   
+         } elsif ( exists $no_match_index{$entry_number} ) {  
+             print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n" if $self->{verbose} ; 
+             $entry_number++; 
+         } 
+      }  
+      # add to little hash  
+      $little_hash{$field}.=join (" " , @l); 
+      $last_field = $field ;   
     } 
   } # fetch next round .. 
  
@@ -431,11 +440,11 @@ sub get_Entry_Fields_BatchFetch {
        print "KEY $key\n" ;
          my %tmp = %{$all_entries{$key}} ;
          for ( keys %tmp ) {   
-            if ( /AC/ ) { 
-              print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n"; 
-            }else {  
+           # if ( /AC/ ) { 
+           #   print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n"; 
+           # }else {  
               print "\t\t$_ --> $tmp{$_}\n";  
-            }
+           # }
          }  
          print "\n" ;
     }   
@@ -554,7 +563,9 @@ sub _make_mfetch_prefix_command {
   if (defined $options){
     $command .= "$options ";
   }
-  print "PREFIX COMMAND $command\n" ;  
+  if ($self->verbose ) { 
+    print "PREFIX COMMAND $command\n"  
+  }
   return $command ; 
 }  
 
