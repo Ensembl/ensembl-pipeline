@@ -435,7 +435,7 @@ sub make_clone_attribute {
 
 sub make_seq_set_attribute {
 	my ($arr_ref) = @_;
-	my ($chr,$desc,$hide,$write) =  @$arr_ref;
+	my ($chr,$desc,$write,$hide) =  @$arr_ref;
 	my @attrib;
 
 	$hide = defined($hide) ? $hide : 1;
