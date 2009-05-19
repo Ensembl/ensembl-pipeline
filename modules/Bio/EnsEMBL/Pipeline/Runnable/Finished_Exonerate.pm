@@ -477,7 +477,7 @@ sub parse_results {
 			$q_strand, $q_length, \@align_components
 		);
 
-		# now we have extracted the exons we can use 
+		# now we have extracted the exons we can use
 		# the gene_orienation to flip the strands if necessary
 		if ( $gene_orientation == -1 ) {
 			$t_strand *= -1;
@@ -573,27 +573,34 @@ sub parse_results {
 			$transcript->add_Exon($exon);
 		}
 
+
+# Comment out the following peace of code below because it produces
+# the "Insertion Deletion in the same alignment region" warning
+# when creating AlignFeature objects from protein alignment with
+# slip codons.
+
+
 		# Create a single supporting feature for the whole transcript
-		my $t_supp_feat;
-		eval {
-			if ( $self->query_type eq 'protein' )
-			{
-				$t_supp_feat =
-				  Bio::EnsEMBL::DnaPepAlignFeature->new(
-					-features => \@tran_feature_pairs );
-			}
-			else {
-				$t_supp_feat =
-				  Bio::EnsEMBL::DnaDnaAlignFeature->new(
-					-features => \@tran_feature_pairs );
-			}
-		};
-		if ($@) {
-			$self->warn("Could not create Transcript supporting feature");
-		}
-		else {
-			#$transcript->add_supporting_features($t_supp_feat);
-		}
+#		my $t_supp_feat;
+#		eval {
+#			if ( $self->query_type eq 'protein' )
+#			{
+#				$t_supp_feat =
+#				  Bio::EnsEMBL::DnaPepAlignFeature->new(
+#					-features => \@tran_feature_pairs );
+#			}
+#			else {
+#				$t_supp_feat =
+#				  Bio::EnsEMBL::DnaDnaAlignFeature->new(
+#					-features => \@tran_feature_pairs );
+#			}
+#		};
+#		if ($@) {
+#			$self->warn("Could not create Transcript supporting feature");
+#		}
+#		else {
+#			#$transcript->add_supporting_features($t_supp_feat);
+#		}
 
 	}
 
