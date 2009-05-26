@@ -26,7 +26,7 @@ Required arguments:
 
 Optional arguments:
 
-    --ncbi								compare with an NCBI chromosome
+    --multiple							produce a "N to one" mapping (default: "one to one")
     --altdbname=NAME                    alternative database NAME
 
     --ref_start                         start coordinate on reference chromosomes
@@ -144,11 +144,11 @@ $support->parse_extra_options(
 	'altassembly=s',            'chromosomes|chr=s@',
 	'altchromosomes|altchr=s@', 'skipcomponents|skip_components=s',
 	'exctype=s', 'ref_start=i', 'ref_end=i', 'alt_start=i', 'alt_end=i',
-	'ncbi!'
+	'multiple!'
 );
 $support->allowed_params( $support->get_common_params, 'assembly', 'altdbname',
 	'altassembly', 'chromosomes', 'altchromosomes', 'skipcomponents', 'exctype',
-	'ncbi'
+	'multiple'
 );
 
 if ( $support->param('help') or $support->error ) {
@@ -162,7 +162,7 @@ $support->param( 'verbose',     1 );    # throw away all that garbage
 $support->param( 'interactive', 0 );    # stop that garbage from coming up
 
 my $write_db = not $support->param('dry_run');
-my $ncbi =  $support->param('ncbi');
+my $multiple =  $support->param('multiple');
 
 # ask user to confirm parameters to proceed
 $support->confirm_params;
@@ -398,7 +398,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 							push @{ $match->{$R_chr} },
 							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr, $ori ];
 						}
-						elsif(!$ncbi) {
+						elsif($multiple) {
 							if ( $tag == -1 ) {
 								$support->log(
 									   "start a new overlap non-align block\n");
