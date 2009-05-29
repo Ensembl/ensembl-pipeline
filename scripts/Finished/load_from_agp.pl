@@ -451,7 +451,7 @@ sub make_slice {
 sub check_line {
 	my ($line) = @_;
 	my $input_type;
-	my $type = $ensembl ? "^[AUFWD]\$" : "^[AUF]\$";
+	my $type = $ensembl ? "^[AUFOWD]\$" : "^[AUFO]\$";
 
 # 0       1       2       3       4       5               6       7       8     9
 # chr_20  2808333 2934911 29      F       AL121905.0      101     126679  +     Optional comment

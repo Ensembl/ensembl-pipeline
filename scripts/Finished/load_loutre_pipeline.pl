@@ -469,7 +469,7 @@ sub check_line {
 # splits each line into its component parts - puts line in a temporary array (splits the line on whitespace)
 	my @line_in_array = split /\s+/, $line, 10;
 
-	if ( $line_in_array[4] && $line_in_array[4] =~ /^[AUF]$/ ) {
+	if ( $line_in_array[4] && $line_in_array[4] =~ /^[AUFO]$/ ) {
 		$input_type = "AGP";
 	}
 	else {
