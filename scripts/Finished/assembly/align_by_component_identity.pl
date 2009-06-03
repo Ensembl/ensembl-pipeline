@@ -26,7 +26,9 @@ Required arguments:
 
 Optional arguments:
 
-    --multiple							produce a "N to one" mapping (default: "one to one")
+    --multiple                          produce a "one to many" mapping (default: off)
+                                        one region on the reference assembly can be mapped to many regions
+                                        on the alternative assembly
     --altdbname=NAME                    alternative database NAME
 
     --ref_start                         start coordinate on reference chromosomes
@@ -398,13 +400,11 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 							push @{ $match->{$R_chr} },
 							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr, $ori ];
 						}
-						elsif($multiple) {
-							if ( $tag == -1 ) {
-								$support->log(
-									   "start a new overlap non-align block\n");
-								push @{ $nomatch->{$R_chr} },
-								  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr ];
-							}
+						elsif($multiple && $tag == -1) {
+							$support->log(
+								   "start a new overlap non-align block\n");
+							push @{ $nomatch->{$R_chr} },
+							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr ];
 						}
 					}
 					$match_flag = 2;
@@ -412,9 +412,166 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					);
 					next DIFF;
 				}
+				elsif ( $R_acc ne $A_acc ) {
+					# Project the reference clone to the chromosome cs in case it
+					# matches another part in the alt. chromosome
+					my $s = $diff->[1]->to_Slice->seq_region_Slice;
+					$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
+					my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
+					foreach my $A_chr_proj (@A_chrs) {
+						my ($A_chr_name) = $A_chr_proj->to_Slice->seq_region_name;
+						if ($A_chr_name eq $A_chr) {
+							$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
+							my ($proj_chr) =
+							  @{ $s->project_to_slice( $A_chr_proj->to_Slice ) };
 
+							my ( $R_chr_start, $R_chr_end ) =
+							  ( $diff->[1]->from_start, $diff->[1]->from_end );
+							my ( $R_ctg_start, $R_ctg_end ) = (
+													$diff->[1]->to_Slice->start,
+													$diff->[1]->to_Slice->end
+							);
+							my $R_ctg_strand = $diff->[1]->to_Slice->strand;
+							my $R_coords = [
+										 $R_ctg_start, $R_ctg_end, $R_chr_start,
+										 $R_chr_end,   $R_ctg_strand
+							];
+
+							my ( $A_chr_start, $A_chr_end ) = (
+													 $proj_chr->to_Slice->start,
+													 $proj_chr->to_Slice->end
+							);
+							my ( $A_ctg_start, $A_ctg_end ) =
+							  ( $proj_chr->from_start, $proj_chr->from_end );
+							my $A_ctg_strand = $proj_chr->to_Slice->strand;
+							my $A_coords = [
+										 $A_ctg_start, $A_ctg_end, $A_chr_start,
+										 $A_chr_end,   $A_ctg_strand
+							];
+
+							my $blocks =
+							  &parse_projections( $R_coords, $A_coords );
+
+							foreach my $block (@$blocks) {
+								my ( $R_s, $R_e, $A_s, $A_e, $tag, $ori ) =
+								  @$block;
+								if ($ori) {
+									$support->log("start a new align block\n");
+									push @{ $match->{$R_chr} },
+									  [
+										$A_s, $A_e, $j, $R_s, $R_e, $i,
+										$proj_chr->to_Slice->seq_region_name,
+										$ori
+									  ];
+								}
+								else {
+									if ( $multiple && $tag == -1 ) {
+										$support->log("start a new overlap non-align block\n");
+										push @{ $nomatch->{$R_chr} },
+										  [
+											$A_s,
+											$A_e,
+											$j,
+											$R_s,
+											$R_e,
+											$i,
+											$proj_chr->to_Slice->seq_region_name
+										  ];
+									}
+								}
+							}
+							$match_flag = 2;
+							$support->log(
+										   sprintf(
+													"%-40s\t%-10s %-40s\n",
+													$left, $tag, $right
+										   )
+							);
+							$support->log(
+										   sprintf(
+													"%-40s\t%-10s %-40s\n",
+													"", "", &get_cmp_key( $proj_chr, 1 )
+										   )
+							);
+							next DIFF;
+						}
+					}
+				}
 			}
-			#found_nomatch($R_chr,$A_chr,$diff->[1],$diff->[2],$i,$j,$match, $nomatch,$match_flag);
+			elsif ( $type eq '-' ) {
+				my ( $R_acc, $R_sv ) = split /\./,
+				  $diff->[1]->to_Slice->seq_region_name;
+				# Project the reference clone slice to the chromosome cs in case
+				# it matches another part of the alt. chromosome
+				my $s = $diff->[1]->to_Slice->seq_region_Slice;
+				$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
+				my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
+				foreach my $A_chr_proj (@A_chrs) {
+					my ($A_chr_name) = $A_chr_proj->to_Slice->seq_region_name;
+					if ($A_chr_name eq $A_chr) {
+						$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
+						my ($proj_chr) =
+						  @{ $s->project_to_slice( $A_chr_proj->to_Slice ) };
+
+						my ( $R_chr_start, $R_chr_end ) =
+						  ( $diff->[1]->from_start, $diff->[1]->from_end );
+						my ( $R_ctg_start, $R_ctg_end ) = (
+													$diff->[1]->to_Slice->start,
+													$diff->[1]->to_Slice->end
+						);
+						my $R_ctg_strand = $diff->[1]->to_Slice->strand;
+						my $R_coords = [
+										 $R_ctg_start, $R_ctg_end, $R_chr_start,
+										 $R_chr_end,   $R_ctg_strand
+						];
+
+						my ( $A_chr_start, $A_chr_end ) = (
+													 $proj_chr->to_Slice->start,
+													 $proj_chr->to_Slice->end
+						);
+						my ( $A_ctg_start, $A_ctg_end ) =
+						  ( $proj_chr->from_start, $proj_chr->from_end );
+						my $A_ctg_strand = $proj_chr->to_Slice->strand;
+						my $A_coords = [
+										 $A_ctg_start, $A_ctg_end, $A_chr_start,
+										 $A_chr_end,   $A_ctg_strand
+						];
+
+						my $blocks = &parse_projections( $R_coords, $A_coords );
+
+						foreach my $block (@$blocks) {
+							my ( $R_s, $R_e, $A_s, $A_e, $tag, $ori ) = @$block;
+							if ($ori) {
+								$support->log("start a new align block\n");
+								push @{ $match->{$R_chr} },
+								  [
+									$A_s, $A_e, $j, $R_s, $R_e, $i,
+									$proj_chr->to_Slice->seq_region_name, $ori
+								  ];
+							}
+							else {
+								if ( $multiple && $tag == -1 ) {
+									$support->log("start a new overlap non-align block\n");
+									push @{ $nomatch->{$R_chr} },
+									  [
+										$A_s, $A_e, $j, $R_s, $R_e, $i,
+										$proj_chr->to_Slice->seq_region_name
+									  ];
+								}
+							}
+						}
+						$match_flag = 2;
+						$right = &get_cmp_key( $proj_chr, 1 );
+						$support->log(
+									   sprintf(
+												"%-40s\t%-10s %-40s\n",
+												$left, $tag, $right
+									   )
+						);
+						next DIFF;
+					}
+				}
+			}
 			$match_flag = 0;
 		}
 
@@ -466,8 +623,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 		$ref_gap = $r_start - $sr_end - 1;
 		$alt_gap = $a_start - $sa_end - 1;
+		# Don't run lastz on large non-align blocks > (1.1Mbp)
 		if (    ( $ref_gap > 0 && $alt_gap > 0 )
-			 && ( $ref_gap < 1000000 && $alt_gap < 1000000 ) )
+			 && ( $ref_gap < 1100000 && $alt_gap < 1100000 ) )
 		{
 			push @{ $nomatch->{$R_chr} },
 			  [
