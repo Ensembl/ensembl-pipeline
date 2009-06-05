@@ -227,7 +227,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $created_genes	 = 0;
 	my $transfered_sf    = 0;
 	my $skipped_sf       = 0;
-	my $skipped_g        = 0;
+	my $missed_g        = 0;
 
 	my $sth_cs = $dbh->prepare($sql_sr_update);
 	$sth_cs->execute( $A_chr, $altassembly ) unless ( !$cs_change );
@@ -321,6 +321,8 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		}
 
 	  GENE: foreach my $g (@genes) {
+	  		my ($gene_name_attrib) = @{ $g->get_all_Attributes('name') };
+	  		my $gene_name = $gene_name_attrib ? $gene_name_attrib->value : "UNDEF";
 			my $tg = Bio::Vega::Gene->new;
 			$tg->analysis( $g->analysis );
 			$tg->biotype( $g->biotype );
@@ -359,7 +361,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					if(&transcript_is_missed($t,$alt_sl)) {
 						$support->log_verbose(
 							sprintf(
-								"WARNING: %s %s %d %d in gene %s cannot be transfered on %s\n",
+								"WARNING: %s %s %d %d in gene %s ($gene_name) cannot be transfered on %s\n",
 								$t->stable_id, $t->biotype, $t->start, $t->end, $g->stable_id,$A_chr
 							)
 						);
@@ -405,7 +407,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						} else {
 							my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl );
 							if(!$new_t) {
-								$support->log_verbose(sprintf("WARNING: %s %s %d %d in gene %s cannot be transfered on %s\n",
+								$support->log_verbose(sprintf("WARNING: %s %s %d %d in gene %s ($gene_name) cannot be transfered on %s\n",
 															   $t->stable_id, $t->biotype, $t->start, $t->end, $g->stable_id,$A_chr));
 								next TRANSCRIPT;
 							}
@@ -467,7 +469,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					if($exist) {
 						$support->log_verbose(
 							sprintf(
-								"WARNING: SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+								"WARNING: SKIP GENE %s %s ($gene_name) (%s:%d-%d => %s:%d-%d) already transfered\n",
 								$gene->stable_id, $gene->biotype, $R_chr,
 								$g->start,      $g->end,      $gene->seq_region_name,
 								$gene->start,     $gene->end
@@ -493,8 +495,6 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 							$eg->description,
 							scalar(@{$eg->get_all_Transcripts}))."\n");
 						}
-
-						$skipped_g++;
 						next GENE;
 					}
 				}
@@ -512,7 +512,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 								$gene->start,     $gene->end
 							)
 						);
-						$support->log_verbose(sprintf("WARNING: Check Gene %s with %d missing transcripts\n",$gene->stable_id,$missing_transcript)) if $missing_transcript;
+						$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name) with %d missing transcripts\n",$gene->stable_id,$missing_transcript)) if $missing_transcript;
 					} else {
 						throw(
 							sprintf(
@@ -526,18 +526,19 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				}
 				if(scalar(@$genes) -1) {
 					# print info about split gene for the annotators
-					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
+					$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name), it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
 			} else {
 				$support->log_verbose(
 					sprintf(
-								"WARNING: SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
+								"WARNING: SKIP GENE %s %s ($gene_name) (%s:%d-%d => %s:%d-%d) with %d missing transcripts\n",
 								$tg->stable_id, $tg->biotype, $R_chr,
 								$g->start,      $g->end,      $A_chr,
 								$tg->start,     $tg->end,
 								$missing_transcript
 							)
 				);
+				$missed_g++;
 			}
 		}
 
@@ -558,16 +559,16 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		$support->log_verbose(
 			sprintf(
 "INFO: Annotation transfer %s:%s => %s/%s
-INFO: transfered Gene: %d/%d
-INFO: created Gene:	%d
-INFO: skipped Gene: %d/%d
+INFO: transfered genes: %d/%d
+INFO: missed genes: %d/%d
+INFO: created genes (split):	%d
 INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$A_chr,            $support->param('altassembly'),
-				$transfered_genes, ($total_genes+$created_genes),
+				$transfered_genes, $total_genes,
+				$missed_g, $total_genes,
 				$created_genes,
-				$skipped_g, ($total_genes+$created_genes),
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)
