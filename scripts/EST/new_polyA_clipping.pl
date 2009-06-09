@@ -5,45 +5,66 @@ use strict;
 
 =head1 NAME
 
-polA-clipping.pl
+  new_polyA_clipping.pl
 
 =head1 DESCRIPTION
-         
-script to parse a fasta file and identify sequences with polyA/T tails/heads
-these are then clipped and stored in a file 
 
-Script will also trim the sequence before polyA clipping, if a path to the -comments
-file is specified. This file should contain the following columns:
-  1./ accession
-  2./ high quality sequence start or stop
-  3./ numeric value
+  Script to parse a fasta file and identify sequences with polyA/T
+  tails/heads these are then clipped and stored in a file. Clipped,
+  and potentially trimmed, sequences that are shorter than the
+  specified minimum length are not stored.
 
-For human ESTs, the -comment file can be created by connecting to the Mole embl database and 
-doing the following query:  (change tax_division and data_class as appropriate)
+=head2 Clipping
 
-   SELECT accession_version,comment_key,comment_value 
-   FROM entry e, comment c 
-   WHERE e.entry_id = c.entry_id 
-   AND e.tax_division = 'HUM' 
-   AND e.data_class = 'EST' 
+  - The non-A/T sequences at the ends must be <=10bp (set by $buffer)
+  - The polyA/T string must be >4bp to be removed
+  - It only clips polyA tails or polyT heads using a sliding window of 3 bp
+  - The clipping is recursive but only clips one end of a sequence
+  - The head/tail is only clipped if the polyA/T string is longer than
+    the non-polyA/T string at the end of the sequence
 
-The query takes about 5 mins for 1 million ESTs, depending on how busy the database is.
+=head1 OPTIONS
 
-clipping:
-  the non-A/T sequences at the ends must be <=10bp (set by $buffer)  
-  the polyA/T string must be >4bp to be removed
-  it only clips polyA tails or polyT heads using a sliding window of 3 bp
-  the clipping is recursive but only clips one end of a sequence
-  the head/tail is only clipped if the polyA/T string is longer than the non-polyA/T string at the end of the sequence
+  -readfile     Input sequence file in fasta format
+  -outfile      Output file in fasta format
+  -min_length   Minimum sequence length (default 60)
+  -trim         Flag for trimming
+  -comments     sequence quality file
 
-For only polA clipping:
-  perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out
+  Note that the -trim and -comments options are dependent and need
+  to be specified together when trimming the sequences. The sequence
+  quality file should contain the following tab columns:
 
-For trimming and polyA clipping (accepting default min cutoff length of 60 bp for trimmed sequence):
-  perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out -trim -comments comments.ls
+    1./ accession number
+    2./ high quality sequence start or stop
+    3./ numeric value
 
-For trimming and polyA clipping (with specified min length cutoff for trimmed sequence):
-  perl new_polyA_clipping.pl -read sequences.fasta -out polyat_clipped.out -trim -comments comments.ls -min_length 50
+  For human ESTs, the sequence quality file can be created by
+  connecting to the Mole embl database and doing the following query,
+  changing tax_division and data_class as appropriate:
+
+    SELECT accession_version,comment_key,comment_value
+    FROM entry e, comment c
+    WHERE e.entry_id = c.entry_id
+    AND e.tax_division = 'HUM'
+    AND e.data_class = 'EST'
+
+  The query takes about 5 mins for 1 million ESTs, depending on how
+  busy the database is.
+
+=head1 EXAMPLES
+
+  For only polA clipping:
+
+    perl new_polyA_clipping.pl -readfile sequences.fasta -outfile polyat_clipped.out
+
+  For trimming and polyA clipping:
+
+    perl new_polyA_clipping.pl -readfile sequences.fasta -outfile polyat_clipped.out -trim -comments comments.ls
+
+  For trimming and polyA clipping with specified min length cutoff:
+
+    perl new_polyA_clipping.pl -readfile sequences.fasta -outfile polyat_clipped.out -trim -comments comments.ls -min_length 50
 
 =cut
 
@@ -59,38 +80,39 @@ my (
     $trim,
     $hqs_comment_file,
     $min_length,
-   ); 
+   );
+
 #
-# NOTE : This script is used in production code ( cdna_update ) - please do not 
+# NOTE : This script is used in production code ( cdna_update ) - please do not
 # change the calls / options, otherewise the cDNA update code breaks ...
 #
 &GetOptions(
-            'readfile:s'   => \$data, # = '/path/to/unclipped/cdnas_unclipped.fa';
-            'outfile:s'    => \$clipped_cdnas, # = '/path/to/clipped/cdnas_clipped.fa';
-            'trim'         => \$trim, # flag
-            'comments:s'   => \$hqs_comment_file, #  = '/path/to/high-quality-sequence-comments-file';
-            'min_length:s' => \$min_length,
+            'readfile:s'   => \$data,             # '/path/to/unclipped/cdnas_unclipped.fa';
+            'outfile:s'    => \$clipped_cdnas,    # '/path/to/clipped/cdnas_clipped.fa';
+            'trim'         => \$trim,             # trimming flag
+            'comments:s'   => \$hqs_comment_file, # '/path/to/high-quality-sequence-comments-file';
+            'min_length:s' => \$min_length,       # cutoff on sequence length
            );
 
-# this is for backwards compatibility as options changed in r 1.10 
+# this is for backwards compatibility as options changed in r 1.10
 $data = $ARGV[0] if $ARGV[0]; 
-$clipped_cdnas = $ARGV[1] if $ARGV[1] ; 
+$clipped_cdnas = $ARGV[1] if $ARGV[1] ;
 
-
+if (defined $min_length) {
+  print STDERR "Using minimum length of $min_length.\n";
+} else {
+  print STDERR "No minimum seq length specified. Using default of 60 bases.\n";
+  $min_length = 60;
+}
 
 if ($trim && !defined $hqs_comment_file) {
-  die "Please enter -comments file path if you'd like to trim sequences\n";
-}
-if (!$trim && defined $hqs_comment_file) {
-  die "You specified -comments file path but not -trim. Please enter both or none of these options.\n";
-}
-if ($trim && defined $hqs_comment_file && !defined $min_length) {
-  $min_length = 60;
-  print STDERR "No minimum seq length specified. Using default of 60 bases.\n";
+  die "Please enter -comments file path if you'd like to trim sequences. "
+    . "Please enter both or none of these options.\n";
 }
 
-if (!$trim && !defined $hqs_comment_file && defined $min_length) {
-  print STDERR "No -trim and -comments file path provided. -min_length option is not used.\n";
+if (!$trim && defined $hqs_comment_file) {
+  die "You specified -comments file path but not -trim. "
+    . "Please enter both or none of these options.\n";
 }
 
 my $seqin  = new Bio::SeqIO( -file   => "<$data",
@@ -100,7 +122,6 @@ my $seqin  = new Bio::SeqIO( -file   => "<$data",
 my $seqout = new Bio::SeqIO( -file   => ">$clipped_cdnas",
                              -format => "Fasta"
                            );
-
 
 my %comments;
 if ($trim) {
@@ -134,12 +155,19 @@ while ( my $fullseq = $seqin->next_seq ) {
     # print STDERR "Clipped $num_bases_removed bases from seq. Writing to file.\n";
   }
   if (defined $clipped) {
-    # we currently do not specify a minimum seq length here, but it might be a good idea
-    $seqout->write_seq($clipped);
+    # Skip the sequence if length is shorter than $min_length after
+    # it's been clipped.
+    if ( $clipped->length < $min_length ) {
+      print STDERR "After clipping, "
+        . $unclipped->display_id
+        . " is shorter than $min_length, it will be skipped.\n";
+    } else {
+      $seqout->write_seq($clipped);
+    }
   } else {
-    print STDERR "Sequence removed: ".$unclipped->display_id."\n";
+    print STDERR "Sequence removed: ". $unclipped->display_id . "\n";
   }
-}  
+}
 
 
 sub trim_if_possible {
@@ -176,9 +204,8 @@ sub trim_if_possible {
           # The latter part of the if clause ($stop == $start) here is necessary 
           # to catch cases which are not worth trimming when $min_length 
           # is set to 0 by the user.
-            print STDERR "Not trimming seq ".$seq->display_id.
-                         " which would trim to length " . ($stop-$start+1) . "\n";
-         # }
+          print STDERR "Not trimming seq ".$seq->display_id.
+                       " which would trim to length " . ($stop-$start+1) . "\n";
         } else {
           # do the trim
           $seq->seq($seq->subseq($start,$stop));
@@ -186,7 +213,7 @@ sub trim_if_possible {
           }
       } else {
         print STDERR "Not trimming seq ".$seq->display_id." which has invalid ".
-                      "hq stop pos " . $start . " " . $stop . " " . $seq->length . "\n";
+                     "hq stop pos " . $start . " " . $stop . " " . $seq->length . "\n";
       }
     }
 
