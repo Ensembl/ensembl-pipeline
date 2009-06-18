@@ -26,9 +26,9 @@ Required arguments:
 
 Optional arguments:
 
-    --multiple                          produce a "one to many" mapping (default: off)
-                                        one region on the reference assembly can be mapped to many regions
-                                        on the alternative assembly
+    --multiple                          produce a "many to one" mapping (default: off)
+                                        many regions on the reference assembly can be mapped to one region
+                                        on the alternative assembly (e.g. in new clone overlaps)
     --altdbname=NAME                    alternative database NAME
 
     --ref_start                         start coordinate on reference chromosomes
