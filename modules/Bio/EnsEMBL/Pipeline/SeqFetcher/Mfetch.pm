@@ -102,15 +102,18 @@ sub executable {
 =cut
 
 sub options {
-
   my ($self, $options) = @_;
-  if ($options)
-    {
-      $self->{'_options'} = $options;
-    }
-  return $self->{'_options'};  
+  if ($options) {
+      if ( $self->{_options} ) {
+         $self->{'_options'} = $self->{_options} . " " . $options;
+      } else {
+        $self->{'_options'} = $options;
+     }
+  }
+  return $self->{'_options'};
 
 }
+
 
 =head2 get_Seq_by_acc
 
@@ -154,8 +157,7 @@ sub  get_Seq_by_acc {
      next if $line=~m/>/;  
      $seqstr.=$line; 
   }  
-
-  close IN or throw("Error running mfetch for accession [$acc]: $mfetch");
+  close IN or throw("Error running mfetch for accession [$acc]: \n$mfetch");
   chomp($seqstr);
   eval{
     if(defined $seqstr && $seqstr ne "no match") {
@@ -221,9 +223,10 @@ sub  get_Entry_Fields {
   $acc_format=~s/\"//g; 
 
   print "cmd: $command\n" if $self->{verbose}; 
-  open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");  
-   my @lines = <IN> ; 
-  close IN or throw("Error running mfetch for accession [$acc_format]: $command ");  
+  my @lines = @{$self->_mfetch_command($command)} ; 
+  #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");  
+  # my @lines = <IN> ; 
+  #close IN or throw("Error running mfetch for accession [$acc_format]: $command ");  
  
   my %entry;  
 
@@ -280,15 +283,17 @@ sub  get_Entry_Fields {
 } 
 
 
-=head2 get_Entry_Fields_BatchFetch 
+sub _mfetch_command {
+  my  ($self, $command)= @_;
 
-  Title   : batch_fetch
-  Usage   : $self->batch_retrieval(@accession_list);
-  Function: Retrieves multiple sequences via mfetch
-  Returns : reference to a list of Bio::Seq objects
-  Args    : array of accession strings
+  open(IN,"$command |") or throw("Error opening pipe to mfetch for command  $command ");
+  my @lines = <IN> ;
+  close IN or throw("Error running mfetch for command $command ");
+  return \@lines ;
+}
 
-=cut 
+
+
 
 
 sub build_acc_index { 
@@ -301,7 +306,19 @@ sub build_acc_index {
      $position++;
    }  
    return \%tmp ; 
-}
+} 
+
+
+=head2 get_Entry_Fields_BatchFetch 
+
+  Title   : batch_fetch
+  Usage   : $self->batch_retrieval(@accession_list);
+  Function: Retrieves multiple sequences via mfetch
+  Returns : reference to a list of Bio::Seq objects
+  Args    : array of accession strings
+
+=cut 
+
 
 sub get_Entry_Fields_BatchFetch { 
   my ($self, $acc,$fields) = @_;
@@ -314,7 +331,6 @@ sub get_Entry_Fields_BatchFetch {
 
 
   my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);  
-
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
   my @fetch_strings = @{make_fetch_strings($acc, 250 )};  
@@ -343,10 +359,12 @@ sub get_Entry_Fields_BatchFetch {
     }
     
     my $t0 = gettimeofday() ;  
-    print "starting mfetch \n" ; 
-    open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
-      my @lines  = <IN> ; 
-    close IN or throw("Error running mfetch for accession [$acc_string]: $command");   
+    print "starting mfetch \n" ;  
+    my @lines = @{$self->_mfetch_command($command)} ; 
+    #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
+    #  my @lines  = <IN> ; 
+    #close IN or throw("Error running mfetch for accession [$acc_string]: $command");    
+
     my $t1 = gettimeofday() ; 
     my $delta_t = $t1 - $t0 ;  
 
@@ -452,10 +470,76 @@ sub get_Entry_Fields_BatchFetch {
   for ( @entries_not_found ) {  
      print "no entry found for : $_\n" if $self->{verbose};  
   } 
-
-
   return [\%all_entries , \@entries_not_found ] ; 
 } 
+
+
+sub get_Seq_BatchFetch {
+  my ($self, $acc ) = @_;
+
+  unless ( ref($acc) =~m/ARRAY/ ) {
+    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n");
+  }
+
+  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields() 
+
+  my $options = $self->options ;
+  unless ( $options=~m/-v fasta/ ) {
+    $self->options("-v fasta") ;
+  }
+  my $cmd_prefix = $self->_make_mfetch_prefix_command([]) ;
+
+  my %acc_index = %{build_acc_index($acc)};
+
+  # fetch in batches of 300   
+  my @fetch_strings = @{make_fetch_strings($acc, 300 )};
+
+
+  my (@clean , @entries_not_found, @lines ) ;
+  my ($command) ;
+  my $entry_number = 0;
+
+  # data fetching + parsing  
+  STRING: for my $acc_string ( @fetch_strings ) {
+    $command = $cmd_prefix ." " .  $acc_string;
+    my @nr_acc = split /\s+/, $acc_string ;
+
+    # data retrieval   
+    #print $command ;  
+    my @lines = @{$self->_mfetch_command($command)} ; 
+    #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");
+    #my @lines  = <IN> ;
+    #close IN or throw("Error running mfetch for accession [$acc_string]: $command");
+
+
+    LINE: for my $line ( @lines ) {
+      chomp($line) ;
+
+      if ( $line =~m/no match/ ) {
+        $entry_number++;
+        print "no match for $acc_index{$entry_number}\n" ;
+        push @entries_not_found , $acc_index{$entry_number};
+        next LINE;
+      } else {
+        push @clean, $line ;
+      }
+    }
+  } # fetch next round .. 
+
+  for ( @entries_not_found ) {
+    print "no entry found for : $_\n" if $self->{verbose};
+  }
+  return  [\@clean, \@entries_not_found ] ;
+}
+
+
+
+
+
+
+
+
+
 
 
 sub _add_information_to_big_hash {
@@ -539,7 +623,6 @@ sub verbose {
  
 sub _make_mfetch_prefix_command {  
    my ($self, $f ) = @_ ; 
-   my @fields = @$f ;  
 
    my $mfetch = $self->executable;  
    my $options = $self->options;
@@ -547,18 +630,31 @@ sub _make_mfetch_prefix_command {
      unless ($options =~ /^-/ ) {
        $options = '-' . $options; 
      }
-   }
-  my $command = "$mfetch "; 
-  if ( scalar(@fields) > 0 ) {   
-    my $f = join (" ",@fields) ;  
-    if ( $f=~m/acc/) {  
-      $f =~s/acc//g; 
+   }  
+
+   my $command = "$mfetch "; 
+
+  # case 1 : we want to fetch entries with -f flag, ie 
+  # mfetch -f "acc Taxon " ABCDE890.1    
+  # user should only submit field names,NOT " -f Taxon " ... 
+
+  if ( defined $f && ref($f)=~m/ARRAY/) {
+    my @fields = @$f ;   
+    if ( scalar(@fields) > 0 ) {   
+      my $f = join (" ",@fields) ;    
+      # remove -f flag if user has submitted it 
+      $f=~s/-f//g; 
+      # put 'acc' field at the beginning of the string and remove redundancy 
+      # and that it's there as well.
+
+      if ( $f=~m/acc/) {  
+        $f =~s/acc//g; 
+      }
+      $f = "acc " .$f; 
+      $command .= " -f \"$f \" "      ;
     }
-    $f = "acc " .$f; 
-    $command .= " -f \"$f \" "      ;
-  }else {  
-    $command .= " -v  full"  ;   
-  }   
+  } 
+   
 
   if (defined $options){
     $command .= "$options ";
