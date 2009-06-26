@@ -25,7 +25,7 @@ here is an example commandline
 -port 3352
 -dbname pipe_human
 -user pipuser
--pass *****
+-pass ***** [AGP_FILE]
 
 =head1 OPTIONS
 
@@ -35,8 +35,7 @@ here is an example commandline
     -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
-    -ensembl to load all types of clones found in the AGP (A=Active Finishing, F=Finished, D=Draft HTG,
-      W=Whole Genome shutgun, U=gap of unknown size) by default load only A, U and F.
+    -skip_type comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
     -cs_name (default:chromosome) the name of the coordinate system being stored
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	the sequence set name
@@ -75,7 +74,7 @@ my $cs_version = 'Otter';
 my $set;
 my $description;
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
-my $ensembl;
+my @skip;
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -89,11 +88,13 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'cs_version:s' 			=> \$cs_version,
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
-	'ensembl!'                 => \$ensembl,
+	'skip_type=s'                 => \@skip,
 	'submit!'                 => \$do_submit,
 	'h|help!'                 => $usage
   )
   or $usage->();
+
+@skip = split(/,/,join(',',@skip));
 
 my $agp_file =
   $ARGV[0];    # takes the remaining argument as the filename to be read
@@ -451,14 +452,48 @@ sub make_slice {
 sub check_line {
 	my ($line) = @_;
 	my $input_type;
-	my $type = $ensembl ? "^[AUFOWD]\$" : "^[AUFO]\$";
+
+## AGP file specification 1.1
+# The sequencing status of the component.
+# These typically correspond to keywords in
+# the International Sequence Database
+# (GenBank/EMBL/DDBJ) submission.
+#  Current acceptable values are:
+#    A=Active Finishing
+#    D=Draft HTG (often phase1 and phase2
+#    are called Draft, whether or not they have
+#    the draft keyword).
+#    F=Finished HTG (phase 3)
+#    G=Whole Genome Finishing
+#    N=gap with specified size
+#    O=Other sequence (typically means no
+#    HTG keyword)
+#    P=Pre Draft
+#    U= gap of unknown size, typically
+#    defaulting to predefined values.
+#    W=WGS contig
+##
+
+	my $known_type = "^[ADFGNOPUW]\$";
+
+	my $accepted_type = "ADFGOPW";
+	if(@skip) {
+		my $skip_pattern = "[".join('',@skip)."]";
+		$accepted_type =~ s/$skip_pattern//g;
+	}
+
+	my $accepted_type_p = "^[$accepted_type]\$";
 
 # 0       1       2       3       4       5               6       7       8     9
 # chr_20  2808333 2934911 29      F       AL121905.0      101     126679  +     Optional comment
 # splits each line into its component parts - puts line in a temporary array (splits the line on whitespace)
 	my @line_in_array = split /\s+/, $line, 10;
 
-	if ( $line_in_array[4] && $line_in_array[4] =~ /$type/ ) {
+	# throw exception if new type
+	throw("Unknown sequence status in AGP row\n$line")
+		if ($line_in_array[4] && $line_in_array[4] !~ /$known_type/);
+
+	if ( $line_in_array[4] && $line_in_array[4] =~ /$accepted_type_p/ ) {
 		$input_type = "AGP";
 	}
 	else {
