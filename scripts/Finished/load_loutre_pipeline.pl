@@ -36,6 +36,7 @@ here is an example commandline
     -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
 
     -skip_type comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
+    -assembly attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	the sequence set name
     -description the sequence set description
@@ -70,6 +71,7 @@ my $pass = '';
 my $cs_version = 'Otter';
 my $set;
 my $description;
+my $assembly;
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
 my @skip;
 
@@ -85,6 +87,7 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 	'set=s'                   => \$set,
 	'description=s'           => \$description,
 	'skip_type=s'                 => \@skip,
+	'assembly=s'			  => \$assembly,
 	'submit!'                 => \$do_submit,
 	'h|help!'                 => $usage
   )
@@ -203,7 +206,7 @@ my $seqset_info     = {};
 	throw("AGP should contains (only) one chromosome: [@chrs]")
 		unless (scalar(@chrs) == 1);
 
-	$seqset_info->{$set} = [ shift @chrs ,$description  ];
+	$seqset_info->{$set} = [ shift @chrs ,$description, undef, undef, $assembly  ];
 
 	close $fh;
 
@@ -403,7 +406,7 @@ sub make_clone_attribute {
 
 sub make_seq_set_attribute {
 	my ($arr_ref) = @_;
-	my ($chr,$desc,$hide,$write) =  @$arr_ref;
+	my ( $chr, $desc, $hide, $write, $assembly) =  @$arr_ref;
 	my @attrib;
 
 	$hide = defined($hide) ? $hide : 1;
@@ -432,6 +435,16 @@ sub make_seq_set_attribute {
 			'hidden',
 			'Hidden Sequence Set', '',$hide
 	);
+
+	if($assembly) {
+		push @attrib,
+			&make_attribute(
+				'equiv_asm',
+				'Equivalent EnsEMBL assembly',
+				'For full chromosomes made from NCBI AGPs',
+				$assembly
+			);
+	}
 
 	return \@attrib;
 }
