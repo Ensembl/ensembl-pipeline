@@ -275,6 +275,7 @@ eval {
 		my $transfered_sf    = 0;
 		my $skipped_sf       = 0;
 		my $skipped_g       = 0;
+		my $missed_g       = 0;
 
 		my $ref_sl =
 	  		$sliceAd->fetch_by_region( 'chromosome', $R_chr, undef, undef, undef,$assembly );
@@ -291,7 +292,7 @@ eval {
 		my @proj_feat;
 		my @simple_features = @{ $sfeat_Ad->fetch_all_by_Slice($ref_sl) };
 		$total_sf = scalar @simple_features;
-		foreach my $f (@simple_features) {
+		SF: foreach my $f (@simple_features) {
 			my $tf = $f->transform('chromosome',$altassembly);
 			if ( defined $tf ) {
 				$tf->dbID(undef);
@@ -328,6 +329,8 @@ eval {
 		}
 
 	  GENE: foreach my $g (@genes) {
+	  		my ($gene_name_attrib) = @{ $g->get_all_Attributes('name') };
+	  		my $gene_name = $gene_name_attrib ? $gene_name_attrib->value : "UNDEF";
 			my $tg = Bio::Vega::Gene->new;
 			$tg->analysis( $g->analysis );
 			$tg->biotype( $g->biotype );
@@ -365,8 +368,8 @@ eval {
 				} else {
 					$support->log_verbose(
 						sprintf(
-							"\t%s %s %d %d cannot be transfered on $to_assembly assembly\n",
-							$t->stable_id, $t->biotype, $t->start, $t->end
+							"WARNING: %s %s %d %d in gene %s ($gene_name) cannot be transfered on $to_assembly assembly\n",
+							$t->stable_id, $t->biotype, $t->start, $t->end, $g->stable_id
 						)
 					);
 				}
@@ -411,7 +414,7 @@ eval {
 					if($exist) {
 						$support->log_verbose(
 							sprintf(
-								"SKIP GENE %s %s (%s:%d-%d => %s:%d-%d) already transfered\n",
+								"WARNING: SKIP GENE %s %s ($gene_name) (%s:%d-%d => %s:%d-%d) already transfered\n",
 								$gene->stable_id, $gene->biotype, $R_chr,
 								$g->start,      $g->end,      $gene->seq_region_name,
 								$gene->start,     $gene->end
@@ -469,17 +472,18 @@ eval {
 				}
 				if(scalar(@$genes) -1) {
 					# print info about split gene for the annotators
-					$support->log_verbose(sprintf("WARNING: Check Gene %s, it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
+					$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name), it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
 			} else {
 				$support->log_verbose(
 					sprintf(
-								"SKIP GENE %s %s (%s:%d-%d => %s assembly) with %d missing transcripts\n",
+								"WARNING: SKIP GENE %s %s ($gene_name) (%s:%d-%d => %s assembly) with %d missing transcripts\n",
 								$tg->stable_id, $tg->biotype, $R_chr,
 								$g->start,      $g->end,      $to_assembly,
 								$missing_transcript
 							)
 				);
+				$missed_g++;
 			}
 		}
 
@@ -490,15 +494,15 @@ eval {
 sprintf(
 "INFO: Annotation transfer %s:%s => %s
 INFO: transfered Gene: %d/%d
+INFO: missed Gene: %d/%d
 INFO: created Gene:	%d
-INFO: skipped Gene: %d/%d
 INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$to_assembly,
-				$transfered_genes, ($total_genes+$created_genes),
+				($transfered_genes - $created_genes), $total_genes,
+				$missed_g, $total_genes,
 				$created_genes,
-				$skipped_g, ($total_genes+$created_genes),
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)

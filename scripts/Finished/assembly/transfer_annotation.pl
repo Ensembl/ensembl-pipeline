@@ -566,7 +566,7 @@ INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$A_chr,            $support->param('altassembly'),
-				$transfered_genes, $total_genes,
+				($transfered_genes - $created_genes), $total_genes,
 				$missed_g, $total_genes,
 				$created_genes,
 				$transfered_sf,    $total_sf,
