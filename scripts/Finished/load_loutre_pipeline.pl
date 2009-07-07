@@ -16,32 +16,32 @@ The sequence loaded into the dna table is either Pfetched or fetched from a raw 
 If the login, password and port parameters of the loutre connexion are not provided, they will be
 recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
-here is an example commandline
+Here is an example command line
 
-./load_loutre_pipeline.pl
--set chr11-02
--description 'chromosome 11'
--host otterlive
--port 3352
--dbname loutre_human
--user ottuser
--pass ***** [AGP_FILE]
+    ./load_loutre_pipeline.pl \
+	-set chr11-02 \
+	-description 'chromosome 11' \
+	-host otterlive \
+	-port 3352 \
+	-dbname loutre_human \
+	-user ottuser \
+	-pass ***** [AGP_FILE]
 
 =head1 OPTIONS
 
-    -host (default:otterlive)   host name for the loutre database (gets put as phost= in locator)
-    -dbname (no default)  For RDBs, what name to connect to (pname= in locator)
-    -user (check the ~/.netrc file)  For RDBs, what username to connect as (puser= in locator)
-    -pass (check the ~/.netrc file)  For RDBs, what password to use (ppass= in locator)
-    -port (check the ~/.netrc file)   For RDBs, what port to use (pport= in locator)
+    -host   (default:otterlive)        host name for the loutre database (gets put as phost= in locator)
+    -dbname (no default)               for RDBs, what name to connect to (pname= in locator)
+    -user   (check the ~/.netrc file)  for RDBs, what username to connect as (puser= in locator)
+    -pass   (check the ~/.netrc file)  for RDBs, what password to use (ppass= in locator)
+    -port   (check the ~/.netrc file)  for RDBs, what port to use (pport= in locator)
 
     -skip_type comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
     -assembly attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
-    -set	the sequence set name
+    -set	 the sequence set name
     -description the sequence set description
-    -nosubmit	Used to avoid the pipeline priming with the SubmitContig analysis
-    -help|h		displays this documentation with PERLDOC
+    -nosubmit	 used to avoid the pipeline priming with the SubmitContig analysis
+    -help|h      displays this documentation with PERLDOC
 
 =head1 CONTACT
 
