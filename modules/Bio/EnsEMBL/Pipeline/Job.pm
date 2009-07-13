@@ -901,6 +901,7 @@ sub can_retry{
   my ($self, $logic_name) = @_;
 
   $logic_name = $self->analysis->logic_name if(!$logic_name);
+  
   if (!exists($BATCH_QUEUES{$logic_name})) {
     $logic_name = 'default';
   }
@@ -983,19 +984,20 @@ sub set_up_queues {
     }
     $q{$ln}{jobs} = [];
     $q{$ln}{last_flushed} = undef;
-    $q{$ln}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
-    $q{$ln}{queue}           ||= $DEFAULT_BATCH_QUEUE;
-    $q{$ln}{resource}        ||= $DEFAULT_RESOURCE;
-    $q{$ln}{retries}         ||= $DEFAULT_RETRIES;
-    $q{$ln}{cleanup}         ||= $DEFAULT_CLEANUP;
-    $q{$ln}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
-    $q{$ln}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
-    $q{$ln}{runner}          ||= $DEFAULT_RUNNER;
-    $q{$ln}{verbosity}       ||= $DEFAULT_VERBOSITY;
-    $q{$ln}{sub_args}        ||= $DEFAULT_SUB_ARGS;
-    $q{$ln}{retry_queue}     ||= $DEFAULT_RETRY_QUEUE;
-    $q{$ln}{retry_resource}  ||= $DEFAULT_RETRY_RESOURCE;
-    $q{$ln}{retry_sub_args}  ||= $DEFAULT_RETRY_SUB_ARGS;
+    $q{$ln}{batch_size} = $DEFAULT_BATCH_SIZE if !defined($q{$ln}{batch_size});
+    $q{$ln}{queue}					||= $DEFAULT_BATCH_QUEUE;
+    $q{$ln}{resource} 			||= $DEFAULT_RESOURCE;
+		#Allow 0 retries
+    $q{$ln}{retries} = $DEFAULT_RETRIES if !defined($q{$ln}{retries});
+    $q{$ln}{cleanup} 				||= $DEFAULT_CLEANUP;
+    $q{$ln}{runnabledb_path}||= $DEFAULT_RUNNABLEDB_PATH;
+    $q{$ln}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
+    $q{$ln}{runner} 				||= $DEFAULT_RUNNER;
+    $q{$ln}{verbosity} 			||= $DEFAULT_VERBOSITY;
+    $q{$ln}{sub_args} 			||= $DEFAULT_SUB_ARGS;
+    $q{$ln}{retry_queue} 		||= $DEFAULT_RETRY_QUEUE;
+    $q{$ln}{retry_resource} ||= $DEFAULT_RETRY_RESOURCE;
+    $q{$ln}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS;
     #print "HAVE SUB ARGS ".$q{$ln}{sub_args}."\n";
   }
 
@@ -1004,20 +1006,20 @@ sub set_up_queues {
     $q{default}{jobs} = [];
     $q{default}{last_flushed} = undef;
   }
-  # Need these set, so do the ||= thing 
-  $q{default}{batch_size}      ||= $DEFAULT_BATCH_SIZE;
-  $q{default}{queue}           ||= $DEFAULT_BATCH_QUEUE;
-  $q{default}{resource}        ||= $DEFAULT_RESOURCE;
-  $q{default}{retries}         ||= $DEFAULT_RETRIES;
-  $q{default}{cleanup}         ||= $DEFAULT_CLEANUP;
-  $q{default}{runnabledb_path} ||= $DEFAULT_RUNNABLEDB_PATH;
-  $q{default}{output_dir}      ||= $DEFAULT_OUTPUT_DIR;
-  $q{default}{runner}          ||= $DEFAULT_RUNNER;
-  $q{default}{verbosity}       ||= $DEFAULT_VERBOSITY;
-  $q{default}{sub_args}        ||= $DEFAULT_SUB_ARGS;
-  $q{default}{retry_queue}     ||= $DEFAULT_RETRY_QUEUE;
-  $q{default}{retry_resource}  ||= $DEFAULT_RETRY_RESOURCE;
-  $q{default}{retry_sub_args}  ||= $DEFAULT_RETRY_SUB_ARGS;
+  # Need these set, do the ||= thing (but check for numbers that are 0) 
+  $q{default}{batch_size} = $DEFAULT_BATCH_SIZE if !defined($q{default}{batch_size});
+  $q{default}{queue} 					||= $DEFAULT_BATCH_QUEUE;
+  $q{default}{resource} 			||= $DEFAULT_RESOURCE;
+  $q{default}{retries} = $DEFAULT_RETRIES if !defined($q{default}{retries});
+  $q{default}{cleanup} 				||= $DEFAULT_CLEANUP;
+  $q{default}{runnabledb_path}||= $DEFAULT_RUNNABLEDB_PATH;
+  $q{default}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
+  $q{default}{runner} 				||= $DEFAULT_RUNNER;
+  $q{default}{verbosity} 			||= $DEFAULT_VERBOSITY;
+  $q{default}{sub_args} 			||= $DEFAULT_SUB_ARGS;
+  $q{default}{retry_queue} 		||= $DEFAULT_RETRY_QUEUE;
+  $q{default}{retry_resource} ||= $DEFAULT_RETRY_RESOURCE;
+  $q{default}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS;
   return %q;
 }
 
