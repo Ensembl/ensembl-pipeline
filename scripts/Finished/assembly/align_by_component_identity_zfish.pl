@@ -201,13 +201,19 @@ my $sth2 = $dbh->prepare(
 
 $support->log_stamped("Looping over chromosomes...\n");
 
-my $chr_list  = $sa->fetch_all('chromosome');
+# Create the list of reference and alternative chromosomes using assembly dates and/or ref. chromosome version
+
+# list of all chromosome
+my $chr_list  = $sa->fetch_all('chromosome'); # contains only default chromosome version
+
+# add $from_cs_version chromosome version to chromosome list
 if($from_cs_version) {
 	foreach my $cs (@{$csa->fetch_all}) {
 		push @$chr_list, @{$sa->fetch_all($cs->name,$cs->version)} if $cs->version eq $from_cs_version;
 	}
 }
 
+# hash seq_region -> chromosome (e.g. chr13-03 -> 13)
 my $sr_name_to_chr;
 foreach my $chr_slice (@$chr_list) {
 	my ($chr) = $chr_slice->seq_region_name =~ /chr(.*)_/;
@@ -215,7 +221,7 @@ foreach my $chr_slice (@$chr_list) {
 	$sr_name_to_chr->{$chr_slice->seq_region_name} = $chr;
 }
 
-
+# Reference chromsomes
 my @from_chrs;
 if($from_cs_version) {
 	@from_chrs =
@@ -227,10 +233,13 @@ if($from_cs_version) {
 	grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
 }
 
+
+# Alternative chromosomes
 my @to_chrs =
   sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
   grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
 
+# throw up error if lists don't match in length
 if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
 	throw(   "Chromosome lists do not match by length:\n["
 		   . join( " ", map( $_->seq_region_name, @from_chrs ) ) . "]\n["
@@ -238,7 +247,7 @@ if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
 		   . "]\n" );
 }
 
-# Check that the chromosome names match
+# check that the chromosome names match in the lists
 for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	my $R_sr_name = $from_chrs[$i]->seq_region_name;
 	my $A_sr_name = $to_chrs[$i] ? $to_chrs[$i]->seq_region_name : "undef";
@@ -255,6 +264,8 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	$seq_region_id->{$A_sr_name} = $sa->get_seq_region_id( $to_chrs[$i] ) if $to_chrs[$i];
 }
 
+
+# Loop through the chromsosomes here
 CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# get the chromosome slices
@@ -535,6 +546,9 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	}
 }
 
+
+# Loop through the chromosomes to save the align/non-align data
+# and print chromosome specific stats
 REF: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# get the chromosome slices
