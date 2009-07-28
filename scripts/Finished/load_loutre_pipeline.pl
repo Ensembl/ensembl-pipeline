@@ -289,7 +289,8 @@ my $seqset_info     = {};
 				values
 				(?,?,?,?,?,?,?) };
 		my $insert_sth = $dba->dbc->prepare($insert_query);
-		for ( values %$contigs_hashref ) {
+		my $error = '';
+		CLONE: for ( values %$contigs_hashref ) {
 			my $chr_name     = $_->[0];
 			my $sequence_set = $_->[8];
 			my $chr_start    = $_->[1];
@@ -320,20 +321,22 @@ my $seqset_info     = {};
 				$clone_seq_reg_id = $clone->get_seq_region_id;
 				$ctg_seq_reg_id   = $contig->get_seq_region_id;
 			} else {
-				##fetch the dna sequence from pfetch server with acc_ver id
+				##fetch the dna sequence from pfetch server or a local fasta file with acc_ver id
 				my $seqobj;
-				eval {
-					if($objects{$acc_ver}){
-						$seqobj = $objects{$acc_ver};
-					}else{
+
+				if($objects{$acc_ver}){
+					$seqobj = $objects{$acc_ver};
+				}else{
+					eval {
 						$seqobj = &pfetch_acc_sv($acc_ver);
 						$objects{$acc_ver} = $seqobj;
+					};
+					if($@) {
+						$error .= $@;
+						next CLONE;
 					}
-				};
-				if($@) {
-					foreach (@$dbas) { $_->dbc->db_handle->rollback};
-					throw($@);
 				}
+
 				$clone_length = $seqobj->length;
 				$contig_name .= $clone_length unless $clone;
 				my $contig_seq = $seqobj->seq;
@@ -378,6 +381,10 @@ my $seqset_info     = {};
 			$state_info_container->store_input_id_analysis( $contig->name(), $ana,'' )
 				if($do_submit and $dba->dbc->dbname =~ /pipe_/);
 
+		}
+		if($error) {
+			foreach (@$dbas) { $_->dbc->db_handle->rollback};
+			throw($error);
 		}
 	}
 	foreach (@$dbas) { $_->dbc->db_handle->commit};
