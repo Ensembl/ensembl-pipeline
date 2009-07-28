@@ -84,7 +84,7 @@ use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Registry;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory; 
 verbose('WARNING') ; 
-$! = 1;
+$| = 1;
 
 
 my %opt = (
