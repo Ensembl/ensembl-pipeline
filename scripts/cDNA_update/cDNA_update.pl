@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.42 2009-03-30 15:26:21 amonida Exp $
+#$Id: cDNA_update.pl,v 1.43 2009-07-30 14:39:52 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -226,6 +226,8 @@ $| = 1;
 # Variables from configuration
 
 my $GSS                 = $CVS_DIR . $GSS_PATH;
+#in case gss file is not under the same directory as the code checkouts
+   $GSS                 = $GSS_PREFIX . $GSS_PATH if($GSS_PREFIX);
 my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
 my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;

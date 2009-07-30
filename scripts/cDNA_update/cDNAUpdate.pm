@@ -36,8 +36,11 @@ use vars qw(%Config);
         WB_DBPASS     => 'ensembl',
         WB_REF_DBPORT => 3306,
 
-        # Path to gss file
+        # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt',
+        #Only complete if the gss file isn't under CVS_DIR
+        #If completed will replace CVS_DIR as prefix to GSS_PATH
+        GSS_PREFIX => '',
 
         # Various scripts required by the process.
         FASTA_SPLIT             => '/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit',
