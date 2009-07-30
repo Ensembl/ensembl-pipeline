@@ -32,9 +32,9 @@ use vars qw(%Config);
 %Config = (
     DEFAULT => {
         # Admin rights are required
-        WB_DBUSER     => 'ensadmin',
-        WB_DBPASS     => 'ensembl',
-        WB_REF_DBPORT => 3306,
+        WB_DBUSER     => 'dbuser',
+        WB_DBPASS     => 'dbpass',
+        WB_REF_DBPORT => ,
 
         # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt',
@@ -43,7 +43,7 @@ use vars qw(%Config);
         GSS_PREFIX => '',
 
         # Various scripts required by the process.
-        FASTA_SPLIT             => '/nfs/acari/searle/progs/production_code/ensembl-trunk_1106/ensc-core/src/Programs/fastasplit',
+        FASTA_SPLIT             => '',#path to fastasplit
         POLYA_CLIPPING_PATH     => '/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl',
         FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
@@ -52,12 +52,12 @@ use vars qw(%Config);
 
         # Exonerate specifications
         PROGRAM_NAME    => "exonerate",
-        PROGRAM_VERSION => "0.9.0",
-        PROGRAM_FILE    => "/usr/local/ensembl/bin/exonerate-0.9.0",
+        PROGRAM_VERSION => "",#specify version
+        PROGRAM_FILE    => "",#path to exonerate
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
-        SOURCE_HOST => 'cbi4',
+        SOURCE_HOST => '',#name of machine with blastdbs
         SOURCE_DIR  => '/data/blastdb/',
 
         # Taxonomy db for loading meta_table - should not need to change
@@ -74,7 +74,7 @@ use vars qw(%Config);
 
         # User details
         USER         => '',
-        HOST         => '',
+        HOST         => '',#host running script from
         GENEBUILD_ID => undef,
 
         # Reference db (current build)
@@ -127,39 +127,39 @@ use vars qw(%Config);
     },
 
     human => {
-        USER         => 'amonida',
-        HOST         => 'bc-9-1-01',
-        GENEBUILD_ID => 25,
+        USER         => '',
+        HOST         => '',#host running script from
+        GENEBUILD_ID => ,#id entered in db
 
-        WB_REF_DBNAME => 'amonida_human_core_55',
-        WB_REF_DBHOST => 'genebuild7',
+        WB_REF_DBNAME => '',
+        WB_REF_DBHOST => '',
 
-        WB_PIPE_DBNAME => 'amonida_homo_cdna0509_ref',
-        WB_PIPE_DBHOST => 'genebuild1',
+        WB_PIPE_DBNAME => '',
+        WB_PIPE_DBHOST => '',
         WB_PIPE_DBPORT => 3306,
 
-        WB_TARGET_DBNAME => 'amonida_homo_cdna0509_update',
-        WB_TARGET_DBHOST => 'genebuild1',
+        WB_TARGET_DBNAME => '',
+        WB_TARGET_DBHOST => '',
         WB_TARGET_DBPORT => 3306,
 
-        WB_LAST_DBNAME => 'homo_sapiens_cdna_54_36p',
-        WB_LAST_DBHOST => 'ens-livemirror',
+        WB_LAST_DBNAME => '',
+        WB_LAST_DBHOST => '',
         WB_LAST_DBPORT => 3306,
 
-        WB_LAST_DNADBNAME => 'homo_sapiens_core_54_36p',
-        WB_LAST_DNADBHOST => 'ens-livemirror',
+        WB_LAST_DNADBNAME => '',
+        WB_LAST_DNADBHOST => '',
         WB_LAST_DNADBPORT => 3306,
 
-        CVS_DIR => "$ENV{CVSDIR}",
+        CVS_DIR => "",
 
-        DATA_DIR => "$ENV{WORK}",
+        DATA_DIR => "",
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Human/GRCh37/genome/softmasked/softmasked_dusted.fa',
+        GENOMICSEQS => '',
 
         # Chunk size recommendations: 5500 for human
         # otherwise get AWOL jobs in first run
@@ -179,39 +179,39 @@ use vars qw(%Config);
     },
 
     mouse => {
-        USER         => 'amonida',
-        HOST         => 'bc-9-1-03',
-        GENEBUILD_ID => 25,
+        USER         => '',
+        HOST         => '',#host running script from
+        GENEBUILD_ID => ,#id entered in db
 
-        WB_REF_DBNAME => 'amonida_mouse_core_53',
-        WB_REF_DBHOST => 'genebuild4',
+        WB_REF_DBNAME => '',
+        WB_REF_DBHOST => '',
 
-        WB_PIPE_DBNAME => 'amonida_mus_test_ref',
-        WB_PIPE_DBHOST => 'genebuild4',
+        WB_PIPE_DBNAME => '',
+        WB_PIPE_DBHOST => '',
         WB_PIPE_DBPORT => 3306,
 
-        WB_TARGET_DBNAME => 'amonida_mus_test_update',
-        WB_TARGET_DBHOST => 'genebuild4',
+        WB_TARGET_DBNAME => '',
+        WB_TARGET_DBHOST => '',
         WB_TARGET_DBPORT => 3306,
 
-        WB_LAST_DBNAME => 'mus_musculus_cdna_53_37f',
-        WB_LAST_DBHOST => 'ensdb-archive',
+        WB_LAST_DBNAME => '',
+        WB_LAST_DBHOST => '',
         WB_LAST_DBPORT => 5304,
 
-        WB_LAST_DNADBNAME => 'mus_musculus_core_53_37f',
-        WB_LAST_DNADBHOST => 'ens-livemirror',
+        WB_LAST_DNADBNAME => '',
+        WB_LAST_DNADBHOST => '',
         WB_LAST_DNADBPORT => 3306,
 
-        CVS_DIR => '/nfs/acari/amonida/projects/cdna_update/mouse/',
+        CVS_DIR => '',
 
-        DATA_DIR => "$ENV{SCRATCH}",
+        DATA_DIR => "",
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa',
+        GENOMICSEQS => '',
 
         # Chunk size recommendations: 1500 for mouse
         # otherwise get AWOL jobs in first run
