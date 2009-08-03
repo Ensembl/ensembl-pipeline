@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.43 2009-07-30 14:39:52 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.44 2009-08-03 14:22:36 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -225,14 +225,20 @@ $| = 1;
 
 # Variables from configuration
 
-my $GSS                 = $CVS_DIR . $GSS_PATH;
-#in case gss file is not under the same directory as the code checkouts
-   $GSS                 = $GSS_PREFIX . $GSS_PATH if($GSS_PREFIX);
 my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
 my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
 my $UNMAPPED_REASONS    = $CVS_DIR . $UNMAPPED_REASONS_PATH;
 my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
+my $GSS;
+
+if ( defined($GSS_PREFIX) ) {
+    # In case gss file is not under the same directory as the code
+    # checkouts.
+    $CVS_DIR . $GSS_PATH;
+} else {
+    $GSS = $CVS_DIR . $GSS_PATH;
+}
 
 # When comparing to a previously updated cdna db
 # $oldFeatureName = $newFeatureName
@@ -310,6 +316,13 @@ my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
 my $progress_status = undef;
 
 if ( $option eq "prepare" ) {
+
+    print("\n\t\tAre you running this in a screen session? (y/n) ");
+    if ( !get_input_arg() ) {
+        print(   "The program will exit now. "
+               . "Restart it again in a screen session.\n" );
+        unclean_exit();
+    }
 
     print("\nStarting cDNA-update procedure.\n");
 
@@ -414,6 +427,9 @@ if ( $option eq "prepare" ) {
         setup_analysis();
 
         # Synchronise reference and target databases
+        print( "\nHave now added analyses and rules to the pipeline database "
+               . "so should synchronise the target database now...\n" );
+
         sync_databases();
 
         $progress_status = 2;
@@ -455,7 +471,7 @@ elsif ( $option eq "run" ) {
         # Is this needed? The options are set by the script, so user doesn't
         # have to change the configuration.
         print(   "Are you sure you want to reset the configs?\n"
-               . "\tIf you're in the second stage you need to "
+               . "\tIf you're in the second stage you need to\n"
                . "\tedit BatchQueue.pm as well as Exonerate2Genes.pm!\n"
                . "Shall we set the configs? (y/n) " );
 
@@ -588,7 +604,7 @@ elsif ( $option eq "run" ) {
         if ( $progress_status == 8 ) {
 
             print(   "Would you like to store the cDNAs which "
-                   . "have not aligned as unmapped_objects?(y/n) " );
+                   . "have not aligned as unmapped_objects? (y/n) " );
 
             if ( get_input_arg() ) {
 
@@ -619,14 +635,14 @@ elsif ( $option eq "run" ) {
             $progress_status = 11;
             update_progress_status($progress_status);
         }
-    } ## end elsif ( $progress >= 6 )
 
-    print(   "\n\nNOTE!!! You should now change the analysis_ids "
-            . "of the cdnas in your database\n"
-            . "so that they all have the same logic name, "
-            . "otherwise the comparison script won't work;\n"
-            . "you will need to change both the gene and "
-            . "dna_align_feature tables.\n\n" );
+        print(   "\n\nNOTE!!! You should now change the analysis_ids "
+                . "of the cdnas in your database\n"
+                . "so that they all have the same logic name, "
+                . "otherwise the comparison script won't work;\n"
+                . "you will need to change both the gene and "
+                . "dna_align_feature tables.\n\n" );
+    } ## end elsif ( $progress >= 6 )
 }
 
 elsif ( $option eq "compare" ) {
@@ -1249,7 +1265,8 @@ sub DB_setup {
 
         } ## end else [ if ( $rerun_flag == 0 )
 
-        # Synchronise reference and target databases
+        # Synchronise pipeline and target databases
+        print("\nSynchronising the pipeline and target databases...\n");
         sync_databases();
 
     };    ## end eval
@@ -2043,7 +2060,7 @@ sub create_db {
     my $mysql_cmd;
     my ($host, $port);
     if ($is_pipeline) {
-        print("Creating a pipeline db\n");
+        print("\nCreating a pipeline db...\n");
         $host = $WB_PIPE_DBHOST;
         $port = $WB_PIPE_DBPORT;
 
@@ -2054,7 +2071,7 @@ sub create_db {
             . "-p$WB_DBPASS ";
 
     } else {
-        print("Creating a target db\n");
+        print("\nCreating a target db...\n");
         $host = $WB_TARGET_DBHOST;
         $port = $WB_TARGET_DBPORT;
 
