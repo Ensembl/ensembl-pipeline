@@ -34,7 +34,7 @@ use vars qw(%Config);
         # Admin rights are required
         WB_DBUSER     => 'dbuser',
         WB_DBPASS     => 'dbpass',
-        WB_REF_DBPORT => ,
+        WB_REF_DBPORT => undef,
 
         # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt',
@@ -129,7 +129,7 @@ use vars qw(%Config);
     human => {
         USER         => '',
         HOST         => '',#host running script from
-        GENEBUILD_ID => ,#id entered in db
+        GENEBUILD_ID => undef,#id entered in db
 
         WB_REF_DBNAME => '',
         WB_REF_DBHOST => '',
@@ -150,9 +150,9 @@ use vars qw(%Config);
         WB_LAST_DNADBHOST => '',
         WB_LAST_DNADBPORT => 3306,
 
-        CVS_DIR => "",
+        CVS_DIR => '',
 
-        DATA_DIR => "",
+        DATA_DIR => '',
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
@@ -181,7 +181,7 @@ use vars qw(%Config);
     mouse => {
         USER         => '',
         HOST         => '',#host running script from
-        GENEBUILD_ID => ,#id entered in db
+        GENEBUILD_ID => undef,#id entered in db
 
         WB_REF_DBNAME => '',
         WB_REF_DBHOST => '',
@@ -204,7 +204,7 @@ use vars qw(%Config);
 
         CVS_DIR => '',
 
-        DATA_DIR => "",
+        DATA_DIR => '',
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
