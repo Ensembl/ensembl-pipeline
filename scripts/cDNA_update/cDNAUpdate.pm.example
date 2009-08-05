@@ -159,7 +159,7 @@ use vars qw(%Config);
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '',
+        GENOMICSEQS => '/data/blastdb/Ensembl/Human/GRCh37/genome/softmasked/softmasked_dusted.fa',
 
         # Chunk size recommendations: 5500 for human
         # otherwise get AWOL jobs in first run
@@ -211,7 +211,7 @@ use vars qw(%Config);
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '',
+        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa',
 
         # Chunk size recommendations: 1500 for mouse
         # otherwise get AWOL jobs in first run
