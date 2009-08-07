@@ -293,6 +293,43 @@ sub _mfetch_command {
 }
 
 
+=head2 get_Seq_by_acc_wildcard
+
+  Title   : get_Seq_by_acc_wildcard
+  Usage   : $self->get_eq_by_acc($accession);
+  Function: Does the sequence retrieval via mfetch
+  Returns : string  
+  Args    : 
+
+=cut
+
+sub  get_Seq_by_acc_wildcard {
+  my ($self, $acc) = @_;
+
+  $acc=~s/\..*//g; # chop version off 
+
+  my $options = $self->options ;
+  unless ( $options=~m/-v fasta/ ) {
+    $self->options("-v fasta");
+  }
+  my $cmd_prefix = $self->_make_mfetch_prefix_command(\[]) ;
+  $cmd_prefix .= " -i \"acc:$acc\%\""  ;
+
+  my @entry;
+  my $not_found;
+
+  my @lines = @{ $self->_mfetch_command($cmd_prefix)};
+  chomp(@lines) ;
+  for ( @lines ) {
+    if (/no match/) {
+      return \@entry;
+    }
+  }
+ return \@lines ;
+}
+
+
+
 
 
 
