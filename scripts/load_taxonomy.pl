@@ -29,6 +29,7 @@ $self->{'scale'} = 10;
 my ($help, $taxondbhost, $taxondbport, $taxondbname);
 my ($lcdbhost, $lcdbport, $lcdbname, $lcdbuser, $lcdbpass);
 
+
 GetOptions('help'           => \$help,
            'taxon_id=i'     => \$self->{'taxon_id'},
            'name=s'         => \$self->{'scientific_name'},
@@ -41,6 +42,9 @@ GetOptions('help'           => \$help,
            'dbuser|lcdbuser=s'     => \$lcdbuser,
 	   'dbpass|lcdbpass=s'     => \$lcdbpass,
           );
+
+
+#No test for lcdbname which cause other opts to get eaten!
 
 my $state;
 if($self->{'taxon_id'}) { $state = 1; }
@@ -153,11 +157,17 @@ sub load_taxonomy_in_core {
   } else {
     $node = $taxonDBA->fetch_node_by_name($self->{'scientific_name'});
   }
-  unless ($node->rank eq 'species') {
-    print "ERROR: taxon_id=",$self->{'taxon_id'},", '",$node->name,"' is rank '",$node->rank,"'.\n";
-    print "It is not a rank 'species'. So it can't be loaded.\n\n";
+
+  my $match_rank = ($node->name eq 'Canis familiaris') ? 'subspecies' : 'species';
+
+  if($node->rank ne $match_rank){
+      print "ERROR: taxon_id=",$self->{'taxon_id'},", '",$node->name,"' is rank '",$node->rank,"'.\n";
+      print "It is not a rank 'species' (subspecies for dog). So it can't be loaded.\n\n";
     exit 2;
   }
+
+
+
   $node->no_autoload_children;
   my $root = $node->root;
 
