@@ -319,7 +319,7 @@ sub flush_runs {
       throw( "Last batch job not in db" );
     }
     
-    my $pre_exec = $this_runner." -check -output_dir ".$self->output_dir;
+    my $pre_exec = 'perl ' . $this_runner." -check -output_dir ".$self->output_dir;
    
     my ($system_queue, $parameters, $resources) = 
       ($queue->{'queue'}, $queue->{'sub_args'},
