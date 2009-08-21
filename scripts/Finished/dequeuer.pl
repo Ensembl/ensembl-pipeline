@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl
+#!/software/bin/perl
 
 =pod
 

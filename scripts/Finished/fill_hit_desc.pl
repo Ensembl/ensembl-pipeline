@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl -w
+#!/software/bin/perl -w
 ### fill_hit_desc ###
 
 use strict;
