@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.45 2009-08-03 14:27:42 amonida Exp $
+#$Id: cDNA_update.pl,v 1.46 2009-09-01 08:49:56 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -235,7 +235,7 @@ my $GSS;
 if ( defined($GSS_PREFIX) ) {
     # In case gss file is not under the same directory as the code
     # checkouts.
-    $GSS = $CVS_DIR . $GSS_PATH;
+    $GSS = $GSS_PREFIX . $GSS_PATH;
 } else {
     $GSS = $CVS_DIR . $GSS_PATH;
 }
