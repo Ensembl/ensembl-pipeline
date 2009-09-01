@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.46 2009-09-01 08:49:56 amonida Exp $
+#$Id: cDNA_update.pl,v 1.47 2009-09-01 14:05:32 jhv Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -90,7 +90,7 @@ example:
 
   1. config_setup: check config variables & files.
   2. DB_setup: partly copy current db (PIPELINE database),
-     insert analysis etc., create TARGET database, synchronise.
+     insert analysis etc., create OUTPUT database, synchronise.
   3. fastafiles: get & read input files, kill-list objects are removed
      at this stage.
   4. chop off the polyA tails and chunk the fasta files into smaller
@@ -196,11 +196,12 @@ use Data::Dumper;
 use DBI;
 use DBD::mysql;
 
-use Bio::EnsEMBL::KillList::KillList;
+#use Bio::EnsEMBL::KillList::KillList;
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
+use cDNAUpdate; 
 
 # We need the Net::SSH module from somewhere:
 use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
@@ -208,17 +209,19 @@ use Net::SSH qw(sshopen2);
 
 my $species;
 
-BEGIN {
-    print "Which species are you running, human or mouse? ";
-    $species = <STDIN>;
-    chomp $species;
+print "Which species are you running, human or mouse? ";
+$species = <STDIN>;
+chomp $species;
 
-    if ( ($species ne 'human') and ($species ne 'mouse') ){
-        print("Please specify either human or mouse!\n");
-        exit;
-    }
-    eval { require cDNAUpdate; import cDNAUpdate ('DEFAULT', $species ) };
-}
+if ( ($species ne 'human') and ($species ne 'mouse') ){
+    print("Please specify either human or mouse!\n");
+    exit;
+} 
+
+eval {
+       import cDNAUpdate ('DEFAULT', $species )
+     };
+
 
 
 $| = 1;
@@ -260,6 +263,7 @@ my $submitName      = "SubmitcDNAChunk";
 my $genomelist      = join "\',\'", @masked_genome;
 
 my %configvars = (
+                 "MIN_LENGTH"       => $MIN_LENGTH ,         # from cDNAUpdate
                  "CVS_DIR"          => $CVS_DIR,             # from cDNAUpdate
                  "DATA_DIR"         => $DATA_DIR,            # from cDNAUpdate
                  "VERTRNA"          => $VERTRNA,             # from cDNAUpdate
@@ -267,17 +271,17 @@ my %configvars = (
                  "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
                  "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
                  "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
-                 "WB_DBUSER"        => $WB_DBUSER,           # from cDNAUpdate
-                 "WB_DBPASS"        => $WB_DBPASS,           # from cDNAUpdate
-                 "WB_REF_DBNAME"    => $WB_REF_DBNAME,       # from cDNAUpdate
-                 "WB_REF_DBHOST"    => $WB_REF_DBHOST,       # from cDNAUpdate
-                 "WB_REF_DBPORT"    => $WB_REF_DBPORT,       # from cDNAUpdate
-                 "WB_PIPE_DBNAME"   => $WB_PIPE_DBNAME,      # from cDNAUpdate
-                 "WB_PIPE_DBHOST"   => $WB_PIPE_DBHOST,      # from cDNAUpdate
-                 "WB_PIPE_DBPORT"   => $WB_PIPE_DBPORT,      # from cDNAUpdate
-                 "WB_TARGET_DBNAME" => $WB_TARGET_DBNAME,    # from cDNAUpdate
-                 "WB_TARGET_DBHOST" => $WB_TARGET_DBHOST,    # from cDNAUpdate
-                 "WB_TARGET_DBPORT" => $WB_TARGET_DBPORT,    # from cDNAUpdate
+                 "DBUSER"        => $DBUSER,           # from cDNAUpdate
+                 "DBPASS"        => $DBPASS,           # from cDNAUpdate
+                 "REF_DBNAME"    => $REF_DBNAME,       # from cDNAUpdate
+                 "REF_DBHOST"    => $REF_DBHOST,       # from cDNAUpdate
+                 "REF_DBPORT"    => $REF_DBPORT,       # from cDNAUpdate
+                 "PIPE_DBNAME"   => $PIPE_DBNAME,      # from cDNAUpdate
+                 "PIPE_DBHOST"   => $PIPE_DBHOST,      # from cDNAUpdate
+                 "PIPE_DBPORT"   => $PIPE_DBPORT,      # from cDNAUpdate
+                 "OUTPUT_DBNAME" => $OUTPUT_DBNAME,    # from cDNAUpdate
+                 "OUTPUT_DBHOST" => $OUTPUT_DBHOST,    # from cDNAUpdate
+                 "OUTPUT_DBPORT" => $OUTPUT_DBPORT,    # from cDNAUpdate
                  "taxonomy_id"      => $TAX_ID,              # from cDNAUpdate
                  "PROGRAM_NAME"     => $PROGRAM_NAME,        # from cDNAUpdate
                  "PROGRAM_VERSION"  => $PROGRAM_VERSION,     # from cDNAUpdate
@@ -297,21 +301,25 @@ my $maxseqlength      = 17000;
 my $num_missing_cdnas = 0;
 my $rerun_flag        = 0;
 
-my $option = $ARGV[0];
+my $option = $ARGV[0]; 
+
 if ( !$option or
             ( $option ne "prepare"
           and $option ne "prepare"
           and $option ne "test-run"
           and $option ne "run"
           and $option ne "clean"
-          and $option ne "compare" ) ) {
+          and $option ne "compare" ) ) { 
+   print "\n\nYou have to supply an option to the cDNA_update.pl command - valid options are : \n\n\t";
+   print  "perl cDNA_update.pl [ prepare | test-run | run | compare | clean ]\n\n" ; 
+   sleep(1) ; 
    exec('perldoc', $0);
 }
 
 
-my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                     $WB_PIPE_DBNAME, $WB_DBUSER,
-                     $WB_DBPASS );
+my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                     $PIPE_DBNAME, $DBUSER,
+                     $DBPASS );
 
 my $progress_status = undef;
 
@@ -328,12 +336,12 @@ if ( $option eq "prepare" ) {
 
     if ( !defined($progress_status) ) {
 
-        my $ref_db = connect_db( $WB_REF_DBHOST, $WB_REF_DBPORT,
-                                 $WB_REF_DBNAME, "ensro" );
+        my $ref_db = connect_db( $REF_DBHOST, $REF_DBPORT,
+                                 $REF_DBNAME, "ensro" );
 
         # Check existence of source databases
         if ( !$ref_db ) {
-            croak("could not find $WB_REF_DBNAME.");
+            croak("could not find $REF_DBNAME.");
         }
 
         # Disconnect from the database
@@ -368,12 +376,12 @@ if ( $option eq "prepare" ) {
             }
         } else {
 
-            my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                                      $WB_PIPE_DBNAME, $WB_DBUSER,
-                                      $WB_DBPASS );
+            my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                                      $PIPE_DBNAME, $DBUSER,
+                                      $DBPASS );
 
-            my $target_db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                                        $WB_TARGET_DBNAME, "ensro" );
+            my $target_db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                                        $OUTPUT_DBNAME, "ensro" );
 
             if ( $pipe_db->dbc->dbname() && $target_db->dbc->dbname() ) {
                 print("\nDatabases exist, good! so we continue with the process.\n");
@@ -718,9 +726,9 @@ sub config_setup {
     check_vars();
 
     # Check existence of source databases
-    if ( !connect_db( $WB_REF_DBHOST, $WB_REF_DBPORT,
-                      $WB_REF_DBNAME, "ensro" ) ) {
-        croak("Could not find $WB_REF_DBNAME.");
+    if ( !connect_db( $REF_DBHOST, $REF_DBPORT,
+                      $REF_DBNAME, "ensro" ) ) {
+        croak("Could not find $REF_DBNAME.");
     }
 
     # Go through config info to create defined files,
@@ -1043,6 +1051,7 @@ sub write_to_file {
 # Now get the kill_list
 # Config found at /Bio/EnsEMBL/Pipeline/Config/GeneBuild/KillListFilter.pm
 sub remove_kill_list_object {
+    require Bio::EnsEMBL::KillList::KillList;
     my $kill_list_object =
       Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cDNA_update' );
     my %kill_list = %{ $kill_list_object->get_kill_list() };
@@ -1182,7 +1191,7 @@ sub DB_setup {
 
             # Create the pipeline database
             # 1 = pipeline db
-            $status = create_db( $WB_PIPE_DBNAME, 1 );
+            $status = create_db( $PIPE_DBNAME, 1 );
 
             my $tables_to_delete =  'analysis '           . 'assembly '
                                   . 'assembly_exception ' . 'attrib_type '
@@ -1220,7 +1229,7 @@ sub DB_setup {
             $status += import_tables(2, 1);
 
             # Create the target database
-            $status += create_db($WB_TARGET_DBNAME);
+            $status += create_db($OUTPUT_DBNAME);
 
             # Remove unwanted tables from above plus the seq_region table from
             # target db.
@@ -1241,9 +1250,9 @@ sub DB_setup {
         } else {
             # If rerunning without rebuilding databases - clear out jobs tables first:
 
-            my $pipe_db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                                      $WB_PIPE_DBNAME, $WB_DBUSER,
-                                      $WB_DBPASS );
+            my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                                      $PIPE_DBNAME, $DBUSER,
+                                      $DBPASS );
 
             my $tables_to_remove =  'job '              .   'job_status '
                                   . 'rule_goal '        .   'rule_conditions '
@@ -1284,9 +1293,9 @@ sub test_run {
     print("\nRunning the test-RunnablDB.\n");
 
     # Get one input id for testing
-    my $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                         $WB_PIPE_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                         $PIPE_DBNAME, $DBUSER,
+                         $DBPASS );
 
     my $sql = "SELECT input_id "
             . "FROM input_id_analysis i, analysis a "
@@ -1308,11 +1317,11 @@ sub test_run {
     }
 
     $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
-         . " -dbhost "     . $WB_PIPE_DBHOST
-         . " -dbport "     . $WB_PIPE_DBPORT
-         . " -dbuser "     . $WB_DBUSER
-         . " -dbpass "     . $WB_DBPASS
-         . " -dbname "     . $WB_PIPE_DBNAME
+         . " -dbhost "     . $PIPE_DBHOST
+         . " -dbport "     . $PIPE_DBPORT
+         . " -dbuser "     . $DBUSER
+         . " -dbpass "     . $DBPASS
+         . " -dbname "     . $PIPE_DBNAME
          . " -input_id "   . $input_id
          . " -logic_name " . $newFeatureName
          . " -verbose"
@@ -1345,22 +1354,22 @@ sub run_analysis {
 
         if ( get_input_arg() ) {
             $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
-                 . " -dbhost "   . $WB_PIPE_DBHOST
-                 . " -dbport "   . $WB_PIPE_DBPORT
-                 . " -dbuser "   . $WB_DBUSER
-                 . " -dbpass "   . $WB_DBPASS
-                 . " -dbname "   . $WB_PIPE_DBNAME;
+                 . " -dbhost "   . $PIPE_DBHOST
+                 . " -dbport "   . $PIPE_DBPORT
+                 . " -dbuser "   . $DBUSER
+                 . " -dbpass "   . $DBPASS
+                 . " -dbname "   . $PIPE_DBNAME;
 
             print(  "\nSTARTING THE PIPELINE.\n"
                   . "Using command:\n\n"
                   . $cmd
                   . "\n\nPlease monitor the output with:\n\n"
                   . "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/monitor"
-                  . " -dbhost "   . $WB_PIPE_DBHOST
-                  . " -dbport "   . $WB_PIPE_DBPORT
-                  . " -dbuser "   . $WB_DBUSER
-                  . " -dbpass "   . $WB_DBPASS
-                  . " -dbname "   . $WB_PIPE_DBNAME
+                  . " -dbhost "   . $PIPE_DBHOST
+                  . " -dbport "   . $PIPE_DBPORT
+                  . " -dbuser "   . $DBUSER
+                  . " -dbpass "   . $DBPASS
+                  . " -dbname "   . $PIPE_DBNAME
                   . " -current_summary"
                   . " -finishedpercent\n\n" );
 
@@ -1389,9 +1398,9 @@ sub run_analysis {
 # Identify cdnas which did not align to the genome.
 sub find_missing_cdnas {
     # Find all the cdnas which have hits in the database.
-    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                         $WB_TARGET_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                         $OUTPUT_DBNAME, $DBUSER,
+                         $DBPASS );
 
     my $sql = ("SELECT distinct hit_name FROM dna_align_feature");
 
@@ -1439,9 +1448,9 @@ sub chase_jobs {
     $rerun_flag = 1;
     $chunkDIR   = $DATA_DIR . "/chunks2";
 
-    my $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                         $WB_PIPE_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                         $PIPE_DBNAME, $DBUSER,
+                         $DBPASS );
 
     # Want to find the list of input files which did not finish
     # running in the db.
@@ -1557,9 +1566,9 @@ sub chase_jobs {
 # LINEs.
 sub find_many_hits {
     # Mysql queries involving temporary tables
-    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                         $WB_TARGET_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                         $OUTPUT_DBNAME, $DBUSER,
+                         $DBPASS );
 
     # Make a table containing each transcript matching a cDNA
     my $sql1 =
@@ -1623,11 +1632,11 @@ sub why_cdnas_missed {
     $cmd = "perl "              . $STORE_UNMAPPED
         . " -gss "              . $GSS
         . " -seq_file "         . $DATA_DIR . "/missing_cdnas.fasta"
-        . " -user "             . $WB_DBUSER
-        . " -pass "             . $WB_DBPASS
-        . " -host "             . $WB_TARGET_DBHOST
-        . " -port "             . $WB_TARGET_DBPORT
-        . " -dbname "           . $WB_TARGET_DBNAME
+        . " -user "             . $DBUSER
+        . " -pass "             . $DBPASS
+        . " -host "             . $OUTPUT_DBHOST
+        . " -port "             . $OUTPUT_DBPORT
+        . " -dbname "           . $OUTPUT_DBNAME
         . " -species \""        . $SPECIES  . "\""
         . " -vertrna "          . $DATA_DIR . "/" . $VERTRNA
         . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
@@ -1651,9 +1660,9 @@ sub update_metacoord {
                          dna_align_feature
                          transcript);
 
-    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                         $WB_TARGET_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                         $OUTPUT_DBNAME, $DBUSER,
+                         $DBPASS );
 
     my $sql = "TRUNCATE meta_coord";
     my $sth = $db->dbc->prepare($sql);
@@ -1678,9 +1687,9 @@ sub update_metacoord {
 # Setting various meta table entries.
 sub fix_metatable {
 
-    my $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                         $WB_TARGET_DBNAME, $WB_DBUSER,
-                         $WB_DBPASS );
+    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                         $OUTPUT_DBNAME, $DBUSER,
+                         $DBPASS );
 
     # Remove previous entries.
     my $sql = "DELETE FROM meta WHERE meta_key like 'genebuild%" . "id'";
@@ -1712,11 +1721,11 @@ sub fix_metatable {
       . " -taxondbhost "    . $TAXONDBHOST
       . " -taxondbport "    . $TAXONDBPORT
       . " -taxondbname "    . $TAXONDBNAME
-      . " -lcdbhost "       . $WB_TARGET_DBHOST
-      . " -lcdbport "       . $WB_TARGET_DBPORT
-      . " -lcdbname "       . $WB_TARGET_DBNAME
-      . " -lcdbuser "       . $WB_DBUSER
-      . " -lcdbpass "       . $WB_DBPASS;
+      . " -lcdbhost "       . $OUTPUT_DBHOST
+      . " -lcdbport "       . $OUTPUT_DBPORT
+      . " -lcdbname "       . $OUTPUT_DBNAME
+      . " -lcdbuser "       . $DBUSER
+      . " -lcdbpass "       . $DBPASS;
 
     if ( system($cmd) ) {
         carp("Errors occurred when running $LOAD_TAX!\n$cmd\n");
@@ -1832,8 +1841,8 @@ sub clean_up {
         # Remove dbs
         print("\n\nShould we remove the pipeline database? (y/n) ");
         if ( get_input_arg() ) {
-            drop_create_database( $WB_PIPE_DBNAME, $WB_PIPE_DBHOST,
-                                  $WB_PIPE_DBPORT );
+            drop_create_database( $PIPE_DBNAME, $PIPE_DBHOST,
+                                  $PIPE_DBPORT );
         }
 
         print "Cleaned out databases, removed temporary files.\n";
@@ -1891,11 +1900,11 @@ sub compare {
     my $exclude_NT = 1;
 
     # Pld alignments
-    my $db1 = connect_db( $WB_LAST_DBHOST, $WB_LAST_DBPORT,
-                          $WB_LAST_DBNAME, "ensro" );
+    my $db1 = connect_db( $LAST_DBHOST, $LAST_DBPORT,
+                          $LAST_DBNAME, "ensro" );
     # New alignments
-    my $db2 = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                          $WB_TARGET_DBNAME, "ensro" );
+    my $db2 = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                          $OUTPUT_DBNAME, "ensro" );
 
     # Get chromosome names / ids
     $sql = "SELECT coord_system_id "
@@ -1946,18 +1955,18 @@ sub compare {
                  . " -oldname "         . $OLD_FEATURE_NAME
                  . " -newname "         . $newFeatureName
                  . " -dir "             . $DATA_DIR
-                 . " -olddbhost "       . $WB_LAST_DBHOST
-                 . " -olddbport "       . $WB_LAST_DBPORT
-                 . " -olddbname "       . $WB_LAST_DBNAME
-                 . " -newdbhost "       . $WB_TARGET_DBHOST
-                 . " -newdbport "       . $WB_TARGET_DBPORT
-                 . " -newdbname "       . $WB_TARGET_DBNAME
-                 . " -olddnadbhost "    . $WB_LAST_DNADBHOST
-                 . " -olddnadbport "    . $WB_LAST_DNADBPORT
-                 . " -olddnadbname "    . $WB_LAST_DNADBNAME
-                 . " -newdnadbhost "    . $WB_PIPE_DBHOST
-                 . " -newdnadbport "    . $WB_PIPE_DBPORT
-                 . " -newdnadbname "    . $WB_PIPE_DBNAME;
+                 . " -olddbhost "       . $LAST_DBHOST
+                 . " -olddbport "       . $LAST_DBPORT
+                 . " -olddbname "       . $LAST_DBNAME
+                 . " -newdbhost "       . $OUTPUT_DBHOST
+                 . " -newdbport "       . $OUTPUT_DBPORT
+                 . " -newdbname "       . $OUTPUT_DBNAME
+                 . " -olddnadbhost "    . $LAST_DNADBHOST
+                 . " -olddnadbport "    . $LAST_DNADBPORT
+                 . " -olddnadbname "    . $LAST_DNADBNAME
+                 . " -newdnadbhost "    . $PIPE_DBHOST
+                 . " -newdnadbport "    . $PIPE_DBPORT
+                 . " -newdnadbname "    . $PIPE_DBNAME;
 
             if ( system($cmd) ) {
                 carp("Error occurred when submitting job!\n$cmd\n\n");
@@ -2061,25 +2070,25 @@ sub create_db {
     my ($host, $port);
     if ($is_pipeline) {
         print("\nCreating a pipeline db...\n");
-        $host = $WB_PIPE_DBHOST;
-        $port = $WB_PIPE_DBPORT;
+        $host = $PIPE_DBHOST;
+        $port = $PIPE_DBPORT;
 
         $mysql_cmd =  "mysql "
             . "-h $host "
             . "-P $port "
-            . "-u $WB_DBUSER "
-            . "-p$WB_DBPASS ";
+            . "-u $DBUSER "
+            . "-p$DBPASS ";
 
     } else {
         print("\nCreating a target db...\n");
-        $host = $WB_TARGET_DBHOST;
-        $port = $WB_TARGET_DBPORT;
+        $host = $OUTPUT_DBHOST;
+        $port = $OUTPUT_DBPORT;
 
         $mysql_cmd =  "mysql "
             . "-h $host "
             . "-P $port "
-            . "-u $WB_DBUSER "
-            . "-p$WB_DBPASS ";
+            . "-u $DBUSER "
+            . "-p$DBPASS ";
     }
 
     # Drop the database if exists and then create it
@@ -2114,13 +2123,13 @@ sub delete_unwanted_tables {
 
     my $db;
     if ($is_pipeline) {
-        $db = connect_db( $WB_PIPE_DBHOST, $WB_PIPE_DBPORT,
-                          $WB_PIPE_DBNAME, $WB_DBUSER,
-                          $WB_DBPASS );
+        $db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+                          $PIPE_DBNAME, $DBUSER,
+                          $DBPASS );
     } else {
-        $db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                          $WB_TARGET_DBNAME, $WB_DBUSER,
-                          $WB_DBPASS );
+        $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                          $OUTPUT_DBNAME, $DBUSER,
+                          $DBPASS );
     }
 
     foreach my $table ( @tables ) {
@@ -2135,21 +2144,21 @@ sub dump_tables {
     my $mysql_dump;
     if ($is_pipeline) {
         $mysql_dump = "mysqldump "
-                    . "-h $WB_PIPE_DBHOST "
-                    . "-P $WB_PIPE_DBPORT "
-                    . "-u $WB_DBUSER "
-                    . "-p$WB_DBPASS "
-                    . "-t $WB_PIPE_DBNAME ";
+                    . "-h $PIPE_DBHOST "
+                    . "-P $PIPE_DBPORT "
+                    . "-u $DBUSER "
+                    . "-p$DBPASS "
+                    . "-t $PIPE_DBNAME ";
         print("\nDumping from pipeline db.\n");
     }
     else {
         # Dumping from the reference db
         $mysql_dump = "mysqldump "
-                    . "-h $WB_REF_DBHOST "
-                    . "-P $WB_REF_DBPORT "
-                    . "-u $WB_DBUSER "
-                    . "-p$WB_DBPASS "
-                    . "-t $WB_REF_DBNAME ";
+                    . "-h $REF_DBHOST "
+                    . "-P $REF_DBPORT "
+                    . "-u $DBUSER "
+                    . "-p$DBPASS "
+                    . "-t $REF_DBNAME ";
         print("\nDumping from ref db.\n");
     }
 
@@ -2189,19 +2198,19 @@ sub import_tables {
     my $mysql_query;
     if ($is_pipeline) {
         $mysql_query = "mysql "
-            . "-h $WB_PIPE_DBHOST "
-            . "-P $WB_PIPE_DBPORT "
-            . "-u $WB_DBUSER "
-            . "-p$WB_DBPASS "
-            . "-D $WB_PIPE_DBNAME";
+            . "-h $PIPE_DBHOST "
+            . "-P $PIPE_DBPORT "
+            . "-u $DBUSER "
+            . "-p$DBPASS "
+            . "-D $PIPE_DBNAME";
         print("\nImporting tables to pipeline db.\n");
     } else {
         $mysql_query = "mysql "
-            . "-h $WB_TARGET_DBHOST "
-            . "-P $WB_TARGET_DBPORT "
-            . "-u $WB_DBUSER "
-            . "-p$WB_DBPASS "
-            . "-D $WB_TARGET_DBNAME";
+            . "-h $OUTPUT_DBHOST "
+            . "-P $OUTPUT_DBPORT "
+            . "-u $DBUSER "
+            . "-p$DBPASS "
+            . "-D $OUTPUT_DBNAME";
         print("\nImporting tables to target db.\n");
     }
 
@@ -2225,9 +2234,9 @@ sub load_misc_script_files {
             'unmapped_reason' => 'unmapped_reason/unmapped_reason.txt'
     );
 
-    my $target_db = connect_db( $WB_TARGET_DBHOST, $WB_TARGET_DBPORT,
-                                $WB_TARGET_DBNAME, $WB_DBUSER,
-                                $WB_DBPASS );
+    my $target_db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                                $OUTPUT_DBNAME, $DBUSER,
+                                $DBPASS );
 
     foreach my $table ( keys %table_files ) {
         my $prepare =  "LOAD DATA LOCAL INFILE \'"
@@ -2245,11 +2254,11 @@ sub setup_analysis {
     print("Adding analyses and making input_ids...\n\n");
 
     $status = 0;
-    my $sql_pipe = " -dbname " . $WB_PIPE_DBNAME
-                 . " -dbhost " . $WB_PIPE_DBHOST
-                 . " -dbuser " . $WB_DBUSER
-                 . " -dbpass " . $WB_DBPASS
-                 . " -dbport " . $WB_PIPE_DBPORT;
+    my $sql_pipe = " -dbname " . $PIPE_DBNAME
+                 . " -dbhost " . $PIPE_DBHOST
+                 . " -dbuser " . $DBUSER
+                 . " -dbpass " . $DBPASS
+                 . " -dbport " . $PIPE_DBPORT;
 
     my $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
             . $sql_pipe
@@ -2304,8 +2313,8 @@ sub drop_create_database {
     my $serverh = DBI->connect( "DBI:mysql:mysql"
                               . ";host="      . $host
                               . ":port="      . $port
-                              . ";user="      . $WB_DBUSER
-                              . ";password="  . $WB_DBPASS )
+                              . ";user="      . $DBUSER
+                              . ";password="  . $DBPASS )
                             or croak($DBI::errstr);
 
     my $drop_sql = "DROP DATABASE IF EXISTS " . $db_name;
@@ -2339,9 +2348,11 @@ sub polya_clipping {
     # Clip ployA tails
     print("\nPerforming polyA clipping...\n");
     my $newfile3 = $DATA_DIR . "/" . $trim_file. ".clipped";
-    $cmd = "perl " . $POLYA_CLIPPING . " "
-        . $DATA_DIR . "/" . $trim_file . " "
-        . $newfile3;
+    $cmd = "perl " . $POLYA_CLIPPING . " " ; 
+    if ( $MIN_LENGTH ) { 
+       $cmd.="-min_length $MIN_LENGTH "; 
+    } 
+      $cmd .=  $DATA_DIR . "/" . $trim_file . " " . $newfile3;
 
     print $cmd, "\n";
 
