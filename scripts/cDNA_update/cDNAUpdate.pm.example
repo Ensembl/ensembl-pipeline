@@ -49,6 +49,7 @@ use vars qw(%Config);
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
         UNMAPPED_REASONS_PATH   => '/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt',
         LOAD_TAX_PATH           => '/ensembl-pipeline/scripts/load_taxonomy.pl',
+        MIN_LENGTH              => 60,  # minimum length of cdna (otherwise they will be ignored ) 
 
         # Exonerate specifications
         PROGRAM_NAME    => "exonerate",
