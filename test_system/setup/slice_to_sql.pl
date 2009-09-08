@@ -138,10 +138,7 @@ use Bio::EnsEMBL::Pipeline::Utils::SliceDump;
 $| = 1;
 
 my $host   = '';
-
-# By default set the port to 3306
-my $port   = '3306';
-
+my $port   = '';
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
@@ -162,7 +159,6 @@ my @whole_pipeline_tables =
   ( 'rule_goal', 'rule_conditions', 'input_id_type_analysis' );
 
 my @pmatch_tables = ( 'pmatch_feature', 'protein' );
-
 my @partial_standard_tables = ( 'seq_region', 'assembly',
                                 'dna',        'seq_region_attrib',
                                 'assembly_exception' );
@@ -190,7 +186,6 @@ my $pmatch;
 my $no_defaults;
 my $help;
 my $all;
-
 &GetOptions( 'dbhost:s'               => \$host,
              'dbport:n'               => \$port,
              'dbname:s'               => \$dbname,
@@ -213,27 +208,12 @@ my $all;
              'pmatch!'                => \$pmatch,
              'no_defaults!'           => \$no_defaults,
              'all!'                   => \$all,
-             'help'                   => sub { usage(); exit }
+             'help'                   => \$help
 ) or throw("Can't get options");
 
-sub usage {
-  print <<EOF
-
-  Usage: slice_to_sql.pl
-  options are: -dbname              database to connect to
-               -dbhost              host to connect to
-               -dbport              database port
-               -dbuser              username
-               -dbpass              password
-               -output_dir          output directory
-               -seq_region_name     seq_region_name
-               -coord_system_name   coord_system_name
-               -all                 all tables will be dumped (mutually exclusive with the -no_defaults option)
-               -no_defaults         dump the tables named
-               -help                show this information
-EOF
+if ($help) {
+    exec('perldoc', $0);
 }
-
 
 unless ($host && $dbname && $dbuser) {
   throw("Can't run without database argument, use -help option ".
