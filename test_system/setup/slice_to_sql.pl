@@ -138,7 +138,10 @@ use Bio::EnsEMBL::Pipeline::Utils::SliceDump;
 $| = 1;
 
 my $host   = '';
-my $port   = '';
+
+# By default set the port to 3306
+my $port   = '3306';
+
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
@@ -152,22 +155,30 @@ my $output_dir;
 my $verbose;
 my @whole_tables;
 my @partial_tables;
-my @whole_standard_tables = ('meta', 'meta_coord', 
-                             'coord_system', 'analysis', 'attrib_type');
-my @whole_pipeline_tables = ('rule_goal', 'rule_conditions', 
-                             'input_id_type_analysis') ;
-my @pmatch_tables = ('pmatch_feature', 'protein');
-my @partial_standard_tables = ('seq_region', 'assembly', 'dna', 
-                               'seq_region_attrib', 'assembly_exception');
-my @raw_compute_tables = ('repeat_consensus', 'repeat_feature',
-                          'prediction_exon', 'prediction_transcript',
-                          'dna_align_feature', 'protein_align_feature',
-                          'simple_feature');
-my @gene_tables = ('gene', 'exon', 'transcript', 'translation',
-                   'exon_transcript', 'supporting_feature',
-                   'protein_align_feature', 'dna_align_feature',
-                   'gene_stable_id', 'exon_stable_id',
-                   'translation_stable_id', 'transcript_stable_id');
+my @whole_standard_tables =
+  ( 'meta', 'meta_coord', 'coord_system', 'analysis', 'attrib_type' );
+
+my @whole_pipeline_tables =
+  ( 'rule_goal', 'rule_conditions', 'input_id_type_analysis' );
+
+my @pmatch_tables = ( 'pmatch_feature', 'protein' );
+
+my @partial_standard_tables = ( 'seq_region', 'assembly',
+                                'dna',        'seq_region_attrib',
+                                'assembly_exception' );
+
+my @raw_compute_tables = ( 'repeat_consensus',  'repeat_feature',
+                           'prediction_exon',   'prediction_transcript',
+                           'dna_align_feature', 'protein_align_feature',
+                           'simple_feature' );
+
+my @gene_tables = ( 'gene',                  'exon',
+                    'transcript',            'translation',
+                    'exon_transcript',       'supporting_feature',
+                    'protein_align_feature', 'dna_align_feature',
+                    'gene_stable_id',        'exon_stable_id',
+                    'translation_stable_id', 'transcript_stable_id' );
+
 my @protein_annotation_tables = ('protein_feature');
 my $raw_computes;
 my $genes;
@@ -179,37 +190,53 @@ my $pmatch;
 my $no_defaults;
 my $help;
 my $all;
-&GetOptions(
-            'dbhost:s'   => \$host,
-            'dbport:n'   => \$port,
-            'dbname:s'   => \$dbname,
-            'dbuser:s'   => \$dbuser,
-            'dbpass:s'   => \$dbpass,
-            'coord_system_name:s' => \$cs_name,
-            'coord_system_version:s' => \$cs_version,
-            'seq_region_name:s' => \$seq_region_name,
-            'seq_region_start:s' => \$start,
-            'seq_region_end:s' => \$end,
-            'seq_region_strand:s' => \$strand,
-            'verbose!' => \$verbose,
-            'output_dir:s' => \$output_dir,
-            'whole_table:s' => \@whole_commandline_tables,  
-            'partial_table:s' => \@partial_commandline_tables, 
-            'pipeline!' => \$pipeline_tables,
-            'raw_computes!' => \$raw_computes,
-            'genes!' => \$genes,
-            'protein_annotation!' => \$protein_annotation,
-            'pmatch!' => \$pmatch,
-            'no_defaults!' => \$no_defaults,
-            'all!' => \$all,
-           ) or throw("Can't get options");
 
-if ($help) {
-    exec('perldoc', $0);
+&GetOptions( 'dbhost:s'               => \$host,
+             'dbport:n'               => \$port,
+             'dbname:s'               => \$dbname,
+             'dbuser:s'               => \$dbuser,
+             'dbpass:s'               => \$dbpass,
+             'coord_system_name:s'    => \$cs_name,
+             'coord_system_version:s' => \$cs_version,
+             'seq_region_name:s'      => \$seq_region_name,
+             'seq_region_start:s'     => \$start,
+             'seq_region_end:s'       => \$end,
+             'seq_region_strand:s'    => \$strand,
+             'verbose!'               => \$verbose,
+             'output_dir:s'           => \$output_dir,
+             'whole_table:s'          => \@whole_commandline_tables,
+             'partial_table:s'        => \@partial_commandline_tables,
+             'pipeline!'              => \$pipeline_tables,
+             'raw_computes!'          => \$raw_computes,
+             'genes!'                 => \$genes,
+             'protein_annotation!'    => \$protein_annotation,
+             'pmatch!'                => \$pmatch,
+             'no_defaults!'           => \$no_defaults,
+             'all!'                   => \$all,
+             'help'                   => sub { usage(); exit }
+) or throw("Can't get options");
+
+sub usage {
+  print <<EOF
+
+  Usage: slice_to_sql.pl
+  options are: -dbname              database to connect to
+               -dbhost              host to connect to
+               -dbport              database port
+               -dbuser              username
+               -dbpass              password
+               -output_dir          output directory
+               -seq_region_name     seq_region_name
+               -coord_system_name   coord_system_name
+               -all                 all tables will be dumped (mutually exclusive with the -no_defaults option)
+               -no_defaults         dump the tables named
+               -help                show this information
+EOF
 }
 
+
 unless ($host && $dbname && $dbuser) {
-  throw("Can't run without database argument, use -help option ",
+  throw("Can't run without database argument, use -help option ".
         "to see commandline args");
 }
 
