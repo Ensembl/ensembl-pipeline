@@ -475,12 +475,12 @@ sub prepare_RFAM{
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.thr.gz");
   die ("Error decompressing Rfam.thr.gz\n") if $exit > 0; 
   print "done\nUpdating miRNA file...";
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat.gz -O $BLASTDIR/all_mirnas.embl.gz");
+  $exit =   system ("wget ftp://mirbase.org/pub/mirbase/CURRENT/miRNA.dat.gz -O $BLASTDIR/all_mirnas.embl.gz");
   $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.embl.gz");
-  die ("Error with obtaining miRNA.dat  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/miRNA.dat\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa.gz  -O $BLASTDIR/all_mirnas.fa.gz");
+  die ("Error with obtaining miRNA.dat  file from ftp://mirbase.org/pub/mirbase/CURRENT/miRNA.dat\n") if $exit > 0;
+  $exit =   system ("wget ftp://mirbase.org/pub/mirbase/CURRENT/hairpin.fa.gz  -O $BLASTDIR/all_mirnas.fa.gz");
   $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.fa.gz");
-  die ("Error with obtaining hairpin.fa  file from ftp://ftp.sanger.ac.uk/pub/mirbase/sequences/CURRENT/hairpin.fa\n") if $exit > 0;
+  die ("Error with obtaining hairpin.fa  file from ftp://mirbase.org/pub/mirbase/CURRENT/hairpin.fa\n") if $exit > 0;
   print "done\n";
   # use bioperl to parse it
     my $miRNA = Bio::SeqIO-> new
