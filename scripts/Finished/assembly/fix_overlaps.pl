@@ -93,6 +93,9 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
+
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
@@ -106,9 +109,6 @@ if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
 	pod2usage(1);
 }
-
-$support->param('verbose', 1);
-$support->param('interactive', 0);
 
 $support->comma_to_list( 'chromosomes', 'altchromosomes' );
 

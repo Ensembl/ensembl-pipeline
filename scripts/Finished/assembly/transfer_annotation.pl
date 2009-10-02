@@ -17,12 +17,11 @@ Required arguments:
   --pass, --dbpass, --db_pass=PASS    database passwort PASS
   --assembly=ASSEMBLY                 assembly version ASSEMBLY
   --altassembly=ASSEMBLY              alternative assembly version ASSEMBLY
-
-Optional arguments:
-
   --chromosomes, --chr=LIST           only process LIST chromosomes
   --altchromosomes, --altchr=LIST     supply alternative chromosome names (the two lists must agree)
-  --write							  to write the changes
+
+Optional arguments:
+  -n, --dry_run, --dry=0|1            don't write results to database (default: true)
   --author							  author login used to lock the assemblies (must be set to write the changes)
   --ref_start                         start coordinate on reference chromosomes
   --ref_end                           end coordinate on reference chromosomes
@@ -39,7 +38,6 @@ Optional arguments:
 
   -v, --verbose=0|1                   verbose logging (default: false)
   -i, --interactive=0|1               run script interactively (default: true)
-  -n, --dry_run, --dry=0|1            don't write results to database
   -h, --help, -?                      print help (this message)
 
 =head1 DESCRIPTION
@@ -81,6 +79,10 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
+$support->param('dry_run', 1);
+
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
@@ -97,8 +99,7 @@ if ( $support->param('help') or $support->error ) {
 	pod2usage(1);
 }
 
-$support->param('verbose', 1);
-$support->param('interactive', 0);
+
 
 $support->comma_to_list( 'chromosomes', 'altchromosomes' );
 
@@ -114,7 +115,7 @@ my $dbh = $vega_db->dbc->db_handle;
 
 my $assembly    = $support->param('assembly');
 my $altassembly = $support->param('altassembly');
-my $write 		= $support->param('write');
+my $write_db 	= not $support->param('dry_run');
 my $author 		= $support->param('author');
 my $email 		= $support->param('email') || $author;
 my $haplo 		= $support->param('haplotype');
@@ -124,7 +125,7 @@ my $R_end = $support->param('ref_end') || undef;
 my $A_start = $support->param('alt_start') || undef;
 my $A_end = $support->param('alt_end') || undef;
 
-throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write);
+throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
 
 
 my $geneAd   = $vega_db->get_GeneAdaptor;
@@ -182,7 +183,6 @@ my $sth_attrib_type_insert = $dbh->prepare($sql_attrib_type_insert);
 my $sth_attrib_type_delete = $dbh->prepare($sql_attrib_type_delete);
 
 my $cs_change = 0;
-my $sql = 0;
 
 if ( $assembly eq $altassembly ) {
 	$cs_change   = 1;
@@ -238,21 +238,23 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	# Lock the reference and alternative assemblies
 	my ($cb,$author_obj);
 	my $slices = [$ref_sl,$alt_sl];
-	eval {
-		$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
-		$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
-		$support->log_verbose("Locking $R_chr and $A_chr\n");
-		$cb->lock_clones_by_slice($slices,$author_obj,$vega_db);
-	};
-	if($@){
-		warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
+	if($write_db){
+		eval {
+			$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
+			$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
+			$support->log_verbose("Locking $R_chr and $A_chr\n");
+			$cb->lock_clones_by_slice($slices,$author_obj,$vega_db);
+		};
+		if($@){
+			warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
 
-			$sth_cs->execute( $A_chr, $support->param('altassembly') )
-		  unless ( !$cs_change );
-		$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
-		$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
+				$sth_cs->execute( $A_chr, $support->param('altassembly') )
+			  unless ( !$cs_change );
+			$sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
+			$sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 
-			next SET;
+				next SET;
+		}
 	}
 
 	$dbh->begin_work;
@@ -530,7 +532,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		# save polyA features if gene transfered
 		$sfeat_Ad->store(@proj_feat) if ( @proj_feat && $transfered_genes );
 
-		$write ? $dbh->commit : $dbh->rollback;
+		$write_db ? $dbh->commit : $dbh->rollback;
 	};
 
 	if ($@) {
@@ -559,14 +561,15 @@ INFO: skipped PolyA features: %d/%d\n",
 			)
 		);
 	}
-
+	if($write_db){
 	# remove the assemblies locks
-	eval {
-		$support->log_verbose("Removing $R_chr and $A_chr Locks\n");
-		$cb->remove_by_slice($slices,$author_obj,$vega_db);
-	};
-	if($@){
-		warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
+		eval {
+			$support->log_verbose("Removing $R_chr and $A_chr Locks\n");
+			$cb->remove_by_slice($slices,$author_obj,$vega_db);
+		};
+		if($@){
+			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");
+		}
 	}
 
 	$sth_cs->execute( $A_chr, $support->param('altassembly') )

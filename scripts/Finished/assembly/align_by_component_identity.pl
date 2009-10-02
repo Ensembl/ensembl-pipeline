@@ -135,6 +135,9 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param( 'verbose',     1 );    # throw away all that garbage
+$support->param( 'interactive', 0 );    # stop that garbage from coming up
+
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
@@ -155,9 +158,6 @@ if ( $support->param('help') or $support->error ) {
 }
 
 $support->comma_to_list( 'chromosomes', 'altchromosomes' );
-
-$support->param( 'verbose',     1 );    # throw away all that garbage
-$support->param( 'interactive', 0 );    # stop that garbage from coming up
 
 my $write_db = not $support->param('dry_run');
 my $multiple =  $support->param('multiple');

@@ -20,7 +20,9 @@ Required arguments:
     --to_assembly                       new assembly date
 
 Optional arguments:
-
+	--multiple                          produce a "many to one" mapping (default: off)
+                                        many regions on the reference assembly can be mapped to one region
+                                        on the alternative assembly (e.g. in new clone overlaps)
 	--from_cs_version					coordinate system version, this option will overwrite from_assembly
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
@@ -104,21 +106,24 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param( 'verbose',     1 );
+$support->param( 'interactive', 0 );
+
 # parse options
 $support->parse_common_options(@_);
-$support->parse_extra_options( 'from_cs_version=s','from_assembly=s', 'to_assembly=s' );
+$support->parse_extra_options( 'from_cs_version=s','from_assembly=s', 'to_assembly=s', 'multiple!' );
 $support->allowed_params( $support->get_common_params, 'from_cs_version', 'from_assembly',
-						  'to_assembly' );
+						  'to_assembly', 'multiple' );
 if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
 	pod2usage(1);
 }
-$support->param( 'verbose',     1 );
-$support->param( 'interactive', 0 );
+
 my $write_db      = not $support->param('dry_run');
 my $from_cs_version = $support->param('from_cs_version');
 my $from_assembly = $support->param('from_assembly');
 my $to_assembly   = $support->param('to_assembly');
+my $multiple =  $support->param('multiple');
 
 throw("Must set from_assembly or from_cs_version and to_assembly parameters!\n") unless(($from_assembly || $from_cs_version) && $to_assembly);
 
@@ -363,7 +368,7 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 							  [ $A_s, $A_e, $j, $R_s, $R_e, $i, $A_chr, $ori ];
 						}
 						else {
-							if ( $tag == -1 ) {
+							if ( $multiple && $tag == -1 ) {
 								$support->log(
 									   "start a new overlap non-align block\n");
 								push @{ $nomatch->{$R_chr} },
@@ -429,7 +434,7 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 									  ];
 								}
 								else {
-									if ( $tag == -1 ) {
+									if ( $multiple && $tag == -1 ) {
 										$support->log("start a new overlap non-align block\n");
 										push @{ $nomatch->{$R_chr} },
 										  [
@@ -514,7 +519,7 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 								  ];
 							}
 							else {
-								if ( $tag == -1 ) {
+								if ( $multiple && $tag == -1 ) {
 									$support->log("start a new overlap non-align block\n");
 									push @{ $nomatch->{$R_chr} },
 									  [

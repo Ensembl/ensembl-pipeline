@@ -86,6 +86,9 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
+
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
@@ -97,9 +100,6 @@ if ( $support->param('help') or $support->error ) {
 	warn $support->error if $support->error;
 	pod2usage(1);
 }
-
-$support->param('verbose', 1);
-$support->param('interactive', 0);
 
 my $from_cs_version = $support->param('from_cs_version');
 my $from_assembly = $support->param('from_assembly');

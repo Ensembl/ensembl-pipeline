@@ -17,16 +17,13 @@ Required arguments:
   --pass, --dbpass, --db_pass=PASS    database passwort PASS
   --from_assembly                     old assembly date
   --to_assembly                       new assembly date
-  --author                            author login used to lock the assemblies
 
 Optional arguments:
-
-
-  --dry=0|1                           don't write results to database (default: false)
-
+  -n, --dry_run, --dry=0|1            don't write results to database (default: true)
+  --author                            author login used to lock the assemblies
+  --email                             email used to lock the assemblies (default: author)
   --assembly=ASSEMBLY                 assembly version ASSEMBLY (default: Otter)
   --altassembly=ASSEMBLY              alternative assembly version ASSEMBLY (default: assembly)
-  --email                             email used to lock the assemblies (default: author)
   --conffile, --conf=FILE             read parameters from FILE
                                       (default: conf/Conversion.ini)
 
@@ -73,7 +70,7 @@ use vars qw($SERVERROOT);
 BEGIN {
     $SERVERROOT = "$Bin/../../../..";
     unshift(@INC, "$Bin");
-    unshift(@INC, "/software/anacode/otter/otter_production_main/ensembl-otter/modules/");
+    unshift(@INC, "/software/anacode/otter/otter_rel52/ensembl-otter/modules/");
 }
 
 use Getopt::Long;
@@ -90,6 +87,10 @@ $| = 1;
 
 my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
 
+$support->param('verbose', 1);
+$support->param('interactive', 0);
+$support->param('dry_run', 1);
+
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
@@ -103,12 +104,8 @@ if ( $support->param('help') or $support->error ) {
 	pod2usage(1);
 }
 
-$support->param('verbose', 1);
-$support->param('interactive', 0);
-
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
-
 
 # database connection
 my $vega_db = $support->get_database('ensembl');
@@ -126,7 +123,7 @@ my $author 		= $support->param('author');
 my $email 		= $support->param('email') || $author;
 
 
-throw("must set author name to lock the assemblies") if (!$author);
+throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
 
 
 my $geneAd   = $vega_db->get_GeneAdaptor;
@@ -135,25 +132,22 @@ my $sfeat_Ad = $vega_db->get_SimpleFeatureAdaptor();
 
 # make sure that the coordinate system versions are different
 # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
-my $sql_meta_insert = qq{
-	insert ignore into meta (meta_key, meta_value) values
+my @sql_inserts = (
+	"insert ignore into meta (meta_key, meta_value) values
 	('assembly.mapping', 'chromosome:MAPPING|contig'),
 	('assembly.mapping', 'chromosome:MAPPING|contig|clone'),
-	('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING')};
+	('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING');",
+	"insert ignore into coord_system (coord_system_id, name, version, rank, attrib)
+	values (1000, 'chromosome', 'MAPPING', 1000, '');",
+	"insert ignore into meta_coord (table_name, coord_system_id, max_length)
+	values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1);"
+);
 
-my $sql_meta_delete = qq{
-	delete from meta where meta_value like 'chromosome%MAPPING%'};
-
-my $sql_cs_insert = qq{
-	insert ignore into coord_system (coord_system_id, name, version, rank, attrib) values (1000, 'chromosome', 'MAPPING', 1000, '')};
-my $sql_cs_delete = qq{
-	delete from coord_system where version = 'MAPPING'};
-
-my $sql_mc_insert = qq{
-	insert ignore into meta_coord (table_name, coord_system_id, max_length)
-	values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1)};
-my $sql_mc_delete = qq{
-	delete from meta_coord where coord_system_id = 1000};
+my @sql_deletes = (
+	"delete from meta where meta_value like 'chromosome%MAPPING%';",
+	"delete from coord_system where version = 'MAPPING';",
+	"delete from meta_coord where coord_system_id = 1000;"
+);
 
 my $sql_sr_update = qq{
 	update seq_region s, coord_system cs
@@ -192,9 +186,7 @@ if ( $assembly eq $altassembly ) {
 	$cs_change   = 1;
 	$altassembly = 'MAPPING';
 
-	$dbh->do($sql_cs_insert);
-	$dbh->do($sql_meta_insert);
-	$dbh->do($sql_mc_insert);
+	map { $dbh->do($_) } @sql_inserts;
 	$dbh->do($sql_meta_bl_insert);
 }
 
@@ -229,14 +221,16 @@ my @A_chr_list = map $_->seq_region_name , @to_chrs;
 # Lock only old and new assembly contigs
 my ($cb,$author_obj);
 
-eval {
-	$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
-	$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
-	$support->log_verbose("Locking $from_assembly and $to_assembly assemblies\n");
-	$cb->lock_clones_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
-};
-if($@){
-	throw("Problem locking $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
+if($write_db){
+	eval {
+		$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
+		$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
+		$support->log_verbose("Locking $from_assembly and $to_assembly assemblies\n");
+		$cb->lock_clones_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
+	};
+	if($@){
+		throw("Problem locking $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
+	}
 }
 
 # set the top level attribute on old and new assembly
@@ -525,19 +519,19 @@ if($cs_change) {
 	foreach my $A_chr (@A_chr_list) {
 		$sth_cs->execute( $A_chr, $assembly );
 	}
-	$dbh->do($sql_meta_delete);
-	$dbh->do($sql_cs_delete);
-	$dbh->do($sql_mc_delete);
+	map { $dbh->do($_) } @sql_deletes;
 	$dbh->do($sql_meta_bl_delete);
 }
 
 # remove the assemblies locks
-eval {
-	$support->log_verbose("Unlocking $from_assembly and $to_assembly assemblies\n");
-	$cb->remove_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
-};
-if($@){
-	warning("Cannot remove locks from $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
+if($write_db){
+	eval {
+		$support->log_verbose("Unlocking $from_assembly and $to_assembly assemblies\n");
+		$cb->remove_by_slice([@from_chrs,@to_chrs],$author_obj,$vega_db);
+	};
+	if($@){
+		warning("Cannot remove locks from $from_assembly and $to_assembly assemblies with author name $author\n$@\n");
+	}
 }
 
 # remove the top level attribute on old and new assembly
