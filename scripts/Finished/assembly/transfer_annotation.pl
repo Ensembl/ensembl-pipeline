@@ -28,7 +28,6 @@ Optional arguments:
   --ref_end                           end coordinate on reference chromosomes
   --alt_start                         start coordinate on alternative chromosomes
   --alt_end                           end coordinate on alternative chromosomes
-  --reverse                           use the reverse mapping order (compound to assembly)
   --haplotype                         for haplotype transfer, make a copy of genes (with new stable_id)
 
   --conffile, --conf=FILE             read parameters from FILE
@@ -90,7 +89,7 @@ $support->parse_common_options(@_);
 $support->parse_extra_options(
 	'assembly=s',         'altassembly=s',
 	'chromosomes|chr=s@', 'altchromosomes|altchr=s@', 'write!',
-	'reverse!', 'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
+	'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
 	'alt_end=i', 'author=s', 'email=s'
 );
 $support->allowed_params( $support->get_common_params, 'assembly',
@@ -137,31 +136,22 @@ my $sfeat_Ad = $vega_db->get_SimpleFeatureAdaptor();
 
 # make sure that the coordinate system versions are different
 # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
-my $sql_meta_insert = qq{
-	insert ignore into meta (meta_key, meta_value) values
+my @sql_inserts = (
+	"insert ignore into meta (meta_key, meta_value) values
 	('assembly.mapping', 'chromosome:MAPPING|contig'),
-	('assembly.mapping', 'chromosome:MAPPING|contig|clone'),};
-if ( $support->param('reverse') ) {
-	$sql_meta_insert .=
-	  qq{('assembly.mapping', 'chromosome:MAPPING#chromosome:Otter')};
-}
-else {
-	$sql_meta_insert .=
-	  qq{('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING')};
-}
-my $sql_meta_delete = qq{
-	delete from meta where meta_value like 'chromosome%MAPPING%'};
+	('assembly.mapping', 'chromosome:MAPPING|contig|clone'),
+	('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING');",
+	"insert ignore into coord_system (coord_system_id, name, version, rank, attrib)
+	values (1000, 'chromosome', 'MAPPING', 1000, '');",
+	"insert ignore into meta_coord (table_name, coord_system_id, max_length)
+	values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1);"
+);
 
-my $sql_cs_insert = qq{
-	insert ignore into coord_system (coord_system_id, name, version, rank, attrib) values (1000, 'chromosome', 'MAPPING', 1000, '')};
-my $sql_cs_delete = qq{
-	delete from coord_system where version = 'MAPPING'};
-
-my $sql_mc_insert = qq{
-	insert ignore into meta_coord (table_name, coord_system_id, max_length)
-	values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1)};
-my $sql_mc_delete = qq{
-	delete from meta_coord where coord_system_id = 1000};
+my @sql_deletes = (
+	"delete from meta where meta_value like 'chromosome%MAPPING%';",
+	"delete from coord_system where version = 'MAPPING';",
+	"delete from meta_coord where coord_system_id = 1000;"
+);
 
 my $sql_sr_update = qq{
 	update seq_region s, coord_system cs
@@ -201,9 +191,7 @@ if ( $assembly eq $altassembly ) {
 	$cs_change   = 1;
 	$altassembly = 'MAPPING';
 
-	$dbh->do($sql_meta_insert);
-	$dbh->do($sql_cs_insert);
-	$dbh->do($sql_mc_insert);
+	map { $dbh->do($_) } @sql_inserts;
 	$dbh->do($sql_meta_bl_insert);
 }
 
@@ -592,9 +580,7 @@ INFO: skipped PolyA features: %d/%d\n",
 
 # remove temporary 'MAPPING' coordinate system from meta and coord_system table
 if ($cs_change) {
-	$dbh->do($sql_meta_delete);
-	$dbh->do($sql_cs_delete);
-	$dbh->do($sql_mc_delete);
+	map { $dbh->do($_) } @sql_deletes;
 	$dbh->do($sql_meta_bl_delete);
 }
 
