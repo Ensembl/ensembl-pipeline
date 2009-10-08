@@ -100,11 +100,11 @@ use vars qw(%Config);
         OUTPUT_DBHOST => '',   # genebuild_x
         OUTPUT_DBPORT => 3306,
 
-        LAST_DBNAME => '',    # last cdna db  : homo_sapiens_cdna_54_37
+        LAST_DBNAME => '',    # last cdna db  : homo_sapiens_cdna_55_37
         LAST_DBHOST => '',    # ensdb-archive [5304] , ens-livemirror[3306] ,ens-staging [ 3306 ] 
         LAST_DBPORT => 3306,
  
-        LAST_DNADBNAME => '',  # last core db :  homo_sapiens_core_54_37
+        LAST_DNADBNAME => '',  # last core db :  homo_sapiens_core_55_37
         LAST_DNADBHOST => '',
         LAST_DNADBPORT => 3306,
 
