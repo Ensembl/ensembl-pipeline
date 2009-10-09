@@ -39,7 +39,7 @@ my $count;
 #use scaffold or supercontig:
 my $supercontig = 'supercontig';
 my %opt;
-
+my $path = undef;
 
  # options submitted with commandline override MitConf.pm 
 
@@ -61,8 +61,14 @@ GetOptions(
            'rrna_type=s', 
            'codon_table=i', 
            'name=s' , 
-           'genbank_file=s' , 
+           'genbank_file=s' ,
+           'path=s',
            ) ; # or &usage();
+
+if ( $opt{path}){
+  print "you specify path: ", $opt{path},"\n";
+  $path =  $opt{path};
+}
 
 if ($opt{dbhost} && $opt{dbuser} && $opt{dbname} && $opt{dbpass} && $opt{dbport} ) {  
   $MIT_DBHOST  = $opt{dbhost} ; 
