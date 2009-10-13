@@ -425,6 +425,8 @@ sub get_Entry_Fields_BatchFetch {
               undef %little_hash;  
               $entry_number++ ;
               print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
+              print "NEW adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
+              push @entries_not_found,  $acc_index{$entry_number};  
               $no_match_index{$entry_number}=1; 
               next LINE;  
          } 
@@ -432,8 +434,9 @@ sub get_Entry_Fields_BatchFetch {
           if ( exists $no_match_index{$entry_number} ) {  
             $entry_number++ ; 
           } 
-          $no_match_index{$entry_number}=1; 
-          push @entries_not_found,  $acc_index{$entry_number}; 
+          $no_match_index{$entry_number}=1;  
+          print "adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose}; 
+          push @entries_not_found,  $acc_index{$entry_number};  
           $entry_number++ ; 
           next LINE;  
       }  
@@ -503,10 +506,10 @@ sub get_Entry_Fields_BatchFetch {
          }  
          print "\n" ;
     }   
-  }
-  for ( @entries_not_found ) {  
-     print "no entry found for : $_\n" if $self->{verbose};  
   } 
+
+  # combine both  
+
   return [\%all_entries , \@entries_not_found ] ; 
 } 
 
