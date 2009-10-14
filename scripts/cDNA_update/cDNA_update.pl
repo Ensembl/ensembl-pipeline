@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.47 2009-09-01 14:05:32 jhv Exp $
+#$Id: cDNA_update.pl,v 1.48 2009-10-14 15:18:15 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -325,8 +325,9 @@ my $progress_status = undef;
 
 if ( $option eq "prepare" ) {
 
-    print("\n\t\tAre you running this in a screen session? (y/n) ");
-    if ( !get_input_arg() ) {
+    if( exists($ENV{STY}) ) {
+        print "Good, you're running this in screen\n";
+    } else {
         print(   "The program will exit now. "
                . "Restart it again in a screen session.\n" );
         unclean_exit();
