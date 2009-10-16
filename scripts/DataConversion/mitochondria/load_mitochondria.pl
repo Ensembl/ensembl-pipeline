@@ -29,7 +29,7 @@ use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
 
 use Getopt::Long;
-use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
+use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw warning);
 
 
 my $help;
@@ -249,6 +249,17 @@ from the genbank file?(Y/N) ";
     exit 0;
   }
 }
+
+#########################################
+# Check that there is an entry in seq_region_attrib 
+# for the MT chromosome. It needs to use the codon table 2
+my $has_correct_codon_table = check_codon_table($output_db,$slice);
+if ($has_correct_codon_table) {
+  print "Using codon table 2 for translations. (This is correct.)\n";
+} else {
+  throw("Cannot find seq_region_attrib entry for MT chromosome. Need to specify value=2 for codon_table.");
+}
+
 
 #########################################
 #Check that there are not genes in the MT chromosome before uploading the new ones.
@@ -483,6 +494,9 @@ foreach my $new_gene (@new_genes){
       print "Translation:\n".$new_transcript->translate()->seq()."\n" if $MIT_DEBUG;
     }
   };
+  if ($new_transcript && $new_transcript->translate() && $new_transcript->translate()->seq() =~ /\*/) {
+    throw("Stop codon found in translation ".$new_transcript->translate()->seq());
+  }
 }
 
 exit 0;
@@ -821,7 +835,25 @@ sub load_assembly{
 return 0;
 }
 
+sub check_codon_table {
+  my ($out_db,$mt_slice) = @_;
+  my $found;
 
+  my $sql = "SELECT sra.value ".
+            "FROM seq_region_attrib sra, attrib_type att ".
+            "WHERE sra.attrib_type_id = att.attrib_type_id ".
+            "AND att.code = 'codon_table' ".
+            "AND sra.seq_region_id = ".$mt_slice->dbID;
+  my $sth = $out_db->dbc->prepare($sql) or die "sql error!";
+  $sth->execute();
+  my $val = $sth->fetchrow(); 
+  $sth->finish;
+
+  if ($val == 2) {
+    $found = 1;
+  }
+  return $found;
+}
 ##################################################
 # Example of genbank entry
 
