@@ -194,6 +194,7 @@ my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 						   '-pass'   => $MIT_DBPASS,
 						   '-dbname' => $MIT_DBNAME,
 						   '-port'   => $MIT_DBPORT,	
+                                                   '-no_cache' => 1,
 						  );
 
 ########################
@@ -476,26 +477,18 @@ exit 0 unless $MIT_DEBUG;
 print "\n\n################################################################
 # Testing gene load\n\n" if $MIT_DEBUG;
 my $new_genes_adaptor = $output_db->get_GeneAdaptor;
-my @new_genes;
-eval{
-  @new_genes = @{$new_genes_adaptor->fetch_all_by_Slice($slice)};
-};
-  if($@){
-    print "error in fetching from slice ".$slice->name."\n$@\n";
-  }
+my @new_genes = @{$new_genes_adaptor->fetch_all_by_Slice($slice)};
+if (!scalar(@new_genes)) {
+  throw("No genes loaded");
+}  
 
 foreach my $new_gene (@new_genes){
-  print $new_gene."\t".$new_gene->dbID."\n" ;
-  my $new_transcript = @{$new_gene->get_all_Transcripts()}[0];
-  eval{
-    if ($new_transcript->translate()->seq()){
-      my $codon = $new_transcript->seq->seq;
-      print "Transcript:\n$codon\n" if $MIT_DEBUG;
+  print ref($new_gene)."\t with dbID ".$new_gene->dbID."\n" ;
+  foreach my $new_transcript (@{$new_gene->get_all_Transcripts()}) {
+    print "Transcript:\n".$new_transcript->seq->seq."\n"; 
+    if ($new_transcript->translation) {
       print "Translation:\n".$new_transcript->translate()->seq()."\n" if $MIT_DEBUG;
     }
-  };
-  if ($new_transcript && $new_transcript->translate() && $new_transcript->translate()->seq() =~ /\*/) {
-    throw("Stop codon found in translation ".$new_transcript->translate()->seq());
   }
 }
 
@@ -511,6 +504,12 @@ sub load_db(){
     print "Loading gene ",$gene,"\t" if $MIT_DEBUG;
     my $dbid = $output_db->get_GeneAdaptor->store($gene);
     print "dbID = $dbid\n" if $MIT_DEBUG;
+    my $stored_gene = $output_db->get_GeneAdaptor->fetch_by_dbID($dbid);
+    foreach my $transc (@{$stored_gene->get_all_Transcripts}) {
+      if ($transc->translation && $transc->translate()->seq() =~ /\*/) {
+        throw("Stop codon found in translation ".$transc->translate()->seq());
+      }
+    }
   }
   return 0;
 }
