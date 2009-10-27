@@ -134,8 +134,8 @@ my $sfeat_Ad = $vega_db->get_SimpleFeatureAdaptor();
 # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
 my @sql_inserts = (
 	"insert ignore into meta (meta_key, meta_value) values
-	('assembly.mapping', 'chromosome:MAPPING|contig'),
-	('assembly.mapping', 'chromosome:MAPPING|contig|clone'),
+	('assembly.mapping', 'chromosome:MAPPING#contig'),
+	('assembly.mapping', 'chromosome:MAPPING#contig#clone'),
 	('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING');",
 	"insert ignore into coord_system (coord_system_id, name, version, rank, attrib)
 	values (1000, 'chromosome', 'MAPPING', 1000, '');",
