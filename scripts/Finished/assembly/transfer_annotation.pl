@@ -63,7 +63,7 @@ use vars qw($SERVERROOT);
 BEGIN {
     $SERVERROOT = "$Bin/../../../..";
     unshift(@INC, "$Bin");
-    unshift(@INC, "/software/anacode/otter/otter_production_main/ensembl-otter/modules/");
+    unshift(@INC, "/software/anacode/otter/otter_rel52/ensembl-otter/modules/");
 }
 
 use Getopt::Long;

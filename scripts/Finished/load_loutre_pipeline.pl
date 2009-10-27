@@ -290,16 +290,17 @@ my $seqset_info     = {};
 				(?,?,?,?,?,?,?) };
 		my $insert_sth = $dba->dbc->prepare($insert_query);
 		my $error = '';
-		CLONE: for ( values %$contigs_hashref ) {
-			my $chr_name     = $_->[0];
-			my $sequence_set = $_->[8];
-			my $chr_start    = $_->[1];
-			my $chr_end      = $_->[2];
-			my $contig_start = $_->[3];
-			my $contig_end   = $_->[4];
-			my $contig_ori   = $_->[5];
-			my $acc          = $_->[6];
-			my $ver          = $_->[7];
+		CLONE: for ( keys %$contigs_hashref ) {
+
+			my $chr_name     = $contigs_hashref->{$_}->[0];
+			my $sequence_set = $contigs_hashref->{$_}->[8];
+			my $chr_start    = $contigs_hashref->{$_}->[1];
+			my $chr_end      = $contigs_hashref->{$_}->[2];
+			my $contig_start = $contigs_hashref->{$_}->[3];
+			my $contig_end   = $contigs_hashref->{$_}->[4];
+			my $contig_ori   = $contigs_hashref->{$_}->[5];
+			my $acc          = $contigs_hashref->{$_}->[6];
+			my $ver          = $contigs_hashref->{$_}->[7];
 			my $acc_ver      = $acc . "." . $ver;
 
 			my $clone;
