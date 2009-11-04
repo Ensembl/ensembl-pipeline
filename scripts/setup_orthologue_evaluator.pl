@@ -229,8 +229,8 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       # store in ref-db and out-db
       check_and_store_analysis ($pa, $pre_ana) ; 
       check_and_store_analysis ($pa, $submit) ;   
-      check_and_store_analysis ($out_db, $pre_ana) ;   
       add_rule($pa, $pre_ana, $submit) ; 
+      check_and_store_analysis ($out_db, $pre_ana) ;   
 
       # make and upload input_ids for initial analysis  
       
@@ -296,8 +296,8 @@ for my $analysis_type ( keys %main_analysis_setup ) {
       my ($post_analysis,$submit)= get_post_analysis_set($analysis_type, $logic_name,$opt{exonerate_file});      
       check_and_store_analysis ( $pa, $post_analysis ) ;  
       check_and_store_analysis ( $pa, $submit ) ;  
-      check_and_store_analysis ($out_db, $post_analysis) ;  
       add_rule($pa,$post_analysis,$submit) ;  
+      check_and_store_analysis ($out_db, $post_analysis) ;  
 
     }  
 }  
