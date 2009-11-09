@@ -413,7 +413,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					# matches another part in the alt. chromosome
 					my $s = $diff->[1]->to_Slice->seq_region_Slice;
 					$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
-					my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
+					my @A_chrs = @{ $s->project( "chromosome", $A_asm ) };
 					foreach my $A_chr_proj (@A_chrs) {
 						my ($A_chr_name) = $A_chr_proj->to_Slice->seq_region_name;
 						if ($A_chr_name eq $A_chr) {
@@ -501,7 +501,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				# it matches another part of the alt. chromosome
 				my $s = $diff->[1]->to_Slice->seq_region_Slice;
 				$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
-				my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
+				my @A_chrs = @{ $s->project( "chromosome", $A_asm ) };
 				foreach my $A_chr_proj (@A_chrs) {
 					my ($A_chr_name) = $A_chr_proj->to_Slice->seq_region_name;
 					if ($A_chr_name eq $A_chr) {
@@ -607,7 +607,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 	# loop through the directly aligned blocks and fill in the non-aligned block hash
 	# sort the match blocks by ref chromosome start
-	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_gap, $alt_gap );
+	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_seq, $ref_count, $alt_seq, $alt_count );
 	my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
 	my $last = [ $A_length + 1, 0, 0, $R_length + 1, 0, 0, $A_chr ];
 	foreach ( sort { $a->[3] <=> $b->[3] } @{ $match->{$R_chr} }, $last ) {
@@ -617,19 +617,28 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		$r_end   = $_->[4];
 		$a_chr   = $_->[6];
 
-		$ref_gap = $r_start - $sr_end - 1;
-		$alt_gap = $a_start - $sa_end - 1;
+		my ($chr_r_start, $chr_r_end) = $sr_end+1 < $r_start-1 ?
+								   ($sr_end+1, $r_start-1) :
+								   ($r_start-1, $sr_end+1);
+		$ref_seq = $R_sa->fetch_by_region( 'chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
+		$ref_count = $ref_seq =~ s/([atgc])/$1/ig;
+		my ($chr_a_start, $chr_a_end) =    $sa_end+1 < $a_start-1 ?
+								   ($sa_end+1, $a_start-1) :
+								   ($a_start-1, $sa_end+1);
+		$alt_seq = $A_sa->fetch_by_region( 'chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
+		$alt_count = $alt_seq =~ s/([atgc])/$1/ig;
+
 		# Don't run lastz on large non-align blocks > (1.1Mbp)
-		if (    ( $ref_gap > 0 && $alt_gap > 0 )
-			 && ( $ref_gap < 1100000 && $alt_gap < 1100000 ) )
+		if (    ( $ref_count && $alt_count )
+			 && ( $ref_count < 1100000 && $alt_count < 1100000 ) )
 		{
 			push @{ $nomatch->{$R_chr} },
 			  [
-				$sa_end + 1,
-				$a_start - 1,
+				$chr_a_start,
+				$chr_a_end,
 				1,
-				$sr_end + 1,
-				$r_start - 1,
+				$chr_r_start,
+				$chr_r_end,
 				1,
 				$a_chr,
 			  ];
