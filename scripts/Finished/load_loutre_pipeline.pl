@@ -10,22 +10,12 @@ load_loutre_pipeline.pl
 
 =head1 DESCRIPTION
 
-This script is used to load an agp file into a loutre and the corresponding pipeline database (both based on schema version 20+).
+This script is used to load an agp file into a loutre/ensembl database and its corresponding pipeline database if requested.
 The loutre key 'pipeline_db_rw_head' in the meta table is used to retrieve the pipeline connexion parameters.
 The sequence loaded into the dna table is either Pfetched or fetched from a raw file.
 If the login, password and port parameters of the loutre connexion are not provided, they will be
 recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
-Here is an example command line
-
-    ./load_loutre_pipeline.pl \
-	-set chr11-02 \
-	-description 'chromosome 11' \
-	-host otterlive \
-	-port 3352 \
-	-dbname loutre_human \
-	-user ottuser \
-	-pass ***** [AGP_FILE]
 
 =head1 OPTIONS
 
@@ -37,11 +27,57 @@ Here is an example command line
 
     -skip_type comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
     -assembly attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
+    -cs_name (default:chromosome) the name of the coordinate system being stored
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	 the sequence set name
     -description the sequence set description
-    -nosubmit	 used to avoid the pipeline priming with the SubmitContig analysis
+    -do_pipe	(default: true) populate the pipeline sattelite db
+    -nosubmit	 (default: true) don't prime the analysis pipeline
+		i.e. won't add submitcontig rows in the input_id_anlysis table
     -help|h      displays this documentation with PERLDOC
+
+=head1 EXAMPLES
+
+Here are some command line examples:
+
+=head2 1. Populate a loutre db and its pipeline sattelite with a GRCh38 chromosome assembly
+
+    ./load_loutre_pipeline.pl \
+	-set chr11-02 \
+	-description 'chromosome 11 GRCh38' \
+	-assembly GRCh38
+	-dbname loutre_human \
+	[AGP_FILE]
+
+=head2 2. Load a NCBIM36 mouse chromosome in loutre only (needed for the creation of the mapping)
+
+    ./load_loutre_pipeline.pl \
+	-set 11 \
+	-description 'chromosome 11 NCBIM36' \
+	-cs_version NCBIM36
+	-dbname loutre_mouse \
+	[AGP_FILE]
+
+=head2 3. Populate one database only
+
+    ./load_loutre_pipeline.pl \
+	-set chr11-02 \
+	-description 'chromosome 11' \
+	-dbname loutre_human \
+	-do_pipe 0 \
+	[AGP_FILE]
+
+=head2 4. Load a subregion AGP
+
+    ./load_loutre_pipeline.pl \
+	-set subregion-01 \
+	-cs_name subregion \
+	-cs_version '' \
+	-description 'This subregion description will be replaced anyway' \
+	-dbname loutre_human \
+	-do_pipe 0 \
+	[AGP_FILE]
+
 
 =head1 CONTACT
 
@@ -68,10 +104,12 @@ my $name = '';
 my $user = '';
 my $pass = '';
 
+my $cs_name = 'chromosome';
 my $cs_version = 'Otter';
 my $set;
 my $description;
 my $assembly;
+my $do_pipe = 1; # Set to load loutre and pipeline dbs
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
 my @skip;
 
@@ -80,16 +118,18 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 &GetOptions(
 	'host:s'                => \$host,
 	'port:n'                => \$port,
-	'dbname:s'                => \$name,
+	'dbname:s'              => \$name,
 	'user:s'                => \$user,
 	'pass:s'                => \$pass,
-	'cs_version:s' => \$cs_version,
-	'set=s'                   => \$set,
-	'description=s'           => \$description,
-	'skip_type=s'                 => \@skip,
-	'assembly=s'			  => \$assembly,
-	'submit!'                 => \$do_submit,
-	'h|help!'                 => $usage
+	'cs_name:s' 			=> \$cs_name,
+	'cs_version:s'			=> \$cs_version,
+	'set=s'                 => \$set,
+	'description=s'         => \$description,
+	'skip_type=s'           => \@skip,
+	'assembly=s'			=> \$assembly,
+	'do_pipe!'				=> \$do_pipe,
+	'submit!'               => \$do_submit,
+	'h|help!'               => $usage
   )
   or $usage->();
 
@@ -100,9 +140,11 @@ my $agp_file =
 throw("cannot load assembly details, as there is no agp file")
   unless ( defined $agp_file );
 
-throw("no description given") unless ( defined $description );
+throw("No description given") unless ( defined $description );
 
 throw("No sequence set name given") unless ($set);
+
+throw("Can't load a sequence set without a target datbase name") unless $name;
 
 if ( !$user || !$pass || !$port ) {
 	my @param = &get_db_param($host);
@@ -111,32 +153,34 @@ if ( !$user || !$pass || !$port ) {
 	$port = $param[2] unless $port;
 }
 
-if ( !$name ) {
-	print STDERR
-	  "Can't load sequence set without a target pipeline database name\n";
-	print STDERR "-host $host -user $user -pass $pass\n";
-}
-
 my $dbas;
 
-my $loutre_dba = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
-	-user   => $user,
-	-dbname => $name,
-	-host   => $host,
-	-port   => $port,
-	-pass   => $pass
-);
+my $dba = $name =~ /pipe_/ ?
+	Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
+		-user   => $user,
+		-dbname => $name,
+		-host   => $host,
+		-port   => $port,
+		-pass   => $pass) :
+	Bio::EnsEMBL::DBSQL::DBAdaptor->new(
+		-user   => $user,
+		-dbname => $name,
+		-host   => $host,
+		-port   => $port,
+		-pass   => $pass);
 
-push @$dbas, $loutre_dba;
+push @$dbas, $dba;
 
 my $pipe_dba;
-my $meta_container = $loutre_dba->get_MetaContainer();
-my ($pipe_param) = @{$meta_container->list_value_by_key('pipeline_db_rw_head')};
-if($pipe_param) {
-	$pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
-	push @$dbas, $pipe_dba;
-} else {
-	throw("need to add meta key pipeline_db_rw_head in ${host}/${name}\n");
+if($do_pipe) {
+	my $meta_container = $dba->get_MetaContainer();
+	my ($pipe_param) = @{$meta_container->list_value_by_key('pipeline_db_rw_head')};
+	if($pipe_param) {
+		$pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
+		push @$dbas, $pipe_dba;
+	} else {
+		throw("You need to add the meta key 'pipeline_db_rw_head' in ${host}/${name} or unset the do_pipe option to populate ${host}/${name} only\n");
+	}
 }
 
 my %end_value;
@@ -147,7 +191,7 @@ my $seqset_info     = {};
 # Get the sequence set data from the agp and store it in a Hashtable.
 #
 {
-	print STDOUT "Getting data from agp file $agp_file\n";
+	print STDOUT "Getting data from the agp file $agp_file\n";
 
 	open( my $fh, "$agp_file" ) or die "Can't read '$agp_file' : $!";
 
