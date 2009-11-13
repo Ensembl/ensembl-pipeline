@@ -19,22 +19,22 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
 
 =head1 OPTIONS
 
-    -host   (default:otterlive)        host name for the loutre database (gets put as phost= in locator)
+    -host   (default: otterlive)        host name for the loutre database (gets put as phost= in locator)
     -dbname (no default)               for RDBs, what name to connect to (pname= in locator)
     -user   (check the ~/.netrc file)  for RDBs, what username to connect as (puser= in locator)
     -pass   (check the ~/.netrc file)  for RDBs, what password to use (ppass= in locator)
     -port   (check the ~/.netrc file)  for RDBs, what port to use (pport= in locator)
 
-    -skip_type comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
-    -assembly attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
-    -cs_name (default:chromosome) the name of the coordinate system being stored
-    -cs_version (default:Otter) the version of the chromosome coordinate system being stored
-    -set	 the sequence set name
-    -description the sequence set description
-    -do_pipe	(default: true) populate the pipeline sattelite db
-    -nosubmit	 (default: true) don't prime the analysis pipeline
-		i.e. won't add submitcontig rows in the input_id_anlysis table
-    -help|h      displays this documentation with PERLDOC
+    -set          the sequence set name
+    -description  the sequence set description
+    -cs_name      (default: chromosome) the name of the coordinate system being stored
+    -cs_version   (default: Otter) the version of the chromosome coordinate system being stored
+    -do_pipe      (default: true) populate the pipeline sattelite db
+    -submit       (default: true) prime the analysis pipeline
+                  i.e. add submitcontig rows in the input_id_anlysis table
+    -skip_type    (optional) comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
+    -assembly     (optional) attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
+    -help|h       displays this documentation with PERLDOC
 
 =head1 EXAMPLES
 
