@@ -98,7 +98,7 @@ use batch_queue;
    DEFAULT_RETRY_RESOURCE =>'',
    DEFAULT_RETRY_SUB_ARGS => '',
 
-   QUEUE_MANAGER       => 'LSF',#Set to LOCAL for non-farm mode.
+   QUEUE_MANAGER       => $ENV{'QUEUE_MANAGER'},#Set to LOCAL for non-farm mode.
    DEFAULT_BATCH_SIZE  => 5,#20,#100,
    DEFAULT_RETRIES     => 3,
    DEFAULT_RESOURCE => '',
