@@ -29,7 +29,7 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
     -description  the sequence set description
     -cs_name      (default: chromosome) the name of the coordinate system being stored
     -cs_version   (default: Otter) the version of the chromosome coordinate system being stored
-    -do_pipe      (default: true) populate the pipeline sattelite db
+    -do_pipe      (default: false) populate the pipeline sattelite db
     -submit       (default: true) prime the analysis pipeline
                   i.e. add submitcontig rows in the input_id_anlysis table
     -skip_type    (optional) comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
@@ -47,6 +47,7 @@ Here are some command line examples:
 	-description 'chromosome 11 GRCh38' \
 	-assembly GRCh38
 	-dbname loutre_human \
+	-do_pipe	\
 	[AGP_FILE]
 
 =head2 2. Load a NCBIM36 mouse chromosome in loutre only (needed for the creation of the mapping)
@@ -64,7 +65,6 @@ Here are some command line examples:
 	-set chr11-02 \
 	-description 'chromosome 11' \
 	-dbname loutre_human \
-	-do_pipe 0 \
 	[AGP_FILE]
 
 =head2 4. Load a subregion AGP
@@ -75,7 +75,6 @@ Here are some command line examples:
 	-cs_version '' \
 	-description 'This subregion description will be replaced anyway' \
 	-dbname loutre_human \
-	-do_pipe 0 \
 	[AGP_FILE]
 
 
@@ -109,7 +108,7 @@ my $cs_version = 'Otter';
 my $set;
 my $description;
 my $assembly;
-my $do_pipe = 1; # Set to load loutre and pipeline dbs
+my $do_pipe = 0; # Set to load loutre and pipeline dbs
 my $do_submit = 1; # Set if we want to prime the pipeline with the SubmitContig analysis
 my @skip;
 
@@ -283,7 +282,7 @@ my $seqset_info     = {};
 
 		eval {
 			$chromosome_cs =
-			  $cs_a->fetch_by_name( "chromosome", $cs_version );
+			  $cs_a->fetch_by_name( $cs_name, $cs_version );
 			$clone_cs  = $cs_a->fetch_by_name("clone");
 			$contig_cs = $cs_a->fetch_by_name("contig");
 

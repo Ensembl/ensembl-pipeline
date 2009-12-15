@@ -27,10 +27,15 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
     -cs_name (default:chromosome) the name of the coordinate system being stored
     -cs_version (default:Otter) the version of the chromosome coordinate system being stored
     -set	 the sequence set name
-	-first	first accession in the subregion
-	-last	last accession in the subregion
-	-chr	(optional) the chromosome name to be put in the agp
+    -first	first accession in the subregion
+    -last	last accession in the subregion
+    -chr	(optional) the chromosome name to be put in the agp
     -help|h      displays this documentation with PERLDOC
+
+
+=head1 DEPENDENCE
+
+regions_to_agp needs to be in the PATH
 
 =head1 EXAMPLES
 
