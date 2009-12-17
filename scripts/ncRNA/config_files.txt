@@ -27,7 +27,7 @@ package  Bio::EnsEMBL::Analysis::Config::Blast;
      BLAST_PARSER => 'Bio::EnsEMBL::Analysis::Tools::FilterBPlite',
      PARSER_PARAMS => 
      {
-      -regex => '(\w+)-\w+',
+      -regex => '(\w+)\.\w+',
       -query_type => undef,
       -database_type => undef,
      },
@@ -102,58 +102,61 @@ use vars qw(%Config);
   SLEEP_PER_JOB => 30,
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Pipeline/RunnableDB',
   DEFAULT_RUNNER => '',
-  DEFAULT_RESOURCE => 'linux',
-  DEFAULT_RETRY_QUEUE => 'long',
+  DEFAULT_RESOURCE    => '',
+  DEFAULT_SUB_ARGS    => '',
+  DEFAULT_RETRY_QUEUE    => 'long',
+  DEFAULT_RETRY_RESOURCE => '',
   DEFAULT_RETRY_SUB_ARGS => '',
-  DEFAULT_RETRY_RESOURCE => '',  
-  DEFAULT_SUB_ARGS => '',   
-  
+  DEFAULT_RESOURCE    => '',
+  DEFAULT_SUB_ARGS    => '',
+
+
   QUEUE_CONFIG => [
     {
       logic_name => 'BlastmiRNA',
-      batch_size => <MIRNABATCH>,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
+      batch_size => 500,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
-      output_dir => '<DATADIR>/<species>/Blast_miRNA',
+      queue      => 'long',
+      output_dir => '<OUTDIR>Blast_miRNA',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'RfamBlast',
-      batch_size => <RFAMBATCH>,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
+      batch_size => 50,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
-      output_dir => '<DATADIR>/<species>/RfamBlast',
+      queue      => 'long',
+      output_dir => '<OUTDIR>RfamBlast',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     },
     {
       logic_name => 'miRNA',
       batch_size => 1,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD> ] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
-      output_dir => '<DATADIR>/<species>/miRNA',
+      queue      => 'long',
+      output_dir => '<OUTDIR>miRNA',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     }, 
        {
       logic_name => 'ncRNA',
-      batch_size => 500,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=1]',
+      batch_size => 50,
+      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
-      queue      => 'normal',
-      output_dir => '<DATADIR>/<species>/ncRNA',
+      queue      => 'long',
+      output_dir => '<OUTDIR>ncRNA',
       cleanup    => 'no',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     }, 
@@ -163,7 +166,7 @@ use vars qw(%Config);
     resource   => 'linux',
     retries    => 0,
     queue => 'normal',
-    output_dir => '<DATADIR>/<species>/BlastWait',
+    output_dir => '<OUTDIR>BlastWait',
     runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
     cleanup => 'no',
    },
@@ -182,6 +185,7 @@ use vars qw(%Config);
 
     ANALYSIS_WORK_DIR => '/tmp',
     ANALYSIS_REPEAT_MASKING => ['RepeatMask','Dust'],
+
     CORE_VERBOSITY => 'WARNING',
     LOGGER_VERBOSITY => 'OFF',
 );
@@ -189,33 +193,35 @@ use vars qw(%Config);
 >>Bio/EnsEMBL/Analysis/Config/Databases.pm
 package Bio::EnsEMBL::Analysis::Config::Databases;
 
-
 use strict;
-use vars qw(%Config);
+use vars qw( %Config );
 
-%Config= (
+# Hash containing config info
+%Config = (
 
+  DATABASES => {
 
-  DATABASES => { 
-                  
-                 REFERENCE_DB => 
-                                 { 
+                 REFERENCE_DB =>
+                                 {
                                    -dbname => '<DBNAME>',
                                    -host => '<DBHOST>',
                                    -port => '<DBPORT>',
                                    -user => 'ensro',
                                    -pass => '',
                                   },
-  
 
-                 GENEBUILD_DB => 
-                                 { 
+                 GENEBUILD_DB =>
+                                 {
                                    -dbname => '<WRITENAME>',
                                    -host => '<WRITEHOST>',
                                    -port => '<WRITEPORT>',
                                    -user => 'ensadmin',
                                    -pass => '<PASS>',
                                   },
-		},
-             DNA_DBNAME => "REFERENCE_DB",  
-	  );
+
+                 },
+             },
+
+             DNA_DBNAME => "REFERENCE_DB",
+
+	     );
