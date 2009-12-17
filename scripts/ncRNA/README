@@ -1,0 +1,10 @@
+Please be aware that the config files used in this analysis are created automatically from the scaffold config_files.txt
+This file should contain the same global variable names as the most recent config files in the checkout you are running
+
+Creates config for the following modules :
+   - Bio::EnsEMBL::Analysis::Config::Blast;
+   - Bio::EnsEMBL::Pipeline::Config::General;
+   - Bio::EnsEMBL::Pipeline::Config::BatchQueue;
+   - Bio::EnsEMBL::Analysis::Config::General;
+   - Bio::EnsEMBL::Analysis::Config::Databases;
+
