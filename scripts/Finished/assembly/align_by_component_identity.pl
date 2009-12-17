@@ -610,7 +610,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_seq, $ref_count, $alt_seq, $alt_count );
 	my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
 	my $last = [ $A_length + 1, 0, 0, $R_length + 1, 0, 0, $A_chr ];
-	foreach ( sort { $a->[3] <=> $b->[3] } @{ $match->{$R_chr} }, $last ) {
+	foreach ( sort { $a->[3] <=> $b->[3] } @{ $match->{$R_chr} || [] }, $last ) {
 		$a_start = $_->[0];
 		$a_end   = $_->[1];
 		$r_start = $_->[3];
