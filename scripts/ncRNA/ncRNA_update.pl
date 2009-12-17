@@ -91,7 +91,7 @@ foreach my $species (@speciess){
 
   print "Checking config\n";
   my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST 
-			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME );
+			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME OUTDIR);
   config_setup(\@localconfigvars,$species);
 }
 # once thats all done sucessfully start the rule managers
