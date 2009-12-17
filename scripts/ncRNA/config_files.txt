@@ -219,7 +219,7 @@ use vars qw( %Config );
                                    -pass => '<PASS>',
                                   },
 
-                 },
+                 
              },
 
              DNA_DBNAME => "REFERENCE_DB",
