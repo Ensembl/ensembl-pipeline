@@ -845,7 +845,7 @@ sub parse_projections {
 	my $ori    = $R_ctg_strand * $A_ctg_strand;
 
 	# check that contig slices overlap
-	if ( $A_ctg_end < $R_ctg_start || $R_chr_end < $A_ctg_start ) {
+	if ( $A_ctg_end < $R_ctg_start || $R_ctg_end < $A_ctg_start ) {
 		return $blocks;
 	}
 	my $start_offset = $R_ctg_start - $A_ctg_start;
