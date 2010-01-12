@@ -31,7 +31,6 @@ use Bio::SeqIO;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw warning);
 
-
 my $help;
 my @genes;;
 my $translation; # JUST INCASE
@@ -43,66 +42,67 @@ my $path = undef;
 
  # options submitted with commandline override MitConf.pm 
 
-GetOptions(
-           \%opt ,
-           '-h|help'    , 
-           'dbhost=s' , 
-           'dbuser=s' , 
-           'dbpass=s' , 
-           'dbport=i' , 
-           'dbname=s' , 
-           'contig=s',      # MIT_CONTIG_SEQNAME 
-           'chromosome=s',  # MIT_CHROMOSOME_SEQNAME 
-           'supercontig=s', # MIT_SUPERCONTIG_SEQNAME
-           'clone=s',       # MIT_CLONE_SEQNAME 
-           'toplevel=s',    # MIT_TOPLEVEL 
-           'gene_type=s', 
-           'trna_type=s',
-           'rrna_type=s', 
-           'codon_table=i', 
-           'name=s' , 
-           'genbank_file=s' ,
-           'path=s',
-           ) ; # or &usage();
+GetOptions( \%opt,
+            '-h|help',
+            'dbhost=s',
+            'dbuser=s',
+            'dbpass=s',
+            'dbport=i',
+            'dbname=s',
+            'contig=s',         # MIT_CONTIG_SEQNAME
+            'chromosome=s',     # MIT_CHROMOSOME_SEQNAME
+            'supercontig=s',    # MIT_SUPERCONTIG_SEQNAME
+            'clone=s',          # MIT_CLONE_SEQNAME
+            'toplevel=s',       # MIT_TOPLEVEL
+            'gene_type=s',
+            'trna_type=s',
+            'rrna_type=s',
+            'codon_table=i',
+            'name=s',
+            'genbank_file=s',
+            'path=s', );
+            # or &usage();
 
 if ( $opt{path}){
   print "you specify path: ", $opt{path},"\n";
   $path =  $opt{path};
 }
 
-if ($opt{dbhost} && $opt{dbuser} && $opt{dbname} && $opt{dbpass} && $opt{dbport} ) {  
-  $MIT_DBHOST  = $opt{dbhost} ; 
-  $MIT_DBUSER = $opt{dbuser} ;  
-  $MIT_DBPASS = $opt{dbpass} ; 
-  $MIT_DBPORT = $opt{dbport} ; 
-  $MIT_DBNAME = $opt{dbname} ; 
+if (    $opt{dbhost} && $opt{dbuser}
+     && $opt{dbname} && $opt{dbpass}
+     && $opt{dbport} ) {
+  $MIT_DBHOST = $opt{dbhost};
+  $MIT_DBUSER = $opt{dbuser};
+  $MIT_DBPASS = $opt{dbpass};
+  $MIT_DBPORT = $opt{dbport};
+  $MIT_DBNAME = $opt{dbname};
 }
 
-$MIT_GENBANK_FILE = $opt{genbank_file} if $opt{genbank_file} ; 
-$MIT_LOGIC_NAME =  $opt{logic_name} if $opt{logic_name} ; 
-$MIT_NAME =  $opt{name} if $opt{name} ; 
-$MIT_TOPLEVEL =  $opt{toplevel} if $opt{toplevel} ; 
-$MIT_CODON_TABLE =  $opt{codon_table} if $opt{codon_table} ; 
-$MIT_GENE_TYPE =  $opt{gene_type} if $opt{gene_type} ; 
-$MIT_TRNA_TYPE =  $opt{trna_type} if $opt{trna_type} ; 
-$MIT_RRNA_TYPE =  $opt{rrna_type} if $opt{rrna_type} ; 
+$MIT_GENBANK_FILE = $opt{genbank_file} if $opt{genbank_file};
+$MIT_LOGIC_NAME   = $opt{logic_name}   if $opt{logic_name};
+$MIT_NAME         = $opt{name}         if $opt{name};
+$MIT_TOPLEVEL     = $opt{toplevel}     if $opt{toplevel};
+$MIT_CODON_TABLE  = $opt{codon_table}  if $opt{codon_table};
+$MIT_GENE_TYPE    = $opt{gene_type}    if $opt{gene_type};
+$MIT_TRNA_TYPE    = $opt{trna_type}    if $opt{trna_type};
+$MIT_RRNA_TYPE    = $opt{rrna_type}    if $opt{rrna_type};
 
-
-unless ($MIT_DBHOST && $MIT_DBUSER && $MIT_DBNAME && $MIT_GENBANK_FILE && !$help){
-  warn("Can't run without MitConf.pm values:
-MIT_DBHOST $MIT_DBHOST 
-MIT_DBUSER $MIT_DBUSER 
-MIT_DBNAME $MIT_DBNAME
-MIT_DBPASS $MIT_DBPASS
-MIT_GENBANK_FILE $MIT_GENBANK_FILE
-MIT_LOGIC_NAME $MIT_LOGIC_NAME
-MIT_NAME $MIT_NAME
-MIT_TOPLEVEL $MIT_TOPLEVEL
-MIT_CODON_TABLE  $MIT_CODON_TABLE
-MIT_GENE_TYPE $MIT_GENE_TYPE
-MIT_TRNA_TYPE $MIT_TRNA_TYPE
-MIT_RRNA_TYPE $MIT_RRNA_TYPE
-");
+unless (    $MIT_DBHOST && $MIT_DBUSER
+         && $MIT_DBNAME && $MIT_GENBANK_FILE
+         && !$help ) {
+  warn( "Can't run without MitConf.pm values: "
+      . "MIT_DBHOST $MIT_DBHOST "
+      . "MIT_DBUSER $MIT_DBUSER "
+      . "MIT_DBNAME $MIT_DBNAME "
+      . "MIT_DBPASS $MIT_DBPASS "
+      . "MIT_GENBANK_FILE $MIT_GENBANK_FILE "
+      . "MIT_LOGIC_NAME $MIT_LOGIC_NAME "
+      . "MIT_NAME $MIT_NAME "
+      . "MIT_TOPLEVEL $MIT_TOPLEVEL "
+      . "MIT_CODON_TABLE  $MIT_CODON_TABLE "
+      . "MIT_GENE_TYPE $MIT_GENE_TYPE "
+      . "MIT_TRNA_TYPE $MIT_TRNA_TYPE "
+      . "MIT_RRNA_TYPE $MIT_RRNA_TYPE " );
   $help = 1;
 }
 
@@ -174,28 +174,27 @@ my @genbank ;
 push @genbank , $save_entry ; 
 push @genbank , values %nonred_entries ;
  
+#print Dumper(\@genbank);
+
 my %assembly = %{$assembly_ref};
 
 ##########################
 # Get chromosome sequence 
 
-my $seq_file = Bio::SeqIO->new(
-			       -file   => $MIT_GENBANK_FILE,
-			       -format => 'genbank',
-			      );
+my $seq_file = Bio::SeqIO->new( -file   => $MIT_GENBANK_FILE,
+                                -format => 'genbank', );
 my $chromosome_seq = $seq_file->next_seq;
 
 ####################
 #Open db for writing
 
-my $output_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-						   '-host'   => $MIT_DBHOST,
-						   '-user'   => $MIT_DBUSER,
-						   '-pass'   => $MIT_DBPASS,
-						   '-dbname' => $MIT_DBNAME,
-						   '-port'   => $MIT_DBPORT,	
-                                                   '-no_cache' => 1,
-						  );
+my $output_db =
+  new Bio::EnsEMBL::DBSQL::DBAdaptor( '-host'     => $MIT_DBHOST,
+                                      '-user'     => $MIT_DBUSER,
+                                      '-pass'     => $MIT_DBPASS,
+                                      '-dbname'   => $MIT_DBNAME,
+                                      '-port'     => $MIT_DBPORT,
+                                      '-no_cache' => 1, );
 
 ########################
 # Check taxon is correct
@@ -237,8 +236,8 @@ if ($slice){
   foreach my $cs (keys %slices){
     print "$cs    \t".$slices{$cs}->name."\n";
   }
-  print "Do you want to load the chromosome and the associated assembly entries
-from the genbank file?(Y/N) "; 
+  print "Do you want to load the chromosome and "
+      . "the associated assembly entries from the genbank file?(Y/N) ";
   my $answer = <>;
   chomp $answer;
   if ($answer eq "y" or $answer eq "Y"){
@@ -258,7 +257,8 @@ my $has_correct_codon_table = check_codon_table($output_db,$slice);
 if ($has_correct_codon_table) {
   print "Using codon table 2 for translations. (This is correct.)\n";
 } else {
-  throw("Cannot find seq_region_attrib entry for MT chromosome. Need to specify value=2 for codon_table.");
+  throw(   "Cannot find seq_region_attrib entry for MT chromosome. "
+         . "Need to specify value=2 for codon_table." );
 }
 
 
@@ -281,8 +281,9 @@ if (@mt_genes && scalar(@mt_genes) > 0){
     }
     print "Genes removed succesfully, moving to new genes load\n";
   }else{
-    print "You choose not to remove the genes\n";
-    print "Do you want to keep loading the MT genes?(This may create duplicated entries)(Y/N)?\n";
+    print "You choose not to remove the genes\n"
+        . "Do you want to keep loading the MT genes? "
+        . "(This may create duplicated entries)(Y/N)?\n";
     my $load_answer = <>;
     chomp $load_answer;
     if ($load_answer eq "y" or $load_answer eq "Y"){
@@ -315,10 +316,10 @@ if ($MIT_LOGIC_NAME){
 }
 my $ensembl_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if(!defined $ensembl_analysis){
-#croak "analysis $logic_name not found\n";
-  $ensembl_analysis = Bio::EnsEMBL::Analysis->new(
-                                                  -logic_name => 'ensembl',
-                                                 );
+  #croak "analysis $logic_name not found\n";
+  $ensembl_analysis =
+    Bio::EnsEMBL::Analysis->new( -logic_name => 'ensembl', );
+
   print "You have no ".$logic_name." defined creating new object\n";
 }
 
@@ -334,20 +335,17 @@ if(!defined $ensembl_analysis){
 print " have " . scalar(@genbank) . " ENTRIES \n" ;  
 
 for (my $i=1; $i <= $#genbank; $i++){
-
-
-   
-   my %h = %{$genbank[$i]} ;  
-   print "ENTRY $i\n";  
-   foreach ( keys %h) { 
-     print "$_\t$h{$_}\n"  ;   
-     if ( /start/ || /end/) { 
-      my @tmp = @{$h{$_}}; 
-       print "STARTS :\n" ;  
-      print join ("\t" , @tmp ) . "\n" ;  
-     }
-   } 
-   print "\nXXXXXXXXXXXXXXXXXXXXXX\n" ; 
+  my %h = %{ $genbank[$i] };
+  print "ENTRY $i\n";
+  foreach ( keys %h ) {
+    printf "%20s\t%s\n", $_, $h{$_};
+    if ( /start/ || /end/ ) {
+      my @tmp = @{ $h{$_} };
+      print "STARTS: ";
+      print join( "\t", @tmp ) . "\n";
+    }
+  }
+  print "\nXXXXXXXXXXXXXXXXXXXXXX\n" ; 
 
 
   my $desc = $genbank[$i]{'product'};
@@ -428,7 +426,7 @@ for (my $i=1; $i <= $#genbank; $i++){
   $transcript->biotype($type);
   #############
   # Make  genes
-   print "create new trans " . $transcript->seq_region_start."\n" ; 
+   print "create new trans with start at " . $transcript->seq_region_start."\n" ; 
 
   my $gene = new Bio::EnsEMBL::Gene;
   eval {
@@ -445,7 +443,7 @@ for (my $i=1; $i <= $#genbank; $i++){
     print "Error: $@\n";
     exit;
   } 
-  print " pushing " . $gene->seq_region_start . "\n" ; 
+  #print " pushing " . $gene->seq_region_start . "\n" ; 
   push @genes,$gene; 
 }
 
@@ -519,7 +517,7 @@ sub load_db(){
 #######################################
 # PARSE COORDINATES OUT OF GENBANK FILE
 
-sub _parse_coordinates(){
+sub _parse_coordinates() {
 
   print "Parsing coords\n" if $MIT_DEBUG;
 
@@ -538,8 +536,8 @@ sub _parse_coordinates(){
   my @genbank_file;
   $assembly{$MIT_TOPLEVEL} = $MIT_NAME;
 
-#################################################
-# Read genbank file into array, join broken lines
+  #################################################
+  # Read genbank file into array, join broken lines
 
 
   open (GENBANK,$MIT_GENBANK_FILE) or die "Cannot open genbank file $MIT_GENBANK_FILE\n";
@@ -554,101 +552,105 @@ sub _parse_coordinates(){
   }
   close GENBANK;
 
-####################################
-# Array of hashes holds genbank data
+  ####################################
+  # Array of hashes holds genbank data
 
-my $first_entry = 0  ; 
+  my $first_entry = 0  ;
 
-  # read all entries and than filter the predictions 
+  # read all entries and than filter the predictions
 
-  for (@genbank_file){
+  for (@genbank_file) {
     # ignore sequence data
-    next if $_ =~ /^\d+/;  
+    next if $_ =~ /^\d+/;
 
-    my @sources = split/\s+/ ; 
+    my @sources = split /\s+/;
 
     # make comma delimited
     $_ =~ s/\s+/,/g;
     # comment line holds contig name
-    if ($_ =~ /^COMMENT/){
+    if ( $_ =~ /^COMMENT/ ) {
       $go = "comment";
     }
     # ignore features section
-    if ($_ =~ /^FEATURES/){
+    if ( $_ =~ /^FEATURES/ ) {
       $go = "stop";
     }
-    if ($go eq "comment"){
+    if ( $go eq "comment" ) {
       $comment .= $_;
       next;
     }
     # stop parsing unless line starts wih a comma:
-    unless ($_ =~ /^\,/ ){
+    unless ( $_ =~ /^\,/ ) {
       $go = "stop";
     }
-    # Types of entries to parse all others are ignored, could be extended if needed
-    if ($_ =~ /^tRNA/ || $_ =~ /^rRNA/ || $_ =~ /^CDS/ || $_ =~ /^ACCESSION/ || $_ =~ /^source/ ){ 
+    # Types of entries to parse all others are ignored, could be
+    # extended if needed
+    if (    $_ =~ /^tRNA/
+        || $_ =~ /^rRNA/
+        || $_ =~ /^CDS/
+        || $_ =~ /^ACCESSION/
+        || $_ =~ /^source/ )
+    {
       $index++;
-      push(@entries,%entry);
+      push( @entries, %entry );
       # splits the line into words and parses them into the hash
       $_ =~ s/^\,//;
       $_ =~ s/\,/\./g;
       $_ =~ s/\)//g;
-      my @string = split(/\./,$_); 
+      my @string = split( /\./, $_ );
 
-        if ($_ =~ /ACCESSION/){
-	  $entries[$index]{'accession'}=$string[1]; 
-	} 
+      if ( $_ =~ /ACCESSION/ ) {
+        $entries[$index]{'accession'} = $string[1];
+      }
 
-	else{
-	  if  ($string[1]=~ 'complement'){
-	    $entries[$index]{'strand'}='-1';
-	  }
-	  else{
-	    $entries[$index]{'strand'}='1';
-	  }
-	  $string[0] =~ s/\s+//g;
-	  $string[1] =~ s/\D+//g;
+      else {
+        if ( $string[1] =~ 'complement' ) {
+          $entries[$index]{'strand'} = '-1';
+        } else {
+          $entries[$index]{'strand'} = '1';
+        }
+        $string[0] =~ s/\s+//g;
+        $string[1] =~ s/\D+//g;
 
-	  $entries[$index]{'type'}=$string[0];
+        $entries[$index]{'type'} = $string[0];
 
-	  ##################################################
-	  # Pushes starts and stops into array to accomodate
-	  # The rare occurances of multiexon genes
-	  # assumes coords alternate between start and stop
+        ##################################################
+        # Pushes starts and stops into array to accomodate
+        # The rare occurances of multiexon genes
+        # assumes coords alternate between start and stop
 
-	  my $key = 'start';
-	  for(my $i =1 ; $i <= $#string ; $i++){
-	    if ($string[$i] =~ /\d+/){
-	      push @{$entries[$index]{$key}} , $string[$i];
-	      if ($key eq 'end'){ 
-		  $key = 'start';
-		  next;
-		}
-	      if ($key eq 'start'){
-		$key = 'end'; 
-		next;
-	      }
-	    }
-	  }
-	}
+        my $key = 'start';
+        for ( my $i = 1 ; $i <= $#string ; $i++ ) {
+          if ( $string[$i] =~ /\d+/ ) {
+            push @{ $entries[$index]{$key} }, $string[$i];
+            if ( $key eq 'end' ) {
+              $key = 'start';
+              next;
+            }
+            if ( $key eq 'start' ) {
+              $key = 'end';
+              next;
+            }
+          }
+        }
+      } ## end else [ if ( $_ =~ /ACCESSION/)
       # got the first line of the entry, now parse subsequent lines
       $go = 'go';
-    }
+    } ## end if ( $_ =~ /^tRNA/ || ...
 
-    if ($go eq 'go'){
-      my @temp = split(/\"/,$_);
-      if ($temp[1]){
-	$temp[0] =~ s/\W+//g;
-	$temp[1] =~ s/,+/ /g;
-	$entries[$index]{$temp[0]}=$temp[1];
-      }
-      else {
-	if($temp[0] && $temp[0] eq ',/pseudo'){
-	  $entries[$index]{'type'} = 'pseudogene';
-	}
+    if ( $go eq 'go' ) {
+      my @temp = split( /\"/, $_ );
+      if ( $temp[1] ) {
+        $temp[0] =~ s/\W+//g;
+        $temp[1] =~ s/,+/ /g;
+        $entries[$index]{ $temp[0] } = $temp[1];
+      } else {
+        if ( $temp[0] && $temp[0] eq ',/pseudo' ) {
+          $entries[$index]{'type'} = 'pseudogene';
+        }
       }
     }
-  }
+  } ## end for (@genbank_file)
 
   for (my $array_index =0; $array_index <= $#entries ;$array_index ++){
     # Check for trans-splicing events
@@ -657,40 +659,39 @@ my $first_entry = 0  ;
       exit 0;
     }
   }
-  
+
   #############################################################
   # Use config file vales if they are present, otherwise get
   # seq names from GFF file
 
-  if ($MIT_SUPERCONTIG_SEQNAME){
+  if ($MIT_SUPERCONTIG_SEQNAME) {
     $assembly{$supercontig} = $MIT_SUPERCONTIG_SEQNAME;
-  }
-  else {
+  } else {
     $assembly{$supercontig} = $entries[0]{'accession'};
-  }  
-  if ($MIT_CLONE_SEQNAME){
-    $assembly{'clone'} = $MIT_CLONE_SEQNAME;
   }
-  else {
-    if ($comment =~ /reference,sequence,was,derived,from,(\w+)./){
+  if ($MIT_CLONE_SEQNAME) {
+    $assembly{'clone'} = $MIT_CLONE_SEQNAME;
+  } else {
+    if ( $comment =~ /reference,sequence,was,derived,from,(\w+)./ ) {
       $assembly{'clone'} = "$1";
     }
-  }  
-  if ($MIT_CONTIG_SEQNAME){
-    $assembly{'contig'} = $MIT_CONTIG_SEQNAME
   }
-  else { 
-    if ($comment =~ /reference,sequence,was,derived,from,(\w+)./){
-      $assembly{'contig'} = "$1.".@{$entries[1]{'start'}}[0].".".@{$entries[1]{'end'}}[0];  
+  if ($MIT_CONTIG_SEQNAME) {
+    $assembly{'contig'} = $MIT_CONTIG_SEQNAME;
+  } else {
+    if ( $comment =~ /reference,sequence,was,derived,from,(\w+)./ ) {
+      $assembly{'contig'} = "$1."
+        . @{ $entries[1]{'start'} }[0] . "."
+        . @{ $entries[1]{'end'} }[0];
     }
   }
-  return \@entries,\%assembly;
+  return \@entries, \%assembly;
 }
 
 ################################
 # Get the sequence if requested
 
-sub get_chromosomes{
+sub get_chromosomes {
   my ($assembly_ref,$genbank_ref,$output_db,) = @_;
   my %assembly = %{$assembly_ref};
   my @genbank =@{$genbank_ref};
@@ -700,153 +701,153 @@ sub get_chromosomes{
   # Get all coord systems in the database:
   # Make a slice for each coord system
 
+  #$csa->fetch_all->[0]->version($path);
   foreach my $cs (@{$csa->fetch_all()}) {
     my $name = $cs->name;
     $name =  'top_level' if ($cs->name eq $MIT_TOPLEVEL);
     $name =  'seq_level' if ($cs->is_sequence_level);
     if($assembly{$cs->name}){
       $slices{$name}  = Bio::EnsEMBL::Slice->new
-	(
-	 -coord_system      => $cs,
-	 -start             => $genbank[1]{'start'}[0],
-	 -end               => $genbank[1]{'end'}[0],
-	 -strand            => 1,
-	 -seq_region_name   => $assembly{$cs->name},
-	 -seq_region_length => $genbank[1]{'end'}[0]- $genbank[1]{'start'}[0]+1,
-	 -adaptor           => $sa
-	)
-      }
+      (
+        -coord_system      => $cs,
+        -start             => $genbank[1]{'start'}[0],
+        -end               => $genbank[1]{'end'}[0],
+        -strand            => 1,
+        -seq_region_name   => $assembly{$cs->name},
+        -seq_region_length => $genbank[1]{'end'}[0] - $genbank[1]{'start'}[0]+1,
+        -adaptor           => $sa
+      )
+    }
   }
 
   # Die before storing anything unless you have sequences that are top level and seq level
   # Unless you only have one coord system in which case you set it to both seq and top level
   die "Cannot find seq_level coord system" unless $slices{'seq_level'};
-  die "Cannot find top_level coord system $MIT_TOPLEVEL" unless 
-    (scalar(keys %slices) > 1  && $slices{'top_level'} or scalar(keys %slices) == 1);
-  
+  die "Cannot find top_level coord system $MIT_TOPLEVEL"
+    unless (    scalar( keys %slices ) > 1 && $slices{'top_level'}
+             or scalar( keys %slices ) == 1 );
+
 return \%slices;
 
 }
 
-sub load_chromosomes{
-  my ($slices,$output_db,$seq_ref)=@_;
-  my $sa  = $output_db->get_SliceAdaptor();
-  my $aa  = $output_db->get_AttributeAdaptor();
-  # Store slices, add the mit codon usage atribute 
+sub load_chromosomes {
+  my ( $slices, $output_db, $seq_ref ) = @_;
+  my $sa = $output_db->get_SliceAdaptor();
+  my $aa = $output_db->get_AttributeAdaptor();
+  # Store slices, add the mit codon usage atribute
   # add the sequence if the coord system is contig
   # add the top level attribute if the coord system is chromosome
   # Make mitochondrial codon usage attribute
 
-  push my @codonusage , Bio::EnsEMBL::Attribute->new
-    (-CODE => 'codon_table',
-     -NAME => 'Codon Table',
-     -DESCRIPTION => 'Alternate codon table',
-     -VALUE       => $MIT_CODON_TABLE,
-    );  
+  push my @codonusage,
+    Bio::EnsEMBL::Attribute->new( -CODE        => 'codon_table',
+                                  -NAME        => 'Codon Table',
+                                  -DESCRIPTION => 'Alternate codon table',
+                                  -VALUE       => $MIT_CODON_TABLE, );
   # Make top level seq attribute
-  push my @toplevel , Bio::EnsEMBL::Attribute->new
-    (-CODE => 'toplevel',
-     -NAME => 'Top Level',
-     -DESCRIPTION => 'Top Level Non-Redundant Sequence Region',
-     -VALUE => 1
-    );
+  push my @toplevel,
+    Bio::EnsEMBL::Attribute->new(
+                    -CODE        => 'toplevel',
+                    -NAME        => 'Top Level',
+                    -DESCRIPTION => 'Top Level Non-Redundant Sequence Region',
+                    -VALUE       => 1 );
 
-  foreach my $cs (keys %slices){
-    print "Slice ".$slices{$cs}->name."\n"if $MIT_DEBUG;
-    if ($cs eq 'seq_level'){
-      $sa->store($slices{$cs},\$seq_ref->seq);
-      $aa->store_on_Slice($slices{$cs}, \@codonusage);    
+  foreach my $cs ( keys %slices ) {
+    print "Slice " . $slices{$cs}->name . "\n" if $MIT_DEBUG;
+    if ( $cs eq 'seq_level' ) {
+      $sa->store( $slices{$cs}, \$seq_ref->seq );
+      $aa->store_on_Slice( $slices{$cs}, \@codonusage );
       $slices{$cs}->adaptor($sa);
-      print "Storing seqlevel \n"if $MIT_DEBUG;
+      print "Storing seqlevel \n" if $MIT_DEBUG;
       # If only have 1 coord systen it needs to be both seq_level
       # and top level
-     if (scalar(keys %slices) == 1){
-	$aa->store_on_Slice($slices{$cs}, \@toplevel);
+      if ( scalar( keys %slices ) == 1 ) {
+        $aa->store_on_Slice( $slices{$cs}, \@toplevel );
       }
-      next ;
+      next;
     }
-    print "Storing slice \n"if $MIT_DEBUG;
-    $sa->store($slices{$cs});
-    $aa->store_on_Slice($slices{$cs}, \@codonusage);
+    print "Storing slice \n" if $MIT_DEBUG;
+    $sa->store( $slices{$cs} );
+    $aa->store_on_Slice( $slices{$cs}, \@codonusage );
     $slices{$cs}->adaptor($sa);
-    if ($cs eq 'top_level'){
-      $aa->store_on_Slice($slices{$cs}, \@toplevel);
+    if ( $cs eq 'top_level' ) {
+      $aa->store_on_Slice( $slices{$cs}, \@toplevel );
     }
   }
 
-  # if you only have 1 coordsystem dont need an assembly 
-  return 0 if (scalar(keys %slices) == 1);
+  # if you only have 1 coordsystem dont need an assembly
+  return 0 if ( scalar( keys %slices ) == 1 );
 
   # load the assembly
   # Load a chromosome - supercontig entry in the asembly, if these
   # coord stestems exist
 
-  if ($slices{'top_level'} && $slices{$supercontig}){
+  if ( $slices{'top_level'} && $slices{$supercontig} ) {
     print "Making assembly for chromosome vs supercontig\n" if $MIT_DEBUG;
-    &load_assembly
-      (
-       $slices{'top_level'}->get_seq_region_id,
-       $slices{'top_level'}->start,
-       $slices{'top_level'}->end,
-       $slices{$supercontig}->get_seq_region_id,
-       $slices{$supercontig}->start,
-       $slices{$supercontig}->end,
-       1,
-       $output_db
-      );
+    &load_assembly( $slices{'top_level'}->get_seq_region_id,
+                    $slices{'top_level'}->start,
+                    $slices{'top_level'}->end,
+                    $slices{$supercontig}->get_seq_region_id,
+                    $slices{$supercontig}->start,
+                    $slices{$supercontig}->end,
+                    1,
+                    $output_db );
   }
 
   # Load assemby tables for each other coord system vs seq_level
 
-  foreach my $cs (keys %slices){
-    print "Slice ".$slices{$cs}->name."\n"if $MIT_DEBUG;
-    next if ($cs eq 'seq_level');
-    print "Making assembly for $cs vs seq level\n"if $MIT_DEBUG;
-    &load_assembly 
-      (
-       $slices{$cs}->get_seq_region_id,
-       $slices{$cs}->start,
-       $slices{$cs}->end,
-       $slices{'seq_level'}->get_seq_region_id,
-       $slices{'seq_level'}->start,
-       $slices{'seq_level'}->end,
-       1,
-       $output_db
-      )
-    }
+  foreach my $cs ( keys %slices ) {
+    print "Slice " . $slices{$cs}->name . "\n" if $MIT_DEBUG;
+    next if ( $cs eq 'seq_level' );
+    print "Making assembly for $cs vs seq level\n" if $MIT_DEBUG;
+    &load_assembly( $slices{$cs}->get_seq_region_id,
+                    $slices{$cs}->start,
+                    $slices{$cs}->end,
+                    $slices{'seq_level'}->get_seq_region_id,
+                    $slices{'seq_level'}->start,
+                    $slices{'seq_level'}->end,
+                    1,
+                    $output_db );
+  }
   return 0;
-}
+} ## end sub load_chromosomes
 
 ##################################################################
 # Do the sql statement to load the values into the assembly table
 
-sub load_assembly{
-  my ($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori, $db) = @_;
+sub load_assembly {
+  my ( $chr_id, $chr_start, $chr_end,
+       $contig, $contig_start, $contig_end,
+       $contig_ori, $db ) = @_;
 
-  if(!$contig){
+  if ( !$contig ) {
     #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
     die "contig id must be defined for this to work\n";
   }
   my $sql = "insert into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
   # print "$sql\n";
   my $sth = $db->dbc->prepare($sql);
-  $sth->execute($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori); 
-return 0;
+  $sth->execute( $chr_id, $chr_start, $chr_end, $contig, $contig_start,
+                 $contig_end, $contig_ori );
+  return 0;
 }
 
 sub check_codon_table {
   my ($out_db,$mt_slice) = @_;
   my $found;
+  my $mt_slice_dbID = $slice_adaptor->get_seq_region_id($mt_slice);
 
   my $sql = "SELECT sra.value ".
             "FROM seq_region_attrib sra, attrib_type att ".
             "WHERE sra.attrib_type_id = att.attrib_type_id ".
             "AND att.code = 'codon_table' ".
-            "AND sra.seq_region_id = ".$mt_slice->dbID;
+            "AND sra.seq_region_id = ". $mt_slice_dbID;
   my $sth = $out_db->dbc->prepare($sql) or die "sql error!";
   $sth->execute();
-  my $val = $sth->fetchrow(); 
+  my $val = $sth->fetchrow();
   $sth->finish;
+
 
   if ($val == 2) {
     $found = 1;
