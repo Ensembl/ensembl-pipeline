@@ -6,16 +6,20 @@ use vars qw( %MitConf );
 
 %MitConf = (
 	    #location of genbank file
-	    MIT_GENBANK_FILE => '/nfs/acari/sw4/cvs_checkout/ensembl-personal/sw4/Builds/Guineapig/Data/NC_000884.gb',
+	    MIT_GENBANK_FILE => '/lustre/scratch103/ensembl/ba1/releases/v57/rat_MT_AC_000022.gb',
 	    # database to put sequnece and genes into
-	    MIT_DBNAME => 'sw4_cavia_core',
-	    MIT_DBHOST => 'genebuild5',
+	    MIT_DBNAME => 'ba1_rattus_norvegicus_core_57_34y',
+	    MIT_DBHOST => 'genebuild3',
 	    MIT_DBUSER => 'ensadmin',
 	    MIT_DBPASS => 'ensembl',
 	    MIT_DBPORT => '3306',
 	    # logic name of analysis object to be assigned to coding genes
 	    # Non coding genes are assigned ncRNA
-	    MIT_LOGIC_NAME => 'ensembl',
+	    MIT_LOGIC_NAME => 'MT_genbank_import',
+            # name of sequence downloaded from genbank eg NC_001665
+            #  OR you can include the full http path if you like 
+            #  eg http://www.ncbi.nlm.nih.gov/nuccore/NC_001665
+            MIT_DB_FILE => 'http://www.ncbi.nlm.nih.gov/nuccore/NC_XXXX',
 	    # if want the verbose output and sequence output after the load
 	    MIT_DEBUG => '',
 	    # Name of the mitochondrial chromosome
@@ -28,7 +32,7 @@ use vars qw( %MitConf );
 	    MIT_SUPERCONTIG_SEQNAME => '',
 	    MIT_CLONE_SEQNAME => '',
 	    # Name of top level in coord system
-	    MIT_TOPLEVEL => 'scaffold',
+	    MIT_TOPLEVEL => 'chromosome',
 	    # Different oganisms use different mitochondial codons:
 	    # Vertebrate Mitochondrial (2)
 	    # Yeast Mitochondrial (3)
