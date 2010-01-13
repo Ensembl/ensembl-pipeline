@@ -298,15 +298,7 @@ if (@mt_genes && scalar(@mt_genes) > 0){
 #########################################
 #Fetch analysis object
 
-my $logic_name = 'ncRNA';
-my $ncRNA_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
-if(!defined $ncRNA_analysis){
-#croak "analysis $logic_name not found\n";
-  $ncRNA_analysis = Bio::EnsEMBL::Analysis->new(
-                                                -logic_name => 'ncRNA',
-                                               );
-  print "You have no ".$logic_name." defined creating new object\n";
-}
+my $logic_name;
 
 if ($MIT_LOGIC_NAME){
   $logic_name = $MIT_LOGIC_NAME;
@@ -374,8 +366,7 @@ for (my $i=1; $i <= $#genbank; $i++){
     $type = $MIT_RRNA_TYPE;
   }
   print "\n***********************************************************\n" ; 
-  # By default analysis is set to ncRNA
-  my $analysis = $ncRNA_analysis;
+  my $analysis = $ensembl_analysis;
   my $transcript = new Bio::EnsEMBL::Transcript;
   my $start_exon;
   my $end_exon;
