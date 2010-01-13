@@ -311,15 +311,21 @@ if(!defined $ncRNA_analysis){
 if ($MIT_LOGIC_NAME){
   $logic_name = $MIT_LOGIC_NAME;
 } else {
-  $logic_name = 'ensembl';
+  $logic_name = 'MT_genbank_import';
   print "Cannot find MIT_LOGIC_NAME - using standard logic name ensembl\n" if $MIT_DEBUG;
 }
+if (!$MIT_DB_FILE) {
+  warning("MIT_DB_FILE not defined");
+}
+
 my $ensembl_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if(!defined $ensembl_analysis){
   #croak "analysis $logic_name not found\n";
   $ensembl_analysis =
-    Bio::EnsEMBL::Analysis->new( -logic_name => 'ensembl', );
-
+    Bio::EnsEMBL::Analysis->new( -logic_name => 'MT_genbank_import', );
+  if (defined $MIT_DB_FILE) {
+    $ensembl_analysis->db_file($MIT_DB_FILE);
+  }
   print "You have no ".$logic_name." defined creating new object\n";
 }
 
