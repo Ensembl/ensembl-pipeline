@@ -14,7 +14,7 @@ use vars qw( %MitConf );
 	    MIT_DBPASS => 'ensembl',
 	    MIT_DBPORT => '3306',
 	    # logic name of analysis object to be assigned to coding genes
-	    # Non coding genes are assigned ncRNA
+	    # Non coding genes are also assinged this logic_name 
 	    MIT_LOGIC_NAME => 'MT_genbank_import',
             # name of sequence downloaded from genbank eg NC_001665
             #  OR you can include the full http path if you like 
