@@ -83,11 +83,15 @@ B<ensembl-dev@ebi.ac.uk>
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
 use strict;
-use vars qw(%Config);
+use vars qw(%Config @QUEUE_CONFIG);
 
 #eFG ARRAYS dynamic config
 require "$ENV{'WORK_DIR'}/batch_queue.pm";
-use batch_queue;
+#use batch_queue;
+#use Data::Dumper;
+
+#warn "required $ENV{'WORK_DIR'}/batch_queue.pm";
+#warn "queue config is ".Data::Dumper::Dumper(\@QUEUE_CONFIG);
 
 
 %Config = 
@@ -167,7 +171,8 @@ use batch_queue;
     #},
 	
 	#eFG ARRAYS dynamic config from $WORK_DIR/batch_queue.pm
-	@batch_queue::QUEUE_CONFIG,
+	#@batch_queue::QUEUE_CONFIG,
+	@QUEUE_CONFIG,
    ]
   );
 
