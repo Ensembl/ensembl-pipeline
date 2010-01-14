@@ -707,6 +707,13 @@ sub project_transcript_the_hard_way {
 						    $new_trans);
 		$warnings .= sprintf("WARNING: transcript %s  has lost its translation %s\n",
 							  $t->stable_id, $t->translation->stable_id);
+		# We also need to unset the CDS_start/end_NF attribs
+		my ($CDS_start_NF) = @{ $new_trans->get_all_Attributes('cds_start_NF') };
+		my ($CDS_end_NF) = @{ $new_trans->get_all_Attributes('cds_end_NF') };
+		$CDS_start_NF->value(0) if $CDS_start_NF;
+		$CDS_end_NF->value(0) if $CDS_end_NF;
+
+
 	}
 
 	my @new_e;
