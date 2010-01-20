@@ -209,7 +209,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $total_genes      = 0;
 	my $transfered_genes = 0;
 	my $total_sf         = 0;
-	my $created_genes	 = 0;
+	my $total_created_genes	 = 0;
 	my $transfered_sf    = 0;
 	my $skipped_sf       = 0;
 	my $missed_g        = 0;
@@ -310,6 +310,8 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	  GENE: foreach my $g (@genes) {
 	  		my ($gene_name_attrib) = @{ $g->get_all_Attributes('name') };
 	  		my $gene_name = $gene_name_attrib ? $gene_name_attrib->value : "UNDEF";
+	  		my $complex_transfer = 0; # gene complex transfer flag
+	  		my $this_created_gene;
 			my $tg = Bio::Vega::Gene->new;
 			$tg->analysis( $g->analysis );
 			$tg->biotype( $g->biotype );
@@ -345,6 +347,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					&remove_all_db_ids($tt);
 					&log_compare_transcripts( $t, $tt );
 				} else {
+					$complex_transfer = 1;
 					if(&transcript_is_missed($t,$alt_sl)) {
 						$support->log_verbose(
 							sprintf(
@@ -485,8 +488,9 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						next GENE;
 					}
 				}
-
-				$created_genes += (scalar(@$genes) -1);
+				$this_created_gene = scalar(@$genes) -1;
+				$complex_transfer = 1 if $this_created_gene;
+				$total_created_genes += $this_created_gene;
 
 				foreach my $gene (@$genes) {
 					if ( $geneAd->store($gene) ) {
@@ -500,6 +504,18 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 							)
 						);
 						$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name) with %d missing transcripts\n",$gene->stable_id,$missing_transcript)) if $missing_transcript;
+						# for non-complex transfer throw a warning if the gene's version changed
+						# this means that the underlying sequence has changed !!!
+						# NB: for complex transfer warnings are thrown anyway
+						if( !($complex_transfer) && ($genes->[0]->version =! $g->version) ){
+							$support->log_verbose(
+									sprintf("WARNING: Check Gene $gene_name %s version %d (%d) with transcript sequence changes\n",
+											$genes->[0]->stable_id,
+											$genes->[0]->version,
+											$g->version)
+							);
+						}
+
 					} else {
 						throw(
 							sprintf(
@@ -511,7 +527,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						);
 					}
 				}
-				if(scalar(@$genes) -1) {
+				if($this_created_gene) {
 					# print info about split gene for the annotators
 					$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name), it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
@@ -553,9 +569,9 @@ INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$A_chr,            $support->param('altassembly'),
-				($transfered_genes - $created_genes), $total_genes,
+				($transfered_genes - $total_created_genes), $total_genes,
 				$missed_g, $total_genes,
-				$created_genes,
+				$total_created_genes,
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)
@@ -701,6 +717,10 @@ sub project_transcript_the_hard_way {
 	%$new_trans = %$t;
 	bless $new_trans, ref($t);
 	$new_trans->{'translation'} = undef;
+	# If any transcript reach this method, it needs to be checked
+	$warnings .= sprintf("WARNING: complex-transfer of transcript %s on gene %s\n",
+							  $t->stable_id,
+							  $g->stable_id);
 	if ( defined $t->translation ) {
 		&add_hidden_remark(	$t->slice->seq_region_name,
 						    sprintf("transcript %s has lost its translation %s",$t->stable_id,$t->translation->stable_id),
