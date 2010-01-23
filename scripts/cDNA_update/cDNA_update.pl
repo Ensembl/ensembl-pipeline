@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.48 2009-10-14 15:18:15 amonida Exp $
+#$Id: cDNA_update.pl,v 1.49 2010-01-23 11:13:04 jhv Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1374,6 +1374,9 @@ sub run_analysis {
                   . " -current_summary"
                   . " -finishedpercent\n\n" );
 
+            print "\n\nIf you stop the rule-manager due to inactivity / hanging you can restart the\n";
+            print "cDNA update procedure using :\n\n\t\t\tperl cDNA_update.pl run\n\n" ; 
+
             system($cmd);
         }
         else {
@@ -1531,9 +1534,11 @@ sub chase_jobs {
                 $CHUNK    = $ans;
                 $chunkDIR = $DATA_DIR . "/chunks3";
                 print("\nSplitting into $CHUNK chunks.\n");
-
+                
                 $cmd = "$FASTA_SPLIT $DATA_DIR/single_file.out "
-                      . $CHUNK . " " . $chunkDIR;
+                      . $CHUNK . " " . $chunkDIR; 
+
+                print $cmd . "\n" ; 
 
                 if ( system($cmd) ) {
                     croak("Couldn't split file.$@\n");
