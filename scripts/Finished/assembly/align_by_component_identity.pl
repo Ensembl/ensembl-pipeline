@@ -550,7 +550,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 									$support->log("start a new overlap non-align block\n");
 									push @{ $nomatch->{$R_chr} },
 									  [
-										$A_s, $A_e, $j, $R_s, $R_e, $i,
+										$A_s, $A_e, 1, $R_s, $R_e, 1,
 										$proj_chr->to_Slice->seq_region_name
 									  ];
 								}
