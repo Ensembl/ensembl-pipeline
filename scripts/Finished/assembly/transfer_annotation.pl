@@ -507,11 +507,11 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						# for non-complex transfer throw a warning if the gene's version changed
 						# this means that the underlying sequence has changed !!!
 						# NB: for complex transfer warnings are thrown anyway
-						if( !($complex_transfer) && ($genes->[0]->version =! $g->version) ){
+						if( !($complex_transfer) && ($gene->version != $g->version) ){
 							$support->log_verbose(
 									sprintf("WARNING: Check Gene $gene_name %s version %d (%d) with transcript sequence changes\n",
-											$genes->[0]->stable_id,
-											$genes->[0]->version,
+											$gene->stable_id,
+											$gene->version,
 											$g->version)
 							);
 						}
