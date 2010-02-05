@@ -6,10 +6,12 @@ use Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;
 use Bio::EnsEMBL::Analysis::Config::General;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning info);
+use Storable;
 
 
 my $uniprot_archive = 'uniprot_archive';
-my $verbose = 0;
+my $verbose = 1;
+my $debug = 1;
 
 sub new {
     my ( $class, @args ) = @_;
@@ -55,6 +57,7 @@ sub fetch_descriptions {
     my( $self, $id_list, $chunk_size ) = @_;
 
 	my $descriptions = {};	# results are stored here
+	my $hash = {}; # persistent hash with sequence descriptions
 	$chunk_size ||= 1000;
 	my $failed = [];
 	my $f;
@@ -62,13 +65,25 @@ sub fetch_descriptions {
 	my $query;
 	my $dbs;
 
+
 	# Get sequence length and description from local XDF database
 	# if an Analysis object is set
 	if($self->analysis) {
 		$self->is_light_fetch(1);
-		print STDOUT "Fetching ".@$id_list." sequences from XDF database\n" if $verbose;
+		# check that there is a persistent hash with the sequence descriptions
+		my $persistent = "/tmp/$$.desc";
+		if(-e "$persistent") {
+			$hash = retrieve "$persistent";
+		}
+		print STDOUT "DEBUG ".localtime().": Found ".scalar keys(%$hash)." sequence descriptions in $persistent\n" if $debug;
+		print STDOUT "Fetching ".scalar @$id_list." sequences from XDF database\n" if $verbose;
 		SEQ :
 		foreach (@$id_list) {
+			if($hash->{$_}) {
+				$descriptions->{$_}{description} = $hash->{$_}{description};
+				$descriptions->{$_}{length} = $hash->{$_}{length};
+				next SEQ
+			}
 			my $seq = $self->get_Seq_by_acc($_);
 			if(!$seq){
 				push @$failed,$_;
@@ -77,6 +92,8 @@ sub fetch_descriptions {
 			$descriptions->{$_}{description} = $seq->description();
 			$descriptions->{$_}{length} = $seq->length();
 		}
+
+		unlink "$persistent" if(-e "$persistent");
 	}
 
 
