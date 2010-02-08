@@ -94,23 +94,24 @@ sub get_Seq_by_accs {
     }
 
     $command = "$xdget $options $db ".join(" ",@$accs);
-    print $command."\n" if $debug;
-    $/ = ">";
+    print STDOUT $command."\n" if $debug;
+    undef $/;           # enable "slurp" mode
     open FH, "$command 2> /dev/null |" or throw("Error retrieving ".scalar(@$accs)." accessions from $db with $xdget");
+	my $out = <FH>;     # whole output now here
 
-    BLOCK:while(<FH>) {
-      next BLOCK if $_ =~ /^>$/;
-      my @rows = split("\n",$_);
+    BLOCK:foreach(split(/\n>/,$out)) {
+      my @rows = split(/\n/,$_);
       $desc = shift @rows;
-      # Parse EMBL header
+      $desc =~ s/^>//;
+      # EMBL header
       # >AF001541.1 Homo sapiens clone alpha_S628 mRNA sequence.
       ($acc) = $desc =~ /^(\w+\.\w+)/;
-      # Then parse refseq header if $acc not defined
+      # RefSeq header
       # >gi|8923664|ref|NM_017949.1| Homo sapiens CUE domain containing 1 (CUEDC1), mRNA
       ($acc) = $desc =~ /\|(\w+_\w+\.\w+)\|/ unless $acc;
-	  pop @rows unless $rows[-1] !~ />/;
 	  $seqstr = join('',@rows);
 	  $seqstr =~ s/\s//g;
+	  print STDOUT "Making Bio::Seq accession[$acc] description[$desc] seq[".length($seqstr)."]\n" if $debug;
 	  $seq = Bio::Seq->new(
 			    -seq              => $seqstr,
 			    -display_id       => $acc,
