@@ -17,7 +17,7 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_xdget
 Object to retrieve sequences using xdget (Wash U).
 Database must be formatted with xdformat. Sequence type (protein
 or nucleotide) is guessed, based on file extensions of the database
-files. Returns hashref with accession/Bio::Seq as key/value. 
+files. Returns hashref with accession/Bio::Seq as key/value.
 (Undef value if accession not found)
 
 Additional options for xdget can be specifed though no checking
@@ -102,7 +102,12 @@ sub get_Seq_by_accs {
       next BLOCK if $_ =~ /^>$/;
       my @rows = split("\n",$_);
       $desc = shift @rows;
+      # Parse EMBL header
+      # >AF001541.1 Homo sapiens clone alpha_S628 mRNA sequence.
       ($acc) = $desc =~ /^(\w+\.\w+)/;
+      # Then parse refseq header if $acc not defined
+      # >gi|8923664|ref|NM_017949.1| Homo sapiens CUE domain containing 1 (CUEDC1), mRNA
+      ($acc) = $desc =~ /\|(\w+_\w+\.\w+)\|/ unless $acc;
 	  pop @rows unless $rows[-1] !~ />/;
 	  $seqstr = join('',@rows);
 	  $seqstr =~ s/\s//g;
