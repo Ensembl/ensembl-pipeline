@@ -11,7 +11,7 @@ use Storable;
 
 my $uniprot_archive = 'uniprot_archive';
 my $verbose = 1;
-my $debug = 1;
+my $debug = 0;
 
 sub new {
     my ( $class, @args ) = @_;
