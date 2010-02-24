@@ -111,9 +111,13 @@ if ( scalar(@conditions) eq 0 && defined $add_rule) {
  push @conditions, "Submit_".$goal; 
  # check if submission analysis exists in database 
  my $sa = $anaAdaptor->fetch_by_logic_name("Submit_$goal"); 
- if (!defined $sa ) {  
-   throw("Your submission analysis Submit_$goal does not exist - needs to be created first.\n".
-         "Use ensembl-pipeline/scripts/add_Analysis script for this\n"); 
+ if (!defined $sa ) { 
+   my $goal_analysis = $anaAdaptor->fetch_by_logic_name($goal);  
+   my $analysis = new Bio::EnsEMBL::Pipeline::Analysis;
+   $analysis->logic_name("Submit_$goal");
+   $analysis->module("Dummy"); 
+   $analysis->input_id_type($goal_analysis->input_id_type);    
+   $anaAdaptor->store($analysis); 
  }
 }  
 
