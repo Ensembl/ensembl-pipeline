@@ -50,6 +50,7 @@ use strict;
 use Getopt::Long;
 
 use Bio::EnsEMBL::Root;
+use Bio::EnsEMBL::Utils::Exception qw(throw); 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule;
@@ -66,7 +67,8 @@ my $dbname   = 'pipeline';
 my $dbuser   = 'ensadmin';
 my $pass     = '';
 my $port     = '';
-my $help;
+my $help; 
+my $add_rule ; 
 my %rule_goals; # hash to link up goals with rules for speed later
 
 &GetOptions(
@@ -82,7 +84,8 @@ my %rule_goals; # hash to link up goals with rules for speed later
 	    'analyses'          => \$show_analyses,
 	    'rules'             => \$show_rules,
 	    'ruleId=i'          => \$ruleId,
-	    'h|help'            => \$help,
+	    'h|help'            => \$help, 
+            'auto!'             => \$add_rule,   # automatically create the condtion out of supplied logic_name 
 	   );	     
 if (!($insert||$delete||$show_analyses||$show_rules)) {
   $help = 1;
@@ -90,7 +93,6 @@ if (!($insert||$delete||$show_analyses||$show_rules)) {
 if ($help) {
     exec('perldoc', $0);
 }
-
 print STDERR $host." ".$dbname." ".$pass ." ".$dbuser." ".$port."\n";
 
 my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
@@ -102,7 +104,18 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new
   );
 
 my $anaAdaptor     = $db->get_AnalysisAdaptor();
-my $ruleAdaptor    = $db->get_RuleAdaptor;
+my $ruleAdaptor    = $db->get_RuleAdaptor; 
+
+
+if ( scalar(@conditions) eq 0 && defined $add_rule) {    
+ push @conditions, "Submit_".$goal; 
+ # check if submission analysis exists in database 
+ my $sa = $anaAdaptor->fetch_by_logic_name("Submit_$goal"); 
+ if (!defined $sa ) {  
+   throw("Your submission analysis Submit_$goal does not exist - needs to be created first.\n".
+         "Use ensembl-pipeline/scripts/add_Analysis script for this\n"); 
+ }
+}  
 
 my $basis          = "SubmitContig";
 
@@ -133,7 +146,9 @@ else { exec('perldoc', $0); }
 
 sub insert_rule {
 
-  $goal or die "Cannot insert a rule without a goal logic_name\n";
+  $goal or die "Cannot insert a rule without a goal logic_name\n"; 
+ 
+   
   @conditions or die "Cannot insert a rule without at least one condition logic_name\n";
   
   # check the goal is valid
