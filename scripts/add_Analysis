@@ -1,4 +1,4 @@
-#!/usr/local/bin/perl
+#!/usr/local/ensembl/bin/perl  -w 
 
 =head1 NAME
 
@@ -61,7 +61,7 @@ for the script to work the db files are required as are -logic_name
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-
+use Bio::EnsEMBL::Pipeline::Rule; 
 use strict;
 use Getopt::Long;
 
@@ -85,6 +85,7 @@ my $gff_source;
 my $gff_feature;
 my $input_id_type;
 my $help;
+my $create_submission_ana ;
 
 &GetOptions(
             'dbhost:s'  => \$host,
@@ -105,7 +106,8 @@ my $help;
             'gff_sources:s'      => \$gff_source,
             'gff_feature:s'      => \$gff_feature,
             'input_id_type:s'       => \$input_id_type,
-            'h|help'            => \$help,
+            'h|help'            => \$help, 
+            'auto|all!'   => \$create_submission_ana ,  # creates a submission analysis automatically and adds rule too 
            );
 
 
@@ -156,5 +158,25 @@ if ($gff_source)       {$analysis->gff_source        ($gff_source);}
 if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
 if ($input_id_type)       {$analysis->input_id_type     ($input_id_type);}
 
-$db->get_AnalysisAdaptor->store($analysis);
+$db->get_AnalysisAdaptor->store($analysis); 
+
+if ( defined $create_submission_ana ) {   
+  my $submission_logic_name = "Submit_$logic_name";
+  my $submit_analysis = Bio::EnsEMBL::Pipeline::Analysis->new ( 
+                            -module => "Dummy" , 
+                            -logic_name =>$submission_logic_name, 
+                            );
+  if ($input_id_type) {$submit_analysis->input_id_type($input_id_type);} 
+  $db->get_AnalysisAdaptor->store($submit_analysis);  
+  print "Submission analyis created : $submission_logic_name \n" ;   
+  # create rule   
+  my $rule = Bio::EnsEMBL::Pipeline::Rule->new(
+                                                -goalanalysis => $analysis,
+                                                -adaptor => $db, 
+                                              ); 
+  $rule->add_condition($submission_logic_name); 
+  $db->get_RuleAdaptor->store($rule);  
+  print "rule inserted : " . $analysis->logic_name ." ==>  $submission_logic_name \n" ; 
+} 
+
 
