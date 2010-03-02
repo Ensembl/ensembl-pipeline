@@ -91,7 +91,7 @@ foreach my $species (@speciess){
 
   print "Checking config\n";
   my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST 
-			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME OUTDIR);
+			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME );
   config_setup(\@localconfigvars,$species);
 }
 # once thats all done sucessfully start the rule managers
@@ -119,7 +119,7 @@ foreach my $species (@speciess){
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass -current";
+	  "-dbuser ensadmin -dbpass $pass -current -finishedpercent";
   
   print "$cmd\n";
   close SPEC;
@@ -326,14 +326,14 @@ sub DB_setup{
     # dont automatically run rfam jobs uless specifically requested
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT -dbpass $pass".
-	" -logic_name ncRNA -program cmsearch -program_file /software/ensembl/bin/cmsearch_0.72 -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
+	" -logic_name ncRNA -program cmsearch -program_file /software/ensembl/bin/cmsearch_1.0 -database Rfam -database_version $RFAMVERSION -database_file $BLASTDIR ".
 	  " -module Bio::EnsEMBL::Analysis::RunnableDB::Infernal".
 	    " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type FLAG";
     $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -logic_name RfamBlast -program wublastn -program_file wublastn -database Rfam ".
-	  " -database_file $BLASTDIR/high_copy.fasta -parameters \'lowcopy => $BLASTDIR/low_copy.fasta\' ".
+	" -logic_name RfamBlast -program wublastn -program_file /usr/local/ensembl/bin/wublastn -database Rfam ".
+	  " -database_file $BLASTDIR/filtered.fasta  -parameters  \'W=12 B=1000000 V=1000000 -hspmax 0 -gspmax 0 -kap -cpus=1\'" .
 	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastRfam".
 	      " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type SLICE";
     $status += system($cmd);
@@ -432,48 +432,31 @@ sub connect_db{
 }
 
 sub prepare_RFAM{
-  # high copy domains
-  my %high_copy = 
-    (RF00001 => 1,
-     RF00003 => 1,
-     RF00004 => 1,
-     RF00015 => 1,
-     RF00017 => 1,
-     RF00019 => 1,
-     RF00020 => 1,
-     RF00023 => 1,
-     RF00024 => 1,
-     RF00026 => 1,
-     RF00045 => 1,
-     RF00066 => 1,
-     RF00100 => 1,
-     RF00108 => 1,
-     RF00177 => 1,
-    );
+  # big families
+  my %avoid = ( "RF00177" => 1, #ssu
+		"RF00028" => 1, #GroupI Intron
+		"RF00029" => 1, #Group II Intron
+		"RF00005" => 1
+	      );
   my %families;
   
   # create Rfam.seed file
   my $exit;
   print "Updating RFAM descriptions file ...\n";
   system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz  -O $BLASTDIR/Rfam.tar.gz");
-  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.tar.gz\n") if $exit > 0;
-  $exit =   system ("gzip -d  $BLASTDIR/Rfam.tar.gz");
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.cm.gz  -O $BLASTDIR/Rfam.cm.gz");
+  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.cm.gz\n") if $exit > 0;
+  $exit =   system ("gzip -d  $BLASTDIR/Rfam.cm.gz");
   die ("Error decompressing Rfam.tar.gz\n") if $exit > 0;
-  $exit =  system ("tar -xf $BLASTDIR/Rfam.tar -U -C $BLASTDIR");
-  die ("Error extracting Rfam covariance models  file from $BLASTDIR/Rfam.tar\n") if $exit > 0;
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
   die ("Error with obtaining Rfam.seed file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
   die ("Error with obtaining Rfam.fasta file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.thr.gz -O $BLASTDIR/Rfam.thr.gz");
-  die ("Error with obtaining Rfam.thr file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.thr.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.seed.gz");
   die ("Error decompressing Rfam.seed.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.fasta.gz");
   die ("Error decompressing Rfam.fasta.gz\n") if $exit > 0;   
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.thr.gz");
-  die ("Error decompressing Rfam.thr.gz\n") if $exit > 0; 
   print "done\nUpdating miRNA file...";
   $exit =   system ("wget ftp://mirbase.org/pub/mirbase/CURRENT/miRNA.dat.gz -O $BLASTDIR/all_mirnas.embl.gz");
   $exit =   system ("gzip -d  $BLASTDIR/all_mirnas.embl.gz");
@@ -506,20 +489,14 @@ sub prepare_RFAM{
      -format => "Fasta",
     );
   
-  my $high_copy = Bio::SeqIO-> new
+  my $filtered_sequences = Bio::SeqIO-> new
     (
-     -file => ">$BLASTDIR/high_copy.fasta",
-     -format => "Fasta",
-    );
-  my $low_copy = Bio::SeqIO-> new
-    (
-     -file => ">$BLASTDIR/low_copy.fasta",
+     -file => ">$BLASTDIR/filtered.fasta",
      -format => "Fasta",
     );
   
   die ("Cannot open  /data/blastdb/Rfam/Rfam.fasta\n") unless $RFAM;
-  die ("Cannot open  $BLASTDIR/high_copy.fasta\n") unless $high_copy;
-  die ("Cannot open  $BLASTDIR/low_copy.fasta\n") unless $low_copy;
+  die ("Cannot open  $BLASTDIR/filtered.fasta\n") unless $filtered_sequences;
   print "Done\n";
   open (DESC,"$BLASTDIR/Rfam.seed") or die "Cannot open description file $BLASTDIR/Rfam.seed\n";
   
@@ -540,22 +517,18 @@ sub prepare_RFAM{
   
   
   while (my $seq = $RFAM->next_seq){
-    my $domain = $1 if $seq->desc =~ /^(RF\d+);.+/;
+    my $domain = $1 if $seq->display_id =~ /^(RF\d+);.+/;
     if ($families{$domain}){
-      if ($high_copy{$domain}){
-	$high_copy->write_seq($seq);
-      }
-      else {
-	$low_copy->write_seq($seq);
+      unless ($avoid{$domain}){
+	$filtered_sequences->write_seq($seq);
       }
     }
   }
   print "Done\n Formatting blast databases....\n";
   
   system ("xdformat -n $BLASTDIR/all_mirnas.fa");
-  system ("xdformat -n $BLASTDIR/high_copy.fasta");
-  system ("formatdb -i $BLASTDIR/low_copy.fasta -p f ");
-
+  system ("xdformat -n $BLASTDIR/filtered.fasta");
+  
 return 0;
 }
 
