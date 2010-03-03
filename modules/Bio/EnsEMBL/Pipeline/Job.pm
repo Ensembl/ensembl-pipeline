@@ -105,15 +105,32 @@ sub new {
   $self->output_dir($output_dir);
   $self->number_output_dirs($number_output_dirs); 
 
-  if ($self->output_dir) {
+  if ($self->output_dir) { 
     $self->make_filenames;
   } else {
     my $dir;
 
-    if (!exists($BATCH_QUEUES{$analysis->logic_name})) {
+
+    if (!exists($BATCH_QUEUES{$analysis->logic_name})) { 
+      # set default dir if analysis is NOT configured in BatchQueue
       $dir = $BATCH_QUEUES{default}{output_dir};
-    } else {
-      $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
+      if ( $dir !=~m/\/$/){
+         $dir.="/";
+      }  
+      $dir.=$analysis->logic_name; 
+     
+    } else {  
+      if ( defined $BATCH_QUEUES{$analysis->logic_name}{output_dir} ){ 
+        # analysis is configured...
+        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
+      }else {  
+        # analysis is configured but output dir is not defined; setup_queues() will set it to default_output_dir but we reset-it here... 
+        $dir = $BATCH_QUEUES{default}{output_dir}; 
+        if ( $dir !=~m/\/$/){
+          $dir.="/";
+        } 
+        $dir.=$analysis->logic_name; 
+      }
     }
 
     throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
@@ -971,7 +988,6 @@ sub remove {
 
 sub set_up_queues {
   my %q;
-
   foreach my $queue (@$QUEUE_CONFIG) {
     my $ln = $queue->{logic_name};
     #print "LOOKING AT ".$ln."\n";
@@ -979,7 +995,7 @@ sub set_up_queues {
 
     while (my($k, $v) = each %$queue) {
       next if $k eq 'logic_name';
-      #print "PREPARING ".$k." ".$v." entry\n";
+      #print "PREPARING ".$k." ".$v." entry \n";
       $q{$ln}{$k}     = $v;
     }
     $q{$ln}{jobs} = [];
@@ -991,7 +1007,7 @@ sub set_up_queues {
     $q{$ln}{retries} = $DEFAULT_RETRIES if !defined($q{$ln}{retries});
     $q{$ln}{cleanup} 				||= $DEFAULT_CLEANUP;
     $q{$ln}{runnabledb_path}||= $DEFAULT_RUNNABLEDB_PATH;
-    $q{$ln}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
+    #$q{$ln}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
     $q{$ln}{runner} 				||= $DEFAULT_RUNNER;
     $q{$ln}{verbosity} 			||= $DEFAULT_VERBOSITY;
     $q{$ln}{sub_args} 			||= $DEFAULT_SUB_ARGS;
