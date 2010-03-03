@@ -72,19 +72,27 @@ sub get_Seq_by_accs {
   my $xdget   = $self->executable;
   my $db      = $self->db;
   local       *FH;
-  my %acc_hash = map{ $_ => undef } @$accs;
+  my @sorted_list = sort @$accs;
+  my %acc_hash = map{ $_ => undef } @sorted_list;
 
 
   # maybe should have some checking here to see if -n/-p have
   # already been specified in options
 
+
+
   DB: foreach my $db (@{$self->db}) {
+  	my $accession_file = "/tmp/acc_${$}.list";
   	my $acc;
   	my $seq;
 	my $seqstr;
 	my $desc;
 	my $command;
     my $options = $self->options;
+
+	open(my $F,">$accession_file") or die "cannot create file $accession_file";
+	print $F join("\n",@sorted_list);
+	close $F;
 
     if ($self->_moltype($db) eq 'n') {
       $options .= " -n";
@@ -93,11 +101,12 @@ sub get_Seq_by_accs {
       $options .= " -p";
     }
 
-    $command = "$xdget $options $db ".join(" ",@$accs);
+    $command = "$xdget $options -f $db $accession_file";
     print STDOUT $command."\n" if $debug;
     undef $/;           # enable "slurp" mode
-    open FH, "$command 2> /dev/null |" or throw("Error retrieving ".scalar(@$accs)." accessions from $db with $xdget");
+    open FH, "$command 2> /dev/null |" or throw("Error retrieving ".scalar(@sorted_list)." accessions from $db with $xdget");
 	my $out = <FH>;     # whole output now here
+	unlink $accession_file;
 
     BLOCK:foreach(split(/\n>/,$out)) {
       my @rows = split(/\n/,$_);
@@ -124,12 +133,15 @@ sub get_Seq_by_accs {
     close FH;
     $/ = "\n";
 
-	$accs = [];
+	@sorted_list = ();
 	foreach(keys %acc_hash) {
-		push @$accs, $_ unless $acc_hash{$_};
+		push @sorted_list, $_ unless $acc_hash{$_};
 	}
-	last DB unless @$accs;
+	@sorted_list = sort @sorted_list;
+	last DB unless @sorted_list;
   }
+
+	print STDOUT "xdget fetcher found ".scalar(keys %acc_hash)." sequences\n" if $debug;
 
   return \%acc_hash;
 }
