@@ -166,7 +166,6 @@ my $ssa = $sdb->get_SliceAdaptor;
 my $saa = $sdb->get_AnalysisAdaptor;
 my $final_sa = $final_db->get_SliceAdaptor;
 my $old_sa = $olddb->get_SliceAdaptor;
-my $old_ga = $olddb->get_GeneAdaptor;
 my $final_aa = $final_db->get_AnalysisAdaptor;
 my $analysis;
 # just dump the xrefs
@@ -333,12 +332,17 @@ sub overlaps {
     my @overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
   GENE:  foreach my $overlap (@overlaps) {
       # store the overlapping gene in a hash keyed on the predicted genes dbID
-      if ($overlap->analysis->logic_name eq "ncRNA") {
+      if ($overlap->analysis->logic_name eq "ncRNA" or 
+	  $overlap->analysis->logic_name eq "ncRNA_pseudogene" ) {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
 	# used in a gene merge to remove overlapping ncRNAs from Sean Eddys set
-	$merge_set{$overlap->dbID} = 1 unless $overlap->description =~ /RFAM/;
+	if ( $overlap->analysis->logic_name eq "ncRNA_pseudogene" ) {
+	  print "Overlapping pseudogene " .  $gene->biotype . " vs ".$overlap->biotype." marking it for deletion\n";
+	  $merge_set{$overlap->dbID} =  $overlap;
+	  next GENE;
+	}
 	if( $overlap->biotype ne $gene->biotype  && !$biotype){
 	  print "The non coding gene overlap is of a different type, ".  $gene->biotype . " vs ".$overlap->biotype." not transferring this stable id \n";
 	  next GENE;
@@ -358,6 +362,7 @@ sub overlaps {
 	  my $reply = <>;
 	  chomp $reply;
 	  next GENE if $reply eq "A" or $reply eq "a";
+	  next GENE;
 	}
 	$noncoding{$gene->dbID} = $overlap;
       } else {
@@ -588,31 +593,27 @@ sub generate_new_ids{
 
 sub delete_genes {
   my ($old_hash,$ga,$merge_set) = @_;
-  return if scalar(keys %$old_hash) == 0;
+  return if ( scalar(keys %$old_hash) == 0 &&  scalar(keys %$merge_set) == 0 ) ;
   print STDERR "Warning you have not specified a biotype *ALL* ncRNAs will be deleted\n" unless ($biotype);
   print STDERR "Found ".scalar(keys %$old_hash)." genes  $final_dbname\nshall I delete them? (Y/N) ";
   my $reply = <>;
+  my @genes;
   chomp $reply;
   if ($reply eq "Y" or $reply eq "y") {
     foreach my $key (keys %$old_hash){
-      my $gene;
-      if ( $merge ){
-	# delete ALL the RFAM  / miRBase genes and any overlapping Sean Eddy genes
-	if ( $old_hash->{$key}->description =~ /RFAM/ or $old_hash->{$key}->biotype eq 'miRNA' or $merge_set->{$key} ){
-	  print "MERGE: " . $old_hash->{$key}->description . " ";
-
-	  print $old_hash->{$key}->seq_region_name . " " . 
-	    $old_hash->{$key}->biotype . " " .
-	      $old_hash->{$key}->seq_region_start . " " .
-		$old_hash->{$key}->seq_region_end . " " .
-		  $old_hash->{$key}->seq_region_strand . "\n";
-	  $gene = lazy_load($old_hash->{$key});
-	}
-      } else {
-	$gene = lazy_load($old_hash->{$key});
+      my $gene = lazy_load($old_hash->{$key});
+      next if $biotype && $gene->biotype eq $biotype;
+      push @genes,$gene;
+    }
+    if ( $merge ){
+      foreach my $key (keys %$merge_set){
+	my $gene = lazy_load($merge_set->{$key});
+	push @genes,$gene;	
       }
+    }
+    foreach my $gene ( @genes ) {
       next unless (defined($gene));
-      unless ($gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA'){
+      unless (( $gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA' ) or $gene->analysis->logic_name eq 'ncRNA_pseudogene' ){
 	throw("Gene to be deleted is not a non coding gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n");
       }
       print "Deleting gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";

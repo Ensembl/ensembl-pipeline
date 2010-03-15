@@ -333,7 +333,7 @@ sub DB_setup{
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name RfamBlast -program wublastn -program_file /usr/local/ensembl/bin/wublastn -database Rfam ".
-	  " -database_file $BLASTDIR/filtered.fasta  -parameters  \'W=12 B=1000000 V=1000000 -hspmax 0 -gspmax 0 -kap -cpus=1\'" .
+	  " -database_file $BLASTDIR/filtered.fasta  -parameters  \'W=12 B=10000 V=10000 -hspmax 0 -gspmax 0 -kap -cpus=1\'" .
 	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastRfam".
 	      " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type SLICE";
     $status += system($cmd);
