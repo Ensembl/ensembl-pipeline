@@ -219,7 +219,7 @@ my $repeats = at_content( $new_hash );
 print "Overlaps\n";
 # non-coding overlaps
 if ($use_old_ncRNAs){
-($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $old_sa , $old_ga);
+($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $old_sa , $old_ga,$final_ga);
 } else {
 ($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $final_sa , $final_ga);
 }
@@ -305,7 +305,7 @@ sub duplicates {
 }
 
 sub overlaps {
-  my ($genes , $sa, $ga)  = @_;
+  my ($genes , $sa, $ga, $fga)  = @_;
   # check for overlaps
   my %coding;
   my %noncoding;
@@ -330,6 +330,10 @@ sub overlaps {
       next NCRNA;
     }
     my @overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+    if ($use_old_ncRNAs && $merge){
+      push @overlaps , @{$fga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+    }
+    
   GENE:  foreach my $overlap (@overlaps) {
       # store the overlapping gene in a hash keyed on the predicted genes dbID
       if ($overlap->analysis->logic_name eq "ncRNA" or 
@@ -497,7 +501,23 @@ sub stable_id_mapping {
     # need gene archive entries also...
     print SIDS "INSERT INTO gene_archive(gene_stable_id,gene_version,transcript_stable_id,transcript_version,translation_stable_id,translation_version,peptide_archive_id,mapping_session_id) ";
     print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",'',0,0,$new_session);\n";
+  } 
+  if ( $merge ){
+    foreach my $old_gene (keys %$merge_set){
+      my $gene =  $merge_set->{$old_gene};
+      next unless $gene->biotype =~ /pseudogene/;
+      my $trans = $gene->get_all_Transcripts->[0];
+      # old gene does not need stable id transferring stable id is dead 
+      print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES('".
+	$gene->stable_id."',".$gene->version.",null,0,$new_session,'gene',0);\n";
+      print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES('".
+	$trans->stable_id."',".$trans->version.",null,0,$new_session,'transcript',0);\n";
+      # need gene archive entries also...
+      print SIDS "INSERT INTO gene_archive(gene_stable_id,gene_version,transcript_stable_id,transcript_version,translation_stable_id,translation_version,peptide_archive_id,mapping_session_id) ";
+      print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",'',0,0,$new_session);\n"; 
+    }
   }
+
   # new stable ids need to be added with the appropirate code...
   return $new_session;
 }
@@ -600,10 +620,12 @@ sub delete_genes {
   my @genes;
   chomp $reply;
   if ($reply eq "Y" or $reply eq "y") {
-    foreach my $key (keys %$old_hash){
-      my $gene = lazy_load($old_hash->{$key});
-      next if $biotype && $gene->biotype eq $biotype;
-      push @genes,$gene;
+    unless ( $use_old_ncRNAs ) {
+      foreach my $key (keys %$old_hash){
+	my $gene = lazy_load($old_hash->{$key});
+	next if $biotype && $gene->biotype eq $biotype;
+	push @genes,$gene;
+      }
     }
     if ( $merge ){
       foreach my $key (keys %$merge_set){
@@ -664,7 +686,7 @@ sub lazy_load {
   $gene->get_all_Exons->[0]->stable_id;
   $gene->get_all_DBEntries;
   $gene->get_all_Transcripts->[0]->get_all_supporting_features;
-  return $gene;
+   return $gene;
 }
 
 sub dump_xrefs {
@@ -731,7 +753,8 @@ sub fetch_genes {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,"biotype != '".$biotype_to_skip."'")};
       } else {
 	@ncRNAs =  @{$ga->fetch_all_by_Slice_constraint($slice,'biotype like "%RNA%" ')};
-      }
+      } 
+    #  print "slice " . $slice->name . " got " . scalar(@ncRNAs) . "\n";
       foreach my $ncRNA (@ncRNAs) {
 	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
 	unless ($ncRNA->biotype eq 'miRNA' or
