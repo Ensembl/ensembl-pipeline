@@ -500,7 +500,7 @@ sub stable_id_mapping {
       $trans->stable_id."',".$trans->version.",null,0,$new_session,'transcript',0);\n";
     # need gene archive entries also...
     print SIDS "INSERT INTO gene_archive(gene_stable_id,gene_version,transcript_stable_id,transcript_version,translation_stable_id,translation_version,peptide_archive_id,mapping_session_id) ";
-    print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",'',0,0,$new_session);\n";
+    print SIDS "VALUES('". $gene->stable_id."',".$gene->version.",'". $trans->stable_id."',".$trans->version.",null,0,0,$new_session);\n";
   } 
   if ( $merge ){
     foreach my $old_gene (keys %$merge_set){
