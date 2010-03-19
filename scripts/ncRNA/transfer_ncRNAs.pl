@@ -329,9 +329,16 @@ sub overlaps {
       $coding{$gene->dbID} = 1;
       next NCRNA;
     }
-    my @overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+     my @overlaps;
     if ($use_old_ncRNAs && $merge){
-      push @overlaps , @{$fga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+      my  @livemirror_overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+      # ignore ncRNA pseudogenes
+      foreach my $o ( @livemirror_overlaps ) {
+	push @overlaps, $o unless $o->biotype =~ /RNA_pseudogene/ ;
+      }
+      push @overlaps, @{$fga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
+    } else {
+      @overlaps = @{$ga->fetch_all_by_Slice_constraint($slice,"seq_region_strand = ".$gene->strand)};
     }
     
   GENE:  foreach my $overlap (@overlaps) {
@@ -487,9 +494,9 @@ sub stable_id_mapping {
   # deleting
   foreach my $old_gene (keys %$old_hash){
     next if $done{$old_gene};
-    if ( $merge ){
-      # we might not delete all the old genes so we dont want stable id mappings for them
-      next unless ( $old_hash->{$old_gene}->description =~ /RFAM/ or $old_hash->{$old_gene}->biotype eq 'miRNA' or $merge_set->{$old_gene} )
+    my $gene =  $old_hash->{$old_gene};
+    if ( $use_old_ncRNAs ){
+      next if  $gene->biotype =~ /pseudogene/;
     }
     my $gene =  $old_hash->{$old_gene};
     my $trans = $gene->get_all_Transcripts->[0];
