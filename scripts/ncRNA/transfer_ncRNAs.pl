@@ -219,9 +219,9 @@ my $repeats = at_content( $new_hash );
 print "Overlaps\n";
 # non-coding overlaps
 if ($use_old_ncRNAs){
-($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $old_sa , $old_ga,$final_ga);
+($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $old_sa , $old_ga,$final_ga) unless $no_stable_ids;;
 } else {
-($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $final_sa , $final_ga);
+($noncoding_overlaps,$coding_overlaps,$merge_set) = overlaps($new_hash, $final_sa , $final_ga) unless $no_stable_ids;
 }
 
 # make blacklist of genes to drop
