@@ -25,11 +25,12 @@ See the Net::Netrc module for more details.
 =head1 OPTIONS
 
 	-help|h		displays this documentation with PERLDOC
-	-verbose
+	-verbose	print the submission and update info
 	-sleep		this is the amount of time the script will sleep for
 			after each loop and wait for free slots (default: 180s)
-	-flush		the number of loop after which the jobs batch queues should be flushed (default: 30)
-	-fetch_number	number of jobs fetched from the queue (default: 100)
+	-flush		flush the jobs batch queues after this number of loop (default: 30)
+	-check		check the status of the pipeline jobs after this number of loops (default: 100)
+	-fetch_number	number of jobs fetched from the database queue, pipe_queue (default: 100)
 	-analysis 	a logic_name of an analysis you want to dequeue and submit.
 			If you specify this option you will only submit this analysis
 			or analyses as the option can appear on the command line
@@ -39,7 +40,7 @@ See the Net::Netrc module for more details.
   			analyses which won't be submit
   	-pipeline	only dequeue jobs stored in this pipeline(s)
   	-skip_pipeline	don't dequeue jobs stored in this pipeline(s)
-  	-host	only dequeue jobs stored on this host(s)
+  	-host		only dequeue jobs stored on this host(s)
   	-skip_host	don't dequeue jobs stored on this host(s)
 
 These arguments are overridable configurations
@@ -80,6 +81,7 @@ my $queue_host;
 my $queue_name;
 my $sleep = 180;
 my $flush = 30; # batch queue flush frequency: n => flush the batch queue once every n loops
+my $check = 100; # job status check frequency
 my $fetch_number = 100;
 my @analyses_to_run;
 my @analyses_to_skip;
@@ -88,6 +90,11 @@ my @pipeline_to_skip;
 my @host_to_run;
 my @host_to_skip;
 my $db_adaptors;
+
+my @PIPE_HOST = qw/otterpipe1 otterpipe2/;
+
+my %AWOL_VALID_STATUS = map{$_, 1}
+	('SUBMITTED', 'RUNNING', 'READING','WRITING', 'WAITING','AWOL');
 
 my $usage = sub { exec( 'perldoc', $0 ); };
 
@@ -102,6 +109,7 @@ GetOptions(
 	'queue_host=s'    => \$queue_host,
 	'sleep=s'		  => \$sleep,
 	'flush=s'		  => \$flush,
+	'check=s'		  => \$check,
 	'fetch_number=s'  => \$fetch_number,
 	'analysis|logic_name=s@' => \@analyses_to_run,
 	'skip_analysis=s@'       => \@analyses_to_skip,
@@ -182,9 +190,9 @@ my $batch_q_object = $batch_q_module->new();
 my $loop = 1;
 # The main loop
 while ($loop) {
-	my $free_slots = &job_stats;
-	&flush_queue($free_slots);
-	&flush_batch() if( $loop%$flush ==0);
+	my $free_slots = &job_stats( $loop%$check == 0 || $loop == 1 );
+	&flush_queue( $free_slots );
+	&flush_batch() if( $loop%$flush == 0 );
 	sleep($sleep);
 	print "Waking up and run again (loop $loop) !\n" if $verbose;
 	$loop++;
@@ -269,6 +277,7 @@ sub flush_queue {
 
 # Get some stats about farm jobs
 sub job_stats {
+	my ($update_job) = @_;
 
 	# Do job_stats call before getting jobs
 	if ( !$batch_q_object->can('job_stats') ) {
@@ -279,6 +288,8 @@ sub job_stats {
 	my %job_stats = %{ $batch_q_object->job_stats };
 
 	my $global_job_count = 0;    # job count for all pipelines
+
+	&update_job_status(\%job_stats) if $update_job;
 
   GLOBAL: foreach my $sub_id ( keys %job_stats ) {
 		if ( $statuses_to_count{ $job_stats{$sub_id} } ) {
@@ -296,6 +307,33 @@ sub job_stats {
 	  : 0;    # total nb. of jobs must not exceeds job limit
 	print "$free_slots slots available\n" if $verbose;
 	return $free_slots;
+}
+
+sub update_job_status {
+	my ($bjobs_hash) = @_;
+	print STDOUT "Updating Pipeline Job Status\n" if $verbose;
+	HOST: foreach my $host (@PIPE_HOST) {
+		print STDOUT ('-'x50)."\n$host\n" if $verbose;
+		my $sth = &get_dbi("",$host)->prepare("SHOW DATABASES LIKE 'pipe_%'");
+		$sth->execute;
+		PIPE: while(my ($pipe) = $sth->fetchrow_array){
+			print "\t$pipe\n" if $verbose;
+			my $dba = &get_db_adaptor($pipe,$host);
+			my @jobs = $dba->get_JobAdaptor->fetch_by_Status_not_like('CREATED');
+			JOB: foreach my $job (@jobs) {
+				if ( !$bjobs_hash->{ $job->submission_id } ) {
+					my $db_status = $job->current_status->status;
+					if($AWOL_VALID_STATUS{$db_status}){
+						my $status = &status_from_output($job) || 'AWOL';
+						if($status ne $db_status){
+							print "Job ".$job->dbID." status $db_status changed to $status\n" if $verbose;
+							$job->set_status($status);
+						}
+					}
+				}
+			}
+		}
+	}
 }
 
 sub get_job_from_db {
@@ -361,5 +399,24 @@ sub get_db_param {
 sub delete_job {
 	my ($id) = @_;
 	return $delete->execute($id);
+}
+
+sub status_from_output {
+	my ( $job ) = @_;
+	my $out_file = $job->stdout_file;
+	my $status;
+	eval {
+		if ( -e $out_file ) {
+			open( my $F, "<$out_file" );
+			while (<$F>) {
+				if (/TERM_MEMLIMIT/) { $status = 'OUT_OF_MEMORY'; last; }
+				if (/TERM_RUNLIMIT/) { $status = 'RUNTIME_LIMIT'; last; }
+			}
+			close($F);
+		}
+	};
+	print STDERR "ERROR [$@]\n" if ( $@ && $verbose );
+
+	return $status;
 }
 
