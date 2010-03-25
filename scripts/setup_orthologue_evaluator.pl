@@ -93,7 +93,7 @@ my %opt = (
     dbuser => 'ensadmin',
     dbpass => 'ensembl',
     dbport => '3306',
-    exonerate_file => 'exonerate-1.0.0',
+    exonerate_file => 'exonerate-0.8.3',
 );
 
 &GetOptions(
@@ -106,7 +106,7 @@ my %opt = (
     'verbose+',  
     'exonerate_file=s', # specify the name of the exonerate program_file for analysis table 
                         # in /usr/local/bin/ensembl/bin if don't want to use the default 
-                        # (exonerate-1.0.0)
+                        # (exonerate-0.8.3)
 
     'write',   # if you want to write the Exonerate2Genes file  
 ); 
