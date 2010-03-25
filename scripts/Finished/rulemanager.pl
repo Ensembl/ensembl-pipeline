@@ -226,8 +226,6 @@ if ($rules_sanity) {
 }
 
 
-my $space = $rulemanager->job_stats($job_limit);
-
 my %always_incomplete_accumulators;
 my %accumulator_analyses;
 
@@ -394,8 +392,6 @@ LOOP: while (1) {
 			}
 		}
 	}
-
-	$space = $rulemanager->job_stats($job_limit);
 
 	if ( !$done && !$naccum_submitted ) {
 		if ( !$rulemanager->check_if_done ) {
