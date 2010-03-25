@@ -401,6 +401,15 @@ sub delete_job {
 	return $delete->execute($id);
 }
 
+=head2 status_from_output
+
+  Arg : Job object
+  Function  : Read the job's output file and return the exception status if any.
+  			  could be OUT_OF_MEMORY or RUNTIME_LIMIT.
+  Returntype: string
+
+=cut
+
 sub status_from_output {
 	my ( $job ) = @_;
 	my $out_file = $job->stdout_file;
