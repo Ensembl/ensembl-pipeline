@@ -38,6 +38,8 @@ See the Net::Netrc module for more details.
   	-skip_analysis	a logic_name of an analysis you don't want to dequeue and
   			submit. If this option is specified these are the only
   			analyses which won't be submit
+	-ana_regex 	dequeue and submit analysis logic_name that matches this regular expression
+  	-skip_ana_regex	skip analysis logic_name that matches this regular expression
   	-pipeline	only dequeue jobs stored in this pipeline(s)
   	-skip_pipeline	don't dequeue jobs stored in this pipeline(s)
   	-host		only dequeue jobs stored on this host(s)
@@ -83,8 +85,10 @@ my $sleep = 180;
 my $flush = 30; # batch queue flush frequency: n => flush the batch queue once every n loops
 my $check = 100; # job status check frequency
 my $fetch_number = 100;
-my @analyses_to_run;
-my @analyses_to_skip;
+my @analysis_to_run;
+my @analysis_to_skip;
+my $analysis_regex_skip;
+my $analysis_regex_run;
 my @pipeline_to_run;
 my @pipeline_to_skip;
 my @host_to_run;
@@ -111,8 +115,10 @@ GetOptions(
 	'flush=s'		  => \$flush,
 	'check=s'		  => \$check,
 	'fetch_number=s'  => \$fetch_number,
-	'analysis|logic_name=s@' => \@analyses_to_run,
-	'skip_analysis=s@'       => \@analyses_to_skip,
+	'analysis|logic_name=s@' => \@analysis_to_run,
+	'skip_analysis=s@'       => \@analysis_to_skip,
+	'ana_regex=s' => \$analysis_regex_run,
+	'skip_ana_regex=s'       => \$analysis_regex_skip,
 	'pipeline=s@'		=> \@pipeline_to_run,
 	'skip_pipeline=s@'       => \@pipeline_to_skip,
 	'host=s@'		=> \@host_to_run,
@@ -127,8 +133,8 @@ $queue_manager = $QUEUE_MANAGER unless ($queue_manager);
 $queue_host    = $QUEUE_HOST    unless ($queue_host);
 $queue_name    = $QUEUE_NAME    unless ($queue_name);
 
-@analyses_to_run = map {split/,/} @analyses_to_run ;
-@analyses_to_skip = map {split/,/} @analyses_to_skip ;
+@analysis_to_run = map {split/,/} @analysis_to_run ;
+@analysis_to_skip = map {split/,/} @analysis_to_skip ;
 @pipeline_to_run = map {split/,/} @pipeline_to_run ;
 @pipeline_to_skip = map {split/,/} @pipeline_to_skip ;
 @host_to_run = map {split/,/} @host_to_run ;
@@ -137,13 +143,21 @@ $queue_name    = $QUEUE_NAME    unless ($queue_name);
 # Job fetch statement handle
 my $sql_fetch = qq(SELECT id, created, priority, job_id, host, pipeline, analysis, is_update FROM queue);
 my @where = ();
-if(@analyses_to_run) {
-  my $ana_string = join("', '", @analyses_to_run);
+if(@analysis_to_run) {
+  my $ana_string = join("', '", @analysis_to_run);
   push @where, "analysis IN ('$ana_string')";
 }
-if(@analyses_to_skip) {
-  my $skip_ana_string = join("', '", @analyses_to_skip);
+if(@analysis_to_skip) {
+  my $skip_ana_string = join("', '", @analysis_to_skip);
   push @where, "analysis NOT IN ('$skip_ana_string')";
+}
+if($analysis_regex_run) {
+  my $ana_string = join("', '", @analysis_to_run);
+  push @where, "analysis LIKE '%${analysis_regex_run}%'";
+}
+if($analysis_regex_skip) {
+  my $skip_ana_string = join("', '", @analysis_to_skip);
+  push @where, "analysis NOT LIKE '%${analysis_regex_skip}%'";
 }
 if(@pipeline_to_run) {
   my $pipe_string = join("', '", @pipeline_to_run);
@@ -400,15 +414,6 @@ sub delete_job {
 	my ($id) = @_;
 	return $delete->execute($id);
 }
-
-=head2 status_from_output
-
-  Arg : Job object
-  Function  : Read the job's output file and return the exception status if any.
-  			  could be OUT_OF_MEMORY or RUNTIME_LIMIT.
-  Returntype: string
-
-=cut
 
 sub status_from_output {
 	my ( $job ) = @_;
