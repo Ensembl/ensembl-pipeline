@@ -340,7 +340,8 @@ sub update_job_status {
 					if($AWOL_VALID_STATUS{$db_status}){
 						my $status = &status_from_output($job) || 'AWOL';
 						if($status ne $db_status){
-							print "Job ".$job->dbID." status $db_status changed to $status\n" if $verbose;
+							print "Job ".$job->dbID." ".$job->analysis->logic_name
+							." status $db_status changed to $status\n" if $verbose;
 							$job->set_status($status);
 						}
 					}
