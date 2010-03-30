@@ -199,9 +199,19 @@ sub fetch_descriptions {
 
 sub fetch_mm_data {
 	my ($self,$dbname,$sql,$group,$ids, $chunk_size,$descriptions) = @_;
+	my ($dsn_mole,$dbh);
 
-	my $dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$dbname;
-	my $dbh = DBI->connect( $dsn_mole, $self->mm_user, '',{ 'RaiseError' => 1 } );
+	if($dbname eq $uniprot_archive){
+		my $param = $self->get_param_from_connections($uniprot_archive);
+		$dsn_mole = "DBI:mysql:host=".$param->{'host'}.":port=".$param->{'port'}.":".$uniprot_archive;
+		$dbh = DBI->connect( $dsn_mole, $param->{'username'}, '',{ 'RaiseError' => 1 } );
+	} else {
+		$dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$dbname;
+		$dbh = DBI->connect( $dsn_mole, $self->mm_user, '',{ 'RaiseError' => 1 } );
+	}
+
+	print STDOUT "Connect to $dsn_mole\n" if $debug;
+
 	my $failed = [];
 
 	for (my $i = 0; $i < @$ids; $i += $chunk_size) {
@@ -256,23 +266,33 @@ sub fetch_mm_data {
     return $failed;
 }
 
+sub get_param_from_connections {
+	my ($self,$dbname) = @_;
+	my $query = "SELECT host,port,username
+				FROM connections
+				WHERE is_active = 'yes'
+				AND db_name LIKE '$dbname'
+				ORDER BY conn_id ASC
+				LIMIT 1";
+	my $ini_sth = $self->get_mm_ini_sth($query);
+
+	my $hash = $ini_sth->fetchrow_hashref() ;
+	throw("Couldn't get an active $dbname from the mm_ini:connections table") unless $hash;
+
+	return $hash;
+}
+
 
 sub get_dbnames_like {
 	my ($self, $db) = @_;
-
-	my $ini_db = 'mm_ini';
 	my @dbs;
-
-	my $dsn_mole_ini = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$ini_db;
-	my $dbh_ini = DBI->connect( $dsn_mole_ini, $self->mm_user, '',{ 'RaiseError' => 1 } );
 
 	my $query = "SELECT database_name
 				 FROM ini
 				 WHERE available = 'yes'
 				 AND database_category LIKE \'$db\'
 				 ORDER BY installation DESC";
-	my $ini_sth = $dbh_ini->prepare($query);
-	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
+	my $ini_sth = $self->get_mm_ini_sth($query);
 
 	while(my $hash = $ini_sth->fetchrow_hashref()) {
 		push @dbs, $hash->{'database_name'};
@@ -280,6 +300,19 @@ sub get_dbnames_like {
 	$ini_sth->finish();
 
 	return \@dbs;
+}
+
+sub get_mm_ini_sth {
+	my ($self,$query) = @_;
+
+	my $ini_db = 'mm_ini';
+	my $dsn_mole_ini = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$ini_db;
+	my $dbh_ini = DBI->connect( $dsn_mole_ini, $self->mm_user, '',{ 'RaiseError' => 1 } );
+
+	my $ini_sth = $dbh_ini->prepare($query);
+	$ini_sth->execute() or die "Couldn't execute statement: " . $ini_sth->errstr;
+
+	return $ini_sth;
 }
 
 
