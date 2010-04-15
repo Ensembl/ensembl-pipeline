@@ -173,13 +173,13 @@ for my $prm ( qw(host port user pass dbname) ) {
 
 # reference database
 my $R_dba = $support->get_database('ensembl', '');
+my $R_pipe_dba = &get_pipe_db($R_dba);
 my $R_dbh = $R_dba->dbc->db_handle;
-my $R_sa = $R_dba->get_SliceAdaptor;
 my $R_asm = $support->param('assembly');
 
 # database containing the alternative assembly
-my $A_dba = $support->get_database('core', 'alt');
-my $A_sa = $A_dba->get_SliceAdaptor;
+my $A_dba = $support->get_database('ensembl', 'alt');
+my $A_pipe_dba = &get_pipe_db($A_dba);
 my $A_asm = $support->param('altassembly');
 
 
@@ -219,6 +219,7 @@ if(@A_chr_list) {
 if(scalar(@where)) {
     $sql .= ' WHERE '.join(' AND ', @where);
 }
+
 $sth = $R_dbh->prepare($sql);
 $sth->execute;
 
@@ -236,23 +237,45 @@ while (my $row = $sth->fetchrow_hashref) {
 
   $support->log_stamped("Block with tmp_align_id = $id\n", 1);
 
-  my $A_slice = $A_sa->fetch_by_region(
+  my $A_slice;
+  if($A_pipe_dba){
+  	$A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
       $row->{'alt_seq_region_name'},
       $row->{'alt_start'},
       $row->{'alt_end'},
       1,
       $support->param('altassembly'),
-  );
+    );
+  }
+  $A_slice = $A_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'alt_seq_region_name'},
+      $row->{'alt_start'},
+      $row->{'alt_end'},
+      1,
+      $support->param('altassembly'),
+   ) unless $A_slice;
 
-  my $R_slice = $R_sa->fetch_by_region(
+  my $R_slice;
+  if ($R_pipe_dba) {
+  	$R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
       $row->{'ref_seq_region_name'},
       $row->{'ref_start'},
       $row->{'ref_end'},
       1,
       $support->param('assembly'),
-  );
+    );
+  }
+  $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'ref_seq_region_name'},
+      $row->{'ref_start'},
+      $row->{'ref_end'},
+      1,
+      $support->param('assembly'),
+   ) unless $R_slice;
 
   # write sequences to file
   my $A_basename = "alt_seq.$id";
@@ -334,5 +357,26 @@ $support->log("\nDon't forget to drop the tmp_align table when all is done!\n\n"
 
 # finish logfile
 $support->finish_log;
+
+sub get_pipe_db {
+	my ($dba) = @_;
+	my $metakey = 'pipeline_db_head';
+	my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
+	
+	return undef unless $opt_str;
+	
+	my %anycase_options = (
+        eval $opt_str,
+    );
+    if ($@) {
+        throw("Error evaluating '$opt_str' : $@");
+    }
+    my %uppercased_options = ();
+    while( my ($k,$v) = each %anycase_options) {
+        $uppercased_options{uc($k)} = $v;
+    }
+	
+	return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
+}
 
 
