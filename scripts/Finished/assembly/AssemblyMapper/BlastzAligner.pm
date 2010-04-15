@@ -1,6 +1,7 @@
 package AssemblyMapper::BlastzAligner;
 
 use File::Basename;
+use Bio::EnsEMBL::Analysis::Config::General;
 
 =head1 NAME
 
@@ -187,7 +188,7 @@ sub write_sequence {
     unless (-e "$tmpdir/$basename1.fa") {
       my $fh = $self->support->filehandle('>', "$tmpdir/$basename1.fa");
 	  print $fh ">$basename1\n";
-      print $fh $slice->get_repeatmasked_seq(undef, 1)->seq, "\n";
+      print $fh $slice->get_repeatmasked_seq($ANALYSIS_REPEAT_MASKING, 1)->seq, "\n";
       close($fh);
     }
 
