@@ -76,6 +76,7 @@ use warnings;
 no warnings 'uninitialized';
 
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
+use Bio::SeqIO;
 use File::Path;
 
 use constant FMT1 => "%-30s%10.0f (%3.2f%%)\n";
@@ -229,6 +230,28 @@ sub run_lastz {
       system($blastz_cmd) == 0 or
         $self->support->log_error("Can't run blastz: $!\n");
     }
+}
+
+=head2 bad_sequences
+
+  Description : return true if one sequence in the list is longer than 
+                the limit (1.1MB) and not soft masked.
+  Return type : true or false
+  Caller      : general
+
+=cut
+
+sub bad_sequences {
+	my ($self,$A_basename, $R_basename) = @_;
+	my $tmpdir = $self->tempdir;
+	foreach($A_basename, $R_basename){
+		my $seqio = Bio::SeqIO->new(-file => "$tmpdir/$_.fa", -format => "Fasta");
+		my $seq = $seqio->next_seq();
+		my $base_count = $seq->seq =~ s/([atgc])/$1/ig;
+		my $masked_count = $seq->seq =~ s/([atgc])/$1/g;
+		return 1 unless($base_count < 1100000 || $masked_count > 0);
+	}
+	return 0;	
 }
 
 =head2 lav_to_axt
