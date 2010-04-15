@@ -28,6 +28,7 @@ Optional arguments:
   --alt_start                         start coordinate on alternative chromosomes
   --alt_end                           end coordinate on alternative chromosomes
   --haplotype                         for haplotype transfer, make a copy of genes (with new stable_id)
+  --skip_stable_id                    Gene stable id to skip  
 
   --conffile, --conf=FILE             read parameters from FILE
                                       (default: conf/Conversion.ini)
@@ -89,7 +90,7 @@ $support->parse_extra_options(
 	'assembly=s',         'altassembly=s',
 	'chromosomes|chr=s@', 'altchromosomes|altchr=s@', 'write!',
 	'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
-	'alt_end=i', 'author=s', 'email=s'
+	'alt_end=i', 'author=s', 'email=s','skip_stable_id=s@'
 );
 $support->allowed_params( $support->get_common_params, 'assembly',
 	'altassembly', 'chromosomes', 'altchromosomes', );
@@ -124,6 +125,8 @@ my $R_start = $support->param('ref_start') || undef;
 my $R_end = $support->param('ref_end') || undef;
 my $A_start = $support->param('alt_start') || undef;
 my $A_end = $support->param('alt_end') || undef;
+
+my $skip_gene = join(',',$support->param('skip_stable_id'));
 
 throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
 
@@ -308,6 +311,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		}
 
 	  GENE: foreach my $g (@genes) {
+	  	    next if $g->stable_id =~ /$skip_gene/;
 	  		my ($gene_name_attrib) = @{ $g->get_all_Attributes('name') };
 	  		my $gene_name = $gene_name_attrib ? $gene_name_attrib->value : "UNDEF";
 	  		my $complex_transfer = 0; # gene complex transfer flag
@@ -816,7 +820,14 @@ sub project_transcript_the_hard_way {
 
 	$new_trans->{_trans_exon_array} = [];
 	foreach my $e (@new_e) {
-		$new_trans->add_Exon($e);
+		eval {
+		  $new_trans->add_Exon($e);
+		};
+		if($@) {
+           $warnings .= sprintf("WARNING: Cannot transfer Exon %s %d-%d:%d in Transcript %s of Gene %s\n",
+                                     $e->stable_id,$e->start,$e->end,$e->strand,$t->stable_id,$g->stable_id);
+           next;                          			
+		}
 	}
 
 	if(@new_e) {
