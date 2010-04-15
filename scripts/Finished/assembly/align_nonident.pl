@@ -223,7 +223,7 @@ if(scalar(@where)) {
 $sth = $R_dbh->prepare($sql);
 $sth->execute;
 
-while (my $row = $sth->fetchrow_hashref) {
+BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
   # create BlastzAligner object
 	my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
@@ -296,8 +296,16 @@ while (my $row = $sth->fetchrow_hashref) {
   );
 
   $support->log("Done.\n", 2);
+  
+  # skip unmasked ref/alt sequences longer than 1.1MB
+  # This will avoid everlasting alignment...
+   $support->log("Checking sequences...\n", 2);
+   if($aligner->bad_sequences($A_basename, $R_basename)){
+   	    $support->log("Skip block $id (not soft-masked and too long)...\n", 2);
+   	    next BLOCK;
+   }
 
-  # align using blastz
+  # align using lastz
   $support->log("Running lastz...\n", 2);
   $aligner->run_lastz($A_basename, $R_basename);
   $support->log("Done.\n", 2);
