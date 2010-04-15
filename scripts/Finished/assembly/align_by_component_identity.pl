@@ -629,8 +629,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 		$alt_count = $alt_seq =~ s/([atgc])/$1/ig;
 
 		# Don't run lastz on large non-align blocks > (1.1Mbp)
-		if (    ( $ref_count && $alt_count )
-			 && ( $ref_count < 1100000 && $alt_count < 1100000 ) )
+		if (    ( $ref_count && $alt_count ))
+			 #&& ( $ref_count < 1100000 && $alt_count < 1100000 ) )
 		{
 			push @{ $nomatch->{$R_chr} },
 			  [
