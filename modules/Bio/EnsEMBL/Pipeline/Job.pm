@@ -114,7 +114,7 @@ sub new {
     if (!exists($BATCH_QUEUES{$analysis->logic_name})) { 
       # set default dir if analysis is NOT configured in BatchQueue
       $dir = $BATCH_QUEUES{default}{output_dir};
-      if ( $dir !=~m/\/$/){
+      if ( $dir !~ m/\/$/){
          $dir.="/";
       }  
       $dir.=$analysis->logic_name; 
@@ -126,7 +126,7 @@ sub new {
       }else {  
         # analysis is configured but output dir is not defined; setup_queues() will set it to default_output_dir but we reset-it here... 
         $dir = $BATCH_QUEUES{default}{output_dir}; 
-        if ( $dir !=~m/\/$/){
+        if ( $dir !~ m/\/$/){
           $dir.="/";
         } 
         $dir.=$analysis->logic_name; 
