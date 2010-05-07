@@ -247,8 +247,9 @@ sub bad_sequences {
 	foreach($A_basename, $R_basename){
 		my $seqio = Bio::SeqIO->new(-file => "$tmpdir/$_.fa", -format => "Fasta");
 		my $seq = $seqio->next_seq();
-		my $base_count = $seq->seq =~ s/([atgc])/$1/ig;
-		my $masked_count = $seq->seq =~ s/([atgc])/$1/g;
+		my $string = $seq->seq;
+		my $base_count = $string =~ s/([atgc])/$1/ig;
+		my $masked_count = $string =~ s/([atgc])/$1/g;
 		return 1 unless($base_count < 1100000 || $masked_count > 0);
 	}
 	return 0;	
