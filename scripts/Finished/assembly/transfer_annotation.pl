@@ -28,6 +28,7 @@ Optional arguments:
   --alt_start                         start coordinate on alternative chromosomes
   --alt_end                           end coordinate on alternative chromosomes
   --haplotype                         for haplotype transfer, make a copy of genes (with new stable_id)
+  --gene_prefix                       add a prefix to the transferred gene name
   --skip_stable_id                    Gene stable id to skip  
 
   --conffile, --conf=FILE             read parameters from FILE
@@ -90,7 +91,7 @@ $support->parse_extra_options(
 	'assembly=s',         'altassembly=s',
 	'chromosomes|chr=s@', 'altchromosomes|altchr=s@', 'write!',
 	'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
-	'alt_end=i', 'author=s', 'email=s','skip_stable_id=s@'
+	'alt_end=i', 'author=s', 'email=s','skip_stable_id=s@','gene_prefix=s',
 );
 $support->allowed_params( $support->get_common_params, 'assembly',
 	'altassembly', 'chromosomes', 'altchromosomes', );
@@ -120,6 +121,7 @@ my $write_db 	= not $support->param('dry_run');
 my $author 		= $support->param('author');
 my $email 		= $support->param('email') || $author;
 my $haplo 		= $support->param('haplotype');
+my $prefix       = $support->param('gene_prefix');
 
 my $R_start = $support->param('ref_start') || undef;
 my $R_end = $support->param('ref_end') || undef;
@@ -127,6 +129,7 @@ my $A_start = $support->param('alt_start') || undef;
 my $A_end = $support->param('alt_end') || undef;
 
 my $skip_gene = join(',',$support->param('skip_stable_id'));
+$skip_gene ||= "NOGENETOSKIP";
 
 throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
 
@@ -511,7 +514,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						# for non-complex transfer throw a warning if the gene's version changed
 						# this means that the underlying sequence has changed !!!
 						# NB: for complex transfer warnings are thrown anyway
-						if( !($complex_transfer) && ($gene->version != $g->version) ){
+						if( !$complex_transfer && $gene->version != $g->version && !$haplo){
 							$support->log_verbose(
 									sprintf("WARNING: Check Gene $gene_name %s version %d (%d) with transcript sequence changes\n",
 											$gene->stable_id,
@@ -736,8 +739,6 @@ sub project_transcript_the_hard_way {
 		my ($CDS_end_NF) = @{ $new_trans->get_all_Attributes('cds_end_NF') };
 		$CDS_start_NF->value(0) if $CDS_start_NF;
 		$CDS_end_NF->value(0) if $CDS_end_NF;
-
-
 	}
 
 	my @new_e;
@@ -900,7 +901,7 @@ sub transcripts2genes {
 			       (-CODE => $_->code,
 			        -NAME => $_->name,
 			        -DESCRIPTION => $_->description,
-			        -VALUE => $_->value."_$set");
+			        -VALUE => ($prefix ? $prefix.":":"").$_->value."_$set");
 				$ng->add_Attributes($attrib);
 			} else {
 				$ng->add_Attributes($_);
@@ -921,7 +922,7 @@ sub transcripts2genes {
 	&add_hidden_remark($rg->slice->seq_region_name,$remark,$tg) if(@gene_transcripts);
 	my ($name_attrib) = @{ $tg->get_all_Attributes('name') };
 	# change main gene name
-	$name_attrib->value($name_attrib->value."_1") if(@gene_transcripts);;
+	$name_attrib->value(($prefix ? $prefix.":":"").$name_attrib->value.(@gene_transcripts ? "_1":""));
 	push @genes,$tg;
 
 	return \@genes;
@@ -972,15 +973,19 @@ sub parsenpush_trans{
 		push @{$hash->{$trans->strand}}, $trans;
 	} else {
 		# split transcript with trans splice exons
-		my $translation_stable_id;
 		if ( defined $trans->translation ) {
-			$translation_stable_id = $trans->translation->stable_id;
-			my $remark = "Lost translation $translation_stable_id after transfer of transcript ".$trans->stable_id;
-			my $attribute = Bio::EnsEMBL::Attribute->new
-		       (-CODE => 'hidden_remark',
-		        -NAME => 'Hidden Remark',
-		        -VALUE => $remark);
-		    $trans->add_Attributes($attribute);
+	        &add_hidden_remark( $trans->slice->seq_region_name,
+	                            sprintf("transcript %s has lost its translation %s",
+	                               $trans->stable_id || 'undef',
+	                               $trans->translation->stable_id || 'undef'),
+	                            $trans);
+	        $support->log_verbose(sprintf("WARNING: transcript %s  has lost its translation %s\n",
+	                              $trans->stable_id || 'undef', $trans->translation->stable_id || 'undef'));
+	        # We also need to unset the CDS_start/end_NF attribs
+	        my ($CDS_start_NF) = @{ $trans->get_all_Attributes('cds_start_NF') };
+	        my ($CDS_end_NF) = @{ $trans->get_all_Attributes('cds_end_NF') };
+	        $CDS_start_NF->value(0) if $CDS_start_NF;
+	        $CDS_end_NF->value(0) if $CDS_end_NF;
 		}
 		my @transcript_exons = sort sort_exons values(%$exon_hash);
 
