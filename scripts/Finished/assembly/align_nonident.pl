@@ -225,17 +225,56 @@ $sth->execute;
 
 BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
+  my $id = $row->{'tmp_align_id'};
+  
   # create BlastzAligner object
 	my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
 
 	# create tmpdir to store input and output
 	$aligner->create_tempdir($support->param('tmpdir'));
 
-  my $id = $row->{'tmp_align_id'};
+  
   $aligner->id($id);
   $aligner->seq_region_name($row->{'ref_seq_region_name'});
 
   $support->log_stamped("Block with tmp_align_id = $id\n", 1);
+  
+   # write sequences to file
+  my $A_basename = "alt_seq.$id";
+  my $R_basename = "ref_seq.$id";
+
+  $support->log("Writing sequences to fasta...\n", 2);
+  
+    my $R_slice;
+  if ($R_pipe_dba) {
+    $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'ref_seq_region_name'},
+      $row->{'ref_start'},
+      $row->{'ref_end'},
+      1,
+      $support->param('assembly'),
+    );
+  }
+  $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'ref_seq_region_name'},
+      $row->{'ref_start'},
+      $row->{'ref_end'},
+      1,
+      $support->param('assembly'),
+   ) unless $R_slice;
+
+ 
+  
+  $aligner->write_sequence(
+      $R_slice,
+      $support->param('assembly'),
+      $R_basename
+  );
+  
+  ($A_pipe_dba ? $A_pipe_dba : $A_dba)->get_AssemblyMapperAdaptor()->delete_cache();
+  
 
   my $A_slice;
   if($A_pipe_dba){
@@ -256,45 +295,14 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
       1,
       $support->param('altassembly'),
    ) unless $A_slice;
-
-  my $R_slice;
-  if ($R_pipe_dba) {
-  	$R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
-      'chromosome',
-      $row->{'ref_seq_region_name'},
-      $row->{'ref_start'},
-      $row->{'ref_end'},
-      1,
-      $support->param('assembly'),
-    );
-  }
-  $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
-      'chromosome',
-      $row->{'ref_seq_region_name'},
-      $row->{'ref_start'},
-      $row->{'ref_end'},
-      1,
-      $support->param('assembly'),
-   ) unless $R_slice;
-
-  # write sequences to file
-  my $A_basename = "alt_seq.$id";
-  my $R_basename = "ref_seq.$id";
-
-  $support->log("Writing sequences to fasta...\n", 2);
-
-  $aligner->write_sequence(
+   
+   $aligner->write_sequence(
       $A_slice,
       $support->param('altassembly'),
       $A_basename
   );
-
-  $aligner->write_sequence(
-      $R_slice,
-      $support->param('assembly'),
-      $R_basename
-  );
-
+   
+   
   $support->log("Done.\n", 2);
   
   # skip unmasked ref/alt sequences longer than 1.1MB
@@ -342,7 +350,7 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
   $aligner->log_block_stats(2);
 
   $support->log_stamped("Done with block $id.\n", 1);
-
+  
 
 	# write alignments to assembly table
 	$aligner->write_assembly($R_dba, [$row->{'ref_seq_region_name'}], [$row->{'alt_seq_region_name'}]);
