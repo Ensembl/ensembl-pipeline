@@ -1,43 +1,52 @@
-#!/software/bin/perl -w
+#! /software/bin/perl -w
 
 
 # Author: ck1@sanger.ac.uk
+# Modified by ml6@sanger.ac.uk
 
 use strict;
 use Getopt::Long 'GetOptions';
 use DBI;
 
-#ensdb-1-11:5317:vega_homo_sapiens_ext_20080919_v49_NCBI36 
-#ensdb-1-11:5317:vega_homo_sapiens_ext_20080919_v49_for_ck. 
+#ensdb-1-11:5317:vega_homo_sapiens_ext_20080919_v49_NCBI36
+#ensdb-1-11:5317:vega_homo_sapiens_ext_20080919_v49_for_ck.
 
 # need to change a line (from throw() to warn() )in sub execute_sanity_check() of
-# /lustre/work1/sanger/ck1/NEW_PIPE/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Utils/PipelineSanityChecks.pm
+# ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Utils/PipelineSanityChecks.pm
 # to get rid of MSG: Some of your analyses don't have entries in the input_id_type_analysis table
 # due to rulemanager (as there are other analysis in analysis table)
 
 
 # typical parameters:
-# (a) preparing pipeline: run_prot_pipeline.pl -dbuser ensadmin -dbhost xx -dbport xx -dbpass xx -dbname xx -prepare
-# (b) running pipeline  : run_prot_pipeline.pl -dbuser ensadmin -dbhost xx -dbport xx -dbpass xx -dbname xx [-start_from 200] [-analysis 202]
-#                         omitting both -start_from and -analysis options trigers the script to do all analyses
+# (1a) preparing pipeline (1st step) : 
+#	run_prot_pipeline.pl -dbuser ensadmin -dbhost xx -dbport xx -dbpass xx -dbname xx -prepare1
+#       submit the translations dumping script to a LSF big memory machine and wait 
+# (1b) preparing pipeline (2nd step) : 
+#	run_prot_pipeline.pl -dbuser ensadmin -dbhost xx -dbport xx -dbpass xx -dbname xx -prepare2
+#       run once big memory job sumitted in step one has completed
+# (2) running pipeline   : 
+#	run_prot_pipeline.pl -dbuser ensadmin -dbhost xx -dbport xx -dbpass xx -dbname xx [-start_from 200] [-analysis 202]
+#       omitting both -start_from and -analysis options trigers the script to do all analyses
+# (3) check duplicate prot. features :
+#	run_prot_pipeline.pl -dbuser ensembl -dbhost xx -dbport xx -dbpass xx -dbname xx -finish
 
-# (c) check duplicate
-#     prot. features    : run_prot_pipeline.pl -dbuser ensembl -dbhost xx -dbport xx -dbpass xx -dbname xx -finish
 
-
-my ($dbhost, $dbuser, $dbpass, $dbport, $dbname, $prepare, $analysis_id, $start_from, $help, $finishing);
+my ($dbhost, $dbuser, $dbpass, $dbport, $dbname, $prepare1, $prepare2, $analysis_id, $start_from, $help, $finishing);
+my $species = 'human';
 
 GetOptions('dbhost=s'     => \$dbhost,
-		   'dbuser=s'     => \$dbuser,
-		   'dbpass=s'     => \$dbpass,
-		   'dbport=s'     => \$dbport,
-		   'dbname=s'     => \$dbname,
-           'prepare'      => \$prepare,
-           'start_from=i' => \$start_from,  # dummy analysis_id
-           'analysis=i'   => \$analysis_id,
-           'finish'       => \$finishing
-		  );
-				
+	   'dbuser=s'     => \$dbuser,
+	   'dbpass=s'     => \$dbpass,
+	   'dbport=s'     => \$dbport,
+	   'dbname=s'     => \$dbname,
+       'prepare1'     => \$prepare1,
+	   'prepare2'     => \$prepare2,
+       'species=s'	  => \$species,
+       'start_from=i' => \$start_from,  # dummy analysis_id
+       'analysis=i'   => \$analysis_id,
+       'finish'       => \$finishing
+		);
+
 exec('perldoc', $0) if !($dbhost && $dbuser && $dbpass && $dbport && $dbname);
 
 my $dbh = DBI->connect("DBI:mysql:$dbname:$dbhost:$dbport", $dbuser, $dbpass, {RaiseError => 1, AutoCommit => 0})
@@ -45,52 +54,46 @@ my $dbh = DBI->connect("DBI:mysql:$dbname:$dbhost:$dbport", $dbuser, $dbpass, {R
 
 $dbh->debug();
 
-my $params       = "-dbhost $dbhost -dbname $dbname -dbuser $dbuser -dbport $dbport -dbpass $dbpass";
-my $root         = "/lustre/work1/sanger/ck1";
-my $PIPELINE     = "$root/NEW_PIPE";
-my $protpipe     = "$PIPELINE/ensembl-pipeline/scripts/protein_pipeline";
-my $chunk_dir    = "$root/PIPELINE/chunks";
-my $protein      = "$root/PIPELINE/proteins/dumped_proteins.fa";
-my $chunk_prot   = "perl $protpipe/chunk_protein_file.pl";
-my $dump_prot    = "perl $protpipe/dump_translations.pl";
-my $pipe_tables  = "$root/PIPELINE/template/prot_pipeline_tables.sql";
-my $fill_in_id   = "$root/PIPELINE/scripts/fillin_ids.pl $params";
-my $rulemanager3 = "perl $PIPELINE/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/RuleManager3.pl";
-my $rulemanager  = "perl $PIPELINE/ensembl-pipeline/scripts/rulemanager.pl";
-my $del_dup      = "perl $root/PIPELINE/scripts/delete_duplicates_from_protfeat_table.pl";
-my $sql_db       = "mysql --host=$dbhost --user=$dbuser --port=$dbport --pass=$dbpass";
-my $perl         = "/usr/local/ensembl/bin/perl";
-my $xref_script  = "/lustre/work1/sanger/ck1/NEW_PIPE/ensembl-head/misc-scripts/xref_mapping/xref_parser.pl";
-my $ext_db_file  = "$PIPELINE/ensembl-head/misc-scripts/external_db/external_dbs.txt";
+my $perl        = "/software/bin/perl";
+my $tmp_xref_db = "ml6_interpro_xref_for_vega";
+my $REPOSITORY = "/nfs/anacode/protein_pipeline";
+my $PIPE_DIR   = "/software/anacode/pipeline";
+
+my $params1 = "-dbhost $dbhost -dbname $dbname -dbuser $dbuser -dbport $dbport -dbpass $dbpass";
+my $params2 = "-user $dbuser -pass $dbpass -host $dbhost -port $dbport -dbname $tmp_xref_db";
+my $sql_db  = "mysql --host=$dbhost --user=$dbuser --port=$dbport --pass=$dbpass";
+
+my $ana_dir   = "$PIPE_DIR/ensembl-pipeline/scripts/Finished";
+my $ens_dir   = "$PIPE_DIR/ensembl-pipeline/scripts/protein_pipeline";
+
+my $chunk_dir = "$REPOSITORY/chunks";
+my $bkp_dir   = "$REPOSITORY/backups";
+my $protein   = "$REPOSITORY/proteins/dumped_proteins.fa";
+my $log_file  = "$REPOSITORY/log/${dbname}_dump.$$";
+my $ext_db_file  = "$PIPE_DIR/ensembl/misc-scripts/external_db/external_dbs.txt";
+my $pipe_tables  = "$REPOSITORY/template/prot_pipeline_tables.sql";
+my $drop_tables  = "$REPOSITORY/template/drop_pipeline_tables.sql";
+
+my $xref_script        = "$PIPE_DIR/ensembl/misc-scripts/xref_mapping/xref_parser.pl";
+my $dump_script        = "$perl $ens_dir/dump_translations.pl";
+my $chunk_script       = "$perl $ens_dir/chunk_protein_file.pl";
+my $fill_id_script     = "$perl $ana_dir/fillin_ids.pl";
+my $rulemanager_script = "$perl $ana_dir/rulemanager.pl";
+my $del_dup_script     = "$perl $ana_dir/delete_duplicates_from_protfeat_table.pl";
+
+
 my $status;
 
 
-if ( $prepare ){
-
-  #-------------------------------------------------------
-  #  make sure all config files for pipeline are correct
-  #-------------------------------------------------------
-
-  my $ens_anal  = "$PIPELINE/ensembl-analysis/modules/Bio/EnsEMBL/Analysis/Config";
-  my $ens_pipe  = "$PIPELINE/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config";
-  my $rdb       = "$PIPELINE/ensembl-analysis/modules/Bio/EnsEMBL/Analysis/RunnableDB";
-  my $copy;
-
-  # config files to update
-  $copy  = system("cp $PIPELINE/configs/ensembl-analysis/Config/*.pm $ens_anal");
-  $copy .= system("cp $PIPELINE/configs/ensembl-analysis/Config/GeneBuild/*.pm $ens_anal/GeneBuild/");
-  $copy .= system("cp $PIPELINE/configs/ensembl-pipeline/Config/*pm $ens_pipe");
-  $copy .= system("cp $PIPELINE/configs/ensembl-pipeline/Config/Protein_Annotation/General.pm $ens_pipe/Protein_Annotation/");
-  $copy .= system("cp $PIPELINE/configs/ensembl-analysis/ProteinAnnotation.pm $rdb/"); # this is my modified version for Seq and scanprosite
-  check_status($copy, "(1) Checking config files");
+if ( $prepare1 ){
 
   #-----------------------------------------------------
   # populate xref/interpro table for interpro proteins
   #-----------------------------------------------------
 
   # first prepare an intermediate interpro/xref database
-  $status = system("$perl $xref_script -user $dbuser -pass $dbpass -host $dbhost -port $dbport -dbname ck1_interpro_xref_for_vega -source Interpro -species human -create");
-  check_status($status, "(2) Preparing interpro/xref database: ck1_interpro_xref_for_vega");
+  $status = system("$xref_script $params2 -source Interpro -species $species -create -download_path $REPOSITORY");
+  check_status($status, "(1) Preparing interpro/xref database: $tmp_xref_db");
 
   #--------------------------------
   #   populates vega xref table
@@ -100,11 +103,11 @@ if ( $prepare ){
     $dbh->do(qq{
               INSERT INTO xref
               SELECT null, x.source_id, x.accession, x.label, x.version, x.description, NULL, NULL
-              FROM ck1_interpro_xref_for_vega.xref x, ck1_interpro_xref_for_vega.source s
+              FROM $tmp_xref_db.xref x, $tmp_xref_db.source s
               WHERE x.source_id=s.source_id
             });
 
-    my $getid = $dbh->prepare("SELECT source_id FROM ck1_interpro_xref_for_vega.source WHERE name = 'Interpro'");
+    my $getid = $dbh->prepare("SELECT source_id FROM $tmp_xref_db.source WHERE name = 'Interpro'");
     $getid->execute;
     my $ens_interpro_src_id = $getid->fetchrow;
     my $ext_interpro_src_id = `grep Interpro $ext_db_file | cut -f1`;
@@ -117,12 +120,12 @@ if ( $prepare ){
     #--------------------------------
     #  populates vega interpro table
     #--------------------------------
-    $dbh->do("INSERT IGNORE INTO interpro SELECT * FROM ck1_interpro_xref_for_vega.interpro");
+    $dbh->do("INSERT IGNORE INTO interpro SELECT * FROM $tmp_xref_db.interpro");
 
   };
 
-  $status = $@ ? 'failed' : 'successful';
-  print "(3) Populating xref/interpro tables $status ...\n\n";
+  $status = $@ ?  'failed' : 'successful'; # ?
+  print "(2) Populating xref/interpro tables $status ...\n\n";
   die if $status eq "failed";
 
   #---------------------------------------
@@ -136,7 +139,7 @@ if ( $prepare ){
   # (7) input_id_type_analysis
   #---------------------------------------
   $status = system("$sql_db $dbname < $pipe_tables");
-  check_status($status, "(4) Populating pipeline tables");
+  check_status($status, "(3) Populating pipeline tables");
 
   #-----------------------------
   #  dump protein from database
@@ -144,19 +147,20 @@ if ( $prepare ){
 
   # expected number of proteins: "select count(*) from translation;"
   $status = system("rm -f $protein");
-  check_status($status, "(5.1) Remove all protein dump");
-  $status = system("$dump_prot $params -db_id 1 -file $protein");
-  check_status($status, "(5.2) Dump protein");
-
+  check_status($status, "(4.1) Remove all protein dump");
+  
+  $status = system("bsub -J dump_protein -e $log_file -sp 100 -q normal -M1000000 -R 'select[mem>1000] rusage[mem=1000]' $dump_script $params1 -db_id 1 -file $protein");
+  check_status($status, "(4.2) Submit protein dumping script to the farm (type 'bjobs -J dump_protein' to check its status)");
+}
+if($prepare2){
   #---------------
   # chunk protein
   #---------------
-
   # current setup: 100 proteins / chunk
   $status = system("rm -f $chunk_dir/chunk*");
-  check_status($status, "(6.1) Removing old chunk files");
-  $status = system("$chunk_prot $params");
-  check_status($status, "(6.2) Chunking protein");
+  check_status($status, "(5.1) Removing old chunk files");
+  $status = system("$chunk_script $params1");
+  check_status($status, "(5.2) Chunking protein");
 
   #---------------------------------
   # Fill in input_id_analysis table
@@ -175,25 +179,25 @@ if ( $prepare ){
   #|         203 | Prints                |
   #|         204 | Ncoils                |
   #|         205 | pfscan                |
-  #|         206 | scanprosite           |
+  #|         206 | scanprosite*          | * Removed
   #|                                     |
   #|         300 | SubmitProteome        |
   #|         301 | Seg                   |
   #+-------------+-----------------------+
 
   # input_id_type TRANSLATIONID
-  $status = system("$fill_in_id -id 100 -translation");
+  $status = system("$fill_id_script $params1 -id 100 -translation");
   check_status($status, "(7) TRANSLATIONID filled in");
 
   # input_id_type FILENAME
-  $status = system("$fill_in_id -id 200 -file $chunk_dir");
+  $status = system("$fill_id_script $params1 -id 200 -file $chunk_dir");
   check_status($status, "(8) FILENAME filled in");
 
   # input_id_type PROTEOME
   my $ins = $dbh->prepare(qq{INSERT INTO input_id_analysis VALUES (?,?,?,now(),?,?,?)});;
   eval { $ins->execute('proteome', 'PROTEOME', 300, '', '', 0); };
 
-  $status = $@ ? 'failed' : 'successful';
+  $status = $@ ? 'failed' : 'successful'; # ?
   print "(9) PROTEOME filled in $status ...\n\n";
   die if $status eq "failed";
 
@@ -205,25 +209,27 @@ if ( $prepare ){
 #-----------------------
 
 if ( $start_from and $analysis_id ){
- $status = system("$rulemanager3 $params -verbose -start_from $start_from -analysis $analysis_id");
+ $status = system("$rulemanager_script $params1 -verbose -start_from $start_from -analysis $analysis_id");
  check_status($status, "Rulemanager start_from $start_from analysis_id $analysis_id");
 }
 elsif ( $start_from ){
-  $status = system("$rulemanager3 $params -verbose -start_from $start_from");
+  $status = system("$rulemanager_script $params1 -verbose -start_from $start_from");
   check_status($status, "Rulemanager start_from $start_from");
 }
-elsif ( !$start_from and !$analysis_id && !$prepare && !$finishing ){
+elsif ( !$start_from and !$analysis_id && !$prepare1 && !$prepare2 && !$finishing ){
   # do all
   foreach my $id ( 100, 200, 300 ) {
-    $status = system("$rulemanager3 $params -verbose -start_from $id");
+    $status = system("$rulemanager_script $params1 -verbose -start_from $id");
     check_status($status, "Rulemanager start_from $id");
   }
 }
 
 # check duplicated protein_feature
 elsif ( $finishing ){
-  $status = system("$del_dup $params");
+  $status = system("$del_dup_script $params1 -bkp_dir $bkp_dir");
   check_status($status, "Deleting duplicated protein_features");
+  $status = system("$sql_db $dbname < $drop_tables") unless $status != 0;
+  check_status($status, "Dropping pipeline tables") unless $status != 0;
 }
 
 sub check_status {
@@ -233,60 +239,24 @@ sub check_status {
 
 __END__
 
-#-------------------------
-# Further documentation:
-#-------------------------
-(1) http://intwebdev.sanger.ac.uk/Teams/Team71/vertann/docs/running_prot_pipeline_on_new_schema.shtml
-(2) /lustre/work1/sanger/ck1/NEW_PIPE/ensembl-doc/pipeline_docs/protein_annotation.txt
-
-/lustre/work1/sanger/ck1/NEW_PIPE/configs/ensembl-analysis/Config/
-/lustre/work1/sanger/ck1/NEW_PIPE/ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm
-
-#----------------
-# useful queries
-#----------------
-
-\. ~ck1/query/analysis             -------- show some columns of analysis table
-\. ~/query/show_input_id_analysis  -------- show total jobs to do
-\. ~ck1/query/protprog             -------- show finished jobs
-\. ~ck1/query/protjob              -------- show comprehensive job status
-\. ~ck1/query/failed               -------- show failed jobs
-\. ~ck1/query/failed_c             -------- show failed jobs grouped by analysis
-\. ~ck1/query/kill                 -------- empty job, job_status tables
-
-# checks all external dbs in xref
-select edb.db_name, count(*) from xref x, external_db edb where x.external_db_id = edb.external_db_id group by 
-edb.db_name;
-
-
-#-----------------
-#  useful aliases
-#-----------------
-prot - goes to protein dump dir
-chunk - goes to chunk file dir
-lsfo  - goes to scratch dir
-
-#----------------
-#  setup ENV
-#----------------
-setup ENV: su ml6; source ~ck1/bin/set_pipecodes_csh newpipe
-
 
 #----------------------
 #  running script
 #----------------------
-step 1: /lustre/work1/sanger/ck1/PIPELINE/scripts/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -prepare
+step 1a: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -prepare1
 
-step 2: /lustre/work1/sanger/ck1/PIPELINE/scripts/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl
+step 1b: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -prepare2
 
-step 3: /lustre/work1/sanger/ck1/PIPELINE/scripts/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -finish
+step 2: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl
+
+step 3: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -finish
 
 
 #---------------------
 # configs, templates
 #---------------------
-configfiles:    /lustre/work1/sanger/ck1/NEW_PIPE/configs/
-table template: /lustre/work1/sanger/ck1/PIPELINE/template/prot_pipeline_tables.sql
+protein pipeline files:	/nfs/anacode/protein_pipeline/
+table template: 	/nfs/anacode/protein_pipeline/template/prot_pipeline_tables.sql
 
 # modified version of ProteinAnnotation.pm for Seq
-/lustre/work1/sanger/ck1/NEW_PIPE/ensembl-analysis/modules/Bio/EnsEMBL/Analysis/RunnableDB/ProteinAnnotation.pm
+/nfs/anacode/dna_pipeline/config/module/ProteinAnnotation.pm
