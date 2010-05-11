@@ -137,7 +137,9 @@ foreach my $gene (@{$genes}) {
     eval {
 	    if ( $tseq->seq =~ /\*/ ) {
 
-	      print STDERR "Translation of $identifier has stop codons ",
+	      my ($trans_name) = @{$trans->get_all_Attributes('name')};
+
+	      print STDERR "Translation of $identifier (".($trans_name?"$trans_name:":"").$trans->biotype.") has stop codons ",
         	"- Skipping! (in ",$trans->slice->name(),")\n";
 	      next;
 	     }
