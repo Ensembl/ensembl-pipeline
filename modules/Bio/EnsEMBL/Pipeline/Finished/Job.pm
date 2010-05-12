@@ -415,13 +415,15 @@ sub flush_runs {
 
 		my $farm_queue    = $queue->{'queue'};
 		my $farm_resource = $queue->{'resource'};
-		my $param = $queue->{'sub_args'}.' -sp '.$self->priority.' ';
+		my $param = ' -sp '.$self->priority.' ';
 
 		if ( $self->priority == $BIG_MEM_PRIORITY ) {
 			$farm_queue    = $BIG_MEM_QUEUE;
 			$farm_resource = $BIG_MEM_RESOURCE;
 			$param 		  .= $BIG_MEM_PARAM;
 		}
+		
+		$param .= $queue->{'sub_args'};
 
 		if ( $self->priority == $LONG_JOB_PRIORITY ) {
 			$farm_queue    = $LONG_JOB_QUEUE;
@@ -433,6 +435,8 @@ sub flush_runs {
 		} else {
 			$farm_resource =~ s/otterp1/otterp2/g;
 		}
+		
+		
 
 		my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
