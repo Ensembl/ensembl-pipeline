@@ -77,6 +77,7 @@ my $reread_input_ids   = 0;    # toggle whether to reread input_id each time the
 my $reread_rules = 0;      # toggle whether to reread rules each time the script
                            # loops
 my $reupdate_analysis = 1;
+my $vega = 0;    # set when running a vega protein pipeline
 my $perldoc      = 0;
 my @command_args = @ARGV;
 my $submission_limit;
@@ -120,6 +121,7 @@ GetOptions(
 	'reread_input_ids!'      => \$reread_input_ids,
 	'reread_rules!'          => \$reread_rules,
 	'reupdate_analysis!'	 => \$reupdate_analysis,
+	'vega!'                  => \$vega,
 	'once!'                  => \$once,
 	'perldoc!'               => \$perldoc,
 	'submission_limit!'      => \$submission_limit,
@@ -210,7 +212,7 @@ if (   $ids_to_run
 	$accumulators = 0;
 }
 
-update_analysis_dbversion();
+update_analysis_dbversion() unless $vega;
 
 my $all_rules = $rulemanager->rules;
 
@@ -251,7 +253,7 @@ my $submission_count = 0;
 LOOP: while (1) {
 	print "Reading IDs \n" if $verbose;
 	my $submitted = 0;
-	update_analysis_dbversion() if($reupdate_analysis);
+	update_analysis_dbversion() if($reupdate_analysis && !$vega);
 
 	%completed_accumulator_analyses =
 	  %{ $rulemanager->fetch_complete_accumulators };

@@ -209,17 +209,17 @@ if($prepare2){
 #-----------------------
 
 if ( $start_from and $analysis_id ){
- $status = system("$rulemanager_script $params1 -verbose -start_from $start_from -analysis $analysis_id");
+ $status = system("$rulemanager_script $params1 -verbose -start_from $start_from -analysis $analysis_id -vega");
  check_status($status, "Rulemanager start_from $start_from analysis_id $analysis_id");
 }
 elsif ( $start_from ){
-  $status = system("$rulemanager_script $params1 -verbose -start_from $start_from");
+  $status = system("$rulemanager_script $params1 -verbose -start_from $start_from -vega");
   check_status($status, "Rulemanager start_from $start_from");
 }
 elsif ( !$start_from and !$analysis_id && !$prepare1 && !$prepare2 && !$finishing ){
   # do all
   foreach my $id ( 100, 200, 300 ) {
-    $status = system("$rulemanager_script $params1 -verbose -start_from $id");
+    $status = system("$rulemanager_script $params1 -verbose -start_from $id -vega");
     check_status($status, "Rulemanager start_from $id");
   }
 }
