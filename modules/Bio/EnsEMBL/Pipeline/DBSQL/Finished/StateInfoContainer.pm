@@ -117,7 +117,6 @@ sub fetch_analysis_by_input_id {
 		my $version  = $row->[1];
 		next unless ($analysis);
 		if (   !$version
-			|| $analysis->logic_name =~ /Halfwise/
 			|| $analysis->db_version eq $version )
 		{
 			#print "Analysis " . $analysis->logic_name . " V. $version\n";
