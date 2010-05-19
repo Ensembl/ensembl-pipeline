@@ -247,6 +247,12 @@ sub parse_agp{
     #}
     my $initial_name = $values[0];
    
+    # remove the 'chr' string if it exists
+    if ($initial_name =~ /^chr(\S+)/) {
+      $initial_name = $1;
+    }
+
+
     my $name;
 
     if ($acc_to_name{$initial_name}){
