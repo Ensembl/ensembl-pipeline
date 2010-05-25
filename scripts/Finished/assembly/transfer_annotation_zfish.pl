@@ -261,7 +261,7 @@ eval {
 		# for stats
 		my $total_genes      = 0;
 		my $transfered_genes = 0;
-		my $created_genes	 = 0;
+		my $total_created_genes	 = 0;
 		my $total_sf         = 0;
 		my $transfered_sf    = 0;
 		my $skipped_sf       = 0;
@@ -320,9 +320,11 @@ eval {
 		}
 
 	  GENE: foreach my $g (@genes) {
+	  	    my $this_created_gene;
 	  		my ($gene_name_attrib) = @{ $g->get_all_Attributes('name') };
 	  		my $gene_name = $gene_name_attrib ? $gene_name_attrib->value : "UNDEF";
-			my $tg = Bio::Vega::Gene->new;
+	  		my $complex_transfer = 0; # gene complex transfer flag
+            my $tg = Bio::Vega::Gene->new;
 			$tg->analysis( $g->analysis );
 			$tg->biotype( $g->biotype );
 			$tg->status( $g->status );
@@ -357,6 +359,7 @@ eval {
 					&remove_all_db_ids($tt);
 					&log_compare_transcripts( $t, $tt );
 				} else {
+					$complex_transfer = 1;
 					$support->log_verbose(
 						sprintf(
 							"WARNING: %s %s %d %d in gene %s ($gene_name) cannot be transfered on $to_assembly assembly\n",
@@ -377,7 +380,7 @@ eval {
 
 			my $missing_transcript = scalar(@{ $transcript }) - scalar(@proj_trans);
 
-			if (  $missing_transcript == 0 ) {
+			if (  scalar(@proj_trans) ) {
 			   # essential for loading attribute list so that get_all_Attributes
 			   # won't return empty list
 				$tg->add_Attributes( @{ $g->get_all_Attributes() } );
@@ -396,7 +399,7 @@ eval {
 						next GENE;
 					}
 					my $exist = 0;
-					my $tg_key = join(":",$gene->start,$gene->end,$gene->biotype,$gene->status,$gene->source);
+					my $tg_key = join(":",$gene->seq_region_start,$gene->seq_region_end,$gene->biotype,$gene->status,$gene->source);
 					foreach (@$existing_gene) {
 						my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
 						$exist = 1 if $tg_key eq $existing_gkey;
@@ -437,7 +440,9 @@ eval {
 					}
 				}
 
-				$created_genes += (scalar(@$genes) -1);
+				$this_created_gene = scalar(@$genes) -1;
+                $complex_transfer = 1 if $this_created_gene;
+                $total_created_genes += $this_created_gene;
 
 				foreach my $gene (@$genes) {
 					if ( $geneAd->store($gene) ) {
@@ -450,6 +455,18 @@ eval {
 								$gene->start,     $gene->end
 							)
 						);
+						$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name) with %d missing transcripts\n",$gene->stable_id,$missing_transcript)) if $missing_transcript;
+                        # for non-complex transfer throw a warning if the gene's version changed
+                        # this means that the underlying sequence has changed !!!
+                        # NB: for complex transfer warnings are thrown anyway
+                        if( !$complex_transfer && $gene->version != $g->version){
+                            $support->log_verbose(
+                                    sprintf("WARNING: Check Gene $gene_name %s version %d (%d) with transcript sequence changes\n",
+                                            $gene->stable_id,
+                                            $gene->version,
+                                            $g->version)
+                            );
+                        }
 					} else {
 						throw(
 							sprintf(
@@ -461,7 +478,7 @@ eval {
 						);
 					}
 				}
-				if(scalar(@$genes) -1) {
+				if($this_created_gene) {
 					# print info about split gene for the annotators
 					$support->log_verbose(sprintf("WARNING: Check Gene %s ($gene_name), it has been split into %s\n",$g->stable_id,join(",",map($_->stable_id,@$genes))));
 				}
@@ -491,9 +508,9 @@ INFO: transfered PolyA features: %d/%d
 INFO: skipped PolyA features: %d/%d\n",
 				$R_chr,            $assembly,
 				$to_assembly,
-				($transfered_genes - $created_genes), $total_genes,
+				($transfered_genes - $total_created_genes), $total_genes,
 				$missed_g, $total_genes,
-				$created_genes,
+				$total_created_genes,
 				$transfered_sf,    $total_sf,
 				$skipped_sf,       $total_sf
 			)

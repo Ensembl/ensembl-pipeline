@@ -214,7 +214,7 @@ if($from_cs_version) {
 	}
 }
 
-# hash seq_region -> chromosome (e.g. chr13-03 -> 13)
+# hash seq_region -> chromosome (e.g. chr23_20100514 -> 23)
 my $sr_name_to_chr;
 foreach my $chr_slice (@$chr_list) {
 	my ($chr) = $chr_slice->seq_region_name =~ /chr(.*)_/;
@@ -272,7 +272,7 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	# get the chromosome slices
 	my $R_slice = $from_chrs[$i];
 	my $R_chr   = $R_slice->seq_region_name;
-
+    
 	my $A_slice = $to_chrs[$i] ? $to_chrs[$i] : undef;
 	my $A_chr   = $A_slice ? $A_slice->seq_region_name : "undef";
 
@@ -386,14 +386,14 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 					# matches another chromosome
 					my $s = $diff->[1]->to_Slice->seq_region_Slice;
 					my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
-					foreach $A_chr (@A_chrs) {
+					foreach my $A_chr_proj (@A_chrs) {
 						my ($A_chr_name) =
-						  $A_chr->to_Slice->seq_region_name =~
+						  $A_chr_proj->to_Slice->seq_region_name =~
 						  /(.*)_$to_assembly/;
 						if ($A_chr_name) {
 							$dba->get_AssemblyMapperAdaptor()->delete_cache();
 							my ($proj_chr) =
-							  @{ $s->project_to_slice( $A_chr->to_Slice ) };
+							  @{ $s->project_to_slice( $A_chr_proj->to_Slice ) };
 
 							my ( $R_chr_start, $R_chr_end ) =
 							  ( $diff->[1]->from_start, $diff->[1]->from_end );
@@ -474,13 +474,13 @@ CHR: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 				# it matches another chromosome
 				my $s = $diff->[1]->to_Slice->seq_region_Slice;
 				my @A_chrs = @{ $s->project( "chromosome", "Otter" ) };
-				foreach $A_chr (@A_chrs) {
+				foreach my $A_chr_proj (@A_chrs) {
 					my ($A_chr_name) =
-					  $A_chr->to_Slice->seq_region_name =~ /(.*)_$to_assembly/;
+					  $A_chr_proj->to_Slice->seq_region_name =~ /(.*)_$to_assembly/;
 					if ($A_chr_name) {
 						$dba->get_AssemblyMapperAdaptor()->delete_cache();
 						my ($proj_chr) =
-						  @{ $s->project_to_slice( $A_chr->to_Slice ) };
+						  @{ $s->project_to_slice( $A_chr_proj->to_Slice ) };
 
 						my ( $R_chr_start, $R_chr_end ) =
 						  ( $diff->[1]->from_start, $diff->[1]->from_end );
@@ -555,6 +555,7 @@ REF: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 	# get the chromosome slices
 	my $R_slice  = $from_chrs[$i];
 	my $R_chr    = $R_slice->seq_region_name;
+	my $R_cs     = $R_slice->coord_system();
 	my $R_length = $R_slice->length;
 	my $A_slice  = $to_chrs[$i] ? $to_chrs[$i] : undef ;
 	my $A_chr    = $A_slice ? $A_slice->seq_region_name : undef;
@@ -592,10 +593,11 @@ REF: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 
 	# loop through the directly aligned blocks and fill in the non-aligned block hash
 	# sort the match blocks by ref chromosome start
-	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_gap, $alt_gap );
+	my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_seq, $ref_count,$alt_seq,$alt_count );
 	my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
 	my $last = [ $A_length + 1, 0, 0, $R_length + 1, 0, 0, $A_chr ];
 	my $sa_chr = $A_chr;
+	my $A_cs = $A_slice->coord_system;
 	foreach ( sort { $a->[3] <=> $b->[3] } @{ $match->{$R_chr} }, $last ) {
 		$a_start = $_->[0];
 		$a_end   = $_->[1];
@@ -603,18 +605,25 @@ REF: for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 		$r_end   = $_->[4];
 		$a_chr   = $_->[6];
 		if ( $a_chr eq $sa_chr ) {
-			$ref_gap = $r_start - $sr_end - 1;
-			$alt_gap = $a_start - $sa_end - 1;
-			if (    ( $ref_gap > 0 && $alt_gap > 0 )
-				 && ( $ref_gap < 1000000 && $alt_gap < 1000000 ) )
+			my ($chr_r_start, $chr_r_end) = $sr_end+1 < $r_start-1 ?
+								   ($sr_end+1, $r_start-1) :
+								   ($r_start-1, $sr_end+1);
+			$ref_seq = $sa->fetch_by_region( $R_cs->name, $R_chr, $chr_r_start, $chr_r_end, undef, $R_cs->version )->seq;
+			$ref_count = $ref_seq =~ s/([atgc])/$1/ig;
+			my ($chr_a_start, $chr_a_end) =    $sa_end+1 < $a_start-1 ?
+								   ($sa_end+1, $a_start-1) :
+								   ($a_start-1, $sa_end+1);
+			$alt_seq = $sa->fetch_by_region( $A_cs->name, $a_chr, $chr_a_start, $chr_a_end, undef, $A_cs->version )->seq;
+			$alt_count = $alt_seq =~ s/([atgc])/$1/ig;
+			if ( $ref_count && $alt_count )
 			{
 				push @{ $nomatch->{$R_chr} },
 				  [
-					$sa_end + 1,
-					$a_start - 1,
+					$chr_a_start,
+					$chr_a_end,
 					1,
-					$sr_end + 1,
-					$r_start - 1,
+					$chr_r_start,
+					$chr_r_end,
 					1,
 					$a_chr,
 				  ];

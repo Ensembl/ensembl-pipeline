@@ -111,9 +111,11 @@ $support->init_log;
 $support->check_required_params( 'assembly', 'altassembly' );
 
 # database connection
-my $vega_db = $support->get_database('ensembl');
-bless $vega_db, "Bio::Vega::DBSQL::DBAdaptor";
-my $dbh = $vega_db->dbc->db_handle;
+my $R_dba = $support->get_database('ensembl');
+my $A_dba = $support->get_database( 'ensembl', 'alt' );
+bless $R_dba, "Bio::Vega::DBSQL::DBAdaptor";
+bless $A_dba, "Bio::Vega::DBSQL::DBAdaptor";
+my $dbh = $R_dba->dbc->db_handle;
 
 my $assembly    = $support->param('assembly');
 my $altassembly = $support->param('altassembly');
@@ -134,9 +136,15 @@ $skip_gene ||= "NOGENETOSKIP";
 throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
 
 
-my $geneAd   = $vega_db->get_GeneAdaptor;
-my $sliceAd  = $vega_db->get_SliceAdaptor;
-my $sfeat_Ad = $vega_db->get_SimpleFeatureAdaptor();
+my $geneAd   = $R_dba->get_GeneAdaptor;
+my $sliceAd  = $R_dba->get_SliceAdaptor;
+my $sfeat_Ad = $R_dba->get_SimpleFeatureAdaptor();
+
+my $geneAd_save   = $A_dba->get_GeneAdaptor;
+my $sliceAd_save  = $A_dba->get_SliceAdaptor;
+my $sfeat_Ad_save = $A_dba->get_SimpleFeatureAdaptor();
+
+
 
 # make sure that the coordinate system versions are different
 # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
@@ -228,7 +236,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $alt_sl =
   		$sliceAd->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef,$altassembly );
 
-  	$vega_db->get_AssemblyMapperAdaptor()->delete_cache();
+  	$R_dba->get_AssemblyMapperAdaptor()->delete_cache();
 
 	my $alt_seq_region_id = $alt_sl->get_seq_region_id;
 	my $ref_seq_region_id = $ref_sl->get_seq_region_id;
@@ -249,7 +257,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			$cb = Bio::Vega::ContigLockBroker->new(-hostname => hostname);
 			$author_obj = Bio::Vega::Author->new(-name => $author, -email => $email);
 			$support->log_verbose("Locking $R_chr and $A_chr\n");
-			$cb->lock_clones_by_slice($slices,$author_obj,$vega_db);
+			$cb->lock_clones_by_slice($slices,$author_obj,$R_dba);
 		};
 		if($@){
 			warning("Cannot lock assemblies $R_chr and $A_chr with author name $author\n$@\n");
@@ -283,7 +291,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 			if ( defined $tf ) {
 				$tf->dbID(undef);
 				$tf->adaptor(undef);
-				my $existing_sf = $sfeat_Ad->fetch_all_by_Slice( $tf->feature_Slice, $tf->analysis->logic_name );
+				my $existing_sf = $sfeat_Ad_save->fetch_all_by_Slice( $tf->feature_Slice, $tf->analysis->logic_name );
 				if ( ! @$existing_sf ) {
 					push @proj_feat, $tf;
 					$transfered_sf++;
@@ -449,7 +457,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 					&write_gene($gene);
 					my $existing_gene;
 					eval {
-						$existing_gene = $geneAd->fetch_all_by_Slice( $gene->feature_Slice,
+						$existing_gene = $geneAd_save->fetch_all_by_Slice( $gene->feature_Slice,
 									$gene->analysis->logic_name );
 					};
 					if($@) {
@@ -457,7 +465,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 						next GENE;
 					}
 					my $exist = 0;
-					my $tg_key = join(":",$gene->start,$gene->end,$gene->biotype,$gene->status,$gene->source);
+					my $tg_key = join(":",$gene->seq_region_start,$gene->seq_region_end,$gene->biotype,$gene->status,$gene->source);
 					foreach (@$existing_gene) {
 						my $existing_gkey = join(":",$_->start,$_->end,$_->biotype,$_->status,$_->source);
 						$exist = 1 if $tg_key eq $existing_gkey;
@@ -588,7 +596,7 @@ INFO: skipped PolyA features: %d/%d\n",
 	# remove the assemblies locks
 		eval {
 			$support->log_verbose("Removing $R_chr and $A_chr Locks\n");
-			$cb->remove_by_slice($slices,$author_obj,$vega_db);
+			$cb->remove_by_slice($slices,$author_obj,$R_dba);
 		};
 		if($@){
 			warning("Cannot remove locks from assemblies $R_chr and $A_chr with author name $author\n$@\n");

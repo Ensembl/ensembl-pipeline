@@ -245,6 +245,9 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
   $support->log("Writing sequences to fasta...\n", 2);
   
+  # This is needed otherwise will get a sequence of N's for the ref slice  
+  ($R_pipe_dba ? $R_pipe_dba : $R_dba)->get_AssemblyMapperAdaptor()->delete_cache();
+  
     my $R_slice;
   if ($R_pipe_dba) {
     $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(

@@ -20,7 +20,8 @@ Required arguments:
     --to_assembly                       new assembly date
 
 Optional arguments:
-
+	
+	--from_cs_version					coordinate system version, this option will overwrite from_assembly
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
     --logfile, --log=FILE               log to FILE (default: *STDOUT)
@@ -111,11 +112,11 @@ $support->param('interactive', 0);
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
-	'from_assembly=s', 'to_assembly=s'
+	 'from_cs_version=s','from_assembly=s', 'to_assembly=s'
 );
 $support->allowed_params(
     $support->get_common_params,
-   'from_assembly', 'to_assembly'
+    'from_cs_version=s','from_assembly', 'to_assembly'
 );
 
 if ($support->param('help') or $support->error) {
@@ -123,10 +124,11 @@ if ($support->param('help') or $support->error) {
   pod2usage(1);
 }
 
+my $from_cs_version = $support->param('from_cs_version');
 my $from_assembly = $support->param('from_assembly');
 my $to_assembly = $support->param('to_assembly');
 
-throw("Must set from/to_assembly!\n") unless($from_assembly && $to_assembly);
+throw("Must set from_assembly or from_cs_version and to_assembly parameters!\n") unless(($from_assembly || $from_cs_version) && $to_assembly);
 
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
@@ -145,11 +147,14 @@ for my $prm ( qw(host port user pass dbname) ) {
 
 # reference database
 my $R_dba = $support->get_database('ensembl', '');
+my $R_pipe_dba = &get_pipe_db($R_dba);
+my $R_csa  = $R_dba->get_CoordSystemAdaptor;
 my $R_dbh = $R_dba->dbc->db_handle;
 my $R_sa = $R_dba->get_SliceAdaptor;
 
 # database containing the alternative assembly
 my $A_dba = $support->get_database('core', 'alt');
+my $A_pipe_dba = &get_pipe_db($A_dba);
 my $A_sa = $A_dba->get_SliceAdaptor;
 
 # create BlastzAligner object
@@ -161,29 +166,64 @@ $aligner->create_tempdir($support->param('tmpdir'));
 # loop over non-aligned regions in tmp_align table
 $support->log_stamped("Looping over non-aligned blocks...\n");
 
-my $chr_list = $R_sa->fetch_all('chromosome');
+# list of all chromosome
+my $chr_list  = $R_sa->fetch_all('chromosome'); # contains only default chromosome version
 
-my @from_chrs = sort {lc($a->seq_region_name) cmp lc($b->seq_region_name)}  grep ($_->seq_region_name =~ /$from_assembly/, @$chr_list);
-my @to_chrs = sort {lc($a->seq_region_name) cmp lc($b->seq_region_name)} grep ($_->seq_region_name =~ /$to_assembly/, @$chr_list);
-
-
-if( scalar(@from_chrs) != scalar(@to_chrs) ) {
-	throw("Chromosome lists do not match by length:\n[".
-	join(" ",map($_->seq_region_name,@from_chrs))."]\n[".
-	join(" ",map($_->seq_region_name,@to_chrs))."]\n");
+# add $from_cs_version chromosome version to chromosome list
+if($from_cs_version) {
+    foreach my $cs (@{$R_csa->fetch_all}) {
+        push @$chr_list, @{$R_sa->fetch_all($cs->name,$cs->version)} if $cs->version eq $from_cs_version;
+    }
 }
+
+# hash seq_region -> chromosome (e.g. chr23_20100514 -> 23)
+my $sr_name_to_chr;
+foreach my $chr_slice (@$chr_list) {
+    my ($chr) = $chr_slice->seq_region_name =~ /chr(.*)_/;
+    $chr = $chr_slice->seq_region_name unless $chr;
+    $sr_name_to_chr->{$chr_slice->seq_region_name} = $chr;
+}
+
+# Reference chromsomes
+my @from_chrs;
+if($from_cs_version) {
+    @from_chrs =
+    sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+    grep ( $_->coord_system->version eq $from_cs_version, @$chr_list );
+} else {
+    @from_chrs =
+    sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+    grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
+}
+
+# Alternative chromosomes
+my @to_chrs =
+  sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
+  grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
+  
+  
+# throw up error if lists don't match in length
+if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
+    throw(   "Chromosome lists do not match by length:\n["
+           . join( " ", map( $_->seq_region_name, @from_chrs ) ) . "]\n["
+           . join( " ", map( $_->seq_region_name, @to_chrs ) )
+           . "]\n" );
+}
+
 
 # Check that the chromosome names match
 for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
-	my $R_sr_name = $from_chrs[$i]->seq_region_name;
-	my $A_sr_name = $to_chrs[$i]->seq_region_name;
-	my ($R_chr) = $R_sr_name =~ /(.*)_$from_assembly/;
-	my ($A_chr) = $A_sr_name =~ /(.*)_$to_assembly/;
-	throw("chromosome names don't match $R_chr != $A_chr\n[".
-	join(" , ",map($_->seq_region_name,@from_chrs))."]\n[".
-	join(" , ",map($_->seq_region_name,@to_chrs))."]\n") unless $R_chr eq $A_chr;
+    my $R_sr_name = $from_chrs[$i]->seq_region_name;
+    my $A_sr_name = $to_chrs[$i] ? $to_chrs[$i]->seq_region_name : "undef";
+    my $R_chr = $sr_name_to_chr->{$R_sr_name};
+    my $A_chr = $sr_name_to_chr->{$A_sr_name};
 
-	$support->log_verbose("$R_sr_name	=>	$A_sr_name\n");
+    throw(   "chromosome names don't match $R_chr != $A_chr\n["
+           . join( " , ", map( $_->seq_region_name, @from_chrs ) ) . "]\n["
+           . join( " , ", map( $_->seq_region_name, @to_chrs ) )
+           . "]\n" )
+      unless(($R_chr eq $A_chr) || $from_cs_version);
+    $support->log_verbose("$R_sr_name   =>  $A_sr_name\n");
 }
 
 my @R_chr_list = map $_->seq_region_name , @from_chrs;
@@ -216,43 +256,80 @@ while (my $row = $sth->fetchrow_hashref) {
 
   $support->log_stamped("Block with tmp_align_id = $id\n", 1);
 
-  my $A_slice = $A_sa->fetch_by_region(
-      'chromosome',
-      $row->{'alt_seq_region_name'},
-      $row->{'alt_start'},
-      $row->{'alt_end'},
-      1,
-  );
-
-  my $R_slice = $R_sa->fetch_by_region(
-      'chromosome',
-      $row->{'ref_seq_region_name'},
-      $row->{'ref_start'},
-      $row->{'ref_end'},
-      1,
-  );
-
   # write sequences to file
   my $A_basename = "alt_seq.$id";
   my $R_basename = "ref_seq.$id";
 
   $support->log("Writing sequences to fasta...\n", 2);
+  
+  # This is needed otherwise will get a sequence of N's for the ref slice  
+  ($R_pipe_dba ? $R_pipe_dba : $R_dba)->get_AssemblyMapperAdaptor()->delete_cache();
+  
+   my $R_slice;
+  if ($R_pipe_dba) {
+    $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'ref_seq_region_name'},
+      $row->{'ref_start'},
+      $row->{'ref_end'},
+      1,
+    );
+  }
+  $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'ref_seq_region_name'},
+      $row->{'ref_start'},
+      $row->{'ref_end'},
+      1,
+   ) unless $R_slice;
 
-  $aligner->write_sequence(
-      $A_slice,
-      undef,
-      $A_basename
-  );
-
+ 
+  
   $aligner->write_sequence(
       $R_slice,
       undef,
       $R_basename
   );
+    
+  # This is needed otherwise will get a sequence of N's for the alt slice  
+  ($A_pipe_dba ? $A_pipe_dba : $A_dba)->get_AssemblyMapperAdaptor()->delete_cache();
+  
+
+  my $A_slice;
+  if($A_pipe_dba){
+  	$A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'alt_seq_region_name'},
+      $row->{'alt_start'},
+      $row->{'alt_end'},
+      1,
+    );
+  }
+  $A_slice = $A_dba->get_SliceAdaptor->fetch_by_region(
+      'chromosome',
+      $row->{'alt_seq_region_name'},
+      $row->{'alt_start'},
+      $row->{'alt_end'},
+      1,
+   ) unless $A_slice;
+   
+   $aligner->write_sequence(
+      $A_slice,
+      undef,
+      $A_basename
+  );
 
   $support->log("Done.\n", 2);
 
-  # align using blastz
+  # skip unmasked ref/alt sequences longer than 1.1MB
+  # This will avoid everlasting alignment...
+   $support->log("Checking sequences...\n", 2);
+   if($aligner->bad_sequences($A_basename, $R_basename)){
+   	    $support->log("Skip block $id (not soft-masked and too long)...\n", 2);
+   	    next BLOCK;
+   }
+
+  # align using lastz
   $support->log("Running lastz...\n", 2);
   $aligner->run_lastz($A_basename, $R_basename);
   $support->log("Done.\n", 2);
@@ -310,5 +387,26 @@ $support->log("\nDon't forget to drop the tmp_align table when all is done!\n\n"
 
 # finish logfile
 $support->finish_log;
+
+sub get_pipe_db {
+	my ($dba) = @_;
+	my $metakey = 'pipeline_db_head';
+	my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
+	
+	return undef unless $opt_str;
+	
+	my %anycase_options = (
+        eval $opt_str,
+    );
+    if ($@) {
+        throw("Error evaluating '$opt_str' : $@");
+    }
+    my %uppercased_options = ();
+    while( my ($k,$v) = each %anycase_options) {
+        $uppercased_options{uc($k)} = $v;
+    }
+	
+	return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
+}
 
 
