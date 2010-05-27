@@ -267,13 +267,16 @@ while (my $row = $sth->fetchrow_hashref) {
   
    my $R_slice;
   if ($R_pipe_dba) {
-    $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
-      'chromosome',
-      $row->{'ref_seq_region_name'},
-      $row->{'ref_start'},
-      $row->{'ref_end'},
-      1,
-    );
+  	eval {
+	    $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
+	      'chromosome',
+	      $row->{'ref_seq_region_name'},
+	      $row->{'ref_start'},
+	      $row->{'ref_end'},
+	      1,
+	      $from_cs_version ? $from_cs_version : undef
+	    );
+  	};
   }
   $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
@@ -281,9 +284,9 @@ while (my $row = $sth->fetchrow_hashref) {
       $row->{'ref_start'},
       $row->{'ref_end'},
       1,
+      $from_cs_version ? $from_cs_version : undef
    ) unless $R_slice;
-
- 
+   
   
   $aligner->write_sequence(
       $R_slice,

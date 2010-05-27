@@ -619,7 +619,7 @@ sub write_assembly {
     foreach my $R_chr (keys %{$self->{'_match'}}) {
         # get seq_region_id for alternative and reference chromosome
         my $A_chr = $alt_chr_map->{$R_chr};
-        my $R_sid = $R_sa->get_seq_region_id($R_sa->fetch_by_region('chromosome', $R_chr, undef, undef, undef, $self->support->param('assembly')));
+        my $R_sid = $R_sa->get_seq_region_id($R_sa->fetch_by_region('chromosome', $R_chr, undef, undef, undef, $self->support->param('from_cs_version') || $self->support->param('assembly')));
         my $A_sid = $R_sa->get_seq_region_id($R_sa->fetch_by_region('chromosome', $A_chr, undef, undef, undef, $self->support->param('altassembly')));
 		print STDOUT "Ref $R_chr Alt $A_chr\n";
         foreach my $id (sort { $a <=> $b } keys %{ $self->{'_match'}->{$R_chr} }) {
