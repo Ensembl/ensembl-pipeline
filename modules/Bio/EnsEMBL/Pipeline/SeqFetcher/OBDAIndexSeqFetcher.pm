@@ -241,7 +241,7 @@ sub  get_Seq_by_acc {
     ##print STDERR $seq->seq."\n";
   }
   else{
-    print STDERR "sequence not found. Returning undef\n";
+    warning("sequence not found. Returning undef\n");
   }
 
   return $seq;
