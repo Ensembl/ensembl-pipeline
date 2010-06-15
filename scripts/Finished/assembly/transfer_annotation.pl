@@ -110,6 +110,11 @@ $support->init_log;
 
 $support->check_required_params( 'assembly', 'altassembly' );
 
+for my $prm (qw(host port user pass dbname)) {
+    $support->param( "alt$prm", $support->param($prm) )
+      unless ( $support->param("alt$prm") );
+}
+
 # database connection
 my $R_dba = $support->get_database('ensembl');
 my $A_dba = $support->get_database( 'ensembl', 'alt' );
