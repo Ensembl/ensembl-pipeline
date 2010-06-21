@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.49 2010-01-23 11:13:04 jhv Exp $
+#$Id: cDNA_update.pl,v 1.50 2010-06-21 12:50:40 at6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -760,7 +760,13 @@ sub config_setup {
         if (   ( $filename =~ /Exonerate2Genes/ )
             && ( $rerun_flag == 1 ) ) {
             # Because only interested in those which don't align after new parameters
-            $content =~ s/-verbosity => 0/-verbosity => 1/;
+
+            # $content =~ s/-verbosity => 0/-verbosity => 1/;  # old regex, didn't work
+
+            # Due to config hash formatting, there are usually many trailing
+            # whitespaces between the hash key and values. Must include the
+            # spaces in the regex to carry out the substitution as intended:
+            $content =~ s/\-verbosity\s+=>\s0/-verbosity => 1/;
 
             my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
             $content =~ s/--softmasktarget TRUE/$substitute/;
