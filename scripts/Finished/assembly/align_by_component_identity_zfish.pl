@@ -233,12 +233,13 @@ if($from_cs_version) {
 	sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
 	grep ( $_->seq_region_name =~ /$from_assembly/, @$chr_list );
 }
-
+map($seq_region_id->{$_->seq_region_name} = $sa->get_seq_region_id( $_ ), @from_chrs);
 
 # Alternative chromosomes
 my @to_chrs =
   sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
   grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
+map($seq_region_id->{$_->seq_region_name} = $sa->get_seq_region_id( $_ ), @to_chrs);  
 
 # throw up error if lists don't match in length
 if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
@@ -261,8 +262,6 @@ for my $i ( 0 .. scalar(@from_chrs) - 1 ) {
 		   . "]\n" )
 	  unless(($R_chr eq $A_chr) || $from_cs_version);
 	$support->log_verbose("$R_sr_name	=>	$A_sr_name\n");
-	$seq_region_id->{$R_sr_name} = $sa->get_seq_region_id( $from_chrs[$i] ) if $from_chrs[$i];
-	$seq_region_id->{$A_sr_name} = $sa->get_seq_region_id( $to_chrs[$i] ) if $to_chrs[$i];
 }
 
 
