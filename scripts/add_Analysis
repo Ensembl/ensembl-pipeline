@@ -86,7 +86,7 @@ my $gff_feature;
 my $input_id_type;
 my $help;
 my $create_submission_ana ;
-
+my $uppercase; 
 &GetOptions(
             'dbhost:s'  => \$host,
             'dbport:n'  => \$port,
@@ -106,6 +106,7 @@ my $create_submission_ana ;
             'gff_sources:s'      => \$gff_source,
             'gff_feature:s'      => \$gff_feature,
             'input_id_type:s'       => \$input_id_type,
+            'uppercase|uc!'       => \$uppercase,
             'h|help'            => \$help, 
             'auto|all!'   => \$create_submission_ana ,  # creates a submission analysis automatically and adds rule too 
            );
@@ -134,6 +135,11 @@ if(!$help){
   }
 }
 
+if ( $uppercase ) {   
+  $input_id_type=uc($input_id_type) ; 
+} 
+
+
 if ($help) {
     exec('perldoc', $0);
 }
@@ -156,7 +162,7 @@ if ($parameters)       {$analysis->parameters        ($parameters);}
 if ($program_version)  {$analysis->program_version   ($program_version);}
 if ($gff_source)       {$analysis->gff_source        ($gff_source);}
 if ($gff_feature)      {$analysis->gff_feature       ($gff_feature);} 
-if ($input_id_type)       {$analysis->input_id_type     ($input_id_type);}
+if ($input_id_type)    {$analysis->input_id_type     ($input_id_type);}
 
 $db->get_AnalysisAdaptor->store($analysis); 
 
