@@ -56,19 +56,20 @@ sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
 
-  my ($exe, $options) = rearrange(['EXECUTABLE', 'OPTIONS'], @args);
-  
+  my ($exe, $options ) = rearrange(['EXECUTABLE', 'OPTIONS'], @args);
+ 
   if (!defined $exe) {
     $exe = 'mfetch';
   }
-  $self->executable($exe);
+  $self->executable($exe); 
 
-  if (defined $options) {
+  if (defined $options) { 
+    $options=~s/^\s+//g; 
     $self->options($options);
   } 
   # caching of sequences 
-  $self->{_seq_cache}={};    
-  $self->{verbose} = 0 ; 
+  $self->{_seq_cache}={};      
+
   return $self; # success - we hope!
 }
 
@@ -84,7 +85,7 @@ sub new {
 
 sub executable {
   my ($self, $exe) = @_;
-  if ($exe)
+  if (defined $exe)
     {
       $self->{'_exe'} = $exe;
     }
@@ -111,7 +112,6 @@ sub options {
      }
   }
   return $self->{'_options'};
-
 }
 
 
@@ -232,11 +232,10 @@ sub  get_Entry_Fields {
 
   for my $line ( @lines ) { 
         chomp($line) ;    
-
-        print "LINE $line\n" if $self->{verbose};
+        #print "LINE $line" if $self->{verbose};
         # we're just parsing one entry so if we get a no_match we just return  .... 
         
-        if ( $line =~m/no match/ ) {    
+        if ( $line =~m/no match/ ) {     
            print  "no entry found for $acc_to_fetch with $command\n" if $self->{verbose};
            push @entries_not_found, $acc_to_fetch; 
            return [\%all_entries , \@entries_not_found ] ; 
@@ -259,7 +258,6 @@ sub  get_Entry_Fields {
         $entry{$key_field}.= join(" ", @l);    
         print "populating $key_field ... ".join(" ", @l) . "\n" if $self->{verbose};
   }  
-
   # populate all_entry-hash 
   for my $field ( keys %entry ) {  
     $all_entries{$acc_format}{$field}=$entry{$field}; 
@@ -367,15 +365,13 @@ sub get_Entry_Fields_BatchFetch {
   # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields() 
 
 
-  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);  
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);   
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 250 )};  
-
+  my @fetch_strings = @{make_fetch_strings($acc, 500 )};   
+  print "got " . scalar(@fetch_strings) . " jobs to run \n"; 
   my $command ;  
-  my %all_entries; 
   my @entries_not_found;   
-  my %all_entries; 
   my $last_acc; 
   my %last_entry ;  
   my $entry_number = 0;
@@ -383,46 +379,49 @@ sub get_Entry_Fields_BatchFetch {
   # data fetching + parsing  
   my %no_match_index;  
   my $last_field ="";     
-  my ( %little_hash, %all_entries ) ; 
+  #my ( %little_hash, %all_entries ) ;  #c 
+  my ( $little_hash, $all_entries ) ; 
   my $new_entry = 0;  
   #my $no_match_found = 0 ; 
 
-  STRING: for my $acc_string ( @fetch_strings ) {   
+  STRING: for my $acc_string ( @fetch_strings ) {    
     $command = $cmd_prefix ." " .  $acc_string;
-    my @nr_acc = split /\s+/, $acc_string ;     
+    my @nr_acc = split /\s+/, $acc_string ;      
+
+    print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ;  
+
     if ( $self->{verbose} ) { 
-      print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ; 
-      print "\n\n$command \n\n" if $self->{verbose} ;  
+      print "\n\n$command \n\n" ;
     }
     
     my $t0 = gettimeofday() ;  
-    print "starting mfetch \n" ;  
+    print "starting mfetch\n" ;  
     my @lines = @{$self->_mfetch_command($command)} ; 
-    #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");   
-    #  my @lines  = <IN> ; 
-    #close IN or throw("Error running mfetch for accession [$acc_string]: $command");    
-
     my $t1 = gettimeofday() ; 
     my $delta_t = $t1 - $t0 ;  
-
     print "time for mfetch : $delta_t\n" ; 
     
     # data parsing  
    
     LINE: for my $line ( @lines ) {  
+      print "PARSING : $line\n" if $self->verbose(); 
       chomp($line) ;   
 
-      if ( $line =~m/no match/ ) {       
+      if ( $line =~m/no match/ ) {        
+       # print "line $line\n"; 
         print "line contains \"no match\"  \n" if $self->{verbose} ;  
         $last_field = "";    
 
         # if we have an entry in memory store it  
         
-         if (scalar(keys %little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
+         #if (scalar(keys %little_hash) > 0 )  #
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
               print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose}; 
               my  $query_acc = $acc_index{$entry_number}; 
-              %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
-              undef %little_hash;  
+              #%all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};    #c 
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
+              undef $little_hash;  
+              #undef %little_hash;  #c
               $entry_number++ ;
               print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
               print "NEW adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
@@ -441,7 +440,6 @@ sub get_Entry_Fields_BatchFetch {
           next LINE;  
       }  
 
-
       my @l = split /\s+/, $line;    
       my $field = shift @l ;     
 
@@ -459,9 +457,11 @@ sub get_Entry_Fields_BatchFetch {
       }   
 
       if ( $new_entry == 1 ) {    
-         if (scalar(keys %little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
+         #if (scalar(keys %little_hash) > 0 )    # if we have read a full entry before which has not been stored #c
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
            if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...  
               
+              print " NEW ENTRY STARTS\n" ;
               print " NEW ENTRY STARTS\n" if $self->{verbose} ; 
               # determine correct entry index 
               while (  exists $no_match_index{$entry_number} ) { 
@@ -476,27 +476,35 @@ sub get_Entry_Fields_BatchFetch {
               #} else { 
                 $query_acc = $acc_index{$entry_number}; 
               #}
-              %all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   
-              undef %little_hash;  
+              my $tY = gettimeofday() ; 
+              #%all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   #c
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
+              print "time : ". (gettimeofday() - $tY) . "\n" ;   
+
+              undef $little_hash;  
               $entry_number++; 
-           } 
+           }  
          } elsif ( exists $no_match_index{$entry_number} ) {  
-             print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n" if $self->{verbose} ; 
+             print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n";
+             #print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n" if $self->{verbose} ; 
              $entry_number++; 
          } 
-      }  
+      }
       # add to little hash  
-      $little_hash{$field}.=join (" " , @l); 
+      $$little_hash{$field}.=join (" " , @l); 
       $last_field = $field ;   
-    } 
-  } # fetch next round .. 
+    }  # next LINE 
+    my $t2 = gettimeofday() ; 
+    $delta_t = $t2 - $t1 ;  
+    print "time for parsing: $delta_t\n" ; 
+  } # next STRING - fetch next round 
  
   # add last entry to all_entries . 
   
   if ( $self->{verbose}  ) { 
-    for my $key ( keys %all_entries ) {  
+    for my $key ( keys %{$all_entries} ) {  
        print "KEY $key\n" ;
-         my %tmp = %{$all_entries{$key}} ;
+         my %tmp = %{$$all_entries{$key}} ;
          for ( keys %tmp ) {   
            # if ( /AC/ ) { 
            #   print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n"; 
@@ -510,7 +518,8 @@ sub get_Entry_Fields_BatchFetch {
 
   # combine both  
 
-  return [\%all_entries , \@entries_not_found ] ; 
+  #return [\%all_entries , \@entries_not_found ] ; #c
+  return [$all_entries , \@entries_not_found ] ; 
 } 
 
 
@@ -585,19 +594,21 @@ sub get_Seq_BatchFetch {
 sub _add_information_to_big_hash {
   my ($all, $little, $query_acc)  = @_ ;  
 
-  my %all_entries = %$all; 
-  my %little_hash = %$little; 
+  #my %all_entries = %$all;  #c 
+  #my %little_hash = %$little; #c  
+  #my %little_hash = %$little; #c  
 
   # $little_hash{AC} =  Q7PYN8; Q01FQ6;
   # $little_hash{OC} =  Eukaryota; Metazoa; Arthropoda; Hexapoda; Insecta; Pterygota; 
   # $little_hash{PE} =  4: Predicted;
  
-  my $acc_string = $little_hash{AC};
+  #my $acc_string = $little_hash{AC}; c 
+  my $acc_string = $$little{AC};
   $acc_string =~s/\;//g;
   my @accession_numbers = split /\s+/, $acc_string ;   
 
   # consistency check - the query acc which we used in the mfetch query should also be in the AC field of the entry returned ....  
-  my $found ; 
+  my $found ;  
   for my $returned_acc ( @accession_numbers ) {  
      if ($query_acc =~m/$returned_acc/) {  
         $found = 1; 
@@ -608,27 +619,44 @@ sub _add_information_to_big_hash {
   } 
 
 
-    unless ( exists $all_entries{$query_acc} ) { 
-      $all_entries{$query_acc} = \%little_hash; 
+    #unless ( exists $all_entries{$query_acc} ) {  # c 
+    unless ( exists $$all{$query_acc} ) { 
+      #$all_entries{$query_acc} = \%little_hash;  # c 
+      #$$all{$query_acc} = \%little_hash; 
+      $$all{$query_acc} = $little;
     }else { 
       # we already have an entry for this ACC. - check if the entries are the same ...  
       print "Warning ! The acc. you like to add has already been indexed ...\n" ; 
     
       # check if the entries are the same
-      my %new_entry_to_add = %little_hash ; 
-      my %stored_data = %{$all_entries{$query_acc}}; 
+      #my %new_entry_to_add = %little_hash ;  
+      
+#      my %stored_data = %{$all_entries{$query_acc}}; 
+#
+#      for my $lk ( keys %little_hash ) {    
+#          if (  $little_hash{$lk}=~/$stored_data{$lk}/ ) { 
+#          } else {  
+#            print "DATA INCONSITENCY !!!\n" ; 
+#            print "NEW : $lk  --> $little_hash{$lk}\n" ; 
+#            print "OLD : $lk  --> $stored_data{$lk}\n" ;  
+#          } 
+#      }  
+#      my %stored_data = %{$all_entries{$query_acc}};
+#
 
-      for my $lk ( keys %little_hash ) {    
-          if (  $little_hash{$lk}=~/$stored_data{$lk}/ ) { 
+      for my $lk ( keys %$little) {    
+          if (  $$little{$lk}=~/$$all{$query_acc}{$lk}/ ) { 
+          #if (  $$little{$lk}=~/$stored_data{$lk}/ ) { 
           } else {  
             print "DATA INCONSITENCY !!!\n" ; 
-            print "NEW : $lk  --> $little_hash{$lk}\n" ; 
-            print "OLD : $lk  --> $stored_data{$lk}\n" ;  
+            print "NEW : $lk  --> $$little{$lk}\n" ; 
+            print "OLD : $lk  --> $$all{$query_acc}{$lk}\n";
           } 
       } 
       print "\n\n\n" ; 
     }  
-  return \%all_entries; 
+  #return \%all_entries;  # c 
+  return $all; 
 }       
 
 
@@ -654,7 +682,7 @@ sub make_fetch_strings {
 
 sub verbose { 
    my ($self, $arg ) = @_ ; 
-   if ( $arg ) { 
+   if (defined $arg ) { 
       $self->{verbose}= $arg ;  
    }
 }  
