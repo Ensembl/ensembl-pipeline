@@ -414,14 +414,11 @@ sub get_Entry_Fields_BatchFetch {
 
         # if we have an entry in memory store it  
         
-         #if (scalar(keys %little_hash) > 0 )  #
          if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
               print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose}; 
               my  $query_acc = $acc_index{$entry_number}; 
-              #%all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};    #c 
               $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
               undef $little_hash;  
-              #undef %little_hash;  #c
               $entry_number++ ;
               print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
               print "NEW adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
@@ -457,11 +454,9 @@ sub get_Entry_Fields_BatchFetch {
       }   
 
       if ( $new_entry == 1 ) {    
-         #if (scalar(keys %little_hash) > 0 )    # if we have read a full entry before which has not been stored #c
          if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
            if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...  
               
-              print " NEW ENTRY STARTS\n" ;
               print " NEW ENTRY STARTS\n" if $self->{verbose} ; 
               # determine correct entry index 
               while (  exists $no_match_index{$entry_number} ) { 
@@ -476,17 +471,13 @@ sub get_Entry_Fields_BatchFetch {
               #} else { 
                 $query_acc = $acc_index{$entry_number}; 
               #}
-              my $tY = gettimeofday() ; 
-              #%all_entries = %{_add_information_to_big_hash(\%all_entries, \%little_hash,$query_acc )};   #c
               $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
-              print "time : ". (gettimeofday() - $tY) . "\n" ;   
 
               undef $little_hash;  
               $entry_number++; 
            }  
          } elsif ( exists $no_match_index{$entry_number} ) {  
-             print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n";
-             #print "entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n" if $self->{verbose} ; 
+             warning("entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n");
              $entry_number++; 
          } 
       }
@@ -494,9 +485,6 @@ sub get_Entry_Fields_BatchFetch {
       $$little_hash{$field}.=join (" " , @l); 
       $last_field = $field ;   
     }  # next LINE 
-    my $t2 = gettimeofday() ; 
-    $delta_t = $t2 - $t1 ;  
-    print "time for parsing: $delta_t\n" ; 
   } # next STRING - fetch next round 
  
   # add last entry to all_entries . 
@@ -518,7 +506,6 @@ sub get_Entry_Fields_BatchFetch {
 
   # combine both  
 
-  #return [\%all_entries , \@entries_not_found ] ; #c
   return [$all_entries , \@entries_not_found ] ; 
 } 
 
@@ -541,7 +528,7 @@ sub get_Seq_BatchFetch {
   my %acc_index = %{build_acc_index($acc)};
 
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 300 )};
+  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};
 
 
   my (@clean , @entries_not_found, @lines ) ;
@@ -602,7 +589,6 @@ sub _add_information_to_big_hash {
   # $little_hash{OC} =  Eukaryota; Metazoa; Arthropoda; Hexapoda; Insecta; Pterygota; 
   # $little_hash{PE} =  4: Predicted;
  
-  #my $acc_string = $little_hash{AC}; c 
   my $acc_string = $$little{AC};
   $acc_string =~s/\;//g;
   my @accession_numbers = split /\s+/, $acc_string ;   
@@ -619,43 +605,24 @@ sub _add_information_to_big_hash {
   } 
 
 
-    #unless ( exists $all_entries{$query_acc} ) {  # c 
     unless ( exists $$all{$query_acc} ) { 
-      #$all_entries{$query_acc} = \%little_hash;  # c 
-      #$$all{$query_acc} = \%little_hash; 
       $$all{$query_acc} = $little;
     }else { 
       # we already have an entry for this ACC. - check if the entries are the same ...  
       print "Warning ! The acc. you like to add has already been indexed ...\n" ; 
     
       # check if the entries are the same
-      #my %new_entry_to_add = %little_hash ;  
-      
-#      my %stored_data = %{$all_entries{$query_acc}}; 
-#
-#      for my $lk ( keys %little_hash ) {    
-#          if (  $little_hash{$lk}=~/$stored_data{$lk}/ ) { 
-#          } else {  
-#            print "DATA INCONSITENCY !!!\n" ; 
-#            print "NEW : $lk  --> $little_hash{$lk}\n" ; 
-#            print "OLD : $lk  --> $stored_data{$lk}\n" ;  
-#          } 
-#      }  
-#      my %stored_data = %{$all_entries{$query_acc}};
-#
 
       for my $lk ( keys %$little) {    
           if (  $$little{$lk}=~/$$all{$query_acc}{$lk}/ ) { 
-          #if (  $$little{$lk}=~/$stored_data{$lk}/ ) { 
           } else {  
-            print "DATA INCONSITENCY !!!\n" ; 
+            warning( "POSSIBLE DATA INCONSITENCY !!!\n" );
             print "NEW : $lk  --> $$little{$lk}\n" ; 
             print "OLD : $lk  --> $$all{$query_acc}{$lk}\n";
           } 
       } 
       print "\n\n\n" ; 
     }  
-  #return \%all_entries;  # c 
   return $all; 
 }       
 
