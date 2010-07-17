@@ -72,7 +72,7 @@ sub new {
   my ($p, $f, $l) = caller;
 
   my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner,$number_output_dirs) 
-	= rearrange([qw(ADAPTOR
+        = rearrange([qw(ADAPTOR
                   ID
                   SUBMISSION_ID
                   INPUT_ID
@@ -92,7 +92,7 @@ sub new {
   $analysis   || throw("Can't create a job object without an analysis object");
 
   $analysis->isa("Bio::EnsEMBL::Analysis") ||
-	throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
+        throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
   
   $self->dbID($dbID);
   $self->adaptor($adaptor);
@@ -136,7 +136,8 @@ sub new {
     throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
     $self->output_dir($dir);
     $self->make_filenames;
-  }
+  } 
+  #print "Job->new() : instantiating the runner\n"; 
   $self->runner($runner);
   if(!$self->runner){
     my $queue = $BATCH_QUEUES{$self->analysis->logic_name};
@@ -164,12 +165,12 @@ sub create_by_analysis_input_id {
   warning("Bio::EnsEMBL::Pipeline::Job->create_by_analysis_input_id is deprecated ". (caller) .
                " should now call the constructor directly");
   my $job = Bio::EnsEMBL::Pipeline::Job->new(
-					     -input_id    => $inputId,
-					     -analysis    => $analysis,
-					     -output_dir => $output_dir,
-					     -auto_update => $auto_update,
-					     -retry_count => 0
-					    );
+                                             -input_id    => $inputId,
+                                             -analysis    => $analysis,
+                                             -output_dir => $output_dir,
+                                             -auto_update => $auto_update,
+                                             -retry_count => 0
+                                            );
   #$job->make_filenames;
   return $job;
 }
@@ -335,12 +336,29 @@ sub flush_runs {
     if ( ! $lastjob) {
       throw( "Last batch job not in db" );
     }
-    
-    my $pre_exec = 'perl ' . $this_runner." -check -output_dir ".$self->output_dir;
-   
-    my ($system_queue, $parameters, $resources) = 
-      ($queue->{'queue'}, $queue->{'sub_args'},
-       $queue->{'resource'});
+    # jhv LD_LIBRARY_PATH lsf-pre-exec hack  
+    # We're running the runner.pl with /usr/local/ensembl32/bin/perl - this is a bit un-usual , but it's 
+    # currently ( July 2010 ) needed to overcome some lsf bug / lsf security feature. 
+    # The probelm is that if you're using the 64bit perl( to use more than 4 gigs of memory ), the job
+    # will fail in the pre-exec command stage; ( you can see this with "bhist -l <jobnr>" 
+    # This is because the bsub pre-exec command runs in a different environment than your normal one, 
+    # and the  LD_LIBRARY_PATH is unset. so you can't use the libraries you want, ie if you you're using 
+    #  /software/intel_cce_80/bin/iccvars.csh
+  
+    my $pre_exec_perl = "perl"; 
+    if ( defined $queue->{lsf_pre_exec_perl} ) {
+      $pre_exec_perl = $queue->{lsf_pre_exec_perl}; 
+       warning("using lsf_pre_exec  : $pre_exec_perl \n");
+      if (! -x $pre_exec_perl ) {  
+         throw("Your LSF_PRE_EXEC_PERL or DEFAULT_LSF_PRE_EXEC_PERL [$pre_exec_perl] is not executable\n");
+      } 
+    } 
+    #my $pre_exec = '/usr/local/ensembl32/bin/perl ' . $this_runner." -check -output_dir ".$self->output_dir;
+    my $pre_exec = $pre_exec_perl." ". $this_runner." -check -output_dir ".$self->output_dir;
+    warning("using $pre_exec_perl for the runner to overcome LSF_LD_SECURITY / 64 bit perl problem - see DEFAULT_LSF_PRE_EXEC_PERL in BatchQueue.pm-config ");
+      
+    my ($system_queue, $parameters, $resources) = ($queue->{'queue'}, $queue->{'sub_args'}, $queue->{'resource'});
+
     if($self->retry_count >= 1){
       $system_queue = $queue->{retry_queue} if($queue->{retry_queue});
       $parameters = $queue->{retry_sub_args} if($queue->{retry_sub_args});
@@ -367,25 +385,38 @@ sub flush_runs {
 
     # check if the password has been defined, and write the
     # "connect" command line accordingly otherwise -pass gets the
-    # first job id as password, instead of remaining undef
+    # first job id as password, instead of remaining undef 
+   
+    my $exec_perl ="perl" ; 
+ 
+    if ( defined $queue->{lsf_perl} ) {
+      $exec_perl = $queue->{lsf_perl};  
+       warning("using lsf_perl : $exec_perl\n");
+      if (! -x $exec_perl ) {  
+         throw("Your LSF_PERL or DEFAULT_LSF_PERL [$exec_perl] is not executable\n");
+      } 
+    } 
 
-    if ($pass) {
-      $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
+    if ($pass) {  
+      $cmd = "$exec_perl $runner  -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
+      #$cmd = "/usr/local/ensembl64/bin/perl $runner  -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
     } else {
-      $cmd = $runner." -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
+      $cmd = "$exec_perl $runner  -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
     }
+  
+ 
     $cmd .= " -output_dir ".$self->output_dir;
     $cmd .= " -queue_manager $QUEUE_MANAGER  " ;
     if ($self->cleanup) {
       $cmd .= " -cleanup "
     }
     $cmd .= " @job_ids";
-    
+    #print "Job.pm-cmd : $cmd\n";   
     $batch_job->construct_command_line($cmd);
 
     eval {
       # SMJS LSF Specific for debugging
-      #print STDERR "Submitting: ", $batch_job->bsub, "\n";
+      print STDERR "Submitting: ", $batch_job->bsub, "\n";
       $batch_job->open_command_line();
     };
 
@@ -416,7 +447,7 @@ sub flush_runs {
           # get a job ID. Safest NOT to raise an error here,
           # (a warning would have already issued) but flag
           print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
-          $job->submission_id( 0 );		
+          $job->submission_id( 0 );             
         }
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
@@ -1001,19 +1032,22 @@ sub set_up_queues {
     $q{$ln}{jobs} = [];
     $q{$ln}{last_flushed} = undef;
     $q{$ln}{batch_size} = $DEFAULT_BATCH_SIZE if !defined($q{$ln}{batch_size});
-    $q{$ln}{queue}					||= $DEFAULT_BATCH_QUEUE;
-    $q{$ln}{resource} 			||= $DEFAULT_RESOURCE;
-		#Allow 0 retries
+    $q{$ln}{queue}     ||= $DEFAULT_BATCH_QUEUE;
+    $q{$ln}{resource}  ||= $DEFAULT_RESOURCE;
+                #Allow 0 retries
     $q{$ln}{retries} = $DEFAULT_RETRIES if !defined($q{$ln}{retries});
-    $q{$ln}{cleanup} 				||= $DEFAULT_CLEANUP;
+    $q{$ln}{cleanup}                            ||= $DEFAULT_CLEANUP;
     $q{$ln}{runnabledb_path}||= $DEFAULT_RUNNABLEDB_PATH;
-    #$q{$ln}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
-    $q{$ln}{runner} 				||= $DEFAULT_RUNNER;
-    $q{$ln}{verbosity} 			||= $DEFAULT_VERBOSITY;
-    $q{$ln}{sub_args} 			||= $DEFAULT_SUB_ARGS;
-    $q{$ln}{retry_queue} 		||= $DEFAULT_RETRY_QUEUE;
+    #$q{$ln}{output_dir}                ||= $DEFAULT_OUTPUT_DIR;
+    $q{$ln}{runner}                             ||= $DEFAULT_RUNNER;
+    $q{$ln}{verbosity}                  ||= $DEFAULT_VERBOSITY;
+    $q{$ln}{sub_args}                   ||= $DEFAULT_SUB_ARGS;
+    $q{$ln}{retry_queue}                ||= $DEFAULT_RETRY_QUEUE;
     $q{$ln}{retry_resource} ||= $DEFAULT_RETRY_RESOURCE;
-    $q{$ln}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS;
+    $q{$ln}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS; 
+
+    $q{$ln}{lsf_pre_exec_perl} ||= $DEFAULT_LSF_PRE_EXEC_PERL;
+    $q{$ln}{lsf_perl} ||= $DEFAULT_LSF_PERL; 
     #print "HAVE SUB ARGS ".$q{$ln}{sub_args}."\n";
   }
 
@@ -1024,18 +1058,20 @@ sub set_up_queues {
   }
   # Need these set, do the ||= thing (but check for numbers that are 0) 
   $q{default}{batch_size} = $DEFAULT_BATCH_SIZE if !defined($q{default}{batch_size});
-  $q{default}{queue} 					||= $DEFAULT_BATCH_QUEUE;
-  $q{default}{resource} 			||= $DEFAULT_RESOURCE;
+  $q{default}{queue}     ||= $DEFAULT_BATCH_QUEUE;
+  $q{default}{resource}  ||= $DEFAULT_RESOURCE;
   $q{default}{retries} = $DEFAULT_RETRIES if !defined($q{default}{retries});
-  $q{default}{cleanup} 				||= $DEFAULT_CLEANUP;
+  $q{default}{cleanup}    ||= $DEFAULT_CLEANUP;
   $q{default}{runnabledb_path}||= $DEFAULT_RUNNABLEDB_PATH;
-  $q{default}{output_dir} 		||= $DEFAULT_OUTPUT_DIR;
-  $q{default}{runner} 				||= $DEFAULT_RUNNER;
-  $q{default}{verbosity} 			||= $DEFAULT_VERBOSITY;
-  $q{default}{sub_args} 			||= $DEFAULT_SUB_ARGS;
-  $q{default}{retry_queue} 		||= $DEFAULT_RETRY_QUEUE;
+  $q{default}{output_dir} ||= $DEFAULT_OUTPUT_DIR;
+  $q{default}{runner}     ||= $DEFAULT_RUNNER;
+  $q{default}{verbosity}  ||= $DEFAULT_VERBOSITY;
+  $q{default}{sub_args}   ||= $DEFAULT_SUB_ARGS;
+  $q{default}{retry_queue}||= $DEFAULT_RETRY_QUEUE;
   $q{default}{retry_resource} ||= $DEFAULT_RETRY_RESOURCE;
-  $q{default}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS;
+  $q{default}{retry_sub_args} ||= $DEFAULT_RETRY_SUB_ARGS; 
+  $q{default}{lsf_pre_exec_perl} ||= $DEFAULT_LSF_PRE_EXEC_PERL;
+  $q{default}{lsf_perl} ||= $DEFAULT_LSF_PERL; 
   return %q;
 }
 
