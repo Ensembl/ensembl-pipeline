@@ -98,10 +98,8 @@ and returns a ref to a list of Bio::EnsEMBL::Analysis.
 
 sub fetch_analysis_by_input_id {
 	my ( $self, $inputId ) = @_;
-
 	my @result;
-	my @row;
-
+	my $ana_hash;
 	my $anaAd = $self->db->get_AnalysisAdaptor();
 
 	my $sth = $self->prepare(
@@ -111,20 +109,37 @@ sub fetch_analysis_by_input_id {
     WHERE input_id = ? }
 	);
 	$sth->execute($inputId);
-
+    # Get a list of completed analysis for this input_id
 	while ( my $row = $sth->fetchrow_arrayref ) {
 		my $analysis = $anaAd->fetch_by_dbID( $row->[0] );
 		my $version  = $row->[1];
 		next unless ($analysis);
-		if (   !$version
-			|| $analysis->db_version eq $version )
-		{
-			#print "Analysis " . $analysis->logic_name . " V. $version\n";
-			push( @result, $analysis );
-		}
-		else {
-			#print "Analysis ". $analysis->logic_name." V. $version need to be updated to V. ". $analysis->db_version."\n";
-		}
+		$ana_hash->{$analysis->logic_name} = [$analysis,$version];
+	}
+	# Process the list to return completed analysis that are:
+	# 1) non-updatable (i.e. Trf, RepeatMasker, ...)
+	# 2) up to date (i.e. same current and saved db versions)
+	# 3) out of date but depending analysis not run yet
+	# For example: Est2genome_other_raw has 
+	# saved_version = 04-Oct-09 (101) and current_version = 02-Jun-10 (103)
+	# but depending analysis Est2genome_other not run so include it in the list
+	# of completed analysis so that the depending analysis get run. 
+	foreach(keys %$ana_hash){
+		my $analysis        = $ana_hash->{$_}->[0];
+		my $saved_version   = $ana_hash->{$_}->[1];
+		my $current_version = $analysis->db_version;
+		if ( !$current_version ||                  # test points 1
+		      $saved_version eq $current_version ) # test points 2
+        {
+            push( @result, $analysis );
+        } elsif(my ($filter_ana) = /(.*)_raw/) { # test point 3
+            push( @result, $analysis ) unless (
+                $ana_hash->{$filter_ana}       ||
+                $ana_hash->{$filter_ana.'_SW'} ||
+                $ana_hash->{$filter_ana.'_TR'}
+            };
+        }
+        
 	}
 
 	return \@result;
