@@ -137,7 +137,7 @@ sub fetch_analysis_by_input_id {
                 $ana_hash->{$filter_ana}       ||
                 $ana_hash->{$filter_ana.'_SW'} ||
                 $ana_hash->{$filter_ana.'_TR'}
-            };
+            );
         }
         
 	}
