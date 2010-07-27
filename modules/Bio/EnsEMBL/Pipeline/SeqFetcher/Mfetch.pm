@@ -368,7 +368,7 @@ sub get_Entry_Fields_BatchFetch {
   my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);   
   my %acc_index = %{build_acc_index($acc)};
   # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 500 )};   
+  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};   
   print "got " . scalar(@fetch_strings) . " jobs to run \n"; 
   my $command ;  
   my @entries_not_found;   
@@ -527,8 +527,8 @@ sub get_Seq_BatchFetch {
 
   my %acc_index = %{build_acc_index($acc)};
 
-  # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};
+  # fetch in batches of 500   
+  my @fetch_strings = @{make_fetch_strings($acc, 500 )};
 
 
   my (@clean , @entries_not_found, @lines ) ;
