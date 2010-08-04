@@ -122,7 +122,8 @@ my $update;
 
 
 if($help){
-  useage();
+  useage(); 
+  exit(0);
 }
 
 
