@@ -253,7 +253,7 @@ use vars qw(%Config);
       batch_size => 600,
       resource       => '',
       retries        => 3,
-      sub_args       => '',
+      sub_args       => '-sp 100', #want all vertrnas to run together
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -264,7 +264,7 @@ use vars qw(%Config);
       batch_size => 600,
       resource       => '',
       retries        => 3,
-      sub_args       => '',
+      sub_args       => '-sp 95', #only want unigenes to run after vertrna
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -275,7 +275,7 @@ use vars qw(%Config);
       batch_size => 500,
       resource       => '',
       retries        => 3,
-      sub_args       => '',
+      sub_args       => '-sp 90',
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
