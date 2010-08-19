@@ -98,6 +98,7 @@ my $patch_fix;
 my $all_patch_types;
 my $on_or_after;
 my $all_dates;
+my $slice_size = undef;
 &GetOptions(
             'dbhost:s'     => \$host,
             'dbport:n'     => \$port,
@@ -116,6 +117,7 @@ my $all_dates;
             'all_patch_types!' => \$all_patch_types,
             'on_or_after:s' => \$on_or_after,
             'all_dates!' => \$all_dates,
+            'slice_size:n' => \$slice_size,
            );
 
 
@@ -191,14 +193,12 @@ foreach my $slice (@slices){
           throw "Patch day isn't a day\n" if $patch_day < 1 or $patch_day > 31; 
 
           if($patch_year >= $year and $patch_month >= $month and $patch_day >= $day){
-            push @input_id_slice_names, $slice->name;
-            print "Added ".$slice->name."\n";
+            store_slice($slice);
           }
         }
       }
       else{
-        push @input_id_slice_names, $slice->name;
-        print "Added ".$slice->name."\n";
+        store_slice($slice);
       }
     }
   }
@@ -220,4 +220,44 @@ my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
 $inputIDFactory->input_ids(\@input_id_slice_names);
 $inputIDFactory->store_input_ids;
 
+sub store_slice{
+  my $slice = shift;
 
+  #if slice size has been specified...
+  if($slice_size){
+    #...and slice is longer
+    if($slice->length>$slice_size){
+      my $start = 1;
+      my $end = $slice_size;
+      my $not_at_end = 1;
+      while($not_at_end){
+        my $sub_slice = $slice->sub_Slice($start, $end);
+        push @input_id_slice_names, $sub_slice->name;
+        print "Added ".$sub_slice->name."\n";
+
+        #prepare for next section
+        $start = $end + 1;
+        $end = $end + $slice_size;
+
+        #if next section will be the last one
+        if($end>$slice->length){
+          $end = $slice->length;
+          $sub_slice = $slice->sub_Slice($start, $end);
+          push @input_id_slice_names, $sub_slice->name;
+          print "Added ".$sub_slice->name."\n";
+          $not_at_end = 0;
+        }
+      }
+    }
+    else{
+      push @input_id_slice_names, $slice->name;
+      print "Added ".$slice->name."\n";
+    }
+  }
+  #no slice size specified
+  else{
+    push @input_id_slice_names, $slice->name;
+    print "Added ".$slice->name."\n";
+  }
+
+}
