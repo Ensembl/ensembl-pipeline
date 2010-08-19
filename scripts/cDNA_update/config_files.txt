@@ -45,6 +45,8 @@ use vars qw(%Config);
   DEFAULT_RETRY_QUEUE     => 'long',
   DEFAULT_RETRY_SUB_ARGS  => '',
   DEFAULT_RETRY_RESOURCE  => '',
+  DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl', # ONLY use 32bit perl for lsf -pre-exec jobs
+  DEFAULT_LSF_PERL          =>'/usr/local/ensembl32/bin/perl', # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
   QUEUE_CONFIG => [
     {  logic_name => '<newFeatureName>',
        batch_size => 1,
