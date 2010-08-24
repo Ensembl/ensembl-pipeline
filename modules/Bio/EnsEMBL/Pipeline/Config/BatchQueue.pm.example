@@ -213,7 +213,7 @@ use vars qw(%Config);
         retry_queue    => '',
         retry_resource => '',
         retry_sub_args => '',
-        lsf_perl        => '/usr/local/ensembl4/bin/perl',
+        lsf_perl        => '/usr/local/ensembl64/bin/perl',
     },
     {
       logic_name => 'Eponine',
