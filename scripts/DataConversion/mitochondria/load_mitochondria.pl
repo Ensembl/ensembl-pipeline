@@ -712,8 +712,8 @@ sub get_chromosomes {
         -strand            => 1,
         -seq_region_name   => $assembly{$cs->name},
         -seq_region_length => $genbank[1]{'end'}[0] - $genbank[1]{'start'}[0]+1,
-        -adaptor           => $sa
-      )
+      );
+   
     }
   }
 
@@ -750,7 +750,7 @@ sub load_chromosomes {
                     -DESCRIPTION => 'Top Level Non-Redundant Sequence Region',
                     -VALUE       => 1 );
 
-  foreach my $cs ( keys %slices ) {
+  foreach my $cs (  sort keys %slices ) {
     print "Slice " . $slices{$cs}->name . "\n" if $MIT_DEBUG;
     if ( $cs eq 'seq_level' ) {
       $sa->store( $slices{$cs}, \$seq_ref->seq );
