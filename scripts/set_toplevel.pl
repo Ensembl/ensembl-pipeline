@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/ensembl/bin/perl
 
 =head1 NAME
 
@@ -6,31 +6,32 @@ set_toplevel.pl
 
 =head1 SYNOPSIS
 
-  set_toplevel.pl -dbhost host -dbuser ensro -dbname homo_sapiens_core_20_34
+  set_toplevel.pl -dbhost host -dbport port -dbuser ensro -dbname homo_sapiens_core_20_34
 
 =head1 DESCRIPTION
 
-This script flags the set of non-redundant sequence regions in a database as
-'toplevel'.  Doing this enables the use of 'toplevel' alias when retrieving
-all slices from the database and allows the generic construction of input
-ids for the pipeline regardless of what the actual assembly looks like.
-This script should be run before the pipeline is started.
+  This script flags the set of non-redundant sequence regions in a
+  database as 'toplevel'. Doing this enables the use of 'toplevel'
+  alias when retrieving all slices from the database and allows the
+  generic construction of input ids for the pipeline regardless of
+  what the actual assembly looks like. This script should be run
+  before the pipeline is started.
 
-Before you can use this script the seq_region, assembly, and coord_system
-tables need to be fully populated.  This is normally done via the
-B<load_seq_region.pl> and B<load_agp.pl> scripts.
-
-here is an example commandline
-
-  ./set_toplevel.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+  Before you can use this script the seq_region, assembly, and
+  coord_system tables need to be fully populated. This is normally
+  done via the B<load_seq_region.pl> and B<load_agp.pl> scripts.
 
 =head1 OPTIONS
 
-    -dbhost    host name for database (gets put as host= in locator)
-    -dbname    what name to connect to (dbname= in locator)
-    -dbuser    what username to connect as (dbuser= in locator)
-    -dbpass    what password to use (dbpass= in locator)
-    -help      displays this documentation with PERLDOC
+  -dbhost    host name for database (gets put as host= in locator)
+  -dbname    what name to connect to (dbname= in locator)
+  -dbuser    what username to connect as (dbuser= in locator)
+  -dbpass    what password to use (dbpass= in locator)
+  -help      displays this documentation with PERLDOC
+
+=head1 EXAMPLES
+
+  perl set_toplevel.pl -dbhost host -dbport port -dbuser user -dbname my_db -dbpass ****
 
 =cut
 
@@ -55,15 +56,14 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
   my $help;
   my @coord_system;
 
-  &GetOptions(
-              'dbhost:s'   => \$host,
-              'dbport:n'   => \$port,
-              'dbname:s'   => \$dbname,
-              'dbuser:s'   => \$dbuser,
-              'dbpass:s'   => \$dbpass,
+  GetOptions( 'dbhost:s'               => \$host,
+              'dbport:n'               => \$port,
+              'dbname:s'               => \$dbname,
+              'dbuser:s'               => \$dbuser,
+              'dbpass:s'               => \$dbpass,
               'ignore_coord_system:s@' => \@coord_system,
-              'h|help'     => \$help,
-             ) or ($help = 1);
+              'h|help'                 => \$help,
+  ) or ( $help = 1 );
 
   if(!$host || !$dbuser || !$dbname || !$dbpass){
     print STDERR "Can't store sequence without database details\n";
