@@ -55,7 +55,8 @@ methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
 
-use Bio::EnsEMBL::Pipeline::BatchSubmission;
+use Bio::EnsEMBL::Pipeline::BatchSubmission; 
+use Bio::EnsEMBL::Utils::Exception qw(throw warning); 
 use vars qw(@ISA);
 # command out by GT
 #use strict;
@@ -110,7 +111,7 @@ sub construct_command_line{
    open(QSUB, '>', $test.'.sh');
    print QSUB "#!/usr/bin/tcsh\n";
    print QSUB "source /home/ensembl/cvs_checkout/set_perl_path.sh\n";
-   print QSUB "setenv PERL5LIB /home/ensembl/workshop/genebuild/configs/pipeline_config/modules:".'${PERL5LIB}'."\n";
+   # print QSUB "setenv PERL5LIB /home/ensembl/workshop/genebuild/configs/pipeline_config/modules:".'${PERL5LIB}'."\n";
 
 
   $self->command($command);
@@ -172,6 +173,7 @@ sub construct_command_line{
 
   #add by GT
   $ffpreexec1 = $self->pre_exec;
+  # print QSUB "/usr/local/ensembl/bin/"."$ffpreexec1\n";
   print QSUB "$ffpreexec1\n";
 
 
@@ -189,9 +191,9 @@ sub construct_command_line{
 #  $self->qsub($qsub_line);
 
 
-  #print "$ge_wrapper\n";
-  #print "command is\n";
-  #print "$command\n";
+  print "$ge_wrapper\n";
+  print "command is\n";
+  print "$command\n";
 
   # add by GT
   $gewrappercommand = "$ge_wrapper \"".$command . "\"";
@@ -215,12 +217,12 @@ sub open_command_line{
   print "run open_command_line in GridEngine.pm\n";
   my ($self)= @_;
 
-  print STDERR $self->qsub."\n";
+  print STDERR $self->qsub." 2>&1 \n";
   print STDERR "opening command line\n";
   open(SUB, $self->qsub." 2>&1 |");
   my $geid;
   while(<SUB>){
-    if (/your job (\d+)/) {
+    if (/Your job (\d+)/) {
       $geid = $1;
     }
   }
@@ -236,10 +238,14 @@ sub temp_filename{
   print "run temp_filename in GridEngine.pm\n";
   my ($self) = @_;
 
+  for ( keys %ENV ) {  
+     print STDERR "key $_ $ENV{$_}\n";
+  } 
   $self->{'sge_jobfilename'} = $ENV{'JOB_NAME'};
 
   print "ENV{JOB_NAME}=$ENV{'JOB_NAME'} in GridEngine.pm\n";
 
+  print " JOBNAME " . $self->{'sge_jobfilename'} . "\n"; 
   return $self->{'sge_jobfilename'};
 }
 
