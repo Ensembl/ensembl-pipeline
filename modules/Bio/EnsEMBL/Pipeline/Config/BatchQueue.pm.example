@@ -110,7 +110,7 @@ use vars qw(%Config);
   #
   # For mor info look into:
   # /ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/BatchSubmission
-  QUEUE_MANAGER => 'LSF',
+  QUEUE_MANAGER => 'LSF', # use "SGE_GridEngine_v6" for running in ensembl cloud evironment
 
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
