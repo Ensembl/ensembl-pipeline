@@ -106,6 +106,7 @@ sub construct_command_line{
 
   $test= $self->stdout_file  if defined $self->stdout_file;
 
+  print "test $test\n";
   $test =~ s/\:/\_/g; #SGE does not like : in job name so change to _ 
 
    # this section writes a little wrapper script for the job itself which will be executed by 
@@ -119,7 +120,7 @@ sub construct_command_line{
             "You have to define a setup script in Pipeline/Config/General.pm to set up your PERL5LIB env"); 
    }
    if ( -e $SGE_PERL5LIB_ENV_SCRIPT && -r $SGE_PERL5LIB_ENV_SCRIPT ) {  
-     print "SGE_GridEngine_v6.pm : using setup script $env_setup_script\n";  
+     print "SGE_GridEngine_v6.pm : using setup script $SGE_PERL5LIB_ENV_SCRIPT\n";  
    } else {  
      throw("Your setup script SGE_PERL5LIB_ENV_SCRIPT specified in Pipeline/Config/General.pm is not readable or does not exist\n");
    } 
@@ -194,7 +195,8 @@ sub construct_command_line{
   my $ge_wrapper = "ge_wrapper.pl";
   unless (-x $ge_wrapper) {
     $ge_wrapper = __FILE__;
-    $ge_wrapper =~ s:GridEngine.pm:../../../../../scripts/ge_wrapper.pl:;
+    #$ge_wrapper =~ s:GridEngine.pm:../../../../../scripts/ge_wrapper.pl:;
+    $ge_wrapper =~ s:SGE_GridEngine_v6.pm:../../../../../scripts/ge_wrapper.pl:;
     print $ge_wrapper . "\n";
     my $caller = caller(0);
     $self->throw("ge_wrapper not found - needs to be set in $caller\n") unless -x $ge_wrapper;
