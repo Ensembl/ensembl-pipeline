@@ -276,7 +276,7 @@ sub job_stats {
   sleep(20);
 
   local *BJOB;
-  open(BJOB, "$command 2>&1 |") or throw("couldn't open pipe to bjobs");
+  open(BJOB, "$command 2>&1 |") or throw("couldn't open pipe to bjobs - make sure you're using the correct BatchSubmision-module (LSF,GridEngine..)");
 
   my %jobs;
  LINE:
