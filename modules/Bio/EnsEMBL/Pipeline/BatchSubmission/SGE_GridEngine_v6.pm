@@ -57,6 +57,7 @@ package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
 
 use Bio::EnsEMBL::Pipeline::BatchSubmission; 
 use Bio::EnsEMBL::Utils::Exception qw(throw warning); 
+use Bio::EnsEMBL::Pipeline::Config::General;
 use vars qw(@ISA);
 # command out by GT
 #use strict;
@@ -105,13 +106,25 @@ sub construct_command_line{
 
   $test= $self->stdout_file  if defined $self->stdout_file;
 
-  $test =~ s/\:/\_/g; #SGE does not like : in job name so change to _
-  print "  test jobname = $test\n";
+  $test =~ s/\:/\_/g; #SGE does not like : in job name so change to _ 
+
+   # this section writes a little wrapper script for the job itself which will be executed by 
+   # the sun grid engine. 
 
    open(QSUB, '>', $test.'.sh');
-   print QSUB "#!/usr/bin/tcsh\n";
-   print QSUB "source /home/ensembl/cvs_checkout/set_perl_path.sh\n";
-   # print QSUB "setenv PERL5LIB /home/ensembl/workshop/genebuild/configs/pipeline_config/modules:".'${PERL5LIB}'."\n";
+   print QSUB "#!/usr/bin/tcsh\n";  
+
+   if (!defined $SGE_PERL5LIB_ENV_SCRIPT || length($SGE_PERL5LIB_ENV_SCRIPT) == 0 ) {   
+     throw("Missing config variable : SGE_PERL5LIB_ENV_SCRIPT !!! \n".
+            "You have to define a setup script in Pipeline/Config/General.pm to set up your PERL5LIB env"); 
+   }
+   if ( -e $SGE_PERL5LIB_ENV_SCRIPT && -r $SGE_PERL5LIB_ENV_SCRIPT ) {  
+     print "SGE_GridEngine_v6.pm : using setup script $env_setup_script\n";  
+   } else {  
+     throw("Your setup script SGE_PERL5LIB_ENV_SCRIPT specified in Pipeline/Config/General.pm is not readable or does not exist\n");
+   } 
+   my $env_setup_script = $SGE_PERL5LIB_ENV_SCRIPT; 
+   print QSUB "source $env_setup_script\n"; 
 
 
   $self->command($command);
