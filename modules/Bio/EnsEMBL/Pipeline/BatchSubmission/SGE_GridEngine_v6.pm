@@ -53,7 +53,7 @@ methods are usually preceded with a _
 =cut
 
 
-package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
+package Bio::EnsEMBL::Pipeline::BatchSubmission::SGE_GridEngine_v6; 
 
 use Bio::EnsEMBL::Pipeline::BatchSubmission; 
 use Bio::EnsEMBL::Utils::Exception qw(throw warning); 
