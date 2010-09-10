@@ -136,9 +136,9 @@ use vars qw(%Config);
   # jobs (e.g. early LSF versions and SGE)
   JOB_LIMIT           => 10000,
 
-  JOB_STATUSES_TO_COUNT => ['PEND'],    # These are the jobs which will be
+  JOB_STATUSES_TO_COUNT => ['PEND'],    # These are the jobs which will be 
                                         # counted. valid statuses for
-                                        # this array are RUN, PEND, SSUSP, EXIT, DONE
+                                        # this array are RUN, PEND, SSUSP, EXIT, DONE ; use 'qw' for Sun Grid Engine
   MARK_AWOL_JOBS => 1,
   MAX_JOB_SLEEP  => 3600,   # The maximun time to sleep for when job limit
                             # reached
