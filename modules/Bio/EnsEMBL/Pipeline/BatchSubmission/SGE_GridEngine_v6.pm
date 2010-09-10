@@ -94,19 +94,18 @@ sub qsub {
 ######################
 
 sub construct_command_line{
-  print "run construct_command_line in GridEngine.pm\n";
-  my($self, $command, $stdout, $stderr) = @_; 
+  my($self, $command, $stdout, $stderr) = @_;  
+
   #print STDERR "creating the command line\n";
-#command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
+  #command must be the first argument then if stdout or stderr aren't definhed the objects own can be used
   if(!$command){
     $self->throw("cannot create qsub if nothing to submit to it : $!\n");
-  }
-  my $qsub_line;
-#add by GT
+  } 
+
+  my $qsub_line="";
 
   $test= $self->stdout_file  if defined $self->stdout_file;
 
-  print "test $test\n";
   $test =~ s/\:/\_/g; #SGE does not like : in job name so change to _ 
 
    # this section writes a little wrapper script for the job itself which will be executed by 
@@ -128,29 +127,43 @@ sub construct_command_line{
    print QSUB "source $env_setup_script\n"; 
 
 
-  $self->command($command);
-  if($stdout){
-    #$qsub_line = "qsub -V -cwd -v FINAL_STDOUT=".$stdout;
-# add by GT
-   print QSUB "setenv FINAL_STDOUT $stdout\n";
+  $self->command($command); 
 
+
+  if($stdout){
+   #$qsub_line = "qsub -V -cwd -v FINAL_STDOUT=".$stdout;
+   # add by GT
+   print QSUB "setenv FINAL_STDOUT $stdout\n"; 
+   $stdout =~s/:+/_/g; # outout file can't include ::  
+   $qsub_line .= " -o $stdout "; # jhv 
   }else{
     #$qsub_line = "qsub -V -cwd -v FINAL_STDOUT=".$self->stdout_file;
     $ffstdout = $self->stdout_file;
+    $ffstdout =~s/:+/_/g; # outout file can't include ::  
+    print QSUB "setenv FINAL_STDOUT $ffstdout\n"; 
+    print "XXX SETTING STDOUT $ffstdout\n"; 
+    $qsub_line .= " -o $ffstdout "; # jhv 
+  } 
 
-    print QSUB "setenv FINAL_STDOUT $ffstdout\n";
-  }
+
   if($stderr){
     #$qsub_line .= " -v FINAL_STDERR=".$stderr;
-#add by GT
-    print QSUB "setenv FINAL_STDERR $stderr\n";
+    #add by GT
+    print QSUB "setenv FINAL_STDERR $stderr\n"; 
+    $stderr =~s/:+/_/g; # outout file can't include ::  
+    $qsub_line .= " -e $stderr "; # jhv 
   }else{
     $ffstderr = $self->stderr_file;
+    $ffstderr =~s/:+/_/g; # outout file can't include ::  
    # $qsub_line .= " -v FINAL_STDERR=".$self->stderr_file;
-# add by GT
+   # add by GT
    #$stderrprint = .$self->stderr_file;
     print QSUB "setenv FINAL_STDERR $ffstdout.err\n";
-  }
+    print "XXX SETTING STDERR $ffstdout \n"; 
+    $qsub_line .= " -e $ffstderr "; # jhv 
+  } 
+
+
   #$qsub_line .= " -o /tmp -e /tmp";
 
   #add by GT
@@ -176,9 +189,7 @@ sub construct_command_line{
   #print "qsub _line 2 is  $qsub_line in GridEngine.pm\n";
   #print "self = $self \n";
 
-
   #$qsub_line .= " ".$self->parameters." "  if defined $self->parameters;
-
   #print "qsub _line 3 is  $qsub_line in GridEngine.pm\n";
 
   #$qsub_line .= " -v PREEXEC=\"".$self->pre_exec."\"" if defined $self->pre_exec; 
@@ -215,13 +226,12 @@ sub construct_command_line{
   print QSUB "$gewrappercommand\n";
 
   # change qsub_line by GT
-  $qsub_line = "qsub $test.sh\n";
+  $qsub_line = "qsub " . $qsub_line . " $test.sh\n";
 
   $self->qsub($qsub_line);
 
-  print "have command line\n";
-  print "$qsub_line\n";
-  print "above is the command line\n";
+  print "SGE: have command line\n";
+  print "CMD : $qsub_line\n\n";
 
   close (QSUB);
 }
@@ -229,8 +239,9 @@ sub construct_command_line{
 
 
 sub open_command_line{
+  my ($self)= @_; 
+
   print "run open_command_line in GridEngine.pm\n";
-  my ($self)= @_;
 
   print STDERR $self->qsub." 2>&1 \n";
   print STDERR "opening command line\n";
@@ -253,9 +264,9 @@ sub temp_filename{
   print "run temp_filename in GridEngine.pm\n";
   my ($self) = @_;
 
-  for ( keys %ENV ) {  
-     print STDERR "key $_ $ENV{$_}\n";
-  } 
+  #for ( keys %ENV ) {  
+  #   print STDERR "key $_ $ENV{$_}\n";
+  #} 
   $self->{'sge_jobfilename'} = $ENV{'JOB_NAME'};
 
   print "ENV{JOB_NAME}=$ENV{'JOB_NAME'} in GridEngine.pm\n";
