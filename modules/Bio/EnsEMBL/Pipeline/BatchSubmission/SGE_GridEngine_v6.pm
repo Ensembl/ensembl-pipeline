@@ -281,22 +281,35 @@ sub job_stats {
   my ($self, $verbose) = @_;
   my $command = "qstat";
 
-  # Need to sleep to make sure SGE is displaying correct info
+  # Need to sleep to make sure SGE is displaying correct info 
+  #print "sleeping sge \n";
   sleep(20);
 
   local *QSTAT;
   open(QSTAT, "$command 2>&1 |") or throw("couldn't open pipe to qstat");
 
   my %jobs;
- LINE:
-  while(<QSTAT>){
-    chomp;
-    if ($_ =~ / /) {
-      last LINE;
-    }
-    my @values = split;
-    $jobs{$values[0]} = $values[2];
-  }
+  LINE:
+   while(my $line = <QSTAT>){
+     #print "QSTAT $line";
+     chomp($line);
+     if ($line =~ /^job-ID/) {
+       next LINE;  # skip the header returned by qstat
+     } 
+     if ($line =~ /--------------/) {
+       next LINE;  # skip the 2nd line 
+     }  
+     $line=~s/^\s+//;
+     #if ($_ =~ / /) {
+     #  last LINE;
+     #}
+     my @values = split /\s+/,$line ; 
+     # 422 0.55500 BLOOD=chun ensembl      qw    09/10/2010 16:35:46 
+     # record status of job; needs also to be configured in BatchQUeue STATUS_TO_COUNT
+     $jobs{$values[0]} = $values[4]; 
+     #print "recording job $values[0] as $values[4]\n";
+  } 
+  #sleep(10);
   return \%jobs;
 }
 
