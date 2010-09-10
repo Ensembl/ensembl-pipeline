@@ -1,8 +1,12 @@
+#!/usr/local/ensembl/bin/perl 
+
 # A simple wrapper script for running jobs through GridEngine.
 #
-#!/usr/local/bin/perl
 
-print "Running on machine " . `hostname` . "\n";
+use strict;  
+
+print STDERR "Running on machine " . `hostname` . "\n"; 
+
 my $ok = 1;
 if (exists($ENV{PREEXEC})) {
   print "Pre exec = " . $ENV{PREEXEC} . "\n";
