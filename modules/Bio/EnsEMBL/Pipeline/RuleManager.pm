@@ -763,9 +763,9 @@ sub job_limit_check{
 
   if (!$self->batch_q_module->can('job_stats')) {
     throw($self->batch_q_module." doesn't have the job_stats method");
-  }
-  my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in
-                                                                #BatchQueue.pm
+  } 
+
+  my %statuses_to_count = map{$_, 1} @{$JOB_STATUSES_TO_COUNT}; #found in BatchQueue.pm, PEND for Lsf, qw for gridengine
   my %job_stats = %{$self->batch_q_module->job_stats};
   my $job_count = 0;
 
