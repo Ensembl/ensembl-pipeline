@@ -408,7 +408,7 @@ sub get_Entry_Fields_BatchFetch {
       chomp($line) ;   
 
       if ( $line =~m/no match/ ) {        
-       # print "line $line\n"; 
+# print "line $line\n"; 
         print "line contains \"no match\"  \n" if $self->{verbose} ;  
         $last_field = "";    
 
@@ -473,6 +473,7 @@ sub get_Entry_Fields_BatchFetch {
               #}
               $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
 
+
               undef $little_hash;  
               $entry_number++; 
            }  
@@ -488,6 +489,7 @@ sub get_Entry_Fields_BatchFetch {
   } # next STRING - fetch next round 
  
   # add last entry to all_entries . 
+  $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$acc_index{$entry_number} );   
   
   if ( $self->{verbose}  ) { 
     for my $key ( keys %{$all_entries} ) {  
