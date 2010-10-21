@@ -74,7 +74,7 @@ use vars qw(%Config);
   RENAME_ON_RETRY => 1, # toggle to see if you want the stdout/err
                         #files renamed when a job is retried 
 
-  SGE_PERL5LIB_ENV_SCRIPT => undef ,  # path to script to set up PERL5LIB enviromnet for Sun Grid Engine
+  SGE_PERL5LIB_ENV_SCRIPT => "", # path to script to set up PERL5LIB enviromnet for Sun Grid Engine
                                       # you find an example in ensembl-pipeline/scripts/set_PERL5LIB_SGE.sh 
 );
 
