@@ -60,6 +60,7 @@ use vars qw(%Config);
         # Source data files details
         SOURCE_HOST => 'cbi4',           # name of machine with up-to-date-blastdbs
         SOURCE_DIR  => '/data/blastdb/',
+        REFSEQ_SOURCE => '/data/blastdb/refseqdna',
 
         # Taxonomy db for loading meta_table - should not need to change
         TAXONDBNAME => 'ncbi_taxonomy',

@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.50 2010-06-21 12:50:40 at6 Exp $
+#$Id: cDNA_update.pl,v 1.51 2010-10-21 09:42:18 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -288,6 +288,7 @@ my %configvars = (
                  "PROGRAM_FILE"     => $PROGRAM_FILE,        # from cDNAUpdate
                  "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
                  "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
+                 "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
                  "chunkDIR"         => $chunkDIR,
                  "outDIR"           => $outDIR,
                  "configDIR"        => $configDIR,
@@ -824,6 +825,7 @@ sub check_vars {
         }
 
         if ( $configvarref =~ m/.+DIR.*/ ) {
+            print "$configvars{$configvarref}\n";
             if ( !-e $configvars{$configvarref} ) {
                 if ( system("mkdir $configvars{$configvarref}") ) {
                     croak(   "Could not create directory! "
@@ -930,7 +932,7 @@ sub fastafiles {
         }
         if ($refseq_ver) {
             $cmd = "scp -p " . $SOURCE_HOST . ":"
-                . $SOURCE_DIR . "/" . $REFSEQ . " "
+                . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
                 . $DATA_DIR   . "/" . $REFSEQ;
 
             print $cmd, "\n";
