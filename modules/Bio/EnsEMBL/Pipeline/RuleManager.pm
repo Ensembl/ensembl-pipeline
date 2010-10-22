@@ -1210,7 +1210,7 @@ sub check_if_done {
   foreach my $job (@jobs) {
     my $status = $job->current_status->status;
 
-    if ($status eq 'KILLED' || $status eq 'SUCCESSFUL') {
+    if ($status eq 'KILLED' || $status eq 'SUCCESSFUL' || $status eq 'VOID' || $status eq 'FAIL_NO_RETRY') {
       next JOB;
     } elsif ($status eq 'FAILED' || $status eq 'AWOL') {
       if (!$job->can_retry) {
