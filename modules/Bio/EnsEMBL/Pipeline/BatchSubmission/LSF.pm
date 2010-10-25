@@ -178,9 +178,11 @@ sub get_pending_jobs {
 
   my ($user)  = $args{'-user'}  || $args{'-USER'}  || undef;
   my ($queue) = $args{'-queue'} || $args{'-QUEUE'} || undef;
+  my ($jobname) = $args{'-jobname'} || $args{'-JOBNAME'} || undef;
 
   my $cmd = "bjobs";
   $cmd .= " -q $queue" if $queue;
+  $cmd .= " -J $jobname"  if $jobname;
   $cmd .= " -u $user"  if $user;
   $cmd .= " | grep -c PEND ";
 
@@ -468,5 +470,41 @@ sub copy_command{
   return $self->{'_copy_command'} || 'lsrcp ';
 }
 
+sub is_db_overloaded {
+    my ($self, $load_pending_cost) = @_;
+
+    my $resource = $self->resource;
+    my ($select) = $resource =~ /select\[([^]]+)/;
+    my ($rusage) = $resource =~ /rusage\[([^]]+)/;
+    return 0 unless (defined $select);
+    my @a_dbs = $select =~ /my(\w+)\s*\W+\s*(\d+)/g;
+    return 0 unless (@a_dbs);
+    use Bio::EnsEMBL::Analysis::Config::Databases;
+    for (my $i = 0; $i < @a_dbs; $i += 2) {
+        my ($host, $user, $passwd, $port);
+        foreach my $db (values %$DATABASES) {
+            next unless ($db->{'-host'} eq $a_dbs[$i]);
+            $host = $db->{'-host'};
+            $user = $db->{'-user'};
+            $passwd = $db->{'-pass'};
+            $port = $db->{'-port'};
+        }
+        my $dsn = "DBI:mysql:database=mysql;host=$host;port=$port";
+        my $dbh = DBI->connect($dsn, $user,$passwd) or die "Couldn't connect to database: " . DBI->errstr;
+        my $sth = $dbh->prepare('SHOW STATUS WHERE Variable_name = "Threads_connected" OR Variable_name = "Queries"') or die "Couldn't prepare statement: " . $dbh->errstr;
+        $sth->execute();
+        my $t1 = time;
+        sleep(1);
+        my $t = $sth->fetchall_arrayref();
+        $sth = $dbh->prepare("SHOW STATUS LIKE \'Queries\'" ) or die "Couldn't prepare statement: " . $dbh->errstr;
+        $sth->execute();
+        my @q = $sth->fetchrow_array();
+        my $time_diff = time-$t1;
+        my $queries_num = ($q[1]-$t->[0][1]-1)/$time_diff;
+        my $db_load = $t->[1][1]+($queries_num*10)+($self->get_pending_jobs(('-JOBNAME' => $self->jobname))*$load_pending_cost);
+        return 1 if ($a_dbs[$i+1] < $db_load);
+    }
+    return 0;
+}
 
 1;

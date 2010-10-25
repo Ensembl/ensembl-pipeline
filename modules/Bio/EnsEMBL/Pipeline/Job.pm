@@ -413,6 +413,7 @@ sub flush_runs {
     $cmd .= " @job_ids";
     #print "Job.pm-cmd : $cmd\n";   
     $batch_job->construct_command_line($cmd);
+    return "DB overloaded" if ($batch_job->is_db_overloaded($queue->{load_pending_cost} || 10));
 
     eval {
       # SMJS LSF Specific for debugging

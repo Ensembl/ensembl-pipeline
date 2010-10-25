@@ -270,4 +270,16 @@ sub delete_output{
   throw("this method delete_output must be implemented");
 }
 
+
+###############
+#check methods#
+###############
+
+sub is_db_overloaded {
+    my ($self) = @_;
+
+    warning("If you need to take care of the load of your DB, is_db_overloaded must be implemented");
+    return 0;
+}
+
 1;
