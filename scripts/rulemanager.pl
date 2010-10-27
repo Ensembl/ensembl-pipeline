@@ -75,6 +75,7 @@ my $reread_rules = 0; # toggle whether to reread rules each time the script
 my $perldoc = 0;
 my @command_args = @ARGV;
 my $submission_limit;
+my $dbload;
 my $submission_number = 1000; 
 my $number_output_dirs = 10;  
 GetOptions(
@@ -117,6 +118,7 @@ GetOptions(
            'reread_rules!'         => \$reread_rules,
            'once!'                 => \$once,
            'perldoc!'              => \$perldoc,
+           'dbload!'              => \$dbload,
            'submission_limit!'     => \$submission_limit,
            'submission_number=s'   => \$submission_number,
            'unlock|delete_lock'    => \$unlock,
@@ -172,7 +174,6 @@ my $rulemanager = Bio::EnsEMBL::Pipeline::RuleManager->new
    -UNLOCK => $unlock,
    -NUMBER_OUTPUT_DIRS => $number_output_dirs,
    );
-   
 
 my $done;
 my $reset;
@@ -183,6 +184,15 @@ if ($config_sanity) {
 
 if ($db_sanity) {
   $sanity->db_sanity_check;
+}
+
+if ($dbload) {
+# I know it is dirty but I do not want to change all the pipeline just for this option...
+  our $CHECK_DBLOAD = 1;
+  warn("!!\nYou are using the database load management from RuleManager!!\n!!");
+} else {
+  our $CHECK_DBLOAD = 0;
+  warn("!!\nIf you need database load managment use -dbload and add a line resource in your BatchQueue.pm file\n!!");
 }
 
 
