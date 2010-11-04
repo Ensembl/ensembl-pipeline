@@ -21,17 +21,17 @@ use Data::Dumper;
     my $rev    = 0;
     my $ana_id = 0;
     GetOptions(
-	       'help|h'   => \$help,
-	       'dbhost=s' => \$dbhost,
-	       'dbname=s' => \$dbname,
-	       'dbuser=s' => \$dbuser,
-	       'dbpass=s' => \$dbpass,
-	       'dbport=s' => \$dbport,
-	       'table=s'  => \$table,
-	       'ana_id=s' => \$ana_id,
-	       'reverse'  => \$rev,
-	       'left'     => \$left,
-	       ) or useage();
+           'help|h'   => \$help,
+           'dbhost=s' => \$dbhost,
+           'dbname=s' => \$dbname,
+           'dbuser=s' => \$dbuser,
+           'dbpass=s' => \$dbpass,
+           'dbport=s' => \$dbport,
+           'table=s'  => \$table,
+           'ana_id=s' => \$ana_id,
+           'reverse'  => \$rev,
+           'left'     => \$left,
+           ) or useage();
     useage() if $help;
 
     my $db = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(
@@ -88,7 +88,7 @@ use Data::Dumper;
         my $j = $i + $chunk_size - 1;
         $j = $#$ids if $j > $#$ids;
         my $chunk = [@$ids[$i..$j]];
-	    my $failed = $seqfetcher->write_descriptions($db, $chunk,$chunk_size);
+        my $failed = $seqfetcher->write_descriptions($db, $chunk,$chunk_size);
         if (@$failed) {
             warn "Failed to fetch:\n".join(",", @$failed)."\n";
             print STDERR "Failed ".scalar(@$failed)." ids\n";

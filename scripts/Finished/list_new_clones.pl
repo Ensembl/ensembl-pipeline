@@ -73,37 +73,57 @@ my $dbc = $loutre_dba->dbc;
 
 my $current_chr_list = $dbc->prepare(
 qq{
-SELECT s.name
-FROM attrib_type t1, attrib_type t2,attrib_type t3, attrib_type t4, attrib_type t5, coord_system c, seq_region s
-LEFT JOIN seq_region_attrib a1 ON (a1.seq_region_id =  s.seq_region_id AND t1.attrib_type_id = a1.attrib_type_id)
-LEFT JOIN seq_region_attrib a2 ON (a2.seq_region_id =  s.seq_region_id AND t2.attrib_type_id = a2.attrib_type_id)
-LEFT JOIN seq_region_attrib a3 ON (a3.seq_region_id =  s.seq_region_id AND t3.attrib_type_id = a3.attrib_type_id)
-LEFT JOIN seq_region_attrib a4 ON (a4.seq_region_id =  s.seq_region_id AND t4.attrib_type_id = a4.attrib_type_id)
-LEFT JOIN seq_region_attrib a5 ON (a5.seq_region_id =  s.seq_region_id AND t5.attrib_type_id = a5.attrib_type_id)
-WHERE c.name  IN ('chromosome','subregion')
-AND c.coord_system_id = s.coord_system_id
-AND t1.code = 'chr'
-AND t2.code = 'description'
-AND t3.code = 'write_access'
-AND t4.code = 'hidden'
-AND t5.code = 'equiv_asm'
-AND a4.value = 0
-AND a3.value = 1
-AND s.name LIKE 'chr%'
-ORDER BY  s.name
+    SELECT s.name
+    FROM (attrib_type t1
+          , attrib_type t2
+          , attrib_type t3
+          , attrib_type t4
+          , attrib_type t5
+          , coord_system c
+          , seq_region s)
+    LEFT JOIN seq_region_attrib a1
+      ON (a1.seq_region_id = s.seq_region_id
+          AND t1.attrib_type_id = a1.attrib_type_id)
+    LEFT JOIN seq_region_attrib a2
+      ON (a2.seq_region_id = s.seq_region_id
+          AND t2.attrib_type_id = a2.attrib_type_id)
+    LEFT JOIN seq_region_attrib a3
+      ON (a3.seq_region_id = s.seq_region_id
+          AND t3.attrib_type_id = a3.attrib_type_id)
+    LEFT JOIN seq_region_attrib a4
+      ON (a4.seq_region_id = s.seq_region_id
+          AND t4.attrib_type_id = a4.attrib_type_id)
+    LEFT JOIN seq_region_attrib a5
+      ON (a5.seq_region_id = s.seq_region_id
+          AND t5.attrib_type_id = a5.attrib_type_id)
+    WHERE c.name IN ('chromosome','subregion')
+      AND c.coord_system_id = s.coord_system_id
+      AND t1.code = 'chr'
+      AND t2.code = 'description'
+      AND t3.code = 'write_access'
+      AND t4.code = 'hidden'
+      AND t5.code = 'equiv_asm'
+      AND a4.value = 0
+      AND a3.value = 1
+      AND s.name LIKE 'chr%'
+    ORDER BY s.name
 } );
 
 my $chr_clone_list = $dbc->prepare(
 qq{
-SELECT DISTINCT(sc.name)
-FROM seq_region sa, seq_region sc, assembly a, coord_system ca, coord_system cc
-WHERE sa.seq_region_id = a.asm_seq_region_id
-AND sc.seq_region_id = a.cmp_seq_region_id
-AND ca.name = 'chromosome'
-AND ca.coord_system_id = sa.coord_system_id
-AND cc.name = 'contig'
-AND cc.coord_system_id = sc.coord_system_id
-AND sa.name = ?
+    SELECT DISTINCT(sc.name)
+    FROM seq_region sa
+      , seq_region sc
+      , assembly a
+      , coord_system ca
+      , coord_system cc
+    WHERE sa.seq_region_id = a.asm_seq_region_id
+      AND sc.seq_region_id = a.cmp_seq_region_id
+      AND ca.name = 'chromosome'
+      AND ca.coord_system_id = sa.coord_system_id
+      AND cc.name = 'contig'
+      AND cc.coord_system_id = sc.coord_system_id
+      AND sa.name = ?
 } );
 
 $current_chr_list->execute;
