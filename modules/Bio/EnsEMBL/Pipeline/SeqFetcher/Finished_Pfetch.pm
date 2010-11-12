@@ -19,7 +19,7 @@ sub new {
     my ( $server, $port, $options, $archive_port ) = $self->_rearrange(
         [ 'PFETCH_SERVER', 'PFETCH_PORT', 'OPTIONS' ], @args );
 
-    $self->server($server || 'cbi3.internal.sanger.ac.uk');
+    $self->server($server || 'pfetch.sanger.ac.uk');
     $self->port($port || 22400);
     $self->options($options);
 
