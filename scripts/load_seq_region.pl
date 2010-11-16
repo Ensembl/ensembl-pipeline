@@ -181,7 +181,10 @@ if ($name_file){
 
 
 if($fasta){
-  &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
+  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
+  if ($count_ambiguous_bases) {
+    throw("All sequences has loaded, but $count_ambiguous_bases slices have ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N.");
+  }
 }
 
 if($agp){
@@ -190,6 +193,7 @@ if($agp){
 
 sub parse_fasta{
   my ($filename, $cs, $sa, $store_seq,$regex,) = @_;
+  my $have_ambiguous_bases = 0;
 
   my $seqio = new Bio::SeqIO(
                              -format=>'Fasta',
@@ -219,11 +223,18 @@ sub parse_fasta{
             "this is what you wanted") if($verbose);
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
     if($store_seq){
+      # check that we don't have ambiguous bases in the DNA sequence
+      # we are only allowed to load ATGCN
+      if ($seq->seq =~ tr/ATGCN/N/c) {
+        $have_ambiguous_bases++;
+        warning("Slice ".$name." has at least one non-ATGCN (RYKMSWBDHV) base. Please change to N.");
+      }
       $sa->store($slice, \$seq->seq);
     }else{
       $sa->store($slice);
     }
   }
+  return $have_ambiguous_bases;
 }
 
 
