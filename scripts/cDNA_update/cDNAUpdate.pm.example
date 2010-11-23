@@ -34,6 +34,7 @@ use vars qw(%Config);
         # write-access is required
         DBUSER     => 'ensadmin',
         DBPASS     => '*****', 
+        DBUSER_RO  => 'ensro',
 
         # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
 
@@ -109,6 +110,10 @@ use vars qw(%Config);
         LAST_DNADBHOST => '',
         LAST_DNADBPORT => 3306,
 
+        PRODUCTION_DBNAME => 'ensembl_production',#db to read unmapped reason and external db from
+        PRODUCTION_DBHOST => '',
+        PRODUCTION_DBPORT => 3306,
+
         CVS_DIR => '',
 
         DATA_DIR => '',
@@ -156,6 +161,10 @@ use vars qw(%Config);
         LAST_DNADBNAME => '', # late core db with dna : mus_musculus_core_49_37c 
         LAST_DNADBHOST => '', # ensdb-archive [5304] , ens-livemirror[3306] ,ens-staging [ 3306 ] 
         LAST_DNADBPORT => 3306, 
+
+        PRODUCTION_DBNAME => 'ensembl_production',#db to read unmapped reason and external db from
+        PRODUCTION_DBHOST => '',
+        PRODUCTION_DBPORT => 3306,
 
         CVS_DIR => '',
 

@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.51 2010-10-21 09:42:18 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.52 2010-11-23 15:04:58 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -273,6 +273,7 @@ my %configvars = (
                  "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
                  "DBUSER"        => $DBUSER,           # from cDNAUpdate
                  "DBPASS"        => $DBPASS,           # from cDNAUpdate
+                 "DBUSER_RO"     => $DBUSER_RO,        # from cDNAUpdate
                  "REF_DBNAME"    => $REF_DBNAME,       # from cDNAUpdate
                  "REF_DBHOST"    => $REF_DBHOST,       # from cDNAUpdate
                  "REF_DBPORT"    => $REF_DBPORT,       # from cDNAUpdate
@@ -282,6 +283,9 @@ my %configvars = (
                  "OUTPUT_DBNAME" => $OUTPUT_DBNAME,    # from cDNAUpdate
                  "OUTPUT_DBHOST" => $OUTPUT_DBHOST,    # from cDNAUpdate
                  "OUTPUT_DBPORT" => $OUTPUT_DBPORT,    # from cDNAUpdate
+                 "PRODUCTION_DBNAME" => $PRODUCTION_DBNAME,    # from cDNAUpdate
+                 "PRODCUTION_DBHOST" => $PRODUCTION_DBHOST,    # from cDNAUpdate
+                 "PRODUCTION_DBPORT" => $PRODUCTION_DBPORT,    # from cDNAUpdate
                  "taxonomy_id"      => $TAX_ID,              # from cDNAUpdate
                  "PROGRAM_NAME"     => $PROGRAM_NAME,        # from cDNAUpdate
                  "PROGRAM_VERSION"  => $PROGRAM_VERSION,     # from cDNAUpdate
@@ -2239,27 +2243,64 @@ sub import_tables {
 }
 
 # Load the external_dbs and unmapped_reason tables from
-# /ensembl/misc-scripts.
+# /ensembl/misc-scripts (now production db).
 sub load_misc_script_files {
-
-    my $dir = $CVS_DIR . "/ensembl/misc-scripts/";
+    #'files' to load (now in production db)
+    #names in core and names in production db
     my %table_files = (
-            'external_db'     => 'external_db/external_dbs.txt',
-            'unmapped_reason' => 'unmapped_reason/unmapped_reason.txt'
+            'external_db'     => 'master_external_db',
+            'unmapped_reason' => 'master_unmapped_reason'
     );
 
-    my $target_db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-                                $OUTPUT_DBNAME, $DBUSER,
-                                $DBPASS );
-
     foreach my $table ( keys %table_files ) {
-        my $prepare =  "LOAD DATA LOCAL INFILE \'"
-                     . $dir . $table_files{$table}
-                     . "\' INTO TABLE " . $table;
+        #dump from production to data dir
+        print "Dumping ".$table_files{$table}." from production db and loading to output db.\n";
 
-        my $target_sth = $target_db->dbc->prepare($prepare);
-        $target_sth->execute();
-        $target_sth->finish();
+        my $dump_cmd = "mysqldump "
+                      ."-h $PRODUCTION_DBHOST "
+                      ."-P $PRODUCTION_DBPORT "
+                      ."-u $DBUSER_RO "
+                      ."--add-drop-table "
+                      ."$PRODUCTION_DBNAME "
+                      .$table_files{$table}
+                      ." > ".$DATA_DIR."/".$table.".sql";
+
+        print $dump_cmd."\n";
+
+        my $dump_status = system($dump_cmd);
+        if($dump_status){
+          throw("Dumping ".$table_files{$table}." from $PRODUCTION_DBNAME failed\n");
+        }
+
+        #import into output db
+        my $mysql_out = "mysql "
+                      . "-h $OUTPUT_DBHOST "
+                      . "-P $OUTPUT_DBPORT "
+                      . "-u $DBUSER "
+                      . "-p$DBPASS "
+                      . "-D $OUTPUT_DBNAME";
+
+        my $import = " < ".$DATA_DIR."/".$table.".sql";
+        my $import_cmd = $mysql_out.$import;
+
+        print $import_cmd."\n";
+
+        my $import_status = system($import_cmd);
+        if($import_status){
+          throw("Importing ".$DATA_DIR."/".$table.".sql failed\n");
+        }
+        #drop original empty table from output db
+        my $drop = $mysql_out." -e'drop table ".$table."'";
+        my $drop_status = system($drop);
+        if($drop_status){
+          throw("Drop table ".$table." failed\n");
+        }
+        #rename loaded production table to normal core name
+        my $rename = $mysql_out." -e'rename table ".$table_files{$table}." to ".$table."'";
+        my $rename_status = system($rename);
+        if($rename_status){
+          throw("Renaming ".$table_files{$table}." failed\n");
+        }
     }
 }
 
