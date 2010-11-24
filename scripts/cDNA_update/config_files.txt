@@ -227,4 +227,31 @@ use vars qw(%Config);
 
     DNA_DBNAME => "REFERENCE_DB",
 
+  #
+  # Arrayref. to distributed dbs ( see POD on top of file )
+  #
+
+    DISTRIBUTED_DBS => {
+                         DITAG_DB_DIST => [ "DB_COPY_1","DB_COPY_2"],
+                       },
+  #
+  # MAIN_REFERENCE_DB should point to the database which is used as reference db. The MAIN_REFERENCE_DB
+  # key is used in some cloud-based modules to automatically create new databaes. The 'vital tables' array
+  # specifies which tables are dumped by some modules.
+  #
+
+  MAIN_REFERENCE_DB => "REFERENCE_DB",
+  VITAL_TABLES => ["analysis",
+                   "analysis_description",
+                   "assembly",
+                   "assembly_exception",
+                   "attrib_type",
+                   "coord_system",
+                   "external_db",
+                   "meta",
+                   "meta_coord",
+                   "seq_region",
+                   "seq_region_attrib",
+                  ],
+
 );
