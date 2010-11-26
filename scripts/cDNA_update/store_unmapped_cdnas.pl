@@ -19,7 +19,7 @@ my ($reasons_file);
             'gss=s'      		=> \$gss,
             'seq_file=s'      	=> \$seq_file,
             'user=s'          	=> \$user,
-			'pass=s'            => \$pass,
+			      'pass=s'            => \$pass,
             'host=s'    		=> \$host,
             'port=s'    		=> \$port,
             'dbname=s'    		=> \$dbname,
@@ -29,7 +29,7 @@ my ($reasons_file);
             'vertrna_update=s' 	=> \$vertrna_update,
             'infile=s' 			=> \$infile,
             'findN_prog=s' 		=> \$findN_prog,
-			'reasons_file=s'    => \$reasons_file
+			      'reasons_file=s'    => \$reasons_file
 	   );
 
 my $db1 = new Bio::EnsEMBL::DBSQL::DBAdaptor(
@@ -272,8 +272,15 @@ $q1->execute();
 my $embl_id = $q1->fetchrow_array;
 #print "RefSeq = $refseq_id and EMBL = $embl_id\n";
 
-#read reasons file into database
+#read reasons file from database
 my %reason_list;
+my $write_reasons_cmd = "mysql -h ".$host
+                        ." -u ".$user
+                        ." -p".$pass
+                        ." -P ".$port
+                        ." -D ".$dbname
+                        ." -BN -e'select * from unmapped_reason' > ".$reasons_file; 
+system($write_reasons_cmd);
 open (IN, "$reasons_file") or die("Can't open $reasons_file $!\n");
 while(<IN>){
 	chomp;
@@ -344,8 +351,8 @@ for my $id (@sorted){
         -external_db_id => $external_db_id,
         -identifier     => $id,
         -summary        => $summary,
-	-full_desc      => $reason_list{$summary},
-	-query_score    => $reasons{$summary},
+	      -full_desc      => $reason_list{$summary},
+	      -query_score    => $reasons{$summary},
         -target_score   => $target_score,
         -ensembl_id     => $ensembl_id,
         -ensembl_object_type   => $ensembl_object_type,

@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.53 2010-11-26 12:02:58 th3 Exp $
+#$Id: cDNA_update.pl,v 1.54 2010-11-26 13:29:26 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1662,7 +1662,7 @@ sub why_cdnas_missed {
         . " -vertrna_update "   . $DATA_DIR . "/" . $VERTRNA_UPDATE
         . " -infile "           . $file
         . " -findN_prog "       . $FIND_N
-        . " -reasons_file "     . $UNMAPPED_REASONS;
+        . " -reasons_file "     . $DATA_DIR."/unmapped_reasons.txt";
 
     if ( system($cmd) ) {
         carp("Erros when running $STORE_UNMAPPED!\n$cmd\n");
