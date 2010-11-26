@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.52 2010-11-23 15:04:58 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.53 2010-11-26 12:02:58 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -889,26 +889,27 @@ sub fastafiles {
     my @filestamp;
 
     eval {
+        local $SIG{CHLD} = sub { wait() };
         # Check file versions, copy only if changed
-        $cmd = "cd $SOURCE_DIR; ls -n "
+        $cmd = "cd $SOURCE_DIR && ls -n "
                 . $VERTRNA . " "
                 . $VERTRNA_UPDATE . " "
                 . $REFSEQ;
-
-        sshopen2( "$USER\@$HOST", *READER, *WRITER, "$cmd" ) || croak "ssh: $!";
+        sshopen2( "$USER\@$SOURCE_HOST", *READER, *WRITER, $cmd ) || croak "ssh: $!";
         while (<READER>) {
             @filestamp = split( " ", $_ );
             my $stampA = join( "-", @filestamp[ 5 .. 7 ] );
-            $cmd = "cd " . $DATA_DIR . "; " . "ls -n " . $filestamp[8];
+            $cmd = "cd " . $DATA_DIR . "; " . "ls -n " . $filestamp[7];
             @filestamp = split( " ", `$cmd` );
+            next if ($? != 0);
             my $stampB = join( "-", @filestamp[ 5 .. 7 ] );
             if ( $stampA eq $stampB ) {
                 # No changes...
-                if ( $filestamp[8] eq $VERTRNA ) {
+                if ( $filestamp[7] eq $VERTRNA ) {
                     $vertrna_ver = 0;
-                } elsif ( $filestamp[8] eq $VERTRNA_UPDATE ) {
+                } elsif ( $filestamp[7] eq $VERTRNA_UPDATE ) {
                     $vertrna_upd_ver = 0;
-                } elsif ( $filestamp[8] eq $REFSEQ ) {
+                } elsif ( $filestamp[7] eq $REFSEQ ) {
                     $refseq_ver = 0;
                 }
             }
