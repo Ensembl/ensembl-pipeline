@@ -50,6 +50,7 @@ use vars qw(@ISA);
 use strict;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 @ISA = qw( Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer );
 
@@ -162,7 +163,7 @@ sub store_input_id_analysis {
 	throw("[$analysis] is not a Bio::EnsEMBL::Pipeline::Analysis object")
 	  unless $analysis->isa("Bio::EnsEMBL::Pipeline::Analysis");
 
-	throw("Invalid inputId [$inputId]")
+	throw("Must provide inputId")
 	  unless $inputId;
 
 	throw("No type defined in analysis obj")
