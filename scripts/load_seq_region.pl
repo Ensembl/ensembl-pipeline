@@ -225,7 +225,7 @@ sub parse_fasta{
     if($store_seq){
       # check that we don't have ambiguous bases in the DNA sequence
       # we are only allowed to load ATGCN
-      if ($seq->seq =~ tr/ATGCN/N/c) {
+      if ($seq->seq =~ /[^ACGTN]+/i) {
         $have_ambiguous_bases++;
         warning("Slice ".$name." has at least one non-ATGCN (RYKMSWBDHV) base. Please change to N.");
       }
