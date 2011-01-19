@@ -109,6 +109,8 @@ use vars qw(%Config);
   DEFAULT_RETRY_SUB_ARGS => '',
   DEFAULT_RESOURCE    => '',
   DEFAULT_SUB_ARGS    => '',
+  DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl',
+  DEFAULT_LSF_PERL =>'/usr/local/ensembl32/bin/perl',
 
 
   QUEUE_CONFIG => [
@@ -223,5 +225,9 @@ use vars qw( %Config );
              },
 
              DNA_DBNAME => "REFERENCE_DB",
+
+             DISTRIBUTED_DBS => { },
+             MAIN_REFERENCE_DB => "REFERENCE_DB",
+             VITAL_TABLES => [],
 
 	     );
