@@ -306,6 +306,7 @@ sub DB_setup{
     my $cmd = "mysqldump -u$WRITEUSER -p$pass -h$REFDBHOST -P$REFDBPORT -t $REFDBNAME".
       " assembly attrib_type coord_system meta meta_coord".
       " assembly_exception seq_region seq_region_attrib ".
+      " unmapped_reason external_db " .
       " > ".$DATADIR."/$species/import_tables.sql";
     $status += system($cmd);
     print ".";
@@ -315,10 +316,6 @@ sub DB_setup{
            "DELETE FROM assembly_exception; DELETE FROM seq_region_attrib;; ".
            "DELETE FROM assembly_exception;' $WRITENAME ";
     $status += system($cmd);
-    print ".";
-    $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME -e\"load data local infile \'$CVSDIR/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt\' into table unmapped_reason;\"");
-    print ".";
-    $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME -e\"load data local infile \'$CVSDIR/ensembl/misc-scripts/external_db/external_dbs.txt\' into table external_db;\"");
     print ".";
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < ".$DATADIR."/$species/import_tables.sql");
     print ".";
