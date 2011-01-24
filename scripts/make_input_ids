@@ -134,6 +134,7 @@ use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use strict;
+use warnings;
 use Getopt::Long;
 
 my $host;
