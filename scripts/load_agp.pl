@@ -143,6 +143,9 @@ LINE:while(<FH>){
   if($type eq 'N'){
     next LINE; #skipping gaps as not stored in db
   }
+  if ($type eq 'U') {
+    next LINE ;
+  }
   if(!$type){
     next LINE;
   }
