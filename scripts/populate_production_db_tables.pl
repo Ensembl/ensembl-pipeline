@@ -11,8 +11,8 @@ my @tables =
   ( 'attrib_type', 'external_db', 'misc_set', 'unmapped_reason' );
 
 # Master database location:
-my ( $mhost, $mport ) = ( undef, 3306 );
-my ( $muser, $mpass);
+my ( $mhost, $mport ) = ( undef, '3306' );
+my ( $muser, $mpass );
 my $mdbname = 'ensembl_production';
 
 # User database location (default values):
@@ -29,10 +29,13 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'port|P=i'       => \$port,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
-                  'database|d=s'   => \$dbname 
-                )
-     || !( defined($host) && defined($user) && defined($dbname) &&
-           defined($mhost) && defined($muser) && defined($mdbname) ) )
+                  'database|d=s'   => \$dbname )
+     || !(    defined($host)
+           && defined($user)
+           && defined($dbname)
+           && defined($mhost)
+           && defined($muser)
+           && defined($mdbname) ) )
 {
   my $indent = ' ' x length($0);
   print <<USAGE_END;
@@ -55,7 +58,7 @@ Usage:
 
 USAGE_END
   die;
-}
+} ## end if ( !GetOptions( 'mhost|mh=s'...))
 
 # Fetch all data from the master database.
 my %data;
