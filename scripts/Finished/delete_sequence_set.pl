@@ -6,9 +6,9 @@ delete_sequence_set.pl
 
 =head1 SYNOPSIS
 
-delete_sequence_set.pl -host otterpipe2 -port 3303 -dbname pipe_zebrafish -user otta -pass **** -show
+delete_sequence_set.pl -host otterpipe2 -port 3323 -dbname pipe_zebrafish -user otta -pass **** -show
 
-delete_sequence_set.pl -host otterpipe2 -port 3303 -dbname pipe_zebrafish -user otta -pass **** -delete -set chr1
+delete_sequence_set.pl -host otterpipe2 -port 3323 -dbname pipe_zebrafish -user otta -pass **** -delete -set chr1
 
 =head1 DESCRIPTION
 

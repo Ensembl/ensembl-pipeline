@@ -52,7 +52,7 @@ Here is a command line example:
 To find out whether the contigs from clones in the assembly are sorted
 or jumbled, try
 
-  make_subregion_agp.pl -host otterlive -port 3301 -user ottadmin -pass mumble \
+  make_subregion_agp.pl -host otterlive -port 3324 -user ottadmin -pass mumble \
    -dbname loutre_pig -set chrX-05 -chr pigX5 -first FP236733 -last CU928280 \
     |cut -f6 | cut -d. -f1 | uniq | sort | uniq -c | sort -rn
   # Take the accession names and uniq them twice.
@@ -60,7 +60,7 @@ or jumbled, try
 
 To count the contigs per clone just remove the first uniq:
 
-  make_subregion_agp.pl -host otterlive -port 3301 -user ottadmin -pass mumble \
+  make_subregion_agp.pl -host otterlive -port 3324 -user ottadmin -pass mumble \
    -dbname loutre_pig -set chrX-05 -chr pigX5 -first FP236733 -last CU928280 \
     |cut -f6 | cut -d. -f1 | sort | uniq -c | sort -rn
 

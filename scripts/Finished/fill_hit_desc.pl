@@ -14,7 +14,7 @@ use Data::Dumper;
     my $dbname = 'pipe_human';
     my $dbuser = 'ottadmin';
     my $dbpass = undef;
-    my $dbport = 3302;
+    my $dbport = 3322;
     my $table  = 'dna';
     my $query  = undef;
     my $left   = 0;
