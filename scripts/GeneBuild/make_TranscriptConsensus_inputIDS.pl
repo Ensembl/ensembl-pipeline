@@ -38,7 +38,7 @@ then create input ids of a specified size while making sure it doesn't cut any o
 
     -slice_size          maximum size for the input_ids
 
-    -logic_name          logic_name of the TranscriptConsensus analysis
+    -analysis            logic_name of the TranscriptConsensus analysis
                          this will be used to fetch the corresponding configuration in the TranscriptConsensus config file
 
     -submit_analysis     logic_name of the associated Submit_analysis
@@ -48,7 +48,7 @@ then create input ids of a specified size while making sure it doesn't cut any o
 
 =head1 EXAMPLES
 
-perl make_TranscriptConsensus_inputIDS.pl -dbhost myhost -dbuser myuser -dbpass mypass -dbport 3306 -dbname mydb -submit_analysis SubmitConsensus -slice_size 1000000 -coord_system toplevel -outfile consensus_input_ids.sql -path mypath -logic_name Sim_consensus
+perl make_TranscriptConsensus_inputIDS.pl -dbhost myhost -dbuser myuser -dbpass mypass -dbport 3306 -dbname mydb -submit_analysis SubmitConsensus -slice_size 1000000 -coord_system toplevel -outfile consensus_input_ids.sql -path mypath -analysis Sim_consensus
 
 this commandline will write a file consensus_input_ids.sql containing the input_ids to be added to SubmitConsensus,
 which is the dummy analysis for Sim_consensus
@@ -87,7 +87,7 @@ my ( $outfile, $coordsystem, $dbhost, $dbname, $dbpass ) ;
 my $dbuser = 'ensro' ;
 my $dbport = 3306 ;
 my $slice_size ;
-my $logic_name ;
+my $analysis ;
 my $submit_analysis ;
 my @seq_region_names ;
 my $path ;
@@ -104,7 +104,7 @@ my $path ;
             'coord_system:s'    => \$coordsystem,
             'path:s'            => \$path,
             'slice_size=i'      => \$slice_size,
-            'logic_name=s'      => \$logic_name,
+            'analysis=s'        => \$analysis,
             'submit_analysis=s' => \$submit_analysis,
             );
 
@@ -154,17 +154,17 @@ my $pa = new Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor(
                                           );
 
 my $rule = $pa->get_RuleAdaptor() ;
-my $ana = $pa->get_AnalysisAdaptor->fetch_by_logic_name($logic_name) ;
+my $ana = $pa->get_AnalysisAdaptor->fetch_by_logic_name($analysis) ;
 my $submit = $pa->get_AnalysisAdaptor->fetch_by_logic_name($submit_analysis) ;
 my $input_id_type = $ana->input_id_type ;
 my $analysis_id = $submit->dbID ;
 
-throw ( "can't find analysis with logic_name $logic_name in db $dbname \@ $dbhost\n")
+throw ( "can't find analysis with logic_name $analysis in db $dbname \@ $dbhost\n")
   unless $ana ;
 throw ( "can't find analysis with logic_name $submit_analysis in db $dbname \@ $dbhost\n")
   unless $submit ;
 my $rule_id = $rule->fetch_by_goal($ana) ;
-throw ( "Your submit analysis $submit_analysis doesn't match your logic_name $logic_name\n")
+throw ( "Your submit analysis $submit_analysis doesn't match your logic_name $analysis\n")
   unless (${ $rule_id->list_conditions }[0] eq $submit_analysis) ;
 
 my $chrhash = get_chrlengths_v20($db, $path, $coordsystem) ;
@@ -194,7 +194,7 @@ foreach my $k (keys %check) {
   $var_hash->{$k} = $entry;
 }
 
-my $uc_logic = uc($logic_name);
+my $uc_logic = uc($analysis);
 my $entry ;
 if (exists $var_hash->{$uc_logic}) {
   $entry = $var_hash->{$uc_logic};
