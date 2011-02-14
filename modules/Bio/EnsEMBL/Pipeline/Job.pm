@@ -1,33 +1,35 @@
+=head1 LICENSE
 
-# Object for storing details of an analysis job
-#
-# Cared for by Michele Clamp  <michele@sanger.ac.uk>
-#
-# Copyright Michele Clamp
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-=pod 
+  This software is distributed under a modified Apache license.
+  For license details, please see
 
-=head1 NAME
-
-Bio::EnsEMBL::Pipeline::Job
-
-=head1 SYNOPSIS
-
-=head1 DESCRIPTION
-
-Stores run and status details of an analysis job
+    http://www.ensembl.org/info/about/code_licence.html
 
 =head1 CONTACT
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 NAME
+
+  Bio::EnsEMBL::Pipeline::Job
+
+=head1 DESCRIPTION
+
+  Stores run and status details of an analysis job
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
+  The rest of the documentation details each of the object methods.
+  Internal methods are usually preceded with a _
 
 =cut
 
