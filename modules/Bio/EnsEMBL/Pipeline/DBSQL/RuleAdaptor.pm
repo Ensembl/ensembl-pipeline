@@ -1,50 +1,52 @@
-# Perl module for Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
-#
-# Creator: Arne Stabenau <stabenau@ebi.ac.uk>
-# Date of creation: 10.09.2000
-# Last modified : 10.09.2000 by Arne Stabenau
-#
-# Copyright EMBL-EBI 2000
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-=head1 NAME
+  This software is distributed under a modified Apache license.
+  For license details, please see
 
-Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
-
-=head1 SYNOPSIS
-
- $jobAdaptor = $dbobj->getRuleAdaptor();
- $jobAdaptor = $jobobj->getRuleAdaptor();
-
-=head1 DESCRIPTION
-
-Module to encapsulate all db access for persistent class Rule.
-There should be just one per application and database connection.
+    http://www.ensembl.org/info/about/code_licence.html
 
 =head1 CONTACT
 
-Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 NAME
+
+  Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
+
+=head1 SYNOPSIS
+
+  $jobAdaptor = $dbobj->getRuleAdaptor();
+  $jobAdaptor = $jobobj->getRuleAdaptor();
+
+=head1 DESCRIPTION
+
+  Module to encapsulate all db access for persistent class Rule There.
+  should be just one per application and database connection.
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods.
-Internal methods are usually preceded with a _
+  The rest of the documentation details each of the object methods.
+  Internal methods are usually preceded with a _
 
 =cut
 
 
 # Let the code begin...
 
-
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Root;
-use Bio::EnsEMBL::Utils::Exception qw (throw warning) ; 
+use Bio::EnsEMBL::Utils::Exception qw (throw warning);
 use vars qw(@ISA);
 use strict;
 
@@ -166,13 +168,13 @@ sub fetch_all {
   RULE: while( my($ruleId, $goal) = $sth->fetchrow_array ) {
     if ($goal =~ /\D/) {
       $analysis = $anaAdaptor->fetch_by_newest_logic_name($goal) or do {
-        $self->warn("Couldn't find analysis to match logic_name $goal");
+        $self->warning("Couldn't find analysis to match logic_name $goal");
 	next RULE;
       };
     }
     else {
       $analysis = $anaAdaptor->fetch_by_dbID($goal) or do {
-        $self->warn("Couldn't find analysis to match dbID $goal");
+        $self->warning("Couldn't find analysis to match dbID $goal");
 	next RULE;
       };
     }
