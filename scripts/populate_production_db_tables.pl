@@ -7,10 +7,11 @@ use Data::Dumper;
 use DBI;
 use Getopt::Long qw( :config no_ignore_case );
 
-my @tables =
-  ( 'attrib_type', 'external_db', 'misc_set', 'unmapped_reason' );
-my $user_table = '';
-
+my %master_tables = ( 'attrib_type'     => 1,
+                      'external_db'     => 1,
+                      'misc_set'        => 1,
+                      'unmapped_reason' => 1 );
+my @tables = keys(%master_tables);
 
 # Master database location:
 my ( $mhost, $mport ) = ( undef, '3306' );
@@ -26,27 +27,29 @@ my $dbname;
 if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'mport|mP=i'     => \$mport,
                   'muser|mu=s'     => \$muser,
+                  'mpass|mp=s'     => \$mpass,
                   'mdatabase|md=s' => \$mdbname,
                   'host|h=s'       => \$host,
                   'port|P=i'       => \$port,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
                   'database|d=s'   => \$dbname,
-                  'table|t=s'     => \$user_table)
+                  'table|t=s'      => \@tables )
      || !(    defined($host)
            && defined($user)
            && defined($dbname)
            && defined($mhost)
-           && defined($muser)
-           && defined($mdbname) ) )
+           && defined($muser) ) )
 {
   my $indent = ' ' x length($0);
   print <<USAGE_END;
 Usage:
 
   $0 -h host [-P port] \\
-  $indent -u user [-p password] \\
-  $indent -d database
+  $indent -u user [-p password] -d database \\
+  $indent -mh host [-mP port] \\
+  $indent -mu user [-mp password] [-md database] \\
+  $indent [-t table] [-t table] [-t ...]
 
   -h / --host       User database server host
   -P / --port       User database server port (optional, default is 3306)
@@ -54,19 +57,27 @@ Usage:
   -p / --pass       User password (optional, default is undefined)
   -d / --database   User database name
 
-  -mh / --mhost       ensembl_production database server host
-  -mP / --mport       ensembl_production database server port (optional, default is 3306)
-  -mu / --muser       ensembl_production username (no write-access required)
-  -md / --mdatabase   ensembl_production database name
+  -mh / --mhost     Production database server host
+  -mP / --mport     Production database server port
+                    (optional, default is 3306)
+  -mu / --muser     Production database username (no write-access required)
+  -mp / --mpass     Production database password
+                    (optional, default is undefined)
+  -md / --mdatabase Production database name
+                    (optional, default is 'ensembl_production')
 
-  -t / --table       specify a table to update
+  -t / --table      A specific table to update, may occur several times
 
 USAGE_END
-  die;
+
+  die("Need the following options: -h -u -d -mh -mu\n");
+
 } ## end if ( !GetOptions( 'mhost|mh=s'...))
 
-if ($user_table) {
-  @tables = $user_table;
+foreach my $table (@tables) {
+  if ( !exists( $master_tables{$table} ) ) {
+    die( sprintf( "Invalid table specified: '%s'\n", $table ) );
+  }
 }
 
 # Fetch all data from the master database.
