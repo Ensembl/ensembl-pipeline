@@ -9,6 +9,8 @@ use Getopt::Long qw( :config no_ignore_case );
 
 my @tables =
   ( 'attrib_type', 'external_db', 'misc_set', 'unmapped_reason' );
+my $user_table = '';
+
 
 # Master database location:
 my ( $mhost, $mport ) = ( undef, '3306' );
@@ -29,7 +31,8 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'port|P=i'       => \$port,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
-                  'database|d=s'   => \$dbname )
+                  'database|d=s'   => \$dbname,
+                  'table|t=s'     => \$user_table)
      || !(    defined($host)
            && defined($user)
            && defined($dbname)
@@ -56,9 +59,15 @@ Usage:
   -mu / --muser       ensembl_production username (no write-access required)
   -md / --mdatabase   ensembl_production database name
 
+  -t / --table       specify a table to update
+
 USAGE_END
   die;
 } ## end if ( !GetOptions( 'mhost|mh=s'...))
+
+if ($user_table) {
+  @tables = $user_table;
+}
 
 # Fetch all data from the master database.
 my %data;
