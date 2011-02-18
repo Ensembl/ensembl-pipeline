@@ -11,7 +11,7 @@ my %master_tables = ( 'attrib_type'     => 1,
                       'external_db'     => 1,
                       'misc_set'        => 1,
                       'unmapped_reason' => 1 );
-my @tables = keys(%master_tables);
+my @tables;
 
 # Master database location:
 my ( $mhost, $mport ) = ( undef, '3306' );
@@ -74,10 +74,14 @@ USAGE_END
 
 } ## end if ( !GetOptions( 'mhost|mh=s'...))
 
-foreach my $table (@tables) {
-  if ( !exists( $master_tables{$table} ) ) {
-    die( sprintf( "Invalid table specified: '%s'\n", $table ) );
+if (@tables) {
+  foreach my $table (@tables) {
+    if ( !exists( $master_tables{$table} ) ) {
+      die( sprintf( "Invalid table specified: '%s'\n", $table ) );
+    }
   }
+} else {
+  @tables = keys(%master_tables);
 }
 
 # Fetch all data from the master database.
