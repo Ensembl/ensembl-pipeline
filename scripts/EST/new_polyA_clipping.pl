@@ -82,6 +82,8 @@ my (
     $min_length,
    );
 
+my $err_file = '';
+
 #
 # NOTE : This script is used in production code ( cdna_update ) - please do not
 # change the calls / options, otherewise the cDNA update code breaks ...
@@ -92,11 +94,16 @@ my (
             'trim'         => \$trim,             # trimming flag
             'comments:s'   => \$hqs_comment_file, # '/path/to/high-quality-sequence-comments-file';
             'min_length:s' => \$min_length,       # cutoff on sequence length
+            'errfile:s'    => \$err_file,         # file to direct STDERR to
            );
 
 # this is for backwards compatibility as options changed in r 1.10
 $data = $ARGV[0] if $ARGV[0]; 
 $clipped_cdnas = $ARGV[1] if $ARGV[1] ;
+
+if($err_file){
+  open STDERR, ">$err_file" or die "Can't redirect stderr\n";
+}
 
 if (defined $min_length) {
   print STDERR "Using minimum length of $min_length.\n";
@@ -167,6 +174,10 @@ while ( my $fullseq = $seqin->next_seq ) {
   } else {
     print STDERR "Sequence removed: ". $unclipped->display_id . "\n";
   }
+  if($err_file){
+    close STDERR;
+  }
+
 }
 
 
