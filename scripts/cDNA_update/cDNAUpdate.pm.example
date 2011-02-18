@@ -48,8 +48,8 @@ use vars qw(%Config);
         POLYA_CLIPPING_PATH     => '/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl',
         FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
-        UNMAPPED_REASONS_PATH   => '/ensembl/misc-scripts/unmapped_reason/unmapped_reason.txt',
         LOAD_TAX_PATH           => '/ensembl-pipeline/scripts/load_taxonomy.pl',
+        LOAD_PROD_DB            => '/ensembl-pipeline/scripts/populate_production_db_tables.pl',
         MIN_LENGTH              => 60,  # minimum length of cdna (otherwise they will be ignored ) 
 
         # Exonerate specifications
@@ -59,7 +59,6 @@ use vars qw(%Config);
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
-        SOURCE_HOST => 'cbi4',           # name of machine with up-to-date-blastdbs
         SOURCE_DIR  => '/data/blastdb/',
         REFSEQ_SOURCE => '/data/blastdb/refseqdna',
 
