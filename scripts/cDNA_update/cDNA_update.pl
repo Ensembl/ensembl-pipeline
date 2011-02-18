@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.54 2010-11-26 13:29:26 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.55 2011-02-18 10:11:36 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -231,8 +231,8 @@ $| = 1;
 my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
 my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
-my $UNMAPPED_REASONS    = $CVS_DIR . $UNMAPPED_REASONS_PATH;
 my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
+my $LOAD_PROD        = $CVS_DIR . $LOAD_PROD_DB;
 my $GSS;
 
 if ( defined($GSS_PREFIX) ) {
@@ -889,37 +889,47 @@ sub fastafiles {
     my @filestamp;
 
     eval {
-        local $SIG{CHLD} = sub { wait() };
-        # Check file versions, copy only if changed
-        $cmd = "cd $SOURCE_DIR && ls -n "
-                . $VERTRNA . " "
-                . $VERTRNA_UPDATE . " "
-                . $REFSEQ;
-        sshopen2( "$USER\@$SOURCE_HOST", *READER, *WRITER, $cmd ) || croak "ssh: $!";
+
+        my $ls_cmd = "ls -n $SOURCE_DIR/$VERTRNA $SOURCE_DIR/$VERTRNA_UPDATE $REFSEQ_SOURCE/$REFSEQ";
+        open(READER, "$ls_cmd |") or die "Can't run '$ls_cmd'\n";
+        
+
         while (<READER>) {
             @filestamp = split( " ", $_ );
-            my $stampA = join( "-", @filestamp[ 5 .. 7 ] );
-            $cmd = "cd " . $DATA_DIR . "; " . "ls -n " . $filestamp[7];
+            my @path = split "/", $filestamp[7];
+            my $file = $path[scalar(@path)-1];
+            print "FILE: ".$file."\n";
+            my $stampA = join( "-", @filestamp[ 5 .. 6 ] );
+            $stampA = $stampA."-".$file;
+            $cmd = "ls -n " . $DATA_DIR."/".$file;
+            print "cmd: ".$cmd."\n";
             @filestamp = split( " ", `$cmd` );
+            print "$? returned by cmd\n";
             next if ($? != 0);
-            my $stampB = join( "-", @filestamp[ 5 .. 7 ] );
+            my @pathB = split "/", $filestamp[7];
+            my $fileB = $pathB[scalar(@pathB)-1];
+            my $stampB = join( "-", @filestamp[ 5 .. 6 ] );
+            $stampB = $stampB."-".$fileB;
+
+            print "A: ".$stampA." B: ".$stampB."\n";
+            print "7: ". $filestamp[7]."\n";
+  
             if ( $stampA eq $stampB ) {
                 # No changes...
-                if ( $filestamp[7] eq $VERTRNA ) {
+                if ( $file eq $VERTRNA ) {
                     $vertrna_ver = 0;
-                } elsif ( $filestamp[7] eq $VERTRNA_UPDATE ) {
+                } elsif ( $file eq $VERTRNA_UPDATE ) {
                     $vertrna_upd_ver = 0;
-                } elsif ( $filestamp[7] eq $REFSEQ ) {
+                } elsif ( $file eq $REFSEQ ) {
                     $refseq_ver = 0;
                 }
             }
         } ## end while (<READER>)
         close(READER);
-        close(WRITER);
 
         # Copy files
         if ($vertrna_ver) {
-            $cmd = "scp -p " . $SOURCE_HOST . ":"
+            $cmd = "scp -p "
                 . $SOURCE_DIR . "/" . $VERTRNA . " "
                 . $DATA_DIR   . "/" . $VERTRNA;
 
@@ -928,7 +938,7 @@ sub fastafiles {
             $status += system($cmd);
         }
         if ($vertrna_upd_ver) {
-            $cmd = "scp -p " . $SOURCE_HOST . ":"
+            $cmd = "scp -p "
                 . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
                 . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
 
@@ -936,7 +946,7 @@ sub fastafiles {
             $status += system($cmd);
         }
         if ($refseq_ver) {
-            $cmd = "scp -p " . $SOURCE_HOST . ":"
+            $cmd = "scp -p "
                 . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
                 . $DATA_DIR   . "/" . $REFSEQ;
 
@@ -2246,62 +2256,33 @@ sub import_tables {
 # Load the external_dbs and unmapped_reason tables from
 # /ensembl/misc-scripts (now production db).
 sub load_misc_script_files {
-    #'files' to load (now in production db)
-    #names in core and names in production db
     my %table_files = (
             'external_db'     => 'master_external_db',
             'unmapped_reason' => 'master_unmapped_reason'
     );
 
     foreach my $table ( keys %table_files ) {
-        #dump from production to data dir
-        print "Dumping ".$table_files{$table}." from production db and loading to output db.\n";
+        #populate from production db
+        print "Populating ".$table_files{$table}." from production db to $OUTPUT_DBNAME.\n";
 
-        my $dump_cmd = "mysqldump "
-                      ."-h $PRODUCTION_DBHOST "
-                      ."-P $PRODUCTION_DBPORT "
-                      ."-u $DBUSER_RO "
-                      ."--add-drop-table "
-                      ."$PRODUCTION_DBNAME "
-                      .$table_files{$table}
-                      ." > ".$DATA_DIR."/".$table.".sql";
+        my $cmd = "perl $LOAD_PROD "
+                      ."-mhost $PRODUCTION_DBHOST "
+                      ."-mport $PRODUCTION_DBPORT "
+                      ."-muser $DBUSER_RO "
+                      ."-host $OUTPUT_DBHOST "
+                      ."-user $DBUSER "
+                      ."-pass $DBPASS "
+                      ."-database $OUTPUT_DBNAME "
+                      ."-port $OUTPUT_DBPORT "
+                      ."-table $table";
 
-        print $dump_cmd."\n";
+        print $cmd."\n";
 
-        my $dump_status = system($dump_cmd);
-        if($dump_status){
-          throw("Dumping ".$table_files{$table}." from $PRODUCTION_DBNAME failed\n");
+        my $cmd_status = system($cmd);
+        if($cmd_status){
+          throw("Populating ".$table_files{$table}." from $PRODUCTION_DBNAME failed\n");
         }
 
-        #import into output db
-        my $mysql_out = "mysql "
-                      . "-h $OUTPUT_DBHOST "
-                      . "-P $OUTPUT_DBPORT "
-                      . "-u $DBUSER "
-                      . "-p$DBPASS "
-                      . "-D $OUTPUT_DBNAME";
-
-        my $import = " < ".$DATA_DIR."/".$table.".sql";
-        my $import_cmd = $mysql_out.$import;
-
-        print $import_cmd."\n";
-
-        my $import_status = system($import_cmd);
-        if($import_status){
-          throw("Importing ".$DATA_DIR."/".$table.".sql failed\n");
-        }
-        #drop original empty table from output db
-        my $drop = $mysql_out." -e'drop table ".$table."'";
-        my $drop_status = system($drop);
-        if($drop_status){
-          throw("Drop table ".$table." failed\n");
-        }
-        #rename loaded production table to normal core name
-        my $rename = $mysql_out." -e'rename table ".$table_files{$table}." to ".$table."'";
-        my $rename_status = system($rename);
-        if($rename_status){
-          throw("Renaming ".$table_files{$table}." failed\n");
-        }
     }
 }
 
@@ -2405,6 +2386,7 @@ sub polya_clipping {
     print("\nPerforming polyA clipping...\n");
     my $newfile3 = $DATA_DIR . "/" . $trim_file. ".clipped";
     $cmd = "perl " . $POLYA_CLIPPING . " " ; 
+    $cmd.="-errfile $DATA_DIR/polyA.err ";
     if ( $MIN_LENGTH ) { 
        $cmd.="-min_length $MIN_LENGTH "; 
     } 
