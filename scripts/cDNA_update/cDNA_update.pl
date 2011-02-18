@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.55 2011-02-18 10:11:36 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.56 2011-02-18 10:42:05 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -904,7 +904,6 @@ sub fastafiles {
             $cmd = "ls -n " . $DATA_DIR."/".$file;
             print "cmd: ".$cmd."\n";
             @filestamp = split( " ", `$cmd` );
-            print "$? returned by cmd\n";
             next if ($? != 0);
             my @pathB = split "/", $filestamp[7];
             my $fileB = $pathB[scalar(@pathB)-1];
