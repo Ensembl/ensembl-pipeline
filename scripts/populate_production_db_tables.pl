@@ -37,12 +37,17 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'table|t=s'      => \@tables )
      || !(    defined($host)
            && defined($user)
+           && defined($pass)
            && defined($dbname)
            && defined($mhost)
            && defined($muser) ) )
 {
   my $indent = ' ' x length($0);
   print <<USAGE_END;
+This script copies the tables 'attrib_type', 'external_db', 'misc_set'
+and 'unmapped_reason' from the prodcution database into a user-defined
+database.
+
 Usage:
 
   $0 -h host [-P port] \\
@@ -53,16 +58,20 @@ Usage:
 
   -h / --host       User database server host
   -P / --port       User database server port (optional, default is 3306)
+
   -u / --user       User username (must have write-access)
-  -p / --pass       User password (optional, default is undefined)
+  -p / --pass       User password
+
   -d / --database   User database name
 
   -mh / --mhost     Production database server host
   -mP / --mport     Production database server port
                     (optional, default is 3306)
+
   -mu / --muser     Production database username (no write-access required)
   -mp / --mpass     Production database password
                     (optional, default is undefined)
+
   -md / --mdatabase Production database name
                     (optional, default is 'ensembl_production')
 
@@ -70,7 +79,7 @@ Usage:
 
 USAGE_END
 
-  die("Need the following options: -h -u -d -mh -mu\n");
+  die("Need the following options: -h -u -p -d -mh -mu\n");
 
 } ## end if ( !GetOptions( 'mhost|mh=s'...))
 
