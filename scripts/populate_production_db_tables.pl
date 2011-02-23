@@ -4,7 +4,7 @@ use strict;
 use warnings;
 
 use Data::Dumper;
-use DBI;
+use DBI qw( :sql_types );
 use Getopt::Long qw( :config no_ignore_case );
 
 my %master_tables = ( 'attrib_type'     => 1,
@@ -21,7 +21,7 @@ my $mdbname = 'ensembl_production';
 # User database location (default values):
 my ( $host, $port ) = ( undef, '3306' );
 my ( $user, $pass );
-my $dbname;
+my $dbpattern;
 
 # Do command line parsing.
 if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
@@ -33,12 +33,12 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'port|P=i'       => \$port,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
-                  'database|d=s'   => \$dbname,
+                  'database|d=s'   => \$dbpattern,
                   'table|t=s'      => \@tables )
      || !(    defined($host)
            && defined($user)
            && defined($pass)
-           && defined($dbname)
+           && defined($dbpattern)
            && defined($mhost)
            && defined($muser) ) )
 {
@@ -62,7 +62,7 @@ Usage:
   -u / --user       User username (must have write-access)
   -p / --pass       User password
 
-  -d / --database   User database name
+  -d / --database   User database name or pattern
 
   -mh / --mhost     Production database server host
   -mP / --mport     Production database server port
@@ -119,54 +119,133 @@ my %data;
 
 # Put all data into the specified database.
 {
-  my $dsn = sprintf( 'DBI:mysql:host=%s;port=%d;database=%s',
-                     $host, $port, $dbname );
+  my $dsn = sprintf( 'DBI:mysql:host=%s;port=%d', $host, $port );
   my $dbh = DBI->connect( $dsn, $user, $pass,
                           { 'PrintError' => 1, 'RaiseError' => 1 } );
 
-  foreach my $table ( keys(%data) ) {
-    printf( "Inserting into %s.%s\n", $dbname, $table );
+  my $sth = $dbh->prepare('SHOW DATABASES LIKE ?');
+  $sth->bind_param( 1, $dbpattern, SQL_VARCHAR );
 
-    # Make a backup of any existing data.
-    $dbh->do( sprintf( 'CREATE TABLE %s_bak LIKE %s',
-                       $dbh->quote_identifier( undef, $dbname, $table ),
-                       $dbh->quote_identifier( undef, $dbname, $table )
-              ) );
-    $dbh->do( sprintf( 'INSERT INTO %s_bak SELECT * FROM %s',
-                       $dbh->quote_identifier( undef, $dbname, $table ),
-                       $dbh->quote_identifier( undef, $dbname, $table )
-              ) );
+  $sth->execute();
 
-    # Truncate (empty) the table before inserting new data into it.
-    $dbh->do(sprintf( 'TRUNCATE TABLE %s',
-                      $dbh->quote_identifier( undef, $dbname, $table ) )
-    );
+  my $dbname;
+  $sth->bind_col( 1, \$dbname );
 
-    # Get column information.
-    my $colinfo_sth = $dbh->column_info( undef, $dbname, $table, '%' );
-    my $colinfo =
-      $colinfo_sth->fetchall_hashref( ['ORDINAL_POSITION'] );
+  while ( $sth->fetch() ) {
+    print( '-' x 80, "\n" );
+    printf( "\t%s\n", $dbname );
+    print( '-' x 80, "\n" );
 
-    my $numcols = scalar( keys( %{$colinfo} ) );
+    foreach my $table ( keys(%data) ) {
+      printf( "==> Inserting into %s\n", $table );
 
-    # For each row read from the master table,
-    # issue an INSERT statement.
-    foreach my $row ( @{ $data{$table} } ) {
-      my $insert_statement = sprintf(
-        'INSERT INTO %s (%s) VALUES (%s)',
-        $dbh->quote_identifier( undef, $dbname, $table ),
-        join( ', ',
-              map { $colinfo->{$_}{'COLUMN_NAME'} } 1 .. $numcols ),
-        join(
-          ', ',
-          map {
-            $dbh->quote( $row->[ $_ - 1 ], $colinfo->{$_}{'DATA_TYPE'} )
-            } ( 1 .. $numcols ) ) );
+      my $full_table_name =
+        $dbh->quote_identifier( undef, $dbname, $table );
+      my $full_table_name_bak =
+        $dbh->quote_identifier( undef, $dbname, $table . '_bak' );
+      my $key_name = $table . '_id';
 
-      $dbh->do($insert_statement);
-    }
+      # Make a backup of any existing data.
+      $dbh->do( sprintf( 'CREATE TABLE %s LIKE %s',
+                         $full_table_name_bak, $full_table_name ) );
+      $dbh->do( sprintf( 'INSERT INTO %s SELECT * FROM %s',
+                         $full_table_name_bak, $full_table_name ) );
 
-  } ## end foreach my $table ( keys(%data...))
+      # Truncate (empty) the table before inserting new data into it.
+      $dbh->do( sprintf( 'TRUNCATE TABLE %s', $full_table_name ) );
+
+      # Get column information.
+      my $colinfo_sth =
+        $dbh->column_info( undef, $dbname, $table, '%' );
+      my $colinfo =
+        $colinfo_sth->fetchall_hashref( ['ORDINAL_POSITION'] );
+
+      my $numcols = scalar( keys( %{$colinfo} ) );
+
+      # For each row read from the master table,
+      # issue an INSERT statement.
+      foreach my $row ( @{ $data{$table} } ) {
+        my $insert_statement = sprintf(
+          'INSERT INTO %s (%s) VALUES (%s)',
+          $full_table_name,
+          join( ', ',
+                map { $colinfo->{$_}{'COLUMN_NAME'} } 1 .. $numcols ),
+          join(
+            ', ',
+            map {
+              $dbh->quote( $row->[ $_ - 1 ],
+                           $colinfo->{$_}{'DATA_TYPE'} )
+              } ( 1 .. $numcols ) ) );
+
+        $dbh->do($insert_statement);
+      }
+
+      {
+        my $statement = sprintf( 'SELECT %s '
+                                   . 'FROM %s '
+                                   . 'LEFT JOIN %s t USING (%s) '
+                                   . 'WHERE t.%s IS NULL '
+                                   . 'ORDER BY %s',
+                                 $key_name,
+                                 $full_table_name,
+                                 $full_table_name_bak,
+                                 $key_name,
+                                 $key_name,
+                                 $key_name );
+
+        my $sth2 = $dbh->prepare($statement);
+        $sth2->execute();
+
+        my $key;
+        $sth2->bind_col( 1, \$key );
+
+        my @keys;
+        while ( $sth2->fetch() ) {
+          push( @keys, $key );
+        }
+
+        if (@keys) {
+          print("New data inserted:\n");
+          printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
+                  $table, $table, join( ',', @keys ) );
+        }
+      }
+      {
+        my $statement = sprintf( 'SELECT %s '
+                                   . 'FROM %s'
+                                   . 'LEFT JOIN %s t USING (%s) '
+                                   . 'WHERE t.%s IS NULL '
+                                   . 'ORDER BY %s',
+                                 $key_name,
+                                 $full_table_name_bak,
+                                 $full_table_name,
+                                 $key_name,
+                                 $key_name,
+                                 $key_name );
+
+        my $sth2 = $dbh->prepare($statement);
+        $sth2->execute();
+
+        my $key;
+        $sth2->bind_col( 1, \$key );
+
+        my @keys;
+        while ( $sth2->fetch() ) {
+          push( @keys, $key );
+        }
+
+        if (@keys) {
+          print("Old data deleted:\n");
+          printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
+                  $table . '_bak',
+                  $table, join( ',', @keys ) );
+        }
+      }
+
+    } ## end foreach my $table ( keys(%data...))
+    print("\n");
+    print("Remember to drop the backup tables!\n\n");
+  } ## end while ( $sth->fetch() )
 
   $dbh->disconnect();
 }
