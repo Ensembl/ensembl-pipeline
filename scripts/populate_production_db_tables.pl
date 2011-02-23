@@ -45,7 +45,7 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
   my $indent = ' ' x length($0);
   print <<USAGE_END;
 This script copies the tables 'attrib_type', 'external_db', 'misc_set'
-and 'unmapped_reason' from the prodcution database into a user-defined
+and 'unmapped_reason' from the production database into a user-defined
 database.
 
 Usage:
@@ -126,6 +126,16 @@ my %data;
 
   foreach my $table ( keys(%data) ) {
     printf( "Inserting into %s.%s\n", $dbname, $table );
+
+    # Make a backup of any existing data.
+    $dbh->do( sprintf( 'CREATE TABLE %s_bak LIKE %s',
+                       $dbh->quote_identifier( undef, $dbname, $table ),
+                       $dbh->quote_identifier( undef, $dbname, $table )
+              ) );
+    $dbh->do( sprintf( 'INSERT INTO %s_bak SELECT * FROM %s',
+                       $dbh->quote_identifier( undef, $dbname, $table ),
+                       $dbh->quote_identifier( undef, $dbname, $table )
+              ) );
 
     # Truncate (empty) the table before inserting new data into it.
     $dbh->do(sprintf( 'TRUNCATE TABLE %s',
