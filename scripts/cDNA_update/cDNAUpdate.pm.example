@@ -59,8 +59,8 @@ use vars qw(%Config);
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
-        SOURCE_DIR  => '/data/blastdb/',
-        REFSEQ_SOURCE => '/data/blastdb/refseqdna',
+        SOURCE_DIR  => '/data/blastdb/Supported',#formerly /data/blastdb                                             
+        REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',#formerly /data/blastdb/refseqdna
 
         # Taxonomy db for loading meta_table - should not need to change
         TAXONDBNAME => 'ncbi_taxonomy',
