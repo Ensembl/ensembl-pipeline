@@ -58,7 +58,8 @@ database.
 Usage:
 
   $0 -h host [-P port] \\
-  $indent -u user [-p password] -d database \\
+  $indent -u user [-p password]
+  $indent -d database | --pattern pattern \\
   $indent -mh host [-mP port] \\
   $indent -mu user [-mp password] [-md database] \\
   $indent [-t table] [-t table] [-t ...] \\
@@ -90,7 +91,9 @@ Usage:
   -md / --mdatabase Production database name
                     (optional, default is 'ensembl_production')
 
-  -t / --table      A specific table to update, may occur several times
+  -t / --table      A specific table to update, may occur several times,
+                    must be one of the tables attrib_type, external_db,
+                    misc_set, or unmapped_reason
 
   -D / --drop       Drop backup tables if they exists
   -v / --verbose    Be verbose, display every SQL statement as they
