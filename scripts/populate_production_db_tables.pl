@@ -21,6 +21,7 @@ my $mdbname = 'ensembl_production';
 # User database location (default values):
 my ( $host, $port ) = ( undef, '3306' );
 my ( $user, $pass );
+my $dbname;
 my $dbpattern;
 
 my $drop_bak = 0;
@@ -36,14 +37,15 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'port|P=i'       => \$port,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
-                  'database|d=s'   => \$dbpattern,
+                  'database|d=s'   => \$dbname,
+                  'pattern=s'      => \$dbpattern,
                   'table|t=s'      => \@tables,
                   'drop|D!'        => \$drop_bak,
                   'verbose|v!'     => \$verbose )
      || !(    defined($host)
            && defined($user)
            && defined($pass)
-           && defined($dbpattern)
+           && ( defined($dbname) || defined($dbpattern) )
            && defined($mhost)
            && defined($muser) ) )
 {
@@ -68,8 +70,14 @@ Usage:
   -u / --user       User username (must have write-access)
   -p / --pass       User password
 
-  -d / --database   User database name or pattern (Perl regular expression)
-                    e.g. --database "(rnaseq|vega)_62"
+  -d / --database   User database name or SQL pattern
+                    e.g. --database="homo_sapiens_rnaseq_62_37g"
+                    or   --database="%core_62%"
+
+  --pattern         User database by Perl regular expression
+                    e.g. --pattern="^homo.*(rnaseq|vega)_62"
+
+                    (-d/--database and --pattern are mutually exclusive)
 
   -mh / --mhost     Production database server host
   -mP / --mport     Production database server port
@@ -104,6 +112,10 @@ if (@tables) {
   @tables = keys(%master_tables);
 }
 
+if ( defined($dbname) && defined($dbpattern) ) {
+  die("-d/--database and --pattern are mutually exclusive\n");
+}
+
 # Fetch all data from the master database.
 my %data;
 {
@@ -134,15 +146,20 @@ my %data;
   my $dbh = DBI->connect( $dsn, $user, $pass,
                           { 'PrintError' => 1, 'RaiseError' => 1 } );
 
-  my $sth = $dbh->prepare('SHOW DATABASES');
+  my $sth;
+  if ( defined($dbname) ) {
+    $sth = $dbh->prepare('SHOW DATABASES LIKE ?');
+    $sth->bind_param( 1, $dbname, SQL_VARCHAR );
+  } else {
+    $sth = $dbh->prepare('SHOW DATABASES');
+  }
 
   $sth->execute();
 
-  my $dbname;
   $sth->bind_col( 1, \$dbname );
 
   while ( $sth->fetch() ) {
-    if ( $dbname !~ /$dbpattern/ ) { next }
+    if ( defined($dbpattern) && $dbname !~ /$dbpattern/ ) { next }
 
     print( '=' x 80, "\n" );
     printf( "\t%s\n", $dbname );
