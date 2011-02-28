@@ -23,6 +23,9 @@ my ( $host, $port ) = ( undef, '3306' );
 my ( $user, $pass );
 my $dbpattern;
 
+my $drop_bak = 0;
+my $verbose  = 0;
+
 # Do command line parsing.
 if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'mport|mP=i'     => \$mport,
@@ -34,7 +37,9 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'user|u=s'       => \$user,
                   'pass|p=s'       => \$pass,
                   'database|d=s'   => \$dbpattern,
-                  'table|t=s'      => \@tables )
+                  'table|t=s'      => \@tables,
+                  'drop|D!'        => \$drop_bak,
+                  'verbose|v!'     => \$verbose )
      || !(    defined($host)
            && defined($user)
            && defined($pass)
@@ -54,7 +59,8 @@ Usage:
   $indent -u user [-p password] -d database \\
   $indent -mh host [-mP port] \\
   $indent -mu user [-mp password] [-md database] \\
-  $indent [-t table] [-t table] [-t ...]
+  $indent [-t table] [-t table] [-t ...] \\
+  $indent [-D] [-v]
 
   -h / --host       User database server host
   -P / --port       User database server port (optional, default is 3306)
@@ -76,6 +82,10 @@ Usage:
                     (optional, default is 'ensembl_production')
 
   -t / --table      A specific table to update, may occur several times
+
+  -D / --drop       Drop backup tables if they exists
+  -v / --verbose    Be verbose, display every SQL statement as they
+                    are executed
 
 USAGE_END
 
@@ -132,9 +142,9 @@ my %data;
   $sth->bind_col( 1, \$dbname );
 
   while ( $sth->fetch() ) {
-    print( '-' x 80, "\n" );
+    print( '=' x 80, "\n" );
     printf( "\t%s\n", $dbname );
-    print( '-' x 80, "\n" );
+    print( '=' x 80, "\n" );
 
     foreach my $table ( keys(%data) ) {
       printf( "==> Inserting into %s\n", $table );
@@ -144,6 +154,12 @@ my %data;
       my $full_table_name_bak =
         $dbh->quote_identifier( undef, $dbname, $table . '_bak' );
       my $key_name = $table . '_id';
+
+      # Drop backup table if it exists and if asked to do so.
+      if ($drop_bak) {
+        $dbh->do(
+           sprintf( 'DROP TABLE IF EXISTS %s', $full_table_name_bak ) );
+      }
 
       # Make a backup of any existing data.
       $dbh->do( sprintf( 'CREATE TABLE %s LIKE %s',
@@ -177,6 +193,9 @@ my %data;
                            $colinfo->{$_}{'DATA_TYPE'} )
               } ( 1 .. $numcols ) ) );
 
+        if ($verbose) {
+          printf( "EXECUTING: %s\n", $insert_statement );
+        }
         $dbh->do($insert_statement);
       }
 
@@ -194,6 +213,10 @@ my %data;
                                  $key_name );
 
         my $sth2 = $dbh->prepare($statement);
+
+        if ($verbose) {
+          printf( "EXECUTING: %s\n", $statement );
+        }
         $sth2->execute();
 
         my $key;
@@ -208,11 +231,12 @@ my %data;
           print("New data inserted:\n");
           printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
                   $table, $table, join( ',', @keys ) );
+          print("\n");
         }
       }
       {
         my $statement = sprintf( 'SELECT %s '
-                                   . 'FROM %s'
+                                   . 'FROM %s '
                                    . 'LEFT JOIN %s t USING (%s) '
                                    . 'WHERE t.%s IS NULL '
                                    . 'ORDER BY %s',
@@ -224,6 +248,10 @@ my %data;
                                  $key_name );
 
         my $sth2 = $dbh->prepare($statement);
+
+        if ($verbose) {
+          printf( "EXECUTING: %s\n", $statement );
+        }
         $sth2->execute();
 
         my $key;
@@ -235,10 +263,13 @@ my %data;
         }
 
         if (@keys) {
-          print("Old data deleted:\n");
+          print( '-' x 40, "\n" );
+          print("!! Old data deleted:\n");
           printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
                   $table . '_bak',
                   $table, join( ',', @keys ) );
+          print( '-' x 40, "\n" );
+          print("\n");
         }
       }
 
