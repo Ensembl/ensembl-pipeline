@@ -68,7 +68,8 @@ Usage:
   -u / --user       User username (must have write-access)
   -p / --pass       User password
 
-  -d / --database   User database name or pattern
+  -d / --database   User database name or pattern (Perl regular expression)
+                    e.g. --database "(rnaseq|vega)_62"
 
   -mh / --mhost     Production database server host
   -mP / --mport     Production database server port
@@ -133,8 +134,7 @@ my %data;
   my $dbh = DBI->connect( $dsn, $user, $pass,
                           { 'PrintError' => 1, 'RaiseError' => 1 } );
 
-  my $sth = $dbh->prepare('SHOW DATABASES LIKE ?');
-  $sth->bind_param( 1, $dbpattern, SQL_VARCHAR );
+  my $sth = $dbh->prepare('SHOW DATABASES');
 
   $sth->execute();
 
@@ -142,6 +142,8 @@ my %data;
   $sth->bind_col( 1, \$dbname );
 
   while ( $sth->fetch() ) {
+    if ( $dbname !~ /$dbpattern/ ) { next }
+
     print( '=' x 80, "\n" );
     printf( "\t%s\n", $dbname );
     print( '=' x 80, "\n" );
