@@ -7,6 +7,8 @@ use Data::Dumper;
 use DBI qw( :sql_types );
 use Getopt::Long qw( :config no_ignore_case );
 
+local $| = 1;
+
 my %master_tables = ( 'attrib_type'     => 1,
                       'external_db'     => 1,
                       'misc_set'        => 1,
@@ -24,8 +26,10 @@ my ( $user, $pass );
 my $dbname;
 my $dbpattern;
 
+my $core     = 0;
 my $drop_bak = 0;
 my $verbose  = 0;
+my $cleanup  = 0;
 
 # Do command line parsing.
 if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
@@ -41,13 +45,16 @@ if ( !GetOptions( 'mhost|mh=s'     => \$mhost,
                   'pattern=s'      => \$dbpattern,
                   'table|t=s'      => \@tables,
                   'drop|D!'        => \$drop_bak,
-                  'verbose|v!'     => \$verbose )
-     || !(    defined($host)
-           && defined($user)
-           && defined($pass)
-           && ( defined($dbname) || defined($dbpattern) )
-           && defined($mhost)
-           && defined($muser) ) )
+                  'verbose|v!'     => \$verbose,
+                  'core=i'         => \$core,
+                  'cleanup!'       => \$cleanup )
+     || !(
+           defined($host)
+        && defined($user)
+        && defined($pass)
+        && ( defined($dbname) || defined($dbpattern) || defined($core) )
+        && defined($mhost)
+        && defined($muser) ) )
 {
   my $indent = ' ' x length($0);
   print <<USAGE_END;
@@ -80,6 +87,10 @@ Usage:
 
                     (-d/--database and --pattern are mutually exclusive)
 
+  --core=NN         Preset pattern for Core-like databases in relase NN
+                    Specifying --core=62 is equivalent to using
+                    --pattern="(cdna|core|otherfeatures|rnaseq|vega)_62"
+
   -mh / --mhost     Production database server host
   -mP / --mport     Production database server port
                     (optional, default is 3306)
@@ -95,9 +106,13 @@ Usage:
                     must be one of the tables attrib_type, external_db,
                     misc_set, or unmapped_reason
 
-  -D / --drop       Drop backup tables if they exists
+  -D / --drop       Drop backup tables if they already exists in the
+                    database from a previous run
+
+  --cleanup         Just clean up backup tables, do nothing else
+
   -v / --verbose    Be verbose, display every SQL statement as they
-                    are executed
+                    are executed (on standard error)
 
 USAGE_END
 
@@ -115,8 +130,13 @@ if (@tables) {
   @tables = keys(%master_tables);
 }
 
+if ( defined($core) ) {
+  $dbpattern =
+    sprintf( '(cdna|core|otherfeatures|rnaseq|vega)_%d', $core );
+}
+
 if ( defined($dbname) && defined($dbpattern) ) {
-  die("-d/--database and --pattern are mutually exclusive\n");
+  die("-d/--database and --pattern/--core are mutually exclusive\n");
 }
 
 # Fetch all data from the master database.
@@ -169,7 +189,7 @@ my %data;
     print( '=' x 80, "\n" );
 
     foreach my $table ( keys(%data) ) {
-      printf( "==> Inserting into %s\n", $table );
+      printf( "==> %s: ", $table );
 
       my $full_table_name =
         $dbh->quote_identifier( undef, $dbname, $table );
@@ -178,9 +198,12 @@ my %data;
       my $key_name = $table . '_id';
 
       # Drop backup table if it exists and if asked to do so.
-      if ($drop_bak) {
+      if ( $cleanup || $drop_bak ) {
         $dbh->do(
            sprintf( 'DROP TABLE IF EXISTS %s', $full_table_name_bak ) );
+
+        print("<dropped old backup> ");
+        if ($cleanup) { next }
       }
 
       # Make a backup of any existing data.
@@ -188,6 +211,7 @@ my %data;
                          $full_table_name_bak, $full_table_name ) );
       $dbh->do( sprintf( 'INSERT INTO %s SELECT * FROM %s',
                          $full_table_name_bak, $full_table_name ) );
+      print("<created new backup> ");
 
       # Truncate (empty) the table before inserting new data into it.
       $dbh->do( sprintf( 'TRUNCATE TABLE %s', $full_table_name ) );
@@ -216,10 +240,12 @@ my %data;
               } ( 1 .. $numcols ) ) );
 
         if ($verbose) {
-          printf( "EXECUTING: %s\n", $insert_statement );
+          printf( STDERR "EXECUTING: %s\n", $insert_statement );
         }
         $dbh->do($insert_statement);
       }
+
+      print("<inserted data>");
 
       {
         my $statement = sprintf( 'SELECT %s '
@@ -237,7 +263,7 @@ my %data;
         my $sth2 = $dbh->prepare($statement);
 
         if ($verbose) {
-          printf( "EXECUTING: %s\n", $statement );
+          printf( STDERR "EXECUTING: %s\n", $statement );
         }
         $sth2->execute();
 
@@ -250,6 +276,7 @@ my %data;
         }
 
         if (@keys) {
+          print("\n");
           print("New data inserted:\n");
           printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
                   $table, $table, join( ',', @keys ) );
@@ -272,7 +299,7 @@ my %data;
         my $sth2 = $dbh->prepare($statement);
 
         if ($verbose) {
-          printf( "EXECUTING: %s\n", $statement );
+          printf( STDERR "EXECUTING: %s\n", $statement );
         }
         $sth2->execute();
 
@@ -285,6 +312,7 @@ my %data;
         }
 
         if (@keys) {
+          print("\n");
           print( '-' x 40, "\n" );
           print("!! Old data deleted:\n");
           printf( "SELECT * FROM %s WHERE %s_id IN (%s);\n",
@@ -294,10 +322,14 @@ my %data;
           print("\n");
         }
       }
+    } continue {
+      print("\n");
+    }
 
-    } ## end foreach my $table ( keys(%data...))
     print("\n");
-    print("Remember to drop the backup tables!\n\n");
+    if ( !$cleanup ) {
+      print("Remember to drop the backup tables!\n\n");
+    }
   } ## end while ( $sth->fetch() )
 
   $dbh->disconnect();
