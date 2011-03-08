@@ -160,7 +160,7 @@ my $seq_region_name;
 my $name = 'genome';
 my $seq_level;
 my $top_level;
-my $include_non_reference;
+my $include_non_reference = 1;
 my $insert_analysis = 0;
 my $hap_pair;
 &GetOptions(
