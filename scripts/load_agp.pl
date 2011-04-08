@@ -140,7 +140,7 @@ LINE:while(<FH>){
   my ($a_name_init, $a_start, $a_end, $ordinal, $type, $c_name, $c_start, 
       $c_end, $ori) = split;
 
-  if($type eq 'N'){
+  if($type eq 'N' || $type eq 'U'){
     next LINE; #skipping gaps as not stored in db
   }
   if ($type eq 'U') {
