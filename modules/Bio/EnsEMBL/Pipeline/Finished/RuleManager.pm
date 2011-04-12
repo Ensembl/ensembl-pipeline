@@ -192,6 +192,8 @@ sub create_and_store_job {
 		-analysis   => $analysis,
 		-output_dir => $self->output_dir,
 		-runner     => $self->runner,
+                -submission_id => 0, # default is invalid with strict sql_mode on MySQL 5
+                                     # (set to -1 in Bio::EnsEMBL::Pipeline::Job v. 1.120)
 	);
 
 	eval { $self->job_adaptor->store($job); };
