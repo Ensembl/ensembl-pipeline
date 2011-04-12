@@ -4,6 +4,8 @@ package Bio::EnsEMBL::Pipeline::DBSQL::Finished::ProteinAlignFeatureAdaptor;
 use vars qw(@ISA);
 use strict;
 
+use Data::Dumper;
+
 use Bio::EnsEMBL::DnaPepAlignFeature;
 use Bio::EnsEMBL::DBSQL::ProteinAlignFeatureAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
@@ -96,7 +98,14 @@ sub store{
    $sth->bind_param(13,$feat->external_db_id,{ TYPE => 'SQL_INTEGER' });
    $sth->bind_param(14,$feat->hcoverage,{ TYPE => 'SQL_DOUBLE' });
 
-   $sth->execute();
+   eval { 
+       $sth->execute();
+       1;
+   } or do {
+       my $dump = Dumper($feat);
+       throw("FEATURE WRITE FAILED\n[$@]\n>>>\n$dump\n<<<\n");
+   };
+
    $original->dbID($sth->{'mysql_insertid'});
    $original->adaptor($self);
 
