@@ -24,7 +24,7 @@ sub new {
     throw("Must pass a molecule type, either protein or dna ".
           "not a ".$type) unless($type eq 'protein' || $type eq 'dna');
     $self->type($type);
-    $self->mm_host($mm_host || 'cbi3');
+    $self->mm_host($mm_host || 'cbi5d');
     $self->mm_port($mm_port || 3306);
     $self->mm_user($mm_user || 'genero');
 
