@@ -12,7 +12,7 @@ sub new {
 
 	my ( $mm_host , $mm_port , $mm_user, $mm_name ) = rearrange(
         [  'MM_HOST', 'MM_PORT','MM_USER', 'MM_NAME' ], @args );
-    $self->mm_host($mm_host || 'cbi3');
+    $self->mm_host($mm_host || 'cbi5d');
     $self->mm_port($mm_port || 3306);
     $self->mm_user($mm_user || 'genero');
     $self->mm_name($mm_name || 'mm_ini');
