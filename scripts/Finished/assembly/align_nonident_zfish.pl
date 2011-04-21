@@ -248,7 +248,7 @@ $sql .= ' ORDER BY (alt_end - alt_start) ASC';
 $sth = $R_dbh->prepare($sql);
 $sth->execute;
 
-while (my $row = $sth->fetchrow_hashref) {
+BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
   my $id = $row->{'tmp_align_id'};
   $aligner->id($id);
