@@ -49,7 +49,7 @@ use vars qw(%Config);
         FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
         LOAD_TAX_PATH           => '/ensembl-pipeline/scripts/load_taxonomy.pl',
-        LOAD_PROD_DB            => '/ensembl-pipeline/scripts/populate_production_db_tables.pl',
+        LOAD_PROD_DB            => '/ensembl/misc-scripts/production_database/scripts/populate_production_db_tables.pl',
         MIN_LENGTH              => 60,  # minimum length of cdna (otherwise they will be ignored ) 
 
         # Exonerate specifications
