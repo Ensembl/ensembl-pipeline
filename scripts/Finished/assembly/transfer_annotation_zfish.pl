@@ -48,6 +48,16 @@ is done by a series of scripts. Please see scripts in
 for a high-level description of this process, and POD in the individual scripts
 for the details.
 
+=head1 WARNING
+
+This script changes attributes of the chromosome seq_regions.  If you
+abort it, these changes will not be undone.  Among other things(?)
+this will prevent those seq_regions being visible as chromosomes.
+
+To fix: delete the toplevel (6) seq_region_attrib from ref & alt
+chromosomes; reset coord_system_id of alt ("to") chromosomes; delete
+cruft from tables, which will happen after next successful run.
+
 =head1 AUTHOR
 
 Patrick Meidl <meidl@ebi.ac.uk>, Ensembl core API team
