@@ -57,7 +57,7 @@ use vars qw(%Config);
        retries         => 1,
        sub_args        => '',
        runner          => '',
-       queue           => 'long',
+       queue           => 'normal',
        output_dir      => '<outDIR>',
        cleanup         => 'no',
        runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB', }
