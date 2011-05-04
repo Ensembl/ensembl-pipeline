@@ -20,6 +20,9 @@ then create input ids of a specified size while making sure it doesn't cut any o
     -seq_region_names    list of seq_regions on which to run the script
                          if none specified, it runs on all the seq_regions
 
+    -sr_names_file       the name of the file which contains a list of seq_region names on which
+                         the script should be run.
+
     -dbname              name of the reference database containing the input_ids
 
     -dbhost              host of the reference database
@@ -90,11 +93,13 @@ my $slice_size ;
 my $analysis ;
 my $submit_analysis ;
 my @seq_region_names ;
+my $sr_names_file;
 my $path ;
 
 
 &GetOptions(
             'seq_region_names:s'=> \@seq_region_names,
+            'sr_names_file:s'   => \$sr_names_file,
             'dbname:s'          => \$dbname,
             'dbhost:s'          => \$dbhost,
             'dbpass:s'          => \$dbpass,
@@ -108,9 +113,20 @@ my $path ;
             'submit_analysis=s' => \$submit_analysis,
             );
 
+if (scalar(@seq_region_names) && $sr_names_file) {
+  throw("You cannot provide seq_region names via the command line and via a file at the same time.\n")
+}
+
 
 if (scalar(@seq_region_names)) {
   @seq_region_names = split(/,/, join(',',@seq_region_names) ) ;
+} elsif ($sr_names_file) {
+  open (IN, $sr_names_file) || die "Cannot open your seq_region_names file: $sr_names_file";
+  my @names = <IN>;
+  foreach my $name(@names) {
+    chomp $name;
+    push (@seq_region_names, $name);
+  }
 }
 
 $slice_size = 100_000 unless $slice_size ;
