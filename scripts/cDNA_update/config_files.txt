@@ -43,8 +43,8 @@ use vars qw(%Config);
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',
   DEFAULT_RUNNER          => '',
   DEFAULT_RETRY_QUEUE     => 'long',
-  DEFAULT_RETRY_SUB_ARGS  => '',
-  DEFAULT_RETRY_RESOURCE  => '',
+  DEFAULT_RETRY_SUB_ARGS  => '-M4000000',
+  DEFAULT_RETRY_RESOURCE  => 'select[mem>4000] rusage[mem=4000]',
   DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl', # ONLY use 32bit perl for lsf -pre-exec jobs
   DEFAULT_LSF_PERL          =>'/usr/local/ensembl32/bin/perl', # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
   QUEUE_CONFIG => [
