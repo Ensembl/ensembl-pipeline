@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.56 2011-02-18 10:42:05 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.57 2011-05-05 10:27:38 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -232,7 +232,7 @@ my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
 my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
 my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
-my $LOAD_PROD        = $CVS_DIR . $LOAD_PROD_DB;
+my $LOAD_PROD           = $CVS_DIR . $LOAD_PROD_DB;
 my $GSS;
 
 if ( defined($GSS_PREFIX) ) {
@@ -299,6 +299,7 @@ my %configvars = (
                  "newfile"          => $newfile,
                  "config_file"      => $config_file,
                  "masked_genome"    => $genomelist,
+                 "queue"            => $QUEUE,
                  "newFeatureName"   => $newFeatureName );
 
 # Fasta chunk specifications:
@@ -776,6 +777,10 @@ sub config_setup {
             my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
             $content =~ s/--softmasktarget TRUE/$substitute/;
         }
+        if (   ( $filename =~ /BatchQueue/ )
+            && ( $rerun_flag == 1 ) ) {
+            $content =~ s/(queue\s+=>\s+')\w+/$1$QUEUE_OTHERS/;
+        }
 
         # Backup file if exists
         if ( -e $CVS_DIR . "/" . $header ) {
@@ -890,66 +895,81 @@ sub fastafiles {
 
     eval {
 
-        my $ls_cmd = "ls -n $SOURCE_DIR/$VERTRNA $SOURCE_DIR/$VERTRNA_UPDATE $REFSEQ_SOURCE/$REFSEQ";
-        open(READER, "$ls_cmd |") or die "Can't run '$ls_cmd'\n";
-        
 
-        while (<READER>) {
-            @filestamp = split( " ", $_ );
-            my @path = split "/", $filestamp[7];
-            my $file = $path[scalar(@path)-1];
-            print "FILE: ".$file."\n";
-            my $stampA = join( "-", @filestamp[ 5 .. 6 ] );
-            $stampA = $stampA."-".$file;
-            $cmd = "ls -n " . $DATA_DIR."/".$file;
-            print "cmd: ".$cmd."\n";
-            @filestamp = split( " ", `$cmd` );
-            next if ($? != 0);
-            my @pathB = split "/", $filestamp[7];
-            my $fileB = $pathB[scalar(@pathB)-1];
-            my $stampB = join( "-", @filestamp[ 5 .. 6 ] );
-            $stampB = $stampB."-".$fileB;
+#        my $ls_cmd = "ls -n $SOURCE_DIR/$VERTRNA $SOURCE_DIR/$VERTRNA_UPDATE $REFSEQ_SOURCE/$REFSEQ";
+#        open(READER, "$ls_cmd |") or die "Can't run '$ls_cmd'\n";
+#        
+#
+#        while (<READER>) {
+#            @filestamp = split( " ", $_ );
+#            my @path = split "/", $filestamp[7];
+#            my $file = $path[scalar(@path)-1];
+#            print "FILE: ".$file."\n";
+#            my $stampA = join( "-", @filestamp[ 5 .. 6 ] );
+#            $stampA = $stampA."-".$file;
+#            $cmd = "ls -n " . $DATA_DIR."/".$file;
+#            print "cmd: ".$cmd."\n";
+#            @filestamp = split( " ", `$cmd` );
+#            next if ($? != 0);
+#            my @pathB = split "/", $filestamp[7];
+#            my $fileB = $pathB[scalar(@pathB)-1];
+#            my $stampB = join( "-", @filestamp[ 5 .. 6 ] );
+#            $stampB = $stampB."-".$fileB;
+#
+#            print "A: ".$stampA." B: ".$stampB."\n";
+#            print "7: ". $filestamp[7]."\n";
+#  
+#            if ( $stampA eq $stampB ) {
+#                # No changes...
+#                if ( $file eq $VERTRNA ) {
+#                    $vertrna_ver = 0;
+#                } elsif ( $file eq $VERTRNA_UPDATE ) {
+#                    $vertrna_upd_ver = 0;
+#                } elsif ( $file eq $REFSEQ ) {
+#                    $refseq_ver = 0;
+#                }
+#            }
+#        } ## end while (<READER>)
+#        close(READER);
+#
+#        # Copy files
+#        if ($vertrna_ver) {
+#            $cmd = "scp -p "
+#                . $SOURCE_DIR . "/" . $VERTRNA . " "
+#                . $DATA_DIR   . "/" . $VERTRNA;
+#
+#            print $cmd, "\n";
+#
+#            $status += system($cmd);
+#        }
+#        if ($vertrna_upd_ver) {
+#            $cmd = "scp -p "
+#                . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
+#                . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
+#
+#            print $cmd, "\n";
+#            $status += system($cmd);
+#        }
+#        if ($refseq_ver) {
+#            $cmd = "scp -p "
+#                . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
+#                . $DATA_DIR   . "/" . $REFSEQ;
+#
+#            print $cmd, "\n";
+#            $status += system($cmd);
+#        }
 
-            print "A: ".$stampA." B: ".$stampB."\n";
-            print "7: ". $filestamp[7]."\n";
-  
-            if ( $stampA eq $stampB ) {
-                # No changes...
-                if ( $file eq $VERTRNA ) {
-                    $vertrna_ver = 0;
-                } elsif ( $file eq $VERTRNA_UPDATE ) {
-                    $vertrna_upd_ver = 0;
-                } elsif ( $file eq $REFSEQ ) {
-                    $refseq_ver = 0;
-                }
+        for my $pfile ($SOURCE_DIR.'/'.$VERTRNA, $SOURCE_DIR.'/'.$VERTRNA_UPDATE, $REFSEQ_SOURCE.'/'.$REFSEQ) {
+            my @pstamp = stat $pfile;
+            my ($file) = $pfile =~ /([^\/]*)$/;
+            if (-e $DATA_DIR.'/'.$file) {
+                my @stamp = stat $DATA_DIR.'/'.$file;
+                next unless ($pstamp[9] > $stamp[9]);
             }
-        } ## end while (<READER>)
-        close(READER);
-
-        # Copy files
-        if ($vertrna_ver) {
-            $cmd = "scp -p "
-                . $SOURCE_DIR . "/" . $VERTRNA . " "
-                . $DATA_DIR   . "/" . $VERTRNA;
+            $cmd = 'scp -p '.$pfile.' '.$DATA_DIR.'/'. $file;
 
             print $cmd, "\n";
 
-            $status += system($cmd);
-        }
-        if ($vertrna_upd_ver) {
-            $cmd = "scp -p "
-                . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
-                . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
-
-            print $cmd, "\n";
-            $status += system($cmd);
-        }
-        if ($refseq_ver) {
-            $cmd = "scp -p "
-                . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
-                . $DATA_DIR   . "/" . $REFSEQ;
-
-            print $cmd, "\n";
             $status += system($cmd);
         }
         if ($status) { croak("Error while copying files.\n"); }

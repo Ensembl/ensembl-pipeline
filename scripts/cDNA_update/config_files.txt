@@ -50,14 +50,14 @@ use vars qw(%Config);
   QUEUE_CONFIG => [
     {  logic_name => '<newFeatureName>',
        batch_size => 1,
-       resource   => 'select[linux && mem>2000] rusage[mem=2000]',
+       resource   => '',
        #'model=IBMBC2800',
        # or 'select[mem>2000] rusage[mem=2000]'
        # to limit mysql 'select[linux && myia64g<800] rusage[myia64g=10:duration=20:decay=1]
        retries         => 1,
        sub_args        => '',
        runner          => '',
-       queue           => 'normal',
+       queue           => '<queue>',
        output_dir      => '<outDIR>',
        cleanup         => 'no',
        runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB', }

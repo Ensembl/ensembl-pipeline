@@ -58,6 +58,9 @@ use vars qw(%Config);
         PROGRAM_FILE    => "/usr/local/ensembl/bin/exonerate-0.9.0",  #path to exonerate
         MODULE_NAME     => "Exonerate2Genes",
 
+        QUEUE  => 'small',
+        QUEUE_OTHERS => 'normal',
+
         # Source data files details
         SOURCE_DIR  => '/data/blastdb/Supported',#formerly /data/blastdb                                             
         REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',#formerly /data/blastdb/refseqdna
