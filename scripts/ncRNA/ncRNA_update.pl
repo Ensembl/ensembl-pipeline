@@ -303,7 +303,7 @@ sub DB_setup{
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < "."$CVSDIR/ensembl-pipeline/sql/flag.sql");
     print ".";;
     #copy defined db tables from current build
-    my $cmd = "mysqldump -u$WRITEUSER -p$pass -h$REFDBHOST -P$REFDBPORT -t $REFDBNAME".
+    my $cmd = "mysqldump --add-drop-table -u$WRITEUSER -p$pass -h$REFDBHOST -P$REFDBPORT $REFDBNAME ".
       " assembly attrib_type coord_system meta meta_coord".
       " assembly_exception seq_region seq_region_attrib ".
       " unmapped_reason external_db " .
