@@ -203,7 +203,8 @@ sub fetch_mm_data {
 
 	if($dbname eq $uniprot_archive){
 		my $param = $self->get_param_from_connections($uniprot_archive);
-		$dsn_mole = "DBI:mysql:host=".$param->{'host'}.":port=".$param->{'port'}.":".$uniprot_archive;
+		$dsn_mole = "DBI:mysql:host=".$param->{'host'}.$param->{'poss_nodes'}
+                            .":port=".$param->{'port'}.":".$uniprot_archive;
 		$dbh = DBI->connect( $dsn_mole, $param->{'username'}, '',{ 'RaiseError' => 1 } );
 	} else {
 		$dsn_mole = "DBI:mysql:host=".$self->mm_host.":port=".$self->mm_port.":".$dbname;
@@ -268,7 +269,7 @@ sub fetch_mm_data {
 
 sub get_param_from_connections {
 	my ($self,$dbname) = @_;
-	my $query = "SELECT host,port,username
+	my $query = "SELECT host,port,username,poss_nodes
 				FROM connections
 				WHERE is_active = 'yes'
 				AND db_name LIKE '$dbname'
