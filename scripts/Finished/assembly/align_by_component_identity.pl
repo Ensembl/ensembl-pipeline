@@ -557,18 +557,51 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         R_count => 0,
         A_name  => $A_chr
     };
-    foreach ( sort { $a->{R_start} <=> $b->{R_start} } @{ $match->{$R_chr} || [] }, $last ) {
+
+  DIR_ALIGN_BLOCK: foreach ( sort { $a->{R_start} <=> $b->{R_start} } @{ $match->{$R_chr} || [] }, $last ) {
+
         $a_start = $_->{A_start};
         $a_end   = $_->{A_end};
         $r_start = $_->{R_start};
         $r_end   = $_->{R_end};
         $a_chr   = $_->{A_name};
 
-        my ($chr_r_start, $chr_r_end) = $sr_end+1 < $r_start-1 ?
-            ($sr_end+1, $r_start-1) :
-            ($r_start-1, $sr_end+1);
+        my $ref_abutt = ( ($r_start - $sr_end) == 1 );
+        my $alt_abutt = ( ($a_start - $sa_end) == 1 );
+
+        if ( $ref_abutt and $alt_abutt ) {
+            $support->log( "Both ref and alt blocks abutt, skipping (ref $sr_end - $r_start)\n", 1);
+            next DIR_ALIGN_BLOCK;
+        }
+
+        if ( ($r_start - $sr_end) < 1 ) {
+            $support->log_warning( "We shouldn't be going backwards!\n" );
+            next DIR_ALIGN_BLOCK;
+        }
+
+        my ($chr_r_start, $chr_r_end) = ($sr_end+1, $r_start-1);
+
+        if ( $ref_abutt ) {
+            # Ref blocks abutting, so ignore ? or find another way to sort something to align against?
+            # Certainly just lastz'ing against an empty block ain't gonna help.
+            $support->log_warning("Skipping zero-length ref gap for ref: $chr_r_start - $chr_r_end\n");
+            next DIR_ALIGN_BLOCK;
+        }
+
+        if ( $alt_abutt ) {
+            # Alt blocks abutting, so ignore ? or find another way to sort something to align against?
+            # Certainly just lastz'ing against an empty block ain't gonna help.
+            $support->log_warning("Skipping zero-length alt gap for ref: $chr_r_start - $chr_r_end\n");
+            next DIR_ALIGN_BLOCK;
+        }
+
+        if ( ($a_start - $sa_end) < 1 ) {
+            $support->log_warning("Negative alt gap for ref: $chr_r_start - $chr_r_end\n");
+        }
+
         $ref_seq = $R_sa->fetch_by_region( 'chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
         $ref_count = $ref_seq =~ s/([atgc])/$1/ig;
+
         my ($chr_a_start, $chr_a_end) =    $sa_end+1 < $a_start-1 ?
             ($sa_end+1, $a_start-1) :
             ($a_start-1, $sa_end+1);
@@ -590,6 +623,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 A_name  => $a_chr,       # 6
             };
         }
+
+    } continue { # DIR_ALIGN_BLOCK
 
         $sa_start = $_->{A_start};
         $sa_end   = $_->{A_end};
