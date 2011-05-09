@@ -546,8 +546,11 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
     # loop through the directly aligned blocks and fill in the non-aligned block hash
     # sort the match blocks by ref chromosome start
-    my ( $r_start, $r_end, $a_start, $a_end, $a_chr, $ref_seq, $ref_count, $alt_seq, $alt_count );
+
+    # start/end coords of previous match
     my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
+
+    # dummy match at end of chromosome
     my $last = { 
         A_start => $A_length + 1,
         A_end   => 0,
@@ -560,11 +563,11 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
   DIR_ALIGN_BLOCK: foreach ( sort { $a->{R_start} <=> $b->{R_start} } @{ $match->{$R_chr} || [] }, $last ) {
 
-        $a_start = $_->{A_start};
-        $a_end   = $_->{A_end};
-        $r_start = $_->{R_start};
-        $r_end   = $_->{R_end};
-        $a_chr   = $_->{A_name};
+        my $a_start = $_->{A_start};
+        my $a_end   = $_->{A_end}; # not used
+        my $r_start = $_->{R_start};
+        my $r_end   = $_->{R_end}; # not used
+        my $a_chr   = $_->{A_name};
 
         my $ref_abutt = ( ($r_start - $sr_end) == 1 );
         my $alt_abutt = ( ($a_start - $sa_end) == 1 );
@@ -599,18 +602,17 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             $support->log_warning("Negative alt gap for ref: $chr_r_start - $chr_r_end\n");
         }
 
-        $ref_seq = $R_sa->fetch_by_region( 'chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
-        $ref_count = $ref_seq =~ s/([atgc])/$1/ig;
+        my $ref_seq = $R_sa->fetch_by_region('chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
+        my $ref_count = $ref_seq =~ s/([atgc])/$1/ig;
 
         my ($chr_a_start, $chr_a_end) =    $sa_end+1 < $a_start-1 ?
             ($sa_end+1, $a_start-1) :
             ($a_start-1, $sa_end+1);
-        $alt_seq = $A_sa->fetch_by_region( 'chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
-        $alt_count = $alt_seq =~ s/([atgc])/$1/ig;
 
-        # Don't run lastz on large non-align blocks > (1.1Mbp)
-        if (    ( $ref_count && $alt_count ))
-            #&& ( $ref_count < 1100000 && $alt_count < 1100000 ) )
+        my $alt_seq = $A_sa->fetch_by_region('chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
+        my $alt_count = $alt_seq =~ s/([atgc])/$1/ig;
+
+        if ( $ref_count && $alt_count )
         {
             push @{ $nomatch->{$R_chr} },
             {
