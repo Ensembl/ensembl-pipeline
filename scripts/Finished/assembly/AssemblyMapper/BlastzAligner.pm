@@ -171,6 +171,7 @@ sub remove_tempdir {
   Arg[3]      : String $basename1 - basename of single sequence file
   Arg[4]      : (optional) String $basename2 - basename of multiple sequence
                 file
+  Arg[5]      : (optional) Arrayref $masks - array ref of coord pairs to hard-mask in sequence
   Example     : $aligner->write_sequence($slice, 'NCBI35', 'e_seq.1');
   Description : Writes a slice's sequence to a fasta file and converts it to nib
                 format. Optionally appends the sequence to another
@@ -182,14 +183,22 @@ sub remove_tempdir {
 =cut
 
 sub write_sequence {
-    my ($self, $slice, $assembly, $basename1, $basename2) = @_;
+    my ($self, $slice, $assembly, $basename1, $basename2, $masks) = @_;
+
+    if ($basename2 and $masks) {
+        $self->support->log_error('$basename2 and $masks together is not supported\n');
+    }
 
     my $tmpdir = $self->tempdir;
 
+    my $seq = $slice->get_repeatmasked_seq($ANALYSIS_REPEAT_MASKING, 1)->seq;
+    if ($masks) {
+        $seq = $self->apply_masks($slice, $seq, $masks);
+    }
     unless (-e "$tmpdir/$basename1.fa") {
       my $fh = $self->support->filehandle('>', "$tmpdir/$basename1.fa");
 	  print $fh ">$basename1\n";
-      print $fh $slice->get_repeatmasked_seq($ANALYSIS_REPEAT_MASKING, 1)->seq, "\n";
+      print $fh $seq, "\n";
       close($fh);
     }
 
@@ -857,6 +866,42 @@ sub _by_chr_num {
             return $awords[1] cmp $bwords[1];
         }
     }
+}
+
+=head2 apply_masks
+=cut
+
+sub apply_masks {
+    my ($self, $slice, $seq, $masks) = @_;
+    foreach my $mask (@$masks) {
+        $self->apply_mask_inplace($slice, \$seq, $mask);
+    }
+    return $seq;
+}
+
+=head2 apply_mask_inplace
+=cut
+
+sub apply_mask_inplace {
+    my ($self, $slice, $seq_ref, $mask) = @_;
+
+    my $m_start = $mask->{mask_start};
+    my $m_end   = $mask->{mask_end};
+    my $s_start = $slice->start;
+    my $s_end   = $slice->end;
+
+    if ($m_start < $s_start or $m_end > $s_end) {
+        $self->support->log_error("Mask [$m_start:$m_end] out of range of slice [$s_start:$s_end]\n");
+    }
+
+    my $m_len = $m_end - $m_start + 1;
+    my $rel_start = $m_start - $s_start;
+
+    my $pad = 'N' x $m_len;
+
+    substr($$seq_ref, $rel_start, $m_len) = $pad;
+
+    return $$seq_ref;
 }
 
 =head2 AUTOLOAD

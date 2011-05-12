@@ -187,6 +187,10 @@ $support->confirm_params;
 # get log filehandle and print heading and parameters to logfile
 $support->init_log;
 
+if ($multiple) {
+    $support->log_error("--multiple mode disabled for now following May 2011 rewrite\n");
+}
+
 $support->check_required_params( 'assembly', 'altassembly' );
 
 # first set connection parameters for alternative db
@@ -214,7 +218,7 @@ my $A_end = $support->param('alt_end') || undef;
 
 
 #####
-# create temporary table for storing non-aligned blocks
+# create temporary tables for storing non-aligned blocks and their masks
 #
 if ($write_db) {
     $R_dbh->do(
@@ -235,10 +239,29 @@ if ($write_db) {
 
     # clear tmp_align table of entries from previous runs
     $R_dbh->do(qq(DELETE FROM tmp_align));
+
+    $R_dbh->do(
+        qq(
+        CREATE TABLE IF NOT EXISTS tmp_mask (
+          tmp_mask_id int(10) unsigned NOT NULL auto_increment,
+          tmp_align_id int(10) unsigned NOT NULL,
+          alt_mask_start int(10) UNSIGNED,
+          alt_mask_end int(10) UNSIGNED,
+          ref_mask_start int(10) UNSIGNED,
+          ref_mask_end int(10) UNSIGNED,
+
+          PRIMARY KEY (tmp_mask_id),
+          KEY tmp_align_idx (tmp_align_id)
+          ) ENGINE=InnoDB;
+  )
+	);
+
+    # clear tmp_mask table of entries from previous runs
+    $R_dbh->do(qq(DELETE FROM tmp_mask));
 }
 else {
     $support->log(
-        "\nHere I would create and empty 'tmp_align' table, if you'd let me\n",
+        "\nHere I would create and empty 'tmp_align' and 'tmp_mask' tables, if you'd let me\n",
         1
 	);
 }
@@ -265,9 +288,9 @@ my $fmt1 = "%-40s%10.0f\n";
 my $fmt2 = "%-40s%9.2f%%\n";
 my $fmt3 = "%-12s%-12s%-15s%-12s%-12s%-12s\n";
 my $fmt33 = "%-12s%-12s%-15s%-12s%-12s%-15s%-12s\n";
-my $fmt4 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f\n";
-my $fmt_rmask = "                                      %10.0f  %10.0f mask\n";
-my $fmt_amask = "  %10.0f  %10.0f mask\n";
+my $fmt4 = " %10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f\n";
+my $fmt_rmask = "                                    [%10.0f  %10.0f mask ]\n";
+my $fmt_amask = "[%10.0f  %10.0f mask ]\n";
 my $fmt44 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f %7.0f\n";
 my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
@@ -283,6 +306,14 @@ my $sth1 = $R_dbh->prepare(
 my $sth2 = $R_dbh->prepare(
     qq{
   INSERT INTO tmp_align values(NULL, ?, ?, ?, ?, ?, ?)
+}
+    );
+
+my $sth_mask = $R_dbh->prepare(
+    qq{
+  INSERT INTO tmp_mask 
+      (tmp_align_id, alt_mask_start, alt_mask_end, ref_mask_start, ref_mask_end)
+      values (?, ?, ?, ?, ?)
 }
     );
 
@@ -516,10 +547,47 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
   } # DIFF
 
+    # coalesce directly aligned blocks to improve handling (below) of
+    # out-of-sequence alt blocks, sequence gaps, and zero-length gaps on one side
+
+    my $number_aligned_blocks = scalar( @{ $match->{$R_chr} || [] } );
+    $support->log("\nFound $number_aligned_blocks directly aligned blocks before coalescing\n", 1);
+
+    my $current = $match->{$R_chr}->[0];
+    if ($current) {
+        my $c = 1;
+
+      COALESCE: while (my $next_block = $match->{$R_chr}->[$c]) {
+
+            my $ref_abutt = ( ($next_block->{R_start} - $current->{R_end}) == 1 );
+            my $alt_abutt = ( ($next_block->{A_start} - $current->{A_end}) == 1 );
+            my $same_ori  = ( ($next_block->{ori} * $current->{ori}) > 0 );
+
+            if ($ref_abutt and $alt_abutt and $same_ori) {
+
+                my $c_block = get_block_loc_str($current);
+                my $n_block = get_block_loc_str($next_block);
+                $support->log( "Merging adjacent blocks: $c_block : $n_block\n", 2);
+
+                $current->{A_end} = $next_block->{A_end};
+                $current->{R_end} = $next_block->{R_end};
+                $current->{A_count} += $next_block->{A_count};
+                $current->{R_count} += $next_block->{R_count};
+
+                splice @{$match->{$R_chr}}, $c, 1; # drop $next_block from match array
+                                                   # $c will now point at new $next_block
+                next COALESCE;
+            }
+
+            $current = $next_block;
+            $c++;
+        }
+    }
+
     my $c;
 
     # store directly aligned blocks in assembly table
-    my $number_aligned_blocks = scalar( @{ $match->{$R_chr} || [] } );
+    $number_aligned_blocks = scalar( @{ $match->{$R_chr} || [] } );
     if ($write_db) {
 
         $support->log(
@@ -560,10 +628,10 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     # dummy match at end of chromosome
     my $last = { 
         A_start => $A_length + 1,
-        A_end   => 0,
+        A_end   => $A_length + 1,
         A_count => 0,
         R_start => $R_length + 1,
-        R_end   => 0,
+        R_end   => $R_length + 1,
         R_count => 0,
         A_name  => $A_chr
     };
@@ -581,6 +649,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     my @alt_masks = ();
 
     my ($match_by_ref, $match_by_alt); # declare here or redo won't work as anticipated
+
   DIR_ALIGN_BLOCK: while ( $match_by_ref = shift @matches_by_ref, $match_by_alt = shift @matches_by_alt ) {
 
         unless ($match_by_ref and $match_by_alt) {
@@ -589,9 +658,6 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             $what = 'alt' unless $match_by_alt;
             die "Oops, reached the end and ran out of $what blocks";
         }
-
-        my $gap = get_gap_loc_str($prev_match, $match_by_ref);
-        my $a_block = get_block_loc_str($match_by_alt);
 
         my $a_start = $match_by_ref->{A_start};
         my $r_start = $match_by_ref->{R_start};
@@ -608,6 +674,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             next DIR_ALIGN_BLOCK;
         }
 
+        my $gap = get_gap_loc_str($prev_match, $match_by_ref);
+        my $a_block = get_block_loc_str($match_by_alt);
+
         # Short-cut pointer comparison: both elements come from same source array, @aug_match_list.
         my $in_step = ($match_by_ref == $match_by_alt);
         unless ($in_step) {
@@ -615,28 +684,30 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             my $alt_a_start = $match_by_alt->{A_start};
             if ($alt_a_start < $a_start) {
 
-                $support->log("There's an extra alt match block in this gap\n" .
-                              "  gap: $gap\n  alt: $a_block\n");
+                $support->log("There's an extra alt match block in this gap\n", 1);
+                $support->log("  gap: $gap\n", 1);
+                $support->log("  alt: $a_block\n", 1);
 
                 # Alt block from a later match occurs in this gap, so:
 
                 # - queue the intruding alt block for masking and move onto the next
-                push @alt_masks, $match_by_alt;
+                push @alt_masks, $match_by_alt unless $match_by_alt == $last;
                 $match_by_alt = shift @matches_by_alt;
                 
                 # - restart comparison to use the new alt block, and in case there's another alt insert
-                redo DIR_ALIGN_BLOCK;
+                redo DIR_ALIGN_BLOCK if $match_by_alt;
 
             } else {
 
-                $support->log("There's an extra ref match block, extending gap\n" .
-                              "  gap: $gap\n  alt: $a_block\n");
+                $support->log("There's an extra ref match block, extending gap\n", 1);
+                $support->log("  gap: $gap\n", 1);
+                $support->log("  alt: $a_block\n", 1);
 
                 # Alt block from this match occured earlier, thus this ref block is an 'extra'
                 # ocurring in the gap between alt blocks, so:
 
                 # - queue the intruding ref block for masking and move onto the next
-                push @ref_masks, $match_by_ref;
+                push @ref_masks, $match_by_ref unless $match_by_ref == $last;
                 $match_by_ref = shift @matches_by_ref;
 
                 # - restart comparision to use the new ref block, and in case there's another ref insert
@@ -653,24 +724,28 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         my ($chr_r_start, $chr_r_end) = ($sr_end+1, $r_start-1);
 
-        if ( $ref_abutt ) {
-            # Ref blocks abutting, so ignore ? or find another way to sort something to align against?
-            # Certainly just lastz'ing against an empty block ain't gonna help.
-            $support->log_warning("Skipping zero-length ref gap for ref: $chr_r_start - $chr_r_end\n");
-            next DIR_ALIGN_BLOCK;
-        }
+        # We filter out the null case where both abutt above.
+        if ( $ref_abutt or $alt_abutt ) {
 
-        if ( $alt_abutt ) {
-            # Alt blocks abutting, so ignore ? or find another way to sort something to align against?
-            # Certainly just lastz'ing against an empty block ain't gonna help.
-            $support->log_warning("Skipping zero-length alt gap for ref: $chr_r_start - $chr_r_end\n");
-            next DIR_ALIGN_BLOCK;
+            $support->log("Zero-length ref gap (ref:$chr_r_start-$chr_r_end\n", 1) if $ref_abutt;
+            $support->log("Zero-length alt gap (ref:$chr_r_start-$chr_r_end\n", 1) if $alt_abutt;
+
+            # We put both ref and alt blocks onto the mask lists and extend the gap to the next one
+            push @alt_masks, $match_by_alt unless $match_by_alt == $last;
+            push @ref_masks, $match_by_ref unless $match_by_ref == $last;
+
+            $match_by_alt = shift @matches_by_alt;
+            $match_by_ref = shift @matches_by_ref;
+
+            redo DIR_ALIGN_BLOCK if ($match_by_alt and $match_by_ref);
         }
 
         if ( ($a_start - $sa_end) < 1 ) {
             # This should never get hit now
             $support->log_warning("Negative alt gap for ref: $chr_r_start - $chr_r_end\n");
         }
+
+        # We should apply masks before seeing if there's sequence...
 
         my $ref_seq = $R_sa->fetch_by_region('chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
         my $ref_count = $ref_seq =~ s/([atgc])/$1/ig;
@@ -682,8 +757,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         my $alt_seq = $A_sa->fetch_by_region('chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
         my $alt_count = $alt_seq =~ s/([atgc])/$1/ig;
 
-        if ( $ref_count && $alt_count )
-        {
+        if ( $ref_count and $alt_count ) {
+
+            # We have a pair of unmatched blocks, both of which have sequence. Save them!
             push @{ $nomatch->{$R_chr} },
             {
                 A_start => $chr_a_start, # 0
@@ -696,9 +772,25 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 A_masks => [ @alt_masks ],
                 R_masks => [ @ref_masks ],
             };
+
+        } elsif ( $ref_count or $alt_count ) {
+
+            $support->log("Unmatched block: gap in ref (ref: $gap)\n", 1) unless $ref_count;
+            $support->log("Unmatched block: gap in alt (ref: $gap)\n", 1) unless $alt_count;
+
+            # We add masks, and extend the unmatched block to the next one
+            push @alt_masks, $match_by_alt unless $match_by_alt == $last;
+            push @ref_masks, $match_by_ref unless $match_by_ref == $last;
+
+            $match_by_alt = shift @matches_by_alt;
+            $match_by_ref = shift @matches_by_ref;
+
+            redo DIR_ALIGN_BLOCK if ($match_by_alt and $match_by_ref);
+
+            $support->log_warning("Reached end of list with gap on one side of unmatched block\n");
+
         } else {
-            $support->log("Skipping unmatched block: gap in ref (ref: $gap)\n", 1) unless $ref_count;
-            $support->log("Skipping unmatched block: gap in alt (ref: $gap)\n", 1) unless $alt_count;
+            $support->log("Skipping unmatched block: gaps in both ref and alt (ref: $gap)\n", 1);
         }
 
     } continue { # DIR_ALIGN_BLOCK
@@ -710,6 +802,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         @ref_masks = ();
         @alt_masks = ();
     }
+
+    die "Oops, reached the end and still had ref blocks" if @matches_by_ref;
+    die "Oops, reached the end and still had alt blocks" if @matches_by_alt;
 
     # filter single assembly inserts from non-aligned blocks (i.e. cases where
     # a block has components only in one assembly, not in the other) - there is
@@ -726,29 +821,52 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         if ( $nomatch->{$R_chr} ) {
 
-            $support->log( "Storing non-aligned blocks in tmp_align table...\n",
+            $support->log( "Storing non-aligned blocks & masks in tmp_align & tmp_mask tables...\n",
                            1 );
 
+            my $n_masks = 0;
+
             foreach $c ( 0 .. $number_nonaligned_blocks - 1 ) {
+
+                my $block = $nomatch->{$R_chr}->[$c];
+
                 $sth2->execute(
-                    $nomatch->{$R_chr}->[$c]->{A_name},
-                    $nomatch->{$R_chr}->[$c]->{A_start},
-                    $nomatch->{$R_chr}->[$c]->{A_end},
+                    $block->{A_name},
+                    $block->{A_start},
+                    $block->{A_end},
                     $R_chr,
-                    $nomatch->{$R_chr}->[$c]->{R_start},
-                    $nomatch->{$R_chr}->[$c]->{R_end},
+                    $block->{R_start},
+                    $block->{R_end},
                     );
+
+                my $tmp_align_id = $sth2->{mysql_insertid}; # retrieve auto-incr insert id
+
+                foreach my $mask ( @{$block->{A_masks}} )
+                {
+                    $sth_mask->execute($tmp_align_id, $mask->{A_start}, $mask->{A_end}, undef, undef);
+                    $n_masks++;
+                }
+
+                foreach my $mask ( @{$block->{R_masks}} )
+                {
+                    $sth_mask->execute($tmp_align_id, undef, undef, $mask->{R_start}, $mask->{R_end});
+                    $n_masks++;
+                }
             }
 
-            $support->log(
-                "Done inserting $number_nonaligned_blocks entries.\n", 1 );
+            $support->log( "Done inserting $number_nonaligned_blocks tmp_align entries,\n", 1 );
+            $support->log( " and $n_masks tmp_mask entries.\n", 1 );
         }
     }
     else {
-        $support->log(
-            "\nHere I would insert $number_nonaligned_blocks rows into 'tmp_align' table, if you'd let me\n",
-            1
-            );
+        my $n_masks = 0;
+        foreach my $block ( @{ $nomatch->{$R_chr} || [] } ) {
+            map { $n_masks++ } @{$block->{A_masks}};
+            map { $n_masks++ } @{$block->{R_masks}};
+        }
+        $support->log( "\n" );
+        $support->log( "Here I would insert $number_nonaligned_blocks rows into 'tmp_align' table,\n", 1 );
+        $support->log( "and $n_masks rows into 'tmp_mask' table, if you'd let me\n", 1 );
     }
 
     # stats for this chromosome

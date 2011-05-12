@@ -162,7 +162,7 @@ $support->check_required_params(
 #####
 # connect to database and get adaptors
 #
-my ($dba, $dbh, $sql, $sth);
+my ($dba, $dbh, $block_sql, $block_sth);
 
 # first set connection parameters for alternative db
 # both databases have to be on the same host, so we don't need to configure
@@ -206,7 +206,7 @@ if(! scalar(@A_chr_list) ) {
 }
 
 
-$sql = qq(SELECT * FROM tmp_align);
+$block_sql = qq(SELECT * FROM tmp_align);
 my @where = ();
 if(@R_chr_list) {
   my $chr_string = join("', '", @R_chr_list);
@@ -217,13 +217,24 @@ if(@A_chr_list) {
   push @where, "alt_seq_region_name IN ('$altchr_string')";
 }
 if(scalar(@where)) {
-    $sql .= ' WHERE '.join(' AND ', @where);
+    $block_sql .= ' WHERE '.join(' AND ', @where);
 }
 
-$sth = $R_dbh->prepare($sql);
-$sth->execute;
+$block_sth = $R_dbh->prepare($block_sql);
+$block_sth->execute;
 
-BLOCK: while (my $row = $sth->fetchrow_hashref) {
+# Pre-prepare per-block mask queries
+my $ref_mask_sql = qq(SELECT ref_mask_start AS mask_start, ref_mask_end AS mask_end
+                        FROM tmp_mask 
+                       WHERE tmp_align_id = ? AND ref_mask_start IS NOT NULL);
+my $ref_mask_sth = $R_dbh->prepare($ref_mask_sql);
+
+my $alt_mask_sql = qq(SELECT alt_mask_start AS mask_start, alt_mask_end AS mask_end
+                        FROM tmp_mask 
+                       WHERE tmp_align_id = ? AND alt_mask_start IS NOT NULL);
+my $alt_mask_sth = $R_dbh->prepare($alt_mask_sql);
+
+BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
 
   my $id = $row->{'tmp_align_id'};
   
@@ -238,7 +249,18 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
   $aligner->seq_region_name($row->{'ref_seq_region_name'});
 
   $support->log_stamped("Block with tmp_align_id = $id\n", 1);
-  
+
+  $ref_mask_sth->execute($id);
+  my $ref_masks = $ref_mask_sth->fetchall_arrayref({}); # get array of hashrefs
+  my $n_ref_masks = scalar(@$ref_masks);
+
+  $alt_mask_sth->execute($id);
+  my $alt_masks = $alt_mask_sth->fetchall_arrayref({}); # get array of hashrefs
+  my $n_alt_masks = scalar(@$alt_masks);
+
+  $support->log("Fetched $n_ref_masks ref masks for this block\n", 2);
+  $support->log("Fetched $n_alt_masks alt masks for this block\n", 2);
+
    # write sequences to file
   my $A_basename = "alt_seq.$id";
   my $R_basename = "ref_seq.$id";
@@ -269,13 +291,13 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
       1,
       $support->param('assembly'),
    ) unless $R_slice;
-
- 
   
   $aligner->write_sequence(
       $R_slice,
       $support->param('assembly'),
-      $R_basename
+      $R_basename,
+      undef,
+      $ref_masks,
   );
   
   ($A_pipe_dba ? $A_pipe_dba : $A_dba)->get_AssemblyMapperAdaptor()->delete_cache();
@@ -306,7 +328,9 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
    $aligner->write_sequence(
       $A_slice,
       $support->param('altassembly'),
-      $A_basename
+      $A_basename,
+      undef,
+      $alt_masks,
   );
    
    
@@ -376,7 +400,7 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
 $support->log_stamped("Done.\n\n");
 
 # remind to drop tmp_align
-$support->log("\nDon't forget to drop the tmp_align table when all is done!\n\n");
+$support->log("\nDon't forget to drop the tmp_align & tmp_mask tables when all is done!\n\n");
 
 # finish logfile
 $support->finish_log;
