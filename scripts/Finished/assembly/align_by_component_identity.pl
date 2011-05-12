@@ -266,6 +266,8 @@ my $fmt2 = "%-40s%9.2f%%\n";
 my $fmt3 = "%-12s%-12s%-15s%-12s%-12s%-12s\n";
 my $fmt33 = "%-12s%-12s%-15s%-12s%-12s%-15s%-12s\n";
 my $fmt4 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f\n";
+my $fmt_rmask = "                                      %10.0f  %10.0f mask\n";
+my $fmt_amask = "  %10.0f  %10.0f mask\n";
 my $fmt44 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f %7.0f\n";
 my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
@@ -547,8 +549,13 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     # loop through the directly aligned blocks and fill in the non-aligned block hash
     # sort the match blocks by ref chromosome start
 
-    # start/end coords of previous match
-    my ( $sr_start, $sr_end, $sa_start, $sa_end ) = ( 0, 0, 0, 0 );
+    # start/end coords of previous match, start with dummy zero
+    my $prev_match = {
+        A_start => 0,
+        A_end   => 0,
+        R_start => 0,
+        R_end   => 0,
+    };
 
     # dummy match at end of chromosome
     my $last = { 
@@ -561,23 +568,85 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         A_name  => $A_chr
     };
 
-  DIR_ALIGN_BLOCK: foreach ( sort { $a->{R_start} <=> $b->{R_start} } @{ $match->{$R_chr} || [] }, $last ) {
+    my @aug_match_list;
+    @aug_match_list = @{ $match->{$R_chr} } if $match->{$R_chr};
+    push @aug_match_list, $last;
 
-        my $a_start = $_->{A_start};
-        my $a_end   = $_->{A_end}; # not used
-        my $r_start = $_->{R_start};
-        my $r_end   = $_->{R_end}; # not used
-        my $a_chr   = $_->{A_name};
+    # copies of augmented match list, sorted by ref start and alt start respectively.
+    my @matches_by_ref = sort { $a->{R_start} <=> $b->{R_start} } @aug_match_list;
+    my @matches_by_alt = sort { $a->{A_start} <=> $b->{A_start} } @aug_match_list;
+
+    # these cannot be initialised in-loop as we may wish to restart a block without clearing mask lists.
+    my @ref_masks = ();
+    my @alt_masks = ();
+
+    my ($match_by_ref, $match_by_alt); # declare here or redo won't work as anticipated
+  DIR_ALIGN_BLOCK: while ( $match_by_ref = shift @matches_by_ref, $match_by_alt = shift @matches_by_alt ) {
+
+        unless ($match_by_ref and $match_by_alt) {
+            my $what;
+            $what = 'ref' unless $match_by_ref;
+            $what = 'alt' unless $match_by_alt;
+            die "Oops, reached the end and ran out of $what blocks";
+        }
+
+        my $gap = get_gap_loc_str($prev_match, $match_by_ref);
+        my $a_block = get_block_loc_str($match_by_alt);
+
+        my $a_start = $match_by_ref->{A_start};
+        my $r_start = $match_by_ref->{R_start};
+        my $a_chr   = $match_by_ref->{A_name}; # NB not the same as $A_chr !!
+
+        my $sa_end  = $prev_match->{A_end};
+        my $sr_end  = $prev_match->{R_end};
 
         my $ref_abutt = ( ($r_start - $sr_end) == 1 );
         my $alt_abutt = ( ($a_start - $sa_end) == 1 );
 
         if ( $ref_abutt and $alt_abutt ) {
-            $support->log( "Both ref and alt blocks abutt, skipping (ref $sr_end - $r_start)\n", 1);
+            $support->log( "Both ref and alt blocks abutt, skipping (ref:$sr_end-$r_start)\n", 1);
             next DIR_ALIGN_BLOCK;
         }
 
+        # Short-cut pointer comparison: both elements come from same source array, @aug_match_list.
+        my $in_step = ($match_by_ref == $match_by_alt);
+        unless ($in_step) {
+
+            my $alt_a_start = $match_by_alt->{A_start};
+            if ($alt_a_start < $a_start) {
+
+                $support->log("There's an extra alt match block in this gap\n" .
+                              "  gap: $gap\n  alt: $a_block\n");
+
+                # Alt block from a later match occurs in this gap, so:
+
+                # - queue the intruding alt block for masking and move onto the next
+                push @alt_masks, $match_by_alt;
+                $match_by_alt = shift @matches_by_alt;
+                
+                # - restart comparison to use the new alt block, and in case there's another alt insert
+                redo DIR_ALIGN_BLOCK;
+
+            } else {
+
+                $support->log("There's an extra ref match block, extending gap\n" .
+                              "  gap: $gap\n  alt: $a_block\n");
+
+                # Alt block from this match occured earlier, thus this ref block is an 'extra'
+                # ocurring in the gap between alt blocks, so:
+
+                # - queue the intruding ref block for masking and move onto the next
+                push @ref_masks, $match_by_ref;
+                $match_by_ref = shift @matches_by_ref;
+
+                # - restart comparision to use the new ref block, and in case there's another ref insert
+                redo DIR_ALIGN_BLOCK if $match_by_ref;
+            }
+
+        }
+        
         if ( ($r_start - $sr_end) < 1 ) {
+            # This should never get hit
             $support->log_warning( "We shouldn't be going backwards!\n" );
             next DIR_ALIGN_BLOCK;
         }
@@ -599,6 +668,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         }
 
         if ( ($a_start - $sa_end) < 1 ) {
+            # This should never get hit now
             $support->log_warning("Negative alt gap for ref: $chr_r_start - $chr_r_end\n");
         }
 
@@ -623,15 +693,22 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 R_end   => $chr_r_end,   # 4
                 R_count => 1,            # 5
                 A_name  => $a_chr,       # 6
+                A_masks => [ @alt_masks ],
+                R_masks => [ @ref_masks ],
             };
+        } else {
+            $support->log("Skipping unmatched block: gap in ref (ref: $gap)\n", 1) unless $ref_count;
+            $support->log("Skipping unmatched block: gap in alt (ref: $gap)\n", 1) unless $alt_count;
         }
 
     } continue { # DIR_ALIGN_BLOCK
 
-        $sa_start = $_->{A_start};
-        $sa_end   = $_->{A_end};
-        $sr_start = $_->{R_start};
-        $sr_end   = $_->{R_end};
+        $prev_match->{A_end} = $match_by_ref->{A_end};
+        $prev_match->{R_end} = $match_by_ref->{R_end};
+
+        # clear the mask lists before starting on next gap
+        @ref_masks = ();
+        @alt_masks = ();
     }
 
     # filter single assembly inserts from non-aligned blocks (i.e. cases where
@@ -779,13 +856,24 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         for ( $c = 0 ; $c < scalar( @{ $nomatch->{$R_chr} } ) ; $c++ ) {
 
-            $support->log( sprintf( $fmt4, @{ $nomatch->{$R_chr}->[$c] }{qw(A_start A_end A_count R_start R_end R_count A_name)} ), 2 );
+            my $nmb = $nomatch->{$R_chr}->[$c];
+            $support->log(sprintf( $fmt4, @{ $nmb }{qw(A_start A_end A_count R_start R_end R_count A_name)} ), 2);
+
+            if ($nmb->{R_masks}) {
+                foreach my $mask (@{$nmb->{R_masks}}) {
+                    $support->log(sprintf( $fmt_rmask, $mask->{R_start}, $mask->{R_end} ), 2);
+                }
+            }
+
+            if ($nmb->{A_masks}) {
+                foreach my $mask (@{$nmb->{A_masks}}) {
+                    $support->log(sprintf( $fmt_amask, $mask->{A_start}, $mask->{A_end} ), 2);
+                }
+            }
 
             # find longest non-aligned block
-            my $A_length =
-                $nomatch->{$R_chr}->[$c]->{A_end} - $nomatch->{$R_chr}->[$c]->{A_start} + 1;
-            my $R_length =
-                $nomatch->{$R_chr}->[$c]->{R_end} - $nomatch->{$R_chr}->[$c]->{R_start} + 1;
+            my $A_length = $nmb->{A_end} - $nmb->{A_start} + 1;
+            my $R_length = $nmb->{R_end} - $nmb->{R_start} + 1;
             push @block_length, [ $A_chr, $A_length, $R_chr, $R_length ];
 
         }
@@ -836,6 +924,22 @@ $support->log_stamped("\nDone.\n");
 $support->finish_log;
 
 ### end main
+
+sub get_block_loc_str {
+    my ($block) = @_;
+    return sprintf('R:%d-%d,A:%d-%d',
+                   $block->{R_start}, $block->{R_end},
+                   $block->{A_start}, $block->{A_end},
+        );
+}
+
+sub get_gap_loc_str {
+    my ($prev, $block) = @_;
+    return sprintf('R:%d-%d,A:%d-%d',
+                   $prev->{R_end}+1, $block->{R_start}-1,
+                   $prev->{A_end}+1, $block->{A_start}-1,
+        );
+}
 
 sub get_cmp_key {
     my ($cmp, $flag) = @_;
