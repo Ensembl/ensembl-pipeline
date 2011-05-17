@@ -206,15 +206,15 @@ my $R_dba = $support->get_database( 'ensembl', '' );
 my $R_dbh = $R_dba->dbc->db_handle;
 my $R_sa  = $R_dba->get_SliceAdaptor;
 my $R_asm = $support->param('assembly');
-my $R_start = $support->param('ref_start') || undef;
-my $R_end = $support->param('ref_end') || undef;
+my $Ref_start = $support->param('ref_start') || undef;
+my $Ref_end = $support->param('ref_end') || undef;
 
 # database containing the alternative assembly
 my $A_dba = $support->get_database( 'ensembl', 'alt' );
 my $A_sa  = $A_dba->get_SliceAdaptor;
 my $A_asm = $support->param('altassembly');
-my $A_start = $support->param('alt_start') || undef;
-my $A_end = $support->param('alt_end') || undef;
+my $Alt_start = $support->param('alt_start') || undef;
+my $Alt_end = $support->param('alt_end') || undef;
 
 
 #####
@@ -348,34 +348,39 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
     # fetch chromosome slices
     my $R_slice =
-        $R_sa->fetch_by_region( 'chromosome', $R_chr, $R_start, $R_end, undef, $R_asm );
+        $R_sa->fetch_by_region( 'chromosome', $R_chr, $Ref_start, $Ref_end, undef, $R_asm );
     print STDOUT $R_slice->seq_region_name." ".$R_slice->start." -> ".$R_slice->end."\n";
 
     my $A_slice =
-        $A_sa->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef, $A_asm );
+        $A_sa->fetch_by_region( 'chromosome', $A_chr, $Alt_start, $Alt_end, undef, $A_asm );
     my $A_slice_ref =
-        $A_sa->fetch_by_region( 'chromosome', $A_chr, $A_start, $A_end, undef, $A_asm );
+        $A_sa->fetch_by_region( 'chromosome', $A_chr, $Alt_start, $Alt_end, undef, $A_asm );
 
     my $R_length = $R_slice->length;
     my $A_length = $A_slice->length;
 
     # project() returns triplets [start,end,slice]
-    #           where start,end are in source slice coords
+    #           where start,end are from start of source slice
     #           and slice is in requested coord system
     #           (the triplets are blessed as Bio::EnsEMBL::ProjectionSegment objects too)
+    #
+    # NB base for triplet start,end coords is 1 => start of slice
+    # They are NOT in the coord system of the slice...
 
     my @A_components = @{ $A_slice->project($component_cs) };
     $R_dba->get_AssemblyMapperAdaptor()->delete_cache();
     my @R_components = @{ $R_slice->project($component_cs) };
 
-    if($A_start){
-        map ($_->[$PROJ_START] += ($A_start-1) , @A_components);
-        map ($_->[$PROJ_END]   += ($A_start-1) , @A_components);
+    # ...which should get taken care of here.
+    #
+    if($Alt_start){
+        map ($_->[$PROJ_START] += ($Alt_start-1) , @A_components);
+        map ($_->[$PROJ_END]   += ($Alt_start-1) , @A_components);
     }
 
-    if($R_start){
-        map ($_->[$PROJ_START] += ($R_start-1) , @R_components);
-        map ($_->[$PROJ_END]   += ($R_start-1) , @R_components);
+    if($Ref_start){
+        map ($_->[$PROJ_START] += ($Ref_start-1) , @R_components);
+        map ($_->[$PROJ_END]   += ($Ref_start-1) , @R_components);
     }
 
     my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
@@ -618,20 +623,24 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     # sort the match blocks by ref chromosome start
 
     # start/end coords of previous match, start with dummy zero
+    my $A_dummy_prev_end = $Alt_start ? $Alt_start - 1 : 0;
+    my $R_dummy_prev_end = $Ref_start ? $Ref_start - 1 : 0;
     my $prev_match = {
-        A_start => 0,
-        A_end   => 0,
-        R_start => 0,
-        R_end   => 0,
+        A_start => $A_dummy_prev_end,
+        A_end   => $A_dummy_prev_end,
+        R_start => $R_dummy_prev_end,
+        R_end   => $R_dummy_prev_end,
     };
 
     # dummy match at end of chromosome
+    my $A_dummy_last_start = $Alt_start ? $Alt_start + $A_length : 1 + $A_length;
+    my $R_dummy_last_start = $Ref_start ? $Ref_start + $R_length : 1 + $R_length;
     my $last = { 
-        A_start => $A_length + 1,
-        A_end   => $A_length + 1,
+        A_start => $A_dummy_last_start,
+        A_end   => $A_dummy_last_start,
         A_count => 0,
-        R_start => $R_length + 1,
-        R_end   => $R_length + 1,
+        R_start => $R_dummy_last_start,
+        R_end   => $R_dummy_last_start,
         R_count => 0,
         A_name  => $A_chr
     };
