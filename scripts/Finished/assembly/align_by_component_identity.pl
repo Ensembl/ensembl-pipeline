@@ -342,7 +342,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     my $match   = {};
     my $nomatch = {};
     my $match_flag = 0;
-    my %stats_chr;
+    my %stats_chr = ( identical => 0, mismatch => 0, skipped => 0 );
 
     $support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
 
@@ -736,8 +736,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
         # We filter out the null case where both abutt above.
         if ( $ref_abutt or $alt_abutt ) {
 
-            $support->log("Zero-length ref gap (ref:$chr_r_start-$chr_r_end\n", 1) if $ref_abutt;
-            $support->log("Zero-length alt gap (ref:$chr_r_start-$chr_r_end\n", 1) if $alt_abutt;
+            $support->log("Zero-length ref gap (ref:$chr_r_start-$chr_r_end)\n", 1) if $ref_abutt;
+            $support->log("Zero-length alt gap (ref:$chr_r_start-$chr_r_end)\n", 1) if $alt_abutt;
 
             # We put both ref and alt blocks onto the mask lists and extend the gap to the next one
             push @alt_masks, $match_by_alt unless $match_by_alt == $last;
@@ -786,6 +786,11 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
             $support->log("Unmatched block: gap in ref (ref: $gap)\n", 1) unless $ref_count;
             $support->log("Unmatched block: gap in alt (ref: $gap)\n", 1) unless $alt_count;
+
+            unless ($match_by_alt and $match_by_ref) {
+                $support->log("Ran out of sequence (may be new extension on one side)\n", 1);
+                last DIR_ALIGN_BLOCK;
+            }
 
             # We add masks, and extend the unmatched block to the next one
             push @alt_masks, $match_by_alt unless $match_by_alt == $last;
