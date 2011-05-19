@@ -203,7 +203,7 @@ for my $prm (qw(host port user pass dbname)) {
 
 # reference database
 my $R_dba = $support->get_database( 'ensembl', '' );
-my $R_dbh = $R_dba->dbc->db_handle;
+my $R_dbc = $R_dba->dbc;
 my $R_sa  = $R_dba->get_SliceAdaptor;
 my $R_asm = $support->param('assembly');
 my $Ref_start = $support->param('ref_start') || undef;
@@ -221,7 +221,7 @@ my $Alt_end = $support->param('alt_end') || undef;
 # create temporary tables for storing non-aligned blocks and their masks
 #
 if ($write_db) {
-    $R_dbh->do(
+    $R_dbc->do(
         qq(
         CREATE TABLE IF NOT EXISTS tmp_align (
           tmp_align_id int(10) unsigned NOT NULL auto_increment,
@@ -238,9 +238,9 @@ if ($write_db) {
 	);
 
     # clear tmp_align table of entries from previous runs
-    $R_dbh->do(qq(DELETE FROM tmp_align));
+    $R_dbc->do(qq(DELETE FROM tmp_align));
 
-    $R_dbh->do(
+    $R_dbc->do(
         qq(
         CREATE TABLE IF NOT EXISTS tmp_mask (
           tmp_mask_id int(10) unsigned NOT NULL auto_increment,
@@ -257,7 +257,7 @@ if ($write_db) {
 	);
 
     # clear tmp_mask table of entries from previous runs
-    $R_dbh->do(qq(DELETE FROM tmp_mask));
+    $R_dbc->do(qq(DELETE FROM tmp_mask));
 }
 else {
     $support->log(
@@ -295,7 +295,7 @@ my $fmt44 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f %7.0f\n";
 my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
 
-my $sth1 = $R_dbh->prepare(
+my $sth1 = $R_dbc->prepare(
     qq{
     INSERT IGNORE INTO assembly (asm_seq_region_id, cmp_seq_region_id,
                                  asm_start, asm_end, cmp_start, cmp_end, ori)
@@ -303,13 +303,13 @@ my $sth1 = $R_dbh->prepare(
 }
     );
 
-my $sth2 = $R_dbh->prepare(
+my $sth2 = $R_dbc->prepare(
     qq{
   INSERT INTO tmp_align values(NULL, ?, ?, ?, ?, ?, ?)
 }
     );
 
-my $sth_mask = $R_dbh->prepare(
+my $sth_mask = $R_dbc->prepare(
     qq{
   INSERT INTO tmp_mask 
       (tmp_align_id, alt_mask_start, alt_mask_end, ref_mask_start, ref_mask_end)
