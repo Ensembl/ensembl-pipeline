@@ -63,6 +63,7 @@ sub get_available_adaptors {
   my $pairs = $self->SUPER::get_available_adaptors();
 
   $pairs->{'Analysis'}                  = 'Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor';
+  $pairs->{'AnalysisRun'}               = 'Bio::EnsEMBL::Pipeline::DBSQL::AnalysisRunAdaptor';
   $pairs->{'Job'}                       = 'Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor';
   $pairs->{'PmatchFeature'}             = 'Bio::EnsEMBL::Pipeline::DBSQL::PmatchFeatureAdaptor';
   $pairs->{'Rule'}                      = 'Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor';

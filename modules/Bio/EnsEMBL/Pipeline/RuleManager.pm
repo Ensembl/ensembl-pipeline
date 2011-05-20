@@ -37,6 +37,7 @@ use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Pipeline::Job;
+use Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils;
 
 @ISA = qw();
 
@@ -578,7 +579,7 @@ sub create_and_store_job{
   return $job;
 }
 
-=head2 can_run_job
+=head2 can_job_run
 
   Arg [1]   : string, input_id
   Arg [2]   : Bio::EnsEMBL::Pipeline::Analysis
@@ -1232,4 +1233,35 @@ sub number_output_dirs {
   return $self->{number_output_dirs} ; 
 } 
 
+sub analysisrun_setup {
+  my $self = shift;
+  my ($rh_analyses_to_run, $rh_analyses_to_skip, $rh_to_keep) = @_;
+
+  my $analysis_adaptor = $self->analysis_adaptor;
+  my @a_analysis;
+  if (keys(%$rh_analyses_to_run)) {
+    @a_analysis = keys (%$rh_analyses_to_run);
+  }
+  else {
+    foreach my $analysis (@{$analysis_adaptor->fetch_all}) {
+      next if (exists $rh_analyses_to_skip->{$analysis->dbID});
+      push(@a_analysis, $analysis->dbID);
+    }
+  }
+  if ($rh_to_keep) {
+      my @a_tmp ;
+      while( my $analysis = shift(@a_analysis)) {
+          print STDERR $analysis, "\n";
+          if ($self->db->get_meta_value_by_key('tracking.analysis', $analysis)) {
+              next if (exists $rh_to_keep->{$analysis});
+          }
+          else {
+              $self->db->store_meta_key_value('tracking.analysis', $analysis);
+          }
+          push(@a_tmp, $analysis)
+      }
+      @a_analysis = @a_tmp;
+  }
+  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis));
+}
 1;

@@ -587,10 +587,12 @@ sub run_module {
     eval {
       require $perl_path.".pm";
       $perl_path =~ s/\//::/g;
+      my $is_tracking = 1;#TIBO
       $rdb = $perl_path->new( -analysis => $self->analysis,
                               -input_id => $self->input_id,
                               -db => $self->adaptor->db,
-                              -verbosity => $verbosity
+                              -verbosity => $verbosity,
+                              -is_tracking => $is_tracking
                             );
     };
     

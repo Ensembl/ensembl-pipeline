@@ -75,8 +75,10 @@ sub new {
   
   $self->db($db);
 
+print STDERR 'blastdb: ', $ENV{BLASTDB}, "\n";
   
   foreach my $database ( $self->db ){
+print STDERR 'loop db: ', $database, "\n";
     # Prepend $ENV{BLASTDB} if not given a full path
     if ( $database !~ /^\// ){
       $database = $ENV{BLASTDB} . "/" . $database;
@@ -86,6 +88,7 @@ sub new {
       $database = $1;
     }
 
+print STDERR 'db: ', $database, "\n";
     # get the index name and the index directory out of $database
     my @path = split /\//, $database;
 
@@ -111,6 +114,7 @@ sub new {
 						   -format    => $format
 						 );
 
+print STDERR 'obda: ', $self->index_name, "\n", $db_name, "\n";
     $self->_seqfetcher($OBDAfetcher);
   }
 

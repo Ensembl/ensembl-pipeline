@@ -29,6 +29,7 @@ Bio::EnsEMBL::DBSQL::Pipeline::AnalysisAdaptor
 =head1 CONTACT
 
     Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
+
     Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
 
 =head1 APPENDIX
@@ -218,6 +219,179 @@ sub store {
 
 
 
+sub fetch_analysis_input_id_type{
+  my ($self, $analysis) = @_;
+  
+  my $sql = "select input_id_type from input_id_type_analysis".
+    " where analysis_id = ?";
+ 
+  my $sth = $self->prepare($sql);
+  $sth->execute($analysis->dbID);
+  my ($type) = $sth->fetchrow;
+  return $type;
+}
+
+=head2 db
+
+  Arg [1]    : (optional) Bio::EnsEMBL::DBSQL::DBAdaptor $db
+               the database used by this adaptor.
+  Example    : my $db = $analysis_adaptor->db()
+  Description: Getter/Setter for the database this adaptor uses internally
+               to fetch and store database objects.
+  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
+  Exceptions : none
+  Caller     : BaseAdaptor::new, general
+
+=cut
+
+sub db {
+  my ( $self, $arg )  = @_;
+  ( defined $arg ) &&
+    ($self->{_db} = $arg);
+  $self->{_db};;
+}
+
+=head2 remove
+
+ Arg [1]    : $analysis, a Bio::EnsEMBL::Pipeline::Analysis
+ Example    : $self->remove($analysis);
+ Description: Remove an analysis from the pipeline. Delete it from the
+              database.
+ Returntype : 
+ Exceptions : 
+
+
+=cut
+
+sub remove {
+
+  my $self = shift;
+  my $analysis = shift;
+  
+  if( !$analysis || !($analysis->isa('Bio::EnsEMBL::Pipeline::Analysis'))) {
+    throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
+  }
+  my $sql = 'delete from analysis where analysis_id = ?';
+  my $sth = $self->prepare($sql);
+  $sth->execute($analysis->dbID);
+
+  if($analysis->input_id_type){
+    my $sql = 'delete from input_id_type_analysis where analysis_id = ?';
+    my $sth = $self->prepare($sql);
+    $sth->execute($analysis->dbID);
+  }
+
+}
+
+=head2 fetch_by_input_id_type
+
+ Arg [1]    : $input_id_type, string
+ Example    : $self->fetch_by_input_id_type($input_id_type);
+ Description: Fetch all the analysis that have this type of input id
+ Returntype : listref of Bio::EnsEMBL::Pipeline::Analysis
+ Exceptions : 
+
+
+=cut
+
+sub fetch_by_input_id_type{
+  my ($self, $input_id_type) = @_;
+  
+  my $query = q{ SELECT analysis_id
+                 FROM input_id_type_analysis
+                 WHERE input_id_type = ? };
+  my $sth = $self->prepare($query);
+  $sth->execute($input_id_type);
+  my @analysis_ids;
+  while(my ($id) = $sth->fetchrow){
+    push(@analysis_ids, $id);
+  }
+  my @analyses;
+  foreach my $id(@analysis_ids){
+    my $analysis = $self->fetch_by_dbID($id);
+    push(@analyses, $analysis);
+  }
+  return(\@analyses);
+}
+
+
+###################
+# Private methods #
+###################
+
+=head2 _tables
+
+ Example    : $self->_tables;
+ Description: Return the table and its abbreviation
+ Returntype : a listref of string
+ Exceptions : 
+
+
+=cut
+
+sub _tables {
+  my $self = shift;
+  return (['analysis' , 'a']);
+}
+
+=head2 _columns
+
+ Example    : $self->_columns;
+ Description: Return a list of columns
+ Returntype : a listref of string
+ Exceptions : 
+
+
+=cut
+
+sub _columns {
+  my $self = shift;
+  return ( 'a.created', 'a.logic_name', 'a.db', 'a.db_version', 'a.db_file', 'a.program', 'a.program_version', 'a.program_file', 'a.parameters', 'a.module', 'a.module_version', 'a.gff_source', 'a.gff_feature');
+}
+
+
+=head2 _objs_from_sth
+
+ Arg [1]    : $sth
+ Example    : $self->_objs_from_sth($sth);
+ Description: Put the result of the query in Bio::EnsEMBL::Pipeline::InputSeq objects
+ Returntype : listref of Bio::EnsEMBL::Pipeline::InputSeq
+ Exceptions : 
+
+
+=cut
+
+sub _objs_from_sth {
+  my ($self, $sth) = @_;
+
+  my @out;
+  my ( $created, $logic_name, $db, $db_version, $db_file, $program, $program_version, $program_file, $parameters, $module, $module_version, $gff_source, $gff_feature);
+  my ( $analysis_run_id, $analysis_id, $run_date, $input_db_id, $output_db_id);
+  $sth->bind_columns( \$created, \$logic_name, \$db, \$db_version, \$db_file, \$program, \$program_version, \$program_file, \$parameters, \$module, \$module_version, \$gff_source, \$gff_feature);
+
+  while($sth->fetch()) {
+    push @out, Bio::EnsEMBL::Pipeline::Analysis->new(
+       -id              => $analysis_id,
+       -adaptor         => $self,
+       -db              => $db,
+       -db_file         => $db_file,
+       -db_version      => $db_version,
+       -program         => $program,
+       -program_version => $program_version,
+       -program_file    => $program_file,
+       -gff_source      => $gff_source,
+       -gff_feature     => $gff_feature,
+       -module          => $module,
+       -module_version  => $module_version,
+       -parameters      => $parameters,
+       -created         => $created,
+       -logic_name      => $logic_name,
+       );
+    my $type = $self->fetch_analysis_input_id_type($out[-1]);
+    $out[-1]->input_id_type($type);
+  }
+  return \@out;
+}
 
 =head2 _objFromHashref
 
@@ -256,80 +430,6 @@ sub _objFromHashref {
   my $type = $self->fetch_analysis_input_id_type($analysis);
   $analysis->input_id_type($type);
   return $analysis;
-}
-
-sub fetch_analysis_input_id_type{
-  my ($self, $analysis) = @_;
-  
-  my $sql = "select input_id_type from input_id_type_analysis".
-    " where analysis_id = ?";
- 
-  my $sth = $self->prepare($sql);
-  $sth->execute($analysis->dbID);
-  my ($type) = $sth->fetchrow;
-  return $type;
-}
-
-=head2 db
-
-  Arg [1]    : (optional) Bio::EnsEMBL::DBSQL::DBAdaptor $db
-               the database used by this adaptor.
-  Example    : my $db = $analysis_adaptor->db()
-  Description: Getter/Setter for the database this adaptor uses internally
-               to fetch and store database objects.
-  Returntype : Bio::EnsEMBL::DBSQL::DBAdaptor
-  Exceptions : none
-  Caller     : BaseAdaptor::new, general
-
-=cut
-
-sub db {
-  my ( $self, $arg )  = @_;
-  ( defined $arg ) &&
-    ($self->{_db} = $arg);
-  $self->{_db};;
-}
-
-
-sub remove {
-
-  my $self = shift;
-  my $analysis = shift;
-  
-  if( !$analysis || !($analysis->isa('Bio::EnsEMBL::Pipeline::Analysis'))) {
-    throw("called store on Pipeline::AnalysisAdaptor with a [$analysis]");
-  }
-  my $sql = 'delete from analysis where analysis_id = ?';
-  my $sth = $self->prepare($sql);
-  $sth->execute($analysis->dbID);
-
-  if($analysis->input_id_type){
-    my $sql = 'delete from input_id_type_analysis where analysis_id = ?';
-    my $sth = $self->prepare($sql);
-    $sth->execute($analysis->dbID);
-  }
-
-}
-
-
-sub fetch_by_input_id_type{
-  my ($self, $input_id_type) = @_;
-  
-  my $query = q{ SELECT analysis_id
-                 FROM input_id_type_analysis
-                 WHERE input_id_type = ? };
-  my $sth = $self->prepare($query);
-  $sth->execute($input_id_type);
-  my @analysis_ids;
-  while(my ($id) = $sth->fetchrow){
-    push(@analysis_ids, $id);
-  }
-  my @analyses;
-  foreach my $id(@analysis_ids){
-    my $analysis = $self->fetch_by_dbID($id);
-    push(@analyses, $analysis);
-  }
-  return(\@analyses);
 }
 
 1;

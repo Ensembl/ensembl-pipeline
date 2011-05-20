@@ -73,56 +73,58 @@ my $reread_input_ids = 0; # toggle whether to reread input_id each time the
 my $reread_rules = 0; # toggle whether to reread rules each time the script
                       # loops
 my $perldoc = 0;
+my @to_keep;
 my @command_args = @ARGV;
 my $submission_limit;
 my $dbload;
 my $submission_number = 1000; 
 my $number_output_dirs = 10;  
 GetOptions(
-           'dbhost=s'              => \$dbhost,
-           'dbname=s'              => \$dbname,
-           'dbuser=s'              => \$dbuser,
-           'dbpass=s'              => \$dbpass,
-           'dbport=s'              => \$dbport,
-           'help!'                 => \$help,
-           'verbose!'              => \$verbose,
-           'queue_manager=s'       => \$queue_manager,
-           'max_job_time=s'        => \$max_job_time,
-           'min_job_job=s'         => \$min_job_time,
-           'sleep_per_job=s'       => \$sleep_per_job,
-           'runner=s'              => \$runner,
-           'output_dir=s'          => \$output_dir,
-           'job_limit=s'           => \$job_limit,
-           'mark_awol!'            => \$mark_awol,
-           'rename_on_retry'       => \$rename_on_retry,
-           'starts_from=s@'        => \@starts_from,
+           'dbhost=s'               => \$dbhost,
+           'dbname=s'               => \$dbname,
+           'dbuser=s'               => \$dbuser,
+           'dbpass=s'               => \$dbpass,
+           'dbport=s'               => \$dbport,
+           'help!'                  => \$help,
+           'verbose!'               => \$verbose,
+           'queue_manager=s'        => \$queue_manager,
+           'max_job_time=s'         => \$max_job_time,
+           'min_job_job=s'          => \$min_job_time,
+           'sleep_per_job=s'        => \$sleep_per_job,
+           'runner=s'               => \$runner,
+           'output_dir=s'           => \$output_dir,
+           'job_limit=s'            => \$job_limit,
+           'mark_awol!'             => \$mark_awol,
+           'rename_on_retry'        => \$rename_on_retry,
+           'starts_from=s@'         => \@starts_from,
            'analysis|logic_name=s@' => \@analyses_to_run,
-           'skip_analysis=s@'      => \@analyses_to_skip,
-           'input_id_type=s@'      => \@types_to_run,
-           'skip_input_id_type=s@' => \@types_to_skip,
-           'input_id_file=s'       => \$ids_to_run,
-           'skip_input_id_file=s'  => \$ids_to_skip,
-           'config_sanity!'        => \$config_sanity,
-           'accumulator_sanity!'   => \$accumulator_sanity,
-           'db_sanity!'            => \$db_sanity,
-           'rules_sanity!'         => \$rules_sanity,
-           'kill_jobs!'            => \$kill_jobs,
-           'killed_time=s'         => \$killed_time,
-           'kill_file=s'           => \$kill_file,
-           'rerun_sleep=s'         => \$rerun_sleep,
-           'utils_verbosity=s'     => \$utils_verbosity,
-           'shuffle!'              => \$shuffle,
-           'accumulators!'         => \$accumulators,
-           'force_accumulators!'   => \$force_accumulators,
-           'reread_input_ids!'     => \$reread_input_ids,
-           'reread_rules!'         => \$reread_rules,
-           'once!'                 => \$once,
-           'perldoc!'              => \$perldoc,
-           'dbload!'              => \$dbload,
-           'submission_limit!'     => \$submission_limit,
-           'submission_number=s'   => \$submission_number,
-           'unlock|delete_lock'    => \$unlock,
-           'number_output_dirs=i'    => \$number_output_dirs,  
+           'skip_analysis=s@'       => \@analyses_to_skip,
+           'input_id_type=s@'       => \@types_to_run,
+           'skip_input_id_type=s@'  => \@types_to_skip,
+           'input_id_file=s'        => \$ids_to_run,
+           'skip_input_id_file=s'   => \$ids_to_skip,
+           'config_sanity!'         => \$config_sanity,
+           'accumulator_sanity!'    => \$accumulator_sanity,
+           'db_sanity!'             => \$db_sanity,
+           'rules_sanity!'          => \$rules_sanity,
+           'kill_jobs!'             => \$kill_jobs,
+           'killed_time=s'          => \$killed_time,
+           'kill_file=s'            => \$kill_file,
+           'rerun_sleep=s'          => \$rerun_sleep,
+           'utils_verbosity=s'      => \$utils_verbosity,
+           'shuffle!'               => \$shuffle,
+           'accumulators!'          => \$accumulators,
+           'force_accumulators!'    => \$force_accumulators,
+           'reread_input_ids!'      => \$reread_input_ids,
+           'reread_rules!'          => \$reread_rules,
+           'once!'                  => \$once,
+           'perldoc!'               => \$perldoc,
+           'dbload!'                => \$dbload,
+           'submission_limit!'      => \$submission_limit,
+           'submission_number=s'    => \$submission_number,
+           'unlock|delete_lock'     => \$unlock,
+           'number_output_dirs=i'   => \$number_output_dirs,  
+           'to_keep=s@'             => \@to_keep,  
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -130,6 +132,7 @@ verbose($utils_verbosity);
 
 
 @analyses_to_run = map {split/,/} @analyses_to_run ; 
+@to_keep = map {split/,/} @to_keep ; 
 
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
@@ -152,6 +155,14 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                        -pass   => $dbpass,
                                                        -port   => $dbport,
                                                       );
+
+#my $track_db = Bio::EnsEMBL::Analysis::EvidenceTracking::DBSQL::DBAdaptor->new(
+#                                                       -host   => $dbhost,
+#                                                       -dbname => $dbname,
+#                                                       -user   => $dbuser,
+#                                                       -pass   => $dbpass,
+#                                                       -port   => $dbport,
+#                                                      );
 
 my $sanity = Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new
   (
@@ -198,6 +209,7 @@ if ($dbload) {
 
 my %analyses_to_run = %{$rulemanager->logic_name2dbID(\@analyses_to_run)};
 my %analyses_to_skip = %{$rulemanager->logic_name2dbID(\@analyses_to_skip)};
+my %to_keep = %{$rulemanager->logic_name2dbID(\@to_keep)};
 
 if ($ids_to_run && ! -e $ids_to_run) {
   throw("Must be able to read $ids_to_run");
@@ -250,7 +262,6 @@ setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules,
                \%accumulator_analyses, \%always_incomplete_accumulators, 
                $ids_to_run, $ids_to_skip, \@types_to_run, \@types_to_skip,
                \@starts_from, $rulemanager);
-
 my %completed_accumulator_analyses;
 my $submission_count = 0;
 while (1) {
@@ -389,6 +400,7 @@ sub setup_pipeline{
   $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                $types_to_run, $types_to_skip, 
                                $starts_from);
+  $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, \%to_keep);
 }
 
 sub shuffle {
