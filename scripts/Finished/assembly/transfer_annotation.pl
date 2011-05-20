@@ -120,7 +120,8 @@ my $R_dba = $support->get_database('ensembl');
 my $A_dba = $support->get_database( 'ensembl', 'alt' );
 bless $R_dba, "Bio::Vega::DBSQL::DBAdaptor";
 bless $A_dba, "Bio::Vega::DBSQL::DBAdaptor";
-my $dbh = $R_dba->dbc->db_handle;
+my $dbc = $R_dba->dbc;          # for all SQL except...
+my $dbh = $dbc->db_handle;      # ONLY for transaction control
 
 my $assembly    = $support->param('assembly');
 my $altassembly = $support->param('altassembly');
@@ -197,9 +198,9 @@ qq{insert into seq_region_attrib (seq_region_id, attrib_type_id, value) values (
 my $sql_attrib_type_delete =
 qq{delete from seq_region_attrib where seq_region_id = ? and attrib_type_id = 6};
 
-my $sth_attrib_type_select = $dbh->prepare($sql_attrib_type_select);
-my $sth_attrib_type_insert = $dbh->prepare($sql_attrib_type_insert);
-my $sth_attrib_type_delete = $dbh->prepare($sql_attrib_type_delete);
+my $sth_attrib_type_select = $dbc->prepare($sql_attrib_type_select);
+my $sth_attrib_type_insert = $dbc->prepare($sql_attrib_type_insert);
+my $sth_attrib_type_delete = $dbc->prepare($sql_attrib_type_delete);
 
 my $cs_change = 0;
 
@@ -207,8 +208,8 @@ if ( $assembly eq $altassembly ) {
 	$cs_change   = 1;
 	$altassembly = 'MAPPING';
 
-	map { $dbh->do($_) } @sql_inserts;
-	$dbh->do($sql_meta_bl_insert);
+	map { $dbc->do($_) } @sql_inserts;
+	$dbc->do($sql_meta_bl_insert);
 }
 
 my @R_chr_list = $support->param('chromosomes');
@@ -233,7 +234,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 	my $skipped_sf       = 0;
 	my $missed_g        = 0;
 
-	my $sth_cs = $dbh->prepare($sql_sr_update);
+	my $sth_cs = $dbc->prepare($sql_sr_update);
 	$sth_cs->execute( $A_chr, $altassembly ) unless ( !$cs_change );
 
 	my $ref_sl =
@@ -343,7 +344,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 			$support->log_verbose(
 				sprintf(
-					"Transferring gene %s %s %d %d\n",
+					"\n========================================\nTransferring gene %s %s %d %d\n",
 					$g->stable_id, $g->biotype, $g->start, $g->end
 				)
 			);
@@ -616,8 +617,8 @@ INFO: skipped PolyA features: %d/%d\n",
 
 # remove temporary 'MAPPING' coordinate system from meta and coord_system table
 if ($cs_change) {
-	map { $dbh->do($_) } @sql_deletes;
-	$dbh->do($sql_meta_bl_delete);
+	map { $dbc->do($_) } @sql_deletes;
+	$dbc->do($sql_meta_bl_delete);
 }
 
 $support->log_stamped("\nDone.\n");
@@ -754,13 +755,19 @@ sub project_transcript_the_hard_way {
 		$CDS_end_NF->value(0) if $CDS_end_NF;
 	}
 
-	my @new_e;
+	my %new_exons;          # keyed by self
+        my %old_exons;          # keyed by new exon
+
+        my %projected_exons;
+        my %paired_exons;
+
 	my $cs = $alt_sl->coord_system;
 	EXON: foreach my $e ( @{ $new_trans->get_all_Exons } ) {
 		my $te = $e->transfer($alt_sl);
 
 		if ( defined $te ) {
-			push @new_e, $te;
+			$new_exons{$te} = $te;
+                        $old_exons{$te} = $e;
 		}
 		else {
 			my @bits = @{ $e->project( $cs->name, $cs->version) };
@@ -784,7 +791,7 @@ sub project_transcript_the_hard_way {
 						$coord->{$strand}->{end} = $end;
 					}
 				}
-				my $flag = 0;
+				my $pair = undef;
 				foreach ( sort { $coord->{$b}->{length} <=> $coord->{$a}->{length} } keys  %$coord ) {
 					my $new_e = Bio::Vega::Exon->new;
 					$new_e->start($coord->{$_}->{start});
@@ -793,27 +800,19 @@ sub project_transcript_the_hard_way {
 					$new_e->phase(-1);
 					$new_e->end_phase(-1);
 					$new_e->slice($alt_sl);
-					$new_e->stable_id( $e->stable_id ) unless $flag;
-					# Check here that the exon doesn't overlap with those already in the list
-					if(&features_overlap($new_e,\@new_e)){
-						$warnings .= sprintf("WARNING: Exons overlap found on strand %d, discard Exon %s in Transcript %s of Gene %s\n",
-								$_,
-								$e->stable_id,
-								$t->stable_id,
-								$g->stable_id);
-						&add_hidden_remark($e->slice->seq_region_name,
-								    sprintf("exon %s %d-%d:%d cannot be transfered",$e->stable_id,$e->start,$e->end,$e->strand),
-								    $new_trans);
-						# if exon projected on two strands
-						# and if the longest bit of exon already saved in the list
-						# should remove it from the list
-						pop @new_e if $flag;
+					$new_e->stable_id( $e->stable_id ) unless $pair;
 
-						next EXON;
-					}
+					# Overlap checking deferred to end
 
-					push @new_e, $new_e;
-					$flag = 1;
+                                        $projected_exons{$new_e} = 1;
+                                        $new_exons{$new_e} = $new_e;
+                                        $old_exons{$new_e} = $e;
+
+                                        if ($pair) {
+                                            $paired_exons{$pair} = $new_e;
+                                            $paired_exons{$new_e} = $pair;
+                                        }
+					$pair = $new_e;
 				}
 				&add_hidden_remark($e->slice->seq_region_name,
 									    sprintf("exon %s has been altered",$e->stable_id),
@@ -830,10 +829,68 @@ sub project_transcript_the_hard_way {
 								     $e->stable_id,$e->start,$e->end,$e->strand,$t->stable_id,$g->stable_id);
 			}
 		}
-	}
+	} # EXON
+
+        # Check for overlaps
+      OVERLAPS: {
+          my @exons = sort { $a->start <=> $b->start } values %new_exons;
+
+        EXON: while (my $e = shift @exons) {
+
+            if (my $overlap = features_overlap($e, \@exons)) {
+                # Decide what to do based on types of exon
+                my $to_delete = undef;
+                my $msg;
+                if ($projected_exons{$overlap} or $projected_exons{$e}) {
+                    if ($projected_exons{$overlap} and $projected_exons{$e}) {
+                        # Both projected: arbitrarily choose current exon for removal
+                        $to_delete = $e;
+                        $msg = 'arbitrary choice of two projected exons';
+                    } else {
+                        $msg = 'projected exon';
+                        if ($projected_exons{$overlap}) {
+                            # Current is transferred: remove overlapping exon
+                            $to_delete = $overlap;
+                        } else {
+                            # Overlapping is transferred: remove current exon
+                            $to_delete = $e;
+                        }
+                    }
+                } else {
+                    # Both transferred: arbitrarily choose current exon for removal
+                    $to_delete = $e;
+                    $msg = 'arbitrary choice of two transferred exons';
+                }
+
+                my $pair = $paired_exons{$to_delete};
+                my $oe = $old_exons{$to_delete};
+
+                &add_hidden_remark($oe->slice->seq_region_name,
+                                   sprintf("exon %s %d-%d:%d cannot be transfered (overlap: %s)",$oe->stable_id,$oe->start,$oe->end,$oe->strand,$msg),
+                                   $new_trans);
+                $warnings .= sprintf("WARNING: Exon overlap (%s) found, discard Exon %s in Transcript %s of Gene %s\n",
+                                     $msg,
+                                     $oe->stable_id,
+                                     $t->stable_id,
+                                     $g->stable_id);
+                $warnings .= sprintf("       : Paired projected exon on other strand also discarded\n") if $pair;
+
+                delete $new_exons{$to_delete};
+                delete $new_exons{$pair} if $pair;
+
+                if ($to_delete == $overlap or $pair) {
+                    # @exons list invalidated, start it again
+                    redo OVERLAPS;
+                } else {
+                    # safe to carry on
+                    next EXON;
+                }
+            }
+        } # EXON
+        } # OVERLAP
 
 	$new_trans->{_trans_exon_array} = [];
-	foreach my $e (@new_e) {
+	foreach my $e (values %new_exons) {
 		eval {
 		  $new_trans->add_Exon($e);
 		};
@@ -844,7 +901,7 @@ sub project_transcript_the_hard_way {
 		}
 	}
 
-	if(@new_e) {
+	if(%new_exons) {
 		$support->log_verbose($warnings);
 		return $new_trans;
 	} else {
@@ -855,11 +912,12 @@ sub project_transcript_the_hard_way {
 sub features_overlap {
 	my ($f,$list) = @_;
 	foreach my $lf ( sort { $a->start <=> $b->start } grep($_->strand == $f->strand,@$list) ) {
+                next if $f == $lf; # not interested in whether we overlap ourselves
 		my $v = max($f->start,$lf->start) - min($f->end,$lf->end);
-		return 1 unless $v >= 0;
+		return $lf unless $v >= 0;
 	}
 
-	return 0;
+	return undef;
 }
 
 sub add_hidden_remark {
