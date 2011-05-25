@@ -1,18 +1,30 @@
-# Perl module for Bio::EnsEMBL::DBSQL::AnalysisAdaptor
-#
-# Creator: Arne Stabenau <stabenau@ebi.ac.uk>
-# Date of creation: 25.01.2001
-# Last modified : 25.01.2001 by Arne Stabenau
-#
-# Copyright EMBL-EBI 2000
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 AUTHORS
+
+  Creator: Arne Stabenau <stabenau@ebi.ac.uk>
 
 =head1 NAME
 
-Bio::EnsEMBL::DBSQL::Pipeline::AnalysisAdaptor 
+Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor - 
 
 =head1 SYNOPSIS
 
@@ -26,11 +38,9 @@ Bio::EnsEMBL::DBSQL::Pipeline::AnalysisAdaptor
   There should be just one per application and database connection.
      
 
-=head1 CONTACT
+=head1 METHODS
 
-    Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-
-    Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
+=cut
 
 =head1 APPENDIX
 
@@ -346,7 +356,7 @@ sub _tables {
 
 sub _columns {
   my $self = shift;
-  return ( 'a.created', 'a.logic_name', 'a.db', 'a.db_version', 'a.db_file', 'a.program', 'a.program_version', 'a.program_file', 'a.parameters', 'a.module', 'a.module_version', 'a.gff_source', 'a.gff_feature');
+  return ( 'a.analysis_id', 'a.created', 'a.logic_name', 'a.db', 'a.db_version', 'a.db_file', 'a.program', 'a.program_version', 'a.program_file', 'a.parameters', 'a.module', 'a.module_version', 'a.gff_source', 'a.gff_feature');
 }
 
 
@@ -365,9 +375,8 @@ sub _objs_from_sth {
   my ($self, $sth) = @_;
 
   my @out;
-  my ( $created, $logic_name, $db, $db_version, $db_file, $program, $program_version, $program_file, $parameters, $module, $module_version, $gff_source, $gff_feature);
-  my ( $analysis_run_id, $analysis_id, $run_date, $input_db_id, $output_db_id);
-  $sth->bind_columns( \$created, \$logic_name, \$db, \$db_version, \$db_file, \$program, \$program_version, \$program_file, \$parameters, \$module, \$module_version, \$gff_source, \$gff_feature);
+  my ( $analysis_id, $created, $logic_name, $db, $db_version, $db_file, $program, $program_version, $program_file, $parameters, $module, $module_version, $gff_source, $gff_feature);
+  $sth->bind_columns( \$analysis_id, \$created, \$logic_name, \$db, \$db_version, \$db_file, \$program, \$program_version, \$program_file, \$parameters, \$module, \$module_version, \$gff_source, \$gff_feature);
 
   while($sth->fetch()) {
     push @out, Bio::EnsEMBL::Pipeline::Analysis->new(
@@ -387,6 +396,7 @@ sub _objs_from_sth {
        -created         => $created,
        -logic_name      => $logic_name,
        );
+    print STDERR $analysis_id, "\n";
     my $type = $self->fetch_analysis_input_id_type($out[-1]);
     $out[-1]->input_id_type($type);
   }

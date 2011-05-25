@@ -1,11 +1,26 @@
-package Bio::EnsEMBL::Pipeline::RuleManager;
+=head1 LICENSE
 
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-=pod 
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RuleManager
+Bio::EnsEMBL::Pipeline::RuleManager - 
 
 =head1 SYNOPSIS
 
@@ -14,15 +29,19 @@ Bio::EnsEMBL::Pipeline::RuleManager
 
 The RuleManager object is to provide functionailty for creating Jobs, checking if they can run and checking their status and existence
 
-=head1 CONTACT
+=head1 METHODS
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+=cut
 
 =head1 APPENDIX
 
 The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
 
 =cut
+
+
+package Bio::EnsEMBL::Pipeline::RuleManager;
+
 
 
 use vars qw(@ISA);
@@ -33,6 +52,7 @@ use Sys::Hostname;
 use Socket;
 
 use Bio::EnsEMBL::Pipeline::Config::General;
+use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
@@ -1008,6 +1028,11 @@ sub cleanup_waiting_jobs{
   } 
 }
 
+sub cleanup_meta {
+    my $self = shift;
+
+    Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::cleanup_meta_tracking($self->db);
+}
 
 =head2 add_created_jobs_back
 
@@ -1235,8 +1260,9 @@ sub number_output_dirs {
 
 sub analysisrun_setup {
   my $self = shift;
-  my ($rh_analyses_to_run, $rh_analyses_to_skip, $rh_to_keep) = @_;
+  my ($rh_analyses_to_run, $rh_analyses_to_skip, $tracking, $rh_to_keep) = @_;
 
+print STDERR "AnalysisRun Setup\n";
   my $analysis_adaptor = $self->analysis_adaptor;
   my @a_analysis;
   if (keys(%$rh_analyses_to_run)) {
@@ -1248,20 +1274,7 @@ sub analysisrun_setup {
       push(@a_analysis, $analysis->dbID);
     }
   }
-  if ($rh_to_keep) {
-      my @a_tmp ;
-      while( my $analysis = shift(@a_analysis)) {
-          print STDERR $analysis, "\n";
-          if ($self->db->get_meta_value_by_key('tracking.analysis', $analysis)) {
-              next if (exists $rh_to_keep->{$analysis});
-          }
-          else {
-              $self->db->store_meta_key_value('tracking.analysis', $analysis);
-          }
-          push(@a_tmp, $analysis)
-      }
-      @a_analysis = @a_tmp;
-  }
-  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis));
+  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis), $rh_to_keep)
+    if ($tracking);
 }
 1;

@@ -1,7 +1,22 @@
-# EnsEMBL module for Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
@@ -51,49 +66,49 @@
 
 =head2 Database throttling
 
-    This runs a job on a linux host, throttles ecs4:3350 to not have
-    more than 300 active connections, 10 connections per job in the
-    duration of the first 10 minutes when the job is running (means 30
-    hosts * 10 connections = 300 connections):
+  In order to run no more than 10 jobs concurrently against a database,
+  we would submit jobs asking for 1000 tokens each (10,000/10=1000).
+  
+  bsub -R "rusage[myens_gen1tok=1000]" ....
+  
+  If you wanted to run no more than 500 jobs against the database, you
+  would tell LSF that each job requires 20 tokens. (10,000/500=20).
+  
+  bsub -R "rusage[myens_gen1tok=20]" ....
+  
+  You will have to experiment to find out how many concurrent jobs your
+  database can support; it will depend on how complex your sql queries are.
+  
+  By default jobs taken token for the whole lifetime of a job. However, some
+  jobs only use a database at the start of a job. It is possible to add a
+  duration to the token reservation so that the tokens are returned x minutes
+  after the job has started.
+  
+  Durations are specified in hours or minutes.
+  
+  bsub -R "rusage[token=1000:duration=5]" ...   # reserve 1000 tokens for 5 minutes
+  bsub -R "rusage[token=20:duration=12h]" ..  # reserve 20 tokens for 12 hours
+  
+  You can also specify the "decay" flag, which causes tokens to linearly
+  decrease over the time period.
+  
+  bsub -R "rusage[token=10:duration=1h:decay=1]" #release 1 token per hour over the first 10 hours.
+  
+  [edit] Playing nicely with others
+  
+  If multiple users request tokens from the same database, LSF will arbirate
+  between them using the normal faireshare facilities. However, you may wish
+  to reserve tokens for other users to use. You can use a select statement to
+  stop your jobs from using all of the available tokens, keeping them free for
+  another user.
+  
+  eg: To reserve 2000 tokens for another user:
+  
+  bsub -R "rusage[token=100] select[token>2000]"
+  
+  The above example would allow 80 jobs to run at any one time. (10,000-2000)/100=80. 
 
-        resource =>'select[linux && ecs4my3350 <=300] rusage[ecs4my3350=10:duration=10]',
-
-    Running on 'linux' hosts with not more than 200 active connections
-    for myia64f and myia64g, 10 connections per job to each
-    db-instance for the first 10 minutes:
-
-        resource =>'select[linux && myia64f <=200 && myia64g <=200] rusage[myia64f=10:myia64g=10:duration=10]',
-
-    Running on hosts of model 'IBMBC2800' hosts with not more than
-    200 active connections to myia64f, 10 connections per job for the
-    first 10 minutes:
-
-        resource =>'select[model==IBMBC2800 && myia64f<=200] rusage[myia64f=10:duration=10]',
-
-    Running on hosts of host_group bc_hosts with not more than 200
-    active connections to myia64f, 10 connections per job for the
-    first 10 minutes:
-
-        resource =>'select[myia64f<=200] rusage[myia64f=10:duration=10]',
-        sub_args =>'-m bc_hosts'
-
-=head1 LICENSE
-
-    Copyright (c) 1999-2009 The European Bioinformatics Institute and
-    Genome Research Limited.  All rights reserved.
-
-    This software is distributed under a modified Apache license.
-    For license details, please see
-
-      http://www.ensembl.org/info/about/code_licence.html
-
-=head1 CONTACT
-
-    Please email comments or questions to the public Ensembl
-    developers list at <ensembl-dev@ebi.ac.uk>.
-
-    Questions may also be sent to the Ensembl help desk at
-    <helpdesk@ensembl.org>.
+=head1 METHODS
 
 =cut
 

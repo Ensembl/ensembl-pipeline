@@ -1,19 +1,30 @@
-# Ensembl Pipeline module for handling job submission via Sun Grid Engine 
-# load sharing software
-#
-# Cared for by Steve Searle
-#
-# Copyright Steve Searle
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
+=head1 LICENSE
 
-=pod
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 AUTHORS
+
+Steve Searle
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine
+Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine - 
 
 =head1 SYNOPSIS
 
@@ -40,9 +51,8 @@ in a distributed environment using Sun Grid Engine.
 
 See base class Bio::EnsEMBL::Pipeline::BatchSubmission for more info
 
-=head1 CONTACT
+=head1 METHODS
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 

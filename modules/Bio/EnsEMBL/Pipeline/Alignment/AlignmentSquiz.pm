@@ -1,9 +1,41 @@
+=head1 LICENSE
 
-# Simple hacked module for looking at alignment quality, especially
-# coverage and identity.  Designed for finding odd alignments.
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-# Use the script ensembl-pipeline/scripts/alignment_squiz.pl to 
-# drive this module.
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 NAME
+
+AlignmentSquizz - 
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+  Simple hacked module for looking at alignment quality, especially
+  coverage and identity.  Designed for finding odd alignments.
+  Use the script ensembl-pipeline/scripts/alignment_squiz.pl to 
+  drive this module.
+
+=head1 METHODS
+
+=cut
+
 
 
 package AlignmentSquizz;

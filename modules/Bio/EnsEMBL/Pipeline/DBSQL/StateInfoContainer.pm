@@ -1,19 +1,30 @@
-# Perl module for Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
-#
-# Creator: Arne Stabenau <stabenau@ebi.ac.uk>
-#
-# Date of creation: 15.09.2000
-# Last modified : 20.09.2000 by Arne Stabenau
-#
-# Copyright EMBL-EBI 2000
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 AUTHORS
+
+Arne Stabenau <stabenau@ebi.ac.uk>
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
+Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer - 
 
 =head1 SYNOPSIS
 
@@ -28,15 +39,9 @@ this object.
 
 Deliberatly NOT called an adaptor, as it does not serve objects.
 
-=head1 CONTACT
+=head1 METHODS
 
-=over 4
-
-=item Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-
-=item Ewan Birney on EnsEMBL in general: birney@ebi.ac.uk
-
-=back
+=cut
 
 =head1 APPENDIX
 
@@ -63,13 +68,15 @@ use strict;
 
 =head2 new
 
-Object constructor. Takes a
-Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor as argument.
-
-Can also be constructed by calling
-get_StateInfoContainer() on a
-Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor.
-
+ Arg [1]    : Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
+ Example    : 
+ Description: Constructor
+              Can also be constructed by calling
+              get_StateInfoContainer() on a
+              Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor.
+ Returntype :
+ Exceptions :
+ 
 =cut
 
 sub new {
@@ -83,10 +90,12 @@ sub new {
 
 =head2 fetch_analysis_by_input_id
 
-Fetches all analyses
-which have been completed on a specific input ID
-Takes one string - input ID
-and returns a ref to a list of Bio::EnsEMBL::Analysis.
+ Arg [1]    : string, input ID
+ Example    : 
+ Description: Fetches all analyses which have been completed
+              on a specific input ID
+ Returntype : listref of Bio::EnsEMBL::Analysis
+ Exceptions : 
 
 =cut
 
@@ -117,12 +126,14 @@ sub fetch_analysis_by_input_id {
 
 =head2 store_input_id_analysis
 
-Stores an input ID, type and analysis [optionally runtime info].
-Takes an input ID (as string), Bio::EnsEMBL::Analysis object, 
-and [optionally save_runtime_info Boolean].
-Throws an exception if any of the inputs are invalid or if 
-the analysis object does not have a type.
- called by: Job->run_module
+ Arg [1]    : input ID (as string)
+ Arg [2]    : Bio::EnsEMBL::Analysis object
+ Arg [3]    : [optionally save_runtime_info Boolean]
+ Example    : 
+ Description: Stores an input ID, type and analysis [optionally runtime info]
+ Returntype :  
+ Exceptions : Throws an exception if any of the inputs are invalid or if 
+              the analysis object does not have a type.
 
 =cut
 
@@ -163,10 +174,11 @@ sub store_input_id_analysis {
 
 =head2 list_input_id_created_by_analysis
 
-As list_input_id_by_analysis() but
-also returns the time the analysis was
-created. Returns a ref to a list of (anonymous)
-arrays.
+ Arg [1]    : 
+ Example    : $As list_input_id_by_analysis() but
+ Description:  also returns the time the analysis was
+ Returntype :  created. Returns a ref to a list of (anonymous)
+ Exceptions :  arrays.
 
   foreach my $id_time ($sic->list_input_id_created_by_analysis) {
     my $id      = $id_time->[0];
@@ -196,11 +208,11 @@ sub list_input_id_created_by_analysis {
 
 
 =head2 list_input_id_by_Analysis
-
-Takes a Bio::EnsEMBL::Analysis object and
-returns a ref to a list of input IDs which have had
-that analysis performed on them.
-
+ Arg [1]    : 
+ Example    : $Takes a Bio::EnsEMBL::Analysis object and
+ Description:  returns a ref to a list of input IDs which have had
+ Returntype :  that analysis performed on them.
+ Exceptions : 
   foreach my $idlist ($sic->list_input_id_class_by_Analysis('SubmitSlice')) {
     my $id    = $idlist->[0];
     my $class = $idlist->[1];
@@ -237,11 +249,11 @@ sub list_input_id_by_Analysis {
 
 =head2 list_input_id_by_Analysis_assembly_type
 
- 
- As for list_input_id_by_Analysis but takes an optional list ref
-of assembly types to return for. 
-
- $obj->list_input_id_by_Analysis_assembly_type($AnalysisObj, ['test', 'other']);
+  Arg [1]    : 
+  Example    : $As for list_input_id_by_Analysis but takes an optional list ref
+o Description:  f assembly types to return for. 
+  Returntype : 
+  Exceptions :  $obj->list_input_id_by_Analysis_assembly_type($AnalysisObj, ['test', 'other']);
 
  This is mainly for the Finished Analysis Pipeline.
 
@@ -283,11 +295,11 @@ sub list_input_id_by_Analysis_assembly_type {
 }
 
 =head2 list_input_id_class_by_start_count
-
-Returns a ref to a list of all input_id and class,
-with an optional start and end limit.
-
-  # get 1st 100 entries from list
+ Arg [1]    : 
+ Example    : $Returns a ref to a list of all input_id and class,
+ Description:  with an optional start and end limit.
+ Returntype : 
+ Exceptions :    # get 1st 100 entries from list
 
   foreach my $idlist ($sic->list_input_id_class_by_start_count(0, 100)) {
     my $id    = $idlist->[0];
@@ -388,11 +400,11 @@ sub list_input_ids_by_analysis {
 
 
 =head2 delete_input_id
-
-Takes an input ID (as a string) and removes
-all matching entries from the pipeline
-database. See also delete_input_id_class()
-and delete_input_id_analysis().
+ Arg [1]    : 
+ Example    : $Takes an input ID (as a string) and removes
+ Description:  all matching entries from the pipeline
+ Returntype :  database. See also delete_input_id_class()
+ Exceptions :  and delete_input_id_analysis().
 
 =cut
 
@@ -408,11 +420,11 @@ sub delete_input_id {
 
 
 =head2 delete_input_id_analysis
-
-Takes an input ID (as a string) and an
-analysis internal ID or Bio::EnsEMBL::Analysis
-and removes
-all matching entries from the pipeline
+ Arg [1]    : 
+ Example    : $Takes an input ID (as a string) and an
+ Description:  analysis internal ID or Bio::EnsEMBL::Analysis
+ Returntype :  and removes
+ Exceptions :  all matching entries from the pipeline
 database. See also delete_input_id()
 and delete_input_id_class().
 
@@ -438,11 +450,11 @@ sub delete_input_id_analysis {
 
 
 =head2 db
-
-Method to get/set the DB object. Takes
-and returns a Bio::EnsEMBL::DBSQL::DBAdaptor.
-
-  my $job_adaptor = $sic->db->get_JobAdaptor;
+ Arg [1]    : 
+ Example    : $Method to get/set the DB object. Takes
+ Description:  and returns a Bio::EnsEMBL::DBSQL::DBAdaptor.
+ Returntype : 
+ Exceptions :    my $job_adaptor = $sic->db->get_JobAdaptor;
 
 =cut
 
@@ -457,11 +469,11 @@ sub db {
 
 
 =head2 prepare
-
-Convenience DBI prepare method.
-
-  my $sth = $sic->prepare(q{
-    SELECT distinct input_id from input_id_analysis
+ Arg [1]    : 
+ Example    : $Convenience DBI prepare method.
+ Description: 
+ Returntype :    my $sth = $sic->prepare(q{
+ Exceptions :      SELECT distinct input_id from input_id_analysis
   });
   $sth->execute;
 

@@ -1,6 +1,6 @@
 =head1 LICENSE
 
-  Copyright (c) 1999-2010 The European Bioinformatics Institute and
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
   Genome Research Limited.  All rights reserved.
 
   This software is distributed under a modified Apache license.
@@ -20,11 +20,18 @@
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::Job
+Bio::EnsEMBL::Pipeline::Job - 
+
+=head1 SYNOPSIS
+
 
 =head1 DESCRIPTION
 
   Stores run and status details of an analysis job
+
+=head1 METHODS
+
+=cut
 
 =head1 APPENDIX
 
@@ -960,9 +967,11 @@ sub can_retry{
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
   if (!$self->retry_count) {
+    $BATCH_QUEUES{$logic_name}{'batch_size'} = $BATCH_QUEUES{$logic_name}{'retry_batch_size'} if (exists $BATCH_QUEUES{$logic_name}{'retry_batch_size'});
     return 1;
   }
   if ($self->retry_count && $self->retry_count <= $max_retry) {
+    $BATCH_QUEUES{$logic_name}{'batch_size'} = $BATCH_QUEUES{$logic_name}{'retry_batch_size'} if (exists $BATCH_QUEUES{$logic_name}{'retry_batch_size'});
     return 1;
   } else {
     return 0;

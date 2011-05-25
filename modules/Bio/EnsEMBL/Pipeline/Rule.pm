@@ -1,18 +1,30 @@
-# Perl module for Bio::EnsEMBL::Pipeline::Rule
-#
-# Creator: Arne Stabenau <stabenau@ebi.ac.uk>
-# Date of creation: 10.09.2000
-# Last modified : 10.09.2000 by Arne Stabenau
-#
-# Copyright EMBL-EBI 2000
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 AUTHORS
+
+Arne Stabenau <stabenau@ebi.ac.uk>
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Rule
+Bio::EnsEMBL::Pipeline::Rule - 
 
 =head1 SYNOPSIS
 
@@ -20,10 +32,8 @@ Bio::EnsEMBL::Pipeline::Rule
 =head1 DESCRIPTION
 
 
-=head1 CONTACT
+=head1 METHODS
 
-    Contact Arne Stabenau on implemetation/design detail: stabenau@ebi.ac.uk
-    Contact Ewan Birney on EnsEMBL in general: birney@sanger.ac.uk
 
 =head1 APPENDIX
 

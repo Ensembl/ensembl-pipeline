@@ -1,11 +1,26 @@
-# Perl module for Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
-# POD documentation - main docs before the code
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor
+Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor - 
 
 =head1 SYNOPSIS
 
@@ -17,9 +32,8 @@ Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor
 Module to encapsulate all db access to flag table
 
 
-=head1 CONTACT
+=head1 METHODS
 
-Post general queries to ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 
