@@ -79,6 +79,10 @@ my $submission_limit;
 my $dbload;
 my $submission_number = 1000; 
 my $number_output_dirs = 10;  
+my $tracking;  
+my $keep_all;  
+my $batch;
+
 GetOptions(
            'dbhost=s'               => \$dbhost,
            'dbname=s'               => \$dbname,
@@ -124,7 +128,10 @@ GetOptions(
            'submission_number=s'    => \$submission_number,
            'unlock|delete_lock'     => \$unlock,
            'number_output_dirs=i'   => \$number_output_dirs,  
+           'tracking!'              => \$tracking,  
            'to_keep=s@'             => \@to_keep,  
+           'batch=s'                => \$batch,
+           'keep_all!'              => \$keep_all,  
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -155,14 +162,6 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                        -pass   => $dbpass,
                                                        -port   => $dbport,
                                                       );
-
-#my $track_db = Bio::EnsEMBL::Analysis::EvidenceTracking::DBSQL::DBAdaptor->new(
-#                                                       -host   => $dbhost,
-#                                                       -dbname => $dbname,
-#                                                       -user   => $dbuser,
-#                                                       -pass   => $dbpass,
-#                                                       -port   => $dbport,
-#                                                      );
 
 my $sanity = Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks->new
   (
@@ -291,7 +290,14 @@ while (1) {
     next INPUT_ID_TYPE if ($type eq 'ACCUMULATOR');
 
     my @id_list = keys(%{$id_hash->{$type}});
-    @id_list = shuffle(@id_list) if $shuffle;
+    if ($shuffle) {
+        if ($batch) {
+           @id_list = ordered_shuffle(@id_list);
+        }
+        else {
+           @id_list = shuffle(@id_list);
+        }
+    }
 
    INPUT_ID:
     foreach my $input_id (@id_list){
@@ -379,6 +385,7 @@ while (1) {
   }
 
   $rulemanager->cleanup_waiting_jobs();
+  $rulemanager->cleanup_meta();
   if ($done || $once) {
     $rulemanager->db->pipeline_unlock;
     exit 0;
@@ -400,7 +407,7 @@ sub setup_pipeline{
   $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                $types_to_run, $types_to_skip, 
                                $starts_from);
-  $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, \%to_keep);
+  $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, $tracking, \%to_keep) unless ($keep_all);
 }
 
 sub shuffle {
@@ -413,6 +420,47 @@ sub shuffle {
 
     return @out;
 }
+
+sub ordered_shuffle {
+    my (@in) = @_;
+    my @out;
+
+    my @tmp = sort { my ($o) =$a =~ /^[^:]+:[^:]+:[^:]+:[^:]+:([^:]+)/; my ($p) = $b =~ /^[^:]+:[^:]+:[^:]+:[^:]+:([^:]+)/; $p <=> $o } @in;
+    my $add = 0;
+    my $i = 0;
+    my $base;
+    my $size = scalar(@tmp);
+    if ($size%$batch) {
+        $base = int($size/$batch)+1;
+    }
+    else {
+        $base = int($size/$batch);
+    }
+    if ($batch < $base) {
+        ($batch, $base) = ($base, $batch);
+    }
+    while (my $tmp = shift @tmp) {
+        my $index = $base*$i+$add;
+        $out[$index] = $tmp;
+        ++$i;
+        if ($i >= $batch) {
+            ++$add;
+            $i = 0;
+            last;
+        }
+    }
+    while (my $tmp = pop @tmp) {
+        my $index = $base*$i+$add;
+        $out[$index] = $tmp;
+        ++$i;
+        if ($i >= $batch) {
+            ++$add;
+            $i = 0;
+        }
+    }
+    return @out;
+}
+
 
 
 sub termhandler {
