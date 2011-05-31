@@ -390,12 +390,13 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				              	#add_trans_remark($R_chr, $status, $tt);
 				              	push @proj_trans, $tt;
 								$support->log_verbose(
-					              	sprintf("\t%s %s %d %d CDS transferred cleanly:\n",
+					              	sprintf("\t%s %s %d %d CDS transferred cleanly (UTR lost):\n",
 					                	$t->stable_id,
 					                    $t->biotype,
 					                    $t->start,
 					                    $t->end)
 								);
+                                                &add_hidden_remark( $t->slice->seq_region_name, "missing_UTRs", $tt );
 				            	&log_compare_transcripts($cds_t, $tt);
 				            	&remove_all_db_ids($tt);
 				            } else {
@@ -415,7 +416,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 				                &remove_all_db_ids($new_t);
 				              	&log_summarise_projection_by_exon($t, $alt_sl);
 				            }
-						} else {
+						} else { # not ($t->translation and $haplo)
 							my $new_t = &project_transcript_the_hard_way($g, $t, $alt_sl );
 							if(!$new_t) {
 								$support->log_verbose(sprintf("WARNING: %s %s %d %d in gene %s ($gene_name) cannot be transfered on %s\n",
