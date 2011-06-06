@@ -162,7 +162,7 @@ $support->check_required_params(
 #####
 # connect to database and get adaptors
 #
-my ($dba, $dbh, $block_sql, $block_sth);
+my ($block_sql, $block_sth);
 
 # first set connection parameters for alternative db
 # both databases have to be on the same host, so we don't need to configure
@@ -174,7 +174,7 @@ for my $prm ( qw(host port user pass dbname) ) {
 # reference database
 my $R_dba = $support->get_database('ensembl', '');
 my $R_pipe_dba = &get_pipe_db($R_dba);
-my $R_dbh = $R_dba->dbc->db_handle;
+my $R_dbc = $R_dba->dbc;
 my $R_asm = $support->param('assembly');
 
 # database containing the alternative assembly
@@ -220,19 +220,19 @@ if(scalar(@where)) {
     $block_sql .= ' WHERE '.join(' AND ', @where);
 }
 
-$block_sth = $R_dbh->prepare($block_sql);
+$block_sth = $R_dbc->prepare($block_sql);
 $block_sth->execute;
 
 # Pre-prepare per-block mask queries
 my $ref_mask_sql = qq(SELECT ref_mask_start AS mask_start, ref_mask_end AS mask_end
                         FROM tmp_mask 
                        WHERE tmp_align_id = ? AND ref_mask_start IS NOT NULL);
-my $ref_mask_sth = $R_dbh->prepare($ref_mask_sql);
+my $ref_mask_sth = $R_dbc->prepare($ref_mask_sql);
 
 my $alt_mask_sql = qq(SELECT alt_mask_start AS mask_start, alt_mask_end AS mask_end
                         FROM tmp_mask 
                        WHERE tmp_align_id = ? AND alt_mask_start IS NOT NULL);
-my $alt_mask_sth = $R_dbh->prepare($alt_mask_sql);
+my $alt_mask_sth = $R_dbc->prepare($alt_mask_sql);
 
 BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
 
