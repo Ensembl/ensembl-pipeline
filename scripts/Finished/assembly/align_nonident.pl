@@ -340,7 +340,7 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
   # This will avoid everlasting alignment...
    $support->log("Checking sequences...\n", 2);
    if($aligner->bad_sequences($A_basename, $R_basename)){
-   	    $support->log("Skip block $id (not soft-masked and too long)...\n", 2);
+   	    $support->log_warning("Skip block $id (not soft-masked and too long)...\n", 2);
    	    next BLOCK;
    }
 

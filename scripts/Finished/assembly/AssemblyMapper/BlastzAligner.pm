@@ -3,6 +3,10 @@ package AssemblyMapper::BlastzAligner;
 use File::Basename;
 use Bio::EnsEMBL::Analysis::Config::General;
 
+use Readonly;
+
+Readonly my $MAX_UNMASKED_SEQ_LEN => 2500000;
+
 =head1 NAME
 
 BlastzAligner.pm - module to do a whole genome alignment between two closely
@@ -244,7 +248,7 @@ sub run_lastz {
 =head2 bad_sequences
 
   Description : return true if one sequence in the list is longer than 
-                the limit (1.1MB) and not soft masked.
+                the limit and not soft or hard masked.
   Return type : true or false
   Caller      : general
 
@@ -258,8 +262,8 @@ sub bad_sequences {
 		my $seq = $seqio->next_seq();
 		my $string = $seq->seq;
 		my $base_count = $string =~ s/([atgc])/$1/ig;
-		my $masked_count = $string =~ s/([atgc])/$1/g;
-		return 1 unless($base_count < 1100000 || $masked_count > 0);
+		my $masked_count = $string =~ s/([atgcN])/$1/g;
+		return 1 unless($base_count < $MAX_UNMASKED_SEQ_LEN || $masked_count > 0);
 	}
 	return 0;	
 }
