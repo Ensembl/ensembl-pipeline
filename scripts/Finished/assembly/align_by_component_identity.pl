@@ -235,7 +235,7 @@ if ($write_db) {
           PRIMARY KEY (tmp_align_id)
           ) ENGINE=InnoDB;
   )
-	);
+    );
 
     # clear tmp_align table of entries from previous runs
     $R_dbc->do(qq(DELETE FROM tmp_align));
@@ -254,7 +254,7 @@ if ($write_db) {
           KEY tmp_align_idx (tmp_align_id)
           ) ENGINE=InnoDB;
   )
-	);
+    );
 
     # clear tmp_mask table of entries from previous runs
     $R_dbc->do(qq(DELETE FROM tmp_mask));
@@ -263,7 +263,7 @@ else {
     $support->log(
         "\nHere I would create and empty 'tmp_align' and 'tmp_mask' tables, if you'd let me\n",
         1
-	);
+    );
 }
 
 
@@ -311,7 +311,7 @@ my $sth2 = $R_dbc->prepare(
 
 my $sth_mask = $R_dbc->prepare(
     qq{
-  INSERT INTO tmp_mask 
+  INSERT INTO tmp_mask
       (tmp_align_id, alt_mask_start, alt_mask_end, ref_mask_start, ref_mask_end)
       values (?, ?, ?, ?, ?)
 }
@@ -384,7 +384,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     }
 
     my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
-    
+
     # loop over sdiff results
   DIFF: foreach my $diff (@assembly_diffs)  {
 
@@ -396,7 +396,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
       my $R_exists = $R_ele ? 1 : 0;
       my $A_exists = $A_ele ? 1 : 0;
-      
+
       my ($R_ele_slice, $A_ele_slice);
       my ($R_key, $A_key) = ('<UNDEF>', '<UNDEF>');
 
@@ -635,7 +635,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     # dummy match at end of chromosome
     my $A_dummy_last_start = $Alt_start ? $Alt_start + $A_length : 1 + $A_length;
     my $R_dummy_last_start = $Ref_start ? $Ref_start + $R_length : 1 + $R_length;
-    my $last = { 
+    my $last = {
         A_start => $A_dummy_last_start,
         A_end   => $A_dummy_last_start,
         A_count => 0,
@@ -702,7 +702,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 # - queue the intruding alt block for masking and move onto the next
                 push @alt_masks, $match_by_alt unless $match_by_alt == $last;
                 $match_by_alt = shift @matches_by_alt;
-                
+
                 # - restart comparison to use the new alt block, and in case there's another alt insert
                 redo DIR_ALIGN_BLOCK if $match_by_alt;
 
@@ -724,7 +724,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             }
 
         }
-        
+
         if ( ($r_start - $sr_end) < 1 ) {
             # This should never get hit
             $support->log_warning( "We shouldn't be going backwards!\n" );
@@ -914,37 +914,37 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                  "Identical components that were skipped:",
                  $stats_chr{'skipped'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components with start/end mismatch:",
                  $stats_chr{'mismatch'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components only in alternative assembly:",
                  $stats_chr{'A_only'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components only in reference assembly:",
                  $stats_chr{'R_only'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt2,
                  "Direct match coverage (alternative):",
                  $stats_chr{'A_coverage'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt2,
                  "Direct match coverage (reference):",
                  $stats_chr{'R_coverage'} ),
         2
-	);
+    );
 
     # Aligned blocks
     if ( $match->{$R_chr} ) {
@@ -1278,14 +1278,14 @@ sub parse_projections {
             }
         }
     }
-    push @$blocks, 
+    push @$blocks,
     {
         R_start => $R_chr_s,
         R_end   => $R_chr_e,
         A_start => $A_chr_s,
         A_end   => $A_chr_e,
         tag     => 0,
-        ori     => $ori 
+        ori     => $ori
     };
 
     # create the 2nd non-align block if exists
@@ -1375,7 +1375,7 @@ sub store_blocks {
                 R_start => $R_s,
                 R_end   => $R_e,
                 R_count => 1,
-                A_name  => $A_name 
+                A_name  => $A_name
             };
         }
     }

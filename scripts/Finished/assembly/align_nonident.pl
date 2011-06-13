@@ -225,26 +225,26 @@ $block_sth->execute;
 
 # Pre-prepare per-block mask queries
 my $ref_mask_sql = qq(SELECT ref_mask_start AS mask_start, ref_mask_end AS mask_end
-                        FROM tmp_mask 
+                        FROM tmp_mask
                        WHERE tmp_align_id = ? AND ref_mask_start IS NOT NULL);
 my $ref_mask_sth = $R_dbc->prepare($ref_mask_sql);
 
 my $alt_mask_sql = qq(SELECT alt_mask_start AS mask_start, alt_mask_end AS mask_end
-                        FROM tmp_mask 
+                        FROM tmp_mask
                        WHERE tmp_align_id = ? AND alt_mask_start IS NOT NULL);
 my $alt_mask_sth = $R_dbc->prepare($alt_mask_sql);
 
 BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
 
   my $id = $row->{'tmp_align_id'};
-  
+
   # create BlastzAligner object
-	my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
+    my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
 
-	# create tmpdir to store input and output
-	$aligner->create_tempdir($support->param('tmpdir'));
+    # create tmpdir to store input and output
+    $aligner->create_tempdir($support->param('tmpdir'));
 
-  
+
   $aligner->id($id);
   $aligner->seq_region_name($row->{'ref_seq_region_name'});
 
@@ -266,10 +266,10 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
   my $R_basename = "ref_seq.$id";
 
   $support->log("Writing sequences to fasta...\n", 2);
-  
-  # This is needed otherwise will get a sequence of N's for the ref slice  
+
+  # This is needed otherwise will get a sequence of N's for the ref slice
   ($R_pipe_dba ? $R_pipe_dba : $R_dba)->get_AssemblyMapperAdaptor()->delete_cache();
-  
+
     my $R_slice;
   if ($R_pipe_dba) {
     eval {
@@ -291,7 +291,7 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
       1,
       $support->param('assembly'),
    ) unless $R_slice;
-  
+
   $aligner->write_sequence(
       $R_slice,
       $support->param('assembly'),
@@ -299,14 +299,14 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
       undef,
       $ref_masks,
   );
-  
+
   ($A_pipe_dba ? $A_pipe_dba : $A_dba)->get_AssemblyMapperAdaptor()->delete_cache();
-  
+
 
   my $A_slice;
   if($A_pipe_dba){
       eval {
-  	$A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
+    $A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
       $row->{'alt_seq_region_name'},
       $row->{'alt_start'},
@@ -324,7 +324,7 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
       1,
       $support->param('altassembly'),
    ) unless $A_slice;
-   
+
    $aligner->write_sequence(
       $A_slice,
       $support->param('altassembly'),
@@ -332,16 +332,16 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
       undef,
       $alt_masks,
   );
-   
-   
+
+
   $support->log("Done.\n", 2);
-  
+
   # skip unmasked ref/alt sequences longer than 1.1MB
   # This will avoid everlasting alignment...
    $support->log("Checking sequences...\n", 2);
    if($aligner->bad_sequences($A_basename, $R_basename)){
-   	    $support->log_warning("Skip block $id (not soft-masked and too long)...\n", 2);
-   	    next BLOCK;
+        $support->log_warning("Skip block $id (not soft-masked and too long)...\n", 2);
+        next BLOCK;
    }
 
   # align using lastz
@@ -381,17 +381,17 @@ BLOCK: while (my $row = $block_sth->fetchrow_hashref) {
   $aligner->log_block_stats(2);
 
   $support->log_stamped("Done with block $id.\n", 1);
-  
 
-	# write alignments to assembly table
-	$aligner->write_assembly($R_dba, [$row->{'ref_seq_region_name'}], [$row->{'alt_seq_region_name'}]);
 
-	# overall stats
-	$aligner->log_overall_stats;
+    # write alignments to assembly table
+    $aligner->write_assembly($R_dba, [$row->{'ref_seq_region_name'}], [$row->{'alt_seq_region_name'}]);
 
-	# cleanup
-	$support->log_stamped("\nRemoving tmpdir...\n");
-	$aligner->remove_tempdir;
+    # overall stats
+    $aligner->log_overall_stats;
+
+    # cleanup
+    $support->log_stamped("\nRemoving tmpdir...\n");
+    $aligner->remove_tempdir;
 
 } # while ($row = fetchrow...)
 
@@ -406,13 +406,13 @@ $support->log("\nDon't forget to drop the tmp_align & tmp_mask tables when all i
 $support->finish_log;
 
 sub get_pipe_db {
-	my ($dba) = @_;
-	my $metakey = 'pipeline_db_head';
-	my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
-	
-	return undef unless $opt_str;
-	
-	my %anycase_options = (
+    my ($dba) = @_;
+    my $metakey = 'pipeline_db_head';
+    my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
+
+    return undef unless $opt_str;
+
+    my %anycase_options = (
         eval $opt_str,
     );
     if ($@) {
@@ -422,8 +422,8 @@ sub get_pipe_db {
     while( my ($k,$v) = each %anycase_options) {
         $uppercased_options{uc($k)} = $v;
     }
-	
-	return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
+
+    return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
 }
 
 
