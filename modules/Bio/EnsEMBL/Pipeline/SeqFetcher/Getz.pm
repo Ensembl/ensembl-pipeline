@@ -117,7 +117,7 @@ sub library {
 
 =cut
 
-sub  get_Seq_by_acc {
+sub get_Seq_by_acc {
   my ($self, $acc) = @_;
   my $libs = $self->library;
 
@@ -159,7 +159,7 @@ sub  get_Seq_by_acc {
 
 =cut
 
-sub  get_Seq_by_id {
+sub get_Seq_by_id {
   my ($self, $id) = @_;
   my $libs = $self->library;
 

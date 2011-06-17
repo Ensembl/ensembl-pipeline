@@ -72,7 +72,7 @@ sub new {
 
 =cut
 
-sub  get_Seq_by_acc {
+sub get_Seq_by_acc {
   my ($self, $acc) = @_;
   
   if (!defined($acc)) {

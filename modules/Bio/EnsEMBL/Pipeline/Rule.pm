@@ -45,7 +45,7 @@ use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
 @ISA = qw();
 
-=head2 Constructor
+=head2 new
 
   Title   : new
   Usage   : ...Rule->new($analysis);

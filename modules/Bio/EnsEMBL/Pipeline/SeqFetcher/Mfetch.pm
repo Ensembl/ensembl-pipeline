@@ -125,7 +125,7 @@ sub options {
 
 =cut
 
-sub  get_Seq_by_acc {
+sub get_Seq_by_acc {
   my ($self, $acc) = @_;
   
   if (!defined($acc)) {
@@ -194,7 +194,7 @@ sub  get_Seq_by_acc {
 
 =cut
 
-sub  get_Entry_Fields {
+sub get_Entry_Fields {
   my ($self, $acc_to_fetch,$fields) = @_; 
 
    print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
@@ -301,7 +301,7 @@ sub _mfetch_command {
 
 =cut
 
-sub  get_Seq_by_acc_wildcard {
+sub get_Seq_by_acc_wildcard {
   my ($self, $acc) = @_;
 
   $acc=~s/\..*//g; # chop version off 
