@@ -43,7 +43,7 @@ use strict;
 
 @ISA = qw( Bio::EnsEMBL::Root );
 
-=head2 Constructor
+=head2 new
 
   Title   : new
   Usage   : ...Flag->new($analysis);
@@ -115,10 +115,10 @@ sub dbID {
   return $self->{'_dbID'};
 }
 
-=head2 ensemblID
+=head2 ensembl_id
 
   Title   : ensemblID
-  Usage   : $self->ensemblID($ensemblID);
+  Usage   : $self->ensembl_id($ensemblID);
   Function: Get/set method for the dbID of the object to be flagged
   Returns : Scalar
   Args    : Scalar

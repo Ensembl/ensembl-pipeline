@@ -53,7 +53,7 @@ use strict;
 use Carp;
 @ISA = qw( Bio::EnsEMBL::Root );
 
-=head2 Constructor
+=head2 new
 
   Title   : new
   Usage   : $dbobj->get_RuleAdaptor

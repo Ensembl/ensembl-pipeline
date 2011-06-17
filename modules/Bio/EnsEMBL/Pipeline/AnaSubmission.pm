@@ -18,15 +18,15 @@ use Hum::SubmissionConf;
                 get_db
                 );
 
-=pod
-
-=head2 ref_from_query( SQL )
-
-Returns a reference to an array of anonymous
-arrays containing the results from running the
-B<SQL> query on the database.  
-
-=cut
+#=pod
+#
+#=head2 ref_from_query( SQL )
+#
+#Returns a reference to an array of anonymous
+#arrays containing the results from running the
+#B<SQL> query on the database.  
+#
+#=cut
 ##
 ##sub ref_from_query {
 ##    my( $query ) = @_;
