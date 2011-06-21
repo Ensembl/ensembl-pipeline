@@ -117,7 +117,7 @@ use vars qw(%Config);
     {
       logic_name => 'BlastmiRNA',
       batch_size => 500,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      resource   => 'select[linux && <REFINS> > <REFLOAD> && <WRITEINS> > <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -129,7 +129,7 @@ use vars qw(%Config);
     {
       logic_name => 'RfamBlast',
       batch_size => 50,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      resource   => 'select[linux && <REFINS> > <REFLOAD> && <WRITEINS> > <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -141,7 +141,7 @@ use vars qw(%Config);
     {
       logic_name => 'miRNA',
       batch_size => 1,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      resource   => 'select[linux && <REFINS> > <REFLOAD> && <WRITEINS> > <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
@@ -153,7 +153,7 @@ use vars qw(%Config);
        {
       logic_name => 'ncRNA',
       batch_size => 1000,
-      resource   => 'select[linux && <REFINS> <= <REFLOAD> && <WRITEINS> <= <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
+      resource   => 'select[linux && <REFINS> > <REFLOAD> && <WRITEINS> > <WRITELOAD>] rusage[<REFINS>=10:<WRITEINS>=10:duration=10:decay=10]',
       retries    => 3,
       sub_args   => '',
       runner     => '',
