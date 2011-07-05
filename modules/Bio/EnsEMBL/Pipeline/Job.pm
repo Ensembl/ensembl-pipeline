@@ -958,14 +958,17 @@ sub can_retry{
   }
   my $max_retry = $BATCH_QUEUES{$logic_name}{'retries'};
   if (!$self->retry_count) {
+    $BATCH_QUEUES{$logic_name}{'batch_size'} = $BATCH_QUEUES{$logic_name}{'retry_batch_size'} if (exists $BATCH_QUEUES{$logic_name}{'retry_batch_size'});
     return 1;
   }
   if ($self->retry_count && $self->retry_count <= $max_retry) {
+    $BATCH_QUEUES{$logic_name}{'batch_size'} = $BATCH_QUEUES{$logic_name}{'retry_batch_size'} if (exists $BATCH_QUEUES{$logic_name}{'retry_batch_size'});
     return 1;
   } else {
     return 0;
   }
 }
+
 
 sub cleanup{
   my ($self, $logic_name) = @_;
