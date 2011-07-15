@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.57 2011-05-05 10:27:38 th3 Exp $
+#$Id: cDNA_update.pl,v 1.58 2011-07-15 13:52:25 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -2293,6 +2293,7 @@ sub load_misc_script_files {
                       ."-pass $DBPASS "
                       ."-database $OUTPUT_DBNAME "
                       ."-port $OUTPUT_DBPORT "
+                      ."-dumppath $DATA_DIR "
                       ."-table $table";
 
         print $cmd."\n";
