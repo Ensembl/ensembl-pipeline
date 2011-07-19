@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.59 2011-07-19 09:22:28 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.60 2011-07-19 09:54:38 db8 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -271,6 +271,7 @@ my %configvars = (
                  "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
                  "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
                  "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
+                 "RESOURCE"        => $RESOURCE,
                  "DBUSER"        => $DBUSER,           # from cDNAUpdate
                  "DBPASS"        => $DBPASS,           # from cDNAUpdate
                  "DBUSER_RO"     => $DBUSER_RO,        # from cDNAUpdate
@@ -1355,7 +1356,7 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+    $cmd = "bsub -I -q yesterday perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
          . " -dbhost "     . $PIPE_DBHOST
          . " -dbport "     . $PIPE_DBPORT
          . " -dbuser "     . $DBUSER
