@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.58 2011-07-15 13:52:25 sf7 Exp $
+#$Id: cDNA_update.pl,v 1.59 2011-07-19 09:22:28 sf7 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -293,13 +293,13 @@ my %configvars = (
                  "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
                  "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
                  "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
+                 "RESOURCE" => $RESOURCE,   # from cDNAUpdate
                  "chunkDIR"         => $chunkDIR,
                  "outDIR"           => $outDIR,
                  "configDIR"        => $configDIR,
                  "newfile"          => $newfile,
                  "config_file"      => $config_file,
                  "masked_genome"    => $genomelist,
-                 "queue"            => $QUEUE,
                  "newFeatureName"   => $newFeatureName );
 
 # Fasta chunk specifications:
@@ -776,10 +776,6 @@ sub config_setup {
 
             my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
             $content =~ s/--softmasktarget TRUE/$substitute/;
-        }
-        if (   ( $filename =~ /BatchQueue/ )
-            && ( $rerun_flag == 1 ) ) {
-            $content =~ s/(queue\s+=>\s+')\w+/$1$QUEUE_OTHERS/;
         }
 
         # Backup file if exists

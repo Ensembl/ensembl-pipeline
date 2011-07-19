@@ -116,6 +116,8 @@ use vars qw(%Config);
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
 
+        RESOURCE => '',#can be used for token requirements, etc.
+
         CVS_DIR => '',
 
         DATA_DIR => '',
@@ -167,6 +169,8 @@ use vars qw(%Config);
         PRODUCTION_DBNAME => 'ensembl_production',#db to read unmapped reason and external db from
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
+
+        RESOURCE => '',#can be used for token requirements, etc.
 
         CVS_DIR => '',
 
