@@ -225,10 +225,10 @@ if ($write_db) {
         qq(
         CREATE TABLE IF NOT EXISTS tmp_align (
           tmp_align_id int(10) unsigned NOT NULL auto_increment,
-          alt_seq_region_name varchar(20) NOT NULL,
+          alt_seq_region_name varchar(40) NOT NULL,
           alt_start int(10) UNSIGNED NOT NULL,
           alt_end int(10) UNSIGNED NOT NULL,
-          ref_seq_region_name varchar(20) NOT NULL,
+          ref_seq_region_name varchar(40) NOT NULL,
           ref_start int(10) UNSIGNED NOT NULL,
           ref_end int(10) UNSIGNED NOT NULL,
 
