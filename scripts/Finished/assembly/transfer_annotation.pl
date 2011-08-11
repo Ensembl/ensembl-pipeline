@@ -57,90 +57,70 @@ ml6@sanger.ac.uk
 
 use strict;
 use warnings;
-use List::Util qw[min max];
 no warnings 'uninitialized';
 
 use FindBin qw($Bin);
-use vars qw($SERVERROOT);
-BEGIN {
-    $SERVERROOT = "$Bin/../../../..";
-    unshift(@INC, "$Bin");
-    unshift(@INC, "/software/anacode/otter/otter_rel52/ensembl-otter/modules/");
-}
+use lib "$Bin";
 
-use Getopt::Long;
+use List::Util qw[min max];
 use Pod::Usage;
-use Sys::Hostname;
-use Bio::EnsEMBL::Utils::ConversionSupport;
+use Sys::Hostname;              # provides hostname()
+use AssemblyMapper::Support;
 use Bio::Vega::DBSQL::DBAdaptor;
 use Bio::Vega::ContigLockBroker;
 use Bio::Vega::Author;
-use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 $| = 1;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
+my $support = AssemblyMapper::Support->new(
+    extra_options => [
+        'haplotype!',
+        'ref_start=i',
+        'ref_end=i',
+        'alt_start=i',
+        'alt_end=i',
+        'author=s',
+        'email=s',
+        'skip_stable_id=s@',
+        'gene_prefix=s',
+    ],
+    );
 
-$support->param('verbose', 1);
-$support->param('interactive', 0);
+# Play safe
 $support->param('dry_run', 1);
 
-# parse options
-$support->parse_common_options(@_);
-$support->parse_extra_options(
-    'assembly=s',         'altassembly=s',
-    'chromosomes|chr=s@', 'altchromosomes|altchr=s@', 'write!',
-    'haplotype!', 'ref_start=i', 'ref_end=i', 'alt_start=i',
-    'alt_end=i', 'author=s', 'email=s','skip_stable_id=s@','gene_prefix=s',
-);
-$support->allowed_params( $support->get_common_params, 'assembly',
-    'altassembly', 'chromosomes', 'altchromosomes', );
-
-if ( $support->param('help') or $support->error ) {
-    print STDOUT $support->error if $support->error;
+unless ($support->parse_arguments(@_)) {
+    warn $support->error if $support->error;
     pod2usage(1);
 }
 
-
-
-$support->comma_to_list( 'chromosomes', 'altchromosomes' );
-
-# get log filehandle and print heading and parameters to logfile
-$support->init_log;
-
-$support->check_required_params( 'assembly', 'altassembly' );
-
-for my $prm (qw(host port user pass dbname)) {
-    $support->param( "alt$prm", $support->param($prm) )
-      unless ( $support->param("alt$prm") );
-}
+$support->connect_dbs( rebless_dba => "Bio::Vega::DBSQL::DBAdaptor" );
 
 # database connection
-my $R_dba = $support->get_database('ensembl');
-my $A_dba = $support->get_database( 'ensembl', 'alt' );
-bless $R_dba, "Bio::Vega::DBSQL::DBAdaptor";
-bless $A_dba, "Bio::Vega::DBSQL::DBAdaptor";
+my $R_dba = $support->ref_dba;
+my $A_dba = $support->alt_dba;
+
 my $dbc = $R_dba->dbc;          # for all SQL except...
 my $dbh = $dbc->db_handle;      # ONLY for transaction control
 
-my $assembly    = $support->param('assembly');
-my $altassembly = $support->param('altassembly');
+my $assembly    = $support->ref_asm;
+my $altassembly = $support->alt_asm;
 my $write_db    = not $support->param('dry_run');
 my $author      = $support->param('author');
 my $email       = $support->param('email') || $author;
 my $haplo       = $support->param('haplotype');
-my $prefix       = $support->param('gene_prefix');
+my $prefix      = $support->param('gene_prefix');
 
-my $R_start = $support->param('ref_start') || undef;
-my $R_end = $support->param('ref_end') || undef;
-my $A_start = $support->param('alt_start') || undef;
-my $A_end = $support->param('alt_end') || undef;
+my $R_start = $support->ref_start;
+my $R_end   = $support->ref_end;
+my $A_start = $support->alt_start;
+my $A_end   = $support->alt_end;
 
 my $skip_gene = join(',',$support->param('skip_stable_id'));
 $skip_gene ||= "NOGENETOSKIP";
 
 throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
-
 
 my $geneAd   = $R_dba->get_GeneAdaptor;
 my $sliceAd  = $R_dba->get_SliceAdaptor;
@@ -212,18 +192,17 @@ if ( $assembly eq $altassembly ) {
     $dbc->do($sql_meta_bl_insert);
 }
 
-my @R_chr_list = $support->param('chromosomes');
-die "Reference chromosome list must be defined!" unless scalar(@R_chr_list);
+my $ok = $support->iterate_chromosomes(
+    prev_stage =>     '40-fix_overlaps',
+    this_stage =>     '50-transfer_anno',
+    worker =>         \&do_transfer_anno,
+    );
 
-my @A_chr_list = $support->param('altchromosomes');
-if ( scalar(@R_chr_list) != scalar(@A_chr_list) ) {
-    die "Chromosome lists do not match by length";
-}
+sub do_transfer_anno {
+    my ($asp, $data) = @_;
 
-SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
-    my $R_chr = $R_chr_list[$i];
-    my $A_chr = $A_chr_list[$i];
-
+    my $R_chr = $asp->ref_chr;
+    my $A_chr = $asp->alt_chr;
 
     # for stats
     my $total_genes      = 0;
@@ -273,7 +252,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             $sth_attrib_type_delete->execute($alt_seq_region_id) unless $alt_attrib_set;
             $sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 
-                next SET;
+                return;
         }
     }
 
@@ -284,7 +263,7 @@ SET: for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
 
         my @genes;
-        @genes       = @{ $ref_sl->get_all_Genes };
+        @genes       = @{ $geneAd->fetch_all_by_Slice_untruncated($ref_sl) };
         $total_genes = scalar @genes;
         @genes = sort { $a->start <=> $b->start } @genes;
 

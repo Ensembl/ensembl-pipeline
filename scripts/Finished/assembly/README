@@ -1,0 +1,36 @@
+ONLY MAJOR CHANGES and hotfixes are commited to ensembl-pipeline CVS.
+
+Full change history is in git at:
+http://git.internal.sanger.ac.uk/cgi-bin/gitweb.cgi?p=anacode/assembly_mapper.git
+
+The scripts should be run in the following order for each mapping
+task:
+
+ - new_align_session.pl           [creates align_session and
+                                   align_stage tables if required]
+
+ - align_by_component_identity.pl [creates tmp_align and tmp_mask
+                                   tables if not present         ]
+
+ - check_repeat_masked.pl         [be sure to fix any identified
+                                   repeat-mask analysis gaps     ]
+
+ - align_nonident.pl
+
+ - add_extra_mappings.pl          [optional]
+
+ - fix_overlaps.pl
+
+ - transfer_annotation.pl         [if required]
+
+Correct ordering is enforced via entries in (and checks on) the
+align_session and align_stage tables.
+
+The '--force-stage' argument can be used to bypass stage checking, but
+note that new_align_session.pl must be run, and that entries in the
+tmp_align table are now keyed on the corresponding align_session
+entry.
+
+As a consequence it is no longer necessary to drop the the tmp_align
+and tmp_mask tables between mapping sessions on the same
+database. Concurrent mapping sessions are now possible.

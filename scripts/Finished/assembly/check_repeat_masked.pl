@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-check_repeat_masked.pl  
+check_repeat_masked.pl
 
 =head1 SYNOPSIS
 
@@ -27,138 +27,59 @@ use strict;
 use warnings;
 
 use FindBin qw($Bin);
-use vars qw($SERVERROOT);
+use lib "$Bin";
 
-BEGIN {
-    $SERVERROOT = "$Bin/../../../..";
-    unshift(@INC, "$Bin");
-}
+use AssemblyMapper::Support;
 
 use Pod::Usage;
 use Readonly;
 
-use Bio::EnsEMBL::Utils::ConversionSupport;
-use Bio::EnsEMBL::Utils::Exception qw(throw);
+use Bio::EnsEMBL::Utils::Exception qw(throw); # supply via AssemblyMapper::Support?
 use Bio::EnsEMBL::Analysis::Config::General;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 
 my %logic_names = map { $_ => 1 } @$ANALYSIS_REPEAT_MASKING;
 my $n_logic_names = scalar  @$ANALYSIS_REPEAT_MASKING;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
-
-$support->param( 'verbose',     1 );    # throw away all that garbage
-$support->param( 'interactive', 0 );    # stop that garbage from coming up
-
-# parse options
-$support->parse_common_options(@_);
-$support->parse_extra_options(
-    'assembly=s',
-    'altassembly=s',
-    'altdbname=s',
-    'chromosomes|chr=s@',
-    'altchromosomes|altchr=s@',
-    'ref_start=i', 
-    'ref_end=i',
-    'alt_start=i',
-    'alt_end=i',
-    );
-$support->allowed_params( $support->get_common_params,
-                          'assembly',
-                          'altassembly',
-                          'altdbname',
-                          'chromosomes',
-                          'altchromosomes',
+my $support = AssemblyMapper::Support->new(
+    extra_options => [
+        'ref_start=i',
+        'ref_end=i',
+        'alt_start=i',
+        'alt_end=i',
+    ],
     );
 
-if ( $support->param('help') or $support->error ) {
+unless ($support->parse_arguments(@_)) {
     warn $support->error if $support->error;
     pod2usage(1);
 }
-
-$support->comma_to_list( 'chromosomes', 'altchromosomes' );
 
 #FIXME: params if appropriate
 Readonly my $TARGET_CS  => 'contig';
 Readonly my $TARGET_CS_VERSION;
 
-# get log filehandle and print heading and parameters to logfile
-$support->init_log;
+$support->connect_dbs;
 
-$support->check_required_params( 'assembly', 'altassembly' );
-
-# first set connection parameters for alternative db
-# both databases have to be on the same host, so we don't need to configure
-# them separately
-for my $prm (qw(host port user pass dbname)) {
-    $support->param( "alt$prm", $support->param($prm) )
-        unless ( $support->param("alt$prm") );
-}
-
-# FIXME dup with align_by_component_identity.pl
-
-# reference database
-my $R_dba = $support->get_database( 'ensembl', '' );
-my $R_dbc = $R_dba->dbc;
-my $R_sa  = $R_dba->get_SliceAdaptor;
-my $R_asm = $support->param('assembly');
-my $Ref_start = $support->param('ref_start') || undef;
-my $Ref_end = $support->param('ref_end') || undef;
-
-# database containing the alternative assembly
-my $A_dba = $support->get_database( 'ensembl', 'alt' );
-my $A_sa  = $A_dba->get_SliceAdaptor;
-my $A_asm = $support->param('altassembly');
-my $Alt_start = $support->param('alt_start') || undef;
-my $Alt_end = $support->param('alt_end') || undef;
-
-$support->log_stamped("Looping over chromosomes...\n");
-
-my @R_chr_list = $support->param('chromosomes');
-if ( !scalar(@R_chr_list) ) {
-    @R_chr_list = $support->sort_chromosomes;
-
-    if ( scalar( $support->param('altchromosomes') ) ) {
-        die "AltChromosomes list is defined while Chromosomes list is not!";
-    }
-}
-
-my @A_chr_list = $support->param('altchromosomes');
-if ( !scalar(@A_chr_list) ) {
-    @A_chr_list = @R_chr_list;
-}
-elsif ( scalar(@R_chr_list) != scalar(@A_chr_list) ) {
-    die "Chromosome lists do not match by length";
-}
-
-my $ok = 1;
-
-for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
-    my $R_chr = $R_chr_list[$i];
-    my $A_chr = $A_chr_list[$i];
-
-    $support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
-
-    # fetch chromosome slices
-    my $R_slice =
-        $R_sa->fetch_by_region( 'chromosome', $R_chr, $Ref_start, $Ref_end, undef, $R_asm );
-    $support->log($R_slice->seq_region_name." ".$R_slice->start." -> ".$R_slice->end."\n", 2);
-
-    my $r_ok = check_repeat_analyses($R_slice);
-    $ok &&= $r_ok;
-
-    my $A_slice =
-        $A_sa->fetch_by_region( 'chromosome', $A_chr, $Alt_start, $Alt_end, undef, $A_asm );
-    $support->log($A_slice->seq_region_name." ".$A_slice->start." -> ".$A_slice->end."\n", 2);
-
-    my $a_ok = check_repeat_analyses($A_slice);
-    $ok &&= $a_ok;
-}
+my $ok = $support->iterate_chromosomes(
+    prev_stage =>     '10-align_identical',
+    this_stage =>     '20-check_repeat_masked',
+    worker =>         \&do_check_repeat_masked,
+    );
 
 $support->log_warning("\n*** Detected missing repeat masking ***\n") if not $ok;
 $support->finish_log;
 
 exit ($ok ? 0 : 1);
+
+sub do_check_repeat_masked {
+    my ($asp, $data) = @_;
+
+    my $r_ok = check_repeat_analyses($asp->ref_slice);
+    my $a_ok = check_repeat_analyses($asp->alt_slice);
+
+    return ($r_ok and $a_ok);
+}
 
 sub check_repeat_analyses {
     my ($slice, $analyses) = @_;

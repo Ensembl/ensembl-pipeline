@@ -76,54 +76,28 @@ Please post comments/questions to Anacode
 
 use strict;
 use warnings;
-no warnings 'uninitialized';
+# no warnings 'uninitialized';
 
 use FindBin qw($Bin);
-use vars qw($SERVERROOT);
-BEGIN {
-    $SERVERROOT = "$Bin/../../../..";
-    unshift(@INC, "$Bin");
-}
+use lib "$Bin";
 
-use Getopt::Long;
 use Pod::Usage;
-use Bio::EnsEMBL::Utils::ConversionSupport;
+use AssemblyMapper::Support;
 
 $| = 1;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
+my $support = AssemblyMapper::Support->new();
 
-$support->param('verbose', 1);
-$support->param('interactive', 0);
-
-# parse options
-$support->parse_common_options(@_);
-$support->parse_extra_options(
-    'assembly=s',         'altassembly=s',
-    'chromosomes|chr=s@', 'altchromosomes|altchr=s@',
-);
-$support->allowed_params( $support->get_common_params, 'assembly',
-    'altassembly', 'chromosomes', 'altchromosomes', );
-
-if ( $support->param('help') or $support->error ) {
+unless ($support->parse_arguments(@_)) {
     warn $support->error if $support->error;
     pod2usage(1);
 }
 
-$support->comma_to_list( 'chromosomes', 'altchromosomes' );
+$support->connect_dbs;
+my $dbc = $support->ref_dbc;
 
-
-# get log filehandle and print heading and parameters to logfile
-$support->init_log;
-
-$support->check_required_params( 'assembly', 'altassembly' );
-
-# database connection
-my $dba = $support->get_database('ensembl');
-my $dbh = $dba->dbc->db_handle;
-
-my $assembly    = $support->param('assembly');
-my $altassembly = $support->param('altassembly');
+my $assembly    = $support->ref_asm;
+my $altassembly = $support->alt_asm;
 
 my $select = qq(
   SELECT a.*
@@ -142,39 +116,48 @@ my $select = qq(
   ORDER BY a.asm_start
 );
 
-my $sth_select = $dbh->prepare($select);
+my $sth_select = $dbc->prepare($select);
 
 my $sql_insert = qq(INSERT INTO assembly VALUES (?, ?, ?, ?, ?, ?, ?));
-my $sth_insert = $dbh->prepare($sql_insert);
+my $sth_insert = $dbc->prepare($sql_insert);
 
 my $fmt1 = "%10s %10s %10s %10s %3s\n";
 
-$support->log_stamped("Looping over chromosomes...\n");
+my $ok = $support->iterate_chromosomes(
+    prev_stage =>     '30-align_nonident',
+    this_stage =>     '40-fix_overlaps',
+    worker =>         \&do_fix_overlaps,
+    callback_data => {
+        dbc        => $dbc,
+        select_sth => $sth_select,
+        insert_sth => $sth_insert,
+    },
+    );
 
-my @R_chr_list = $support->param('chromosomes');
-die "Reference chromosome list must be defined!" unless scalar(@R_chr_list);
+$sth_select->finish;
+$sth_insert->finish;
 
-my @A_chr_list = $support->param('altchromosomes');
-if ( scalar(@R_chr_list) != scalar(@A_chr_list) ) {
-    die "Chromosome lists do not match by length";
-}
+$support->finish_log;
+exit ($ok ? 0 : 1);
 
-for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
-    my $R_chr = $R_chr_list[$i];
-    my $A_chr = $A_chr_list[$i];
+sub do_fix_overlaps {
+    my ($asp, $data) = @_;
+    my $db_handles = $data;
+
+    my $R_chr = $asp->ref_chr;
+    my $A_chr = $asp->alt_chr;
+
     my @rows  = ();
 
-    $support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
-
-    $sth_select->execute( $R_chr, $A_chr );
+    $db_handles->{select_sth}->execute( $R_chr, $A_chr );
 
     # do an initial fetch
-    my $last = $sth_select->fetchrow_hashref;
+    my $last = $db_handles->{select_sth}->fetchrow_hashref;
 
     # skip seq_regions for which we don't have data
     unless ($last) {
         $support->log( "No $R_chr/$A_chr mappings found. Skipping.\n", 1 );
-        next;
+        return 1;
     }
 
     push @rows, $last;
@@ -183,7 +166,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     my $j = 0;
     my $k = 0;
 
-    while ( $last and ( my $r = $sth_select->fetchrow_hashref ) ) {
+    while ( $last and ( my $r = $db_handles->{select_sth}->fetchrow_hashref ) ) {
 
         # merge adjacent assembly segments (these can result from alternating
         # alignments from clone identity and blastz alignment)
@@ -321,7 +304,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     else {
 
         # delete all current mappings from the db and insert the corrected ones
-        my $c = $dbh->do(
+        my $c = $db_handles->{dbc}->do(
             qq(
     DELETE a
     FROM assembly a, seq_region sr1, seq_region sr2,
@@ -342,7 +325,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         # now insert the fixed entries
         foreach my $r (@rows) {
-            $sth_insert->execute(
+            $db_handles->{insert_sth}->execute(
                 map { $r->{$_} }
                   qw(asm_seq_region_id cmp_seq_region_id
                   asm_start asm_end cmp_start cmp_end ori)
@@ -353,11 +336,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
               . scalar(@rows)
               . " fixed entries to the assembly table.\n" );
     }
+
+    return 1;
 }
 
-$sth_select->finish;
-$sth_insert->finish;
-
-# finish logfile
-$support->finish_log;
+# EOF
 
