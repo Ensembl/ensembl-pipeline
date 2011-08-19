@@ -19,6 +19,7 @@ Readonly my @OTTER_ALIGN_COMMON_OPTIONS => (
     'chromosomes|chr=s@',
     'altchromosomes|altchr=s@',
     'force_stage|force-stage!',
+    'no_sessions|no-sessions!',
     );
 
 Readonly my @OTTER_ALIGN_REQUIRED_PARAMS => (
@@ -306,6 +307,11 @@ sub iterate_chromosomes {
 
 sub session_setup {
     my ($self, $asp, $alt_db_name) = @_;
+
+    if ($self->support->s_param('no_sessions')) {
+        $self->support->log_warning("Skipping mapping session management.\n");
+        return 1;
+    }
 
     my $params = $asp->iterator_params;
 

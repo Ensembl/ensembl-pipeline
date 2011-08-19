@@ -166,7 +166,9 @@ sub do_fix_overlaps {
     my $j = 0;
     my $k = 0;
 
-    while ( $last and ( my $r = $db_handles->{select_sth}->fetchrow_hashref ) ) {
+    my $r; # declare outside loop or redo won't work as anticipated
+
+  SEGMENT: while ( $last and ( $r = $db_handles->{select_sth}->fetchrow_hashref ) ) {
 
         # merge adjacent assembly segments (these can result from alternating
         # alignments from clone identity and blastz alignment)
@@ -201,7 +203,7 @@ sub do_fix_overlaps {
             $last->{'cmp_end'} = $r->{'cmp_end'};
             push @rows, $last;
 
-            next;
+            next SEGMENT;
         }
 
       # bridge small gaps (again, these can result from alternating alignments
@@ -238,7 +240,7 @@ sub do_fix_overlaps {
             $last->{'cmp_end'} = $r->{'cmp_end'};
             push @rows, $last;
 
-            next;
+            next SEGMENT;
         }
 
         # look for overlaps with last segment
@@ -265,7 +267,7 @@ sub do_fix_overlaps {
             # skip if this segment ends before the last one
             if ( $r->{'asm_end'} <= $last->{'asm_end'} ) {
                 $support->log_verbose( "skipped\n\n", 1 );
-                next;
+                next SEGMENT;
             }
 
             my $overlap = $last->{'asm_end'} - $r->{'asm_start'} + 1;
@@ -287,6 +289,17 @@ sub do_fix_overlaps {
                   . "\n",
                 1
             );
+
+            # Now that the overlap's removed, this segment may be
+            # adjacent to, or within bridging distance of,
+            # the last segment.
+            #
+            # Therefore we restart the loop body. Since it doesn't
+            # overlap any more, if nothing else, it'll fall through
+            # to below anyway...
+            #
+            redo SEGMENT;
+
         }
 
         push @rows, $r;
