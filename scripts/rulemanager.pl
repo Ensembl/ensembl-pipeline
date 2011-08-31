@@ -259,7 +259,9 @@ while (1) {
   my $done_something = 0;
   %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
   my %incomplete_accumulator_analyses = %always_incomplete_accumulators;
-
+  foreach my $key ( keys %incomplete_accumulator_analyses ) {
+   print "ICAA $key " . $incomplete_accumulator_analyses{$key} ."\n";
+  }
   if ($reread_input_ids) {
     $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                  \@types_to_run, \@types_to_skip,
@@ -302,11 +304,13 @@ while (1) {
           if ($anal->input_id_type ne 'ACCUMULATOR') {
              $analHash{$anal->dbID} = $anal;
           }
-        } else {
-          if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
-              $rule->has_condition_of_input_id_type($type)) {
-            $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
-          }
+        }
+      }
+      foreach my $rule (@{$rulemanager->rules}){
+        if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
+            $rule->has_condition_of_input_id_type($type) &&
+	    scalar(keys %analHash)) {
+          $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
         }
       }
       my $current_jobs_hash = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
