@@ -68,7 +68,7 @@ use vars qw(%Config);
         TAXONDBPORT => 3306,
 
         # For the comparison only
-        OLD_FEATURE_NAME => 'cDNA_update',
+        OLD_FEATURE_NAME => 'cdna_update',
 
         # These variables need to be set, please do so in the
         # corresponding hash tables for the species you want to

@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.60 2011-07-19 09:54:38 db8 Exp $
+#$Id: cDNA_update.pl,v 1.61 2011-09-05 19:23:58 ba1 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -245,7 +245,7 @@ if ( defined($GSS_PREFIX) ) {
 
 # When comparing to a previously updated cdna db
 # $oldFeatureName = $newFeatureName
-my $newFeatureName  = "cDNA_update"; # the analysis name!
+my $newFeatureName  = "cdna_update"; # the analysis name!
 
 my %saved_files;
 my $cmd;
@@ -1093,7 +1093,7 @@ sub write_to_file {
 sub remove_kill_list_object {
     require Bio::EnsEMBL::KillList::KillList;
     my $kill_list_object =
-      Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cDNA_update' );
+      Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cdna_update' );
     my %kill_list = %{ $kill_list_object->get_kill_list() };
 
     open( LIST, "<", $GSS ) or croak("can't open gss list $GSS");

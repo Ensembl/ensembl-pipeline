@@ -153,7 +153,7 @@ use vars qw( %Config );
                 # analysis_ids ie. accession removed from the
                 # kill-list will have been set to 'allowed' for these
                 # analyses below
-                -for_analyses => ['cDNA_update'],
+                -for_analyses => ['cdna_update'],
 
                 # kill_list will not return accessions that have an
                 # entry in the kill_object_species table for these
@@ -184,7 +184,7 @@ use vars qw( %Config );
                 # analysis_ids ie. accession removed from the
                 # kill-list will have been set to 'allowed' for these
                 # analyses below.
-                -for_analyses => ['cDNA_update'],
+                -for_analyses => ['cdna_update'],
 
                 # kill_list will not return accessions that have an
                 # entry in the kill_object_species table for these
