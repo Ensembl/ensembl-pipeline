@@ -52,7 +52,7 @@ use Sys::Hostname;
 use Socket;
 
 use Bio::EnsEMBL::Pipeline::Config::General;
-use Data::Dumper;
+#use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
@@ -1258,11 +1258,24 @@ sub number_output_dirs {
   return $self->{number_output_dirs} ; 
 } 
 
+=head2 analysisrun_setup
+
+ Arg [1]    : $rh_analyses_to_run, hashref of dbID of analysis
+ Arg [2]    : $rh_analyses_to_skip, hashref of dbID of analysis
+ Arg [3]    : $tracking, boolean
+ Arg [4]    : $rh_to_keep, hashref of dbId of analysis
+ Example    : $rulemanager->analysisrun_setup($rh_analyses_to_run, $rh_analyses_to_skip, $tracking, $rh_to_keep);
+ Description: For each analysis we will have to run, set up the tracking system
+              by populating the dbs table with the databases used and creating
+              the good analysis run
+
+
+=cut
+
 sub analysisrun_setup {
   my $self = shift;
   my ($rh_analyses_to_run, $rh_analyses_to_skip, $tracking, $rh_to_keep) = @_;
 
-print STDERR "AnalysisRun Setup\n";
   my $analysis_adaptor = $self->analysis_adaptor;
   my @a_analysis;
   if (keys(%$rh_analyses_to_run)) {
