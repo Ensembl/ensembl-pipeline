@@ -36,7 +36,6 @@ use Readonly;
 
 use Bio::EnsEMBL::Utils::Exception qw(throw); # supply via AssemblyMapper::Support?
 use Bio::EnsEMBL::Analysis::Config::General;
-use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 
 my %logic_names = map { $_ => 1 } @$ANALYSIS_REPEAT_MASKING;
 my $n_logic_names = scalar  @$ANALYSIS_REPEAT_MASKING;
@@ -75,30 +74,24 @@ exit ($ok ? 0 : 1);
 sub do_check_repeat_masked {
     my ($asp, $data) = @_;
 
-    my $r_ok = check_repeat_analyses($asp->ref_slice);
-    my $a_ok = check_repeat_analyses($asp->alt_slice);
+    my $r_ok = check_repeat_analyses($asp->ref_slice, $asp->align_support);
+    my $a_ok = check_repeat_analyses($asp->alt_slice, $asp->align_support);
 
     return ($r_ok and $a_ok);
 }
 
 sub check_repeat_analyses {
-    my ($slice, $analyses) = @_;
+    my ($slice, $support) = @_;
 
     my $input_ids = list_slice_input_ids($slice, $TARGET_CS, $TARGET_CS_VERSION);
 
     my $missing = 0;
     my $total   = 0;
 
-    # FIXME - duplication with load_loutre_pipeline.pl
-    my $meta_container = $slice->adaptor->db->get_MetaContainer();
-    my ($pipe_param) = @{$meta_container->list_value_by_key('pipeline_db_rw_head')};
-    my $state_info_container;
-    if($pipe_param) {
-        my $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
-        $state_info_container = $pipe_dba->get_StateInfoContainer;
-    } else {
-        throw("Missing meta key 'pipeline_db_rw_head'\n");
-    }
+    my $dba = $support->get_pipe_db($slice->adaptor->db);
+    $dba ||= $slice->adaptor->db;
+
+    my $state_info_container = $dba->get_StateInfoContainer;
 
     foreach my $id (@$input_ids) {
         ++$total;

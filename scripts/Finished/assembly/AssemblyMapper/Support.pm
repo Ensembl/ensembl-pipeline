@@ -9,6 +9,8 @@ use Carp;
 use Pod::Usage;
 use Readonly;
 use Bio::EnsEMBL::Utils::ConversionSupport;
+use Bio::EnsEMBL::Utils::Exception qw(throw); # FIXME - inconsistent die vs. error?
+use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use AssemblyMapper::AlignSession;
 use AssemblyMapper::SlicePair;
 
@@ -19,6 +21,7 @@ Readonly my @OTTER_ALIGN_COMMON_OPTIONS => (
     'chromosomes|chr=s@',
     'altchromosomes|altchr=s@',
     'force_stage|force-stage!',
+    'skip_create_stage|skip-create-stage!',
     'no_sessions|no-sessions!',
     );
 
@@ -56,6 +59,12 @@ has support => (
     );
 
 has extra_options => (
+    is       => 'ro',
+    isa      => 'ArrayRef[Str]',
+    default  => sub { [] },
+    );
+
+has conflicting_options => (
     is       => 'ro',
     isa      => 'ArrayRef[Str]',
     default  => sub { [] },
@@ -137,6 +146,7 @@ sub parse_arguments {
     return if $support->param('help') or $support->error;
 
     $support->check_required_params(@{$self->required_params}); # dies if not
+    $self->check_conflicting_params;                            # dies if so
 
     $support->comma_to_list( 'chromosomes', 'altchromosomes' );
     if ($self->single_chromosome) {
@@ -176,6 +186,20 @@ sub get_common_params {
 sub extra_params {
     my $self = shift;
     return $self->opts_to_params(@{$self->extra_options});
+}
+
+sub check_conflicting_params {
+    my $self = shift;
+    my @conflicts;
+    foreach my $param (@{$self->conflicting_options}) {
+        if ($self->param($param)) {
+            push @conflicts, $param;
+        }
+    }
+    if (@conflicts) {
+        throw("Illegal parameters: @conflicts\nNot supported by this stage.\n");
+    }
+    return 1;
 }
 
 sub opts_to_params {
@@ -338,6 +362,10 @@ sub session_setup {
             );
     }
 
+    $asp->session_id($session->id);
+
+    return 1 if $self->support->s_param('skip_create_stage');
+
     $session->create_stage(
         previous   => $params->{prev_stage},
         before     => $params->{before_stage},
@@ -348,7 +376,29 @@ sub session_setup {
         force_stage=> $self->support->s_param('force_stage'),
         );
 
-    $asp->session_id($session->id);
+    return 1;
+}
+
+sub get_pipe_db {
+    my ($self, $dba) = @_;
+
+    my $metakey = 'pipeline_db_head';
+    my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
+    return unless $opt_str;
+
+    my %anycase_options = (
+        eval $opt_str, ## no critic(BuiltinFunctions::ProhibitStringyEval)
+    );
+    if ($@) {
+        throw("Error evaluating '$opt_str' : $@");
+    }
+
+    my %uppercased_options = ();
+    while( my ($k,$v) = each %anycase_options) {
+        $uppercased_options{uc($k)} = $v;
+    }
+
+    return Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(%uppercased_options);
 }
 
 __PACKAGE__->meta->make_immutable;

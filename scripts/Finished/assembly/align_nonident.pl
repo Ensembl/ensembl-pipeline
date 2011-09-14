@@ -116,6 +116,9 @@ my $support = AssemblyMapper::Support->new(
         'bindir=s',
         'tmpdir=s',
     ],
+    conflicting_options => [
+        'no_sessions',
+    ],
     );
 
 unless ($support->parse_arguments(@_)) {
@@ -130,12 +133,12 @@ $support->connect_dbs;
 
 # reference database
 my $R_dba = $support->ref_dba;
-my $R_pipe_dba = &get_pipe_db($R_dba);
+my $R_pipe_dba = $support->get_pipe_db($R_dba);
 my $R_dbc = $R_dba->dbc;
 
 # database containing the alternative assembly
 my $A_dba = $support->alt_dba;
-my $A_pipe_dba = &get_pipe_db($A_dba);
+my $A_pipe_dba = $support->get_pipe_db($A_dba);
 
 # Pre-prepare tmp_align query
 my $block_sth = $R_dbc->prepare(qq{
@@ -334,25 +337,4 @@ sub do_align_nonident {
     return 1;
 }
 
-sub get_pipe_db {
-    my ($dba) = @_;
-    my $metakey = 'pipeline_db_head';
-    my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
-
-    return undef unless $opt_str;
-
-    my %anycase_options = (
-        eval $opt_str,
-    );
-    if ($@) {
-        throw("Error evaluating '$opt_str' : $@");
-    }
-    my %uppercased_options = ();
-    while( my ($k,$v) = each %anycase_options) {
-        $uppercased_options{uc($k)} = $v;
-    }
-
-    return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
-}
-
-
+# EOF

@@ -34,3 +34,6 @@ entry.
 As a consequence it is no longer necessary to drop the the tmp_align
 and tmp_mask tables between mapping sessions on the same
 database. Concurrent mapping sessions are now possible.
+
+The '--skip_create_stage' argument can be used to inhibit writing of a
+stage entry into the align_stage table.
