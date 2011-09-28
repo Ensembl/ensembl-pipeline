@@ -78,51 +78,55 @@ my $submission_limit;
 my $dbload;
 my $submission_number = 1000; 
 my $number_output_dirs = 10;  
+my $distribute;
+my $reverse;
 GetOptions(
-           'dbhost=s'              => \$dbhost,
-           'dbname=s'              => \$dbname,
-           'dbuser=s'              => \$dbuser,
-           'dbpass=s'              => \$dbpass,
-           'dbport=s'              => \$dbport,
-           'help!'                 => \$help,
-           'verbose!'              => \$verbose,
-           'queue_manager=s'       => \$queue_manager,
-           'max_job_time=s'        => \$max_job_time,
-           'min_job_job=s'         => \$min_job_time,
-           'sleep_per_job=s'       => \$sleep_per_job,
-           'runner=s'              => \$runner,
-           'output_dir=s'          => \$output_dir,
-           'job_limit=s'           => \$job_limit,
-           'mark_awol!'            => \$mark_awol,
-           'rename_on_retry'       => \$rename_on_retry,
-           'starts_from=s@'        => \@starts_from,
+           'dbhost=s'               => \$dbhost,
+           'dbname=s'               => \$dbname,
+           'dbuser=s'               => \$dbuser,
+           'dbpass=s'               => \$dbpass,
+           'dbport=s'               => \$dbport,
+           'help!'                  => \$help,
+           'verbose!'               => \$verbose,
+           'queue_manager=s'        => \$queue_manager,
+           'max_job_time=s'         => \$max_job_time,
+           'min_job_job=s'          => \$min_job_time,
+           'sleep_per_job=s'        => \$sleep_per_job,
+           'runner=s'               => \$runner,
+           'output_dir=s'           => \$output_dir,
+           'job_limit=s'            => \$job_limit,
+           'mark_awol!'             => \$mark_awol,
+           'rename_on_retry'        => \$rename_on_retry,
+           'starts_from=s@'         => \@starts_from,
            'analysis|logic_name=s@' => \@analyses_to_run,
-           'skip_analysis=s@'      => \@analyses_to_skip,
-           'input_id_type=s@'      => \@types_to_run,
-           'skip_input_id_type=s@' => \@types_to_skip,
-           'input_id_file=s'       => \$ids_to_run,
-           'skip_input_id_file=s'  => \$ids_to_skip,
-           'config_sanity!'        => \$config_sanity,
-           'accumulator_sanity!'   => \$accumulator_sanity,
-           'db_sanity!'            => \$db_sanity,
-           'rules_sanity!'         => \$rules_sanity,
-           'kill_jobs!'            => \$kill_jobs,
-           'killed_time=s'         => \$killed_time,
-           'kill_file=s'           => \$kill_file,
-           'rerun_sleep=s'         => \$rerun_sleep,
-           'utils_verbosity=s'     => \$utils_verbosity,
-           'shuffle!'              => \$shuffle,
-           'accumulators!'         => \$accumulators,
-           'force_accumulators!'   => \$force_accumulators,
-           'reread_input_ids!'     => \$reread_input_ids,
-           'reread_rules!'         => \$reread_rules,
-           'once!'                 => \$once,
-           'perldoc!'              => \$perldoc,
-           'dbload!'              => \$dbload,
-           'submission_limit!'     => \$submission_limit,
-           'submission_number=s'   => \$submission_number,
-           'unlock|delete_lock'    => \$unlock,
-           'number_output_dirs=i'    => \$number_output_dirs,  
+           'skip_analysis=s@'       => \@analyses_to_skip,
+           'input_id_type=s@'       => \@types_to_run,
+           'skip_input_id_type=s@'  => \@types_to_skip,
+           'input_id_file=s'        => \$ids_to_run,
+           'skip_input_id_file=s'   => \$ids_to_skip,
+           'config_sanity!'         => \$config_sanity,
+           'accumulator_sanity!'    => \$accumulator_sanity,
+           'db_sanity!'             => \$db_sanity,
+           'rules_sanity!'          => \$rules_sanity,
+           'kill_jobs!'             => \$kill_jobs,
+           'killed_time=s'          => \$killed_time,
+           'kill_file=s'            => \$kill_file,
+           'rerun_sleep=s'          => \$rerun_sleep,
+           'utils_verbosity=s'      => \$utils_verbosity,
+           'shuffle!'               => \$shuffle,
+           'accumulators!'          => \$accumulators,
+           'force_accumulators!'    => \$force_accumulators,
+           'reread_input_ids!'      => \$reread_input_ids,
+           'reread_rules!'          => \$reread_rules,
+           'once!'                  => \$once,
+           'perldoc!'               => \$perldoc,
+           'dbload!'                => \$dbload,
+           'submission_limit!'      => \$submission_limit,
+           'submission_number=s'    => \$submission_number,
+           'unlock|delete_lock'     => \$unlock,
+           'number_output_dirs=i'   => \$number_output_dirs,  
+           'distribute=s'           => \$distribute,
+           'reverse=s'              => \$reverse,
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -282,7 +286,12 @@ while (1) {
     next INPUT_ID_TYPE if ($type eq 'ACCUMULATOR');
 
     my @id_list = keys(%{$id_hash->{$type}});
-    @id_list = shuffle(@id_list) if $shuffle;
+    if ($shuffle) {
+           @id_list = shuffle(@id_list);
+    }
+    elsif ($distribute) {
+           @id_list = ordered_shuffle(@id_list);
+    }
 
    INPUT_ID:
     foreach my $input_id (@id_list){
@@ -406,6 +415,73 @@ sub shuffle {
     return @out;
 }
 
+sub ordered_shuffle {
+    my (@in) = @_;
+    my @out;
+
+    return @in unless (@in and $in[0] =~ /^[^:]+:[^:]+:/);
+    my @tmp = sort { my ($s1, $e1) = $a =~ /^[^:]+:[^:]+:[^:]+:([^:]+):([^:]+)/;
+                     my ($s2, $e2) = $b =~ /^[^:]+:[^:]+:[^:]+:([^:]+):([^:]+)/;
+                     my $l1 = $e1-$s1;
+                     my $l2 = $e2-$s2;
+                     $l2 <=> $l1 }
+               @in;
+    my $add = 0;
+    my $i = 0;
+    my $base;
+    my $size = scalar(@tmp);
+    if ($size%$distribute) {
+        $base = int($size/$distribute)+1;
+    }
+    else {
+        $base = int($size/$distribute);
+    }
+    # First we sort the input_id on their size.
+    # For the reverse, the smallest are the first.
+    # The smallest in the first batch, the second smallest in the second batch and so on
+    # When we reach the total number of batch we put the smallest+n in the first batch,
+    # smallest+n+1 in the second batch,...
+    # For the normal, the biggest input_id are first but only for the first round, after
+    # we take the smallest one. Hopefully all the bigest will be in the first round, so
+    # once they are done the rest is quick.
+    if ($reverse) {
+        my @rev = reverse @tmp;
+        while (my $tmp = shift @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+            }
+        }
+    }
+    else {
+        if ($distribute < $base) {
+            ($distribute, $base) = ($base, $distribute);
+        }
+        while (my $tmp = shift @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+                last;
+            }
+        }
+        while (my $tmp = pop @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+            }
+        }
+    }
+    return grep { defined $_ } @out;
+}
 
 sub termhandler {
     $term_sig = 1;
