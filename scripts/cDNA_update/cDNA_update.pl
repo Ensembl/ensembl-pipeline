@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.61 2011-09-05 19:23:58 ba1 Exp $
+#$Id: cDNA_update.pl,v 1.62 2011-09-28 16:12:25 searle Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -205,7 +205,7 @@ use cDNAUpdate;
 
 # We need the Net::SSH module from somewhere:
 use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
-use Net::SSH qw(sshopen2);
+# Not used anymore use Net::SSH qw(sshopen2);
 
 my $species;
 
@@ -1002,62 +1002,26 @@ sub write_to_file {
     # update file.
     # Read update file.
     local $/ = "\n>";
-    open( RP, "<", $DATA_DIR . "/" . $VERTRNA_UPDATE )
-      or croak("can't read $VERTRNA_UPDATE\n");
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
+    my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
+    system("/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t $configvars{taxonomy_id} > $embl_fa_file");
+    open( RP, "<", $embl_fa_file )
+      or croak("can't read $embl_fa_file\n");
     while ( my $entry = <RP> ) {
         # Need this to include the first record when using $/='\n>'
         $entry =~ s/^>//;
-        if ( $entry =~ m/$SPECIES/ ) {
-            # Extract & save id
-            $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-            if ( !$1 ) {
-                croak(   "\n$VERTRNA_UPDATE: "
-                       . "unmatched id pattern:\n$entry\n" );
-            }
-            $EMBL_ids{$1} = 1;
-            # Re-write fasta entry
-            $entry =~ s/\>//g;
-            print WP '>' . $entry;
+        # Extract & save id
+        $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
+        if ( !$1 ) {
+            croak(   "\n$VERTRNA_UPDATE: " . "unmatched id pattern:\n$entry\n" );
         }
+        # Re-write fasta entry
+        $entry =~ s/\>//g;
+        print WP '>' . $entry;
     }
     close(RP);
-    print("\nRead update $VERTRNA_UPDATE EMBL file.\n");
-
-    my @embl_vertrna_files;
-    opendir( DIR, "$DATA_DIR" || croak "Cannot opendir $DATA_DIR $!" );
-    while ( my $filename = readdir(DIR) ) {
-        if ( $filename =~ /$VERTRNA/ ) {
-            push @embl_vertrna_files, $filename;
-        }
-    }
-
-    # now loop through all embl_vertna files
-    #read base file
-    foreach my $embl_vert (@embl_vertrna_files) {
-        open( RP, "<", $DATA_DIR . "/" . $embl_vert )
-          or croak("Can't read $embl_vert\n");
-        #<RP>;
-        while ( my $entry = <RP> ) {
-            # Need this to include the first record when using $/='\n>'
-            $entry =~ s/^>//;
-            if ( $entry =~ m/$SPECIES/ ) {
-                # Extract & save id
-                $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-                if ( !$1 ) {
-                    croak("\n$embl_vert: unmatched id pattern:\n$entry\n");
-                }
-                if ( !defined( $EMBL_ids{$1} ) ) {
-                    # Add fasta entry for unchanged id
-                    $entry =~ s/\>//g;
-                    print WP '>' . $entry;
-                }
-            }
-        }
-        close(RP);
-        print "Read base $embl_vert EMBL file.\n";
-    }
+    print("\nRead EMBL file.\n");
 
     # Read RefSeq file
     open( RP, "<", $DATA_DIR . "/" . $REFSEQ )
@@ -1674,6 +1638,7 @@ sub why_cdnas_missed {
     }
 
     # Need to pass all the variables to the script:
+    my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
     $cmd = "perl "              . $STORE_UNMAPPED
         . " -gss "              . $GSS
         . " -seq_file "         . $DATA_DIR . "/missing_cdnas.fasta"
@@ -1683,15 +1648,14 @@ sub why_cdnas_missed {
         . " -port "             . $OUTPUT_DBPORT
         . " -dbname "           . $OUTPUT_DBNAME
         . " -species \""        . $SPECIES  . "\""
-        . " -vertrna "          . $DATA_DIR . "/" . $VERTRNA
+        . " -vertrna "          . $DATA_DIR . "/" . $embl_fa_file
         . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
-        . " -vertrna_update "   . $DATA_DIR . "/" . $VERTRNA_UPDATE
         . " -infile "           . $file
         . " -findN_prog "       . $FIND_N
         . " -reasons_file "     . $DATA_DIR."/unmapped_reasons.txt";
 
     if ( system($cmd) ) {
-        carp("Erros when running $STORE_UNMAPPED!\n$cmd\n");
+        carp("Errors when running $STORE_UNMAPPED!\n$cmd\n");
     }
     else {
         print("\nUnmapped objects stored.\n");
