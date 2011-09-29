@@ -117,6 +117,7 @@ sub fetch_by_ncbi_taxon_id {
   
 #  $root->print_tree($self->{'scale'});
   if ($node->rank eq 'species') {
+  #if ($node->rank eq 'species' || $node->rank eq 'subspecies') {
     print "classification: ",$node->classification,"\n";
     print "scientific name: ",$node->binomial,"\n";
     if (defined $node->common_name) {
@@ -159,6 +160,15 @@ sub load_taxonomy_in_core {
   }
 
   my $match_rank = ($node->name eq 'Canis familiaris') ? 'subspecies' : 'species';
+#  my $match_rank;
+#  if ($node->name eq 'Canis familiaris' ||
+#      $node->name eq 'Gorilla gorilla gorilla' ||
+#      $node->name eq 'Mustela putorius furo' 
+#     ) {
+#    $match_rank = 'subspecies';
+#  } else {
+#    $match_rank = 'species';
+#  }
 
   if($node->rank ne $match_rank){
       print "ERROR: taxon_id=",$self->{'taxon_id'},", '",$node->name,"' is rank '",$node->rank,"'.\n";
@@ -191,10 +201,30 @@ sub load_taxonomy_in_core {
     $mc->store_key_value('species.ensembl_alias_name',$node->get_tagvalue('ensembl alias name'));
     print "Loading species.ensembl_alias_name = ",$node->get_tagvalue('ensembl alias name'),"\n";
   }
+  if (defined $node->has_tag('genbank common name')) {
+    print "Found species.genbank_common_name = ",$node->get_tagvalue('genbank common name'),"\n";
+  }
+  if (defined $node->has_tag('scientific name')) {
+    print "Found species.scientific_name = ",$node->get_tagvalue('scientific name'),"\n";
+  }
+  if (defined $node->has_tag('common name')) {
+    print "Found species.common_name = ",join (',',@{$node->get_tagvalue('common name')}),"\n";
+  }
+  if (defined $node->has_tag('misspelling')) {
+    print "Found species.alias = ",$node->get_tagvalue('misspelling'),"\n";
+  }
+  if (defined $node->has_tag('synonym')) {
+    print "Found species.synonym = ",$node->get_tagvalue('synonym'),"\n";
+  }
+
+  # It is possible to remove the subspecies from the full species.classification list by commenting out the following line in 
+  #ensembl-compara/modules/Bio/EnsEMBL/Compara/NCBITaxon.pm
+  #sub _to_text_classification : 
+  # unshift @text_classification, $subspecies if (defined $subspecies);
   my @classification = split(",",$node->classification(",", 1));
   LEVEL: foreach my $level (@classification) {
-    next LEVEL if ($level =~ /\s+/);
     print "Loading species.classification = ",$level,"\n";
+    next LEVEL if ($level =~ /\s+/);
     $mc->store_key_value('species.classification',$level);
   }
   $self->{'root'} = $root;
