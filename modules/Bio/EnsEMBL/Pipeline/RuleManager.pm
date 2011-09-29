@@ -1262,9 +1262,8 @@ sub number_output_dirs {
 
  Arg [1]    : $rh_analyses_to_run, hashref of dbID of analysis
  Arg [2]    : $rh_analyses_to_skip, hashref of dbID of analysis
- Arg [3]    : $tracking, boolean
- Arg [4]    : $rh_to_keep, hashref of dbId of analysis
- Example    : $rulemanager->analysisrun_setup($rh_analyses_to_run, $rh_analyses_to_skip, $tracking, $rh_to_keep);
+ Arg [3]    : $rh_to_keep, hashref of dbId of analysis
+ Example    : $rulemanager->analysisrun_setup($rh_analyses_to_run, $rh_analyses_to_skip, $rh_to_keep);
  Description: For each analysis we will have to run, set up the tracking system
               by populating the dbs table with the databases used and creating
               the good analysis run
@@ -1274,7 +1273,7 @@ sub number_output_dirs {
 
 sub analysisrun_setup {
   my $self = shift;
-  my ($rh_analyses_to_run, $rh_analyses_to_skip, $tracking, $rh_to_keep) = @_;
+  my ($rh_analyses_to_run, $rh_analyses_to_skip, $rh_to_keep) = @_;
 
   my $analysis_adaptor = $self->analysis_adaptor;
   my @a_analysis;
@@ -1287,7 +1286,27 @@ sub analysisrun_setup {
       push(@a_analysis, $analysis->dbID);
     }
   }
-  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis), $rh_to_keep)
-    if ($tracking);
+  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis), $rh_to_keep);
 }
+
+sub check_evidences {
+  my $self = shift;
+  my ($rh_analyses_to_run, $rh_analyses_to_skip) = @_;
+
+  my $analysis_adaptor = $self->analysis_adaptor;
+  my @a_analysis;
+  if (keys(%$rh_analyses_to_run)) {
+    @a_analysis = keys (%$rh_analyses_to_run);
+  }
+  else {
+    foreach my $analysis (@{$analysis_adaptor->fetch_all}) {
+      next if (exists $rh_analyses_to_skip->{$analysis->dbID});
+      push(@a_analysis, $analysis->dbID);
+    }
+  }
+
+  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::check_trackevidences($self, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $self->analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis));
+}
+
+
 1;

@@ -387,6 +387,7 @@ while (1) {
   $rulemanager->cleanup_waiting_jobs();
   $rulemanager->cleanup_meta();
   if ($done || $once) {
+#    $rulemanager->check_evidences() if ($tracking);
     $rulemanager->db->pipeline_unlock;
     exit 0;
   }
@@ -407,7 +408,10 @@ sub setup_pipeline{
   $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                $types_to_run, $types_to_skip, 
                                $starts_from);
-  $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, $tracking, \%to_keep) unless ($keep_all);
+  if ($tracking and !$keep_all) {
+    print "***SETTING UP TRACKING SYSTEM*****\n";
+    $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, \%to_keep);
+  }
 }
 
 sub shuffle {

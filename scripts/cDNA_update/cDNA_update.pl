@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.57 2011-05-05 10:27:38 th3 Exp $
+#$Id: cDNA_update.pl,v 1.57.2.1 2011-09-29 15:36:14 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -198,7 +198,8 @@ use DBD::mysql;
 
 #use Bio::EnsEMBL::KillList::KillList;
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg );
+use Bio::EnsEMBL::Analysis::Tools::Utilities qw( get_input_arg );
+use Bio::EnsEMBL::Analysis::EvidenceTracking::Tools qw( unlock_tracking );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 use cDNAUpdate; 
@@ -501,6 +502,7 @@ elsif ( $option eq "run" ) {
     if ( $progress_status >= 2 && $progress_status < 6 ) {
 
         if ( $progress_status == 2 || $progress_status == 3 ) {
+            unlock_tracking($pipe_db);
             if ( !run_analysis() ) {
 
                 # Set status to 2 (fasta files & kill list removal are done).
@@ -1359,16 +1361,17 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
-         . " -dbhost "     . $PIPE_DBHOST
-         . " -dbport "     . $PIPE_DBPORT
-         . " -dbuser "     . $DBUSER
-         . " -dbpass "     . $DBPASS
-         . " -dbname "     . $PIPE_DBNAME
-         . " -input_id "   . $input_id
-         . " -logic_name " . $newFeatureName
-         . " -verbose"
-         . " -nowrite";
+    $cmd = 'perl ' . $CVS_DIR . '/ensembl-analysis/scripts/test_RunnableDB'
+         . ' -dbhost '     . $PIPE_DBHOST
+         . ' -dbport '     . $PIPE_DBPORT
+         . ' -dbuser '     . $DBUSER
+         . ' -dbpass '     . $DBPASS
+         . ' -dbname '     . $PIPE_DBNAME
+         . ' -input_id '   . $input_id
+         . ' -logic_name ' . $newFeatureName
+         . ' -verbose'
+         . ' -tracking'
+         . ' -nowrite';
 
     print $cmd . "\n";
     system($cmd);
@@ -1396,12 +1399,13 @@ sub run_analysis {
         print("\n\nShall we start the actual analysis? (y/n) ");
 
         if ( get_input_arg() ) {
-            $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
-                 . " -dbhost "   . $PIPE_DBHOST
-                 . " -dbport "   . $PIPE_DBPORT
-                 . " -dbuser "   . $DBUSER
-                 . " -dbpass "   . $DBPASS
-                 . " -dbname "   . $PIPE_DBNAME;
+            $cmd = 'perl ' . $CVS_DIR . '/ensembl-pipeline/scripts/rulemanager.pl'
+                 . ' -dbhost '   . $PIPE_DBHOST
+                 . ' -dbport '   . $PIPE_DBPORT
+                 . ' -dbuser '   . $DBUSER
+                 . ' -dbpass '   . $DBPASS
+                 . ' -dbname '   . $PIPE_DBNAME
+                 . ' -tracking';
 
             print(  "\nSTARTING THE PIPELINE.\n"
                   . "Using command:\n\n"
@@ -1663,8 +1667,8 @@ sub why_cdnas_missed {
 
     # Make a file containing all of the relevant lines from
     # ExonerateTranscriptFilter.pm outputs.
-    my @output = ( "output2", "output3" );
-    my $file = $DATA_DIR . "/failed_hits.out";
+    my @output = ( 'output2', 'output3' );
+    my $file = $DATA_DIR . '/failed_hits.out';
 
     open( OUT, ">$file" ) or croak("Can not open file $file");
     close OUT;
@@ -1677,24 +1681,24 @@ sub why_cdnas_missed {
     }
 
     # Need to pass all the variables to the script:
-    $cmd = "perl "              . $STORE_UNMAPPED
-        . " -gss "              . $GSS
-        . " -seq_file "         . $DATA_DIR . "/missing_cdnas.fasta"
-        . " -user "             . $DBUSER
-        . " -pass "             . $DBPASS
-        . " -host "             . $OUTPUT_DBHOST
-        . " -port "             . $OUTPUT_DBPORT
-        . " -dbname "           . $OUTPUT_DBNAME
-        . " -species \""        . $SPECIES  . "\""
-        . " -vertrna "          . $DATA_DIR . "/" . $VERTRNA
-        . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
-        . " -vertrna_update "   . $DATA_DIR . "/" . $VERTRNA_UPDATE
-        . " -infile "           . $file
-        . " -findN_prog "       . $FIND_N
-        . " -reasons_file "     . $DATA_DIR."/unmapped_reasons.txt";
+    $cmd = 'perl '              . $STORE_UNMAPPED
+        . ' -gss '              . $GSS
+        . ' -seq_file '         . $DATA_DIR . '/missing_cdnas.fasta'
+        . ' -user '             . $DBUSER
+        . ' -pass '             . $DBPASS
+        . ' -host '             . $OUTPUT_DBHOST
+        . ' -port '             . $OUTPUT_DBPORT
+        . ' -dbname '           . $OUTPUT_DBNAME
+        . ' -species "'        . $SPECIES  . '"'
+        . ' -vertrna '          . $DATA_DIR . '/' . $VERTRNA
+        . ' -refseq '           . $DATA_DIR . '/' . $REFSEQ
+        . ' -vertrna_update '   . $DATA_DIR . '/' . $VERTRNA_UPDATE
+        . ' -infile '           . $file
+        . ' -findN_prog '       . $FIND_N
+        . ' -reasons_file '     . $DATA_DIR.'/unmapped_reasons.txt';
 
     if ( system($cmd) ) {
-        carp("Erros when running $STORE_UNMAPPED!\n$cmd\n");
+        carp("Errors when running $STORE_UNMAPPED!\n$cmd\n");
     }
     else {
         print("\nUnmapped objects stored.\n");
@@ -1996,25 +2000,25 @@ sub compare {
         print "\nSubmitting jobs for detailed analysis.\n\n";
         foreach my $chromosome ( keys %chromosomes_1 ) {
 
-            $cmd = "bsub -q normal "
-                 . "-o "                . $DATA_DIR . "/" . $chromosome . ".out "
-                 . "perl "              . $CVS_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
-                 . " -chrom "           . $chromosome
-                 . " -oldname "         . $OLD_FEATURE_NAME
-                 . " -newname "         . $newFeatureName
-                 . " -dir "             . $DATA_DIR
-                 . " -olddbhost "       . $LAST_DBHOST
-                 . " -olddbport "       . $LAST_DBPORT
-                 . " -olddbname "       . $LAST_DBNAME
-                 . " -newdbhost "       . $OUTPUT_DBHOST
-                 . " -newdbport "       . $OUTPUT_DBPORT
-                 . " -newdbname "       . $OUTPUT_DBNAME
-                 . " -olddnadbhost "    . $LAST_DNADBHOST
-                 . " -olddnadbport "    . $LAST_DNADBPORT
-                 . " -olddnadbname "    . $LAST_DNADBNAME
-                 . " -newdnadbhost "    . $PIPE_DBHOST
-                 . " -newdnadbport "    . $PIPE_DBPORT
-                 . " -newdnadbname "    . $PIPE_DBNAME;
+            $cmd = 'bsub -q normal '
+                 . '-o '                . $DATA_DIR . '/' . $chromosome . '.out '
+                 . 'perl '              . $CVS_DIR . '/ensembl-pipeline/scripts/cDNA_update/comparison.pl '
+                 . ' -chrom '           . $chromosome
+                 . ' -oldname '         . $OLD_FEATURE_NAME
+                 . ' -newname '         . $newFeatureName
+                 . ' -dir '             . $DATA_DIR
+                 . ' -olddbhost '       . $LAST_DBHOST
+                 . ' -olddbport '       . $LAST_DBPORT
+                 . ' -olddbname '       . $LAST_DBNAME
+                 . ' -newdbhost '       . $OUTPUT_DBHOST
+                 . ' -newdbport '       . $OUTPUT_DBPORT
+                 . ' -newdbname '       . $OUTPUT_DBNAME
+                 . ' -olddnadbhost '    . $LAST_DNADBHOST
+                 . ' -olddnadbport '    . $LAST_DNADBPORT
+                 . ' -olddnadbname '    . $LAST_DNADBNAME
+                 . ' -newdnadbhost '    . $PIPE_DBHOST
+                 . ' -newdnadbport '    . $PIPE_DBPORT
+                 . ' -newdnadbname '    . $PIPE_DBNAME;
 
             if ( system($cmd) ) {
                 carp("Error occurred when submitting job!\n$cmd\n\n");
@@ -2025,17 +2029,17 @@ sub compare {
     print "\nGetting hits per chromosome\n" . "\told\tnew\tdiff\n";
 
     # Check hits per chromosome
-    $sql = "SELECT COUNT(distinct hit_name) "
-         . "FROM dna_align_feature daf, analysis a "
-         . "WHERE a.logic_name = '" . $OLD_FEATURE_NAME
-         . "' and a.analysis_id = daf.analysis_id "
-         . "and daf.seq_region_id = ?";
+    $sql = 'SELECT COUNT(distinct hit_name) '
+         . 'FROM dna_align_feature daf, analysis a '
+         . 'WHERE a.logic_name = "' . $OLD_FEATURE_NAME
+         . '" and a.analysis_id = daf.analysis_id '
+         . 'and daf.seq_region_id = ?';
     $sth1 = $db1->dbc->prepare($sql) or croak("Sql error!$!\n");
-    $sql = "SELECT COUNT(distinct hit_name) "
-         . "FROM dna_align_feature daf, analysis a "
-         . "WHERE a.logic_name = '" . $newFeatureName
-         . "' and a.analysis_id = daf.analysis_id "
-         . "and daf.seq_region_id = ?";
+    $sql = 'SELECT COUNT(distinct hit_name) '
+         . 'FROM dna_align_feature daf, analysis a '
+         . 'WHERE a.logic_name = "' . $newFeatureName
+         . '" and a.analysis_id = daf.analysis_id '
+         . 'and daf.seq_region_id = ?';
 
     $sth2 = $db2->dbc->prepare($sql) or croak("Sql error!$!\n");
 
@@ -2055,7 +2059,7 @@ sub compare {
         $hitcount2 += $hits_per_chrom_2{$chromosome};
     }
 
-    print "\n\nsum:" . "\t" . $hitcount1 . "\t" . $hitcount2 . "\n\n";
+    print "\n\n", 'sum:' , "\t" , $hitcount1 , "\t" , $hitcount2 , "\n\n";
 } ## end sub compare
 
 
@@ -2105,7 +2109,7 @@ sub update_progress_status {
     $sth->execute;
     $sth->finish;
     print(   "\n\nprogress_status has been updated to "
-           . "$progress_status.\n\n" );
+           . $progress_status.".\n\n" );
 }
 
 # Create a generic databse
@@ -2121,7 +2125,7 @@ sub create_db {
         $host = $PIPE_DBHOST;
         $port = $PIPE_DBPORT;
 
-        $mysql_cmd =  "mysql "
+        $mysql_cmd =  'mysql '
             . "-h $host "
             . "-P $port "
             . "-u $DBUSER "
@@ -2132,7 +2136,7 @@ sub create_db {
         $host = $OUTPUT_DBHOST;
         $port = $OUTPUT_DBPORT;
 
-        $mysql_cmd =  "mysql "
+        $mysql_cmd =  'mysql '
             . "-h $host "
             . "-P $port "
             . "-u $DBUSER "
@@ -2143,14 +2147,20 @@ sub create_db {
     # 1 = drop AND create
     drop_create_database($db_name, $host, $port, 1);
 
-    $cmd     = $mysql_cmd . " " . $db_name . " < "
-             . $CVS_DIR . "/ensembl/sql/table.sql";
+    $cmd     = $mysql_cmd .$db_name . ' < '
+             . $CVS_DIR . '/ensembl/sql/table.sql';
     $status += system($cmd);
 
     # If it's a pipeline db, add the pipeline tables.
     if ($is_pipeline) {
-        $cmd     = $mysql_cmd . "$db_name < "
-                 . $CVS_DIR . "/ensembl-pipeline/sql/table.sql";
+        $cmd     = $mysql_cmd .$db_name. ' < '
+                 . $CVS_DIR . '/ensembl-pipeline/sql/table.sql';
+        $status += system($cmd);
+        $cmd     = $mysql_cmd . $db_name.' < '
+                 . $CVS_DIR . '/ensembl-analysis/modules/Bio/EnsEMBL/Analysis/EvidenceTracking/sql/table.sql';
+        $status += system($cmd);
+        $cmd     = $mysql_cmd . $db_name.' -e \'LOAD DATA INFILE "'
+                 . $CVS_DIR . '/ensembl-analysis/modules/Bio/EnsEMBL/Analysis/EvidenceTracking/sql/reasons.txt" INTO TABLE reasons\'';
         $status += system($cmd);
     }
 
@@ -2191,7 +2201,7 @@ sub dump_tables {
 
     my $mysql_dump;
     if ($is_pipeline) {
-        $mysql_dump = "mysqldump "
+        $mysql_dump = 'mysqldump '
                     . "-h $PIPE_DBHOST "
                     . "-P $PIPE_DBPORT "
                     . "-u $DBUSER "
@@ -2201,7 +2211,7 @@ sub dump_tables {
     }
     else {
         # Dumping from the reference db
-        $mysql_dump = "mysqldump "
+        $mysql_dump = 'mysqldump '
                     . "-h $REF_DBHOST "
                     . "-P $REF_DBPORT "
                     . "-u $DBUSER "
@@ -2212,20 +2222,20 @@ sub dump_tables {
 
     # Copy defined db tables from current build
     # (removed analysis table)
-    my $file_name = $DATA_DIR . "/import_tables" . $count . ".sql";
+    my $file_name = $DATA_DIR . '/import_tables' . $count . '.sql';
 
     my $cmd;
     if ( -e $file_name ) {
         print(   "\n$file_name exists, "
-               . "do you still want to dump the tables? (y/n) " );
+               . 'do you still want to dump the tables? (y/n) ' );
 
         if ( get_input_arg() ) {
-            $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
+            $cmd = $mysql_dump . $tables_to_dump . ' > ' . $file_name;
             print $cmd, "\n";
             $status += system($cmd);
         }
         else {
-            print("\nNot dumping the tables again.\n\n");
+            print "\n", 'Not dumping the tables again.'. "\n\n";
         }
     }
     else {
@@ -2245,7 +2255,7 @@ sub import_tables {
 
     my $mysql_query;
     if ($is_pipeline) {
-        $mysql_query = "mysql "
+        $mysql_query = 'mysql '
             . "-h $PIPE_DBHOST "
             . "-P $PIPE_DBPORT "
             . "-u $DBUSER "
@@ -2253,7 +2263,7 @@ sub import_tables {
             . "-D $PIPE_DBNAME";
         print("\nImporting tables to pipeline db.\n");
     } else {
-        $mysql_query = "mysql "
+        $mysql_query = 'mysql '
             . "-h $OUTPUT_DBHOST "
             . "-P $OUTPUT_DBPORT "
             . "-u $DBUSER "
@@ -2263,8 +2273,8 @@ sub import_tables {
     }
 
     print "\nLoading the tables from file...\n";
-    my $cmd = $mysql_query . " < "
-            . $DATA_DIR . "/import_tables" . $count . ".sql";
+    my $cmd = $mysql_query . ' < '
+            . $DATA_DIR . '/import_tables' . $count . '.sql';
 
     print $cmd, "\n";
     $status += system($cmd);
@@ -2282,7 +2292,7 @@ sub load_misc_script_files {
 
     foreach my $table ( keys %table_files ) {
         #populate from production db
-        print "Populating ".$table_files{$table}." from production db to $OUTPUT_DBNAME.\n";
+        print 'Populating ', $table_files{$table}, ' from production db to $OUTPUT_DBNAME.', "\n";
 
         my $cmd = "perl $LOAD_PROD "
                       ."-mhost $PRODUCTION_DBHOST "
@@ -2310,50 +2320,50 @@ sub setup_analysis {
     print("Adding analyses and making input_ids...\n\n");
 
     $status = 0;
-    my $sql_pipe = " -dbname " . $PIPE_DBNAME
-                 . " -dbhost " . $PIPE_DBHOST
-                 . " -dbuser " . $DBUSER
-                 . " -dbpass " . $DBPASS
-                 . " -dbport " . $PIPE_DBPORT;
+    my $sql_pipe = ' -dbname ' . $PIPE_DBNAME
+                 . ' -dbhost ' . $PIPE_DBHOST
+                 . ' -dbuser ' . $DBUSER
+                 . ' -dbpass ' . $DBPASS
+                 . ' -dbport ' . $PIPE_DBPORT;
 
-    my $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+    my $cmd = 'perl ' . $CVS_DIR . '/ensembl-pipeline/scripts/add_Analysis '
             . $sql_pipe
-            . " -logic_name "      . $newFeatureName
-            . " -program "         . $PROGRAM_NAME
-            . " -program_version " . $PROGRAM_VERSION
-            . " -program_file "    . $PROGRAM_FILE
-            . " -module "          . $MODULE_NAME
-            . " -module_version "  . "1 "
-            . " -gff_source "      . "Exonerate "
-            . " -gff_feature "     . "similarity "
-            . " -input_id_type "   . "FILENAME";
+            . ' -logic_name '      . $newFeatureName
+            . ' -program '         . $PROGRAM_NAME
+            . ' -program_version ' . $PROGRAM_VERSION
+            . ' -program_file '    . $PROGRAM_FILE
+            . ' -module '          . $MODULE_NAME
+            . ' -module_version '  . '1 '
+            . ' -gff_source '      . 'Exonerate '
+            . ' -gff_feature '     . 'similarity '
+            . ' -input_id_type '   . 'FILENAME';
 
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+    $cmd = 'perl ' . $CVS_DIR . '/ensembl-pipeline/scripts/add_Analysis '
          . $sql_pipe
-         . " -logic_name "      . $submitName
-         . " -module "          . "dummy"
-         . " -input_id_type "   . "FILENAME";
+         . ' -logic_name '      . $submitName
+         . ' -module '          . 'dummy'
+         . ' -input_id_type '   . 'FILENAME';
 
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd =  "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/RuleHandler.pl "
+    $cmd =  'perl ' . $CVS_DIR . '/ensembl-pipeline/scripts/RuleHandler.pl '
           . $sql_pipe
-          . " -goal "       . $newFeatureName
-          . " -condition "  . $submitName
-          . " -insert";
+          . ' -goal '       . $newFeatureName
+          . ' -condition '  . $submitName
+          . ' -insert';
 
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd =  "perl ".$CVS_DIR."/ensembl-pipeline/scripts/make_input_ids "
+    $cmd =  'perl '.$CVS_DIR.'/ensembl-pipeline/scripts/make_input_ids '
           . $sql_pipe
-          . " -file "
-          . " -dir "        . $chunkDIR
-          . " -logic_name " . $submitName;
+          . ' -file '
+          . ' -dir '        . $chunkDIR
+          . ' -logic_name ' . $submitName;
 
     print $cmd, "\n";
     $status += system($cmd);
@@ -2366,18 +2376,18 @@ sub setup_analysis {
 sub drop_create_database {
     my ($db_name, $host, $port, $create) = @_;
 
-    my $serverh = DBI->connect( "DBI:mysql:mysql"
-                              . ";host="      . $host
-                              . ":port="      . $port
-                              . ";user="      . $DBUSER
-                              . ";password="  . $DBPASS )
+    my $serverh = DBI->connect( 'DBI:mysql:mysql'
+                              . ';host='      . $host
+                              . ':port='      . $port
+                              . ';user='      . $DBUSER
+                              . ';password='  . $DBPASS )
                             or croak($DBI::errstr);
 
-    my $drop_sql = "DROP DATABASE IF EXISTS " . $db_name;
+    my $drop_sql = 'DROP DATABASE IF EXISTS ' . $db_name;
     $serverh->do($drop_sql);
 
     if ($create) {
-        my $create_sql = "CREATE DATABASE " . $db_name;
+        my $create_sql = 'CREATE DATABASE ' . $db_name;
         $serverh->do($create_sql);
     }
 
@@ -2388,8 +2398,8 @@ sub drop_create_database {
 sub get_status {
     my ($dbc) = @_;
 
-    my $status_sql = "SELECT meta_value FROM meta "
-        . "WHERE meta_key = 'progress_status'";
+    my $status_sql = 'SELECT meta_value FROM meta '
+        . 'WHERE meta_key = "progress_status"';
     my $sth = $dbc->prepare($status_sql);
     $sth->execute;
     my $status = $sth->fetchrow_array;
@@ -2403,13 +2413,12 @@ sub polya_clipping {
 
     # Clip ployA tails
     print("\nPerforming polyA clipping...\n");
-    my $newfile3 = $DATA_DIR . "/" . $trim_file. ".clipped";
-    $cmd = "perl " . $POLYA_CLIPPING . " " ; 
-    $cmd.="-errfile $DATA_DIR/polyA.err ";
+    my $newfile3 = $DATA_DIR . '/' . $trim_file. '.clipped';
+    $cmd = 'perl ' . $POLYA_CLIPPING. ' -errfile '.$DATA_DIR.'/polyA.err ';
     if ( $MIN_LENGTH ) { 
        $cmd.="-min_length $MIN_LENGTH "; 
     } 
-      $cmd .=  $DATA_DIR . "/" . $trim_file . " " . $newfile3;
+      $cmd .=  $DATA_DIR . '/' . $trim_file . ' ' . $newfile3;
 
     print $cmd, "\n";
 
@@ -2472,7 +2481,7 @@ sub connect_db {
     if ($dnadb) {
         $dbObj =
           new Bio::EnsEMBL::DBSQL::DBAdaptor( -host   => $host
-                                                -port => $port,
+                                              -port   => $port,
                                               -dbname => $dbname,
                                               -user   => $user,
                                               -pass   => $pass,

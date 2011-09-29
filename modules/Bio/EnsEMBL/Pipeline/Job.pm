@@ -47,6 +47,7 @@ package Bio::EnsEMBL::Pipeline::Job;
 
 use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
+use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Analysis::Tools::Logger;
@@ -313,6 +314,7 @@ sub flush_runs {
   # then in same directory as Job.pm,
   # and fail if not found
 
+    print STDERR 'prepare the runner', "\n";
   my $runner = $self->runner;
 
   if (!$runner || ! -x $runner) {
@@ -327,11 +329,17 @@ sub flush_runs {
  
  ANAL:
   for my $anal (@analyses) {
+    print STDERR 'loop ANAL', "\n";
 
     my $queue = $BATCH_QUEUES{$anal};
+    my @job_ids;
    
     
-    my @job_ids = @{$queue->{'jobs'}};
+#    my @job_ids = @{$queue->{'jobs'}};
+    my @jobs = @{$queue->{'jobs'}};
+    foreach my $job (@{$queue->{'jobs'}}) {
+        push(@job_ids, $job->dbID);
+    }
     if (!@job_ids) {
       next ANAL;
     }
@@ -340,11 +348,14 @@ sub flush_runs {
     #print "This runner is ".$this_runner."\n";
     $this_runner = (-x $this_runner) ? $this_runner : $runner;
     
-    my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
-    
-    if ( ! $lastjob) {
-      throw( "Last batch job not in db" );
-    }
+#    print STDERR 'lastjob', Dumper(@job_ids), "\n";
+#    my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
+#    print STDERR 'lastjob', "\n";
+#    
+#    if ( ! $lastjob) {
+#      throw( "Last batch job not in db" );
+#    }
+    my $lastjob = $jobs[-1];
     # jhv LD_LIBRARY_PATH lsf-pre-exec hack  
     # We're running the runner.pl with /usr/local/ensembl32/bin/perl - this is a bit un-usual , but it's 
     # currently ( July 2010 ) needed to overcome some lsf bug / lsf security feature. 
@@ -354,6 +365,7 @@ sub flush_runs {
     # and the  LD_LIBRARY_PATH is unset. so you can't use the libraries you want, ie if you you're using 
     #  /software/intel_cce_80/bin/iccvars.csh
   
+    print STDERR 'before exec', "\n";
     my $pre_exec_perl = "perl"; 
     if ( defined $queue->{lsf_pre_exec_perl} ) {
       $pre_exec_perl = $queue->{lsf_pre_exec_perl}; 
@@ -421,26 +433,32 @@ sub flush_runs {
     }
     $cmd .= " @job_ids";
     #print "Job.pm-cmd : $cmd\n";   
+    print STDERR 'construct cmd', "\n";
     $batch_job->construct_command_line($cmd);
     return "DB overloaded" if ($main::CHECK_DBLOAD and $batch_job->is_db_overloaded($queue->{load_pending_cost} || 10));
 
     eval {
       # SMJS LSF Specific for debugging
-      # print STDERR "Submitting: ", $batch_job->bsub, "\n"; # only if you run jobs with LSF /batch submission; does not work if you run jobs locally
+ print STDERR "Submitting: ", $batch_job->bsub, "\n"; # only if you run jobs with LSF /batch submission; does not work if you run jobs locally
       $batch_job->open_command_line();
     };
 
+    print STDERR 'Running', "\n";
     if ($@) {
       print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
       print STDERR "Using ".$batch_job->bsub."\n";
-      foreach my $job_id (@job_ids) {
-        my $job = $adaptor->fetch_by_dbID($job_id);
+#      foreach my $job_id (@job_ids) {
+#        my $job = $adaptor->fetch_by_dbID($job_id);
+#        $job->set_status( "FAILED" );
+#      }
+      foreach my $job (@jobs) {
         $job->set_status( "FAILED" );
       }
     } else {
       #print STDERR "have submitted ".@job_ids." jobs with ".$batch_job->id
       #."\n";
-      my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
+    print STDERR 'Good', "\n";
+#      my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
       foreach my $job (@jobs) {
 
         if( $job->retry_count > 0 ) {
@@ -450,6 +468,7 @@ sub flush_runs {
         }
 
         #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
+    print STDERR 'Better', "\n";
         if ($batch_job->id) {
           $job->submission_id( $batch_job->id );
         } else {
@@ -461,8 +480,12 @@ sub flush_runs {
         }
         $job->retry_count( $job->retry_count + 1 );
         $job->set_status( "SUBMITTED" );
+    print STDERR 'Updated', "\n";
         $job->stdout_file($lastjob->stdout_file);
+    print STDERR 'stdout', "\n";
         $job->stderr_file($lastjob->stderr_file);
+    print STDERR 'stderr', "\n";
+        $job->stdout_file($lastjob->stdout_file);
       }
       $adaptor->update(@jobs);
     }
@@ -486,6 +509,7 @@ sub flush_runs {
 sub batch_runRemote {
   my ($self) = @_;
 
+    print STDERR 'in batch_remote', "\n";
   my $queue;
   
   if (!exists($BATCH_QUEUES{$self->analysis->logic_name})) {
@@ -494,12 +518,18 @@ sub batch_runRemote {
     $queue = $self->analysis->logic_name;
   }
   
-  push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
+    print STDERR 'push job ', "\n";
+#  push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
+  push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self;
+  print STDERR 'jobs: ', Dumper($BATCH_QUEUES{$queue}{'jobs'});
+  print STDERR 'batchsize: ', Dumper($BATCH_QUEUES{$queue}{'batch_size'});
  
   if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
                $BATCH_QUEUES{$queue}{'batch_size'}) {
 
+    print STDERR 'run job ', "\n";
     $self->flush_runs($self->adaptor, $queue);
+    print STDERR 'running job ', "\n";
   } else {
     # print STDERR "Not running ".$self->dbID." yet as batch size is ".
     #              $BATCH_QUEUES{$queue}{'batch_size'} . " and there are ".
