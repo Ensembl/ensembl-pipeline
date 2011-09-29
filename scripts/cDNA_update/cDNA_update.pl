@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.57.2.1 2011-09-29 15:36:14 th3 Exp $
+#$Id: cDNA_update.pl,v 1.57.2.2 2011-09-29 15:47:15 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -206,7 +206,7 @@ use cDNAUpdate;
 
 # We need the Net::SSH module from somewhere:
 use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
-use Net::SSH qw(sshopen2);
+# Not used anymore use Net::SSH qw(sshopen2);
 
 my $species;
 
@@ -246,7 +246,7 @@ if ( defined($GSS_PREFIX) ) {
 
 # When comparing to a previously updated cdna db
 # $oldFeatureName = $newFeatureName
-my $newFeatureName  = "cDNA_update"; # the analysis name!
+my $newFeatureName  = "cdna_update"; # the analysis name!
 
 my %saved_files;
 my $cmd;
@@ -272,6 +272,7 @@ my %configvars = (
                  "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
                  "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
                  "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
+                 "RESOURCE"        => $RESOURCE,
                  "DBUSER"        => $DBUSER,           # from cDNAUpdate
                  "DBPASS"        => $DBPASS,           # from cDNAUpdate
                  "DBUSER_RO"     => $DBUSER_RO,        # from cDNAUpdate
@@ -294,13 +295,13 @@ my %configvars = (
                  "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
                  "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
                  "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
+                 "RESOURCE" => $RESOURCE,   # from cDNAUpdate
                  "chunkDIR"         => $chunkDIR,
                  "outDIR"           => $outDIR,
                  "configDIR"        => $configDIR,
                  "newfile"          => $newfile,
                  "config_file"      => $config_file,
                  "masked_genome"    => $genomelist,
-                 "queue"            => $QUEUE,
                  "newFeatureName"   => $newFeatureName );
 
 # Fasta chunk specifications:
@@ -779,10 +780,6 @@ sub config_setup {
             my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
             $content =~ s/--softmasktarget TRUE/$substitute/;
         }
-        if (   ( $filename =~ /BatchQueue/ )
-            && ( $rerun_flag == 1 ) ) {
-            $content =~ s/(queue\s+=>\s+')\w+/$1$QUEUE_OTHERS/;
-        }
 
         # Backup file if exists
         if ( -e $CVS_DIR . "/" . $header ) {
@@ -1007,62 +1004,26 @@ sub write_to_file {
     # update file.
     # Read update file.
     local $/ = "\n>";
-    open( RP, "<", $DATA_DIR . "/" . $VERTRNA_UPDATE )
-      or croak("can't read $VERTRNA_UPDATE\n");
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
+    my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
+    system("/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t $configvars{taxonomy_id} > $embl_fa_file");
+    open( RP, "<", $embl_fa_file )
+      or croak("can't read $embl_fa_file\n");
     while ( my $entry = <RP> ) {
         # Need this to include the first record when using $/='\n>'
         $entry =~ s/^>//;
-        if ( $entry =~ m/$SPECIES/ ) {
-            # Extract & save id
-            $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-            if ( !$1 ) {
-                croak(   "\n$VERTRNA_UPDATE: "
-                       . "unmatched id pattern:\n$entry\n" );
-            }
-            $EMBL_ids{$1} = 1;
-            # Re-write fasta entry
-            $entry =~ s/\>//g;
-            print WP '>' . $entry;
+        # Extract & save id
+        $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
+        if ( !$1 ) {
+            croak(   "\n$VERTRNA_UPDATE: " . "unmatched id pattern:\n$entry\n" );
         }
+        # Re-write fasta entry
+        $entry =~ s/\>//g;
+        print WP '>' . $entry;
     }
     close(RP);
-    print("\nRead update $VERTRNA_UPDATE EMBL file.\n");
-
-    my @embl_vertrna_files;
-    opendir( DIR, "$DATA_DIR" || croak "Cannot opendir $DATA_DIR $!" );
-    while ( my $filename = readdir(DIR) ) {
-        if ( $filename =~ /$VERTRNA/ ) {
-            push @embl_vertrna_files, $filename;
-        }
-    }
-
-    # now loop through all embl_vertna files
-    #read base file
-    foreach my $embl_vert (@embl_vertrna_files) {
-        open( RP, "<", $DATA_DIR . "/" . $embl_vert )
-          or croak("Can't read $embl_vert\n");
-        #<RP>;
-        while ( my $entry = <RP> ) {
-            # Need this to include the first record when using $/='\n>'
-            $entry =~ s/^>//;
-            if ( $entry =~ m/$SPECIES/ ) {
-                # Extract & save id
-                $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
-                if ( !$1 ) {
-                    croak("\n$embl_vert: unmatched id pattern:\n$entry\n");
-                }
-                if ( !defined( $EMBL_ids{$1} ) ) {
-                    # Add fasta entry for unchanged id
-                    $entry =~ s/\>//g;
-                    print WP '>' . $entry;
-                }
-            }
-        }
-        close(RP);
-        print "Read base $embl_vert EMBL file.\n";
-    }
+    print("\nRead EMBL file.\n");
 
     # Read RefSeq file
     open( RP, "<", $DATA_DIR . "/" . $REFSEQ )
@@ -1098,7 +1059,7 @@ sub write_to_file {
 sub remove_kill_list_object {
     require Bio::EnsEMBL::KillList::KillList;
     my $kill_list_object =
-      Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cDNA_update' );
+      Bio::EnsEMBL::KillList::KillList->new( -TYPE => 'cdna_update' );
     my %kill_list = %{ $kill_list_object->get_kill_list() };
 
     open( LIST, "<", $GSS ) or croak("can't open gss list $GSS");
@@ -1361,17 +1322,17 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = 'perl ' . $CVS_DIR . '/ensembl-analysis/scripts/test_RunnableDB'
-         . ' -dbhost '     . $PIPE_DBHOST
-         . ' -dbport '     . $PIPE_DBPORT
-         . ' -dbuser '     . $DBUSER
-         . ' -dbpass '     . $DBPASS
-         . ' -dbname '     . $PIPE_DBNAME
-         . ' -input_id '   . $input_id
-         . ' -logic_name ' . $newFeatureName
-         . ' -verbose'
+    $cmd = "bsub -I -q yesterday perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+         . " -dbhost "     . $PIPE_DBHOST
+         . " -dbport "     . $PIPE_DBPORT
+         . " -dbuser "     . $DBUSER
+         . " -dbpass "     . $DBPASS
+         . " -dbname "     . $PIPE_DBNAME
+         . " -input_id "   . $input_id
+         . " -logic_name " . $newFeatureName
+         . " -verbose"
          . ' -tracking'
-         . ' -nowrite';
+         . " -nowrite";
 
     print $cmd . "\n";
     system($cmd);
@@ -1681,21 +1642,21 @@ sub why_cdnas_missed {
     }
 
     # Need to pass all the variables to the script:
-    $cmd = 'perl '              . $STORE_UNMAPPED
-        . ' -gss '              . $GSS
-        . ' -seq_file '         . $DATA_DIR . '/missing_cdnas.fasta'
-        . ' -user '             . $DBUSER
-        . ' -pass '             . $DBPASS
-        . ' -host '             . $OUTPUT_DBHOST
-        . ' -port '             . $OUTPUT_DBPORT
-        . ' -dbname '           . $OUTPUT_DBNAME
-        . ' -species "'        . $SPECIES  . '"'
-        . ' -vertrna '          . $DATA_DIR . '/' . $VERTRNA
-        . ' -refseq '           . $DATA_DIR . '/' . $REFSEQ
-        . ' -vertrna_update '   . $DATA_DIR . '/' . $VERTRNA_UPDATE
-        . ' -infile '           . $file
-        . ' -findN_prog '       . $FIND_N
-        . ' -reasons_file '     . $DATA_DIR.'/unmapped_reasons.txt';
+    my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
+    $cmd = "perl "              . $STORE_UNMAPPED
+        . " -gss "              . $GSS
+        . " -seq_file "         . $DATA_DIR . "/missing_cdnas.fasta"
+        . " -user "             . $DBUSER
+        . " -pass "             . $DBPASS
+        . " -host "             . $OUTPUT_DBHOST
+        . " -port "             . $OUTPUT_DBPORT
+        . " -dbname "           . $OUTPUT_DBNAME
+        . " -species \""        . $SPECIES  . "\""
+        . " -vertrna "          . $DATA_DIR . "/" . $embl_fa_file
+        . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
+        . " -infile "           . $file
+        . " -findN_prog "       . $FIND_N
+        . " -reasons_file "     . $DATA_DIR."/unmapped_reasons.txt";
 
     if ( system($cmd) ) {
         carp("Errors when running $STORE_UNMAPPED!\n$cmd\n");
@@ -2303,6 +2264,7 @@ sub load_misc_script_files {
                       ."-pass $DBPASS "
                       ."-database $OUTPUT_DBNAME "
                       ."-port $OUTPUT_DBPORT "
+                      ."-dumppath $DATA_DIR "
                       ."-table $table";
 
         print $cmd."\n";

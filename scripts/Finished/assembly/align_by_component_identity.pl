@@ -102,8 +102,8 @@ Please see http://www.ensembl.org/code_licence.html for details
 Patrick Meidl <meidl@ebi.ac.uk>, Ensembl core API team
 
 modified by Leo Gordon <lg4@sanger.ac.uk>
-
 and Mustapha Larbaoui <ml6@sanger.ac.uk>
+and Michael Gray <mg13@sanger.ac.uk>
 
 =head1 CONTACT
 
@@ -119,20 +119,15 @@ use warnings;
 # no warnings 'uninitialized';
 
 use FindBin qw($Bin);
-use vars qw($SERVERROOT);
+use lib "$Bin";
 
-BEGIN {
-    $SERVERROOT = "$Bin/../../../..";
-    unshift(@INC, "$Bin");
-}
+use AssemblyMapper::Support;
 
-use Getopt::Long;
 use Pod::Usage;
 use Readonly;
 use Switch;
-use Bio::EnsEMBL::Utils::ConversionSupport;
-use Bio::EnsEMBL::Attribute;
-use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning);
+
+use Bio::EnsEMBL::Utils::Exception qw( throw );
 use Algorithm::Diff qw(sdiff);
 
 # project() returns triplets [start,end,slice]
@@ -152,95 +147,53 @@ Readonly my $SDIFF_RIGHT_ELE => 2;
 
 $| = 1;
 
-my $support = new Bio::EnsEMBL::Utils::ConversionSupport($SERVERROOT);
-
-$support->param( 'verbose',     1 );    # throw away all that garbage
-$support->param( 'interactive', 0 );    # stop that garbage from coming up
-
-# parse options
-$support->parse_common_options(@_);
-$support->parse_extra_options(
-    'assembly=s',               'altdbname=s',
-    'altassembly=s',            'chromosomes|chr=s@',
-    'altchromosomes|altchr=s@', 'skipcomponents|skip_components=s',
-    'exctype=s', 'ref_start=i', 'ref_end=i', 'alt_start=i', 'alt_end=i',
-    'multiple!'
-    );
-$support->allowed_params( $support->get_common_params, 'assembly', 'altdbname',
-                          'altassembly', 'chromosomes', 'altchromosomes', 'skipcomponents', 'exctype',
-                          'multiple'
+my $support = AssemblyMapper::Support->new(
+    extra_options => [
+        'skipcomponents|skip_components=s',
+        'exctype=s',
+        'ref_start=i',
+        'ref_end=i',
+        'alt_start=i',
+        'alt_end=i',
+        'multiple!'
+    ],
     );
 
-if ( $support->param('help') or $support->error ) {
+unless ($support->parse_arguments(@_)) {
     warn $support->error if $support->error;
     pod2usage(1);
 }
 
-$support->comma_to_list( 'chromosomes', 'altchromosomes' );
-
 my $write_db = not $support->param('dry_run');
-my $multiple =  $support->param('multiple');
-
-# ask user to confirm parameters to proceed
-$support->confirm_params;
-
-# get log filehandle and print heading and parameters to logfile
-$support->init_log;
+my $multiple = $support->param('multiple');
 
 if ($multiple) {
     $support->log_error("--multiple mode disabled for now following May 2011 rewrite\n");
 }
 
-$support->check_required_params( 'assembly', 'altassembly' );
-
-# first set connection parameters for alternative db
-# both databases have to be on the same host, so we don't need to configure
-# them separately
-for my $prm (qw(host port user pass dbname)) {
-    $support->param( "alt$prm", $support->param($prm) )
-        unless ( $support->param("alt$prm") );
-}
-
-# reference database
-my $R_dba = $support->get_database( 'ensembl', '' );
-my $R_dbc = $R_dba->dbc;
-my $R_sa  = $R_dba->get_SliceAdaptor;
-my $R_asm = $support->param('assembly');
-my $Ref_start = $support->param('ref_start') || undef;
-my $Ref_end = $support->param('ref_end') || undef;
-
-# database containing the alternative assembly
-my $A_dba = $support->get_database( 'ensembl', 'alt' );
-my $A_sa  = $A_dba->get_SliceAdaptor;
-my $A_asm = $support->param('altassembly');
-my $Alt_start = $support->param('alt_start') || undef;
-my $Alt_end = $support->param('alt_end') || undef;
-
+$support->connect_dbs;
 
 #####
 # create temporary tables for storing non-aligned blocks and their masks
 #
 if ($write_db) {
-    $R_dbc->do(
+    $support->ref_dbc->do(
         qq(
         CREATE TABLE IF NOT EXISTS tmp_align (
           tmp_align_id int(10) unsigned NOT NULL auto_increment,
-          alt_seq_region_name varchar(20) NOT NULL,
+          align_session_id int(10) unsigned NOT NULL,
           alt_start int(10) UNSIGNED NOT NULL,
           alt_end int(10) UNSIGNED NOT NULL,
-          ref_seq_region_name varchar(20) NOT NULL,
           ref_start int(10) UNSIGNED NOT NULL,
           ref_end int(10) UNSIGNED NOT NULL,
 
-          PRIMARY KEY (tmp_align_id)
+          PRIMARY KEY (tmp_align_id),
+          KEY align_session_id_idx (align_session_id)
           ) ENGINE=InnoDB;
   )
-	);
+    );
 
-    # clear tmp_align table of entries from previous runs
-    $R_dbc->do(qq(DELETE FROM tmp_align));
-
-    $R_dbc->do(
+    $support->ref_dbc->do(
         qq(
         CREATE TABLE IF NOT EXISTS tmp_mask (
           tmp_mask_id int(10) unsigned NOT NULL auto_increment,
@@ -254,16 +207,11 @@ if ($write_db) {
           KEY tmp_align_idx (tmp_align_id)
           ) ENGINE=InnoDB;
   )
-	);
+    );
 
-    # clear tmp_mask table of entries from previous runs
-    $R_dbc->do(qq(DELETE FROM tmp_mask));
 }
 else {
-    $support->log(
-        "\nHere I would create and empty 'tmp_align' and 'tmp_mask' tables, if you'd let me\n",
-        1
-	);
+    $support->log("\nHere I might create 'tmp_align' and 'tmp_mask' tables, if you'd let me\n");
 }
 
 
@@ -295,7 +243,7 @@ my $fmt44 = "%10.0f  %10.0f    %7.0f   %10.0f  %10.0f  %7.0f %7.0f\n";
 my $fmt5 = "%-40s%10s\n";
 my $fmt6 = "%-10s%-12s%-10s%-12s\n";
 
-my $sth1 = $R_dbc->prepare(
+my $sth1 = $support->ref_dbc->prepare(
     qq{
     INSERT IGNORE INTO assembly (asm_seq_region_id, cmp_seq_region_id,
                                  asm_start, asm_end, cmp_start, cmp_end, ori)
@@ -303,61 +251,54 @@ my $sth1 = $R_dbc->prepare(
 }
     );
 
-my $sth2 = $R_dbc->prepare(
+my $sth2 = $support->ref_dbc->prepare(
     qq{
-  INSERT INTO tmp_align values(NULL, ?, ?, ?, ?, ?, ?)
+  INSERT INTO tmp_align
+    (align_session_id, alt_start, alt_end, ref_start, ref_end)
+    VALUES (?, ?, ?, ?, ?)
 }
     );
 
-my $sth_mask = $R_dbc->prepare(
+my $sth_mask = $support->ref_dbc->prepare(
     qq{
-  INSERT INTO tmp_mask 
+  INSERT INTO tmp_mask
       (tmp_align_id, alt_mask_start, alt_mask_end, ref_mask_start, ref_mask_end)
       values (?, ?, ?, ?, ?)
 }
     );
 
-$support->log_stamped("Looping over chromosomes...\n");
+my $ok = $support->iterate_chromosomes(
+    prev_stage =>     '00-new_align_session',
+    this_stage =>     '10-align_identical',
+    worker =>         \&do_align,
+    );
 
-my @R_chr_list = $support->param('chromosomes');
-if ( !scalar(@R_chr_list) ) {
-    @R_chr_list = $support->sort_chromosomes;
+sub do_align {
+    my ($asp, $data) = @_;
 
-    if ( scalar( $support->param('altchromosomes') ) ) {
-        die "AltChromosomes list is defined while Chromosomes list is not!";
-    }
-}
-
-my @A_chr_list = $support->param('altchromosomes');
-if ( !scalar(@A_chr_list) ) {
-    @A_chr_list = @R_chr_list;
-}
-elsif ( scalar(@R_chr_list) != scalar(@A_chr_list) ) {
-    die "Chromosome lists do not match by length";
-}
-
-for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
-    my $R_chr = $R_chr_list[$i];
-    my $A_chr = $A_chr_list[$i];
     my $match   = {};
     my $nomatch = {};
     my $match_flag = 0;
     my %stats_chr = ( identical => 0, mismatch => 0, skipped => 0 );
 
-    $support->log_stamped( "Chromosome $R_chr/$A_chr ...\n", 1 );
+    my $R_chr   = $asp->ref_chr;
+    my $A_chr   = $asp->alt_chr;
 
-    # fetch chromosome slices
-    my $R_slice =
-        $R_sa->fetch_by_region( 'chromosome', $R_chr, $Ref_start, $Ref_end, undef, $R_asm );
-    print STDOUT $R_slice->seq_region_name." ".$R_slice->start." -> ".$R_slice->end."\n";
+    my $R_slice = $asp->ref_slice;
+    my $A_slice = $asp->alt_slice;
 
-    my $A_slice =
-        $A_sa->fetch_by_region( 'chromosome', $A_chr, $Alt_start, $Alt_end, undef, $A_asm );
-    my $A_slice_ref =
-        $A_sa->fetch_by_region( 'chromosome', $A_chr, $Alt_start, $Alt_end, undef, $A_asm );
+    my $alt_seq_region_id_in_ref_db = $asp->ref_sa->get_seq_region_id($A_slice);
 
     my $R_length = $R_slice->length;
     my $A_length = $A_slice->length;
+
+    my $Ref_start = $asp->ref_start;
+    my $Alt_start = $asp->alt_start;
+
+    my $R_asm = $asp->ref_asm;
+    my $A_asm = $asp->alt_asm;
+
+    my $R_dba = $asp->ref_dba;
 
     # project() returns triplets [start,end,slice]
     #           where start,end are from start of source slice
@@ -384,7 +325,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     }
 
     my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
-    
+
     # loop over sdiff results
   DIFF: foreach my $diff (@assembly_diffs)  {
 
@@ -396,7 +337,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
       my $R_exists = $R_ele ? 1 : 0;
       my $A_exists = $A_ele ? 1 : 0;
-      
+
       my ($R_ele_slice, $A_ele_slice);
       my ($R_key, $A_key) = ('<UNDEF>', '<UNDEF>');
 
@@ -600,8 +541,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         foreach $c ( 0 .. $number_aligned_blocks - 1 ) {
             $sth1->execute(
-                $R_sa->get_seq_region_id($R_slice),
-                $R_sa->get_seq_region_id($A_slice_ref),
+                $asp->ref_seq_region_id,
+                $alt_seq_region_id_in_ref_db,
                 $match->{$R_chr}->[$c]->{R_start},
                 $match->{$R_chr}->[$c]->{R_end},
                 $match->{$R_chr}->[$c]->{A_start},
@@ -635,7 +576,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     # dummy match at end of chromosome
     my $A_dummy_last_start = $Alt_start ? $Alt_start + $A_length : 1 + $A_length;
     my $R_dummy_last_start = $Ref_start ? $Ref_start + $R_length : 1 + $R_length;
-    my $last = { 
+    my $last = {
         A_start => $A_dummy_last_start,
         A_end   => $A_dummy_last_start,
         A_count => 0,
@@ -702,7 +643,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 # - queue the intruding alt block for masking and move onto the next
                 push @alt_masks, $match_by_alt unless $match_by_alt == $last;
                 $match_by_alt = shift @matches_by_alt;
-                
+
                 # - restart comparison to use the new alt block, and in case there's another alt insert
                 redo DIR_ALIGN_BLOCK if $match_by_alt;
 
@@ -724,7 +665,7 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
             }
 
         }
-        
+
         if ( ($r_start - $sr_end) < 1 ) {
             # This should never get hit
             $support->log_warning( "We shouldn't be going backwards!\n" );
@@ -756,14 +697,16 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
 
         # We should apply masks before seeing if there's sequence...
 
-        my $ref_seq = $R_sa->fetch_by_region('chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
+        my $ref_seq = $asp->ref_sa->fetch_by_region(
+            'chromosome', $R_chr, $chr_r_start, $chr_r_end, undef, $R_asm)->seq;
         my $ref_count = $ref_seq =~ s/([atgc])/$1/ig;
 
         my ($chr_a_start, $chr_a_end) =    $sa_end+1 < $a_start-1 ?
             ($sa_end+1, $a_start-1) :
             ($a_start-1, $sa_end+1);
 
-        my $alt_seq = $A_sa->fetch_by_region('chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
+        my $alt_seq = $asp->alt_sa->fetch_by_region(
+            'chromosome', $A_chr, $chr_a_start, $chr_a_end, undef, $A_asm)->seq;
         my $alt_count = $alt_seq =~ s/([atgc])/$1/ig;
 
         if ( $ref_count and $alt_count ) {
@@ -845,10 +788,9 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                 my $block = $nomatch->{$R_chr}->[$c];
 
                 $sth2->execute(
-                    $block->{A_name},
+                    $asp->session_id,
                     $block->{A_start},
                     $block->{A_end},
-                    $R_chr,
                     $block->{R_start},
                     $block->{R_end},
                     );
@@ -914,37 +856,37 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
                  "Identical components that were skipped:",
                  $stats_chr{'skipped'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components with start/end mismatch:",
                  $stats_chr{'mismatch'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components only in alternative assembly:",
                  $stats_chr{'A_only'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt1,
                  "Components only in reference assembly:",
                  $stats_chr{'R_only'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt2,
                  "Direct match coverage (alternative):",
                  $stats_chr{'A_coverage'} ),
         2
-	);
+    );
     $support->log(
         sprintf( $fmt2,
                  "Direct match coverage (reference):",
                  $stats_chr{'R_coverage'} ),
         2
-	);
+    );
 
     # Aligned blocks
     if ( $match->{$R_chr} ) {
@@ -1012,6 +954,8 @@ for my $i ( 0 .. scalar(@R_chr_list) - 1 ) {
     }
 
     $support->log_stamped( "\nDone with chromosome $R_chr.\n", 1 );
+
+    return 1;
 }
 
 # overall stats
@@ -1278,14 +1222,14 @@ sub parse_projections {
             }
         }
     }
-    push @$blocks, 
+    push @$blocks,
     {
         R_start => $R_chr_s,
         R_end   => $R_chr_e,
         A_start => $A_chr_s,
         A_end   => $A_chr_e,
         tag     => 0,
-        ori     => $ori 
+        ori     => $ori
     };
 
     # create the 2nd non-align block if exists
@@ -1375,7 +1319,7 @@ sub store_blocks {
                 R_start => $R_s,
                 R_end   => $R_e,
                 R_count => 1,
-                A_name  => $A_name 
+                A_name  => $A_name
             };
         }
     }

@@ -58,9 +58,6 @@ use vars qw(%Config);
         PROGRAM_FILE    => "/usr/local/ensembl/bin/exonerate-0.9.0",  #path to exonerate
         MODULE_NAME     => "Exonerate2Genes",
 
-        QUEUE  => 'small',
-        QUEUE_OTHERS => 'normal',
-
         # Source data files details
         SOURCE_DIR  => '/data/blastdb/Supported',#formerly /data/blastdb                                             
         REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',#formerly /data/blastdb/refseqdna
@@ -71,7 +68,7 @@ use vars qw(%Config);
         TAXONDBPORT => 3306,
 
         # For the comparison only
-        OLD_FEATURE_NAME => 'cDNA_update',
+        OLD_FEATURE_NAME => 'cdna_update',
 
         # These variables need to be set, please do so in the
         # corresponding hash tables for the species you want to
@@ -115,6 +112,8 @@ use vars qw(%Config);
         PRODUCTION_DBNAME => 'ensembl_production',#db to read unmapped reason and external db from
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
+
+        RESOURCE => '',#can be used for token requirements, etc.
 
         CVS_DIR => '',
 
@@ -167,6 +166,8 @@ use vars qw(%Config);
         PRODUCTION_DBNAME => 'ensembl_production',#db to read unmapped reason and external db from
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
+
+        RESOURCE => '',#can be used for token requirements, etc.
 
         CVS_DIR => '',
 

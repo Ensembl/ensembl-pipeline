@@ -170,7 +170,7 @@ use vars qw(%Config);
 
   QUEUE_CONFIG => [
     {
-      logic_name      => 'RepeatMask',
+      logic_name      => 'repeatmask',
       batch_size      => 10,
       resource        => '',
       retries         => 3,
@@ -186,7 +186,7 @@ use vars qw(%Config);
       lsf_perl        => '/usr/local/ensembl32/bin/perl',
     },
     {
-      logic_name     => 'Genscan',
+      logic_name     => 'genscan',
       batch_size     => 10,
       resource       => '',
       retries        => 3,
@@ -197,7 +197,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-        logic_name     => 'FirstEF',
+        logic_name     => 'firstef',
         batch_size     => 10,
         resource       => '',
         retries        => 3,
@@ -208,7 +208,7 @@ use vars qw(%Config);
         retry_sub_args => '',
     },
     {
-        logic_name     => 'CpG',
+        logic_name     => 'cpg',
         batch_size     => 10,
         resource       => '',
         retries        => 3,
@@ -231,7 +231,7 @@ use vars qw(%Config);
         lsf_perl        => '/usr/local/ensembl64/bin/perl',
     },
     {
-      logic_name => 'Eponine',
+      logic_name => 'eponine',
       batch_size => 2000,
       resource       => '',
       retries        => 3,
@@ -242,7 +242,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-      logic_name => 'TRF',
+      logic_name => 'trf',
       batch_size => 2000,
       resource       => '',
       retries        => 3,
@@ -253,7 +253,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-      logic_name => 'tRNAscan',
+      logic_name => 'trnascan',
       batch_size => 2000,
       resource       => '',
       retries        => 3,
@@ -264,7 +264,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-      logic_name => 'Vertrna',
+      logic_name => 'vertrna',
       batch_size => 600,
       resource       => '',
       retries        => 3,
@@ -275,7 +275,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-      logic_name => 'Unigene',
+      logic_name => 'unigene',
       batch_size => 600,
       resource       => '',
       retries        => 3,
@@ -286,7 +286,7 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-      logic_name => 'Uniprot',
+      logic_name => 'uniprot',
       batch_size => 500,
       resource       => '',
       retries        => 3,

@@ -59,9 +59,9 @@ my $tmp_xref_db = "ml6_interpro_xref_for_vega";
 my $REPOSITORY = "/nfs/anacode/protein_pipeline";
 my $PIPE_DIR   = "/software/anacode/pipeline";
 
-my $params1 = "-dbhost $dbhost -dbname $dbname -dbuser $dbuser -dbport $dbport -dbpass $dbpass";
-my $params2 = "-user $dbuser -pass $dbpass -host $dbhost -port $dbport -dbname $tmp_xref_db";
-my $sql_db  = "mysql --host=$dbhost --user=$dbuser --port=$dbport --pass=$dbpass";
+my $params1 = "-dbhost $dbhost -dbport $dbport -dbuser $dbuser -dbpass $dbpass -dbname $dbname";
+my $params2 =   "-host $dbhost   -port $dbport   -user $dbuser   -pass $dbpass -dbname $tmp_xref_db";
+my $sql_db  = "mysql --host=$dbhost --port=$dbport --user=$dbuser --pass=$dbpass";
 
 my $ana_dir   = "$PIPE_DIR/ensembl-pipeline/scripts/Finished";
 my $ens_dir   = "$PIPE_DIR/ensembl-pipeline/scripts/protein_pipeline";
@@ -121,7 +121,6 @@ if ( $prepare1 ){
     #  populates vega interpro table
     #--------------------------------
     $dbh->do("INSERT IGNORE INTO interpro SELECT * FROM $tmp_xref_db.interpro");
-
   };
 
   $status = $@ ?  'failed' : 'successful'; # ?

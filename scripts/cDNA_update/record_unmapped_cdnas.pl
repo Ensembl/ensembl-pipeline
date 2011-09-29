@@ -189,7 +189,7 @@ while (my $hit = $q1->fetchrow_array){
 #cdnas are on the kill list
 
 #re-create the kill_list hash, from the file dumped by new_cDNA_upadte.pl 
-my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cDNA_update');
+my $kill_list_object = Bio::EnsEMBL::KillList::KillList->new(-TYPE => 'cdna_update');
 my %kill_list = %{$kill_list_object->get_kill_list()};
 
 foreach my $k (keys %kill_list){
@@ -250,7 +250,7 @@ my $query_score;
 
 
 #set the analysis_id:
-$sql = ("select analysis_id from analysis where logic_name = 'cDNA_update'"); 
+$sql = ("select analysis_id from analysis where logic_name = 'cdna_update'"); 
 $q1 = $db1->dbc->prepare($sql) or die "sql error";
 $q1->execute();
 $analysis_id = $q1->fetchrow_array;

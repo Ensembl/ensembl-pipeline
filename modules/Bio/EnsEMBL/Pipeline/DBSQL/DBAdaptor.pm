@@ -81,17 +81,17 @@ sub get_available_adaptors {
   return $pairs; 
 }
 
-=head2 get_JobAdaptor
-
- Title   : get_JobAdaptor
- Usage   : $db->get_JobAdaptor
- Function: The Adaptor for Job objects in this db
- Example :
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
- Args    : nothing
-
-
-=cut
+#=head2 get_JobAdaptor
+#
+# Title   : get_JobAdaptor
+# Usage   : $db->get_JobAdaptor
+# Function: The Adaptor for Job objects in this db
+# Example :
+# Returns : Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor
+# Args    : nothing
+#
+#
+#=cut
 
 #sub get_JobAdaptor {
 #  my ($self) = @_;
@@ -120,16 +120,16 @@ sub get_available_adaptors {
 #}
 
 
-=head2 get_RuleAdaptor
-
- Title   : get_RuleAdaptor
- Usage   : $db->get_RuleAdaptor
- Function: The Adaptor for Rule objects in this db
- Example :
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
- Args    : nothing
-
-=cut
+#=head2 get_RuleAdaptor
+#
+# Title   : get_RuleAdaptor
+# Usage   : $db->get_RuleAdaptor
+# Function: The Adaptor for Rule objects in this db
+# Example :
+# Returns : Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor
+# Args    : nothing
+#
+#=cut
 
 #sub get_RuleAdaptor {
 #  my ($self) = @_;
@@ -144,16 +144,16 @@ sub get_available_adaptors {
 #}
 
 
-=head2 get_StateInfoContainer
-
- Title   : get_StateInfoContainer
- Usage   : $db->get_StateInfoContainer
- Function:
- Example :
- Returns : Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
- Args    : nothing
-
-=cut
+#=head2 get_StateInfoContainer
+#
+# Title   : get_StateInfoContainer
+# Usage   : $db->get_StateInfoContainer
+# Function:
+# Example :
+# Returns : Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer
+# Args    : nothing
+#
+#=cut
 
 #sub get_StateInfoContainer {
 #  my ($self) = @_;
@@ -227,7 +227,7 @@ sub DESTROY {
    }
 }
 
-=head2 Some Utility Stuff
+=head3 Some Utility Stuff
 
  Access to the meta table of the schema including
  

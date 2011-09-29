@@ -304,9 +304,9 @@ sub DB_setup{
     print ".";;
     #copy defined db tables from current build
     my $cmd = "mysqldump --add-drop-table -u$WRITEUSER -p$pass -h$REFDBHOST -P$REFDBPORT $REFDBNAME ".
-      " assembly attrib_type coord_system meta meta_coord".
+      " assembly  coord_system meta meta_coord".
       " assembly_exception seq_region seq_region_attrib ".
-      " unmapped_reason external_db " .
+      " unmapped_reason  " .
       " > ".$DATADIR."/$species/import_tables.sql";
     $status += system($cmd);
     print ".";
@@ -319,6 +319,17 @@ sub DB_setup{
     print ".";
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < ".$DATADIR."/$species/import_tables.sql");
     print ".";
+
+    $cmd = "mysqldump -u ensro -hens-staging1 ensembl_production master_attrib_type master_external_db > " .$DATADIR."/$species/master.sql";
+    $status += system($cmd);
+    print ".";
+    $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < ".$DATADIR."/$species/master.sql");
+    print ".";        
+    $cmd = "mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass -e  '".
+    "drop table attrib_type; drop table external_db; rename table master_attrib_type to attrib_type; rename table master_external_db to external_db;' $WRITENAME ";
+    $status += system($cmd);
+    print ".";
+
      #insert analysis entries
     # dont automatically run rfam jobs uless specifically requested
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".

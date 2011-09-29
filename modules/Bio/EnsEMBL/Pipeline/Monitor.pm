@@ -566,9 +566,7 @@ sub rules_cache{
     return $self->{'_rules_cache'};
 }
 
-=pod
-
-=head2 get_unfinished_analyses***
+=head2 get_unfinished_analyses_for_input_id
 
 The following methods return an anonymous list of arrays:
  get_unfinished_analyses_for_input_id( $input_id )
@@ -584,7 +582,7 @@ with the following data spec:
  
 They all take an optional $print (Boolean) which prints the arrays for you.
  
-You can grow you're own look up hash to see if a $input_id, $logic_name combination has
+You can grow your own look up hash to see if a $input_id, $logic_name combination has
 finished by doing.
  
  my $unfin = $monitor_obj->get_unfinished_analyses_for_assembly_type($assembly_type);
@@ -592,15 +590,6 @@ finished by doing.
  map { $hash->{$_->[0]}->{$_->[1]} = $_->[2] } @$unfin;
  
 Now B<$hash-E<gt>{$input_id}-E<gt>{$logic_name} = $analysis_id>.
-
-=head2 get_no_hit_contigs_for_analysis
-
- Takes two arguments, and finds all the finished input_ids for which the given analysis
-did NOT find any hits.
- Returns data structure as above.
- 
- get_no_hit_contigs_for_analysis($feature_table, $analysis_id)
-'
 =cut
 
 sub get_unfinished_analyses_for_input_id{
@@ -620,6 +609,31 @@ sub get_unfinished_analyses_for_input_id{
     return $unfinished;
 }
 
+=head2 get_unfinished_analyses_for_assembly_type
+
+The following methods return an anonymous list of arrays:
+ get_unfinished_analyses_for_input_id( $input_id )
+ get_unfinished_analyses_for_assembly_type( $assembly_type )
+ get_unfinished_analyses
+
+with the following data spec:
+ [
+   [ input_id, logic_name, analysis_id ]
+   [ input_id, logic_name, analysis_id ]
+   ...
+ ]
+ 
+They all take an optional $print (Boolean) which prints the arrays for you.
+ 
+You can grow your own look up hash to see if a $input_id, $logic_name combination has
+finished by doing.
+ 
+ my $unfin = $monitor_obj->get_unfinished_analyses_for_assembly_type($assembly_type);
+ my $hash;
+ map { $hash->{$_->[0]}->{$_->[1]} = $_->[2] } @$unfin;
+ 
+Now B<$hash-E<gt>{$input_id}-E<gt>{$logic_name} = $analysis_id>.
+=cut
 sub get_unfinished_analyses_for_assembly_type{
     my ($self, $assembly_type, $print, $unfinished) = @_;
     my $rules_cache = $self->rules_cache();
@@ -639,6 +653,31 @@ sub get_unfinished_analyses_for_assembly_type{
     return $unfinished || [];
 }
 
+=head2 get_unfinished_analyses
+
+The following methods return an anonymous list of arrays:
+ get_unfinished_analyses_for_input_id( $input_id )
+ get_unfinished_analyses_for_assembly_type( $assembly_type )
+ get_unfinished_analyses
+
+with the following data spec:
+ [
+   [ input_id, logic_name, analysis_id ]
+   [ input_id, logic_name, analysis_id ]
+   ...
+ ]
+ 
+They all take an optional $print (Boolean) which prints the arrays for you.
+ 
+You can grow your own look up hash to see if a $input_id, $logic_name combination has
+finished by doing.
+ 
+ my $unfin = $monitor_obj->get_unfinished_analyses_for_assembly_type($assembly_type);
+ my $hash;
+ map { $hash->{$_->[0]}->{$_->[1]} = $_->[2] } @$unfin;
+ 
+Now B<$hash-E<gt>{$input_id}-E<gt>{$logic_name} = $analysis_id>.
+=cut
 sub get_unfinished_analyses{
     my ($self, $print, $unfinished) = @_;
     my $rules_cache = $self->rules_cache();
@@ -656,6 +695,15 @@ sub get_unfinished_analyses{
     return $unfinished;
 }
 
+=head2 get_no_hit_contigs_for_analysis
+
+ Takes two arguments, and finds all the finished input_ids for which the given analysis
+did NOT find any hits.
+ Returns data structure as above.
+ 
+ get_no_hit_contigs_for_analysis($feature_table, $analysis_id)
+
+=cut
 sub get_no_hit_contigs_for_analysis{
     my $self = shift;
     my ($feature_table, $analysis_id, $print, $no_hits) = @_;

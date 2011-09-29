@@ -81,7 +81,8 @@ my $submission_number = 1000;
 my $number_output_dirs = 10;  
 my $tracking;  
 my $keep_all;  
-my $batch;
+my $distribute;
+my $reverse;
 
 GetOptions(
            'dbhost=s'               => \$dbhost,
@@ -102,6 +103,8 @@ GetOptions(
            'rename_on_retry'        => \$rename_on_retry,
            'starts_from=s@'         => \@starts_from,
            'analysis|logic_name=s@' => \@analyses_to_run,
+           'tracking!'              => \$tracking,  
+           'keep_all!'              => \$keep_all,  
            'skip_analysis=s@'       => \@analyses_to_skip,
            'input_id_type=s@'       => \@types_to_run,
            'skip_input_id_type=s@'  => \@types_to_skip,
@@ -128,10 +131,8 @@ GetOptions(
            'submission_number=s'    => \$submission_number,
            'unlock|delete_lock'     => \$unlock,
            'number_output_dirs=i'   => \$number_output_dirs,  
-           'tracking!'              => \$tracking,  
-           'to_keep=s@'             => \@to_keep,  
-           'batch=s'                => \$batch,
-           'keep_all!'              => \$keep_all,  
+           'distribute=s'           => \$distribute,
+           'reverse=s'              => \$reverse,
            ) or useage(\@command_args);
 
 perldoc() if $perldoc;
@@ -269,7 +270,9 @@ while (1) {
   my $done_something = 0;
   %completed_accumulator_analyses = %{$rulemanager->fetch_complete_accumulators};
   my %incomplete_accumulator_analyses = %always_incomplete_accumulators;
-
+  foreach my $key ( keys %incomplete_accumulator_analyses ) {
+   print "ICAA $key " . $incomplete_accumulator_analyses{$key} ."\n";
+  }
   if ($reread_input_ids) {
     $rulemanager->input_id_setup($ids_to_run, $ids_to_skip, 
                                  \@types_to_run, \@types_to_skip,
@@ -291,12 +294,10 @@ while (1) {
 
     my @id_list = keys(%{$id_hash->{$type}});
     if ($shuffle) {
-        if ($batch) {
-           @id_list = ordered_shuffle(@id_list);
-        }
-        else {
            @id_list = shuffle(@id_list);
-        }
+    }
+    elsif ($distribute) {
+           @id_list = ordered_shuffle(@id_list);
     }
 
    INPUT_ID:
@@ -319,11 +320,13 @@ while (1) {
           if ($anal->input_id_type ne 'ACCUMULATOR') {
              $analHash{$anal->dbID} = $anal;
           }
-        } else {
-          if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
-              $rule->has_condition_of_input_id_type($type)) {
-            $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
-          }
+        }
+      }
+      foreach my $rule (@{$rulemanager->rules}){
+        if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
+            $rule->has_condition_of_input_id_type($type) &&
+	    scalar(keys %analHash)) {
+          $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
         }
       }
       my $current_jobs_hash = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
@@ -429,43 +432,69 @@ sub ordered_shuffle {
     my (@in) = @_;
     my @out;
 
-    my @tmp = sort { my ($o) =$a =~ /^[^:]+:[^:]+:[^:]+:[^:]+:([^:]+)/; my ($p) = $b =~ /^[^:]+:[^:]+:[^:]+:[^:]+:([^:]+)/; $p <=> $o } @in;
+    return @in unless (@in and $in[0] =~ /^[^:]+:[^:]+:/);
+    my @tmp = sort { my ($s1, $e1) = $a =~ /^[^:]+:[^:]+:[^:]+:([^:]+):([^:]+)/;
+                     my ($s2, $e2) = $b =~ /^[^:]+:[^:]+:[^:]+:([^:]+):([^:]+)/;
+                     my $l1 = $e1-$s1;
+                     my $l2 = $e2-$s2;
+                     $l2 <=> $l1 }
+               @in;
     my $add = 0;
     my $i = 0;
     my $base;
     my $size = scalar(@tmp);
-    if ($size%$batch) {
-        $base = int($size/$batch)+1;
+    if ($size%$distribute) {
+        $base = int($size/$distribute)+1;
     }
     else {
-        $base = int($size/$batch);
+        $base = int($size/$distribute);
     }
-    if ($batch < $base) {
-        ($batch, $base) = ($base, $batch);
-    }
-    while (my $tmp = shift @tmp) {
-        my $index = $base*$i+$add;
-        $out[$index] = $tmp;
-        ++$i;
-        if ($i >= $batch) {
-            ++$add;
-            $i = 0;
-            last;
+    # First we sort the input_id on their size.
+    # For the reverse, the smallest are the first.
+    # The smallest in the first batch, the second smallest in the second batch and so on
+    # When we reach the total number of batch we put the smallest+n in the first batch,
+    # smallest+n+1 in the second batch,...
+    # For the normal, the biggest input_id are first but only for the first round, after
+    # we take the smallest one. Hopefully all the bigest will be in the first round, so
+    # once they are done the rest is quick.
+    if ($reverse) {
+        my @rev = reverse @tmp;
+        while (my $tmp = shift @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+            }
         }
     }
-    while (my $tmp = pop @tmp) {
-        my $index = $base*$i+$add;
-        $out[$index] = $tmp;
-        ++$i;
-        if ($i >= $batch) {
-            ++$add;
-            $i = 0;
+    else {
+        if ($distribute < $base) {
+            ($distribute, $base) = ($base, $distribute);
+        }
+        while (my $tmp = shift @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+                last;
+            }
+        }
+        while (my $tmp = pop @tmp) {
+            my $index = $base*$i+$add;
+            $out[$index] = $tmp;
+            ++$i;
+            if ($i >= $distribute) {
+                ++$add;
+                $i = 0;
+            }
         }
     }
-    return @out;
+    return grep { defined $_ } @out;
 }
-
-
 
 sub termhandler {
     $term_sig = 1;

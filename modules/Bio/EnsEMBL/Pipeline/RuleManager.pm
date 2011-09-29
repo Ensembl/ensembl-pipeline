@@ -203,7 +203,7 @@ sub db{
 }
 
 
-=head2 adaptors
+=head2 job_adaptor
 
   Arg [1]   : Bio::EnsEMBL::Pipeline::DBSQL::Adaptormodule
   Function  : store and/or create appropriate adaptors
@@ -328,7 +328,7 @@ sub empty_rules{
   $self->{'rules'} = undef;
 }
 
-=head2 boolean toggles 
+=head2 rename_on_retry 
 
   Arg [1]   : int
   Function  : boolean toggle as to whether perform a certain action
@@ -347,6 +347,15 @@ sub rename_on_retry{
   return $self->{'rename_on_retry'};
 }
 
+=head2 mark_awol_jobs 
+
+  Arg [1]   : int
+  Function  : boolean toggle as to whether perform a certain action
+  Returntype: int
+  Exceptions: none
+  Example   : if($self->mark_awol_jobs)
+
+=cut
 #whether to mark jobs which have disappeared from the submission system
 sub mark_awol_jobs{
   my $self = shift;
@@ -374,7 +383,7 @@ sub batch_q_module{
 }
 
 
-=head2 sleep_values
+=head2 max_job_sleep
 
   Arg [1]   : int
   Function  : containers for variables concerned with how long 
@@ -393,6 +402,17 @@ sub max_job_sleep{
   return $self->{'max_job_sleep'};
 }
 
+=head2 min_job_sleep
+
+  Arg [1]   : int
+  Function  : containers for variables concerned with how long 
+  the RuleManager sleeps for, or the maximum number of jobs in job_limit's
+  case'
+  Returntype: int
+  Exceptions: none
+  Example   : 
+
+=cut
 sub min_job_sleep{
   my $self = shift;
 
@@ -400,6 +420,17 @@ sub min_job_sleep{
   return $self->{'min_job_sleep'};
 }
 
+=head2 sleep_per_job
+
+  Arg [1]   : int
+  Function  : containers for variables concerned with how long 
+  the RuleManager sleeps for, or the maximum number of jobs in job_limit's
+  case'
+  Returntype: int
+  Exceptions: none
+  Example   : 
+
+=cut
 sub sleep_per_job{
   my $self = shift;
 
@@ -407,6 +438,17 @@ sub sleep_per_job{
   return $self->{'sleep_per_job'};
 }
 
+=head2 job_limit
+
+  Arg [1]   : int
+  Function  : containers for variables concerned with how long 
+  the RuleManager sleeps for, or the maximum number of jobs in job_limit's
+  case'
+  Returntype: int
+  Exceptions: none
+  Example   : 
+
+=cut
 sub job_limit{
   my $self = shift;
 
@@ -611,7 +653,7 @@ sub create_and_store_job{
   Returntype: int
   Exceptions: throws if not passed an input_id or an analysis object and
               if fails to submit the job 
-  Example   : $rulemanager->can_run_job('filename', $analysis
+  Example   : $rulemanager->can_job_run('filename', $analysis
                                         'path/to/dir', 
                                         'path/to/runner', 1);
 

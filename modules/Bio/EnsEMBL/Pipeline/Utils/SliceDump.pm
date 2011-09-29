@@ -200,7 +200,7 @@ sub dump_table{
 
 
 
-=head2 genereate_where_clause
+=head2 generate_where_clause
 
   Arg [1]   : int, seq_region_id
   Arg [2]   : int, seq_region_start
@@ -306,20 +306,18 @@ sub get_filename{
 #dump_table_name_table to allow for on the fly calling of methods
 #for appropriate tables
 
-=head2 dump_name_table
+=head2 dump_seq_region_table
 
   Arg [1]   : Bio::EnsEMBL::Slice
   Function  : check if any data can be dumped from the defined table
   and if it can call the dump table method with the appropriate
   arguments
-  Returntype: returns 1 if a dump was made 0 if not 
+  Returntype: 1 if a dump was made 0 if not 
   Exceptions: throws if no slice is defined either in the method args or
   SliceDump::Slice or if that slice isn't a slice object'
   Example   : $SliceDump->dump_seq_region_table
 
 =cut
-
-
 
 sub dump_seq_region_table{
   my ($self, $slice) = @_;

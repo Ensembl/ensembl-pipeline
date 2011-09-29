@@ -104,7 +104,7 @@ sub push_job {
 	return $insert->execute( $job_priority, $job_id, $host, $dbname, $analysis, $update );
 }
 
-=head2 can_run_job
+=head2 can_job_run
 
   Arg [1]   : string, input_id
   Arg [2]   : Bio::EnsEMBL::Pipeline::Analysis
@@ -117,7 +117,7 @@ sub push_job {
   Returntype: int
   Exceptions: throws if not passed an input_id or an analysis object and
               if fails to submit the job
-  Example   : $rulemanager->can_run_job('filename', $analysis
+  Example   : $rulemanager->can_job_run('filename', $analysis
                                         'path/to/dir',
                                         'path/to/runner', 1);
 

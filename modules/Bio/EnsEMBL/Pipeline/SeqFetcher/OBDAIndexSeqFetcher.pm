@@ -206,7 +206,7 @@ sub db {
 
 =cut
 
-sub  get_Seq_by_acc {
+sub get_Seq_by_acc {
   my ($self, $acc) = @_;
 
   if (!defined($acc)) {
@@ -287,7 +287,7 @@ sub  get_Seq_by_acc {
 }
 
 
-sub  get_Seq_by_id {
+sub get_Seq_by_id {
   my $self = @_;
   warning("cannot call  get_Seq_by_id on OBDAIndexSeqFetcher, use get_Seq_by_acc instead");
   return undef;
@@ -301,7 +301,7 @@ sub  get_Seq_by_id {
 
 =cut
 
-sub  get_Seq_by_secondary {
+sub get_Seq_by_secondary {
   my ($self, $name, $acc) = @_;
 
   if (!defined($acc)) {

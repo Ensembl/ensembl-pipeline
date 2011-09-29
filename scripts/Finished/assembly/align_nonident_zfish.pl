@@ -20,8 +20,8 @@ Required arguments:
     --to_assembly                       new assembly date
 
 Optional arguments:
-	
-	--from_cs_version					coordinate system version, this option will overwrite from_assembly
+
+    --from_cs_version                   coordinate system version, this option will overwrite from_assembly
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
     --logfile, --log=FILE               log to FILE (default: *STDOUT)
@@ -112,7 +112,7 @@ $support->param('interactive', 0);
 # parse options
 $support->parse_common_options(@_);
 $support->parse_extra_options(
-	 'from_cs_version=s','from_assembly=s', 'to_assembly=s'
+     'from_cs_version=s','from_assembly=s', 'to_assembly=s'
 );
 $support->allowed_params(
     $support->get_common_params,
@@ -200,8 +200,8 @@ if($from_cs_version) {
 my @to_chrs =
   sort { $sr_name_to_chr->{$a->seq_region_name} cmp $sr_name_to_chr->{$b->seq_region_name} }
   grep ( $_->seq_region_name =~ /$to_assembly/, @$chr_list );
-  
-  
+
+
 # throw up error if lists don't match in length
 if ( !$from_cs_version && scalar(@from_chrs) != scalar(@to_chrs) ) {
     throw(   "Chromosome lists do not match by length:\n["
@@ -261,22 +261,22 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
   my $R_basename = "ref_seq.$id";
 
   $support->log("Writing sequences to fasta...\n", 2);
-  
-  # This is needed otherwise will get a sequence of N's for the ref slice  
+
+  # This is needed otherwise will get a sequence of N's for the ref slice
   ($R_pipe_dba ? $R_pipe_dba : $R_dba)->get_AssemblyMapperAdaptor()->delete_cache();
-  
+
    my $R_slice;
   if ($R_pipe_dba) {
-  	eval {
-	    $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
-	      'chromosome',
-	      $row->{'ref_seq_region_name'},
-	      $row->{'ref_start'},
-	      $row->{'ref_end'},
-	      1,
-	      $from_cs_version ? $from_cs_version : undef
-	    );
-  	};
+    eval {
+        $R_slice = $R_pipe_dba->get_SliceAdaptor->fetch_by_region(
+          'chromosome',
+          $row->{'ref_seq_region_name'},
+          $row->{'ref_start'},
+          $row->{'ref_end'},
+          1,
+          $from_cs_version ? $from_cs_version : undef
+        );
+    };
   }
   $R_slice = $R_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
@@ -286,21 +286,21 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
       1,
       $from_cs_version ? $from_cs_version : undef
    ) unless $R_slice;
-   
-  
+
+
   $aligner->write_sequence(
       $R_slice,
       undef,
       $R_basename
   );
-    
-  # This is needed otherwise will get a sequence of N's for the alt slice  
+
+  # This is needed otherwise will get a sequence of N's for the alt slice
   ($A_pipe_dba ? $A_pipe_dba : $A_dba)->get_AssemblyMapperAdaptor()->delete_cache();
-  
+
 
   my $A_slice;
   if($A_pipe_dba){
-  	$A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
+    $A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
       $row->{'alt_seq_region_name'},
       $row->{'alt_start'},
@@ -315,7 +315,7 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
       $row->{'alt_end'},
       1,
    ) unless $A_slice;
-   
+
    $aligner->write_sequence(
       $A_slice,
       undef,
@@ -328,8 +328,8 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
   # This will avoid everlasting alignment...
    $support->log("Checking sequences...\n", 2);
    if($aligner->bad_sequences($A_basename, $R_basename)){
-   	    $support->log("Skip block $id (not soft-masked and too long)...\n", 2);
-   	    next BLOCK;
+        $support->log("Skip block $id (not soft-masked and too long)...\n", 2);
+        next BLOCK;
    }
 
   # align using lastz
@@ -392,13 +392,13 @@ $support->log("\nDon't forget to drop the tmp_align table when all is done!\n\n"
 $support->finish_log;
 
 sub get_pipe_db {
-	my ($dba) = @_;
-	my $metakey = 'pipeline_db_head';
-	my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
-	
-	return undef unless $opt_str;
-	
-	my %anycase_options = (
+    my ($dba) = @_;
+    my $metakey = 'pipeline_db_head';
+    my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
+
+    return undef unless $opt_str;
+
+    my %anycase_options = (
         eval $opt_str,
     );
     if ($@) {
@@ -408,8 +408,8 @@ sub get_pipe_db {
     while( my ($k,$v) = each %anycase_options) {
         $uppercased_options{uc($k)} = $v;
     }
-	
-	return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
+
+    return Bio::EnsEMBL::DBSQL::DBAdaptor->new(%uppercased_options);
 }
 
 
