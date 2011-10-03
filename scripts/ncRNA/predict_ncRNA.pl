@@ -302,7 +302,7 @@ SPECIES:  foreach my $species (@speciess){
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
       "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
 	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass -current";
+	  "-dbuser ensadmin -dbpass $pass -current -finishedp";
   
   print "$cmd\n";
   # set it back to previous
