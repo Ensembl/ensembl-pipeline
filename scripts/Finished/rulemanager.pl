@@ -3,10 +3,10 @@
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
+use Bio::EnsEMBL::Analysis::Tools::BlastDBTracking;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Pipeline::Finished::RuleManager;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
-use BlastableVersion;
 
 $ENV{BLASTDB} = '/data/blastdb/Finished';
 
@@ -449,7 +449,7 @@ sub update_analysis_dbversion {
 		if ( $mod && ( $mod eq 'Blast' || $mod eq 'EST' || $mod =~ /Exonerate/ || $mod =~ /Halfwise/ ) ) {
 			$a_hash->{$ln} = $ana;
 			$db_file    = fetch_databases( $ana->db_file );
-			$db_version = get_db_version( $db_file , 1);
+			$db_version = get_db_version( $db_file );
 			save_db_version($analysis_adaptor,$ana,$db_version) unless $mod =~ /Halfwise/;
 			# save uniprot and pfam db versions
 			$uniprot_db_version = $db_version if $ana->logic_name =~ /Uniprot_raw/;
@@ -508,25 +508,14 @@ sub fetch_databases {
 }
 
 sub get_db_version {
-	my ($db,$force_dbi) = @_;
-	my $ver = eval {
-		my $blast_ver = BlastableVersion->new();
-		$blast_ver->force_dbi($force_dbi);
-		$blast_ver->set_hostname('farm2');
-		$blast_ver->get_version($db);
-		$blast_ver;
-	};
-
-	my $dbv = '';
-	if($@ =~ /not in blast tracking db/ ) {
-		$dbv = get_db_version($db,0);
-	} elsif($@) {
-		throw("I failed to get a BlastableVersion for $db [$@]");
-	} else {
-		$dbv  = $ver->version();
+	my ($db) = @_;
+        my $bdbt  = Bio::EnsEMBL::Analysis::Tools::BlastDBTracking->new( fallback_to_file_stat => 1 );
+        my $entry = $bdbt->by_filename($db);
+        unless ($entry) {
+            throw("I failed to get a BlastDBTracking entry for $db");
 	}
 
-	return $dbv;
+	return $entry->version;
 }
 
 sub shuffle {
