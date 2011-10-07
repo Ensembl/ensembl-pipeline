@@ -969,7 +969,7 @@ sub is_locked{
   my ($self) = @_;
 
   if (my $lock_str = $self->db->pipeline_lock) {
-    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@([^:]+):(\d+):(\d+)/;
 
     $started = scalar localtime $started;
 
