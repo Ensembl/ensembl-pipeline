@@ -518,11 +518,11 @@ sub batch_runRemote {
     $queue = $self->analysis->logic_name;
   }
   
-    print STDERR 'push job ', "\n";
+#    print STDERR 'push job ', "\n";
 #  push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self->dbID;
   push @{$BATCH_QUEUES{$queue}{'jobs'}}, $self;
-  print STDERR 'jobs: ', Dumper($BATCH_QUEUES{$queue}{'jobs'});
-  print STDERR 'batchsize: ', Dumper($BATCH_QUEUES{$queue}{'batch_size'});
+#  print STDERR 'jobs: ', Dumper($BATCH_QUEUES{$queue}{'jobs'});
+#  print STDERR 'batchsize: ', Dumper($BATCH_QUEUES{$queue}{'batch_size'});
  
   if (scalar(@{$BATCH_QUEUES{$queue}{'jobs'}}) >=
                $BATCH_QUEUES{$queue}{'batch_size'}) {

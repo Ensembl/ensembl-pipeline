@@ -31,13 +31,19 @@ use vars qw(%Config);
 
 %Config = (
     DEFAULT => {
+        TRACKING => 0,
+
         # write-access is required
         DBUSER     => 'ensadmin',
         DBPASS     => '*****', 
         DBUSER_RO  => 'ensro',
 
-        # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
+        # LSF
+#        RESOURCE => 'select[myens_build6tok>2000] rusage[myens_build6tok=15]',
+        RESOURCE => '',
+        QUEUE  => 'normal',
 
+        # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt', 
         #Only complete if the gss file isn't under CVS_DIR
         #If completed will replace CVS_DIR as prefix to GSS_PATH

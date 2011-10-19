@@ -52,7 +52,6 @@ use Sys::Hostname;
 use Socket;
 
 use Bio::EnsEMBL::Pipeline::Config::General;
-#use Data::Dumper;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
@@ -990,7 +989,7 @@ sub is_locked{
   my ($self) = @_;
 
   if (my $lock_str = $self->db->pipeline_lock) {
-    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@(\w+):(\d+):(\d+)/;
+    my($user, $host, $pid, $started) = $lock_str =~ /(\w+)@([^:]+):(\d+):(\d+)/;
 
     $started = scalar localtime $started;
 
@@ -1317,18 +1316,11 @@ sub analysisrun_setup {
   my $self = shift;
   my ($rh_analyses_to_run, $rh_analyses_to_skip, $rh_to_keep) = @_;
 
-  my $analysis_adaptor = $self->analysis_adaptor;
   my @a_analysis;
-  if (keys(%$rh_analyses_to_run)) {
-    @a_analysis = keys (%$rh_analyses_to_run);
+  foreach my $rule (@{$self->rules}) {
+      push(@a_analysis, $rule->goalAnalysis);
   }
-  else {
-    foreach my $analysis (@{$analysis_adaptor->fetch_all}) {
-      next if (exists $rh_analyses_to_skip->{$analysis->dbID});
-      push(@a_analysis, $analysis->dbID);
-    }
-  }
-  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, $analysis_adaptor->fetch_all_by_dbID_list(\@a_analysis), $rh_to_keep);
+  Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::setup_pipeline($self->db, $DEFAULT_RUNNABLEDB_PATH, $QUEUE_CONFIG, \@a_analysis, $rh_to_keep);
 }
 
 sub check_evidences {

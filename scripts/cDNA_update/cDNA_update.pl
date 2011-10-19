@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.57.2.2 2011-09-29 15:47:15 th3 Exp $
+#$Id: cDNA_update.pl,v 1.57.2.3 2011-10-19 15:35:13 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -199,13 +199,12 @@ use DBD::mysql;
 #use Bio::EnsEMBL::KillList::KillList;
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Analysis::Tools::Utilities qw( get_input_arg );
-use Bio::EnsEMBL::Analysis::EvidenceTracking::Tools qw( unlock_tracking );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
 use cDNAUpdate; 
 
 # We need the Net::SSH module from somewhere:
-use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
+#use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
 # Not used anymore use Net::SSH qw(sshopen2);
 
 my $species;
@@ -234,7 +233,13 @@ my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
 my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
 my $LOAD_PROD           = $CVS_DIR . $LOAD_PROD_DB;
+my $LOAD_INPUTSEQ       = $CVS_DIR . $LOAD_INPUTSEQ_PATH;
+my $IS_TRACKING         = $TRACKING;
 my $GSS;
+
+if ($IS_TRACKING) {
+    require Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils;
+}
 
 if ( defined($GSS_PREFIX) ) {
     # In case gss file is not under the same directory as the code
@@ -264,45 +269,45 @@ my $submitName      = "SubmitcDNAChunk";
 my $genomelist      = join "\',\'", @masked_genome;
 
 my %configvars = (
-                 "MIN_LENGTH"       => $MIN_LENGTH ,         # from cDNAUpdate
-                 "CVS_DIR"          => $CVS_DIR,             # from cDNAUpdate
-                 "DATA_DIR"         => $DATA_DIR,            # from cDNAUpdate
-                 "VERTRNA"          => $VERTRNA,             # from cDNAUpdate
-                 "VERTRNA_UPDATE"   => $VERTRNA_UPDATE,      # from cDNAUpdate
-                 "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
-                 "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
-                 "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
-                 "RESOURCE"        => $RESOURCE,
-                 "DBUSER"        => $DBUSER,           # from cDNAUpdate
-                 "DBPASS"        => $DBPASS,           # from cDNAUpdate
-                 "DBUSER_RO"     => $DBUSER_RO,        # from cDNAUpdate
-                 "REF_DBNAME"    => $REF_DBNAME,       # from cDNAUpdate
-                 "REF_DBHOST"    => $REF_DBHOST,       # from cDNAUpdate
-                 "REF_DBPORT"    => $REF_DBPORT,       # from cDNAUpdate
-                 "PIPE_DBNAME"   => $PIPE_DBNAME,      # from cDNAUpdate
-                 "PIPE_DBHOST"   => $PIPE_DBHOST,      # from cDNAUpdate
-                 "PIPE_DBPORT"   => $PIPE_DBPORT,      # from cDNAUpdate
-                 "OUTPUT_DBNAME" => $OUTPUT_DBNAME,    # from cDNAUpdate
-                 "OUTPUT_DBHOST" => $OUTPUT_DBHOST,    # from cDNAUpdate
-                 "OUTPUT_DBPORT" => $OUTPUT_DBPORT,    # from cDNAUpdate
+                 "MIN_LENGTH"        => $MIN_LENGTH ,         # from cDNAUpdate
+                 "CVS_DIR"           => $CVS_DIR,             # from cDNAUpdate
+                 "DATA_DIR"          => $DATA_DIR,            # from cDNAUpdate
+                 "VERTRNA"           => $VERTRNA,             # from cDNAUpdate
+                 "VERTRNA_UPDATE"    => $VERTRNA_UPDATE,      # from cDNAUpdate
+                 "REFSEQ"            => $REFSEQ,              # from cDNAUpdate
+                 "FASTASPLIT"        => $FASTA_SPLIT,         # from cDNAUpdate
+                 "POLYA_CLIPPING"    => $POLYA_CLIPPING,      # from cDNAUpdate
+                 "DBUSER"            => $DBUSER,           # from cDNAUpdate
+                 "DBPASS"            => $DBPASS,           # from cDNAUpdate
+                 "DBUSER_RO"         => $DBUSER_RO,        # from cDNAUpdate
+                 "REF_DBNAME"        => $REF_DBNAME,       # from cDNAUpdate
+                 "REF_DBHOST"        => $REF_DBHOST,       # from cDNAUpdate
+                 "REF_DBPORT"        => $REF_DBPORT,       # from cDNAUpdate
+                 "PIPE_DBNAME"       => $PIPE_DBNAME,      # from cDNAUpdate
+                 "PIPE_DBHOST"       => $PIPE_DBHOST,      # from cDNAUpdate
+                 "PIPE_DBPORT"       => $PIPE_DBPORT,      # from cDNAUpdate
+                 "OUTPUT_DBNAME"     => $OUTPUT_DBNAME,    # from cDNAUpdate
+                 "OUTPUT_DBHOST"     => $OUTPUT_DBHOST,    # from cDNAUpdate
+                 "OUTPUT_DBPORT"     => $OUTPUT_DBPORT,    # from cDNAUpdate
                  "PRODUCTION_DBNAME" => $PRODUCTION_DBNAME,    # from cDNAUpdate
                  "PRODCUTION_DBHOST" => $PRODUCTION_DBHOST,    # from cDNAUpdate
                  "PRODUCTION_DBPORT" => $PRODUCTION_DBPORT,    # from cDNAUpdate
-                 "taxonomy_id"      => $TAX_ID,              # from cDNAUpdate
-                 "PROGRAM_NAME"     => $PROGRAM_NAME,        # from cDNAUpdate
-                 "PROGRAM_VERSION"  => $PROGRAM_VERSION,     # from cDNAUpdate
-                 "PROGRAM_FILE"     => $PROGRAM_FILE,        # from cDNAUpdate
-                 "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
-                 "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
-                 "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
-                 "RESOURCE" => $RESOURCE,   # from cDNAUpdate
-                 "chunkDIR"         => $chunkDIR,
-                 "outDIR"           => $outDIR,
-                 "configDIR"        => $configDIR,
-                 "newfile"          => $newfile,
-                 "config_file"      => $config_file,
-                 "masked_genome"    => $genomelist,
-                 "newFeatureName"   => $newFeatureName );
+                 "taxonomy_id"       => $TAX_ID,              # from cDNAUpdate
+                 "PROGRAM_NAME"      => $PROGRAM_NAME,        # from cDNAUpdate
+                 "PROGRAM_VERSION"   => $PROGRAM_VERSION,     # from cDNAUpdate
+                 "PROGRAM_FILE"      => $PROGRAM_FILE,        # from cDNAUpdate
+                 "MODULE_NAME"       => $MODULE_NAME,         # from cDNAUpdate
+                 "SOURCE_DIR"        => $SOURCE_DIR,          # from cDNAUpdate
+                 "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,   # from cDNAUpdate
+                 "RESOURCE"          => $RESOURCE,   # from cDNAUpdate
+                 "QUEUE"             => $QUEUE,   # from cDNAUpdate
+                 "chunkDIR"          => $chunkDIR,
+                 "outDIR"            => $outDIR,
+                 "configDIR"         => $configDIR,
+                 "newfile"           => $newfile,
+                 "config_file"       => $config_file,
+                 "masked_genome"     => $genomelist,
+                 "newFeatureName"    => $newFeatureName );
 
 # Fasta chunk specifications:
 my $maxseqlength      = 17000;
@@ -346,7 +351,7 @@ if ( $option eq "prepare" ) {
     if ( !defined($progress_status) ) {
 
         my $ref_db = connect_db( $REF_DBHOST, $REF_DBPORT,
-                                 $REF_DBNAME, "ensro" );
+                                 $REF_DBNAME, $DBUSER_RO );
 
         # Check existence of source databases
         if ( !$ref_db ) {
@@ -385,12 +390,12 @@ if ( $option eq "prepare" ) {
             }
         } else {
 
-            my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
-                                      $PIPE_DBNAME, $DBUSER,
-                                      $DBPASS );
+#            my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
+#                                      $PIPE_DBNAME, $DBUSER,
+#                                      $DBPASS );
 
             my $target_db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-                                        $OUTPUT_DBNAME, "ensro" );
+                                        $OUTPUT_DBNAME, $DBUSER_RO );
 
             if ( $pipe_db->dbc->dbname() && $target_db->dbc->dbname() ) {
                 print("\nDatabases exist, good! so we continue with the process.\n");
@@ -503,7 +508,11 @@ elsif ( $option eq "run" ) {
     if ( $progress_status >= 2 && $progress_status < 6 ) {
 
         if ( $progress_status == 2 || $progress_status == 3 ) {
-            unlock_tracking($pipe_db);
+            if ($IS_TRACKING) {
+                eval {
+                    Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::unlock_tracking($pipe_db);
+                };
+            }
             if ( !run_analysis() ) {
 
                 # Set status to 2 (fasta files & kill list removal are done).
@@ -626,7 +635,12 @@ elsif ( $option eq "run" ) {
 
             if ( get_input_arg() ) {
 
-                why_cdnas_missed();
+                if ($IS_TRACKING) {
+                    find_Ns();
+                }
+                else {
+                    why_cdnas_missed();
+                }
 
                 $progress_status = 9;
                 update_progress_status($progress_status);
@@ -737,7 +751,7 @@ sub config_setup {
 
     # Check existence of source databases
     if ( !connect_db( $REF_DBHOST, $REF_DBPORT,
-                      $REF_DBNAME, "ensro" ) ) {
+                      $REF_DBNAME, $DBUSER_RO ) ) {
         croak("Could not find $REF_DBNAME.");
     }
 
@@ -893,71 +907,6 @@ sub fastafiles {
     my @filestamp;
 
     eval {
-
-
-#        my $ls_cmd = "ls -n $SOURCE_DIR/$VERTRNA $SOURCE_DIR/$VERTRNA_UPDATE $REFSEQ_SOURCE/$REFSEQ";
-#        open(READER, "$ls_cmd |") or die "Can't run '$ls_cmd'\n";
-#        
-#
-#        while (<READER>) {
-#            @filestamp = split( " ", $_ );
-#            my @path = split "/", $filestamp[7];
-#            my $file = $path[scalar(@path)-1];
-#            print "FILE: ".$file."\n";
-#            my $stampA = join( "-", @filestamp[ 5 .. 6 ] );
-#            $stampA = $stampA."-".$file;
-#            $cmd = "ls -n " . $DATA_DIR."/".$file;
-#            print "cmd: ".$cmd."\n";
-#            @filestamp = split( " ", `$cmd` );
-#            next if ($? != 0);
-#            my @pathB = split "/", $filestamp[7];
-#            my $fileB = $pathB[scalar(@pathB)-1];
-#            my $stampB = join( "-", @filestamp[ 5 .. 6 ] );
-#            $stampB = $stampB."-".$fileB;
-#
-#            print "A: ".$stampA." B: ".$stampB."\n";
-#            print "7: ". $filestamp[7]."\n";
-#  
-#            if ( $stampA eq $stampB ) {
-#                # No changes...
-#                if ( $file eq $VERTRNA ) {
-#                    $vertrna_ver = 0;
-#                } elsif ( $file eq $VERTRNA_UPDATE ) {
-#                    $vertrna_upd_ver = 0;
-#                } elsif ( $file eq $REFSEQ ) {
-#                    $refseq_ver = 0;
-#                }
-#            }
-#        } ## end while (<READER>)
-#        close(READER);
-#
-#        # Copy files
-#        if ($vertrna_ver) {
-#            $cmd = "scp -p "
-#                . $SOURCE_DIR . "/" . $VERTRNA . " "
-#                . $DATA_DIR   . "/" . $VERTRNA;
-#
-#            print $cmd, "\n";
-#
-#            $status += system($cmd);
-#        }
-#        if ($vertrna_upd_ver) {
-#            $cmd = "scp -p "
-#                . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
-#                . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
-#
-#            print $cmd, "\n";
-#            $status += system($cmd);
-#        }
-#        if ($refseq_ver) {
-#            $cmd = "scp -p "
-#                . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
-#                . $DATA_DIR   . "/" . $REFSEQ;
-#
-#            print $cmd, "\n";
-#            $status += system($cmd);
-#        }
-
         for my $pfile ($SOURCE_DIR.'/'.$VERTRNA, $SOURCE_DIR.'/'.$VERTRNA_UPDATE, $REFSEQ_SOURCE.'/'.$REFSEQ) {
             my @pstamp = stat $pfile;
             my ($file) = $pfile =~ /([^\/]*)$/;
@@ -977,6 +926,11 @@ sub fastafiles {
         if ( $vertrna_upd_ver or $vertrna_ver or $refseq_ver ) {
             $update = 1;
             write_to_file();
+        }
+
+        if ($IS_TRACKING) {
+            print 'Populating the input_seq table for the tracking system...', "\n";
+            load_inputseq_from_file();
         }
 
         my $newfile2 = remove_kill_list_object();
@@ -1081,6 +1035,7 @@ sub remove_kill_list_object {
       or croak("Can't open seq file $newfile");
     open( OUT, ">", $DATA_DIR . "/" . $newfile2 )
       or croak("Can't open seq file $newfile2");
+    my @a_killlisted;
     while (<SEQS>) {
         s/>//g;
 
@@ -1094,6 +1049,15 @@ sub remove_kill_list_object {
         if ( ( !exists $kill_list{$acc} ) && ( !exists $gss{$acc} ) ) {
             print OUT ">$_";
         }
+        else {
+            $tmp[0] =~ /(\w+\.\d+)/;
+            push(@a_killlisted, $1);
+        }
+    }
+    if ($IS_TRACKING) {
+        eval {
+            Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_list(\@a_killlisted, $pipe_db, 'KillList');
+        };
     }
 
     local $/ = "\n";
@@ -1331,8 +1295,8 @@ sub test_run {
          . " -input_id "   . $input_id
          . " -logic_name " . $newFeatureName
          . " -verbose"
-         . ' -tracking'
          . " -nowrite";
+    $cmd .= ' -tracking' if ($IS_TRACKING);
 
     print $cmd . "\n";
     system($cmd);
@@ -1365,8 +1329,8 @@ sub run_analysis {
                  . ' -dbport '   . $PIPE_DBPORT
                  . ' -dbuser '   . $DBUSER
                  . ' -dbpass '   . $DBPASS
-                 . ' -dbname '   . $PIPE_DBNAME
-                 . ' -tracking';
+                 . ' -dbname '   . $PIPE_DBNAME;
+            $cmd .= ' -tracking' if ($IS_TRACKING);
 
             print(  "\nSTARTING THE PIPELINE.\n"
                   . "Using command:\n\n"
@@ -1622,6 +1586,30 @@ sub find_many_hits {
     }
 } ## end sub find_many_hits
 
+sub find_Ns {
+    `perl $FIND_N $DATA_DIR/missing_cdnas.fasta > $DATA_DIR/many_n.out`;
+    open(RF, $DATA_DIR.'/many_n.out') || die('Could not open the many N file');
+    my @ids = <RF>;
+    close(RF);
+    chomp @ids;
+#    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+#                         $OUTPUT_DBNAME, $DBUSER,
+#                         $DBPASS );
+#    my @filteredIds;
+#    foreach my $id (@ids) {
+#        my $sql = 'SELECT hit_name from dna_align_feature WHERE hit_name = "'.$id.'"';
+#        my $query = $db->dbc->prepare($sql) or croak("Sql error 1.\n$!");
+#        $query->execute();
+#        my ($hit_name) = $query->fetchrow_array;
+#        push(@filteredIds, $id) unless ($hit_name);
+#    }
+#    Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_list(\@filteredIds, $pipe_db, 'TooManyN');
+
+    eval {
+        Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_list(\@ids, $pipe_db, 'TooManyN');
+    };
+}
+
 # Run the script to parse output from ExonerateTranscriptFilter to
 # identify reasons for failures.
 sub why_cdnas_missed {
@@ -1652,7 +1640,7 @@ sub why_cdnas_missed {
         . " -port "             . $OUTPUT_DBPORT
         . " -dbname "           . $OUTPUT_DBNAME
         . " -species \""        . $SPECIES  . "\""
-        . " -vertrna "          . $DATA_DIR . "/" . $embl_fa_file
+        . " -vertrna "          . $embl_fa_file
         . " -refseq "           . $DATA_DIR . "/" . $REFSEQ
         . " -infile "           . $file
         . " -findN_prog "       . $FIND_N
@@ -1914,10 +1902,10 @@ sub compare {
 
     # Pld alignments
     my $db1 = connect_db( $LAST_DBHOST, $LAST_DBPORT,
-                          $LAST_DBNAME, "ensro" );
+                          $LAST_DBNAME, $DBUSER_RO );
     # New alignments
     my $db2 = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-                          $OUTPUT_DBNAME, "ensro" );
+                          $OUTPUT_DBNAME, $DBUSER_RO );
 
     # Get chromosome names / ids
     $sql = "SELECT coord_system_id "
@@ -2113,7 +2101,7 @@ sub create_db {
     $status += system($cmd);
 
     # If it's a pipeline db, add the pipeline tables.
-    if ($is_pipeline) {
+    if ($is_pipeline and $IS_TRACKING) {
         $cmd     = $mysql_cmd .$db_name. ' < '
                  . $CVS_DIR . '/ensembl-pipeline/sql/table.sql';
         $status += system($cmd);
@@ -2263,6 +2251,7 @@ sub load_misc_script_files {
                       ."-user $DBUSER "
                       ."-pass $DBPASS "
                       ."-database $OUTPUT_DBNAME "
+                      ."-dumppath $configDIR "
                       ."-port $OUTPUT_DBPORT "
                       ."-dumppath $DATA_DIR "
                       ."-table $table";
@@ -2380,12 +2369,22 @@ sub polya_clipping {
     if ( $MIN_LENGTH ) { 
        $cmd.="-min_length $MIN_LENGTH "; 
     } 
-      $cmd .=  $DATA_DIR . '/' . $trim_file . ' ' . $newfile3;
+    $cmd .=  $DATA_DIR . '/' . $trim_file . ' ' . $newfile3;
 
     print $cmd, "\n";
 
     if ( system($cmd) ) {
         croak("Couldn't clip file.$@\n");
+    }
+
+    if ($IS_TRACKING) { 
+        eval {
+            print STDERR "\n", 'Updating the clipped sequences..', "\n";
+            Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_files($pipe_db, 'TooShort', $newfile3, $DATA_DIR.'/'.$trim_file);
+        };
+    }
+    if ($@) {
+        print STDERR $@;
     }
 
     # Split fasta files, store into CHUNKDIR
@@ -2399,6 +2398,20 @@ sub polya_clipping {
     check_chunksizes();
 
     print "\nChopped up the file.\n";
+}
+
+# Store input sequence in the input_seq table
+sub load_inputseq_from_file {
+    my $cmd = 'bsub -I -q yesterday perl '.$LOAD_INPUTSEQ
+               .' -host '.$PIPE_DBHOST
+               .' -port '.$PIPE_DBPORT
+               .' -user '.$DBUSER
+               .' -pass '.$DBPASS
+               .' -dbname '.$PIPE_DBNAME
+               .' -file '.$DATA_DIR .'/'. $newfile
+               .' -molecule_type MRNA';
+    print $cmd, "\n";
+    system($cmd);
 }
 
 # Synchronise reference and target databases

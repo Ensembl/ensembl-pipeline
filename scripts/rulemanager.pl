@@ -413,7 +413,7 @@ sub setup_pipeline{
                                $starts_from);
   if ($tracking and !$keep_all) {
     print "***SETTING UP TRACKING SYSTEM*****\n";
-    $rulemanager->analysisrun_setup($analyses_to_run, $analyses_to_skip, \%to_keep);
+    $rulemanager->analysisrun_setup(\%to_keep);
   }
 }
 
