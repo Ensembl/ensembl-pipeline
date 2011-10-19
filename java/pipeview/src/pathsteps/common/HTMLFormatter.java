@@ -1,7 +1,7 @@
 package pathsteps.common;
 
 import java.util.logging.*;
-import java.util.*;
+import java.util.Date;
 import java.text.*;
 
 public class HTMLFormatter extends Formatter{
