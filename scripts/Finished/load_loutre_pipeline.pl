@@ -117,7 +117,7 @@ my $cs_version = 'Otter';
 my $set;
 my $description;
 my $assembly;
-my $do_pipe   = 0;    # Set to load loutre and pipeline dbs
+my $do_pipe   = 1;    # Set to load loutre and pipeline dbs
 my $do_submit = 1;    # Set if we want to prime the pipeline with the SubmitContig analysis
 my @skip;
 
