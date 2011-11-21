@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.63 2011-10-17 10:13:28 db8 Exp $
+#$Id: cDNA_update.pl,v 1.64 2011-11-21 15:50:18 db8 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1115,7 +1115,7 @@ sub remake_fasta_files {
     # Split fasta files, store into new CHUNKDIR
     print("Splitting new fasta file in to chuncks.\n");
 
-    $cmd = "$FASTA_SPLIT $file $chunk_num $chunkDIR";
+    $cmd = "$FASTA_SPLIT -f $file -c $chunk_num -o $chunkDIR";
     if ( system($cmd) ) {
        croak("Couldn't split file.$@\n");
     }
@@ -1538,9 +1538,8 @@ sub chase_jobs {
                 $chunkDIR = $DATA_DIR . "/chunks3";
                 print("\nSplitting into $CHUNK chunks.\n");
                 
-                $cmd = "$FASTA_SPLIT $DATA_DIR/single_file.out "
-                      . $CHUNK . " " . $chunkDIR; 
-
+                $cmd = "$FASTA_SPLIT -f $DATA_DIR/single_file.out "
+                        .'-c '. $CHUNK . ' -o ' . $chunkDIR; 
                 print $cmd . "\n" ; 
 
                 if ( system($cmd) ) {
@@ -2381,7 +2380,7 @@ sub polya_clipping {
 
     # Split fasta files, store into CHUNKDIR
     print("Splitting fasta file.\n");
-    $cmd = "$FASTA_SPLIT $newfile3 $CHUNK $chunkDIR";
+    $cmd = "$FASTA_SPLIT -f $newfile3 -c $CHUNK -o $chunkDIR";
     if ( system($cmd) ) {
         croak("Couldn't split file.$@\n");
     }
