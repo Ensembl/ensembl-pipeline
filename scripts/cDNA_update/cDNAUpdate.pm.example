@@ -44,7 +44,7 @@ use vars qw(%Config);
         GSS_PREFIX => undef,
 
         # Various scripts required by the process.
-        FASTA_SPLIT             => '/software/ensembl/bin/fastasplit',  #path to fastasplit
+        FASTA_SPLIT             => '/software/ensembl/bin/fastasplit_random',  #path to fastasplit
         POLYA_CLIPPING_PATH     => '/ensembl-pipeline/scripts/EST/new_polyA_clipping.pl',
         FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
