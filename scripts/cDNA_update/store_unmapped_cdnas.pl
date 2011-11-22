@@ -326,7 +326,7 @@ for my $id (@sorted){
 	
     #insert into unmapped_object tables of database:
       my $analysis_adaptor = $db1->get_AnalysisAdaptor;
-      my $analysis = $analysis_adaptor->fetch_by_logic_name('cDNA_update');
+      my $analysis = $analysis_adaptor->fetch_by_logic_name('cdna_update');
       
      
       my $uo = Bio::EnsEMBL::UnmappedObject->new (
