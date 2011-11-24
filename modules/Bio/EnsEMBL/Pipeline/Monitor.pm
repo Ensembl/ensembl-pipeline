@@ -263,8 +263,8 @@ sub show_finished_summary {
   if($show_percent){
     $max_nums = percent_finished($self, 0);
     $self->print_header("Finished job summary");
-    printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","Count","Name","Id","%Done");
-    printf("%-${maxcount}s %-${maxname}s %-${maxid}s%s\n","-----","----","--","-----");
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s %s\n","Count","Name","Id","%Done");
+    printf("%-${maxcount}s %-${maxname}s %-${maxid}s %s\n","-----","----","--","-----");
 
     while (my $count = shift(@counts)) {
       my $name  = shift @names;

@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.57.2.3 2011-10-19 15:35:13 th3 Exp $
+#$Id: cDNA_update.pl,v 1.57.2.4 2011-11-24 09:22:42 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -437,6 +437,11 @@ if ( $option eq "prepare" ) {
                 print(   "Files are present in the directory, "
                        . "removing sequences on the kill-list.\n\n" );
 
+                if ($IS_TRACKING) {
+                    print 'Populating the input_seq table for the tracking system...', "\n";
+                    load_inputseq_from_file();
+                }
+
                 my $trim_file = remove_kill_list_object();
                 polya_clipping($trim_file);
             } else {
@@ -635,12 +640,12 @@ elsif ( $option eq "run" ) {
 
             if ( get_input_arg() ) {
 
-                if ($IS_TRACKING) {
+#                if ($IS_TRACKING) {
                     find_Ns();
-                }
-                else {
+#                }
+#                else {
                     why_cdnas_missed();
-                }
+#                }
 
                 $progress_status = 9;
                 update_progress_status($progress_status);
@@ -1081,7 +1086,7 @@ sub remake_fasta_files {
     # Split fasta files, store into new CHUNKDIR
     print("Splitting new fasta file in to chuncks.\n");
 
-    $cmd = "$FASTA_SPLIT $file $chunk_num $chunkDIR";
+    $cmd = "$FASTA_SPLIT -f $file -c $chunk_num -o $chunkDIR";
     if ( system($cmd) ) {
        croak("Couldn't split file.$@\n");
     }
@@ -1506,8 +1511,8 @@ sub chase_jobs {
                 $chunkDIR = $DATA_DIR . "/chunks3";
                 print("\nSplitting into $CHUNK chunks.\n");
                 
-                $cmd = "$FASTA_SPLIT $DATA_DIR/single_file.out "
-                      . $CHUNK . " " . $chunkDIR; 
+                $cmd = "$FASTA_SPLIT -f $DATA_DIR/single_file.out "
+                      .'-c '. $CHUNK . ' -o ' . $chunkDIR; 
 
                 print $cmd . "\n" ; 
 
@@ -1592,19 +1597,6 @@ sub find_Ns {
     my @ids = <RF>;
     close(RF);
     chomp @ids;
-#    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-#                         $OUTPUT_DBNAME, $DBUSER,
-#                         $DBPASS );
-#    my @filteredIds;
-#    foreach my $id (@ids) {
-#        my $sql = 'SELECT hit_name from dna_align_feature WHERE hit_name = "'.$id.'"';
-#        my $query = $db->dbc->prepare($sql) or croak("Sql error 1.\n$!");
-#        $query->execute();
-#        my ($hit_name) = $query->fetchrow_array;
-#        push(@filteredIds, $id) unless ($hit_name);
-#    }
-#    Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_list(\@filteredIds, $pipe_db, 'TooManyN');
-
     eval {
         Bio::EnsEMBL::Analysis::EvidenceTracking::Tools::TrackUtils::update_from_list(\@ids, $pipe_db, 'TooManyN');
     };
@@ -2389,7 +2381,7 @@ sub polya_clipping {
 
     # Split fasta files, store into CHUNKDIR
     print("Splitting fasta file.\n");
-    $cmd = "$FASTA_SPLIT $newfile3 $CHUNK $chunkDIR";
+    $cmd = "$FASTA_SPLIT -f $newfile3 -c $CHUNK -o $chunkDIR";
     if ( system($cmd) ) {
         croak("Couldn't split file.$@\n");
     }
