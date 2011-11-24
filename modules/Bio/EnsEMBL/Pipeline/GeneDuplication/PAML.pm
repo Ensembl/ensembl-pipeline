@@ -1,15 +1,49 @@
+=head1 LICENSE
 
-# To do:
-# ------
-# -Currently only implements codeml wrapper.  Should at least
-#   include baseml too.
-# -Some perfectly acceptable PAML options set to 0 are being 
-#   treated by Perl as 'unset'.  This probably is harmless, 
-#   but is a bug nonetheless.
-# -Set/Get functions should check dependencies such that config 
-#   errors are thrown by the perl layer rather than the paml 
-#   application.  Tough.
-# -Set functions should check that the set values are allowed.
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 NAME
+
+Bio::EnsEMBL::Pipeline::GeneDuplication::PAML - 
+
+=head1 SYNOPSIS
+
+
+=head1 DESCRIPTION
+
+
+=head1 TODO
+
+ -Currently only implements codeml wrapper.  Should at least
+   include baseml too.
+ -Some perfectly acceptable PAML options set to 0 are being 
+   treated by Perl as 'unset'.  This probably is harmless, 
+   but is a bug nonetheless.
+ -Set/Get functions should check dependencies such that config 
+   errors are thrown by the perl layer rather than the paml 
+   application.  Tough.
+ -Set functions should check that the set values are allowed.
+
+=head1 METHODS
+
+=cut
+
 
 package Bio::EnsEMBL::Pipeline::GeneDuplication::PAML;
 

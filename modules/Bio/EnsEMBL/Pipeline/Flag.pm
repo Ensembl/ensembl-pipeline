@@ -1,12 +1,26 @@
-# Perl module for Bio::EnsEMBL::Pipeline::DBSQL::Flag
+=head1 LICENSE
 
-# You may distribute this module under the same terms as perl itself
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-# POD documentation - main docs before the code
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Flag
+Bio::EnsEMBL::Pipeline::Flag - 
 
 =head1 SYNOPSIS
 
@@ -22,10 +36,6 @@ Object to allow flagging of sequences for further analysis.
 The flag consists of the dbID of the object to be flagged, the name of the
 table in which it is stored and the analysis that you would like to
 pass the object to.
-
-=head1 CONTACT
-
-Post general queries to ensembl-dev@ebi.ac.uk
 
 =head1 APPENDIX
 

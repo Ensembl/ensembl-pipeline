@@ -1,42 +1,56 @@
-# Cared for by Dan Andrews <dta@sanger.ac.uk>
-#
-# Copyright EnsEMBL
-#
-# You may distribute this module under the same terms as perl itself
-#
-# POD documentation - main docs before the code
+=head1 LICENSE
 
-=pod
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
+=head1 AUTHORS
+
+Dan Andrews <dta@sanger.ac.uk>
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment
+Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment - 
 
 =head1 SYNOPSIS
 
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
-# Create our object, specifying the genetic code needed to 
-# translate our sequences.  The commonest codes are: 
-#   universal                => 1 
-#   vertebrate mitochondrial => 2
-# These numbers are the same as those you need to specify to 
-# translate any Bio::Seq object.  Hence if you need a truly 
-# oddball genetic code, check the Bio::Seq module documentation.
+ Create our object, specifying the genetic code needed to 
+ translate our sequences.  The commonest codes are: 
+   universal                => 1 
+   vertebrate mitochondrial => 2
+ These numbers are the same as those you need to specify to 
+ translate any Bio::Seq object.  Hence if you need a truly 
+ oddball genetic code, check the Bio::Seq module documentation.
 my $cba =
   Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
     -genetic_code => 1,
     -seqs         => \@seqs);
 
-# The sequences passed to the module should be a reference to
-# an array of Bio::Seq objects.  Everything is going to fall apart
-# if you pass amino acid sequences here, so make sure they are
-# nucleotide sequences.
+ The sequences passed to the module should be a reference to
+ an array of Bio::Seq objects.  Everything is going to fall apart
+ if you pass amino acid sequences here, so make sure they are
+ nucleotide sequences.
 
-# To run the the actual alignment process do the following.
-# The return value is an array of Bio::Seq objects, that
-# when dumped to a multiple fasta file or the like, will
-# display a multiple alignment.
+ To run the the actual alignment process do the following.
+ The return value is an array of Bio::Seq objects, that
+ when dumped to a multiple fasta file or the like, will
+ display a multiple alignment.
 
 my $align = $cba->run_alignment;
 
@@ -50,10 +64,6 @@ foreach my $seq (@$align){
 
 
 =head1 DESCRIPTION
-
-=head1 CONTACT
-
-Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =cut
 

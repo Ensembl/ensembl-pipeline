@@ -20,11 +20,18 @@
 
 =head1 NAME
 
-  Bio::EnsEMBL::Pipeline::Job
+Bio::EnsEMBL::Pipeline::Job - 
+
+=head1 SYNOPSIS
+
 
 =head1 DESCRIPTION
 
   Stores run and status details of an analysis job
+
+=head1 METHODS
+
+=cut
 
 =head1 APPENDIX
 
@@ -590,7 +597,7 @@ sub run_module {
       $rdb = $perl_path->new( -analysis => $self->analysis,
                               -input_id => $self->input_id,
                               -db => $self->adaptor->db,
-                              -verbosity => $verbosity
+                              -verbosity => $verbosity,
                             );
     };
     

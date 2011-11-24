@@ -1,11 +1,26 @@
-package Bio::EnsEMBL::Pipeline::RuleManager;
+=head1 LICENSE
 
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
 
-=pod 
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::RuleManager
+Bio::EnsEMBL::Pipeline::RuleManager - 
 
 =head1 SYNOPSIS
 
@@ -14,15 +29,13 @@ Bio::EnsEMBL::Pipeline::RuleManager
 
 The RuleManager object is to provide functionailty for creating Jobs, checking if they can run and checking their status and existence
 
-=head1 CONTACT
-
-Post general queries to B<ensembl-dev@ebi.ac.uk>
-
 =head1 APPENDIX
 
 The rest of the documentation details each of the object methods. Internal methods are usually preceded with a _
 
 =cut
+
+package Bio::EnsEMBL::Pipeline::RuleManager;
 
 
 use vars qw(@ISA);

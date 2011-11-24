@@ -1,7 +1,22 @@
-# EnsEMBL module for Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-#
-# You may distribute this module under the same terms as perl itself
+=head1 LICENSE
 
+  Copyright (c) 1999-2011 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
 
 =head1 NAME
 
@@ -73,9 +88,6 @@ Running on hosts of host_group bc_hosts with not more than 200 active connection
    resource =>'select[myia64f<=200] rusage[myia64f=10:duration=10]',
    sub_args =>'-m bc_hosts'
 
-=head1 CONTACT
-
-B<ensembl-dev@ebi.ac.uk>
 
 =cut
 
