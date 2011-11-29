@@ -2,7 +2,7 @@
 
 =head1 NAME
 
-list_input_ids.pl  
+list_input_ids.pl - generate region restriction info for rulemanager.pl
 
 =head1 SYNOPSIS
 
@@ -21,6 +21,9 @@ This script lists the input_ids of the seq_region name(s) provided.
     -target_cs          the target coordinate system you want slices in           (default: contig)
     -target_cs_version  the version of the target coord system you want           (optional)
 
+Switches taking no argument,
+    -add-target-cs      include in the output an extra column showing the target_cs
+    -verbose            (unused so far)
     -help      Displays script documentation with PERLDOC
 
 =head1 CONTACT
