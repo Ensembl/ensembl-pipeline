@@ -29,7 +29,7 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
     -description  the sequence set description
     -cs_name      (default: chromosome) the name of the coordinate system being stored
     -cs_version   (default: Otter) the version of the chromosome coordinate system being stored
-    -do_pipe      (default: false) populate the pipeline sattelite db
+    -do_pipe      (default: true) populate the pipeline satellite db
     -submit       (default: true) prime the analysis pipeline
                   i.e. add submitcontig rows in the input_id_anlysis table
     -skip_type    (optional) comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
