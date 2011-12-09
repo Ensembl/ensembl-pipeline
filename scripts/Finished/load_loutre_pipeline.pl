@@ -378,7 +378,8 @@ my $seqset_info     = {};
                 }
                 else {
                     eval {
-                        $seqobj = &pfetch_acc_sv($acc_ver);
+                        $seqobj = pfetch_acc_sv($acc_ver) || localfile_acc_sv($acc_ver)
+                          || die "No sequence for <$acc_ver>\n";
                         $objects{$acc_ver} = $seqobj;
                     };
                     if ($@) {
@@ -610,20 +611,28 @@ sub get_db_param {
         print "Fetching '$acc_ver'\n";
         $pfetch ||= Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch->new;
         my $seq = $pfetch->get_Seq_by_acc($acc_ver);
-        unless ($seq) {
-            my $seq_file = "$acc_ver.seq";
-            warn "Attempting to read fasta file <$acc_ver.seq> in current dir.\n";
-            my $in = Bio::SeqIO->new(
-                -file   => $seq_file,
-                -format => 'FASTA',
-            );
-            $seq = $in->next_seq;
-            my $name = $seq->display_id;
-            unless ($name eq $acc_ver) {
-                die "Sequence in '$seq_file' is called '$name' not '$acc_ver'";
-            }
+        return $seq;
+    }
+}
+
+sub localfile_acc_sv {
+    my ($acc_ver) = @_;
+
+    my $seq_file = "$acc_ver.seq";
+    if (-f $seq_file && -r _) {
+        warn "Attempting to read fasta file <$acc_ver.seq> in current dir.\n";
+        my $in = Bio::SeqIO->new
+          (-file   => $seq_file,
+           -format => 'FASTA');
+        my $seq = $in->next_seq;
+        my $name = $seq->display_id;
+        unless ($name eq $acc_ver) {
+            die "Sequence in '$seq_file' is called '$name' not '$acc_ver'";
         }
         return $seq;
+    } else {
+        warn "Looked in vain for fasta file <$acc_ver.seq> in current dir.\n";
+        return ();
     }
 }
 
