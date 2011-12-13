@@ -10,12 +10,15 @@ list_input_ids.pl -dataset human -set chr14-04
 
 =head1 DESCRIPTION
 
-This script lists the input_ids of the seq_region name(s) provided.
+This script lists the input_ids of the seq_region name provided.
+
+If you need to list multiple seq_regions, call the script for each one
+and put the result through C<sort -u>.
 
 =head1 OPTIONS
 
     -dataset            the species or dataset to connect to
-    -set|name           the seq_region name you want to prime (could be used several times)
+    -set|name           the seq_region name you want to prime (one only)
     -cs                 the coordinate system associated with the seq_region name (default: chromosome)
     -cs_version         the version of the coord system you want                  (default: Otter)
     -target_cs          the target coordinate system you want slices in           (default: contig)
