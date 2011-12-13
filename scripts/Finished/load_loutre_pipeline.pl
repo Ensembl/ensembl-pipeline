@@ -378,7 +378,7 @@ my $seqset_info     = {};
                 }
                 else {
                     eval {
-                        $seqobj = pfetch_acc_sv($acc_ver) || localfile_acc_sv($acc_ver)
+                        $seqobj = pfetch_acc_sv($acc_ver) || pfetch_ftpghost_acc_sv($acc_ver) || localfile_acc_sv($acc_ver)
                           || die "No sequence for <$acc_ver>\n";
                         $objects{$acc_ver} = $seqobj;
                     };
@@ -633,6 +633,39 @@ sub localfile_acc_sv {
     } else {
         warn "Looked in vain for fasta file <$acc_ver.seq> in current dir.\n";
         return ();
+    }
+}
+
+{
+    my $broken;
+
+    sub pfetch_ftpghost_acc_sv {
+        my ($acc_ver) = @_;
+        return () if $broken;
+
+        my $prog = 'pfetch_ftpghost';
+        open my $fh, '-|', $prog, $acc_ver
+          or do {
+              warn "$prog: doesn't work (open: $!), not going to try it again\n";
+              $broken = 1;
+              return ();
+          };
+
+        my $in = Bio::SeqIO->new(-fh => $fh, -format => 'FASTA');
+        my $seq = eval { $in->next_seq };
+        my $seq_err = $@;
+        close $fh;
+
+        if ($? == 0x300) {
+            warn "$prog: didn't work (on close), not going to try it again\n";
+            $broken = 1;
+        }
+        return () if $?;
+
+        # subprocess succeeded, should have valid sequence
+        die "$prog returned bad data? $seq_err" unless $seq;
+
+        return $seq;
     }
 }
 
