@@ -183,12 +183,11 @@ $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);
 
 # Job delete statement handle
-my $delete = &get_dbi( $queue_name, $queue_host )->prepare(
-	qq{
+my $delete; # sth obtained on demand
+my $delete_sql = qq{
 		DELETE FROM queue
 		WHERE id = ?
-	}
-);
+	};
 
 # Load the BatchSubmission module (LSF)
 my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
@@ -413,7 +412,18 @@ sub get_db_param {
 
 sub delete_job {
 	my ($id) = @_;
-	return $delete->execute($id);
+        if (!$delete || not $delete->{Database}->ping) {
+            $delete = &get_dbi( $queue_name, $queue_host )->prepare($delete_sql);
+        }
+
+        my $rv = $delete->execute($id);
+        if (!$rv) {
+            # If the delete fails, dequeuer may run amuck and create
+            # an LSF job per second
+            die "Delete failed, aborting: SQL=qq{$delete_sql} id=$id err=".$delete->errstr;
+        }
+
+        return $rv;
 }
 
 sub status_from_output {
