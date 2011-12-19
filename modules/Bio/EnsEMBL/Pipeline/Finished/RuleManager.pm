@@ -67,6 +67,10 @@ use DBI;
 
 sub _job_db_queue {
 	my ($self) = @_;
+        if (  $self->{'db_queue'} && ! $self->{'db_queue'}->ping ) {
+            warn "Connection to $QUEUE_HOST.$QUEUE_NAME went away, reconnecting";
+            undef $self->{'db_queue'};
+        }
 	if ( !$self->{'db_queue'} ) {
 		$self->{'db_queue'} = &get_dbi( $QUEUE_NAME, $QUEUE_HOST );
 	}
@@ -259,7 +263,9 @@ sub get_dbi {
 	my ($dbuser, $dbpass, $dbport) = &get_db_param( $dbname, $dbhost );
 	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
 
-	return DBI->connect( $dsn, $dbuser, $dbpass );
+	return DBI->connect( $dsn, $dbuser, $dbpass, # XXX: there should be just one of these, somewhere
+                             { PrintError => 1, AutoCommit => 1 }, # current defaults
+                           );
 }
 
 sub get_db_param {
