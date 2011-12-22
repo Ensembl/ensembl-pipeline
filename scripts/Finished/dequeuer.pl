@@ -206,8 +206,11 @@ while ($loop) {
 	my $free_slots = &job_stats( $loop%$check == 0 || $loop == 1 );
 	&flush_queue( $free_slots );
 	&flush_batch() if( $loop%$flush == 0 );
+        if ($verbose) {
+            my $until = localtime(time() + $sleep);
+            print "Finished for now (loop $loop), going to sleep for $sleep secs until $until\n";
+        }
 	sleep($sleep);
-	print "Waking up and run again (loop $loop) !\n" if $verbose;
 	$loop++;
 }
 
