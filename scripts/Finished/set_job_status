@@ -1,0 +1,93 @@
+#!/software/bin/perl
+
+=head1 NAME
+
+set_job_status - add a new JOB_STATUS to some jobs
+
+=head1 SYNOPSIS
+
+ set_job_status -dataset <species> -status <statusname> <job_id>+
+
+=head1 DESCRIPTION
+
+This script changes the current status of some jobs, allowing you to
+interfere with pipeline progress.  It doesn't respect any locks, you
+must know what's going on.
+
+This operation is tricky in plain SQL because you need to add a new
+record and then update the old one.
+
+=head1 OPTIONS
+
+    -dataset            the species or dataset to connect to
+
+=head1 AUTHOR
+
+Matthew Astley mca@sanger.ac.uk
+
+=cut
+
+use strict;
+use warnings;
+
+use Bio::Otter::Lace::Defaults;
+use Bio::Otter::Lace::PipelineDB;
+
+use Bio::EnsEMBL::Utils::Exception qw(throw);
+
+
+sub main {
+    my %opt;
+    Bio::Otter::Lace::Defaults::do_getopt
+        ('dataset|D=s'   => \$opt{dataset},
+         'status|S=s'    => \$opt{status},
+         'h|help'        => \$opt{help});
+
+    exec(perldoc => $0) if $opt{help};
+
+    my @job_id = @ARGV;
+    if (my @not_id = grep { ! /^\d+$/ } @job_id) {
+        die "Bad job_id @not_id";
+    }
+
+    die "Syntax: $0 -dataset <dataset> -status <statusname> <job_id>+\n"
+      unless $opt{dataset} && $opt{status} && @job_id;
+
+    my $cl = Bio::Otter::Lace::Defaults::make_Client();
+    my $ds = $cl->get_DataSet_by_name($opt{dataset});
+    my $otter_dba = $ds->get_cached_DBAdaptor;
+    my $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($otter_dba);
+
+    set_status($pipe_dba, $opt{status}, @job_id);
+}
+
+
+sub set_status {
+    my ($pipe_dba, $new_status, @job_id) = @_;
+
+    my $dbh = $pipe_dba->dbc()->db_handle();
+    $dbh->begin_work;
+
+    my $ja = $pipe_dba->get_JobAdaptor;
+    my $ok = 1;
+    for my $job_id (@job_id) {
+        my $j = $ja->fetch_by_dbID($job_id);
+        if ($j) {
+            my $old_status = $j->current_status->status;
+            $j->set_status($new_status);
+            print "$job_id: was $old_status, now $new_status\n";
+        } else {
+            warn "job_id=$job_id: gone!\n";
+            $ok = 0;
+        }
+    }
+
+    if ($ok) {
+        $dbh->commit;
+    } else {
+        $dbh->rollback;
+        die "Problems seen - rollback\n";
+    }
+}
+
+main();
