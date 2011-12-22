@@ -56,16 +56,19 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-port'   => $port,
 					   );
 
-my $query = "insert into gene_stable_id values (?,?,?,now(),now())";
+my $query = "UPDATE gene SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE gene_id = ?;";
 my $sth = $db->dbc->prepare($query);
-my $trans_query = "insert into transcript_stable_id ".
-  "values (?,?,?,now(),now())";
+my $trans_query = "UPDATE transcript SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE transcript_id = ?;";
+#my $trans_query = "insert into transcript_stable_id ".
+#  "values (?,?,?,now(),now())";
 my $trans_sth = $db->dbc->prepare($trans_query);
-my $translation_query = "insert into translation_stable_id ".
-  "values (?,?,?,now(),now())";
+my $translation_query = "UPDATE translation SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE translation_id = ?;";
+#my $translation_query = "insert into translation_stable_id ".
+#  "values (?,?,?,now(),now())";
 my $translation_sth = $db->dbc->prepare($translation_query);
-my $exon_query = "insert into exon_stable_id ".
-  "values (?,?,?,now(),now())";
+my $exon_query = "UPDATE exon SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE exon_id = ?;";
+#my $exon_query = "insert into exon_stable_id ".
+#  "values (?,?,?,now(),now())";
 my $exon_sth = $db->dbc->prepare($exon_query);
 GENE:
 foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
@@ -77,23 +80,23 @@ foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
   throw("Gene ".$gene_id." has no protein id") unless defined $gene_protein_id;
   $proteins{$gene_protein_id}++;
   eval{
-    $sth->execute($gene_id,$gene_protein_id."_".$proteins{$gene_protein_id}, $proteins{$gene_protein_id});
+    $sth->execute($gene_protein_id."_".$proteins{$gene_protein_id}, $proteins{$gene_protein_id}, $gene_id);
     foreach my $transcript(@{$gene->get_all_Transcripts}){
       my $transcript_protein_id = get_transcript_protein_id($transcript);
       $transcript_proteins{$transcript_protein_id}++;
-      $trans_sth->execute($transcript->dbID, $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}, 
-                          $transcript_proteins{$transcript_protein_id});
+      $trans_sth->execute($transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}, 
+                          $transcript_proteins{$transcript_protein_id}, $transcript->dbID);
       my $translation = $transcript->translation;
-      $translation_sth->execute($translation->dbID, $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id},
-                                $transcript_proteins{$transcript_protein_id});
+      $translation_sth->execute($transcript_protein_id."_".$transcript_proteins{$transcript_protein_id},
+                                $transcript_proteins{$transcript_protein_id}, $translation->dbID);
       my $exon_count = 1;
       EXON:foreach my $exon(@{$transcript->get_all_Exons}){
         next EXON if($exons{$exon->dbID});
         my $stable_id = $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}.".".$exon_count;
         $exon_count++;
         #print "Storing ".$exon->dbID." with ".$stable_id." ".$transcript_proteins{$transcript_protein_id}."\n";
-        $exon_sth->execute($exon->dbID, $stable_id, 
-                           $transcript_proteins{$transcript_protein_id});
+        $exon_sth->execute($stable_id, 
+                           $transcript_proteins{$transcript_protein_id}, $exon->dbID);
         $exons{$exon->dbID} = $stable_id;
       }
     }
