@@ -71,6 +71,7 @@ use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use DBI;
+use Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 use Net::Netrc;
 use Sys::Hostname;
 use Getopt::Long;
@@ -132,6 +133,7 @@ $job_limit     = $JOB_LIMIT     unless ($job_limit);
 $queue_manager = $QUEUE_MANAGER unless ($queue_manager);
 $queue_host    = $QUEUE_HOST    unless ($queue_host);
 $queue_name    = $QUEUE_NAME    unless ($queue_name);
+Bio::EnsEMBL::Pipeline::Finished::PipeQueue->configure($queue_host, $queue_name);
 
 @analysis_to_run = map {split/,/} @analysis_to_run ;
 @analysis_to_skip = map {split/,/} @analysis_to_skip ;
@@ -180,7 +182,7 @@ if(scalar(@where)) {
 }
 $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 
-my $fetch = &get_dbi( $queue_name, $queue_host )->prepare($sql_fetch);
+my $fetch = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh->prepare($sql_fetch);
 
 # Job delete statement handle
 my $delete; # sth obtained on demand
@@ -383,7 +385,8 @@ sub get_db_adaptor {
 }
 
 sub get_dbi {
-	my ( $dbname, $dbhost ) = @_;
+	my ( $dbname, # vestigial
+             $dbhost ) = @_;
 	my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbhost );
 	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
 
@@ -416,7 +419,7 @@ sub get_db_param {
 sub delete_job {
 	my ($id) = @_;
         if (!$delete || not $delete->{Database}->ping) {
-            $delete = &get_dbi( $queue_name, $queue_host )->prepare($delete_sql);
+            $delete = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh->prepare($delete_sql);
         }
 
         my $rv = $delete->execute($id);
