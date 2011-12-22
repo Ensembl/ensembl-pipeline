@@ -20,6 +20,7 @@ record and then update the old one.
 =head1 OPTIONS
 
     -dataset            the species or dataset to connect to
+    -status             new job_status.status value
 
 =head1 AUTHOR
 
