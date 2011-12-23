@@ -53,7 +53,7 @@ use Bio::EnsEMBL::Pipeline::RuleManager;
 use Bio::EnsEMBL::Pipeline::Finished::Job;
 use File::stat;
 use Net::Netrc;
-use DBI;
+use Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 
 @ISA = qw(Bio::EnsEMBL::Pipeline::RuleManager);
 
@@ -68,11 +68,12 @@ use DBI;
 sub _job_db_queue {
 	my ($self) = @_;
         if (  $self->{'db_queue'} && ! $self->{'db_queue'}->ping ) {
-            warn "Connection to $QUEUE_HOST.$QUEUE_NAME went away, reconnecting";
+            warn "_job_db_queue: Connection went away, reconnecting";
             undef $self->{'db_queue'};
         }
 	if ( !$self->{'db_queue'} ) {
-		$self->{'db_queue'} = &get_dbi( $QUEUE_NAME, $QUEUE_HOST );
+            $self->{'db_queue'} =
+              Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh;
 	}
 
 	return $self->{'db_queue'};
@@ -255,40 +256,6 @@ sub read_input_file {
 	close($IN);
 
 	return $list;
-}
-
-
-sub get_dbi {
-	my ( $dbname, $dbhost ) = @_;
-	my ($dbuser, $dbpass, $dbport) = &get_db_param( $dbname, $dbhost );
-	my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
-
-	return DBI->connect( $dsn, $dbuser, $dbpass, # XXX: there should be just one of these, somewhere
-                             { PrintError => 1, AutoCommit => 1 }, # current defaults
-                           );
-}
-
-sub get_db_param {
-	my ( $dbname, $dbhost ) = @_;
-	my ( $dbuser, $dbpass, $dbport );
-
-	my $ref = Net::Netrc->lookup($dbhost);
-	throw("$dbhost entry is missing from ~/.netrc") unless ($ref);
-	$dbuser = $ref->login;
-	$dbpass = $ref->password;
-	$dbport = $ref->account;
-	throw(
-		"Missing parameter in the ~/.netrc file:\n
-			machine " .  ( $dbhost || 'missing' ) . "\n
-			login " .    ( $dbuser || 'missing' ) . "\n
-			password " . ( $dbpass || 'missing' ) . "\n
-			account "
-		  . ( $dbport || 'missing' )
-		  . " (should be used to set the port number)"
-	  )
-	  unless ( $dbuser && $dbpass && $dbport );
-
-	  return ($dbuser, $dbpass, $dbport);
 }
 
 

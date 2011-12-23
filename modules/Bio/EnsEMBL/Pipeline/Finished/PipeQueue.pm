@@ -58,11 +58,13 @@ sub qdbh {
     my ($called) = @_;
     my ( $dbhost, $dbname ) = $called->_get_config;
 
-    my ( $dbuser, $dbpass, $dbport ) = &get_db_param( $dbhost );
+    my ($dbuser, $dbpass, $dbport) = &get_db_param( $dbhost );
     my $dsn = "DBI:mysql:host=$dbhost;dbname=$dbname;port=$dbport";
 
-    return DBI->connect( $dsn, $dbuser, $dbpass );
+    return DBI->connect($dsn, $dbuser, $dbpass,
+                        { PrintError => 1, AutoCommit => 1 }); # current defaults
 }
+
 
 # XXX:DRY there are already many. fix later.
 use Net::Netrc;
