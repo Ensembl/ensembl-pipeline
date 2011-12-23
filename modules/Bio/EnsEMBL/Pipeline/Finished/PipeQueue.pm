@@ -93,6 +93,40 @@ sub get_db_param {
 }
 
 
+=head2 push_job($qdbh, $job, $priority)
+
+Add a job to the queue.  If $priority is true it overrides
+C<<$job->priority>>.
+
+(This class method has an awkward interface, it is an intermediate
+step in extracting pipequeue logic.)  The caller must supply a
+returnvalue from L</qdbh>, presumably cached.
+
+=cut
+
+sub push_job {
+	my ($called, $dbq, $job, $priority) = @_;
+
+	my $insert = $dbq->prepare(
+		qq {
+			INSERT INTO queue (created, priority, job_id, host, pipeline, analysis, is_update)
+			VALUES ( NOW() , ? , ? , ? , ? , ? , ?)
+		}
+	);
+	my $job_id = $job->dbID;
+	my $dbc    = $job->adaptor->db->dbc();
+	my $dbname = $dbc->dbname;
+	my $host   = $dbc->host;
+	my $analysis = $job->analysis->logic_name;
+	my $job_priority = $job->priority;
+	$job_priority = $priority if $priority;
+
+	my $update = $job->update;
+
+	return $insert->execute( $job_priority, $job_id, $host, $dbname, $analysis, $update );
+}
+
+
 1;
 
 =head1 AUTHOR

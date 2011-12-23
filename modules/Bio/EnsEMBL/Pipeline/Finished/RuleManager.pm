@@ -89,24 +89,11 @@ sub push_job {
 	my ( $self, $job, $priority ) = @_;
 
 	my $dbq    = $self->_job_db_queue;
-	my $insert = $dbq->prepare(
-		qq {
-			INSERT INTO queue (created, priority, job_id, host, pipeline, analysis, is_update)
-			VALUES ( NOW() , ? , ? , ? , ? , ? , ?)
-		}
-	);
-	my $job_id = $job->dbID;
-	my $dbc    = $job->adaptor->db->dbc();
-	my $dbname = $dbc->dbname;
-	my $host   = $dbc->host;
-	my $analysis = $job->analysis->logic_name;
-	my $job_priority = $job->priority;
-	$job_priority = $priority if $priority;
-	$job_priority = $URGENT_JOB_PRIORITY
-	  if ( $self->urgent_input_id->{ $job->input_id } );
-	my $update = $job->update;
 
-	return $insert->execute( $job_priority, $job_id, $host, $dbname, $analysis, $update );
+	$priority = $URGENT_JOB_PRIORITY
+	  if ( $self->urgent_input_id->{ $job->input_id } );
+
+	return Bio::EnsEMBL::Pipeline::Finished::PipeQueue->push_job($dbq, $job, $priority);
 }
 
 =head2 can_job_run
