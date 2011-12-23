@@ -408,8 +408,12 @@ LOOP: while (1) {
 		$rulemanager->db->pipeline_unlock;
 		exit 0;
 	}
-	sleep($rerun_sleep)                if ($submitted == 0);
-	print "Waking up and run again!\n" if $verbose;
+
+        if ($submitted == 0) {
+            my $wake = localtime(time() + $rerun_sleep);
+            print "$0: Sleeping $rerun_sleep until $wake\n" if $verbose;
+            sleep($rerun_sleep);
+        }
 }
 
 sub setup_pipeline {
