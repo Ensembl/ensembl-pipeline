@@ -73,7 +73,7 @@ Running on hosts of host_group bc_hosts with not more than 200 active connection
 
 =head1 CONTACT
 
-<ensembl-dev@ebi.ac.uk>
+<dev@ensembl.org>
 
 =cut
 

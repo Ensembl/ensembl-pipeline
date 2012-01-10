@@ -540,7 +540,7 @@ The ensembl analysis pipeline.
 Genome Res. 2004 May;14(5):934-41.
 PMID: 15123589
 
-or mail ensembl-dev@ebi.ac.uk
+or mail dev@ensembl.org
 
 =head1 SYNOPSIS
 

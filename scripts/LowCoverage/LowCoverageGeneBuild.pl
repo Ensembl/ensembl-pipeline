@@ -59,7 +59,7 @@ and the repeat libraries from EBI, as outlined in README.
 
 =head1 CONTACT
 
-ensembl-dev@ebi.ac.uk
+dev@ensembl.org
 
 =cut
 

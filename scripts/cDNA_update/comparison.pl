@@ -39,7 +39,7 @@ It bases the comparison on genes and tries to trace the hits using the supportin
 
 =head1 CONTACT
 
-ensembl-dev@ebi.ac.uk
+dev@ensembl.org
 
 =cut
 

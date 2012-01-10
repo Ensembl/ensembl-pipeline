@@ -110,7 +110,7 @@ test_whole_pipeline.pl
 docs/running_tests.txt
 ensembl-pipeline/scripts/job_submission.pl
 
-any questions pass to ensembl-dev@ebi.ac.uk
+any questions pass to dev@ensembl.org
 
 =cut
 

@@ -462,7 +462,7 @@ Misc options
 
 =head1 CONTACT
 
-Post general queries to <ensembl-dev@ebi.ac.uk>
+Post general queries to <dev@ensembl.org>
 
 =head1 EXAMPLES
 

@@ -11,7 +11,7 @@
 # defined for a database when it is used
 #
 # Example RE's are below. If you don't understand
-# regexes, e-mail ensembl-dev@ebi.ac.uk for help!
+# regexes, e-mail dev@ensembl.org for help!
 
 
 BEGIN {

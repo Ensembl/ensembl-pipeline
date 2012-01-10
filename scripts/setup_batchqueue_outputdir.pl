@@ -72,7 +72,7 @@ setup_batchqueue_outputdir.pl
 This script will setup the output directories from
 Bio::EnsEMBL::Pipeline::Config::BatchQueue
 
-or mail ensembl-dev@ebi.ac.uk
+or mail dev@ensembl.org
 
 =head1 SYNOPSIS
 

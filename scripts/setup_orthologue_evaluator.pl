@@ -52,7 +52,7 @@ perl setup_orthologue_evaluator.pl -dbname <dbname> -dbuser -write
 
 =head1 CONTACT
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+Post general queries to B<dev@ensembl.org>
 
 =head1 APPENDIX
 

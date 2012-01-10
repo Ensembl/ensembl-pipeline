@@ -42,7 +42,7 @@ input_id_type=CONTIG
 
 =head1 CONTACT
 
-Post general queries to B<ensembl-dev@ebi.ac.uk>
+Post general queries to B<dev@ensembl.org>
 
 =head1 APPENDIX
 

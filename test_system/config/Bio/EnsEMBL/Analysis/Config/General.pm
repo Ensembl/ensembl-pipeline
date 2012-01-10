@@ -29,7 +29,7 @@ Bio::EnsEMBL::Analysis::Config::General
 
 =head1 CONTACT
 
-B<ensembl-dev@ebi.ac.uk>
+B<dev@ensembl.org>
 
 =cut
          

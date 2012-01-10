@@ -2,7 +2,7 @@
 
 =head1 NAME slice_to_sql.pl
 
- mail ensembl-dev@ebi.ac.uk
+ mail dev@ensembl.org
 
 =head1 SYNOPSIS
 
