@@ -836,13 +836,19 @@ sub make_filenames {
     if($@){
       throw("Failed to make dir ".$dir." $@");
     }
-  }   
-  my $stub = $self->input_id.".";
-  $stub .= $self->analysis->logic_name.".";
-  $stub .= int(rand(1000));
+  }
 
-  $self->stdout_file($dir.$stub.".out") unless($self->stdout_file);
-  $self->stderr_file($dir.$stub.".err") unless($self->stderr_file);
+  my $fname = $self->input_id;
+  $fname =~ s/\/+$//;
+  if ($fname =~ /\//) {
+    my ($suffix) = $fname =~ /\/([^\/]+)$/;
+    $fname = $suffix;
+  }
+  $fname .= "." . $self->analysis->logic_name;
+  $fname .= "." . int(rand(1000));
+
+  $self->stdout_file($dir.$fname.".out") unless($self->stdout_file);
+  $self->stderr_file($dir.$fname.".err") unless($self->stderr_file);
 }
 
 
