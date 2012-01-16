@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.66 2012-01-10 17:24:09 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.67 2012-01-16 09:35:36 db8 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1113,7 +1113,7 @@ sub remake_fasta_files {
     my $chunk_num = int( $num_missing_cdnas/20 );
 
     # Split fasta files, store into new CHUNKDIR
-    print("Splitting new fasta file in to chuncks.\n");
+    print("Splitting new fasta file in to chunks.\n");
 
     $cmd = "$FASTA_SPLIT $file $chunk_num $chunkDIR";
     if ( system($cmd) ) {
