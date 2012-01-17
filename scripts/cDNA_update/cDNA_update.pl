@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.67 2012-01-16 09:35:36 db8 Exp $
+#$Id: cDNA_update.pl,v 1.68 2012-01-17 16:01:58 mr6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1707,7 +1707,7 @@ sub fix_metatable {
 
     # Set the genebuild id.
     $sql = "INSERT into meta (meta_key, meta_value) "
-         . "VALUES ('genebuild_id', '$GENEBUILD_ID' )";
+         . "VALUES ('genebuild.id', '$GENEBUILD_ID' )";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
