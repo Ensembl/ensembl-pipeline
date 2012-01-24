@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.69 2012-01-24 14:26:28 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.70 2012-01-24 14:38:26 mr6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1724,7 +1724,7 @@ sub fix_metatable {
     $sth->finish;
 
     # Remove some meta keys not needed in the cdna database
-    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion') " ;
+    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis') " ;
     my $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
