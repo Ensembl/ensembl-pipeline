@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.70 2012-01-24 14:38:26 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.71 2012-01-24 15:02:34 mr6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1719,6 +1719,17 @@ sub fix_metatable {
     $sth->finish;
 
     $sql = "UPDATE transcript set status = 'PUTATIVE'";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # Set all gene and transcript biotypes to cdna_update.
+    $sql = "UPDATE gene set biotype = 'cdna_update'";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE transcript set biotype = 'cdna_update'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
