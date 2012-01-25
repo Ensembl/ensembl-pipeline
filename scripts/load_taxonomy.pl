@@ -193,27 +193,27 @@ sub load_taxonomy_in_core {
     $mc->store_key_value('species.common_name',$node->common_name);
     print "Loading species.common_name = ",$node->common_name,"\n";
   }
-  if (defined $node->has_tag('ensembl common name')) {
+  if ($node->has_tag('ensembl common name')) {
     $mc->store_key_value('species.ensembl_common_name',$node->get_tagvalue('ensembl common name'));
     print "Loading species.ensembl_common_name = ",$node->get_tagvalue('ensembl common name'),"\n";
   }
-  if (defined $node->has_tag('ensembl alias name')) {
+  if ($node->has_tag('ensembl alias name')) {
     $mc->store_key_value('species.ensembl_alias_name',$node->get_tagvalue('ensembl alias name'));
     print "Loading species.ensembl_alias_name = ",$node->get_tagvalue('ensembl alias name'),"\n";
   }
-  if (defined $node->has_tag('genbank common name')) {
+  if ($node->has_tag('genbank common name')) {
     print "Found species.genbank_common_name = ",$node->get_tagvalue('genbank common name'),"\n";
   }
-  if (defined $node->has_tag('scientific name')) {
+  if ($node->has_tag('scientific name')) {
     print "Found species.scientific_name = ",$node->get_tagvalue('scientific name'),"\n";
   }
-  if (defined $node->has_tag('common name')) {
+  if ($node->has_tag('common name')) {
     print "Found species.common_name = ",join (',',@{$node->get_tagvalue('common name')}),"\n";
   }
-  if (defined $node->has_tag('misspelling')) {
+  if ($node->has_tag('misspelling')) {
     print "Found species.alias = ",$node->get_tagvalue('misspelling'),"\n";
   }
-  if (defined $node->has_tag('synonym')) {
+  if ($node->has_tag('synonym')) {
     print "Found species.synonym = ",$node->get_tagvalue('synonym'),"\n";
   }
 
