@@ -214,7 +214,7 @@ sub load_taxonomy_in_core {
     print "Found species.alias = ",$node->get_tagvalue('misspelling'),"\n";
   }
   if ($node->has_tag('synonym')) {
-    print "Found species.synonym = ",$node->get_tagvalue('synonym'),"\n";
+    print "Found species.synonym = ", join (',',@{$node->get_all_values_for_tag('synonym')}),"\n";
   }
 
   # It is possible to remove the subspecies from the full species.classification list by commenting out the following line in 
