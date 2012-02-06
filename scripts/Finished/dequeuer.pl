@@ -270,6 +270,7 @@ sub flush_queue {
 					  if $verbose;
 				};
 				if ($@) {
+					# note, $job->flush_runs eats some errors
 					warn(   "ERROR running job "
 						  . $job->dbID . " "
 						  . $job->analysis->logic_name . " "
