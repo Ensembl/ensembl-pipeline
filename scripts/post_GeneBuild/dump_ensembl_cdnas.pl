@@ -4,7 +4,7 @@
 
 =head1 DESCRIPTION
 
-dumps in fastaA format the cdnas of all the genes in a database specified
+dumps in Fastaa format the cdnas of all the genes in a database specified
 
 =head1 OPTIONS
 
@@ -15,19 +15,21 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
+use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils;
 
 my $file = 'ensembl_cdnas';
-
+≈
 my $dbhost;
-my $dbuser    = 'ensro';
+my $dbuser = 'admin' ;
 my $dbname;
-my $dbpass    = undef;
+my $dbpass;
+my $dbport;
 
 my $dnadbhost;
-my $dnadbuser = 'ensro';
+my $dnadbuser = 'admin' ;
 my $dnadbname;
-my $dnadbpass = undef;
+my $dnadbpass;
+my $dnadbport;
 
 my $genetype;
 
@@ -35,8 +37,12 @@ my $genetype;
 &GetOptions(
 	    'dbname:s'    => \$dbname,
 	    'dbhost:s'    => \$dbhost,
+	    'dbpass:s'    => \$dbpass,
+	    'dbport:s'    => \$dbport,
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
+	    'dnadbpass:s'    => \$dnadbpass,
+	    'dnadbport:s'    => \$dnadbport,
 	    'file:s'  => \$file,
 	    'genetype:s'   => \$genetype,
 	   );
@@ -44,17 +50,17 @@ my $genetype;
 unless ( $dbname && $dbhost && $dnadbname && $dnadbhost ){
   print STDERR "script to dump all the cdnas from the transcripts in a database\n";
  
-  print STDERR "Usage: $0 -dbname -dbhost -dnadbname -dnadbhost\n";
+  print STDERR "Usage: $0 -dbname -dbhost -dbport -dbpass -dnadbname -dnadbhost -dnadbport -dnadbpass\n";
   print STDERR "Optional: -genetype -file (defaulted to ensembl_cdnas)\n";
   exit(0);
 }
-
 
 my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					       '-host'   => $dnadbhost,
 					       '-user'   => $dnadbuser,
 					       '-dbname' => $dnadbname,
 					       '-pass'   => $dnadbpass,
+					       '-port'   => $dnadbport,
 					      );
 
 
@@ -63,7 +69,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					    '-user'   => $dbuser,
 					    '-dbname' => $dbname,
 					    '-pass'   => $dbpass,
-					    '-dnadb'  => $dnadb,
+					    '-port'   => $dbport,
 					   );
 
 
@@ -73,15 +79,15 @@ open (OUT,">$file") or die("unable to open file $file");
 
 my $seqio = Bio::SeqIO->new('-format' => 'Fasta' , -fh => \*OUT ) ;
 
-my  @ids = @{$db->get_GeneAdaptor->list_geneIds};
+my  @genes = @{$db->get_GeneAdaptor->fetch_all} ;
+
 
 GENE:
-foreach my $gene_id(@ids) {
+foreach my $gene(@genes) {
   
-  my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id,1);
-  if ($genetype){
-    next GENE unless ( $gene->type eq $genetype );
-  }
+    if ($genetype){
+	next GENE unless ( $gene->biotype eq $genetype );
+    }
 
 
   my $gene_id = $gene->dbID();
