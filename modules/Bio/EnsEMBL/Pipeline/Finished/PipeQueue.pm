@@ -66,6 +66,27 @@ sub qdbh {
 }
 
 
+=head2 ensure_sth( \$sth, $sql )
+
+Class method.  If the DBI statement handle $sth is not connected,
+prepare it from L</qdbh>.
+
+Deprecated: this is to assist cleanup existing code, not intended for
+writing new code.
+
+=cut
+
+sub ensure_sth {
+    my ($called, $sth_ref, $sql) = @_;
+
+    if (!$$sth_ref || not $$sth_ref->{Database}->ping) {
+        $$sth_ref = $called->qdbh->prepare($sql);
+    }
+
+    return 1;
+}
+
+
 # XXX:DRY there are already many. fix later.
 use Net::Netrc;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);

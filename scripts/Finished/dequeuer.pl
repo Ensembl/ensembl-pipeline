@@ -182,7 +182,8 @@ if(scalar(@where)) {
 }
 $sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
 
-my $fetch = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh->prepare($sql_fetch);
+my $fetch; # sth obtained on demand
+
 
 # Job delete statement handle
 my $delete; # sth obtained on demand
@@ -247,7 +248,17 @@ sub flush_queue {
 	my ($slots) = @_;
 
 	SLOT:while($slots) {
-		$fetch->execute($fetch_number);
+
+		Bio::EnsEMBL::Pipeline::Finished::PipeQueue->ensure_sth(\$fetch, $sql_fetch);
+
+		my $rv = $fetch->execute($fetch_number);
+                if (!$rv) {
+                    my $err = $fetch->errstr;
+                    warn "Fetch from pipe_queue.queue failed: $err; try again later";
+                    undef $fetch;
+                    last SLOT;
+                    # not keen to die here, because we may have cleanup to do
+                }
 		if($fetch->rows == 0){
 			print "No job in queue\n";
 			last SLOT;
@@ -419,10 +430,8 @@ sub get_db_param {
 
 sub delete_job {
 	my ($id) = @_;
-        if (!$delete || not $delete->{Database}->ping) {
-            $delete = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh->prepare($delete_sql);
-        }
 
+        Bio::EnsEMBL::Pipeline::Finished::PipeQueue->ensure_sth(\$delete, $delete_sql);
         my $rv = $delete->execute($id);
         if (!$rv) {
             # If the delete fails, dequeuer may run amuck and create
