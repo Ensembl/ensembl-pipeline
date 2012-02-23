@@ -222,15 +222,19 @@ while ($loop) {
             print "Finished for now (loop $loop), going to sleep for $sleep secs until $until\n";
         }
 	sleep($sleep);
-	$loop++;
+	$loop++ if $loop;
 }
+&flush_batch();
+print "Exit DQdequeuer ....\n" if $verbose;
+exit 0;
 
 ## methods
 
 sub termhandler {
-	&flush_batch();
-	print "Exit DQdequeuer ....\n" if $verbose;
-	exit 0;
+    my ($sig) = @_;
+    undef $SIG{$sig};
+    warn "Caught SIG$sig - another to abend\n";
+    $loop = 0;
 }
 
 # flush the batch jobs
