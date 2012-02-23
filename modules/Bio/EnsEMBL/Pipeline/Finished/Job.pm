@@ -429,14 +429,14 @@ sub flush_runs {
 			$farm_queue    = $LONG_JOB_QUEUE;
 		}
 
-		# change job mysql load ressource
-		if($host eq 'otterpipe1') {
-			$farm_resource =~ s/otterp2/otterp1/g;
-		} else {
-			$farm_resource =~ s/otterp1/otterp2/g;
-		}
-		
-		
+                # change job mysql token resource (otp1tok, otp2tok)
+                if (my ($otpnum) = $host =~ m{^otterpipe(\d+)$}) {
+                    $farm_resource =~ s{\botp\d+tok\b}{otp${otpnum}tok}g;
+                } else {
+                    warn "Couldn't fix up resource $1 from dbhost $host"
+                      if $farm_resource =~ m{\b(otp\d+tok)\b};
+                }
+
 
 		my $batch_job = $batch_q_module->new(
 			-STDOUT     => $lastjob->stdout_file,
