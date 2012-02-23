@@ -423,13 +423,13 @@ sub flush_runs {
                 # increase it - also have to bump the rusage.
                 my $mem_mb;
                 while ($param =~ s{(?:^|\s)\s*-M(\d{6,9})\b}{}) {
-                    my $param_mb = $1;
-                    warn "Multiple -M(megs) sub_args in QUEUE_CONFIG ".
+                    my $param_kb = $1;
+                    my $param_mb = int($param_kb / 1000 + 0.75);
+                    warn "Multiple -M(kb) sub_args in QUEUE_CONFIG ".
                       "for logic_name=$$queue{'logic_name'}" if defined $mem_mb;
                     $mem_mb = $param_mb if !defined $mem_mb || $mem_mb < $param_mb;
                 }
                 $mem_mb = $DEFAULT_MEM_MB if !defined $mem_mb;
-
 
 		if ( $self->priority == $BIG_MEM_PRIORITY ) {
                     $mem_mb        = $BIG_MEM_MB if $mem_mb < $BIG_MEM_MB;
@@ -582,6 +582,7 @@ sub __munge_farm_resource {
         $rus = "mem=$mem_mb".($rus =~ /\S/ ? ", $rus" : '');
         # for duration of the job
     }
+    push @res, "rusage[$rus]";
 
     push @res, $farm_resource if $farm_resource =~ /\S/;
     return join ' ', @res;
