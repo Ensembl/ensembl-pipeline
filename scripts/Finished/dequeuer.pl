@@ -192,6 +192,14 @@ my $delete_sql = qq{
 		WHERE id = ?
 	};
 
+# Unbuffered output
+{
+    my $old = select STDERR;
+    $| = 1;
+    select $old;
+    $| = 1;
+}
+
 # Load the BatchSubmission module (LSF)
 my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 my $file           = "$batch_q_module.pm";
