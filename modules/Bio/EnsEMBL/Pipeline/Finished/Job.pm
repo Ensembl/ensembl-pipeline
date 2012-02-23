@@ -417,13 +417,24 @@ sub flush_runs {
 		my $farm_resource = $queue->{'resource'};
 		my $param = ' -sp '.$self->priority.' ';
 
-		if ( $self->priority == $BIG_MEM_PRIORITY ) {
-			$farm_queue    = $BIG_MEM_QUEUE;
-			$farm_resource = $BIG_MEM_RESOURCE;
-			$param 		  .= $BIG_MEM_PARAM;
-		}
-		
 		$param .= $queue->{'sub_args'};
+
+                # Extract original job memory spec (if any).  We may
+                # increase it - also have to bump the rusage.
+                my $mem_mb;
+                while ($param =~ s{(?:^|\s)\s*-M(\d{6,9})\b}{}) {
+                    my $param_mb = $1;
+                    warn "Multiple -M(megs) sub_args in QUEUE_CONFIG ".
+                      "for logic_name=$$queue{'logic_name'}" if defined $mem_mb;
+                    $mem_mb = $param_mb if !defined $mem_mb || $mem_mb < $param_mb;
+                }
+                $mem_mb = $DEFAULT_MEM_MB if !defined $mem_mb;
+
+
+		if ( $self->priority == $BIG_MEM_PRIORITY ) {
+                    $mem_mb        = $BIG_MEM_MB if $mem_mb < $BIG_MEM_MB;
+                    $farm_queue    = $BIG_MEM_QUEUE;
+		}
 
 		if ( $self->priority == $LONG_JOB_PRIORITY ) {
 			$farm_queue    = $LONG_JOB_QUEUE;
@@ -436,6 +447,12 @@ sub flush_runs {
                     warn "Couldn't fix up resource $1 from dbhost $host"
                       if $farm_resource =~ m{\b(otp\d+tok)\b};
                 }
+
+                # Memory must be specified in -M, -Rselect and -Rrusage
+                $farm_resource = __munge_farm_resource
+                  ($farm_resource, $mem_mb, $queue->{'logic_name'});
+
+                $param .= sprintf(" -M%d ", $mem_mb * 1000); # other -M values were removed
 
 
 		my $batch_job = $batch_q_module->new(
@@ -521,6 +538,55 @@ sub flush_runs {
 		$queue->{'last_flushed'}->{$host}->{$dbname} = time;
 	}
 }
+
+sub __munge_farm_resource {
+    my ($farm_resource, $mem_mb, $ln) = @_;
+    my @res;
+
+    # select[...] must be first
+    my $sel = '';
+    if ($farm_resource =~ s{^\s*select\[([^\[\]]*)\]}{} or
+        $farm_resource =~ s{^\s*([^\[\]]+)(\s+\w+\[|\s*$)}{$2}) {
+        $sel = $1;
+    }
+    if ($farm_resource =~ m{\bselect\[}) {
+        warn "Ignored multiple/misplaced select[...] in farm_resource ".
+          "($sel;; $farm_resource) for logic_name=$ln";
+    }
+
+    if ($sel =~ s{\bmem\s*>\s*(\d+)}{mem>$mem_mb}) {
+        # done
+    } else {
+        $sel = "mem>$mem_mb".($sel =~ /\S/ ? " && $sel" : '');
+    }
+    push @res, "select[$sel]";
+
+    # order[...] would be next - move it out the way
+    if ($farm_resource =~ s{^\s*(order\[([^\[\]]*)\])\s*}{}) {
+        push @res, $1;
+    }
+
+    # rusage[...] would be next - may need fixup
+    my $rus = '';
+    if ($farm_resource =~ s{^\s*rusage\[([^\[\]]*)\]\s*}{}) {
+        $rus = $1;
+    }
+    if ($farm_resource =~ m{\brusage\[}) {
+        warn "Ignored multiple/misplaced rusage[...] in farm_resource ".
+          "($rus;; $farm_resource) for logic_name=$ln";
+    }
+
+    if ($rus =~ s{\bmem\s*=\s*(\d+)}{mem=$mem_mb}) {
+        # done; we keep any existing duration&decay spec
+    } else {
+        $rus = "mem=$mem_mb".($rus =~ /\S/ ? ", $rus" : '');
+        # for duration of the job
+    }
+
+    push @res, $farm_resource if $farm_resource =~ /\S/;
+    return join ' ', @res;
+}
+
 
 sub set_up_queues {
 	my %q;
