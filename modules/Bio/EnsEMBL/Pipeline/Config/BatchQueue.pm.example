@@ -171,10 +171,12 @@ use vars qw(%Config);
   DEFAULT_RETRY_RESOURCE => '',
 
   QUEUE_CONFIG => [
-    {
-      logic_name      => 'repeatmask',
-      batch_size      => 10,
-      resource        => '',
+    { logic_name => 'repeatmask',
+      batch_size => 10,
+
+      # Most RepeatMasker jobs need not more than 500MB.
+      resource => "-R 'select[mem>500] rusage[mem=500]' -M 500000",
+
       retries         => 3,
       sub_args        => '',
       runner          => '',
@@ -183,9 +185,15 @@ use vars qw(%Config);
       verbosity       => 'INFO',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
       retry_queue     => '',
-      retry_resource  => '',
-      retry_sub_args  => '',
-      lsf_perl        => '/usr/local/ensembl32/bin/perl',
+
+      # Some jobs might fail (unlikely with 1M slices), but they will
+      # defintely pass with 2GB.
+      retry_resource =>
+        "-R 'select[mem>2000] rusage[mem=2000]' -M 2000000",
+
+      retry_batch_size => 5,
+      retry_sub_args   => '',
+      lsf_perl         => '/usr/local/ensembl32/bin/perl',
     },
     {
       logic_name     => 'genscan',
@@ -209,15 +217,22 @@ use vars qw(%Config);
       retry_resource => '',
       retry_sub_args => '',
     },
-    {
-      logic_name     => 'cpg',
-      batch_size     => 10,
-      resource       => '',
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
+    { logic_name => 'cpg',
+      batch_size => 10,
+
+      # cpg generally uses little memory
+      resource => '',
+
+      retries     => 3,
+      sub_args    => '',
+      runner      => '',
+      retry_queue => '',
+
+      # This is unlikely to be used as most cpg jobs uses less than
+      # 100MB (default memory limit on Sanger LSF).
+      retry_resource =>
+        "-R 'select[mem>200] rusage[mem=200]' -M 200000",
+
       retry_sub_args => '',
     },
     {
@@ -230,39 +245,59 @@ use vars qw(%Config);
       retry_queue    => '',
       retry_resource => '',
       retry_sub_args => '',
-      lsf_perl        => '/usr/local/ensembl64/bin/perl',
+      lsf_perl       => '/usr/local/ensembl64/bin/perl',
     },
-    {
-      logic_name => 'eponine',
+    { logic_name => 'eponine',
       batch_size => 2000,
-      resource       => '',
+
+      # eponine will probably need about 1GB of memory, it seems to use
+      # anywhere between 500MB and 700MB.
+      resource => "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
+
       retries        => 3,
       sub_args       => '',
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
+
+      # Give it 2GB if 1GB wasn't enough (unlikely)
+      retry_resource =>
+        "-R 'select[mem>2000] rusage[mem=2000]' -M 2000000",
+
       retry_sub_args => '',
     },
-    {
-      logic_name => 'trf',
+    { logic_name => 'trf',
       batch_size => 2000,
-      resource       => '',
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
+
+      # trf is a borderline case for the 100MB limit, give it 200MB.
+      resource => "-R 'select[mem>200] rusage[mem=200]' -M 200000",
+
+      retries     => 3,
+      sub_args    => '',
+      runner      => '',
+      retry_queue => '',
+
+      # For really big things, it might need more, give it 1GB
+      retry_resource =>
+        "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
+
       retry_sub_args => '',
     },
-    {
-      logic_name => 'trnascan',
+    { logic_name => 'trnascan',
       batch_size => 2000,
-      resource       => '',
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
+
+      # trnascan has a similar memory footprint to trf
+      resource => "-R 'select[mem>200] rusage[mem=200]' -M 200000",
+
+      retries     => 3,
+      sub_args    => '',
+      runner      => '',
+      retry_queue => '',
+
+      # As for trf
+      retry_resource =>
+        "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
+
       retry_sub_args => '',
     },
     {
