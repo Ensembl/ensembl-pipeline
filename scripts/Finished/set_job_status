@@ -6,7 +6,7 @@ set_job_status - add a new JOB_STATUS to some jobs
 
 =head1 SYNOPSIS
 
- set_job_status -dataset <species> -status <statusname> <job_id>+
+ set_job_status -dataset <species> -status <statusname> [-requeue] <job_id>+
 
 =head1 DESCRIPTION
 
@@ -15,12 +15,14 @@ interfere with pipeline progress.  It doesn't respect any locks, you
 must know what's going on.
 
 This operation is tricky in plain SQL because you need to add a new
-record and then update the old one.
+record and then update the old one.  Then you have to re-add to the
+pipe_queue, across a database server.
 
 =head1 OPTIONS
 
     -dataset            the species or dataset to connect to
     -status             new job_status.status value
+    -requeue            also add CREATED jobs to pipe_queue
 
 =head1 AUTHOR
 
@@ -33,6 +35,7 @@ use warnings;
 
 use Bio::Otter::Lace::Defaults;
 use Bio::Otter::Lace::PipelineDB;
+use Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 
 use Bio::EnsEMBL::Utils::Exception qw(throw);
 
@@ -42,6 +45,7 @@ sub main {
     Bio::Otter::Lace::Defaults::do_getopt
         ('dataset|D=s'   => \$opt{dataset},
          'status|S=s'    => \$opt{status},
+         'requeue|Q!'    => \$opt{requeue},
          'h|help'        => \$opt{help});
 
     exec(perldoc => $0) if $opt{help};
@@ -59,7 +63,9 @@ sub main {
     my $otter_dba = $ds->get_cached_DBAdaptor;
     my $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($otter_dba);
 
-    set_status($pipe_dba, $opt{status}, @job_id);
+    my @job_created = set_status($pipe_dba, $opt{status}, @job_id);
+
+    requeue(@job_created) if $opt{requeue};
 }
 
 
@@ -71,12 +77,24 @@ sub set_status {
 
     my $ja = $pipe_dba->get_JobAdaptor;
     my $ok = 1;
+    my @job_created;
     for my $job_id (@job_id) {
         my $j = $ja->fetch_by_dbID($job_id);
         if ($j) {
             my $old_status = $j->current_status->status;
+
+            # Detect breakage, tested+fixed from Otter v63.01
+            die "Wrong class: $j from $ja from $pipe_dba"
+              unless $j->isa('Bio::EnsEMBL::Pipeline::Finished::Job');
+
+            if ($old_status eq $new_status) {
+                warn "$job_id: status is already $new_status, ignoring this job (and not requeuing)\n";
+                # but maybe we want to requeue?
+                next;
+            }
             $j->set_status($new_status);
             print "$job_id: was $old_status, now $new_status\n";
+            push @job_created, $j if $new_status eq 'CREATED';
         } else {
             warn "job_id=$job_id: gone!\n";
             $ok = 0;
@@ -85,10 +103,29 @@ sub set_status {
 
     if ($ok) {
         $dbh->commit;
+        return @job_created;
     } else {
         $dbh->rollback;
         die "Problems seen - rollback\n";
     }
 }
+
+
+sub requeue {
+    my (@job) = @_;
+    my $qdb = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->qdbh;
+    my $done = 0;
+    foreach my $j (@job) {
+        my $jid = $j->dbID;
+        my $rv = Bio::EnsEMBL::Pipeline::Finished::PipeQueue->push_job($qdb, $j);
+        if ($rv) {
+            $done++;
+        } else {
+            warn "insert job_id=$jid into pipe_queue failed";
+        }
+    }
+    print "Inserted $done job(s) into pipe_queue\n";
+}
+
 
 main();
