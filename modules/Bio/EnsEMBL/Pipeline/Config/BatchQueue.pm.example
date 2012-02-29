@@ -30,21 +30,21 @@
 =head1 DESCRIPTION
 
     Configuration for pipeline batch queues. Specifies per-analysis
-    resources and configuration, e.g. so that certain jobs are run
-    only on certain nodes.
+    resources and configuration, e.g. so that certain jobs are run only
+    on certain nodes.
 
-    It imports and sets a number of standard global variables into
-    the calling package. Without arguments all the standard variables
-    are set, and with a list, only those variables whose names are
-    provided are set. The module will die if a variable which doesn't
-    appear in its C<%Config> hash is asked to be set.
+    It imports and sets a number of standard global variables into the
+    calling package. Without arguments all the standard variables are
+    set, and with a list, only those variables whose names are provided
+    are set. The module will die if a variable which doesn't appear in
+    its C<%Config> hash is asked to be set.
 
     The variables can also be references to arrays or hashes.
 
     Edit C<%Config> to add or alter variables.
 
-    All the variables are in capitals, so that they resemble
-    environment variables.
+    All the variables are in capitals, so that they resemble environment
+    variables.
 
     To run a job only on a certain host, you have to add specific
     resource-requirements. This can be useful if you have special
@@ -55,14 +55,16 @@
 
     Here are some example resource-statements / sub_args statements:
 
-        sub_args => '-m bc_hosts',              # only use hosts of host-group 'bc_hosts' (see bmgroup)
-        sub_args => '-m bc1_1',                 # only use hosts of host-group 'bc1_1'
+        sub_args => '-m bc_hosts',  # only use hosts of host-group 'bc_hosts'
+                                    # (see bmgroup)
+        sub_args => '-m bc1_1',     # only use hosts of host-group 'bc1_1'
 
         resource => 'select[type==X86_64]',     # use Linux 64 bit machines only
         resource => 'select[model==IBMBC2800]', # only run on IBMBC2800 hosts
 
-        resource => 'alpha',                    # only run on DEC alpha
-        resource => 'linux',                    # run on any machine capable of running 32-bit X86 Linux apps
+        resource => 'alpha',    # only run on DEC alpha
+        resource => 'linux',    # run on any # machine capable of running
+                                # 32-bit X86 Linux apps
 
 =head2 Database throttling
 
@@ -71,28 +73,34 @@
     duration of the first 10 minutes when the job is running (means 30
     hosts * 10 connections = 300 connections):
 
-        resource =>'select[linux && ecs4my3350 <=300] rusage[ecs4my3350=10:duration=10]',
+      resource =>
+        'select[linux && ecs4my3350<=300] rusage[ecs4my3350=10:duration=10]',
 
     Running on 'linux' hosts with not more than 200 active connections
-    for myia64f and myia64g, 10 connections per job to each
-    db-instance for the first 10 minutes:
+    for myia64f and myia64g, 10 connections per job to each db-instance
+    for the first 10 minutes:
 
-        resource =>'select[linux && myia64f <=200 && myia64g <=200] rusage[myia64f=10:myia64g=10:duration=10]',
+      resource =>
+        'select[linux && myia64f<=200 && myia64g<=200] ' .
+        'rusage[myia64f=10:myia64g=10:duration=10]',
 
-    Running on hosts of model 'IBMBC2800' hosts with not more than
-    200 active connections to myia64f, 10 connections per job for the
-    first 10 minutes:
+    Running on hosts of model 'IBMBC2800' hosts with not more than 200
+    active connections to myia64f, 10 connections per job for the first
+    10 minutes:
 
-        resource =>'select[model==IBMBC2800 && myia64f<=200] rusage[myia64f=10:duration=10]',
+      resource =>
+        'select[model==IBMBC2800 && myia64f<=200] ' .
+        'rusage[myia64f=10:duration=10]',
 
     Running on hosts of host_group bc_hosts with not more than 200
-    active connections to myia64f, 10 connections per job for the
-    first 10 minutes:
+    active connections to myia64f, 10 connections per job for the first
+    10 minutes:
 
-        resource =>'select[myia64f<=200] rusage[myia64f=10:duration=10]',
-        sub_args =>'-m bc_hosts'
+      resource =>
+        'select[myia64f<=200] ' .
+        'rusage[myia64f=10:duration=10]',
 
-
+      sub_args =>'-m bc_hosts',
 
 =cut
 
@@ -104,40 +112,50 @@ use vars qw(%Config);
 
 %Config = (
 
-  # Depending on the job-submission-system you're using,
-  # use LSF, you can also use 'Local'.
+  # Depending on the job-submission-system you're using, use LSF, you
+  # can also use 'Local'.
   #
   # For mor info look into:
   # /ensembl-pipeline/modules/Bio/EnsEMBL/Pipeline/BatchSubmission
-  QUEUE_MANAGER => 'LSF', # use "SGE_GridEngine_v6" for running in ensembl cloud evironment
+
+  QUEUE_MANAGER => 'LSF', # use "SGE_GridEngine_v6" for running in
+                          # ensembl cloud evironment
 
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
-  DEFAULT_BATCH_QUEUE => '',    # Put in the queue of your choice, eg. 'normal'
+  DEFAULT_BATCH_QUEUE => '',  # Put in the queue of your choice, e.g. 'normal'
   DEFAULT_RESOURCE    => '',
   DEFAULT_SUB_ARGS    => '',
   DEFAULT_OUTPUT_DIR  => '',
   DEFAULT_CLEANUP     => 'no',
   DEFAULT_VERBOSITY   => 'WARNING',
 
-  # The two variables below are to overcome a bug in LSF. 
-  # We're currently running the pre-exec with a different perl. lsf currently unsets the LD_LIBRARY_PATH 
-  # which we need for certain 64bit libraries in pre-exec commands. (more info see LSF_LD_SECURITY variable ) 
-    
-  DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl', # ONLY use 32bit perl for lsf -pre-exec jobs
-  DEFAULT_LSF_PERL =>'/usr/local/ensembl32/bin/perl', # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
-                                                     # SANGER farm : don't forget to source source /software/intel_cce_80/bin/iccvars.csh for big mem jobs 
-                                                     #
-  # At this number of jobs RuleManager will sleep for a certain period
-  # of time if you effectively want this never to run set the value to
-  # very high ie 100000 for a certain period of time this is important
-  # for queue managers which cannot cope with large numbers of pending
-  # jobs (e.g. early LSF versions and SGE)
-  JOB_LIMIT           => 10000,
+  # The two variables below are to overcome a bug in LSF.  We're
+  # currently running the pre-exec with a different perl.  LSF currently
+  # unsets the LD_LIBRARY_PATH which we need for certain 64bit libraries
+  # in pre-exec commands (more info see LSF_LD_SECURITY variable).
 
-  JOB_STATUSES_TO_COUNT => ['PEND'],    # These are the jobs which will be 
-                                        # counted. valid statuses for
-                                        # this array are RUN, PEND, SSUSP, EXIT, DONE ; use 'qw' for Sun Grid Engine
+  DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl',
+  # ONLY use 32bit perl for lsf -pre-exec jobs
+  DEFAULT_LSF_PERL =>'/usr/local/ensembl32/bin/perl',
+  # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
+
+  # SANGER farm: Don't forget to source source
+  # /software/intel_cce_80/bin/iccvars.csh for big mem jobs.
+
+  # At <this number of jobs> RuleManager will sleep for a certain period
+  # of time.  If you effectively want this never to run set the value
+  # to something very high, e.g. 100000.  This is important for queue
+  # managers which cannot cope with large numbers of pending jobs (e.g.
+  # early LSF versions and SGE).
+  JOB_LIMIT => 10000,
+
+  JOB_STATUSES_TO_COUNT => ['PEND'],    # These are the jobs which will
+                                        # be counted. valid statuses
+                                        # for this array are RUN, PEND,
+                                        # SSUSP, EXIT, DONE ; use 'qw'
+                                        # for Sun Grid Engine
+
   MARK_AWOL_JOBS => 1,
   MAX_JOB_SLEEP  => 3600,   # The maximun time to sleep for when job limit
                             # reached
@@ -181,38 +199,38 @@ use vars qw(%Config);
       retry_sub_args => '',
     },
     {
-        logic_name     => 'firstef',
-        batch_size     => 10,
-        resource       => '',
-        retries        => 3,
-        sub_args       => '',
-        runner         => '',
-        retry_queue    => '',
-        retry_resource => '',
-        retry_sub_args => '',
+      logic_name     => 'firstef',
+      batch_size     => 10,
+      resource       => '',
+      retries        => 3,
+      sub_args       => '',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
     },
     {
-        logic_name     => 'cpg',
-        batch_size     => 10,
-        resource       => '',
-        retries        => 3,
-        sub_args       => '',
-        runner         => '',
-        retry_queue    => '',
-        retry_resource => '',
-        retry_sub_args => '',
+      logic_name     => 'cpg',
+      batch_size     => 10,
+      resource       => '',
+      retries        => 3,
+      sub_args       => '',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
     },
     {
-        logic_name     => 'job_using_more_than_4_gig_of_memory',
-        batch_size     => 10,
-        resource       => '',
-        retries        => 3,
-        sub_args       => '',
-        runner         => '',
-        retry_queue    => '',
-        retry_resource => '',
-        retry_sub_args => '',
-        lsf_perl        => '/usr/local/ensembl64/bin/perl',
+      logic_name     => 'job_using_more_than_4_gig_of_memory',
+      batch_size     => 10,
+      resource       => '',
+      retries        => 3,
+      sub_args       => '',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
+      lsf_perl        => '/usr/local/ensembl64/bin/perl',
     },
     {
       logic_name => 'eponine',
@@ -290,22 +308,23 @@ sub import {
 
   # Get list of variables supplied, or else all
   my @vars = @_ ? @_ : keys(%Config);
-  return unless @vars;
+  if ( !@vars ) { return }
 
   # Predeclare global variables in calling package
-  eval "package $callpack; use vars qw("
-    . join( ' ', map { '$' . $_ } @vars ) . ")";
-  die $@ if $@;
+  eval "package $callpack; use vars qw(" .
+    join( ' ', map { '$' . $_ } @vars ) . ")";
+  if ($@) { die $@ }
 
   foreach (@vars) {
-    if ( defined $Config{$_} ) {
+    if ( defined( $Config{$_} ) ) {
       no strict 'refs';
       # Exporter does a similar job to the following
       # statement, but for function names, not
       # scalar variables:
       *{"${callpack}::$_"} = \$Config{$_};
-    } else {
-      die "Error: Config: $_ not known\n";
+    }
+    else {
+      die("Error: Config: $_ not known\n");
     }
   }
 } ## end sub import
