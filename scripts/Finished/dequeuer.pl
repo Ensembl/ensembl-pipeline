@@ -228,7 +228,8 @@ while ($loop) {
 print "Exit DQdequeuer ....\n" if $verbose;
 exit 0;
 
-## methods
+
+## signal handlers
 
 sub termhandler {
     my ($sig) = @_;
@@ -236,6 +237,9 @@ sub termhandler {
     warn "Caught SIG$sig - another to abend\n";
     $loop = 0;
 }
+
+
+## methods
 
 # flush the batch jobs
 sub flush_batch {
@@ -404,6 +408,17 @@ sub get_db_adaptor {
 	  );
 
 	$db_adaptors->{$dbhost}->{$dbname} = $db;
+
+        $db->dbc->reconnect_when_lost(1);
+
+        # Yet more "are we still connected?"
+# hopefully don't need this
+#        unless ($db->dbc->db_handle->ping) {
+#            my ($cls, $dbname) = (ref($db), $db->dbc->dbname);
+#            warn "$cls($dbname) doesn't ping\n";
+#            $db->dbc->reconnect;
+#            die "Still not connected" unless $db->dbc->db_handle->ping;
+#        }
 
 	return $db;
 }
