@@ -137,6 +137,7 @@ sub new{
 print "file: ",$file,"\n";
 print "translation_id: ",$translation_id,"\n";
 print "single: ",$single,"\n";
+print "include_non_reference: ",$include_non_reference,"\n";
 print "hap_pair: ",$hap_pair,"\n";
   print "SUM: ",$slice+$file+$translation_id+$single+$hap_pair,"\n";
 
