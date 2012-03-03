@@ -202,7 +202,7 @@ use vars qw(%Config);
     {
       logic_name     => 'genscan',
       batch_size     => 10,
-      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
       retries        => 3,
       sub_args       => '',
       runner         => '',
@@ -214,7 +214,7 @@ use vars qw(%Config);
       logic_name     => 'firstef',
       batch_size     => 10,
       retries        => 3,
-      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
       sub_args       => '',
       runner         => '',
       retry_queue    => '',
@@ -308,7 +308,7 @@ use vars qw(%Config);
       logic_name => 'vertrna',
       batch_size => 600,
       retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
       sub_args       => '-M500000 -sp 95', #want all vertrnas to run together
       runner         => '',
       retry_queue    => '',
@@ -319,7 +319,7 @@ use vars qw(%Config);
       logic_name => 'unigene',
       batch_size => 600,
       retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
       sub_args       => '-M500000 -sp 90', #only want unigenes to run after vertrna
       runner         => '',
       retry_queue    => '',
@@ -330,7 +330,7 @@ use vars qw(%Config);
       logic_name => 'uniprot',
       batch_size => 500,
       retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
       sub_args       => '-M500000 -sp 100', # want all uniprots to run first
       runner         => '',
       retry_queue    => '',
