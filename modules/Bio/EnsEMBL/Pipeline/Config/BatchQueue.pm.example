@@ -60,7 +60,7 @@
         sub_args => '-m bc1_1',     # only use hosts of host-group 'bc1_1'
 
         resource => 'select[type==X86_64]',     # use Linux 64 bit machines only
-        resource => 'select[model==IBMBC2800]', # only run on IBMBC2800 hosts
+        resource => 'select[model==X86_64]', # only run on X86_64 hosts
 
         resource => 'alpha',    # only run on DEC alpha
         resource => 'linux',    # run on any # machine capable of running
@@ -68,37 +68,41 @@
 
 =head2 Database throttling
 
-    This runs a job on a linux host, throttles ecs4:3350 to not have
-    more than 300 active connections, 10 connections per job in the
-    duration of the first 10 minutes when the job is running (means 30
-    hosts * 10 connections = 300 connections):
+    Do to find tokens for your MySQL servers 
+    bhosts -s | grep tok
+
+    This runs a job on a linux host, throttles genebuild2:3306 to not have
+    more than 2000 active connections, 10 connections per job in the
+    duration of the first 10 minutes when the job is running (means 200
+    hosts * 10 connections = 2000 connections):
 
       resource =>
-        'select[linux && ecs4my3350<=300] rusage[ecs4my3350=10:duration=10]',
+        'select[linux && myens_build2tok>2000] rusage[myens_build2tok=10:duration=10]',
+     
 
-    Running on 'linux' hosts with not more than 200 active connections
-    for myia64f and myia64g, 10 connections per job to each db-instance
+    Running on 'linux' hosts with not more than 2000 active connections
+    for genebuild3 and genebuild7, 10 connections per job to each db-instance
     for the first 10 minutes:
 
       resource =>
-        'select[linux && myia64f<=200 && myia64g<=200] ' .
-        'rusage[myia64f=10:myia64g=10:duration=10]',
+        'select[linux && myens_build3tok>200 && myens_build7tok>2000] ' .
+        'rusage[myens_build3tok=10:myens_build7tok=10:duration=10]',
 
-    Running on hosts of model 'IBMBC2800' hosts with not more than 200
-    active connections to myia64f, 10 connections per job for the first
+    Running on hosts of model 'X86_64' hosts with not more than 200
+    active connections to genebuild3, 10 connections per job for the first
     10 minutes:
 
       resource =>
-        'select[model==IBMBC2800 && myia64f<=200] ' .
-        'rusage[myia64f=10:duration=10]',
+        'select[model==X86_64 && myens_build3tok>200] ' .
+        'rusage[myens_build3tok=10:duration=10]',
 
     Running on hosts of host_group bc_hosts with not more than 200
-    active connections to myia64f, 10 connections per job for the first
+    active connections to genebuild3, 10 connections per job for the first
     10 minutes:
 
       resource =>
-        'select[myia64f<=200] ' .
-        'rusage[myia64f=10:duration=10]',
+        'select[myens_build3tok>200] ' .
+        'rusage[myens_build3tok=10:duration=10]',
 
       sub_args =>'-m bc_hosts',
 
@@ -198,7 +202,7 @@ use vars qw(%Config);
     {
       logic_name     => 'genscan',
       batch_size     => 10,
-      resource       => '',
+      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
       retries        => 3,
       sub_args       => '',
       runner         => '',
@@ -209,8 +213,8 @@ use vars qw(%Config);
     {
       logic_name     => 'firstef',
       batch_size     => 10,
-      resource       => '',
       retries        => 3,
+      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
       sub_args       => '',
       runner         => '',
       retry_queue    => '',
@@ -303,9 +307,9 @@ use vars qw(%Config);
     {
       logic_name => 'vertrna',
       batch_size => 600,
-      resource       => '',
       retries        => 3,
-      sub_args       => '-sp 100', #want all vertrnas to run together
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      sub_args       => '-M500000 -sp 95', #want all vertrnas to run together
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -314,9 +318,9 @@ use vars qw(%Config);
     {
       logic_name => 'unigene',
       batch_size => 600,
-      resource       => '',
       retries        => 3,
-      sub_args       => '-sp 95', #only want unigenes to run after vertrna
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      sub_args       => '-M500000 -sp 90', #only want unigenes to run after vertrna
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -325,9 +329,9 @@ use vars qw(%Config);
     {
       logic_name => 'uniprot',
       batch_size => 500,
-      resource       => '',
       retries        => 3,
-      sub_args       => '-sp 90',
+      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:[myens_build2tok=10]',
+      sub_args       => '-M500000 -sp 100', # want all uniprots to run first
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
