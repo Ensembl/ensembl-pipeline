@@ -60,11 +60,13 @@
         sub_args => '-m bc1_1',     # only use hosts of host-group 'bc1_1'
 
         resource => 'select[type==X86_64]',     # use Linux 64 bit machines only
-        resource => 'select[model==X86_64]', # only run on X86_64 hosts
+        resource => 'select[model==X86_64]',    # only run on X86_64 hosts
 
         resource => 'alpha',    # only run on DEC alpha
-        resource => 'linux',    # run on any # machine capable of running
+        resource => 'linux',    # run on any machine capable of running
                                 # 32-bit X86 Linux apps
+
+        # Note: On the Sanger farm, all machines are X86_64 Linux hosts.
 
 =head2 Database throttling
 
@@ -77,7 +79,8 @@
     hosts * 10 connections = 2000 connections):
 
       resource =>
-        'select[linux && myens_build2tok>2000] rusage[myens_build2tok=10:duration=10]',
+        'select[linux && myens_build2tok>2000] ' .
+        'rusage[myens_build2tok=10:duration=10]',
      
 
     Running on 'linux' hosts with not more than 2000 active connections
@@ -175,169 +178,170 @@ use vars qw(%Config);
   DEFAULT_RETRY_RESOURCE => '',
 
   QUEUE_CONFIG => [
-    { logic_name => 'repeatmask',
-      batch_size => 10,
-
-      # Most RepeatMasker jobs need not more than 500MB.
-      resource => "-R 'select[mem>500] rusage[mem=500]' -M 500000",
-
+    { logic_name      => 'repeatmask',
+      batch_size      => 10,
       retries         => 3,
-      sub_args        => '',
       runner          => '',
       queue           => 'normal',
       output_dir      => '/some_dir/',
       verbosity       => 'INFO',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-      retry_queue     => '',
+      lsf_perl        => '/usr/local/ensembl32/bin/perl',
+
+      # Most RepeatMasker jobs need not more than 500MB.
+      resource => 'select[mem>500] rusage[mem=500]',
+      sub_args => '-M 500000',
 
       # Some jobs might fail (unlikely with 1M slices), but they will
       # defintely pass with 2GB.
-      retry_resource =>
-        "-R 'select[mem>2000] rusage[mem=2000]' -M 2000000",
+      retry_resource => 'select[mem>2000] rusage[mem=2000]',
+      retry_sub_args => '-M 2000000',
 
+      retry_queue      => '',
       retry_batch_size => 5,
-      retry_sub_args   => '',
-      lsf_perl         => '/usr/local/ensembl32/bin/perl',
     },
-    {
-      logic_name     => 'genscan',
-      batch_size     => 10,
-      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
+    { logic_name => 'genscan',
+      batch_size => 10,
+      retries    => 3,
+      runner     => '',
+
+      resource =>
+        'select[myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      sub_args => '',
+
       retry_resource => '',
       retry_sub_args => '',
-    },
-    {
-      logic_name     => 'firstef',
-      batch_size     => 10,
-      retries        => 3,
-      resource       => 'select[linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
-      sub_args       => '',
-      runner         => '',
       retry_queue    => '',
+    },
+    { logic_name => 'firstef',
+      batch_size => 10,
+      retries    => 3,
+      runner     => '',
+
+      resource => 'select[myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      sub_args => '',
+
       retry_resource => '',
       retry_sub_args => '',
+      retry_queue    => '',
     },
     { logic_name => 'cpg',
       batch_size => 10,
+      retries    => 3,
+      runner     => '',
 
       # cpg generally uses little memory
       resource => '',
-
-      retries     => 3,
-      sub_args    => '',
-      runner      => '',
-      retry_queue => '',
+      sub_args => '',
 
       # This is unlikely to be used as most cpg jobs uses less than
       # 100MB (default memory limit on Sanger LSF).
-      retry_resource =>
-        "-R 'select[mem>200] rusage[mem=200]' -M 200000",
+      retry_resource => 'select[mem>200] rusage[mem=200]',
+      retry_sub_args => '-M 200000',
 
-      retry_sub_args => '',
+      retry_queue => '',
     },
-    {
-      logic_name     => 'job_using_more_than_4_gig_of_memory',
-      batch_size     => 10,
-      resource       => '',
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
+    { logic_name => 'job_using_more_than_4_gig_of_memory',
+      batch_size => 10,
+      retries    => 3,
+      runner     => '',
+      lsf_perl   => '/usr/local/ensembl64/bin/perl',
+
+      resource => '',
+      sub_args => '',
+
       retry_resource => '',
       retry_sub_args => '',
-      lsf_perl       => '/usr/local/ensembl64/bin/perl',
+      retry_queue    => '',
     },
     { logic_name => 'eponine',
       batch_size => 2000,
+      retries    => 3,
+      runner     => '',
 
       # eponine will probably need about 1GB of memory, it seems to use
       # anywhere between 500MB and 700MB.
-      resource => "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
-
-      retries        => 3,
-      sub_args       => '',
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
+      resource => 'select[mem>1000] rusage[mem=1000]',
+      sub_args => '-M 1000000',
 
       # Give it 2GB if 1GB wasn't enough (unlikely)
-      retry_resource =>
-        "-R 'select[mem>2000] rusage[mem=2000]' -M 2000000",
+      retry_resource => 'select[mem>2000] rusage[mem=2000]',
+      retry_sub_args => '-M 2000000',
 
-      retry_sub_args => '',
+      retry_queue => '',
     },
-    { logic_name => 'trf',
-      batch_size => 2000,
+    { logic_name  => 'trf',
+      batch_size  => 2000,
+      retries     => 3,
+      runner      => '',
+      retry_queue => '',
 
       # trf is a borderline case for the 100MB limit, give it 200MB.
-      resource => "-R 'select[mem>200] rusage[mem=200]' -M 200000",
-
-      retries     => 3,
-      sub_args    => '',
-      runner      => '',
-      retry_queue => '',
+      resource => 'select[mem>200] rusage[mem=200]',
+      sub_args => '-M 200000',
 
       # For really big things, it might need more, give it 1GB
-      retry_resource =>
-        "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
-
-      retry_sub_args => '',
+      retry_resource => 'select[mem>1000] rusage[mem=1000]',
+      retry_sub_args => '-M 1000000',
     },
-    { logic_name => 'trnascan',
-      batch_size => 2000,
-
-      # trnascan has a similar memory footprint to trf
-      resource => "-R 'select[mem>200] rusage[mem=200]' -M 200000",
-
+    { logic_name  => 'trnascan',
+      batch_size  => 2000,
       retries     => 3,
-      sub_args    => '',
       runner      => '',
       retry_queue => '',
 
+      # trnascan has a similar memory footprint to trf
+      resource => 'select[mem>200] rusage[mem=200]',
+      sub_args => '-M 200000',
+
       # As for trf
-      retry_resource =>
-        "-R 'select[mem>1000] rusage[mem=1000]' -M 1000000",
-
-      retry_sub_args => '',
+      retry_resource => 'select[mem>1000] rusage[mem=1000]',
+      retry_sub_args => '-M 1000000',
     },
-    {
-      logic_name => 'vertrna',
-      batch_size => 600,
-      retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
-      sub_args       => '-M500000 -sp 95', #want all vertrnas to run together
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
-      retry_sub_args => '',
-    },
-    {
-      logic_name => 'unigene',
-      batch_size => 600,
-      retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
-      sub_args       => '-M500000 -sp 90', #only want unigenes to run after vertrna
-      runner         => '',
-      retry_queue    => '',
-      retry_resource => '',
-      retry_sub_args => '',
-    },
-    {
-      logic_name => 'uniprot',
+    { logic_name => 'uniprot',
       batch_size => 500,
-      retries        => 3,
-      resource       => 'select[mem>500 && linux  && myens_build2tok>2000]  rusage[mem=500:myens_build2tok=10]',
-      sub_args       => '-M500000 -sp 100', # want all uniprots to run first
-      runner         => '',
-      retry_queue    => '',
+      retries    => 3,
+      runner     => '',
+
+      resource =>
+        'select[mem>500 && myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      sub_args => '-M 500000 -sp 100',  # Run before vertrna and unigene
+
       retry_resource => '',
       retry_sub_args => '',
+      retry_queue    => '',
     },
+    { logic_name => 'vertrna',
+      batch_size => 600,
+      retries    => 3,
+      runner     => '',
 
+      resource =>
+        'select[mem>500 && myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      sub_args => '-M 500000 -sp 95',    # Run after uniprot
+
+      retry_resource => '',
+      retry_sub_args => '',
+      retry_queue    => '',
+    },
+    { logic_name => 'unigene',
+      batch_size => 600,
+      retries    => 3,
+      runner     => '',
+
+      resource =>
+        'select[mem>500 && myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      sub_args => '-M 500000 -sp 90',    # Run after vertrna
+
+      retry_resource => '',
+      retry_sub_args => '',
+      retry_queue    => '',
+    },
   ]
 );
 
@@ -359,7 +363,7 @@ sub import {
       no strict 'refs';
       # Exporter does a similar job to the following
       # statement, but for function names, not
-      # scalar variables:
+      # scalar variables
       *{"${callpack}::$_"} = \$Config{$_};
     }
     else {
