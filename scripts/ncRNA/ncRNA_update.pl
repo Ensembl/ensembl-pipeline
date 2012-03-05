@@ -247,7 +247,8 @@ sub config_setup{
     $filecount++;
   }
   close(RP);
-  print "new config files written.\n";
+  print "New config files written.\n";
+  print "You might want to edit $DATADIR/$species/$path/BatchQueue.pm\n\n";
 }
 
 
