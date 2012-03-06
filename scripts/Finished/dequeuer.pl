@@ -105,6 +105,9 @@ my $usage = sub { exec( 'perldoc', $0 ); };
 
 $SIG{TERM} = \&termhandler;
 $SIG{INT}  = \&termhandler;
+$SIG{USR1} = \&wakehandler;
+set_joblim_handler(USR2 => 0);
+
 
 GetOptions(
 	'verbose!'        => \$verbose,
@@ -236,6 +239,21 @@ sub termhandler {
     undef $SIG{$sig};
     warn "Caught SIG$sig - another to abend\n";
     $loop = 0;
+}
+sub wakehandler {
+    my ($sig) = @_;
+    $SIG{$sig} = \&wakehandler;
+    warn "Caught SIG$sig - waking up\n";
+}
+sub set_joblim_handler {
+    my ($sig, $next_joblim) = @_;
+    $SIG{$sig} = sub {
+        my ($sig) = @_;
+        set_joblim_handler($sig, $job_limit);
+        $next_joblim = 1 if $job_limit <= 0 && $next_joblim <= 0;
+        warn "Caught SIG$sig - set job_limit=$next_joblim; again to restore $job_limit\n";
+        $job_limit = $next_joblim;
+    };
 }
 
 
