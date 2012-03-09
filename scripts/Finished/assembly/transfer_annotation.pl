@@ -87,13 +87,18 @@ my $support = AssemblyMapper::Support->new(
     ],
     );
 
-# Play safe
-$support->param('dry_run', 1);
-
 unless ($support->parse_arguments(@_)) {
     warn $support->error if $support->error;
     pod2usage(1);
 }
+
+# Play safe
+{
+    my $dry = $support->param('dry_run');
+    die "Dry-run option is not explicitly set to 0 or 1"
+      unless defined $dry && $dry =~ /^[01]$/;
+}
+
 
 $support->connect_dbs( rebless_dba => "Bio::Vega::DBSQL::DBAdaptor" );
 
