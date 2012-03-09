@@ -287,7 +287,12 @@ sub do_align {
     my $R_slice = $asp->ref_slice;
     my $A_slice = $asp->alt_slice;
 
-    my $alt_seq_region_id_in_ref_db = $asp->ref_sa->get_seq_region_id($A_slice);
+    # we need to fetch the alternative slice from the reference db explicitely by
+    # coord_system, since toplevel attribute is not set there
+    my $cs_name = $A_slice->coord_system_name;
+    my $A_slice_ref = $R_slice->adaptor->fetch_by_region($cs_name, $A_chr, undef, undef, undef, $support->param('altassembly'));
+
+    my $alt_seq_region_id_in_ref_db = $A_slice_ref->get_seq_region_id();
 
     my $R_length = $R_slice->length;
     my $A_length = $A_slice->length;
