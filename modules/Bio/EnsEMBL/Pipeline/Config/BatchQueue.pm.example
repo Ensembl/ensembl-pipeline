@@ -81,7 +81,6 @@
       resource =>
         'select[linux && myens_build2tok>2000] ' .
         'rusage[myens_build2tok=10:duration=10]',
-     
 
     Running on 'linux' hosts with not more than 2000 active connections
     for genebuild3 and genebuild7, 10 connections per job to each db-instance
@@ -201,30 +200,37 @@ use vars qw(%Config);
       retry_batch_size => 5,
     },
     { logic_name => 'genscan',
-      batch_size => 10,
+      batch_size => 120,
       retries    => 3,
       runner     => '',
 
       resource =>
-        'select[myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
-      sub_args => '',
+        'select[mem>400 && myens_build2tok>2000] ' .
+        'rusage[mem=400:myens_build2tok=10]',
+      sub_args => '-M 400000',
 
-      retry_resource => '',
-      retry_sub_args => '',
+      retry_resource =>
+        'select[mem>700 && myens_build2tok>2000] ' .
+        'rusage[mem=700:myens_build2tok=10]',
+      retry_sub_args => '-M 700000',
+
       retry_queue    => '',
     },
     { logic_name => 'firstef',
-      batch_size => 10,
+      batch_size => 2000,
       retries    => 3,
       runner     => '',
 
-      resource => 'select[myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
-      sub_args => '',
+      resource =>
+        'select[mem>300 && myens_build2tok>2000] ' .
+        'rusage[mem=300:myens_build2tok=10]',
+      sub_args => '-M 300000',
 
-      retry_resource => '',
-      retry_sub_args => '',
+      retry_resource =>
+        'select[mem>500 && myens_build2tok>2000] ' .
+        'rusage[mem=500:myens_build2tok=10]',
+      retry_sub_args => '-M 500000',
+
       retry_queue    => '',
     },
     { logic_name => 'cpg',
@@ -306,12 +312,15 @@ use vars qw(%Config);
       runner     => '',
 
       resource =>
+        'select[mem>300 && myens_build2tok>2000] ' .
+        'rusage[mem=300:myens_build2tok=10]',
+      sub_args => '-M 300000 -sp 100',  # Run before vertrna and unigene
+
+      retry_resource =>
         'select[mem>500 && myens_build2tok>2000] ' .
         'rusage[mem=500:myens_build2tok=10]',
-      sub_args => '-M 500000 -sp 100',  # Run before vertrna and unigene
+      retry_sub_args => '-M 500000 -sp 100',  # Run before vertrna and unigene
 
-      retry_resource => '',
-      retry_sub_args => '',
       retry_queue    => '',
     },
     { logic_name => 'vertrna',
