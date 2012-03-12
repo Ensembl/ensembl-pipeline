@@ -3,17 +3,29 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use CGI 'escapeHTML';
 
 # This is an expansion of a one-liner, which may be useful on
 # subsequent runs of transfer_annotation.pl
+#
+# It has ballooned into a mess with complex internal state; but it
+# would be better to rewrite the generation of its input
+# (transfer_annotation.pl) than fix this script.
+
+our $ICONS = 'http://deskpro17119.internal.sanger.ac.uk:8080/icons/';
+# this URL is very temporary, the machine disappears soon
+
 
 sub main {
-    my %opt = (verbose => 0, quiet => 0);
+    my %opt = (verbose => 0, quiet => 0, html => 0, debug => 0);
     die "Syntax: $0 [--quiet] [--verbose] [ <logfile>... or STDIN]\n" unless
-      GetOptions(\%opt, 'verbose|v!', 'quiet|q!');
+      GetOptions(\%opt, 'verbose|v!', 'quiet|q!', 'html|H!', 'debug!');
 
     my $date_re = qr{[-0-9]{10} [:0-9]{8}};
     my $biotype_re = qr{(?:[35]')?\w+};
+
+    my $gene_div_re = qr{^========================================$}; # --verbose=1
+    my $chr_div_re = qr{^ {4}Chromosome (\S+)/(\S+) \.{3} \[$date_re, mem \d+\]$};
 
     my @skip =
       (qr{^\*Changes observed$},
@@ -52,8 +64,7 @@ sub main {
 #       qr{^(INFO|WARNING):},
 #       qr{ complex transfer of non-coding$},
 #       qr{ cannot be transferr?ed on },
-       qr{^CHANGED OTT...G\d+\.\d+$},
-       qr{^-{43}$},
+       qr{^CHANGED OTT...G\d+\.\d+$}, qr{^-{43}$}, # from Bio::Vega::DBSQL::GeneAdaptor
       ) if $opt{'quiet'};
 
     # More from "--verbose 1"
@@ -61,23 +72,140 @@ sub main {
       (qr{^Transferring gene OTT\w+ \w+ \d+ \d+$},
        qr{^\tOTT\w+ $biotype_re \d+ \d+ transferred successfully:$},
        qr{^\t{2}transfer to identical DNA$},
-       qr{^\t{2}transfer to \d+ cDNA diffs and \d+ protein diffs$},
+       qr{^\t{2}transfer to 0 cDNA diffs and 0 protein diffs$},
+       qr{^\t{2}transfer to 0 cDNA diffs$},
        qr{^\tSummary for OTT\w+ : \d+ out of \d+ transcripts? transferred$},
        qr{^GENE OTT\w+ \w+ successfully TRANSFERED \(chr[^: ]+:\d+-\d+ => chr[^: ]+:\d+-\d+\)$},
-       qr{^========================================$},
       );
 
-    my $skip = join '|', @skip;
-    $skip = qr{$skip}o;
+    my $skip_re = join '|', @skip;
+    $skip_re = qr{$skip_re}o;
+
+    my ($skipped_last, @skipped_text, $showed_any);
+    html_for_chr('header') if $opt{'html'};
+
+    my $flush_skipped = sub {
+        if ($showed_any) {
+            print html_skipped(@skipped_text);
+            @skipped_text = ();
+        }
+    };
 
     while (<>) {
-        if ($_ =~ $skip) {
-            print "  |$_" if $opt{'verbose'};
-        } else {
-# s/\t/\\t/g; s/( +)$/length($1)." spaces"/e;
-            print;
+        my @div      =         $_ =~ $gene_div_re;
+        my @skipping = @div || $_ =~ $skip_re;
+        my @chr      =         $_ =~ $chr_div_re;
+
+        if ($opt{'debug'}) {
+            s/\t/\\t/g;
+            s/( +)$/"{".length($1)." spaces}"/e;
         }
+
+        if ($opt{'html'}) {
+            if (@chr) {
+                my ($old, $new) = @chr;
+                $flush_skipped->();
+                html_for_chr($new); # switch output file
+            }
+            if (@skipping) {
+                # (no verbose yet, probably too huge to display)
+                push @skipped_text, $_;
+            }
+            $flush_skipped->() if @div;
+            print next_item() if @div && $showed_any;
+            if (!@skipping) {
+                $showed_any = 1;
+                $flush_skipped->();
+                print escapeHTML($_);
+            }
+
+        } else {
+            # plaintext
+            if (@skipping) {
+                print "  |$_" if $opt{'verbose'};
+            } else {
+                $showed_any = 1;
+                print;
+            }
+        }
+
+        $flush_skipped->() if eof; # not eof()
+
+        # updating state
+        if (@div) {
+            @skipped_text = ();
+            $showed_any = 0;
+        }
+        $skipped_last = scalar @skipping; # bool
     }
 }
+
+
+sub html_head {
+    my ($title) = @_;
+    my $htitle = escapeHTML($title || 'Extract of transfer log');
+    return qq{<html><head>
+ <title> $htitle </title>
+ <style type="text/css">
+  ol.log li { font-family: monospace; white-space: pre-wrap; border-bottom: 1px black dotted }
+  .skip     { color: #8a8 }
+  li:target { outline: 2px red solid }
+  .nav { position: fixed; left: 0; top: 3em; border 1px blue dotted; }
+ </style>
+ <script type="text/javascript">
+  function at_n() {
+    var n = parseInt( location.href.split('#').pop() );
+    return (n > 0 ? n : 1);
+  }
+  function go_n(n) {
+    location.replace( location.href.split('#').shift() + '#' + n );
+  }
+ </script>
+</head><body>
+<div class="nav">
+ <a href="javascript:go_n( at_n() - 1 )"> <img src="$ICONS/up.png"  alt="Previous" /> </a> <br />
+ <a href="javascript:go_n( at_n() + 1 )"> <img src="$ICONS/down.png" alt="Next" />     </a>
+</div>
+<h1> $htitle </h1>
+};
+}
+sub html_foot {
+    return qq{</li></ol></body></html>\n};
+}
+
+{
+    my $item_N = 0;
+    sub next_item {
+        my @out;
+        push @out, $item_N ? '</li>' : '<ol class="log">';
+        $item_N ++;
+        push @out, qq{<li id="$item_N">};
+        return @out;
+    }
+
+    my $prev_fh;
+    sub html_for_chr {
+        my ($chr) = @_;
+        print html_foot() if $prev_fh;
+        my $fn = "html/xfer_filtered.$chr.html";
+        open my $fh, '>', $fn or die "Create $fn: $!";
+        warn "Created $fn\n";
+        select $fh;
+        $prev_fh = $fh;
+        $item_N = 0;
+        print html_head($chr), next_item();
+    }
+    END {
+        print html_foot() if $prev_fh;
+    }
+}
+
+sub html_skipped {
+    my @txt = @_;
+    return (q{<span class="skip">},
+            (map { escapeHTML($_) } @txt),
+            q{</span>});
+}
+
 
 main();
