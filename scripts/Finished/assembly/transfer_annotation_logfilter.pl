@@ -12,8 +12,7 @@ use CGI 'escapeHTML';
 # would be better to rewrite the generation of its input
 # (transfer_annotation.pl) than fix this script.
 
-our $ICONS = 'http://deskpro17119.internal.sanger.ac.uk:8080/icons/';
-# this URL is very temporary, the machine disappears soon
+our $ICONS = '/icons/';
 
 
 sub main {
@@ -116,7 +115,7 @@ sub main {
             if (!@skipping) {
                 $showed_any = 1;
                 $flush_skipped->();
-                print escapeHTML($_);
+                print html_link_quote($_);
             }
 
         } else {
@@ -151,6 +150,9 @@ sub html_head {
   .skip     { color: #8a8 }
   li:target { outline: 2px red solid }
   .nav { position: fixed; left: 0; top: 3em; border 1px blue dotted; }
+  a.gene { font-weight: bold }
+  a.again { text-decoration: line-through }
+  .key { float: right; border: 3px solid pink }
  </style>
  <script type="text/javascript">
   function at_n() {
@@ -165,6 +167,18 @@ sub html_head {
 <div class="nav">
  <a href="javascript:go_n( at_n() - 1 )"> <img src="$ICONS/up.png"  alt="Previous" /> </a> <br />
  <a href="javascript:go_n( at_n() + 1 )"> <img src="$ICONS/down.png" alt="Next" />     </a>
+</div>
+<div class="key">
+ <h2> Style Key </h2>
+ <ol class="log">
+  <li>numbered section per gene,
+or for other parts of the log </li>
+  <li>navigation arrows (left) jump between these
+<span class="skip">this text is "not a problem",
+it is left in for context</span>
+with <a class="gene" href="">link to gene</a> and
+the <a class="gene again" href="">same gene again</a></li>
+ </ol>
 </div>
 <h1> $htitle </h1>
 };
@@ -203,8 +217,30 @@ sub html_foot {
 sub html_skipped {
     my @txt = @_;
     return (q{<span class="skip">},
-            (map { escapeHTML($_) } @txt),
+            (map { html_link_quote($_) } @txt),
             q{</span>});
+}
+
+sub html_link_quote {
+    my ($txt) = @_;
+
+    my $html = escapeHTML($txt);
+    $html =~ s{\b(OTT([A-Z]{3})?G\d+)\b}{annotrack_link($1, $2)}eg;
+
+    return $html;
+}
+
+my %species = (qw( MUS mouse ));
+my %seen_gene; # key = OTTfooGnum
+sub annotrack_link {
+    my ($ottg, $species_tla) = @_;
+
+    my $species = $species{$species_tla}
+      || die "Unknown species TLA '$species_tla' in $ottg";
+
+    my $cls = $seen_gene{$ottg}++ ? "again" : "";
+
+    return qq{<a class="gene $cls" href="http://annotrack.sanger.ac.uk/$species/projects/show/$ottg">$ottg</a>};
 }
 
 
