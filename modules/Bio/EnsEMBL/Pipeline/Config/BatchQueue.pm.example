@@ -351,6 +351,52 @@ use vars qw(%Config);
       retry_sub_args => '',
       retry_queue    => '',
     },
+    {
+      logic_name => 'sim_consensus',
+      batch_size => 200,
+      resource       => 'select[mem>2000] rusage[mem=2000]',
+      retries        => 3,
+      sub_args       => '-M 2000000',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
+    },
+    {
+      logic_name => 'utr_addition',
+      batch_size => 100,
+      resource       => 'select[mem>1500] rusage[mem=1500]',
+      retries        => 3,
+      sub_args       => '-M 1500',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
+    },
+    {
+      logic_name => 'LayerAnnotation',
+      batch_size => 100,
+      resource       => 'select[mem>1500] rusage[mem=1500]',
+      retries        => 3,
+      sub_args       => '-M 1500000',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
+    },
+    {
+      logic_name => 'ensembl',
+      batch_size => 100,
+      resource       => 'select[mem>1000] rusage[mem=1000]',
+      retries        => 3,
+      sub_args       => '-M 1000000',
+      runner         => '',
+      retry_queue    => '',
+      retry_resource => '',
+      retry_sub_args => '',
+    },
+
+
   ]
 );
 
