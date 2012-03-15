@@ -277,8 +277,7 @@ sub iterate_chromosomes {
       $support->log_stamped( "Chromosome $ref_chr/$alt_chr ...\n", 1 );
 
       # fetch chromosome slices
-      my $ref_slice =
-          $self->ref_sa->fetch_by_region(
+      my @ref_args = (
               'chromosome',
               $ref_chr,
               $self->ref_start,
@@ -286,10 +285,8 @@ sub iterate_chromosomes {
               undef,
               $self->ref_asm,
           );
-      my $ref_seq_region_id = $self->ref_sa->get_seq_region_id($ref_slice);
 
-      my $alt_slice =
-          $self->alt_sa->fetch_by_region(
+      my @alt_args = (
               'chromosome',
               $alt_chr,
               $self->alt_start,
@@ -297,6 +294,13 @@ sub iterate_chromosomes {
               undef,
               $self->alt_asm,
           );
+
+      my $ref_slice = $self->ref_sa->fetch_by_region(@ref_args)
+        or throw sprintf("ref slice fetch_by_region%s failed", __show_args(@ref_args));
+      my $alt_slice = $self->alt_sa->fetch_by_region(@alt_args)
+        or throw sprintf("alt slice fetch_by_region%s failed", __show_args(@alt_args));
+
+      my $ref_seq_region_id = $self->ref_sa->get_seq_region_id($ref_slice);
       my $alt_seq_region_id = $self->alt_sa->get_seq_region_id($alt_slice);
 
       $support->log("Ref: ".$ref_slice->seq_region_name.", seq_region: ".$ref_seq_region_id."\n", 2);
@@ -327,6 +331,13 @@ sub iterate_chromosomes {
   } # CHR
 
     return $ok;
+}
+
+sub __show_args {
+    require Data::Dumper;
+    my $D = Data::Dumper->new([ \@_ ], [ 'args' ]);
+    $D->Purity(1)->Terse(1);
+    return $D->Dump;
 }
 
 sub session_setup {
