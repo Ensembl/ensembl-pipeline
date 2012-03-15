@@ -64,16 +64,20 @@ my $ok = $support->iterate_chromosomes(
     prev_stage =>     '10-align_identical',
     this_stage =>     '20-check_repeat_masked',
     worker =>         \&do_check_repeat_masked,
+    do_all => 1, # find out about all input_ids at once
     );
 
 $support->log_warning("\n*** Detected missing repeat masking ***\n") if not $ok;
 if ($support->has_output_info) {
+    my $oi = $support->output_info;
     # This is a nudge in the right direction for when we're mauling it
     # by hand.  WIBNI more integrated.
-    my $ana_id = $support->output_info->{submitcontig};
+    $oi->{input_id_file} = join '',
+      map {qq{$_\tCONTIG\n}} @{$oi->{input_id} };
+    my $ana_id = $oi->{submitcontig};
     my @vals = map {qq{('$_', 'CONTIG', $ana_id, now(), '')}}
-      @{ $support->output_info->{input_id} };
-    $support->output_info->{insert} = q{/* Use this to insert SubmitContig jobs */
+      @{ $oi->{input_id} };
+    $oi->{insert} = q{/* Use this to insert SubmitContig jobs */
 INSERT INTO input_id_analysis (input_id, input_id_type, analysis_id, created, runhost)  values
 }.(join ",\n", @vals).";\n/* and tell the rulemanager */";
     $support->log_warning( $support->output_info_as_yaml );

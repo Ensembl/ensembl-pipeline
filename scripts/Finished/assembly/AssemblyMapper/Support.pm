@@ -250,6 +250,7 @@ sub iterate_chromosomes {
         before_stage   => { isa => 'Str',       optional => 1 }, # better val'n, see AlignStage.pm?
         this_stage     => { isa => 'Str'                      }, # better val'n, see AlignStage.pm?
         create_session => { isa => 'Bool',      optional => 1 },
+        do_all         => { isa => 'Bool',      optional => 1 },
         worker         => { isa => 'CodeRef'                  },
         callback_data  => { isa => 'Defined',   optional => 1 },
         );
@@ -328,12 +329,13 @@ sub iterate_chromosomes {
           next CHR;
       }
 
-
-      $ok &&= &{$params->{worker}}(
+      my $chr_ok;
+      $chr_ok = &{$params->{worker}}(
           $align_slice_pair,
           $params->{callback_data},
-      );
+      ) if ($params->{do_all} || $ok);
 
+      $ok &&= $chr_ok;
   } # CHR
 
     return $ok;
