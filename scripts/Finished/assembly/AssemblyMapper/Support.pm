@@ -104,6 +104,12 @@ has alt_dba => (
     },
     );
 
+
+has output_info => (is => 'rw', lazy => 1, default => sub { {} },
+                    predicate => 'has_output_info',
+                    documentation => 'Somewhere to collect output');
+
+
 # Constructors
 #
 sub BUILD {
@@ -410,6 +416,13 @@ sub get_pipe_db {
     }
 
     return Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(%uppercased_options);
+}
+
+sub output_info_as_yaml {
+    my ($self) = @_;
+    return "" unless $self->has_output_info;
+    require YAML;
+    return YAML::Dump({ output_info => $self->output_info });
 }
 
 __PACKAGE__->meta->make_immutable;

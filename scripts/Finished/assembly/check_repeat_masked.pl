@@ -67,6 +67,17 @@ my $ok = $support->iterate_chromosomes(
     );
 
 $support->log_warning("\n*** Detected missing repeat masking ***\n") if not $ok;
+if ($support->has_output_info) {
+    # This is a nudge in the right direction for when we're mauling it
+    # by hand.  WIBNI more integrated.
+    my $ana_id = $support->output_info->{submitcontig};
+    my @vals = map {qq{('$_', 'CONTIG', $ana_id, now(), '')}}
+      @{ $support->output_info->{input_id} };
+    $support->output_info->{insert} = q{/* Use this to insert SubmitContig jobs */
+INSERT INTO input_id_analysis (input_id, input_id_type, analysis_id, created, runhost)  values
+}.(join ",\n", @vals).";\n/* and tell the rulemanager */";
+    $support->log_warning( $support->output_info_as_yaml );
+}
 $support->finish_log;
 
 exit ($ok ? 0 : 1);
@@ -103,8 +114,17 @@ sub check_repeat_analyses {
         } else {
             $support->log_warning("$id\tNOT FOUND [$l_names]\n", 3);
             ++$missing;
+            push @{ $support->output_info->{input_id} }, $id;
         }
     }
+
+    if ($missing) {
+        my $anaA = $dba->get_AnalysisAdaptor;
+        # stash it for the INSERT generator
+        $support->output_info->{submitcontig} =
+          $anaA->fetch_by_logic_name('SubmitContig')->dbID;
+    }
+
     $support->log(sprintf("%s: %d / %d clones missing repeat analyses\n",
                           $slice->seq_region_name, $missing, $total), 2);
     return ($missing == 0);
