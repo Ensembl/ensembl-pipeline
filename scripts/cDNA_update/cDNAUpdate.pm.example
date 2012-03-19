@@ -113,7 +113,8 @@ use vars qw(%Config);
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
 
-        RESOURCE => '',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>1000] rusage[mem=1000]" -M 1000000',#can be used for token requirements, etc.
+        BATCH_SIZE => 10,
 
         CVS_DIR => '',
 
@@ -167,7 +168,8 @@ use vars qw(%Config);
         PRODUCTION_DBHOST => '',
         PRODUCTION_DBPORT => 3306,
 
-        RESOURCE => '',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>1000] rusage[mem=1000]" -M 1000000',#can be used for token requirements, etc.
+        BATCH_SIZE => 10,
 
         CVS_DIR => '',
 
