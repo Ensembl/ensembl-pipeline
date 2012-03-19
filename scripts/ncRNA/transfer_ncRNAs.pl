@@ -194,10 +194,10 @@ if ($use_old_ncRNAs){
 print "\nFound ".scalar(keys %$new_hash)." new predictions\n";
 print "Found ".scalar(keys %$old_hash)." old predictions\n";
 
-$analysis = $final_aa->fetch_by_logic_name("ncRNA");
+$analysis = $final_aa->fetch_by_logic_name("ncrna");
 unless ($analysis){
   print "$final_dbname needs a ncRNA analysis object, loading one\n";
-  $analysis = $saa->fetch_by_logic_name("ncRNA");
+  $analysis = $saa->fetch_by_logic_name("ncrna");
   die ("ncRNA analysis not found\n") unless $analysis;
   $final_aa->store($analysis);
 }
@@ -343,13 +343,13 @@ sub overlaps {
     
   GENE:  foreach my $overlap (@overlaps) {
       # store the overlapping gene in a hash keyed on the predicted genes dbID
-      if ($overlap->analysis->logic_name eq "ncRNA" or 
-	  $overlap->analysis->logic_name eq "ncRNA_pseudogene" ) {
+      if ($overlap->analysis->logic_name eq "ncrna" or 
+	  $overlap->analysis->logic_name eq "ncrna_pseudogene" ) {
 	# just check its one of our non coding genes
 	next unless scalar(@{$overlap->get_all_Exons}) == 1;
 	next if $overlap->biotype =~ /^Mt_/;
 	# used in a gene merge to remove overlapping ncRNAs from Sean Eddys set
-	if ( $overlap->analysis->logic_name eq "ncRNA_pseudogene" ) {
+	if ( $overlap->analysis->logic_name eq "ncrna_pseudogene" ) {
 	  print "Overlapping pseudogene " .  $gene->biotype . " vs ".$overlap->biotype." marking it for deletion\n";
 	  $merge_set{$overlap->dbID} =  $overlap;
 	  next GENE;
@@ -642,7 +642,7 @@ sub delete_genes {
     }
     foreach my $gene ( @genes ) {
       next unless (defined($gene));
-      unless (( $gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA' ) or $gene->analysis->logic_name eq 'ncRNA_pseudogene' ){
+      unless (( $gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncrna' ) or $gene->analysis->logic_name eq 'ncrna_pseudogene' ){
 	throw("Gene to be deleted is not a non coding gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n");
       }
       print "Deleting gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n";
@@ -660,7 +660,7 @@ sub write_genes {
       next;
     }
     my $gene = lazy_load($new_hash->{$key});
-    unless ($gene->biotype =~ /RNA/ && ( $gene->analysis->logic_name eq 'ncRNA' or $gene->analysis->logic_name eq 'miRNA') ){
+    unless ($gene->biotype =~ /RNA/ && ( $gene->analysis->logic_name eq 'ncrna' or $gene->analysis->logic_name =~ /mirna/) ){
       throw("Gene to be written is not a non coding gene ".$gene->dbID."\t".$gene->stable_id."\t".$gene->biotype."\n");
     }
     # copy the analysis
@@ -703,7 +703,7 @@ sub dump_xrefs {
   foreach my $key (keys %$gene_hash){
     my $gene = $gene_hash->{$key};
     next if $gene->biotype =~ /Mt_/;
-    next unless $gene->analysis->logic_name eq 'ncRNA';
+    next unless $gene->analysis->logic_name eq 'ncrna';
     foreach my $trans (@{$gene->get_all_Transcripts}) {
       my @xrefs = @{$trans->get_all_DBEntries};
       if (@xrefs){
@@ -763,7 +763,7 @@ sub fetch_genes {
       } 
     #  print "slice " . $slice->name . " got " . scalar(@ncRNAs) . "\n";
       foreach my $ncRNA (@ncRNAs) {
-	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
+	next unless ($ncRNA->analysis->logic_name eq 'ncrna' or $ncRNA->analysis->logic_name =~ /mirna/) ;
 	unless ($ncRNA->biotype eq 'miRNA' or
 		$ncRNA->biotype eq 'misc_RNA' or
 		$ncRNA->biotype eq 'snRNA' or
@@ -789,7 +789,7 @@ sub fetch_genes {
 	@ncRNAs =  @{$ga->generic_fetch('biotype like "%RNA%"')};
       }      
       foreach my $ncRNA (@ncRNAs) {
-	next unless ($ncRNA->analysis->logic_name eq 'ncRNA' or $ncRNA->analysis->logic_name eq 'miRNA') ;
+	next unless ($ncRNA->analysis->logic_name eq 'ncrna' or $ncRNA->analysis->logic_name =~ /mirna/) ;
 	unless ($ncRNA->biotype eq 'miRNA' or
 		$ncRNA->biotype eq 'misc_RNA' or
 		$ncRNA->biotype eq 'snRNA' or
