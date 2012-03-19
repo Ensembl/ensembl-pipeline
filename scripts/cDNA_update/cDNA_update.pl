@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.71 2012-01-24 15:02:34 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.72 2012-03-19 15:03:33 mr6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -294,7 +294,7 @@ my %configvars = (
                  "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
                  "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
                  "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
-                 "RESOURCE" => $RESOURCE,   # from cDNAUpdate
+                 "BATCH_SIZE" => $BATCH_SIZE,   # from cDNAUpdate
                  "chunkDIR"         => $chunkDIR,
                  "outDIR"           => $outDIR,
                  "configDIR"        => $configDIR,
@@ -1736,7 +1736,7 @@ sub fix_metatable {
 
     # Remove some meta keys not needed in the cdna database
     $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis') " ;
-    my $sth = $db->dbc->prepare($sql);
+    $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
 
