@@ -77,6 +77,41 @@ sub new {
 
 }
 
+# Rather than the quite cumbersome
+#   resource => 'select[mem>500] rusage[mem=500]',
+#   sub_args => '-M 500000'
+# we allow for
+#   memory   => '500MB' # or '0.5GB' or '500000KB'
+#
+sub memstring_to_resource {
+  my ( $self, $memstring ) = @_;
+
+  my $resource_mem  = $self->memory_conversion( $memstring, 'MB' );
+  my $softlimit_mem = $self->memory_conversion( $memstring, 'KB' );
+
+  my $resource = $self->resource();
+
+  if ( $resource =~ /^-R/ ) {
+    # The resource string might already be prefixed with '-R', in this
+    # case just add the memory resource with another '-R'.
+    $self->resource( sprintf( "%s -R 'select[mem>%d] rusage[mem=%d]'",
+                              $resource, $resource_mem, $resource_mem
+                     ) );
+  }
+  else {
+    # ... otherwise just tag the resource onto the end of the string.
+    $self->resource( sprintf( "%s select[mem>%d] rusage[mem=%d]",
+                              $resource, $resource_mem, $resource_mem
+                     ) );
+  }
+
+  my $parameters = $self->parameters();
+  # Add the soft memory limit to the end of the parameter string.
+  $self->parameters(
+                   sprintf( "%s -M %d", $parameters, $softlimit_mem ) );
+}
+
+
 
 ##################
 #accessor methods#

@@ -366,24 +366,36 @@ sub flush_runs {
     my $pre_exec = $pre_exec_perl." ". $this_runner." -check -output_dir ".$self->output_dir;
     warning("using $pre_exec_perl for the runner to overcome LSF_LD_SECURITY / 64 bit perl problem - see DEFAULT_LSF_PRE_EXEC_PERL in BatchQueue.pm-config ");
       
-    my ($system_queue, $parameters, $resources) = ($queue->{'queue'}, $queue->{'sub_args'}, $queue->{'resource'});
+    my $system_queue = $queue->{'queue'};
+    my $parameters   = $queue->{'sub_args'};
+    my $resources    = $queue->{'resource'};
+    my $memory       = $queue->{'memory'};
 
-    if($self->retry_count >= 1){
-      $system_queue = $queue->{retry_queue} if($queue->{retry_queue});
-      $parameters = $queue->{retry_sub_args} if($queue->{retry_sub_args});
-      $resources = $queue->{retry_resource} if($queue->{retry_resource});
+    if ( $self->retry_count() >= 1 ) {
+      if ( $queue->{'retry_queue'} ) {
+        $system_queue = $queue->{'retry_queue'};
+      }
+      if ( $queue->{'retry_sub_args'} ) {
+        $parameters = $queue->{'retry_sub_args'};
+      }
+      if ( $queue->{'retry_resource'} ) {
+        $resources = $queue->{'retry_resource'};
+      }
+      if ( $queue->{'retry_memory'} ) {
+        $memory = $queue->{'retry_memory'};
+      }
     }
+
     #print "HAVE PARAMETERS ".$parameters."\n";
-    my $batch_job = $batch_q_module->new
-      (
-       -STDOUT     => $lastjob->stdout_file,
-       -PARAMETERS => $parameters,
-       -PRE_EXEC   => $pre_exec,
-       -QUEUE      => $system_queue,
-       -JOBNAME    => $dbname . ':' . $anal,
-       -NODES      => $queue->{'nodes'},
-       -RESOURCE   => $resources,
-      );
+    my $batch_job =
+      $batch_q_module->new( -STDOUT     => $lastjob->stdout_file(),
+                            -PARAMETERS => $parameters,
+                            -PRE_EXEC   => $pre_exec,
+                            -QUEUE      => $system_queue,
+                            -JOBNAME    => $dbname . ':' . $anal,
+                            -NODES      => $queue->{'nodes'},
+                            -RESOURCE   => $resources,
+                            -MEMORY     => $memory, );
 
     my $cmd;
 
