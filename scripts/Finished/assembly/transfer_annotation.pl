@@ -84,6 +84,7 @@ my $support = AssemblyMapper::Support->new(
         'email=s',
         'skip_stable_id=s@',
         'gene_prefix=s',
+        'genes_done_already!',
     ],
     );
 
@@ -552,7 +553,17 @@ sub do_transfer_anno {
         }
 
         # save polyA features if gene transfered
-        $sfeat_Ad->store(@proj_feat) if ( @proj_feat && $transfered_genes );
+        if (@proj_feat) {
+            if ($transfered_genes || $support->param('genes_already_done')) {
+                $sfeat_Ad->store(@proj_feat);
+            } else {
+                # Why? if genes were not transferred, it is still safe
+                # to copy the simple_features forward
+                $support->log_verbose
+                  (sprintf("WARNING: %d simple_features NOT SAVED because no genes were transferred\n",
+                           scalar @proj_feat));
+            }
+        }
 
         $write_db ? $dbh->commit : $dbh->rollback;
     };
