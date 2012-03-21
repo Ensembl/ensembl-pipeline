@@ -554,7 +554,7 @@ sub do_transfer_anno {
 
         # save polyA features if gene transfered
         if (@proj_feat) {
-            if ($transfered_genes || $support->param('genes_already_done')) {
+            if ($transfered_genes || $support->param('genes_done_already')) {
                 $sfeat_Ad->store(@proj_feat);
             } else {
                 # Why? if genes were not transferred, it is still safe
