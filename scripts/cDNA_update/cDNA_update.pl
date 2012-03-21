@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.72 2012-03-19 15:03:33 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.73 2012-03-21 18:20:00 db8 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1320,7 +1320,7 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = "bsub -I -q yesterday perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+    $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
          . " -dbhost "     . $PIPE_DBHOST
          . " -dbport "     . $PIPE_DBPORT
          . " -dbuser "     . $DBUSER
