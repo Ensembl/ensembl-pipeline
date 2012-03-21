@@ -91,25 +91,41 @@ sub memstring_to_resource {
 
   my $resource = $self->resource();
 
-  if ( $resource =~ /^-R/ ) {
-    # The resource string might already be prefixed with '-R', in this
-    # case just add the memory resource with another '-R'.
-    $self->resource( sprintf( "%s -R 'select[mem>%d] rusage[mem=%d]'",
-                              $resource, $resource_mem, $resource_mem
-                     ) );
+  my $new_resource_string = sprintf( "select[mem>%d] rusage[mem=%d]",
+                                     $resource_mem, $resource_mem );
+
+  if ( defined($resource) ) {
+    if ( $resource =~ /^-R/ ) {
+      # The resource string might already be prefixed with '-R', in this
+      # case just add the memory resource with another '-R'.
+      $self->resource(
+             sprintf( "%s -R '%s'", $resource, $new_resource_string ) );
+    }
+    else {
+      # ... otherwise just tag the resource onto the end of the string.
+      $self->resource(
+                  sprintf( "%s %s", $resource, $new_resource_string ) );
+    }
   }
   else {
-    # ... otherwise just tag the resource onto the end of the string.
-    $self->resource( sprintf( "%s select[mem>%d] rusage[mem=%d]",
-                              $resource, $resource_mem, $resource_mem
-                     ) );
+    # No previous resource spec.
+    $self->resource($new_resource_string);
   }
 
   my $parameters = $self->parameters();
-  # Add the soft memory limit to the end of the parameter string.
-  $self->parameters(
-                   sprintf( "%s -M %d", $parameters, $softlimit_mem ) );
-}
+
+  my $new_parameter_string = sprintf( "-M %d", $softlimit_mem );
+
+  if ( defined($parameters) ) {
+    # Add the soft memory limit to the end of the parameter string.
+    $self->parameters(
+               sprintf( "%s %s", $parameters, $new_parameter_string ) );
+  }
+  else {
+    # No previous parameter.
+    $self->parameters($new_parameter_string);
+  }
+} ## end sub memstring_to_resource
 
 
 
