@@ -64,45 +64,52 @@ my $file = "$batch_q_module.pm";
 $file =~ s{::}{/}g;
 require "$file";
 
-# BATCH_QUEUES is a package variable which stores available
-# 'queues'. this allows different analysis types to be sent
-# to different nodes etc. it is keyed on analysis logic_name
-# and has different parameters such as resource (e.g. node set),
-# number of jobs to be batched together etc.
+# BATCH_QUEUES is a package variable which stores available 'queues'.
+# This allows different analysis types to be sent to different nodes
+# etc.  It is keyed on analysis logic_name and has different parameters
+# such as resource (e.g. node set), number of jobs to be batched
+# together etc.
 #
-# this may be better encapsulated as a separate class, but
-# i can't think at the moment how best to do this.
+# This may be better encapsulated as a separate class, but I can't think
+# at the moment how best to do this.
 
-my %BATCH_QUEUES = &set_up_queues;
+my %BATCH_QUEUES = set_up_queues();
 
 sub new {
-  my ($class, @args) = @_;
-  my $self = bless {},$class;
-  my ($p, $f, $l) = caller;
+  my ( $class, @args ) = @_;
 
-  my ($adaptor,$dbID,$submission_id,$input_id,$analysis,$stdout,$stderr,$retry_count, $output_dir, $runner,$number_output_dirs) 
-        = rearrange([qw(ADAPTOR
-                  ID
-                  SUBMISSION_ID
-                  INPUT_ID
-                  ANALYSIS
-                  STDOUT
-                  STDERR
-                  RETRY_COUNT
-                  OUTPUT_DIR
-                  RUNNER
-                  NUMBER_OUTPUT_DIRS
-                 )],@args); 
+  my $self = bless {}, $class;
+  my ( $p, $f, $l ) = caller;
 
-  $dbID            = -1 unless defined($dbID);
-  $submission_id   = -1 unless defined($submission_id);
+  my ( $adaptor,  $dbID,        $submission_id,
+       $input_id, $analysis,    $stdout,
+       $stderr,   $retry_count, $output_dir,
+       $runner,   $number_output_dirs )
+    = rearrange( [ 'ADAPTOR',       'ID',
+                   'SUBMISSION_ID', 'INPUT_ID',
+                   'ANALYSIS',      'STDOUT',
+                   'STDERR',        'RETRY_COUNT',
+                   'OUTPUT_DIR',    'RUNNER',
+                   'NUMBER_OUTPUT_DIRS',
+                 ],
+                 @args );
 
-  $input_id   || throw("Can't create a job object without an input_id");
-  $analysis   || throw("Can't create a job object without an analysis object");
+  if ( !defined($dbID) )          { $dbID          = -1 }
+  if ( !defined($submission_id) ) { $submission_id = -1 }
 
-  $analysis->isa("Bio::EnsEMBL::Analysis") ||
-        throw("Analysis object [$analysis] is not a Bio::EnsEMBL::Analysis");
-  
+  if ( !defined($input_id) ) {
+    throw("Can't create a job object without an input_id");
+  }
+  elsif ( !defined($analysis) ) {
+    throw("Can't create a job object without an analysis object");
+  }
+
+  if ( !$analysis->isa("Bio::EnsEMBL::Analysis") ) {
+    throw(
+        sprintf( "Analysis object [%s] is not a Bio::EnsEMBL::Analysis",
+                 $analysis ) );
+  }
+
   $self->dbID($dbID);
   $self->adaptor($adaptor);
   $self->input_id($input_id);
@@ -112,49 +119,58 @@ sub new {
   $self->retry_count($retry_count);
   $self->submission_id($submission_id);
   $self->output_dir($output_dir);
-  $self->number_output_dirs($number_output_dirs); 
+  $self->number_output_dirs($number_output_dirs);
 
-  if ($self->output_dir) { 
-    $self->make_filenames;
-  } else {
-    my $dir;
+  if ( defined( $self->output_dir() ) ) {
+    $self->make_filenames();
+  }
+  else {
+    my $output_dir;
 
-
-    if (!exists($BATCH_QUEUES{$analysis->logic_name})) { 
-      # set default dir if analysis is NOT configured in BatchQueue
-      $dir = $BATCH_QUEUES{default}{output_dir};
-      if ( $dir !~ m/\/$/){
-         $dir.="/";
-      }  
-      $dir.=$analysis->logic_name; 
-     
-    } else {  
-      if ( defined $BATCH_QUEUES{$analysis->logic_name}{output_dir} ){ 
-        # analysis is configured...
-        $dir = $BATCH_QUEUES{$analysis->logic_name}{output_dir};
-      }else {  
-        # analysis is configured but output dir is not defined; setup_queues() will set it to default_output_dir but we reset-it here... 
-        $dir = $BATCH_QUEUES{default}{output_dir}; 
-        if ( $dir !~ m/\/$/){
-          $dir.="/";
-        } 
-        $dir.=$analysis->logic_name; 
+    if ( !exists( $BATCH_QUEUES{ $analysis->logic_name() } ) ) {
+      # If the analysis is not configured in BatchQueue.pm, set
+      # output_dir by logic_name.
+      $output_dir =
+        $BATCH_QUEUES{'default'}{'output_dir'} . '/' .
+        $analysis->logic_name();
+    }
+    else {
+      if (
+        defined $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} )
+      {
+        # The analysis is configured...
+        $output_dir =
+          $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'};
+      }
+      else {
+        # Analysis is configured but the output directory is not
+        # defined; set_up_queues() will set it to default_output_dir but
+        # we reset-it here... (Why? /ak4)
+        $output_dir =
+          $BATCH_QUEUES{'default'}{'output_dir'} . '/' .
+          $analysis->logic_name();
       }
     }
 
-    throw("need an output directory passed in from RuleManager or from Config/BatchQueue $!") unless($dir);
-    $self->output_dir($dir);
-    $self->make_filenames;
-  } 
-  #print "Job->new() : instantiating the runner\n"; 
+    if ( !defined($output_dir) ) {
+      throw( "Need an output directory passed in from RuleManager " .
+             "or from Config/BatchQueue $!" );
+    }
+
+    $self->output_dir($output_dir);
+    $self->make_filenames();
+  } ## end else [ if ( defined( $self->output_dir...))]
+
   $self->runner($runner);
-  if(!$self->runner){
-    my $queue = $BATCH_QUEUES{$self->analysis->logic_name};
+
+  if ( !$self->runner() ) {
+    my $queue  = $BATCH_QUEUES{ $self->analysis()->logic_name() };
     my $runner = $queue->{'runner'};
     $self->runner($runner);
   }
+
   return $self;
-}
+} ## end sub new
 
 
 =head2 create_by_analysis_input_id
