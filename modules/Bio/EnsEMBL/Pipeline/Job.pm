@@ -53,6 +53,8 @@ use Bio::EnsEMBL::Analysis::Tools::Logger;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
+use List::Util qw( min );    # Used in flush_runs()
+
 @ISA = qw();
 
 
@@ -387,22 +389,61 @@ sub flush_runs {
     my $resources    = $queue->{'resource'};
     my $memory       = $queue->{'memory'};
 
-    if ( $self->retry_count() >= 1 ) {
-      if ( $queue->{'retry_queue'} ) {
-        $system_queue = $queue->{'retry_queue'};
-      }
-      if ( $queue->{'retry_sub_args'} ) {
-        $parameters = $queue->{'retry_sub_args'};
-      }
-      if ( $queue->{'retry_resource'} ) {
-        $resources = $queue->{'retry_resource'};
-      }
-      if ( $queue->{'retry_memory'} ) {
-        $memory = $queue->{'retry_memory'};
-      }
+    # The $system_queue, $parameters, $resources, and $memory settings
+    # may be arrays where the first entry corresponds to the first run
+    # of the job and the following entries are used for consequent
+    # retries.
+    #
+    # The arrays may be shorter than the number of required retries, in
+    # which case the last entry should be re-used.
+    # 
+    # If the setting is not an array, the code reverts to using the old
+    # '_retry' setting, if present.
+
+    my $run_index = $self->retry_count();
+
+    if ( ref($system_queue) eq 'ARRAY' ) {
+      # The 'queue' setting is an array, pick out the one corresponding
+      # to the current run, or the last item if we have retried more
+      # times than the number of items in the list.
+
+      $system_queue =
+        $system_queue->[ min( $#{$system_queue}, $run_index ) ];
+    }
+    elsif ( $run_index > 0 && defined( $queue->{'retry_queue'} ) ) {
+      # We're retrying, and there's a 'retry_queue' specified, use it.
+      $system_queue = $queue->{'retry_queue'};
+    }
+    ## else {
+    ##   # Nothing to do, just use $system_queue as it is.
+    ## }
+
+    # Now do the same for $parameters, $resources, and $memory:
+
+    # $parameters:
+    if ( ref($parameters) eq 'ARRAY' ) {
+      $parameters = $parameters->[ min( $#{$parameters}, $run_index ) ];
+    }
+    elsif ( $run_index > 0 && defined( $queue->{'retry_sub_args'} ) ) {
+      $parameters = $queue->{'retry_sub_args'};
     }
 
-    #print "HAVE PARAMETERS ".$parameters."\n";
+    # $resources:
+    if ( ref($resources) eq 'ARRAY' ) {
+      $resources = $resources->[ min( $#{$resources}, $run_index ) ];
+    }
+    elsif ( $run_index > 0 && defined( $queue->{'retry_resource'} ) ) {
+      $resources = $queue->{'retry_resource'};
+    }
+
+    # $memory:
+    if ( ref($memory) eq 'ARRAY' ) {
+      $memory = $memory->[ min( $#{$memory}, $run_index ) ];
+    }
+    elsif ( $run_index > 0 && defined( $queue->{'retry_memory'} ) ) {
+      $memory = $queue->{'retry_memory'};
+    }
+
     my $batch_job =
       $batch_q_module->new( -STDOUT     => $lastjob->stdout_file(),
                             -PARAMETERS => $parameters,
