@@ -81,21 +81,6 @@ sub new{
 }
 
 
-##################
-#accessor methods#
-##################
-
-sub qsub {
-  my ($self,$qsub_line) = @_;
-
-  if (defined($qsub_line)) {
-    $self->{_qsub} = $qsub_line;
-  }
-  return $self->{_qsub};
-}
-
-##other accessor are in base class##
-
 ######################
 #command line methods#
 ######################
@@ -221,7 +206,7 @@ sub construct_command_line{
   }
 
   #$qsub_line .= " $ge_wrapper \"".$command . "\"";
-#  $self->qsub($qsub_line);
+#  $self->command($qsub_line);
 
 
   print "$ge_wrapper\n";
@@ -235,7 +220,7 @@ sub construct_command_line{
   # change qsub_line by GT
   $qsub_line = "qsub " . $qsub_line . " $test.sh\n";
 
-  $self->qsub($qsub_line);
+  $self->command($qsub_line);
 
   print "SGE: have command line\n";
   print "CMD : $qsub_line\n\n";
@@ -250,16 +235,16 @@ sub open_command_line{
 
   print "run open_command_line in GridEngine.pm\n";
 
-  print STDERR $self->qsub." 2>&1 \n";
+  print STDERR $self->command." 2>&1 \n";
   print STDERR "opening command line\n";
-  open(SUB, $self->qsub." 2>&1 |");
+  open(SUB, $self->command." 2>&1 |");
   my $geid;
   while(<SUB>){
     if (/Your job (\d+)/) {
       $geid = $1;
     }
   }
-  print STDERR "have opened ".$self->qsub."\n";
+  print STDERR "have opened ".$self->command."\n";
   print STDERR "geid ".$geid."\n";
   $self->id($geid);
   close(SUB);
@@ -274,12 +259,12 @@ sub temp_filename{
   #for ( keys %ENV ) {  
   #   print STDERR "key $_ $ENV{$_}\n";
   #} 
-  $self->{'sge_jobfilename'} = $ENV{'JOB_NAME'};
+  $self->{'tmp_jobfilename'} = $ENV{'JOB_NAME'};
 
   print "ENV{JOB_NAME}=$ENV{'JOB_NAME'} in GridEngine.pm\n";
 
-  print " JOBNAME " . $self->{'sge_jobfilename'} . "\n"; 
-  return $self->{'sge_jobfilename'};
+  print " JOBNAME " . $self->{'tmp_jobfilename'} . "\n"; 
+  return $self->{'tmp_jobfilename'};
 }
 
 #add by GT

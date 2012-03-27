@@ -71,7 +71,6 @@ sub new {
   my ( $class, @args ) = @_;
   my $self = $class->SUPER::new(@args);
   #print "CREATING ".$self." with ".join(" ", @args)."\n";
-  $self->{'bsub'} = undef;
 
   return $self;
 
@@ -129,23 +128,6 @@ sub memstring_to_resource {
 
 
 
-##################
-#accessor methods#
-##################
-
-sub bsub{
-  my($self, $arg) = @_;
-
-  if(defined($arg)){
-    $self->{'bsub'} = $arg;
-  }
-
-  return $self->{'bsub'};
-
-}
-
-##other accessor are in base class##
-
 ######################
 #command line methods#
 ######################
@@ -188,7 +170,7 @@ sub construct_command_line {
   $bsub_line .= " -E \"" . $self->pre_exec . "\"" if defined $self->pre_exec;
   ## must ensure the prexec is in quotes ##
   $bsub_line .= " " . $command;
-  $self->bsub($bsub_line);
+  $self->command($bsub_line);
 
 } ## end sub construct_command_line
 
@@ -222,7 +204,7 @@ sub open_command_line {
     # We want STDERR and STDOUT merged for the bsub process
     # open STDERR, '>&STDOUT';
     # probably better to do with shell redirection as above can fail
-    exec( $self->bsub . ' 2>&1' ) || throw("Could not run bsub");
+    exec( $self->command . ' 2>&1' ) || throw("Could not run bsub");
   }
 } ## end sub open_command_line
 
@@ -409,8 +391,8 @@ sub stderr_file {
 sub temp_filename {
   my ($self) = @_;
 
-  $self->{'lsf_jobfilename'} = $ENV{'LSB_JOBFILENAME'};
-  return $self->{'lsf_jobfilename'};
+  $self->{'tmp_jobfilename'} = $ENV{'LSB_JOBFILENAME'};
+  return $self->{'tmp_jobfilename'};
 }
 
 sub temp_outfile {

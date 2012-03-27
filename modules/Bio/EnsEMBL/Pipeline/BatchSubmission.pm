@@ -267,6 +267,15 @@ sub resource{
    return $self->{'resource'};
 }
 
+sub temp_filename {
+   my ($self, $arg) = @_;
+
+   if($arg){
+     $self->{'tmp_jobfilename'} = $arg;
+   }
+
+   return $self->{'tmp_jobfilename'};
+}
 
 #############
 #run methods#
@@ -296,6 +305,12 @@ sub delete_output{
   my ($self) = @_;
 
   throw("this method delete_output must be implemented");
+}
+
+sub job_stats {
+  my ($self) = @_;
+
+  throw("this method job_stats must be implemented");
 }
 
 
