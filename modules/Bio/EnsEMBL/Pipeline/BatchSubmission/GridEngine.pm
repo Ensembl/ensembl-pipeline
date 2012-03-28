@@ -79,21 +79,6 @@ sub new{
 }
 
 
-##################
-#accessor methods#
-##################
-
-sub qsub {
-  my ($self,$qsub_line) = @_;
-
-  if (defined($qsub_line)) {
-    $self->{_qsub} = $qsub_line;
-  }
-  return $self->{_qsub};
-}
-
-##other accessor are in base class##
-
 ######################
 #command line methods#
 ######################
@@ -146,7 +131,7 @@ sub construct_command_line{
   }
 
   $qsub_line .= " $ge_wrapper \"".$command . "\"";
-  $self->qsub($qsub_line);
+  $self->command($qsub_line);
   #print "have command line\n";
 }
 
@@ -155,16 +140,16 @@ sub construct_command_line{
 sub open_command_line{
   my ($self)= @_;
 
-  print STDERR $self->qsub."\n";
+  print STDERR $self->command."\n";
   print STDERR "opening command line\n";
-  open(SUB, $self->qsub." 2>&1 |");
+  open(SUB, $self->command." 2>&1 |");
   my $geid;
   while(<SUB>){
     if (/your job (\d+)/) {
       $geid = $1;
     }
   }
-  print STDERR "have opened ".$self->qsub."\n";
+  print STDERR "have opened ".$self->command."\n";
   print STDERR "geid ".$geid."\n";
   $self->id($geid);
   close(SUB);
