@@ -296,20 +296,20 @@ print STDERR "YOU WILL NOT BE SUBMITTING ANY JOBS BECAUSE YOU DIDN'T ".
   "SPECIFY -open \n" if(!$open);
 
 foreach my $batch_object (@batch_submission_objects) {
-  print $batch_object->bsub."\n" if($verbose);
+  print $batch_object->command."\n" if($verbose);
 
   if ($open) {
     eval {
       $batch_object->open_command_line;
     };
     ifi ($@ || !$batch_object->id) {
-      throw("Failed to open ".$batch_object->bsub." $@");
+      throw("Failed to open ".$batch_object->command." $@");
     }
 
-    print $batch_object->bsub."\n" if($verbose);
+    print $batch_object->command."\n" if($verbose);
     sleep($submission_interval);
   } else {
-    #print $batch_object->bsub."\n";
+    #print $batch_object->command."\n";
   }
 }
 
