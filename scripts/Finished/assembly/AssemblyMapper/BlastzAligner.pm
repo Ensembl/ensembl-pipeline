@@ -200,10 +200,12 @@ sub write_sequence {
         $seq = $self->apply_masks($slice, $seq, $masks);
     }
     unless (-e "$tmpdir/$basename1.fa") {
-      my $fh = $self->support->filehandle('>', "$tmpdir/$basename1.fa");
-	  print $fh ">$basename1\n";
-      print $fh $seq, "\n";
-      close($fh);
+        my $fh = $self->support->filehandle('>', "$tmpdir/$basename1.fa");
+        print $fh ">$basename1\n";
+        while ($seq =~ /(.{1,60})/g) {
+            print $fh $1, "\n";
+        }
+        close($fh);
     }
 
 #    # convert fasta to nib (needed for lavToAxt)
