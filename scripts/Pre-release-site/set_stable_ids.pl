@@ -81,18 +81,15 @@ my $exon_query =
 my $exon_sth = $db->dbc->prepare($exon_query);
 
 GENE:
-foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs } ) {
+foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
 
   if ( defined( $gene->stable_id() ) ) { next GENE }
 
   my $gene_protein_id = get_gene_protein_id($gene);
 
-  if ( !defined($gene_protein_id) ) {
-    throw( "Gene " . $gene_id . " has no protein id" );
-  }
-
   $proteins{$gene_protein_id}++;
+
   eval {
     $sth->execute( $gene_protein_id . "_" . $proteins{$gene_protein_id},
                    $proteins{$gene_protein_id}, $gene_id );
