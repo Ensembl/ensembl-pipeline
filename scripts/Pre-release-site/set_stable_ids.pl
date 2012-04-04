@@ -4,27 +4,25 @@
   set_stable_ids.pl
 
 =head1 SYNOPSIS
- 
-  Script to create stable ids for the pre-release targetted gene set.
-  Sets stable ids to be the name of the evidence used to buikld the structure, 
-  plus a .version in case more than one gene is built from the same protein.
+
+  Script to create stable IDs for the pre-release targetted gene set.
+  Sets stable IDs to be the name of the evidence used to build the
+  structure, plus a .version in case more than one gene is built from
+  the same protein.
 
 =head1 DESCRIPTION
 
 
 =head1 OPTIONS
 
-    -dbhost      host name for database (gets put as host= in locator)
-
-    -dbport      For RDBs, what port to connect to (port= in locator)
-
-    -dbname      For RDBs, what name to connect to (dbname= in locator)
-
-    -dbuser      For RDBs, what username to connect as (dbuser= in locator)
-
-    -dbpass      For RDBs, what password to use (dbpass= in locator)
+  --dbhost  Host name for database.
+  --dbport  For RDBs, what port to connect to (optional).
+  --dbname  For RDBs, what name to connect to.
+  --dbuser  For RDBs, what username to connect as.
+  --dbpass  For RDBs, what password to use.
 
 =cut
+
 use strict;
 use Getopt::Long;
 
@@ -32,7 +30,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw( deprecate throw warning );
 
 my $host;
-my $port;
+my $port = '3306';
 my $name;
 my $user;
 my $pass;
