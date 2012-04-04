@@ -1,4 +1,5 @@
 #!/usr/local/bin/perl -w
+
 =head1 NAME
 
   set_stable_ids.pl
@@ -35,103 +36,114 @@ my $name;
 my $user;
 my $pass;
 
-&GetOptions( 
-	     'dbhost:s'      => \$host,
-	     'dbport:n'      => \$port,
-	     'dbname:s'      => \$name,
-	     'dbuser:s'      => \$user,
-	     'dbpass:s'      => \$pass,
-	     );
+&GetOptions( 'dbhost:s' => \$host,
+             'dbport:n' => \$port,
+             'dbname:s' => \$name,
+             'dbuser:s' => \$user,
+             'dbpass:s' => \$pass, );
 
 my %proteins;
 my %transcript_proteins;
 my %exons;
-my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
-					    '-host'   => $host,
-					    '-user'   => $user,
-					    '-dbname' => $name,
-					    '-pass'   => $pass,
-					    '-port'   => $port,
-					   );
+my $db =
+  new Bio::EnsEMBL::DBSQL::DBAdaptor( '-host'   => $host,
+                                      '-user'   => $user,
+                                      '-dbname' => $name,
+                                      '-pass'   => $pass,
+                                      '-port'   => $port, );
 
-my $query = "UPDATE gene SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE gene_id = ?;";
+my $query =
+"UPDATE gene SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE gene_id = ?;";
 my $sth = $db->dbc->prepare($query);
-my $trans_query = "UPDATE transcript SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE transcript_id = ?;";
+my $trans_query =
+"UPDATE transcript SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE transcript_id = ?;";
 #my $trans_query = "insert into transcript_stable_id ".
 #  "values (?,?,?,now(),now())";
 my $trans_sth = $db->dbc->prepare($trans_query);
-my $translation_query = "UPDATE translation SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE translation_id = ?;";
+my $translation_query =
+"UPDATE translation SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE translation_id = ?;";
 #my $translation_query = "insert into translation_stable_id ".
 #  "values (?,?,?,now(),now())";
 my $translation_sth = $db->dbc->prepare($translation_query);
-my $exon_query = "UPDATE exon SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE exon_id = ?;";
+my $exon_query =
+"UPDATE exon SET stable_id = ?, version = ?, created_date = now(), modified_date = now() WHERE exon_id = ?;";
 #my $exon_query = "insert into exon_stable_id ".
 #  "values (?,?,?,now(),now())";
 my $exon_sth = $db->dbc->prepare($exon_query);
 GENE:
-foreach my $gene_id(@{$db->get_GeneAdaptor->list_dbIDs}) {
+foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs } ) {
   #print STDERR "gene id $gene_id\n";
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
   next GENE if $gene->stable_id;
   my $gene_protein_id = get_gene_protein_id($gene);
   #print "Have protein id ".$gene_protein_id."\n";
-  throw("Gene ".$gene_id." has no protein id") unless defined $gene_protein_id;
+  throw( "Gene " . $gene_id . " has no protein id" )
+    unless defined $gene_protein_id;
   $proteins{$gene_protein_id}++;
-  eval{
-    $sth->execute($gene_protein_id."_".$proteins{$gene_protein_id}, $proteins{$gene_protein_id}, $gene_id);
-    foreach my $transcript(@{$gene->get_all_Transcripts}){
-      my $transcript_protein_id = get_transcript_protein_id($transcript);
+  eval {
+    $sth->execute( $gene_protein_id . "_" . $proteins{$gene_protein_id},
+                   $proteins{$gene_protein_id}, $gene_id );
+    foreach my $transcript ( @{ $gene->get_all_Transcripts } ) {
+      my $transcript_protein_id =
+        get_transcript_protein_id($transcript);
       $transcript_proteins{$transcript_protein_id}++;
-      $trans_sth->execute($transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}, 
-                          $transcript_proteins{$transcript_protein_id}, $transcript->dbID);
+      $trans_sth->execute(
+                         $transcript_protein_id . "_" .
+                           $transcript_proteins{$transcript_protein_id},
+                         $transcript_proteins{$transcript_protein_id},
+                         $transcript->dbID );
       my $translation = $transcript->translation;
-      $translation_sth->execute($transcript_protein_id."_".$transcript_proteins{$transcript_protein_id},
-                                $transcript_proteins{$transcript_protein_id}, $translation->dbID);
+      $translation_sth->execute(
+                         $transcript_protein_id . "_" .
+                           $transcript_proteins{$transcript_protein_id},
+                         $transcript_proteins{$transcript_protein_id},
+                         $translation->dbID );
       my $exon_count = 1;
-      EXON:foreach my $exon(@{$transcript->get_all_Exons}){
-        next EXON if($exons{$exon->dbID});
-        my $stable_id = $transcript_protein_id."_".$transcript_proteins{$transcript_protein_id}.".".$exon_count;
+    EXON: foreach my $exon ( @{ $transcript->get_all_Exons } ) {
+        next EXON if ( $exons{ $exon->dbID } );
+        my $stable_id =
+          $transcript_protein_id . "_" .
+          $transcript_proteins{$transcript_protein_id} . "." .
+          $exon_count;
         $exon_count++;
-        #print "Storing ".$exon->dbID." with ".$stable_id." ".$transcript_proteins{$transcript_protein_id}."\n";
-        $exon_sth->execute($stable_id, 
-                           $transcript_proteins{$transcript_protein_id}, $exon->dbID);
-        $exons{$exon->dbID} = $stable_id;
+#print "Storing ".$exon->dbID." with ".$stable_id." ".$transcript_proteins{$transcript_protein_id}."\n";
+        $exon_sth->execute( $stable_id,
+                           $transcript_proteins{$transcript_protein_id},
+                           $exon->dbID );
+        $exons{ $exon->dbID } = $stable_id;
       }
-    }
+    } ## end foreach my $transcript ( @{...})
   };
-  if($@){
-    throw("Stable id insertion for gene ".$gene_id." failed $@");
+  if ($@) {
+    throw( "Stable id insertion for gene " . $gene_id . " failed $@" );
   }
-}
+} ## end foreach my $gene_id ( @{ $db...})
 
-
-sub get_gene_protein_id{
+sub get_gene_protein_id {
   my ($gene) = @_;
- 
-  my @exons = @{$gene->get_all_Exons};
+
+  my @exons = @{ $gene->get_all_Exons };
   my $protein_id;
-  
-  foreach my $exon(@exons){
-    foreach my $sf(@{$exon->get_all_supporting_features}){
+
+  foreach my $exon (@exons) {
+    foreach my $sf ( @{ $exon->get_all_supporting_features } ) {
       $protein_id = $sf->hseqname;
-      return $protein_id if($protein_id);
+      return $protein_id if ($protein_id);
     }
   }
-  if(!$protein_id){
-    throw("Found no protein id for ".$gene->dbID);
+  if ( !$protein_id ) {
+    throw( "Found no protein id for " . $gene->dbID );
   }
 }
 
-sub get_transcript_protein_id{
+sub get_transcript_protein_id {
   my ($transcript) = @_;
   my $protein_id;
-  foreach my $sf(@{$transcript->get_all_supporting_features}){
+  foreach my $sf ( @{ $transcript->get_all_supporting_features } ) {
     $protein_id = $sf->hseqname;
-      return $protein_id if($protein_id);
+    return $protein_id if ($protein_id);
   }
-  if(!$protein_id){
-    throw("Found no protein id for ".$transcript->dbID);
+  if ( !$protein_id ) {
+    throw( "Found no protein id for " . $transcript->dbID );
   }
 }
-
-
