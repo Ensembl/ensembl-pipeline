@@ -147,10 +147,10 @@ sub store_input_id_analysis {
   	print join("\t",($inputId, $analysis->dbID, $host, $analysis->db_version)) . "\n";
       my $sth = $self->prepare(qq{
       	REPLACE INTO input_id_analysis
-      	(input_id, input_id_type, analysis_id, created, runhost, db_version)
+      	(input_id, input_id_type, analysis_id, created, runhost, result)
       	values (?, ?, ?, now(), ?, ?)
       	});
-    $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $analysis->db_version || 'ERROR');
+    $sth->execute($inputId, $analysis->input_id_type, $analysis->dbID, $host, $save_runtime_info || 'ERROR');
   }else{
       my $sth = $self->prepare(qq{
       	INSERT INTO input_id_analysis

@@ -655,6 +655,8 @@ sub run_module {
   }
 
   my $current_verbosity = logger_verbosity;
+  my $start = 0;
+  my $end = 0;
   logger_verbosity($verbosity);
 
   #print STDERR "have perlpath ".$perl_path."\n";
@@ -695,6 +697,7 @@ sub run_module {
       # "RUNNING"
       eval {
         $self->set_status( "RUNNING" );
+        $start = $self->get_last_status->created();
         $rdb->db->dbc->disconnect_when_inactive(1); 
         $rdb->run;
         $rdb->db->dbc->disconnect_when_inactive(0); 
@@ -734,6 +737,7 @@ sub run_module {
         }
 
         $self->set_status("SUCCESSFUL");
+        $end = $self->get_last_status->created();
       }; 
       if ($err = $@) {
         $self->set_status( "FAILED" );
@@ -749,6 +753,7 @@ sub run_module {
   # update job in StateInfoContainer
   eval {
     my $sic = $self->adaptor->db->get_StateInfoContainer;
+    $SAVE_RUNTIME_INFO = $end - $start;
     $sic->store_input_id_analysis(
                                   $self->input_id,
                                   $self->analysis,
@@ -851,7 +856,7 @@ sub get_all_status {
 =head2 get_last_status
 
   Title   : get_last_status
-  Usage   : my @status = $job->get_all_status ($status)
+  Usage   : my @status = $job->get_last_status ($status)
   Function: Get latest status object associated with this job
   Returns : Bio::EnsEMBL::Pipeline::Status
   Args    : status string
