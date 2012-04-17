@@ -120,7 +120,7 @@ use vars qw(%Config);
       resource   => 'select[mem>200] rusage[mem=200]',
       retries    => 1,
       sub_args   => '-M200000',
-      queue      => 'small',
+      queue      => 'normal',
       output_dir => '<DATADIR>/<species>/Blast_miRNA',
       cleanup    => 'no',
     },
