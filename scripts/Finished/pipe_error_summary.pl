@@ -67,8 +67,9 @@ use DBI;
 sub slurp_file {
     my ($file) = @_;
     
+    local $/ = undef;
     open(my $fh, '<', $file) or die "Can't read '$file'; $!";
-    my $contents = join('', <$fh>);
+    my $contents = <$fh>;
     close $fh or die "Error reading '$file'; $!";
     return $contents;
 }
