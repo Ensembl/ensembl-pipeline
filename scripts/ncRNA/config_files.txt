@@ -126,11 +126,11 @@ use vars qw(%Config);
     },
     {
       logic_name => 'RfamBlast',
-      batch_size => 500,
+      batch_size => 300,
       resource   => 'select[mem>300] rusage[mem=300]',
       retries    => 1,
       sub_args   => '-M300000',
-      queue      => 'small',
+      queue      => 'normal',
       output_dir => '<DATADIR>/<species>/RfamBlast',
       cleanup    => 'no',
     },
