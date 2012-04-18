@@ -49,7 +49,7 @@ use vars qw(%Config);
   DEFAULT_LSF_PERL          =>'/usr/local/ensembl32/bin/perl', # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
   QUEUE_CONFIG => [
     {  logic_name => '<newFeatureName>',
-       batch_size => 1,
+       batch_size => <BATCH_SIZE>,
        resource   => '<RESOURCE>',
        #'model=IBMBC2800',
        # or 'select[mem>2000] rusage[mem=2000]'
@@ -57,7 +57,7 @@ use vars qw(%Config);
        retries         => 1,
        sub_args        => '',
        runner          => '',
-       queue           => 'long',
+       queue           => 'normal',
        output_dir      => '<outDIR>',
        cleanup         => 'no',
        runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB', }
