@@ -115,6 +115,8 @@ use vars qw(%Config);
 
         RESOURCE => '-R"select[mem>1000] rusage[mem=1000]" -M 1000000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
+        RETRY_RESOURCE => 'R"select[mem>2000] rusage[mem=2000]" -M 2000000',
+        RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
 
@@ -170,6 +172,8 @@ use vars qw(%Config);
 
         RESOURCE => '-R"select[mem>1000] rusage[mem=1000]" -M 1000000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
+        RETRY_RESOURCE => 'R"select[mem>2000] rusage[mem=2000]" -M 2000000',
+        RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
 
@@ -180,7 +184,7 @@ use vars qw(%Config);
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/NCBIM37/genome/softmasked_dusted/toplevel_sequence.fa',
+        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/GRCm38/softmasked_dusted/toplevel.fa',
 
         # Chunk size recommendations: 1500 for mouse
         # otherwise get AWOL jobs in first run
