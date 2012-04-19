@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.73 2012-03-21 18:20:00 db8 Exp $
+#$Id: cDNA_update.pl,v 1.74 2012-04-19 10:05:58 mr6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -263,45 +263,47 @@ my $submitName      = "SubmitcDNAChunk";
 my $genomelist      = join "\',\'", @masked_genome;
 
 my %configvars = (
-                 "MIN_LENGTH"       => $MIN_LENGTH ,         # from cDNAUpdate
-                 "CVS_DIR"          => $CVS_DIR,             # from cDNAUpdate
-                 "DATA_DIR"         => $DATA_DIR,            # from cDNAUpdate
-                 "VERTRNA"          => $VERTRNA,             # from cDNAUpdate
-                 "VERTRNA_UPDATE"   => $VERTRNA_UPDATE,      # from cDNAUpdate
-                 "REFSEQ"           => $REFSEQ,              # from cDNAUpdate
-                 "FASTASPLIT"       => $FASTA_SPLIT,         # from cDNAUpdate
-                 "POLYA_CLIPPING"   => $POLYA_CLIPPING,      # from cDNAUpdate
-                 "RESOURCE"        => $RESOURCE,
-                 "DBUSER"        => $DBUSER,           # from cDNAUpdate
-                 "DBPASS"        => $DBPASS,           # from cDNAUpdate
-                 "DBUSER_RO"     => $DBUSER_RO,        # from cDNAUpdate
-                 "REF_DBNAME"    => $REF_DBNAME,       # from cDNAUpdate
-                 "REF_DBHOST"    => $REF_DBHOST,       # from cDNAUpdate
-                 "REF_DBPORT"    => $REF_DBPORT,       # from cDNAUpdate
-                 "PIPE_DBNAME"   => $PIPE_DBNAME,      # from cDNAUpdate
-                 "PIPE_DBHOST"   => $PIPE_DBHOST,      # from cDNAUpdate
-                 "PIPE_DBPORT"   => $PIPE_DBPORT,      # from cDNAUpdate
-                 "OUTPUT_DBNAME" => $OUTPUT_DBNAME,    # from cDNAUpdate
-                 "OUTPUT_DBHOST" => $OUTPUT_DBHOST,    # from cDNAUpdate
-                 "OUTPUT_DBPORT" => $OUTPUT_DBPORT,    # from cDNAUpdate
+                 "MIN_LENGTH"        => $MIN_LENGTH ,         # from cDNAUpdate
+                 "CVS_DIR"           => $CVS_DIR,             # from cDNAUpdate
+                 "DATA_DIR"          => $DATA_DIR,            # from cDNAUpdate
+                 "VERTRNA"           => $VERTRNA,             # from cDNAUpdate
+                 "VERTRNA_UPDATE"    => $VERTRNA_UPDATE,      # from cDNAUpdate
+                 "REFSEQ"            => $REFSEQ,              # from cDNAUpdate
+                 "FASTASPLIT"        => $FASTA_SPLIT,         # from cDNAUpdate
+                 "POLYA_CLIPPING"    => $POLYA_CLIPPING,      # from cDNAUpdate
+                 "RESOURCE"          => $RESOURCE,
+                 "RETRY_RESOURCE"    => $RETRY_RESOURCE,
+                 "DBUSER"            => $DBUSER,           # from cDNAUpdate
+                 "DBPASS"            => $DBPASS,           # from cDNAUpdate
+                 "DBUSER_RO"         => $DBUSER_RO,        # from cDNAUpdate
+                 "REF_DBNAME"        => $REF_DBNAME,       # from cDNAUpdate
+                 "REF_DBHOST"        => $REF_DBHOST,       # from cDNAUpdate
+                 "REF_DBPORT"        => $REF_DBPORT,       # from cDNAUpdate
+                 "PIPE_DBNAME"       => $PIPE_DBNAME,      # from cDNAUpdate
+                 "PIPE_DBHOST"       => $PIPE_DBHOST,      # from cDNAUpdate
+                 "PIPE_DBPORT"       => $PIPE_DBPORT,      # from cDNAUpdate
+                 "OUTPUT_DBNAME"     => $OUTPUT_DBNAME,    # from cDNAUpdate
+                 "OUTPUT_DBHOST"     => $OUTPUT_DBHOST,    # from cDNAUpdate
+                 "OUTPUT_DBPORT"     => $OUTPUT_DBPORT,    # from cDNAUpdate
                  "PRODUCTION_DBNAME" => $PRODUCTION_DBNAME,    # from cDNAUpdate
                  "PRODCUTION_DBHOST" => $PRODUCTION_DBHOST,    # from cDNAUpdate
                  "PRODUCTION_DBPORT" => $PRODUCTION_DBPORT,    # from cDNAUpdate
-                 "taxonomy_id"      => $TAX_ID,              # from cDNAUpdate
-                 "PROGRAM_NAME"     => $PROGRAM_NAME,        # from cDNAUpdate
-                 "PROGRAM_VERSION"  => $PROGRAM_VERSION,     # from cDNAUpdate
-                 "PROGRAM_FILE"     => $PROGRAM_FILE,        # from cDNAUpdate
-                 "MODULE_NAME"      => $MODULE_NAME,         # from cDNAUpdate
-                 "SOURCE_DIR"       => $SOURCE_DIR,          # from cDNAUpdate
-                 "REFSEQ_SOURCE"=> $REFSEQ_SOURCE,   # from cDNAUpdate
-                 "BATCH_SIZE" => $BATCH_SIZE,   # from cDNAUpdate
-                 "chunkDIR"         => $chunkDIR,
-                 "outDIR"           => $outDIR,
-                 "configDIR"        => $configDIR,
-                 "newfile"          => $newfile,
-                 "config_file"      => $config_file,
-                 "masked_genome"    => $genomelist,
-                 "newFeatureName"   => $newFeatureName );
+                 "taxonomy_id"       => $TAX_ID,              # from cDNAUpdate
+                 "PROGRAM_NAME"      => $PROGRAM_NAME,        # from cDNAUpdate
+                 "PROGRAM_VERSION"   => $PROGRAM_VERSION,     # from cDNAUpdate
+                 "PROGRAM_FILE"      => $PROGRAM_FILE,        # from cDNAUpdate
+                 "MODULE_NAME"       => $MODULE_NAME,         # from cDNAUpdate
+                 "SOURCE_DIR"        => $SOURCE_DIR,          # from cDNAUpdate
+                 "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,   # from cDNAUpdate
+                 "BATCH_SIZE"        => $BATCH_SIZE,   # from cDNAUpdate
+                 "RETRY_BATCH_SIZE"  => $RETRY_BATCH_SIZE,
+                 "chunkDIR"          => $chunkDIR,
+                 "outDIR"            => $outDIR,
+                 "configDIR"         => $configDIR,
+                 "newfile"           => $newfile,
+                 "config_file"       => $config_file,
+                 "masked_genome"     => $genomelist,
+                 "newFeatureName"    => $newFeatureName );
 
 # Fasta chunk specifications:
 my $maxseqlength      = 17000;
@@ -546,6 +548,7 @@ elsif ( $option eq "run" ) {
             $configvars{"chunkDIR"}       = $chunkDIR;
             $outDIR                       = $DATA_DIR . "/output2";
             $configvars{"outDIR"}         = $outDIR;
+            $configvars{"RESOURCE"}       = $configvars{"RETRY_RESOURCE"};
 
             $progress_status = get_status($pipe_db->dbc());
 
@@ -1320,7 +1323,8 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = "perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+    $cmd = "bsub -I " . $RESOURCE
+         . " perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
          . " -dbhost "     . $PIPE_DBHOST
          . " -dbport "     . $PIPE_DBPORT
          . " -dbuser "     . $DBUSER
@@ -1530,6 +1534,7 @@ sub chase_jobs {
                 $configvars{"chunkDIR"}       = $chunkDIR;
                 $outDIR                       = $DATA_DIR . "/output3";
                 $configvars{"outDIR"}         = $outDIR;
+                $configvars{"BATCH_SIZE"}     = $configvars{"RETRY_BATCH_SIZE"};
 
                 # Check that the new exonerate parameters are set
                 config_setup();
