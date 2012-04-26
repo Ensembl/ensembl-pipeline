@@ -60,7 +60,7 @@ seq_region table.
 
 =head1 OPTIONS
 
-    DB CONNECT OPTIONS:
+    DB OPTIONS:
     -dbhost    Host name for the database
     -dbport    Port number for the database
     -dbuser    What username to connect as
@@ -86,12 +86,18 @@ seq_region table.
                have a rank of n. There can only be one coordinate
                system for a given rank.
 
-
     -sequence_level
                Flag to denete that this coordinate system is a
                'sequence level'. This means that sequence will be
                stored from the FASTA file in the dna table. This
                option isn't valid for an agp_file.
+
+    -components
+               When loading an AGP, the default behaviour is to load
+               seq_regions from the OBJECT level. Setting this flag
+               will load seq_regions from the COMPONENT level. Note,
+               it will not populate the assembly table, use
+               load_agp.pl instead
 
 
     OTHER OPTIONS:
@@ -128,14 +134,15 @@ use Bio::SeqIO;
 
 use Getopt::Long;
 
-my ($dbhost, $dbport, $dbuser, $dbpass);
-my ($dbname, $regex, $name_file);
+my ($dbhost, $dbport, $dbuser, $dbpass, $dbname);
+my ($regex, $name_file);
 
 my $cs_name;
 my $cs_version;
 my $default = 0;
 my $rank;
 my $sequence_level = 0;
+my $components = 0;
 
 my $agp;
 my $fasta;
@@ -152,9 +159,10 @@ my $verbose = 0;
 
             'coord_system_name:s'    => \$cs_name,
             'coord_system_version:s' => \$cs_version,
+            'default_version!'       => \$default,
             'rank:i'                 => \$rank,
             'sequence_level!'        => \$sequence_level,
-            'default_version!'       => \$default,
+            'components!'            => \$components,
 
             'agp_file:s'   => \$agp,
             'fasta_file:s' => \$fasta,
@@ -257,7 +265,7 @@ if($fasta){
 
 ## Process the AGP file
 if($agp){
-  &process_agp($agp, $cs, $sa, %acc_to_name);
+  &process_agp($agp, $cs, $sa, \%acc_to_name, $components);
 }
 
 warn "Done\n";
@@ -320,60 +328,69 @@ sub process_fasta{
 
 
 sub process_agp{
-  my ($agp_file, $cs, $sa, %acc_to_name) = @_;
-  my %end_value;
+  my ($agp_file, $cs, $sa, $acc_to_name_href, $components) = @_;
+  
+  my %sequence_length;
   
   open(FH, $agp_file)
     or throw("Can't open AGP file '$agp_file' : $!");
   
- while(<FH>){
-    chomp;
+  while(<FH>){
     next if /^\#/;
-
+    chomp;
+    
+    ## See:
+    ## http://www.ncbi.nlm.nih.gov/projects/genome/assembly/agp/AGP_Specification.shtml
+    my @value = split/\t/;
+    
     #GL000001.1      1       615     1       F       AP006221.1      36117   36731   -
     #GL000001.1      616     167417  2       F       AL627309.15     103     166904  +
     #GL000001.1      167418  217417  3       N       50000   clone   yes
-
-    #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
-    #cb25.fpc4250	151062	152023	14	N	962	telomere	yes
-
-    my @values = split;
-    my $initial_name = $values[0];
-   
-    # remove the 'chr' string if it exists
-    if ($initial_name =~ /^chr(\S+)/) {
-      $initial_name = $1;
+    
+    #cb25.fpc4250       119836  151061  13      W       c004100191.Contig2      1       31226   +
+    #cb25.fpc4250       151062  152023  14      N       962     telomere        yes
+    
+    
+    ## Skip gap rows
+    next if $value[4] eq 'U';
+    next if $value[4] eq 'N';
+    
+    ## Collect values for the object level
+    my ($name, $start, $end) = @value[0,1,2];
+    
+    ## Or use the component level
+    if($components){
+        ($name, $start, $end) = @value[5,6,7];
     }
     
-    my $name;
-
-    if ($acc_to_name{$initial_name}){
-      $name = $acc_to_name{$initial_name};
-    }
-    else{
-      $name = $initial_name;
-    }
+    ## Remove 'chr' for some reason
+    my $rename = $name;
     
-    print "Name: $name\n"
+    $rename = $1
+      if $name =~ /^chr(\S+)$/;
+    
+    ## Rename for some reason
+    $rename = $acc_to_name_href->{$name}
+      if exists $acc_to_name_href->{$name};
+    
+    print "Name: $rename\n"
       if $verbose;
     
-    my $end = $values[2];
-    if(!$end_value{$name}){
-      $end_value{$name} = $end;
-    }else{
-      if($end > $end_value{$name}){
-        $end_value{$name} = $end;
-      }
-    }
+    ## Get the length of the sequence
+    $sequence_length{$rename} = 0
+      unless exists $sequence_length{$rename};
+    $sequence_length{$rename} = $end
+      if $end > $sequence_length{$rename};
+    
   }
   
-  foreach my $name (keys %end_value){
-    my $end = $end_value{$name};
-    my $slice = &make_slice( $name, 1, $end, $end, 1, $cs );
+  foreach my $name (keys %sequence_length){
+    my $length = $sequence_length{$name};
+    my $slice = &make_slice( $name, 1, $length, $length, 1, $cs );
     $sa->store($slice);
   }
   
-  return scalar keys %end_value;
+  return scalar keys %sequence_length;
 }
 
 
