@@ -6,64 +6,104 @@ load_seq_region.pl
 
 =head1 SYNOPSIS
 
-  load_seq_region.pl 
+  load_seq_region.pl <DB CONNECT OPTIONS> \
+    { --dbname <databse name> | --regex <?> } \
+    <COORDINATE SYSTEM OPTIONS> \
+    { -fasta file <my.fa> | -agp_file {my.agp} }
 
 =head1 DESCRIPTION
 
-This script can do three things. Use the entries in a fasta file to load
-a set of seq_regions into the seq_region object. If desried the sequence
-can also be stored. It can also load seq_regions which represent the
-assembled pieces from an agp file. The assembled pieces are represented by 
-the first 3 columns of the agp for further definition of the format see here
+This script can do three things:
 
-http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
+1) Use entries in a FASTA file to load a set of seq_regions into the
+   seq_region table.
 
-here are example commandlines
+2) The sequence from the FASTA file can be optionally added to the dna
+   table.
 
-this would load the sequence in the given file into the database under
-a coord system called contig. 
+3) It can load seq_regions that represent the objects in an AGP file.
 
-./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name contig -rank 4 -sequence_level -fasta_file sequence.fa
-
-this would just load seq_regions to represent the entries in this file
-
-./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name clone -rank 3 -fasta_file clone.fa
-
-this will load the assembled pieces from the agp file into the seq_region
-table. T
-./load_seq_region -dbhost host -dbuser user -dbname my_db -dbpass ****
--coord_system_name chromosome -rank 1 -agp_file genome.agp
+In all cases, appropriate (configurable) entries will be added to the
+coord_system_table.
 
 
+Here are example usages:
+
+This would load the *sequences* in the given FASTA file into the
+database under a coord system called contig:
+
+./load_seq_region.pl \
+  -dbhost host -dbuser user -dbname my_db -dbpass **** \
+  -coord_system_name contig -rank 4 -sequence_level \
+  -fasta_file sequence.fa
+
+
+This would just load seq_regions to represent the entries in this
+FASTA file:
+
+./load_seq_region.pl \
+  -dbhost host -dbuser user -dbname my_db -dbpass **** \
+  -coord_system_name clone -rank 3 \
+  -fasta_file clone.fa
+
+
+This will load the assembled pieces from the AGP file into the
+seq_region table. 
+
+./load_seq_region \
+  -dbhost host -dbuser user -dbname my_db -dbpass **** \
+  -coord_system_name chromosome -rank 1 \
+  -agp_file genome.agp
 
 
 
 =head1 OPTIONS
 
-    -dbhost    host name for database (gets put as host= in locator)
-    -dbname    For RDBs, what name to connect to (dbname= in locator)
-    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
-    -dbpass    For RDBs, what password to use (dbpass= in locator)
+    DB CONNECT OPTIONS:
+    -dbhost    Host name for the database
+    -dbname    For RDBs, what name to connect to
+    -dbuser    For RDBs, what username to connect as
+    -dbpass    For RDBs, what password to use
 
-    -coord_system_name the name of the coordinate system being stored
-    -coord_system_version the version of the coordinate system being stored
-    -rank the rank of the coordinate system.  The highest coordinate system
-          should have a rank of 1 (e.g. the chromosome coord system).  The nth
-          highest should have a rank of n.  There can only be one coordinate 
-          system for a given rank.
-    -default_version shows this version is the default version of the 
-                     coordinate system
-    -sequence_level reflects this is a sequence level coordinate system and
-    means sequence will be stored from the fasta file. This option isn't valid
-    if an agp_file is being passed in'
-    -agp_file the name of the agp file to be parsed
-    -fasta_file, name of the fasta file to be parsed without the presence of
-             the -sequence_level option the sequence will not be stored
-    -verbose, prints the name which is going to be used can be switched 
-              off with -noverbose
-    -help      displays this documentation with PERLDOC
+
+    COORDINATE SYSTEM OPTIONS:
+
+    -coord_system_name
+               The name of the coordinate system being stored.
+
+    -coord_system_version
+               The version of the coordinate system being stored.
+
+    -default_version
+               Flag to denote that this version is the default version
+               of the coordinate system.
+
+    -rank      The rank of the coordinate system. The highest
+               coordinate system should have a rank of 1 (e.g. the
+               chromosome coordinate system). The nth highest should
+               have a rank of n. There can only be one coordinate
+               system for a given rank.
+
+
+    -sequence_level
+               Flag to denete that this coordinate system is a
+               'sequence level'. This means that sequence will be
+               stored from the FASTA file in the dna table. This
+               option isn't valid for an agp_file.
+
+
+    OTHER OPTIONS:
+
+    -agp_file   The name of the agp file to be parsed.
+
+    -fasta_file The name of the fasta file to be parsed. Without the
+                presence of the -sequence_level option the sequence
+                will not be stored.
+
+    -verbose    Prints the name which is going to be used can be switched
+                off with -noverbose
+
+    -help     Displays this documentation with PERLDOC.
 
 =cut
 
