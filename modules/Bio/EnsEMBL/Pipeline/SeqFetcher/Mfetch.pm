@@ -47,6 +47,9 @@ rearrange(order, list); #instead
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Mfetch.pm,v $
+# $Revision: 1.21 $ 
+
 # Let the code begin...
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Mfetch;
 
