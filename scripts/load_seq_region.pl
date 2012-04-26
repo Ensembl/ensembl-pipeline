@@ -69,12 +69,15 @@ table. T
 
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::SeqIO;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
-use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
-my $host   = '';
+
+use Bio::SeqIO;
+
+use Getopt::Long;
+
+my $dbhost   = '';
 my $port   = '';
 my $dbname = '';
 my $dbuser = '';
@@ -92,27 +95,31 @@ my $regex;
 my $name_file;
 
 &GetOptions(
-            'dbhost:s'   => \$host,
-            'dbport:n'   => \$port,
-            'dbname:s'   => \$dbname,
-            'dbuser:s'   => \$dbuser,
-            'dbpass:s'   => \$dbpass,
-            'coord_system_name:s' => \$cs_name,
+            'dbhost|host:s' => \$dbhost,
+            'dbport|port:n' => \$port,
+            'dbname|D:s'    => \$dbname,
+            'dbuser|user:s' => \$dbuser,
+            'dbpass|pass:s' => \$dbpass,
+
+            'coord_system_name:s'    => \$cs_name,
             'coord_system_version:s' => \$cs_version,
-            'rank:i' => \$rank,
-            'sequence_level!' => \$sequence_level,
-            'default_version!' => \$default,
-            'agp_file:s' => \$agp,
+            'rank:i'                 => \$rank,
+            'sequence_level!'        => \$sequence_level,
+            'default_version!'       => \$default,
+
+            'agp_file:s'   => \$agp,
             'fasta_file:s' => \$fasta,
-            'verbose!' => \$verbose,
-            'regex:s' => \$regex,
+
+            'regex:s'     => \$regex,
             'name_file:s' => \$name_file,
-            'h|help'     => \$help,
+
+            'verbose!' => \$verbose,
+            'h|help'   => \$help,
            ) or ($help = 1);
 
-if(!$host || !$dbuser || !$dbname || !$dbpass){
+if(!$dbhost || !$dbuser || !$dbname || !$dbpass){
   print STDERR "Can't store sequence without database details\n";
-  print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
+  print STDERR "-dbhost $dbhost -dbuser $dbuser -dbname $dbname ".
     " -dbpass $dbpass\n";
   $help = 1;
 }
@@ -140,7 +147,7 @@ if ($help) {
 
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
-    -host   => $host,
+    -host   => $dbhost,
     -user   => $dbuser,
     -port   => $port,
     -pass   => $dbpass
