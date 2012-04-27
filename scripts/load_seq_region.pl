@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/local/ensembl/bin/perl
 
 =head1 NAME
 
@@ -9,7 +9,7 @@ load_seq_region.pl
 
   load_seq_region.pl <DB OPTIONS> \
     <COORDINATE SYSTEM OPTIONS> \
-    { -fasta file <my.fa> | -agp_file {my.agp} }
+    { -fasta file <my.fa> | -agp_file <my.agp> }
 
 
 =head1 DESCRIPTION
@@ -67,6 +67,9 @@ seq_region table.
     -dbpass    What password to use
     -dbname    What database to connect to
 
+               For convenience, -host, -port, -user, -pass, and -D are
+               also accepted as aliases for the above, respectively.
+
 
     COORDINATE SYSTEM OPTIONS:
 
@@ -108,23 +111,25 @@ seq_region table.
                 presence of the -sequence_level option the sequence
                 will not be stored.
 
-    -verbose    Prints the name which is going to be used can be switched
-                off with -noverbose
-
-    -help       Displays this documentation with PERLDOC.
+    -regex      A regex to parse the desired sequence ID from the
+                FASTA description line.
 
 
     MISC OPTIONS:
 
-    -regex      A regex to parse the desired sequence ID from the
-                FASTA description line.
+    -help       Displays this documentation with PERLDOC.
+    -verbose    Prints ... summin
 
-    -name_file  Accession to 'name' mapping file, only used when
-                parsing AGPs.
+
+=head1 MAINTAINER
+
+Dan Bolser dbolser@ebi.ac.uk
 
 =cut
 
 use strict;
+use warnings;
+
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
@@ -135,7 +140,7 @@ use Bio::SeqIO;
 use Getopt::Long;
 
 my ($dbhost, $dbport, $dbuser, $dbpass, $dbname);
-my ($regex, $name_file);
+my $regex;
 
 my $cs_name;
 my $cs_version;
@@ -153,9 +158,9 @@ my $verbose = 0;
 &GetOptions(
             'dbhost|host:s' => \$dbhost,
             'dbport|port:n' => \$dbport,
-            'dbname|D:s'    => \$dbname,
             'dbuser|user:s' => \$dbuser,
             'dbpass|pass:s' => \$dbpass,
+            'dbname|D:s'    => \$dbname,
 
             'coord_system_name:s'    => \$cs_name,
             'coord_system_version:s' => \$cs_version,
@@ -166,35 +171,30 @@ my $verbose = 0;
 
             'agp_file:s'   => \$agp,
             'fasta_file:s' => \$fasta,
-
-            'regex:s'     => \$regex,
-            'name_file:s' => \$name_file,
+            'regex:s'      => \$regex,
 
             'verbose!' => \$verbose,
-            'h|help'   => \$help,
+            'help'     => \$help,
            ) or ($help = 1);
 
 if( !$dbhost || !$dbuser || !$dbname || !$dbpass ){
   print STDERR "Can't store sequence without database details\n";
-  print STDERR "-dbhost $dbhost -dbuser $dbuser -dbname $dbname ".
-    " -dbpass $dbpass\n";
   $help = 1;
 }
 
 if( !$cs_name || (!$fasta  && !$agp) ){
-  print STDERR "Need coord_system_name and fasta/agp file to beable to run\n";
-  print STDERR "-coord_system_name $cs_name -fasta_file $fasta -agp_file $agp\n";
+  print STDERR "Need a coord_system_name and a FASTA or an AGP file!\n";
   $help = 1;
 }
 
 if($agp && $sequence_level){
-  print STDERR ("Can't use an agp file $agp to store a ".
-                "sequence level coordinate system ".$cs_name."\n");
+  print STDERR ("Can't use an AGP file $agp to store a ".
+                "sequence level coordinate system!\n");
   $help = 1;
 }
 
 if(!$rank) {
-  print STDERR "A rank for the coordinate system must be specified " .
+  print STDERR "A rank for the coordinate system must be specified ".
     "with the -rank argument\n";
     $help = 1;
 }
@@ -220,25 +220,11 @@ my $csa = $db->get_CoordSystemAdaptor();
 my $sa = $db->get_SliceAdaptor();
 
 
-## Get a name mapping hash
-my %acc_to_name;
-if ($name_file){
-  open(NF, $name_file)
-    or throw("Can't open name file '$name_file' : $!");
-  while(<NF>){
-    chomp;
-    my ($acc, $name) = split(/\s+/,$_);
-    $acc_to_name{$acc} = $name;
-  }
-}
-
-
-## Get an existing coord system or create a new one
+## Get an existing coord system...
 my $cs;
+eval{ $cs = $csa->fetch_by_name($cs_name, $cs_version) };
 
-eval{
-  $cs = $csa->fetch_by_name($cs_name, $cs_version);
-};
+## or create a new one
 if(!$cs){
   $cs = Bio::EnsEMBL::CoordSystem->new
     (
@@ -252,8 +238,7 @@ if(!$cs){
 }
 
 
-
-## Process the FASTA file
+## Process the FASTA file...
 if($fasta){
   my $count_ambiguous_bases =
     &process_fasta( $fasta, $cs, $sa, $sequence_level, $regex );
@@ -263,9 +248,9 @@ if($fasta){
 }
 
 
-## Process the AGP file
+## or process the AGP file
 if($agp){
-  &process_agp($agp, $cs, $sa, \%acc_to_name, $components);
+  &process_agp($agp, $cs, $sa, $components);
 }
 
 warn "Done\n";
@@ -328,7 +313,7 @@ sub process_fasta{
 
 
 sub process_agp{
-  my ($agp_file, $cs, $sa, $acc_to_name_href, $components) = @_;
+  my ($agp_file, $cs, $sa, $components) = @_;
   
   my %sequence_length;
   
@@ -363,24 +348,11 @@ sub process_agp{
         ($name, $start, $end) = @value[5,6,7];
     }
     
-    ## Remove 'chr' for some reason
-    my $rename = $name;
-    
-    $rename = $1
-      if $name =~ /^chr(\S+)$/;
-    
-    ## Rename for some reason
-    $rename = $acc_to_name_href->{$name}
-      if exists $acc_to_name_href->{$name};
-    
-    print "Name: $rename\n"
-      if $verbose;
-    
     ## Get the length of the sequence
-    $sequence_length{$rename} = 0
-      unless exists $sequence_length{$rename};
-    $sequence_length{$rename} = $end
-      if $end > $sequence_length{$rename};
+    $sequence_length{$name} = 0
+      unless exists $sequence_length{$name};
+    $sequence_length{$name} = $end
+      if $end > $sequence_length{$name};
     
   }
   
