@@ -20,8 +20,11 @@ Required arguments:
   --chromosomes, --chr=LIST           only process LIST chromosomes
   --altchromosomes, --altchr=LIST     supply alternative chromosome names (the two lists must agree)
 
+One of
+  -n, --dry_run, --dry                don't write results to database } supply one, there
+      --wet_run, --wet                do write results to database    } is no default
+
 Optional arguments:
-  -n, --dry_run, --dry=0|1            don't write results to database (default: true)
   --author                            author login used to lock the assemblies (must be set to write the changes)
   --ref_start                         start coordinate on reference chromosomes
   --ref_end                           end coordinate on reference chromosomes
@@ -82,6 +85,7 @@ my $support = AssemblyMapper::Support->new(
         'alt_end=i',
         'author=s',
         'email=s',
+        'wet_run|wet!',
         'skip_stable_id=s@',
         'gene_prefix=s',
     ],
@@ -92,11 +96,13 @@ unless ($support->parse_arguments(@_)) {
     pod2usage(1);
 }
 
-# Play safe
+# Play safe.  The run may take some hours, we must ensure the caller
+# is awake enough to choose rollback mode.
 {
-    my $dry = $support->param('dry_run');
-    die "Dry-run option is not explicitly set to 0 or 1"
-      unless defined $dry && $dry =~ /^[01]$/;
+    my $dry = $support->param('dry_run'); # was --dry_run=s until e!v65, now is a switch
+    my $wet = $support->param('wet_run');
+    die "Please specify either --dry or --wet.  I cannot run damp"
+      unless ($dry xor $wet);
 }
 
 
@@ -111,7 +117,7 @@ my $dbh = $dbc->db_handle;      # ONLY for transaction control
 
 my $assembly    = $support->ref_asm;
 my $altassembly = $support->alt_asm;
-my $write_db    = not $support->param('dry_run');
+my $write_db    = $support->param('wet_run');
 my $author      = $support->param('author');
 my $email       = $support->param('email') || $author;
 my $haplo       = $support->param('haplotype');
