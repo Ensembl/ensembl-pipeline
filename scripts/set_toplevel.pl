@@ -47,27 +47,29 @@ use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 
-{ # block to avoid namespace pollution
-  my $host   = '';
-  my $port   = '';
+{ # block to avoid namespace pollution what are you talking about?
+  my $dbhost = '';
+  my $dbport = '';
   my $dbname = '';
   my $dbuser = '';
   my $dbpass = '';
+
   my $help;
+
   my @coord_system;
 
-  GetOptions( 'dbhost:s'               => \$host,
-              'dbport:n'               => \$port,
-              'dbname:s'               => \$dbname,
-              'dbuser:s'               => \$dbuser,
-              'dbpass:s'               => \$dbpass,
+  GetOptions( 'dbhost|host:s'          => \$dbhost,
+              'dbport|port:n'          => \$dbport,
+              'dbuser|user:s'          => \$dbuser,
+              'dbpass|pass:s'          => \$dbpass,
+              'dbname|D:s'             => \$dbname,
               'ignore_coord_system:s@' => \@coord_system,
               'h|help'                 => \$help,
   ) or ( $help = 1 );
 
-  if(!$host || !$dbuser || !$dbname || !$dbpass){
+  if(!$dbhost || !$dbuser || !$dbname || !$dbpass){
     print STDERR "Can't store sequence without database details\n";
-    print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
+    print STDERR "-dbhost $dbhost -dbuser $dbuser -dbname $dbname ".
       " -dbpass $dbpass\n";
     $help = 1;
   }
@@ -82,9 +84,9 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
   my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new
     (-dbname => $dbname,
-     -host   => $host,
+     -host   => $dbhost,
      -user   => $dbuser,
-     -port   => $port,
+     -port   => $dbport,
      -pass   => $dbpass);
 
   my $csa = $db->get_CoordSystemAdaptor();
