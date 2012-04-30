@@ -74,140 +74,165 @@ use Bio::Vega::ContigLockBroker;
 use Bio::Vega::Author;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-$| = 1;
 
-my $support = AssemblyMapper::Support->new(
-    extra_options => [
-        'haplotype!',
-        'ref_start=i',
-        'ref_end=i',
-        'alt_start=i',
-        'alt_end=i',
-        'author=s',
-        'email=s',
-        'wet_run|wet!',
-        'skip_stable_id=s@',
-        'gene_prefix=s',
-    ],
+my ($A_end, $A_start, $R_dba, $R_end, $R_start, $altassembly, $assembly);
+
+my ($author, $cs_change, $dbc, $dbh, $email, $geneAd, $geneAd_save,
+    $haplo, $prefix, $sfeat_Ad, $sfeat_Ad_save, $skip_gene, $sliceAd,
+    $support, $write_db);
+
+my ($sql_sr_update, $sth_attrib_type_delete, $sth_attrib_type_insert, $sth_attrib_type_select);
+
+sub main {
+    $| = 1;
+
+    $support = AssemblyMapper::Support->new(
+        extra_options => [
+            'haplotype!',
+            'ref_start=i',
+            'ref_end=i',
+            'alt_start=i',
+            'alt_end=i',
+            'author=s',
+            'email=s',
+            'wet_run|wet!',
+            'skip_stable_id=s@',
+            'gene_prefix=s',
+        ],
+        );
+
+    unless ($support->parse_arguments(@_)) {
+        warn $support->error if $support->error;
+        pod2usage(1);
+    }
+
+    # Play safe.  The run may take some hours, we must ensure the caller
+    # is awake enough to choose rollback mode.
+    {
+        my $dry = $support->param('dry_run'); # was --dry_run=s until e!v65, now is a switch
+        my $wet = $support->param('wet_run');
+        die "Please specify either --dry or --wet.  I cannot run damp"
+          unless ($dry xor $wet);
+    }
+
+
+    $support->connect_dbs( rebless_dba => "Bio::Vega::DBSQL::DBAdaptor" );
+
+    # database connection
+    my $R_dba = $support->ref_dba;
+    my $A_dba = $support->alt_dba;
+
+    my $dbc = $R_dba->dbc;          # for all SQL except...
+    my $dbh = $dbc->db_handle;      # ONLY for transaction control
+
+    $assembly    = $support->ref_asm;
+    $altassembly = $support->alt_asm;
+    $write_db    = $support->param('wet_run');
+    $author      = $support->param('author');
+    $email       = $support->param('email') || $author;
+    $haplo       = $support->param('haplotype');
+    $prefix      = $support->param('gene_prefix');
+
+    $R_start = $support->ref_start;
+    $R_end   = $support->ref_end;
+    $A_start = $support->alt_start;
+    $A_end   = $support->alt_end;
+
+    $skip_gene = join(',',$support->param('skip_stable_id'));
+    $skip_gene ||= "NOGENETOSKIP";
+
+    throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
+
+    $geneAd   = $R_dba->get_GeneAdaptor;
+    $sliceAd  = $R_dba->get_SliceAdaptor;
+    $sfeat_Ad = $R_dba->get_SimpleFeatureAdaptor();
+
+    $geneAd_save   = $A_dba->get_GeneAdaptor;
+#   my $sliceAd_save  = $A_dba->get_SliceAdaptor;
+    $sfeat_Ad_save = $A_dba->get_SimpleFeatureAdaptor();
+
+
+
+    # make sure that the coordinate system versions are different
+    # if they are the same (i.e. both Otter) create a temporary cs version MAPPING
+    my @sql_inserts = (
+        "insert ignore into meta (meta_key, meta_value) values
+        ('assembly.mapping', 'chromosome:MAPPING#contig'),
+        ('assembly.mapping', 'chromosome:MAPPING#contig#clone'),
+        ('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING');",
+        "insert ignore into coord_system (coord_system_id, name, version, rank, attrib)
+        values (1000, 'chromosome', 'MAPPING', 1000, '');",
+        "insert ignore into meta_coord (table_name, coord_system_id, max_length)
+        values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1);"
     );
 
-unless ($support->parse_arguments(@_)) {
-    warn $support->error if $support->error;
-    pod2usage(1);
-}
-
-# Play safe.  The run may take some hours, we must ensure the caller
-# is awake enough to choose rollback mode.
-{
-    my $dry = $support->param('dry_run'); # was --dry_run=s until e!v65, now is a switch
-    my $wet = $support->param('wet_run');
-    die "Please specify either --dry or --wet.  I cannot run damp"
-      unless ($dry xor $wet);
-}
-
-
-$support->connect_dbs( rebless_dba => "Bio::Vega::DBSQL::DBAdaptor" );
-
-# database connection
-my $R_dba = $support->ref_dba;
-my $A_dba = $support->alt_dba;
-
-my $dbc = $R_dba->dbc;          # for all SQL except...
-my $dbh = $dbc->db_handle;      # ONLY for transaction control
-
-my $assembly    = $support->ref_asm;
-my $altassembly = $support->alt_asm;
-my $write_db    = $support->param('wet_run');
-my $author      = $support->param('author');
-my $email       = $support->param('email') || $author;
-my $haplo       = $support->param('haplotype');
-my $prefix      = $support->param('gene_prefix');
-
-my $R_start = $support->ref_start;
-my $R_end   = $support->ref_end;
-my $A_start = $support->alt_start;
-my $A_end   = $support->alt_end;
-
-my $skip_gene = join(',',$support->param('skip_stable_id'));
-$skip_gene ||= "NOGENETOSKIP";
-
-throw("must set author name to lock the assemblies if you want to write the changes") if (!$author && $write_db);
-
-my $geneAd   = $R_dba->get_GeneAdaptor;
-my $sliceAd  = $R_dba->get_SliceAdaptor;
-my $sfeat_Ad = $R_dba->get_SimpleFeatureAdaptor();
-
-my $geneAd_save   = $A_dba->get_GeneAdaptor;
-my $sliceAd_save  = $A_dba->get_SliceAdaptor;
-my $sfeat_Ad_save = $A_dba->get_SimpleFeatureAdaptor();
-
-
-
-# make sure that the coordinate system versions are different
-# if they are the same (i.e. both Otter) create a temporary cs version MAPPING
-my @sql_inserts = (
-    "insert ignore into meta (meta_key, meta_value) values
-    ('assembly.mapping', 'chromosome:MAPPING#contig'),
-    ('assembly.mapping', 'chromosome:MAPPING#contig#clone'),
-    ('assembly.mapping', 'chromosome:Otter#chromosome:MAPPING');",
-    "insert ignore into coord_system (coord_system_id, name, version, rank, attrib)
-    values (1000, 'chromosome', 'MAPPING', 1000, '');",
-    "insert ignore into meta_coord (table_name, coord_system_id, max_length)
-    values ('exon', 1000, 1), ('gene', 1000, 1), ('simple_feature', 1000, 1), ('transcript', 1000, 1);"
-);
-
-my @sql_deletes = (
-    "delete from meta where meta_value like 'chromosome%MAPPING%';",
-    "delete from coord_system where version = 'MAPPING';",
-    "delete from meta_coord where coord_system_id = 1000;"
-);
-
-my $sql_sr_update = qq{
-    update seq_region s, coord_system cs
-    set s.coord_system_id = cs.coord_system_id
-    where s.name = ?
-    and cs.name = 'chromosome'
-    and cs.version = ?};
-
-# 1 and 2 below must be specifically set in order to
-# fetch the features on a particular seq_region and disable
-# the use of the mapping mechanism (used to test duplicates)
-
-# 1. sql queries to enable gene/simple_feature build
-my $sql_meta_bl_insert = qq{
-    insert ignore into meta (meta_key, meta_value) values
-    ('simple_featurebuild.level', '1'),
-    ('genebuild.level', '1')};
-my $sql_meta_bl_delete =
-qq{delete from meta where meta_key in ('simple_featurebuild.level','genebuild.level')};
-
-# 2. attrib_type_id 6 is a Top Level Non-Redundant Sequence Region
-my $sql_attrib_type_select =
-qq{SELECT COUNT(*) FROM seq_region_attrib WHERE seq_region_id = ? AND attrib_type_id = 6;};
-my $sql_attrib_type_insert =
-qq{insert into seq_region_attrib (seq_region_id, attrib_type_id, value) values (?, 6, 1)};
-my $sql_attrib_type_delete =
-qq{delete from seq_region_attrib where seq_region_id = ? and attrib_type_id = 6};
-
-my $sth_attrib_type_select = $dbc->prepare($sql_attrib_type_select);
-my $sth_attrib_type_insert = $dbc->prepare($sql_attrib_type_insert);
-my $sth_attrib_type_delete = $dbc->prepare($sql_attrib_type_delete);
-
-my $cs_change = 0;
-
-if ( $assembly eq $altassembly ) {
-    $cs_change   = 1;
-    $altassembly = 'MAPPING';
-
-    map { $dbc->do($_) } @sql_inserts;
-    $dbc->do($sql_meta_bl_insert);
-}
-
-my $ok = $support->iterate_chromosomes(
-    prev_stage =>     '40-fix_overlaps',
-    this_stage =>     '50-transfer_anno',
-    worker =>         \&do_transfer_anno,
+    my @sql_deletes = (
+        "delete from meta where meta_value like 'chromosome%MAPPING%';",
+        "delete from coord_system where version = 'MAPPING';",
+        "delete from meta_coord where coord_system_id = 1000;"
     );
+
+    $sql_sr_update = qq{
+        update seq_region s, coord_system cs
+        set s.coord_system_id = cs.coord_system_id
+        where s.name = ?
+        and cs.name = 'chromosome'
+        and cs.version = ?};
+
+    # 1 and 2 below must be specifically set in order to
+    # fetch the features on a particular seq_region and disable
+    # the use of the mapping mechanism (used to test duplicates)
+
+    # 1. sql queries to enable gene/simple_feature build
+    my $sql_meta_bl_insert = qq{
+        insert ignore into meta (meta_key, meta_value) values
+        ('simple_featurebuild.level', '1'),
+        ('genebuild.level', '1')};
+    my $sql_meta_bl_delete =
+    qq{delete from meta where meta_key in ('simple_featurebuild.level','genebuild.level')};
+
+    # 2. attrib_type_id 6 is a Top Level Non-Redundant Sequence Region
+    my $sql_attrib_type_select =
+    qq{SELECT COUNT(*) FROM seq_region_attrib WHERE seq_region_id = ? AND attrib_type_id = 6;};
+    my $sql_attrib_type_insert =
+    qq{insert into seq_region_attrib (seq_region_id, attrib_type_id, value) values (?, 6, 1)};
+    my $sql_attrib_type_delete =
+    qq{delete from seq_region_attrib where seq_region_id = ? and attrib_type_id = 6};
+
+    $sth_attrib_type_select = $dbc->prepare($sql_attrib_type_select);
+    $sth_attrib_type_insert = $dbc->prepare($sql_attrib_type_insert);
+    $sth_attrib_type_delete = $dbc->prepare($sql_attrib_type_delete);
+
+    $cs_change = 0;
+
+    if ( $assembly eq $altassembly ) {
+        $cs_change   = 1;
+        $altassembly = 'MAPPING';
+
+        map { $dbc->do($_) } @sql_inserts;
+        $dbc->do($sql_meta_bl_insert);
+    }
+
+    my $ok = $support->iterate_chromosomes(
+        prev_stage =>     '40-fix_overlaps',
+        this_stage =>     '50-transfer_anno',
+        worker =>         \&do_transfer_anno,
+        );
+
+    # remove temporary 'MAPPING' coordinate system from meta and coord_system table
+    if ($cs_change) {
+        map { $dbc->do($_) } @sql_deletes;
+        $dbc->do($sql_meta_bl_delete);
+    }
+
+    $support->log_stamped("\nDone.\n");
+
+    # finish logfile
+    $support->finish_log;
+
+    return 0;
+}
+
 
 sub do_transfer_anno {
     my ($asp, $data) = @_;
@@ -606,16 +631,6 @@ INFO: skipped PolyA features: %d/%d\n",
     $sth_attrib_type_delete->execute($ref_seq_region_id) unless $ref_attrib_set;
 }
 
-# remove temporary 'MAPPING' coordinate system from meta and coord_system table
-if ($cs_change) {
-    map { $dbc->do($_) } @sql_deletes;
-    $dbc->do($sql_meta_bl_delete);
-}
-
-$support->log_stamped("\nDone.\n");
-
-# finish logfile
-$support->finish_log;
 
 sub print_sql {
     my ($g,$tg, $ref_sid, $alt_sid, $R_chr, $A_chr) = @_;
@@ -1240,3 +1255,5 @@ sub write_gene {
     }
 }
 
+
+exit main();
