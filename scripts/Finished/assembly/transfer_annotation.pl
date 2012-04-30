@@ -119,11 +119,11 @@ sub main {
     $support->connect_dbs( rebless_dba => "Bio::Vega::DBSQL::DBAdaptor" );
 
     # database connection
-    my $R_dba = $support->ref_dba;
+    $R_dba = $support->ref_dba;
     my $A_dba = $support->alt_dba;
 
-    my $dbc = $R_dba->dbc;          # for all SQL except...
-    my $dbh = $dbc->db_handle;      # ONLY for transaction control
+    $dbc = $R_dba->dbc;          # for all SQL except...
+    $dbh = $dbc->db_handle;      # ONLY for transaction control
 
     $assembly    = $support->ref_asm;
     $altassembly = $support->alt_asm;
@@ -411,7 +411,7 @@ sub do_transfer_anno {
                                         $t->start,
                                         $t->end)
                                 );
-                                                &add_hidden_remark( $t->slice->seq_region_name, "missing_UTRs", $tt );
+                                &add_hidden_remark( $t->slice->seq_region_name, "missing_UTRs", $tt );
                                 &log_compare_transcripts($cds_t, $tt);
                                 &remove_all_db_ids($tt);
                             } else {
