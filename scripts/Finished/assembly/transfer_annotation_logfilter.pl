@@ -5,14 +5,35 @@ use warnings;
 use Getopt::Long;
 use CGI 'escapeHTML';
 
-# This is an expansion of a one-liner, which may be useful on
-# subsequent runs of transfer_annotation.pl
-#
-# It has ballooned into a mess with complex internal state; but it
-# would be better to rewrite the generation of its input
-# (transfer_annotation.pl) than fix this script.
 
-our $ICONS = '/icons/';
+=head1 NAME
+
+transfer_annotation_logfilter.pl - post-transfer assistance
+
+=head1 SYNOPSIS
+
+ # see serious stuff interactively
+ transfer_annotation_logfilter.pl transfer.log | less
+
+ # generate reports
+ mkdir html
+ transfer_annotation_logfilter.pl --html transfer.log
+
+=head1 DESCRIPTION
+
+This started off as a one-liner to find the serious stuff in the log
+output from L<transfer_annotation.pl>, and has grown.
+
+It has ballooned into a mess with complex internal state; but it may
+be better to rewrite the generation of its input
+(transfer_annotation.pl) than fix this script.
+
+=cut
+
+
+our $ICONS = '/icons/'; # cheerfully assume
+# a) we display under Apache
+# b) this directory is visible
 
 
 sub main {
@@ -55,6 +76,7 @@ sub main {
        qr{^( {3}chromosomes\t|\t\t| {3}altchromosomes)\t(chr\w+-\d+)(, chr\w+-\d+)*,?$}, # special case key:value, and its linewrap
        qr{^ {8}(Ref|Alt): \S+, seq_region: \d+$},
        qr{^(Done|Looping over chromosomes\.\.)\. \[$date_re, mem \d+\]$},
+       qr{^(Locking \S+ and \S+|Removing \S+ and \S+ Locks)$},
       );
 
     push @skip,
