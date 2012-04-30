@@ -120,11 +120,6 @@ seq_region table.
     -help       Displays this documentation with PERLDOC.
     -verbose    Prints ... summin
 
-
-=head1 MAINTAINER
-
-Dan Bolser dbolser@ebi.ac.uk
-
 =cut
 
 use strict;
