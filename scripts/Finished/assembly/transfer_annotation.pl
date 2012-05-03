@@ -74,6 +74,8 @@ use Bio::Vega::ContigLockBroker;
 use Bio::Vega::Author;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
+use Bio::EnsEMBL::Exon; # method replaced below!
+
 
 my ($A_end, $A_start, $R_dba, $R_end, $R_start, $altassembly, $assembly);
 
@@ -1252,6 +1254,65 @@ sub write_gene {
 
             }
         };
+    }
+}
+
+
+###  Replace method on Bio::EnsEMBL::Exon
+#
+# $feature->transfer normally returns undef if something goes wrong.
+#
+# After v60, $feature->length if the feature mapped backwards.
+# $exon->transform checks lengths match before==after.  That breaks
+# the exceptions promise.
+#
+# This turns out to be the canary, not the gas leak.
+# $feature->transform does in some cases map to the wrong place the
+# first time it is called.  This could result in a negative length,
+# which is not allowed by $feature->lenght.  $exon->transform died
+# there.
+#
+# Here we monkey-patch to repeat all $feature->transform calls and
+# decide whether they are sane.  Exons which map backwards should no
+# longer be returned.
+{
+    package Bio::EnsEMBL::Feature;
+
+    BEGIN {
+        *Bio::EnsEMBL::Feature::_transform_real = \& Bio::EnsEMBL::Feature::transform;
+    }
+
+    no warnings 'redefine';
+
+    sub transform {
+        my ($self, @args) = @_;
+
+        my @out;
+        push @out, $self->_transform_real(@args);
+        push @out, $self->_transform_real(@args);
+        push @out, $self->_transform_real(@args);
+
+        my @len = map { scalar eval { $_->length } } @out;
+        if (!defined $out[1] && !defined $out[2]) {
+            # doesn't transform
+            return undef;
+
+        } elsif (defined $len[1] && defined $len[2] && $len[1] == $len[2]) {
+            # transforms OK
+
+            if (!defined $len[0]) {
+                $support->log_verbose
+                  (sprintf("DEBUG: %s %s squiffy transform circumvented\n",
+                           ref($self), $self->stable_id));
+            }
+            return $out[-2];
+
+        } else {
+            throw sprintf
+              ("%s #%d transform is more squiffy than I can handle\n  (%s,%s,%s) len (%s,%s,%s)",
+               ref($self), $self->dbID,
+               map { defined $_ ? $_ : 'undef' } @out, @len);
+        }
     }
 }
 
