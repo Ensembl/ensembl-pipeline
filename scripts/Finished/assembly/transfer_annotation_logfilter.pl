@@ -45,7 +45,9 @@ sub main {
     my $biotype_re = qr{(?:[35]')?\w+};
 
     my $gene_div_re = qr{^========================================$}; # --verbose=1
-    my $chr_div_re = qr{^ {4}Chromosome (\S+)/(\S+) \.{3} \[$date_re, mem \d+\]$};
+
+    # These mark start of chromosome, end of header & start of footer, respectively
+    my $chr_div_re = qr{^(?: {4}Chromosome (\S+)/(\S+) \.\.|(Looping) over chromosomes\.\.|(Done))\. \[$date_re, mem \d+\]$};
 
     my @skip =
       (qr{^\*Changes observed$},
@@ -56,6 +58,7 @@ sub main {
        qr{^ (Before| After)-key: \w+[-0-9]+(-\w+)?(-\w+[-0-9]+)?(-\w+=[^=]+)*$},
 #      1  Before-key: chr1-03-58468844-58480910--1-nonsense_mediated_decay-UNKNOWN-11--1-cds_end_NF=0-cds_start_NF=0-hidden_remark=frame-shifted-mRNA_end_NF=0-mRNA_start_NF=0-name=AC121091.1-005
        qr{^$},
+       qr{^DEBUG:}, # generic but probably not going to be used much in production!
 
        # Multiline warning. MSG is not excluded here.
        qr{^(-{20} WARNING -{22}|-{51})$},
@@ -75,7 +78,6 @@ sub main {
        qr{^\t{3}\S+$}, # linewrap of key:value
        qr{^( {3}chromosomes\t|\t\t| {3}altchromosomes)\t(chr\w+-\d+)(, chr\w+-\d+)*,?$}, # special case key:value, and its linewrap
        qr{^ {8}(Ref|Alt): \S+, seq_region: \d+$},
-       qr{^(Done|Looping over chromosomes\.\.)\. \[$date_re, mem \d+\]$},
        qr{^(Locking \S+ and \S+|Removing \S+ and \S+ Locks)$},
       );
 
@@ -112,6 +114,8 @@ sub main {
         }
     };
 
+    my @footer_info; # collect INFO: for all chromosomes
+
     while (<>) {
         my @div      =         $_ =~ $gene_div_re;
         my @skipping = @div || $_ =~ $skip_re;
@@ -124,10 +128,19 @@ sub main {
 
         if ($opt{'html'}) {
             if (@chr) {
-                my ($old, $new) = @chr;
+                my ($old, $new, $end_header, $start_footer) = @chr;
+                if ($end_header) {
+                    # we only need to ensure output is flushed, so it's not on the first chromosome
+                } elsif ($start_footer) {
+                    $new = 'footer';
+                } else {
+                    # $new should be set
+                    push @footer_info, [ $new ];
+                }
                 $flush_skipped->();
-                html_for_chr($new); # switch output file
+                html_for_chr($new) if defined $new; # switch output file
             }
+            push @{ $footer_info[-1] }, $_ if /^INFO:/; # summary displays twice in total
             if (@skipping) {
                 # (no verbose yet, probably too huge to display)
                 push @skipped_text, $_;
@@ -159,6 +172,32 @@ sub main {
         }
         $skipped_last = scalar @skipping; # bool
     }
+
+    extra_footer(@footer_info) if $opt{'html'};
+}
+
+
+sub extra_footer {
+    my @footer_info = @_;
+    foreach my $item (@footer_info) {
+        my ($chr, @txt) = @$item;
+        print next_item();
+        print "Chromosome $chr\n";
+        foreach my $ln (@txt) {
+            $ln =~ s{^(.*\b)(\d+)/(\d+)\b}{sprintf("%s%d/%d%s", $1,$2,$3, spaced_perc(length($1.$2.$3),$2,$3))}eg;
+            chomp $ln;
+            my $html = escapeHTML($ln);
+            $html = qq{<span class="failinfo">$html</span>} if $ln =~ /miss|split|skip/;
+            print "$html\n";
+        }
+    }
+}
+
+sub spaced_perc {
+    my ($len_before, $num, $denom) = @_;
+    return '' unless $denom;
+    my $perc = sprintf('(%.2f%%)', $num/$denom * 100);
+    return (' ' x (60 - $len_before - length($perc))).$perc;
 }
 
 
@@ -175,6 +214,7 @@ sub html_head {
   a.gene { font-weight: bold }
   a.again { text-decoration: line-through }
   .key { float: right; border: 3px solid pink }
+  .failinfo { color: #800 }
  </style>
  <script type="text/javascript">
   function at_n() {
@@ -252,7 +292,7 @@ sub html_link_quote {
     return $html;
 }
 
-my %species = (qw( MUS mouse ));
+my %species = (qw( MUS mouse SUS pig ));
 my %seen_gene; # key = OTTfooGnum
 sub annotrack_link {
     my ($ottg, $species_tla) = @_;
