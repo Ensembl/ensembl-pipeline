@@ -1,195 +1,133 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w
 
 =head1 NAME
 
 load_seq_region.pl
 
-
 =head1 SYNOPSIS
 
-  load_seq_region.pl <DB OPTIONS> \
-    <COORDINATE SYSTEM OPTIONS> \
-    { -fasta file <my.fa> | -agp_file <my.agp> }
-
+  load_seq_region.pl 
 
 =head1 DESCRIPTION
 
-This script can do three things:
+This script can do three things. Use the entries in a fasta file to load
+a set of seq_regions into the seq_region object. If desried the sequence
+can also be stored. It can also load seq_regions which represent the
+assembled pieces from an agp file. The assembled pieces are represented by 
+the first 3 columns of the agp for further definition of the format see here
 
-1) Use entries in a FASTA file to load a set of seq_regions into the
-   seq_region table.
+http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
 
-2) The sequence from the FASTA file can be optionally added to the dna
-   table.
+here are example commandlines
 
-3) It can load seq_regions that represent the objects in an AGP file.
+this would load the sequence in the given file into the database under
+a coord system called contig. 
 
-In all cases, appropriate (configurable) entries will be added to the
-coord_system_table.
+./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name contig -rank 4 -sequence_level -fasta_file sequence.fa
 
+this would just load seq_regions to represent the entries in this file
 
-Here are example usages:
+./load_seq_region.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name clone -rank 3 -fasta_file clone.fa
 
-This would load the *sequences* in the given FASTA file into the
-database under a coord system called contig:
-
-./load_seq_region.pl \
-  -dbhost host -dbuser user -dbname my_db -dbpass **** \
-  -coord_system_name contig -rank 4 -sequence_level \
-  -fasta_file sequence.fa
-
-
-This would just load seq_regions to represent the entries in this
-FASTA file:
-
-./load_seq_region.pl \
-  -dbhost host -dbuser user -dbname my_db -dbpass **** \
-  -coord_system_name clone -rank 3 \
-  -fasta_file clone.fa
+this will load the assembled pieces from the agp file into the seq_region
+table. T
+./load_seq_region -dbhost host -dbuser user -dbname my_db -dbpass ****
+-coord_system_name chromosome -rank 1 -agp_file genome.agp
 
 
-This will load the assembled pieces from the AGP file into the
-seq_region table.
-
-./load_seq_region \
-  -dbhost host -dbuser user -dbname my_db -dbpass **** \
-  -coord_system_name chromosome -rank 1 \
-  -agp_file genome.agp
 
 
 
 =head1 OPTIONS
 
-    DB OPTIONS:
-    -dbhost    Host name for the database
-    -dbport    Port number for the database
-    -dbuser    What username to connect as
-    -dbpass    What password to use
-    -dbname    What database to connect to
+    -dbhost    host name for database (gets put as host= in locator)
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
 
-               For convenience, -host, -port, -user, -pass, and -D are
-               also accepted as aliases for the above, respectively.
-
-
-    COORDINATE SYSTEM OPTIONS:
-
-    -coord_system_name
-               The name of the coordinate system being stored.
-
-    -coord_system_version
-               The version of the coordinate system being stored.
-
-    -default_version
-               Flag to denote that this version is the default version
-               of the coordinate system.
-
-    -rank      The rank of the coordinate system. The highest
-               coordinate system should have a rank of 1 (e.g. the
-               chromosome coordinate system). The nth highest should
-               have a rank of n. There can only be one coordinate
-               system for a given rank.
-
-    -sequence_level
-               Flag to denete that this coordinate system is a
-               'sequence level'. This means that sequence will be
-               stored from the FASTA file in the dna table. This
-               option isn't valid for an agp_file.
-
-    -components
-               When loading an AGP, the default behaviour is to load
-               seq_regions from the OBJECT level. Setting this flag
-               will load seq_regions from the COMPONENT level. Note,
-               it will not populate the assembly table, use
-               load_agp.pl instead
-
-
-    OTHER OPTIONS:
-
-    -agp_file   The name of the agp file to be parsed.
-
-    -fasta_file The name of the fasta file to be parsed. Without the
-                presence of the -sequence_level option the sequence
-                will not be stored.
-
-    -regex      A regex to parse the desired sequence ID from the
-                FASTA description line.
-
-
-    MISC OPTIONS:
-
-    -help       Displays this documentation with PERLDOC.
-    -verbose    Prints ... summin
+    -coord_system_name the name of the coordinate system being stored
+    -coord_system_version the version of the coordinate system being stored
+    -rank the rank of the coordinate system.  The highest coordinate system
+          should have a rank of 1 (e.g. the chromosome coord system).  The nth
+          highest should have a rank of n.  There can only be one coordinate 
+          system for a given rank.
+    -default_version shows this version is the default version of the 
+                     coordinate system
+    -sequence_level reflects this is a sequence level coordinate system and
+    means sequence will be stored from the fasta file. This option isn't valid
+    if an agp_file is being passed in'
+    -agp_file the name of the agp file to be parsed
+    -fasta_file, name of the fasta file to be parsed without the presence of
+             the -sequence_level option the sequence will not be stored
+    -verbose, prints the name which is going to be used can be switched 
+              off with -noverbose
+    -help      displays this documentation with PERLDOC
 
 =cut
 
 use strict;
-use warnings;
-
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Bio::SeqIO;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
-use Bio::EnsEMBL::Utils::Exception qw(throw warning);
-
-use Bio::SeqIO;
-
 use Getopt::Long;
-
-my ($dbhost, $dbport, $dbuser, $dbpass, $dbname);
-my $regex;
-
+use Bio::EnsEMBL::Utils::Exception qw(throw warning);
+my $host   = '';
+my $port   = '';
+my $dbname = '';
+my $dbuser = '';
+my $dbpass = '';
+my $help;
 my $cs_name;
 my $cs_version;
 my $default = 0;
-my $rank;
 my $sequence_level = 0;
-my $components = 0;
-
 my $agp;
 my $fasta;
-
-my $help;
+my $rank;
 my $verbose = 0;
+my $regex;
+my $name_file;
 
 &GetOptions(
-            'dbhost|host:s' => \$dbhost,
-            'dbport|port:n' => \$dbport,
-            'dbuser|user:s' => \$dbuser,
-            'dbpass|pass:s' => \$dbpass,
-            'dbname|D:s'    => \$dbname,
-
-            'coord_system_name:s'    => \$cs_name,
+            'dbhost:s'   => \$host,
+            'dbport:n'   => \$port,
+            'dbname:s'   => \$dbname,
+            'dbuser:s'   => \$dbuser,
+            'dbpass:s'   => \$dbpass,
+            'coord_system_name:s' => \$cs_name,
             'coord_system_version:s' => \$cs_version,
-            'default_version!'       => \$default,
-            'rank:i'                 => \$rank,
-            'sequence_level!'        => \$sequence_level,
-            'components!'            => \$components,
-
-            'agp_file:s'   => \$agp,
+            'rank:i' => \$rank,
+            'sequence_level!' => \$sequence_level,
+            'default_version!' => \$default,
+            'agp_file:s' => \$agp,
             'fasta_file:s' => \$fasta,
-            'regex:s'      => \$regex,
-
             'verbose!' => \$verbose,
-            'help'     => \$help,
+            'regex:s' => \$regex,
+            'name_file:s' => \$name_file,
+            'h|help'     => \$help,
            ) or ($help = 1);
 
-if( !$dbhost || !$dbuser || !$dbname || !$dbpass ){
+if(!$host || !$dbuser || !$dbname || !$dbpass){
   print STDERR "Can't store sequence without database details\n";
+  print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
+    " -dbpass $dbpass\n";
   $help = 1;
 }
-
-if( !$cs_name || (!$fasta  && !$agp) ){
-  print STDERR "Need a coord_system_name and a FASTA or an AGP file!\n";
+if(!$cs_name || (!$fasta  && !$agp)){
+  print STDERR "Need coord_system_name and fasta/agp file to beable to run\n";
+  print STDERR "-coord_system_name $cs_name -fasta_file $fasta -agp_file $agp\n";
   $help = 1;
 }
-
 if($agp && $sequence_level){
-  print STDERR ("Can't use an AGP file $agp to store a ".
-                "sequence level coordinate system!\n");
+  print STDERR ("Can't use an agp file $agp to store a ".
+                "sequence level coordinate system ".$cs_name."\n");
   $help = 1;
 }
-
 if(!$rank) {
-  print STDERR "A rank for the coordinate system must be specified ".
+  print STDERR "A rank for the coordinate system must be specified " .
     "with the -rank argument\n";
     $help = 1;
 }
@@ -200,26 +138,21 @@ if ($help) {
 
 
 
-## Connect to the DB
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
-    -host   => $dbhost,
+    -host   => $host,
     -user   => $dbuser,
-    -port   => $dbport,
+    -port   => $port,
     -pass   => $dbpass
 );
 
 
-## Get some adaptors
 my $csa = $db->get_CoordSystemAdaptor();
-my $sa = $db->get_SliceAdaptor();
 
-
-## Get an existing coord system...
 my $cs;
-eval{ $cs = $csa->fetch_by_name($cs_name, $cs_version) };
-
-## or create a new one
+eval{
+  $cs = $csa->fetch_by_name($cs_name, $cs_version);
+};
 if(!$cs){
   $cs = Bio::EnsEMBL::CoordSystem->new
     (
@@ -229,76 +162,75 @@ if(!$cs){
      -SEQUENCE_LEVEL  => $sequence_level,
      -RANK            => $rank
     );
-  $csa->store($cs);
+$csa->store($cs);
 }
 
+my $sa  = $db->get_SliceAdaptor();
 
-## Process the FASTA file...
-if($fasta){
-  my $count_ambiguous_bases =
-    &process_fasta( $fasta, $cs, $sa, $sequence_level, $regex );
-  if ($count_ambiguous_bases) {
-    throw("All sequences has loaded, but $count_ambiguous_bases slices have ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N!");
+my %acc_to_name;
+
+if ($name_file){
+  open(NF, $name_file) or throw("Can't open ".$name_file." ".$!);
+  while(<NF>){   
+    chomp;
+    my @name_values = split(/\s+/,$_);
+    $acc_to_name{$name_values[1]}=$name_values[0];
+
   }
 }
 
 
-## or process the AGP file
-if($agp){
-  &process_agp($agp, $cs, $sa, $components);
+if($fasta){
+  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
+  if ($count_ambiguous_bases) {
+    throw("All sequences has loaded, but $count_ambiguous_bases slices have ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N.");
+  }
 }
 
-warn "Done\n";
+if($agp){
+  &parse_agp($agp, $cs, $sa,%acc_to_name);
+}
 
-
-
-
-
-## SUBS
-
-sub process_fasta{
-  my ($filename, $cs, $sa, $store_seq, $regex) = @_;
+sub parse_fasta{
+  my ($filename, $cs, $sa, $store_seq,$regex,) = @_;
   my $have_ambiguous_bases = 0;
 
-  my $seqio = Bio::SeqIO->
-    new( -format=>'Fasta',
-         -file=>$filename,
-       );
+  my $seqio = new Bio::SeqIO(
+                             -format=>'Fasta',
+                             -file=>$filename
+                            );
   
   while ( my $seq = $seqio->next_seq ) {
     
+    #NOTE, the code used to generate the name very much depends on the 
+    #format of your fasta headers and what id you want to use
+    #In this case we use the first word of the sequences description as
+    #parseed by SeqIO but you may want the id or you may want to use a
+    #regular experssion to get the sequence you will need to check what 
+    #this will produce, if you have checked your ids and you know what
+    #you are getting you may want to comment out the warning about this
+    #print STDERR "id ".$seq->id." ".$seq->desc."\n";
+    #my @values = split /\s+/, $seq->desc;
+    #my @name_vals = split /\|/, $seq->id;
     my $name = $seq->id;
-    
-    # NOTE, the code used to generate the sequence name depends on the
-    # format of your fasta headers and what id you want to use. In
-    # this case, we use the first word of the description line, as
-    # parsed by SeqIO. You may want the id, or a custom regular
-    # experssion. You will need to check what this produces. If you
-    # have checked your ids and you know what you are getting you may
-    # want to comment out the warning about this.
-    
+
+    #my $name = $name_vals[3]; 
+       
     if ($regex) {
       ($name) = $name =~ /$regex/;
     }
-    
-    warning("You are going to store with name '$name'. Are you sure ".
-            "this is what you wanted")
-      if $verbose;
-    
-    my $slice =
-      &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
-    
+    warning("You are going to store with name ".$name." are you sure ".
+            "this is what you wanted") if($verbose);
+    my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
     if($store_seq){
-      # Check that we don't have ambiguous bases in the DNA sequence,
+      # check that we don't have ambiguous bases in the DNA sequence
       # we are only allowed to load ATGCN
       if ($seq->seq =~ /[^ACGTN]+/i) {
         $have_ambiguous_bases++;
-        warning("Slice '$name' has at least one non-ATGCN (RYKMSWBDHV) base.".
-                "Please change to N.");
+        warning("Slice ".$name." has at least one non-ATGCN (RYKMSWBDHV) base. Please change to N.");
       }
       $sa->store($slice, \$seq->seq);
-    }
-    else{
+    }else{
       $sa->store($slice);
     }
   }
@@ -306,66 +238,62 @@ sub process_fasta{
 }
 
 
-
-sub process_agp{
-  my ($agp_file, $cs, $sa, $components) = @_;
-  
-  my %sequence_length;
-  
-  open(FH, $agp_file)
-    or throw("Can't open AGP file '$agp_file' : $!");
-  
-  while(<FH>){
-    next if /^\#/;
+sub parse_agp{
+  my ($agp_file, $cs, $sa,%acc_to_name) = @_;
+  my %end_value;
+  open(FH, $agp_file) or throw("Can't open ".$agp_file." ".$!);
+ LINE:while(<FH>){   
     chomp;
-    
-    ## See:
-    ## http://www.ncbi.nlm.nih.gov/projects/genome/assembly/agp/AGP_Specification.shtml
-    my @value = split/\t/;
-    
+    next if /^\#/;
+
     #GL000001.1      1       615     1       F       AP006221.1      36117   36731   -
     #GL000001.1      616     167417  2       F       AL627309.15     103     166904  +
     #GL000001.1      167418  217417  3       N       50000   clone   yes
-    
-    #cb25.fpc4250       119836  151061  13      W       c004100191.Contig2      1       31226   +
-    #cb25.fpc4250       151062  152023  14      N       962     telomere        yes
-    
-    
-    ## Skip gap rows
-    next if $value[4] eq 'U';
-    next if $value[4] eq 'N';
-    
-    ## Collect values for the object level
-    my ($name, $start, $end) = @value[0,1,2];
-    
-    ## Or use the component level
-    if($components){
-        ($name, $start, $end) = @value[5,6,7];
+
+    #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
+    #cb25.fpc4250	151062	152023	14	N	962	telomere	yes
+    my @values = split;
+    #if($values[4] eq 'N'){
+    #  next LINE; 
+    #}
+    my $initial_name = $values[0];
+   
+    # remove the 'chr' string if it exists
+    if ($initial_name =~ /^chr(\S+)/) {
+      $initial_name = $1;
     }
+
+
+    my $name;
+
+    if ($acc_to_name{$initial_name}){
+      $name = $acc_to_name{$initial_name};
+    }else{
+      $name =$initial_name;
+    }
+
+    print "Name: ",$name,"\n";
     
-    ## Get the length of the sequence
-    $sequence_length{$name} = 0
-      unless exists $sequence_length{$name};
-    $sequence_length{$name} = $end
-      if $end > $sequence_length{$name};
-    
+    my $end = $values[2];
+    if(!$end_value{$name}){
+      $end_value{$name} = $end;
+    }else{
+      if($end > $end_value{$name}){
+        $end_value{$name} = $end;
+      }
+    }
   }
-  
-  foreach my $name (keys %sequence_length){
-    my $length = $sequence_length{$name};
-    my $slice = &make_slice( $name, 1, $length, $length, 1, $cs );
+  foreach my $name(keys(%end_value)){
+    my $end = $end_value{$name};
+    my $slice = &make_slice($name, 1, $end, $end, 1, $cs);
     $sa->store($slice);
   }
   
-  return scalar keys %sequence_length;
+  close(FH) or throw("Can't close ".$agp_file);
 }
 
-
-
-# Used by both process_fasta and process_agp
-
 sub make_slice{
-  my ( $name, $start, $end, $length, $strand, $coordinate_system ) = @_;
+  my ($name, $start, $end, $length, $strand, $coordinate_system) = @_;
 
   my $slice = Bio::EnsEMBL::Slice->new
       (
@@ -378,3 +306,5 @@ sub make_slice{
       );
   return $slice;
 }
+
+
