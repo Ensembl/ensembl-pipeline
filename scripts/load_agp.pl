@@ -1,239 +1,231 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/local/ensembl/bin/perl -w
+
 
 =head1 NAME
 
 load_agp.pl
 
-
 =head1 SYNOPSIS
 
-  load_agp.pl <DB OPTIONS> \
-    <OBJECT    COORDINATE SYSTEM OPTIONS> \
-    <COMPONENT COORDINATE SYSTEM OPTIONS> \
-    -agp_file <my.agp>
-
+  load_agp.pl
 
 =head1 DESCRIPTION
+ 
+This is a file for loading a standard agp file into the assembly table
+The agp format is described here
 
-Populates the assembly table from an AGP file
+http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
 
-The AGP spec is described here:
-http://www.ncbi.nlm.nih.gov/projects/genome/assembly/agp/AGP_Specification.shtml
+Before you can use this script you need to have both the component
+and assembled pieces loaded into the seq_region table. This can be
+done with the load_seq_region.pl script
 
-Note, both the OBJECTS and COMPONENTS in the AGP should be loaded into
-the seq_region table. This can be done with the load_seq_region.pl
-script.
+here is an example commandline
 
-NB: What is called the 'object' in AGP terms is the assembled
-sequence, composed of the individual gaps and components. We're not
-talking about programming objects, but more like chromosomes or
-scaffolds.
-
-
-=head1 EXAMPLE USAGE
-
-./load_agp.pl \
-  -dbhost host -dbport 3601999 -dbuser user -dbname my_db -dbpass **** \
-  -object_cs_name    chromosome -object_cs_version NCBI34 \
-  -component_cs_name contig \
-  -agp_file genome.agp
-
+./load_agp.pl -dbhost host -dbuser user -dbname my_db -dbpass ****
+-assembled_name chromosome -assembled_version NCBI34 
+-component_name contig -agp_file genome.agp
 
 =head1 OPTIONS
 
-    DB OPTIONS:
-    -dbhost    Host name for the database
-    -dbport    Port number for the database
-    -dbuser    What username to connect as
-    -dbpass    What password to use
-    -dbname    What database to connect to
-
-               For convenience, -host, -port, -user, -pass, and -D are
-               also accepted as aliases for the above, respectively.
-
-
-    COORDINATE SYSTEM OPTIONS:
-
-    -object_cs_name
-               The name of the object coordinate system.
-
-    -object_cs_version [OPTIONAL]
-               The version of the object coordinate system.
-
-    -component_cs_name
-               The name of the component coordinate system.
-
-    -component_cs_version [OPTIONAL]
-               The version of the component coordinate system.
-
-
-    OTHER OPTIONS:
-
-    -agp_file  The path to the the agp file.
-
-
-    MISC OPTIONS:
-
-    -help       Displays this documentation with PERLDOC.
-    -verbose    Prints ... summin
+    -dbhost    host name for database (gets put as host= in locator)
+    -dbname    For RDBs, what name to connect to (dbname= in locator)
+    -dbuser    For RDBs, what username to connect as (dbuser= in locator)
+    -dbpass    For RDBs, what password to use (dbpass= in locator)
+    -assembled_name, the name of the coordinate system which represents
+                   the assembled pieces
+    -assembled_version, the version of the assembled coord system
+    -component_name, the name of the coordinate system which represents
+                     the component pieces
+    -component_version, the version of the component coord system
+    -agp_file path to the the agp file
+    
+    -help      displays this documentation with PERLDOC
 
 =cut
-
 use strict;
-use warnings;
-
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
+use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-use Getopt::Long;
-
-my ($dbhost, $dbport, $dbuser, $dbpass, $dbname);
-
-my $assembled_cs_name;
-my $assembled_cs_version;
-my $component_cs_name;
-my $component_cs_version;
-
-my $agp_file;
-
+my $host   = '';
+my $port   = '';
+my $dbname = '';
+my $dbuser = '';
+my $dbpass = '';
+my $assembled_name;
+my $assembled_version;
+my $component_name;
+my $component_version;
+my $agpfile;
 my $help;
-my $verbose = 0;
+my $name_file;
 
 &GetOptions(
-    'dbhost|host:s' => \$dbhost,
-    'dbport|port:n' => \$dbport,
-    'dbuser|user:s' => \$dbuser,
-    'dbpass|pass:s' => \$dbpass,
-    'dbname|D:s'    => \$dbname,
+            'dbhost:s'   => \$host,
+            'dbport:n'   => \$port,
+            'dbname:s'   => \$dbname,
+            'dbuser:s'   => \$dbuser,
+            'dbpass:s'   => \$dbpass,
+            'assembled_name:s' => \$assembled_name,
+            'assembled_version:s' => \$assembled_version,
+            'component_name:s' => \$component_name,
+            'component_version:s' => \$component_version,
+            'agp_file:s' => \$agpfile,
+            'name_file:s' => \$name_file,
+            'h|help'     => \$help,
+            ) or ($help = 1);
 
-    'object_cs_name:s'       => \$assembled_cs_name,
-    'object_cs_version:s'    => \$assembled_cs_version,
-    'component_cs_name:s'    => \$component_cs_name,
-    'component_cs_version:s' => \$component_cs_version,
-
-    'agp_file:s' => \$agp_file,
-
-    'verbose!' => \$verbose,
-    'help'     => \$help,
-) or ( $help = 1 );
-
-if ( !$dbhost || !$dbuser || !$dbname || !$dbpass ) {
-    print STDERR "Can't store sequence without database details\n";
-    print STDERR "-dbhost $dbhost -dbuser $dbuser -dbname $dbname "
-      . " -dbpass $dbpass\n";
-    $help = 1;
+if(!$host || !$dbuser || !$dbname || !$dbpass){
+  print STDERR "Can't store sequence without database details\n";
+  print STDERR "-dbhost $host -dbuser $dbuser -dbname $dbname ".
+    " -dbpass $dbpass\n";
+  $help = 1;
 }
 
-if ( !$agp_file || !$assembled_cs_name || !$component_cs_name ) {
-    print STDERR ( "Can't store assembly without an agp file or "
-          . "coord system names for assembled and component pieces\n"
-          . "-agp_file $agp_file -object_cs_name $assembled_cs_name "
-          . "-component_cs_name $component_cs_name\n" );
-    $help = 1;
+if(!$agpfile || !$assembled_name || !$component_name){
+  print STDERR ("Can't store assembly without an agp file or ".
+                "coord system names for assembled and component pieces ".
+                "\n -agp_file $agpfile -assembled_name $assembled_name ".
+                "-component_name $component_name\n");
+  $help = 1;
 }
 
 if ($help) {
-    exec( 'perldoc', $0 );
+    exec('perldoc', $0);
 }
 
+my %acc_to_name;
 
+if ($name_file){
+  open(NF, $name_file) or throw("Can't open ".$name_file." ".$!);
+  while(<NF>){   
+    chomp;
+    my @name_values = split(/\s+/,$_);
+    $acc_to_name{$name_values[1]}=$name_values[0];
 
-## Connect to the DB
+  }
+}
+
 my $db = Bio::EnsEMBL::DBSQL::DBAdaptor->new(
     -dbname => $dbname,
-    -host   => $dbhost,
+    -host   => $host,
     -user   => $dbuser,
-    -port   => $dbport,
+    -port   => $port,
     -pass   => $dbpass
 );
 
-
-## Get some adaptors
 my $csa = $db->get_CoordSystemAdaptor();
-my $sa  = $db->get_SliceAdaptor;
+my $sa = $db->get_SliceAdaptor;
 
+my $assembled_cs = $csa->fetch_by_name($assembled_name, 
+                                       $assembled_version);
+my $component_cs = $csa->fetch_by_name($component_name, 
+                                       $component_version);
 
+open(FH, $agpfile) or throw("Can't open $agpfile");
 
-## Get the two existing coord systems
-my $assembled_cs = $csa->
-  fetch_by_name( $assembled_cs_name, $assembled_cs_version );
-my $component_cs = $csa->
-  fetch_by_name( $component_cs_name, $component_cs_version );
-
-
-## Prepare the insert (isn't there an API way to do this?)
-my $sql = <<EOS;
-  INSERT IGNORE INTO assembly(
-    asm_seq_region_id, asm_start, asm_end,
-    cmp_seq_region_id, cmp_start, cmp_end, ori)
-  VALUES(?, ?, ?, ?, ?, ?, ?)
-EOS
-
-my $sth = $db->dbc->prepare($sql);
-
-
-
-## Process the AGP
-
-open( FH, $agp_file )
-  or throw("Can't open $agp_file");
-
-my %component_reuse;
+my %assembled_ids;
+my %component_ids;
 my $mapping_delimiter = '|';
+LINE:while(<FH>){
+  next if /^\#/;
 
-while (<FH>) {
-    next if /^\#/;
-    chomp;
+  chomp;
 
-    my ($a_name, $a_start, $a_end, $ordinal, $type,
-        $c_name, $c_start, $c_end, $ori ) = split;
+  #CM000686.1  28033929  28215811  243 F AC007965.3  1 181883  +
+  #CM000686.1  28215812  28388853  244 F AC006991.3  1 173042  +
+  #cb25.fpc4250	119836	151061	13	W	c004100191.Contig2	1	31226	+
+  #cb25.fpc4250	151062	152023	14	N	962	fragment	yes
+  my ($a_name_init, $a_start, $a_end, $ordinal, $type, $c_name, $c_start, 
+      $c_end, $ori) = split;
 
-    # Skip gap rows
-    next if $type eq 'N';
-    next if $type eq 'U';
+  if($type eq 'N' || $type eq 'U'){
+    next LINE; #skipping gaps as not stored in db
+  }
+  if ($type eq 'U') {
+    next LINE ;
+  }
+  if(!$type){
+    next LINE;
+  }
+  my $strand = 1;
+  if($ori eq '-'){
+    $strand = -1;
+  }
+  
+  my $a_name;
+  if ($acc_to_name{$a_name_init}){
+    $a_name = $acc_to_name{$a_name_init};
+  }else{
+    $a_name = $a_name_init;
+  }
 
-    ## Convert AGP to Ensembl convention
-    my $strand = $ori ne '-' ? +1 : -1;
+  #print "THIS IS YOUR A NAME : ",$a_name,"\n";
+  #exit;
 
-
-    ## Look up the id for each object and component. Ditched the
-    ## hasing code for clarity...
-
-    my $a_slice = $sa->
-      fetch_by_region( $assembled_cs->name, $a_name, undef, undef, undef,
-                       $assembled_cs->version )
-        or throw( "object    '$a_name' doesn't seem to exist in the database!\n" );
-    my $c_slice = $sa->
-      fetch_by_region( $component_cs->name, $c_name, undef, undef, undef,
-                       $component_cs->version )
-        or throw( "component '$c_name' doesn't seem to exist in the database!\n" );
-
-    ## Sanity checks
-    throw( "object    '$a_name' is longer than in the database! ($a_end vs. "
-           . $a_slice->length. ")\n" )
-      if $a_slice->length < $a_end;
-    throw( "component '$c_name' is longer than in the database! ($c_end vs. "
-           . $c_slice->length. ")\n" )
-      if $c_slice->length < $c_end;
-
-
-    ## I don't quite follow, but here you have it...
-    if ( $component_reuse{$c_name}++ ) {
-        $mapping_delimiter = '#';
-        warning("You are already using component '$c_name' in another place "
-                . "in your assembly. Are you sure you really want to?\n" );
+  my ($a_id, $c_id);
+  if(!$assembled_ids{$a_name}){
+    if($a_name =~ /^chr(\S+)/){
+      $a_name = $1;
     }
-
-    ## INSERT
-    $sth->execute( $sa->get_seq_region_id( $a_slice ), $a_start, $a_end,
-                   $sa->get_seq_region_id( $c_slice ), $c_start, $c_end, $ori );
+    my $a_piece = $sa->fetch_by_region($assembled_cs->name, $a_name,
+                                       undef, undef, undef, 
+                                       $assembled_cs->version);
+    if(!$a_piece){
+      throw($a_name." doesn't seem to exist in the database\n");
+    }
+    if($a_piece->length < $a_end){
+      throw($a_name." apparent length ".$a_end. " is longer than ".
+            "the length in the current database ".
+            $a_piece->length."\n");
+    }
+    $a_id = $sa->get_seq_region_id($a_piece);
+    $assembled_ids{$a_name} = $a_id;
+  }else{
+    $a_id = $assembled_ids{$a_name};
+  }
+  if($component_ids{$c_name}){
+    warning("You are already using ".$c_name." in another place ".
+         "in your assembly are you sure you want to\n");
+    $mapping_delimiter = '#';
+    $c_id = $component_ids{$c_name};
+  }else{
+    my $c_piece = $sa->fetch_by_region($component_cs->name, $c_name,
+                                       undef, undef, undef, 
+                                       $component_cs->version);
+    if(!$c_piece){
+      throw($c_name." doesn't seem to exist in the database\n");
+    }
+    if($c_piece->length < $c_end){
+      throw($c_name." apparent length ".$c_end. " is longer than ".
+            "the length in the current database ".
+            $c_piece->length."\n");
+    }
+    $c_id = $sa->get_seq_region_id($c_piece);
+    $component_ids{$c_name} = $c_id;
+  }
+  &insert_agp_line($a_id, $a_start, $a_end, $c_id, $c_start, $c_end, 
+                   $strand, $db);
 }
 
 my $mapping_string = $assembled_cs->name;
-$mapping_string .= ":" . $assembled_cs->version if ( $assembled_cs->version );
-$mapping_string .= $mapping_delimiter . $component_cs->name;
-$mapping_string .= ":" . $component_cs->version if ( $component_cs->version );
+$mapping_string .= ":".$assembled_cs->version if($assembled_cs->version);
+$mapping_string .= $mapping_delimiter.$component_cs->name;
+$mapping_string .= ":".$component_cs->version if($component_cs->version);
 
 my $mc = $db->get_MetaContainer();
-$mc->store_key_value( 'assembly.mapping', $mapping_string );
+$mc->store_key_value('assembly.mapping', $mapping_string);
 
+sub insert_agp_line{
+  my ($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori, $db) = @_;
+
+  if(!$contig){
+    #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
+    die "contig id must be defined for this to work\n";
+  }
+  my $sql = "insert ignore into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
+  
+  my $sth = $db->dbc->prepare($sql);
+  $sth->execute($chr_id, $chr_start, $chr_end, $contig, $contig_start, $contig_end, $contig_ori); 
+}
