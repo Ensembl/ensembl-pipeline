@@ -305,25 +305,28 @@ while (1) {
       print "\n===\nInput id ".$input_id."\n" if ($verbose);
 
       my %analHash;
+      my %failed_condition_check;
       my @anals = @{$rulemanager->stateinfocontainer->fetch_analysis_by_input_id($input_id)};
 
       foreach my $rule (@{$rulemanager->rules}){
         my $anal = $rule->check_for_analysis(\@anals, $type, \%completed_accumulator_analyses, $verbose);
         if (UNIVERSAL::isa($anal,'Bio::EnsEMBL::Pipeline::Analysis')) {
           if ($anal->input_id_type ne 'ACCUMULATOR') {
-             $analHash{$anal->dbID} = $anal;
+	    $analHash{$anal->dbID} = $anal;
           }
-        }
+        } elsif ($anal >=4 ) {
+	  $failed_condition_check{$rule->goalAnalysis}= 1 ;
+	}
       }
       foreach my $rule (@{$rulemanager->rules}){
         if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR' &&
             $rule->has_condition_of_input_id_type($type) &&
-	    scalar(keys %analHash)) {
-          $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
-        }
+	    ( scalar(keys %analHash) or $failed_condition_check{$rule->goalAnalysis})) {
+	  $incomplete_accumulator_analyses{$rule->goalAnalysis->logic_name} = 1;
+	}
       }
       my $current_jobs_hash = $rulemanager->job_adaptor->fetch_hash_by_input_id($input_id);
-
+      
       print "\n\n Ended up with " . scalar(keys %analHash) . " analyses which pass conditions\n" if ($verbose);
       for my $anal (values %analHash) {
         if ($rulemanager->can_job_run($input_id, $anal,
@@ -352,7 +355,6 @@ while (1) {
       foreach my $logic_name (keys %accumulator_analyses) {
         if (!exists($incomplete_accumulator_analyses{$logic_name}) &&
             !exists($completed_accumulator_analyses{$logic_name})) {
-
           if ($rulemanager->can_job_run('ACCUMULATOR',$accumulator_analyses{$logic_name},$accumulator_jobs_hash)) {
             $submitted++;
             $submission_count++;
