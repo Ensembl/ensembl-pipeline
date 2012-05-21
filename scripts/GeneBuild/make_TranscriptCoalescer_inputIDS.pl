@@ -28,6 +28,7 @@ my $slice_size;
 my $logic_name;  
 my @seq_region_names;
 my $path;
+my $infile;
 
 &GetOptions(
             'seq_region_names:s'=> \@seq_region_names,
@@ -42,10 +43,23 @@ my $path;
             'biotypes=s'        => \@biotypes ,
             'slice_size=i'      => \$slice_size ,  
             'logic_name=s'      => \$logic_name , 
+            'infile=s'          => \$infile,
 	    );
 
 if (scalar(@seq_region_names)) {
   @seq_region_names = split(/,/,join(',',@seq_region_names));
+}
+
+
+my @chromosomes ;
+if ($infile) {
+  open (INFILE, '<',$infile) or die "Cannot open $infile";
+  while (<INFILE>){
+    chomp $_;
+    my $region_id = $_;
+    push @chromosomes, $region_id;
+  }
+  @seq_region_names = @chromosomes ;
 }
 
 $slice_size = 100_000 unless $slice_size ; 
