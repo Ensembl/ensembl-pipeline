@@ -242,13 +242,13 @@ __END__
 #----------------------
 #  running script
 #----------------------
-step 1a: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -prepare1
+step 1a: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass *** -prepare1
 
-step 1b: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -prepare2
+step 1b: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass *** -prepare2
 
-step 2: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl
+step 2: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ***
 
-step 3: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass ensembl -finish
+step 3: /software/anacode/pipeline/run_prot_pipeline.pl -dbuser ensadmin -dbhost ensdb-1-11 -dbname vega_homo_sapiens_20080313_original -dbport 5317 -dbpass *** -finish
 
 
 #---------------------

@@ -62,7 +62,7 @@ my $dnadb = new Bio::EnsEMBL::DBSQL::DBAdaptor(
 my $db =  new Bio::EnsEMBL::DBSQL::DBAdaptor(
 					     -host  => $dbhost,
 					     -user  => 'ensadmin',
-					     -pass  => 'ensembl',
+					     -pass  => '***',
 					     -dbname=> $dbname,
 					     -dnadb => $dnadb,
 					    );

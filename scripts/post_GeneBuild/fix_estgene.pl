@@ -57,7 +57,7 @@ if ( $target_dbhost && $target_dbname ){
 						    '-host'   => $target_dbhost,
 						    '-user'   => 'ensadmin',
 						    '-dbname' => $target_dbname,
-						    '-pass'   => 'ensembl',
+						    '-pass'   => '***',
 						    );
 }
 

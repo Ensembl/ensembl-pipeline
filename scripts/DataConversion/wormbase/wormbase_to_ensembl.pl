@@ -73,7 +73,7 @@ my $WB_DBHOST     = "ia64g";
 my $WB_DBPORT     = "3306";		
 my $WB_DBNAME     = $ENV{'USER'}."_caenorhabditis_elegans_core_".$release;
 my $WB_DBUSER     = "ensadmin";		
-my $WB_DBPASS     = "ensembl";		
+my $WB_DBPASS     = "***";		
 
 use lib '~/PerlCode/ensembl-pipeline/scripts/DataConversion/wormbase';
 

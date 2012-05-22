@@ -11,7 +11,7 @@ my $host   = 'ecs1b';
 my $port   = undef;
 my $dbname = 'abel_crossmatch';
 my $dbuser = 'ensadmin';
-my $pass   = 'ensembl';
+my $pass   = '***';
 my $alnprog = 'crossmatch';
 my $min_score = 50;
 
