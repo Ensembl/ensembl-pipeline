@@ -13,7 +13,7 @@ my $port       = '';
 #my $dbname_snp = 'homo_sapiens_snp_110';
 my $dbname_snp = 'snp120';
 my $dbuser     = 'ensadmin';
-my $dbpass     = 'ensembl';
+my $dbpass     = '***';
 my $module_snp = 'Bio::EnsEMBL::ExternalData::SNPSQL::DBAdaptor';
 
 #&GetOptions ( 

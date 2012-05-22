@@ -91,7 +91,7 @@ my %opt = (
     dbname => '',
     dbhost => '',
     dbuser => 'ensadmin',
-    dbpass => 'ensembl',
+    dbpass => '***',
     dbport => '3306',
     exonerate_file => 'exonerate-0.8.3',
 );

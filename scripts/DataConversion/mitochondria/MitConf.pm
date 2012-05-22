@@ -12,7 +12,7 @@ use vars qw( %MitConf );
   MIT_DBNAME => 'ba1_rattus_norvegicus_core_57_34y',
   MIT_DBHOST => 'genebuild3',
   MIT_DBUSER => 'ensadmin',
-  MIT_DBPASS => 'ensembl',
+  MIT_DBPASS => '***',
   MIT_DBPORT => '3306',
 
   # logic name of analysis object to be assigned to coding genes

@@ -4,10 +4,10 @@
 # Need to configure things like blast header regexp parsing
 # Output directories/paths etc
 
-echo "create database " $1 | mysql -u ensadmin -pensembl -h ecs2b
+echo "create database " $1 | mysql -u ensadmin -p *** -h ecs2b
 
-mysql -u ensadmin -pensembl -h ecs2b $1 < ../../ensembl/sql/table.sql
-mysql -u ensadmin -pensembl -h ecs2b $1  < ../sql/table.sql
+mysql -u ensadmin -p *** -h ecs2b $1 < ../../ensembl/sql/table.sql
+mysql -u ensadmin -p *** -h ecs2b $1  < ../sql/table.sql
 
 #./dump_fasta -host1 ecs1b -dbname1 human_chr13_fin -host2 ecs2b -dbname2 $1
 ./fasta2otter -host ecs2b -dbname $1 -fastafile $2 -chr $3 -type $3
@@ -33,7 +33,7 @@ mysql -u ensadmin -pensembl -h ecs2b $1  < ../sql/table.sql
 
 cd ../modules/Bio/EnsEMBL/Pipeline/
 
-perl RuleManager3.pl -dbhost ecs2b -dbname $1 -dbuser ensadmin -dbpass ensembl -output_dir /ecs2/scratch1/michele/chr6/out -start_from SubmitContig > & rule.$1.out &
+perl RuleManager3.pl -dbhost ecs2b -dbname $1 -dbuser ensadmin -dbpass *** -output_dir /ecs2/scratch1/michele/chr6/out -start_from SubmitContig > & rule.$1.out &
 
 cd ../../../../scripts/
 

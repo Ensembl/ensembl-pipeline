@@ -9,7 +9,7 @@ use Getopt::Long;
 
 my $host;
 my $user = 'ensadmin';
-my $pass = 'ensembl';
+my $pass = '';
 my $port = 3306;
 my $dbname;
 my $logic_name;

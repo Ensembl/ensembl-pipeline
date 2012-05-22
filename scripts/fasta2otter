@@ -13,7 +13,7 @@ my $type;
 my $host;
 my $port = 3306;
 my $user = 'ensadmin';
-my $pass = 'ensembl';
+my $pass = '***';
 my $chr;
 
 my $dbname;

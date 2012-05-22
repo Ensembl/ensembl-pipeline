@@ -76,7 +76,7 @@ use vars qw( %FlyBaseConf );
                 FB_DBNAME => 'ba1_drosophila_5_3_seq',
                 FB_DBHOST => 'genebuild6',
                 FB_DBUSER => 'ensadmin',
-                FB_DBPASS => 'ensembl',
+                FB_DBPASS => '***',
                 FB_DBPORT => '3306',
 
 

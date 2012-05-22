@@ -14,7 +14,7 @@ my $old_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ecs1f',
 my $new_db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host => 'ecs1b',
 					    -user => 'ensadmin',
 					    -dbname => 'elegans_94',
-					    -pass  => 'ensembl',
+					    -pass  => '***',
 					   );
 
 
