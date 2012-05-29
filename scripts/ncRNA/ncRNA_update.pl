@@ -247,8 +247,13 @@ sub config_setup{
     $filecount++;
   }
   close(RP);
+
+  # get the path to BatchQueue.pm
+  my $BQpath = $path;
+  $BQpath =~ s/Analysis/Pipeline/g;
+
   print "New config files written.\n";
-  print "You might want to edit $DATADIR/$species/$path/BatchQueue.pm\n\n";
+  print "You might want to edit $DATADIR/$species/$BQpath/BatchQueue.pm\n\n";
 }
 
 
