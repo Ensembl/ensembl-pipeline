@@ -453,13 +453,14 @@ sub prepare_RFAM{
   my $exit;
   print "Updating RFAM descriptions file ...\n";
   system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.cm.gz  -O $BLASTDIR/Rfam.cm.gz");
-  die ("Error with obtaining Rfam covariance model  file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.cm.gz\n") if $exit > 0;
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz  -O $BLASTDIR/Rfam.cm.gz");
+  die ("Error with obtaining Rfam covariance model  file from
+  ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.cm.gz");
   die ("Error decompressing Rfam.tar.gz\n") if $exit > 0;
-  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
+  $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.seed.gz  -O $BLASTDIR/Rfam.seed.gz");
   die ("Error with obtaining Rfam.seed file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.seed.gz\n") if $exit > 0;
-  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/10.0/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
+  $exit =   system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.fasta.gz -O $BLASTDIR/Rfam.fasta.gz");
   die ("Error with obtaining Rfam.fasta file from ftp://ftp.sanger.ac.uk/pub/databases/Rfam/Rfam.fasta.gz\n") if $exit > 0;
   $exit =   system ("gzip -d  $BLASTDIR/Rfam.seed.gz");
   die ("Error decompressing Rfam.seed.gz\n") if $exit > 0;
