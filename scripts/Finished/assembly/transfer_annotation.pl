@@ -1301,9 +1301,14 @@ sub write_gene {
             # transforms OK
 
             if (!defined $len[0]) {
+		my $what = eval { $self->stable_id };
+		$what ||= sprintf
+		  ("(%d..%d:%d) on %s",
+		   $self->start, $self->end, $self->strand,
+		   $self->seq_region_name);
                 $support->log_verbose
                   (sprintf("DEBUG: %s %s squiffy transform circumvented\n",
-                           ref($self), $self->stable_id));
+                           ref($self), $what));
             }
             return $out[-2];
 
