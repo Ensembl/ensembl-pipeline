@@ -49,6 +49,9 @@ sub main {
     # These mark start of chromosome, end of header & start of footer, respectively
     my $chr_div_re = qr{^(?: {4}Chromosome (\S+)/(\S+) \.\.|(Looping) over chromosomes\.\.|(Done))\. \[$date_re, mem \d+\]$};
 
+    my $gene_passcount_re =
+      qr{^\tSummary for (OTT\w+) : (\d+) out of (\d+) transcripts? transferred$},
+
     my @skip =
       (qr{^\*Changes observed$},
        qr{^\S+\ now\ has\ changed\ main\ key\ (
@@ -82,12 +85,13 @@ sub main {
       );
 
     push @skip,
-      (qr{^MSG: Transcript contained trans splicing event$}, # XXX: investigate
-       qr{^Found a truncated gene$}, # XXX: investigate
-#       qr{^(INFO|WARNING):},
+      (
+#qr{^MSG: Transcript contained trans splicing event$}, # XXX: investigate
+#       qr{^Found a truncated gene$}, # XXX: investigate
+#       qr{^(INFO|WARNING):}, # these are needed for the footer
 #       qr{ complex transfer of non-coding$},
 #       qr{ cannot be transferr?ed on },
-       qr{^CHANGED OTT...G\d+\.\d+$}, qr{^-{43}$}, # from Bio::Vega::DBSQL::GeneAdaptor
+       qr{^(CHANGED|NEW) OTT...G\d+\.\d+$}, qr{^-{43}$}, # from Bio::Vega::DBSQL::GeneAdaptor
       ) if $opt{'quiet'};
 
     # More from "--verbose 1"
@@ -115,15 +119,23 @@ sub main {
     };
 
     my @footer_info; # collect INFO: for all chromosomes
+    my @lost_count; # index = number of transcripts lost, value = list of OTTG...
 
     while (<>) {
         my @div      =         $_ =~ $gene_div_re;
         my @skipping = @div || $_ =~ $skip_re;
         my @chr      =         $_ =~ $chr_div_re;
+        my @gsumm    =         $_ =~ $gene_passcount_re; # (n of m)
 
         if ($opt{'debug'}) {
             s/\t/\\t/g;
             s/( +)$/"{".length($1)." spaces}"/e;
+        }
+
+        if (@gsumm) {
+            my ($ottg, $ok, $tot) = @gsumm; # count of transcripts from gene summary
+            my $lost = $tot - $ok;
+            push @{ $lost_count[$lost] }, $ottg;
         }
 
         if ($opt{'html'}) {
@@ -141,6 +153,7 @@ sub main {
                 html_for_chr($new) if defined $new; # switch output file
             }
             push @{ $footer_info[-1] }, $_ if /^INFO:/; # summary displays twice in total
+            $showed_any = @div = ('(start of chr summary)') if /^INFO:/ && @lost_count;
             if (@skipping) {
                 # (no verbose yet, probably too huge to display)
                 push @skipped_text, $_;
@@ -161,6 +174,19 @@ sub main {
                 $showed_any = 1;
                 print;
             }
+        }
+
+        if (/^INFO:/ && @lost_count) {
+            for (my $lost=1; $lost < @lost_count; $lost++) {
+                next unless $lost_count[$lost] && @{$lost_count[$lost]};
+                my $s = ($lost == 1 ? '' : 's');
+                my $txt = "    Genes which lost $lost transcript$s: @{$lost_count[$lost]}\n";
+                $txt = escapeHTML($txt) if $opt{'html'};
+                print $txt;
+            }
+            print qq{\n nb. genes which lost no transcripts may still have issues,\n},
+              qq{ but are not counted as "missed"\n\n};
+            @lost_count = ();
         }
 
         $flush_skipped->() if eof; # not eof()
