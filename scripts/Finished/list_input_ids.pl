@@ -6,7 +6,7 @@ list_input_ids.pl - generate region restriction info for rulemanager.pl
 
 =head1 SYNOPSIS
 
-list_input_ids.pl -dataset human -set chr14-04
+list_input_ids.pl -dataset human -set chr14-04 [ -purpose <label> ]
 
 =head1 DESCRIPTION
 
@@ -23,6 +23,9 @@ and put the result through C<sort -u>.
     -cs_version         the version of the coord system you want                  (default: Otter)
     -target_cs          the target coordinate system you want slices in           (default: contig)
     -target_cs_version  the version of the target coord system you want           (optional)
+
+    -purpose            Write input_ids to the input_id_purpose table.
+                        If used, you must supply the purpose field.
 
 Switches taking no argument,
     -add-target-cs      include in the output an extra column showing the target_cs
@@ -55,6 +58,7 @@ my $target_cs_version;
 my $add_target_cs;
 my $seqreg_name;
 my $verbose;
+my $purpose;
 my $help = 0;
 Bio::Otter::Lace::Defaults::do_getopt(
         'dataset=s'           => \$dataset_name,
@@ -63,6 +67,7 @@ Bio::Otter::Lace::Defaults::do_getopt(
         'cs_version:s'        => \$cs_version,
         'target_cs:s'         => \$target_cs,
         'target_cs_version:s' => \$target_cs_version,
+        'purpose=s'           => \$purpose,
         'add-target-cs!'      => \$add_target_cs,
         'verbose!'            => \$verbose,
         'h|help'              => \$help
@@ -87,7 +92,7 @@ my $cl = Bio::Otter::Lace::Defaults::make_Client();
 my $ds = $cl->get_DataSet_by_name($dataset_name);
 
 my $otter_dba = $ds->get_cached_DBAdaptor;
-my $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_DBAdaptor($otter_dba);
+my $pipe_dba = $ds->get_pipeline_DBAdaptor(1);
 
 #my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor(
 #        -host   => $host,
@@ -98,6 +103,10 @@ my $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_DBAdaptor($otter_dba);
 #);
 
 my $slice_a              = $pipe_dba->get_SliceAdaptor;
+
+# This table is experimental, but proved itself useful to me.
+my $purph = $pipe_dba->prepare
+  (q{INSERT INTO input_id_purpose (input_id, purpose) VALUES (?,?)});
 
 my $slice = $slice_a->fetch_by_region( $cs, $seqreg_name, undef, undef, undef, $cs_version );
 if ( !$slice ) {
@@ -112,6 +121,10 @@ foreach my $ct (@$target_projection) {
         $slice_a->fetch_by_region( $target_cs,
                                    $target_slice->seq_region_name,
                                    undef, undef, undef, $target_cs_version );
+
+    if (defined $purpose) {
+        $purph->execute($target->name, $purpose);
+    }
 
     if ($add_target_cs) {
         print STDOUT $target->name(), "\t", uc $target_cs, "\n";
