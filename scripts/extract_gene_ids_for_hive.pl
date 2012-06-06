@@ -1,4 +1,4 @@
-#! /usr/local/ensembl/bin/perl -w
+#!/usr/local/ensembl/bin/perl -w
 
 # Usage: ./extract_gene_ids_for_hive.pl -analysis_id <number - optional>
 #                                       -status <status string - optional> 

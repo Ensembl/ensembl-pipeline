@@ -1,4 +1,4 @@
-#! /software/bin/perl -w
+#!/software/bin/perl -w
 
 
 # Author: ck1@sanger.ac.uk

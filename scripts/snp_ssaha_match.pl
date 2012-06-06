@@ -1,4 +1,4 @@
-#! /usr/local/bin/perl
+#!/usr/local/bin/perl
 #
 #This script run after snp_cross_match.pl. snp_cross_match.pl generate a list of refsnpid for which none of the clones #are on GP. snp_ssaha_match.pl by using ssaha method to locate the contigs on GP and then use cross_match to find
 #snp position

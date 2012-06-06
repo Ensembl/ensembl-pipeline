@@ -1,4 +1,4 @@
-#! /usr/local/bin/perl
+#!/usr/local/bin/perl
 
 use strict;
 use ncRNA_update_config;

@@ -1,4 +1,4 @@
-#! /usr/local/bin/perl
+#!/usr/local/bin/perl
 
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Exonerate2Array;
