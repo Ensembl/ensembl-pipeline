@@ -1,4 +1,3 @@
-#!/usr/local/bin/perl5.6.1 -w
 package Bio::EnsEMBL::Pipeline::AnaSubmission;
 
 use strict;
