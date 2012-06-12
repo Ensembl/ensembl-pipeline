@@ -80,8 +80,9 @@ sub main {
 
        # issues to fix
        coords_VQCT_CDS_STARTgtEND => qr{$W VQCT_CDS_STARTgtEND NEGATIVE: $GG starts \((\d+)\) after it ends \((\d+)\)\. $CWHO$},
-       name_VQCG_duplicated_root_name => qr{$W VQCG_duplicated_root_name SPLIT: havana transcript base name (\S+) is found in genes $GG and $GG$},
-       name_VQCG_multi_root_name => qr{$W VQCG_multi_root_name DUPLICATED: havana gene $GG has transcripts with more than one name root $CWHO$},
+       VQCG_duplicated_root_name => qr{$W VQCG_duplicated_root_name SPLIT: havana transcript base name (\S+) is found in genes $GG and $GG$},
+       VQCG_multi_root_name => qr{$W VQCG_multi_root_name DUPLICATED: havana gene $GG has transcripts with more than one name root $CWHO$},
+
        name_VQCG_wrong_name => qr{$W VQCG_wrong_name UNEXPECTED extension for havana GENE (\S+)$},
        name_VQCT_wrong_name => qr{$W VQCT_wrong_name UNEXPECTED name for havana transcript $GG $CWHO$},
        name_VQCT_wrong_name___new => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
@@ -102,13 +103,26 @@ sub main {
     my %count;  # keys from %re, values count regexp hits
     my %state;  # keys from %re, values written
     my %unused; # keys from %re; a set
+    my %hit; # keys from %re, values are match captures
+
+    my %fnum =
+#      (coords_VQCT_CDS_STARTgtEND => qr{$W VQCT_CDS_STARTgtEND NEGATIVE: $GG starts \((\d+)\) after it ends \((\d+)\)\. $CWHO$},
+#       name_VQCG_duplicated_root_name => qr{$W VQCG_duplicated_root_name SPLIT: havana transcript base name (\S+) is found in genes $GG and $GG$},
+#       name_VQCG_multi_root_name => qr{$W VQCG_multi_root_name DUPLICATED: havana gene $GG has transcripts with more than one name root $CWHO$},
+#       name_VQCG_wrong_name => qr{$W VQCG_wrong_name UNEXPECTED extension for havana GENE (\S+)$},
+#       name_VQCT_wrong_name => qr{$W VQCT_wrong_name UNEXPECTED name for havana transcript $GG $CWHO$},
+#       name_VQCT_wrong_name___new => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
+#       name_VQCT_wrong_name___extn => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
+#       name_VQCT_wrong_name___old => qr{$W VQCT_wrong_name UNEXPECTED old format extension for havana (\S+) $CWHO$},
+#      );
+();
 
   LINE: while (<>) {
         my $M = match_keyed($_, \%re);
 
         warn "NO MATCH: $_" unless keys %$M;
 
-        my (@unused, $skip);
+        my (@unused, $skip, $push);
         while (my ($mk, $mv) = each %$M) {
             $count{$mk} ++;
             $skip = 1 if $mk =~ m{^_}; # process noise
@@ -116,16 +130,33 @@ sub main {
 
             if ($mk =~ m{^_state_(.*)$}) {
                 $state{$1} = $mv;
+            } elsif ($mk =~ m{^(coords|name)_}) {
+                $push = $mk;
             } else {
                 $unused{$mk} ++ unless $skip;
             }
         }
+        die "match breakage" if $push && $skip;
         next LINE if $skip;
 
-        $$M{TEXT} = $_;
-#        print Dump($M) if @unused;
+        chomp;
+        push @{ $hit{$push} }, { TEXT => $_, LINE => $., %$M } if $push;
     }
 
+    print qq{-*- org -*-\n
+This file format is most usefully viewed with Emacs.
+
+Move to a line and press TAB to show headings / show all / close\n
+* Issues\n};
+    foreach my $k (sort keys %hit) {
+        printf qq{** %-20s %d\n}, $k, scalar @{ $hit{$k} };
+        foreach my $v (@{ $hit{$k} }) {
+            printf qq{*** %s\n}, $fnum{$k} ? $v->[ $fnum{$k} ] : (join " ", @{ $v->{$k} });
+            print Dump($v);
+        }
+    }
+
+    print "\n* Summary\nHit types starting with '_' are internal stuff.\n";
     print Dump({ line_hit_counts => \%count, unused => [ sort keys %unused ] });
 }
 
