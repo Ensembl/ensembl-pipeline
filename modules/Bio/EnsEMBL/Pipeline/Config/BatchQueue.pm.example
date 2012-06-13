@@ -108,6 +108,66 @@
 
       sub_args =>'-m bc_hosts',
 
+=head2 Memory requirements
+
+    There are two ways of specifying LSF memory requirements.
+
+=head3 Full resource string
+
+    To allocate 4Gb of memory:
+
+      resource  => 'select[mem>4000] rusage[mem=4000]',
+      sub_args  => '-M 4000000'
+
+=head3 Short memory specification string
+
+    To allocate 4Gb of memory, all of the below settings means the same
+    thing (the case of the unit specification is ignored):
+
+      memory => '4Gb'
+
+      memory => '4000Mb'
+
+      memory => '4000000Kb'
+
+=head2 Retrying on failure
+
+    When a job fails due to insufficient memory, or due to run-time
+    constraints, it may be retried.  The number of retries and the
+    settings to use when retrying may be specified in two different
+    ways.
+
+    The maximum number of retries is set with the 'retries' option:
+
+      reties => 3 # Run the job a maximum of four times (three retries).
+
+=head3 Using 'retry_'
+
+    When retrying, the pipeline submission code will look for options
+    prefixed with 'retry_' and use these.  For example:
+
+      memory        => '500Mb',     # Use 500 Mb for first run
+      retry_memory  => '1Gb'        # Use 1 Gb for the retries
+
+    The options that may be prefixed in this way are:
+
+      queue,
+      sub_args,
+      resource,
+      memory
+
+=head3 Using arrays
+
+    Instead of using the 'retry_' prefix, the original option may
+    instead hold an array, like this:
+
+      # Use 0.5Gb for the first run, 1Gb for the second, and 1.5Gb for
+      # the third (and any later) run:
+      memory => ['500Mb', '1Gb', '1500Mb']
+
+    If the 'retries' value is larger than the length of the array, the
+    last value of the array will be re-used.
+
 =cut
 
 
