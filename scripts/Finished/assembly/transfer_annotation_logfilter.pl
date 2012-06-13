@@ -58,7 +58,7 @@ sub main {
               seq_region_name-seq_region_start-seq_region_end-seq_region_strand-phase-end_phase|
               seq_region_name-seq_region_start-seq_region_end-seq_region_strand-biotype-status-exon_count-description-evidence_count-attrib_string|
               start_exon_vega_hashkey-end_exon_vega_hashkey-tl_start-tl_end)$}x,
-       qr{^ (Before| After)-key: \w+[-0-9]+(-\w+)?(-\w+[-0-9]+)?(-\w+=[^=]+)*$},
+       qr{^ (Before| After)-key: [\w.]+[-0-9]+(-\w+)?(-\w+[-0-9]+)?(-\w+=[^=]+)*$},
 #      1  Before-key: chr1-03-58468844-58480910--1-nonsense_mediated_decay-UNKNOWN-11--1-cds_end_NF=0-cds_start_NF=0-hidden_remark=frame-shifted-mRNA_end_NF=0-mRNA_start_NF=0-name=AC121091.1-005
        qr{^$},
        qr{^DEBUG:}, # generic but probably not going to be used much in production!
