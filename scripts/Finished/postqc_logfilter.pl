@@ -86,11 +86,23 @@ sub main {
        name_VQCG_wrong_name => qr{$W VQCG_wrong_name UNEXPECTED extension for havana GENE (\S+)$},
        name_VQCT_wrong_name => qr{$W VQCT_wrong_name UNEXPECTED name for havana transcript $GG $CWHO$},
        name_VQCT_wrong_name___new => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
-       name_VQCT_wrong_name___extn => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
        name_VQCT_wrong_name___old => qr{$W VQCT_wrong_name UNEXPECTED old format extension for havana (\S+) $CWHO$},
 
        # bio_* are ignored
        bio_biotype_comb => qr{$W Combination of gene biotype '(\S+)' and transcript biotype '(\S+)' is not allowed \((\d+) in total\)\. Cases are (.*)$},
+      );
+
+    my %fnum =
+      (# keyed regexp's capture indices, to their function
+       VQCG_PC_NO_CDS => { g_gg => 0, chr => 1 },
+       VQCT_biotype_inconst_CDS => { t_gg => 1, chr => 2 },
+
+       # chr from state should be right for these (seen from the layout of the raw log)
+       name_VQCG_wrong_name => { g_name => 0 },
+       VQCG_duplicated_root_name => {},
+       name_VQCT_wrong_name => { t_gg => 0, chr => 1 },
+       name_VQCT_wrong_name___new => { t_name => 0, chr => 1 },
+       name_VQCT_wrong_name___old => { t_name => 0, chr => 1 },
       );
 
     my %re;
@@ -105,18 +117,6 @@ sub main {
     my %unused; # keys from %re; a set
     my %hit; # keys from %re, values are match captures
 
-    my %fnum =
-#      (coords_VQCT_CDS_STARTgtEND => qr{$W VQCT_CDS_STARTgtEND NEGATIVE: $GG starts \((\d+)\) after it ends \((\d+)\)\. $CWHO$},
-#       name_VQCG_duplicated_root_name => qr{$W VQCG_duplicated_root_name SPLIT: havana transcript base name (\S+) is found in genes $GG and $GG$},
-#       name_VQCG_multi_root_name => qr{$W VQCG_multi_root_name DUPLICATED: havana gene $GG has transcripts with more than one name root $CWHO$},
-#       name_VQCG_wrong_name => qr{$W VQCG_wrong_name UNEXPECTED extension for havana GENE (\S+)$},
-#       name_VQCT_wrong_name => qr{$W VQCT_wrong_name UNEXPECTED name for havana transcript $GG $CWHO$},
-#       name_VQCT_wrong_name___new => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
-#       name_VQCT_wrong_name___extn => qr{$W VQCT_wrong_name UNEXPECTED new format extension for havana (\S+) $CWHO$},
-#       name_VQCT_wrong_name___old => qr{$W VQCT_wrong_name UNEXPECTED old format extension for havana (\S+) $CWHO$},
-#      );
-();
-
   LINE: while (<>) {
         my $M = match_keyed($_, \%re);
 
@@ -130,8 +130,9 @@ sub main {
 
             if ($mk =~ m{^_state_(.*)$}) {
                 $state{$1} = $mv;
-            } elsif ($mk =~ m{^(coords|name)_}) {
+            } elsif ($mk =~ m{^(coords|name)_} || exists $fnum{$mk}) {
                 $push = $mk;
+                $skip = 0;
             } else {
                 $unused{$mk} ++ unless $skip;
             }
@@ -140,24 +141,48 @@ sub main {
         next LINE if $skip;
 
         chomp;
-        push @{ $hit{$push} }, { TEXT => $_, LINE => $., %$M } if $push;
+        if ($push) {
+            push @{ $hit{$push} },
+              { TEXT => $_, LINE => $.,
+                %$M,
+                state => { %state },
+              };
+        }
     }
 
     print qq{-*- org -*-\n
 This file format is most usefully viewed with Emacs.
 
-Move to a line and press TAB to show headings / show all / close\n
-* Issues\n};
+Move to a line and press TAB to show headings / show all / close\n};
+
+    print "\n* Summary\nHit types starting with '_' are internal stuff.\n";
+    my %chr_count; # key = regexp, value = { chr => hitcount }
+    while (my ($k, $info) = each %fnum) {
+        $chr_count{$k} = {};
+        foreach my $v (@{ $hit{$k} }) {
+            my $chr_txt = $info->{chr} ? $v->{$k}->[ $info->{chr} ] : undef;
+            my $chr_state = $v->{state}->{chr}->[0];
+## seen some, but they are OK (due to not clearing state when test changes)
+#            if (defined $chr_txt && $chr_txt ne $chr_state) {
+#                # sanity check this, because not every line tells its chr
+#                die Dump({ fail => 'chr_txt and chr_state mismatch',
+#                           k=> $k, v => $v,
+#                           chr_txt => $chr_txt, chr_state => $chr_state });
+#            }
+            $chr_count{$k}{ $chr_txt || $chr_state } ++;
+            $chr_count{$k}{total} ++;
+        }
+    }
+    print Dump({ line_hit_counts => \%count, per_chr => \%chr_count });
+
+    print "\n* Issues\n";
     foreach my $k (sort keys %hit) {
         printf qq{** %-20s %d\n}, $k, scalar @{ $hit{$k} };
         foreach my $v (@{ $hit{$k} }) {
-            printf qq{*** %s\n}, $fnum{$k} ? $v->[ $fnum{$k} ] : (join " ", @{ $v->{$k} });
+            printf qq{*** %s\n}, join " ", @{ $v->{$k} };
             print Dump($v);
         }
     }
-
-    print "\n* Summary\nHit types starting with '_' are internal stuff.\n";
-    print Dump({ line_hit_counts => \%count, unused => [ sort keys %unused ] });
 }
 
 
