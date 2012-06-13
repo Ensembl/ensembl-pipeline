@@ -47,7 +47,7 @@ sub main {
     my $gene_div_re = qr{^========================================$}; # --verbose=1
 
     # These mark start of chromosome, end of header & start of footer, respectively
-    my $chr_div_re = qr{^(?: {4}Chromosome (\S+)/(\S+) \.\.|(Looping) over chromosomes\.\.|(Done))\. \[$date_re, mem \d+\]$};
+    my $chr_div_re = qr{^(?: {4}Chromosome (\S+)/(\S+) \.\.|(Looping) over chromosomes\.\.|(Done))\. \[$date_re, mem +\d+\]$};
 
     my $gene_passcount_re =
       qr{^\tSummary for (OTT\w+) : (\d+) out of (\d+) transcripts? transferred$},
