@@ -155,36 +155,60 @@ This file format is most usefully viewed with Emacs.
 
 Move to a line and press TAB to show headings / show all / close\n};
 
-    print "\n* Summary\nHit types starting with '_' are internal stuff.\n";
-    my %chr_count; # key = regexp, value = { chr => hitcount }
-    while (my ($k, $info) = each %fnum) {
-        $chr_count{$k} = {};
-        foreach my $v (@{ $hit{$k} }) {
-            my $chr_txt = $info->{chr} ? $v->{$k}->[ $info->{chr} ] : undef;
-            my $chr_state = $v->{state}->{chr}->[0];
+    my $find_chr = sub {
+        my ($k, $v) = @_; # key,value from %hit
+        my $info = $fnum{$k};
+        die "Source of 'chr' unknown for regex-key $k" unless defined $info;
+        my $chr_txt = $info->{chr} ? $v->{$k}->[ $info->{chr} ] : undef;
+        my $chr_state = $v->{state}->{chr}->[0];
 ## seen some, but they are OK (due to not clearing state when test changes)
+#  ...they need checking per type
 #            if (defined $chr_txt && $chr_txt ne $chr_state) {
 #                # sanity check this, because not every line tells its chr
 #                die Dump({ fail => 'chr_txt and chr_state mismatch',
 #                           k=> $k, v => $v,
 #                           chr_txt => $chr_txt, chr_state => $chr_state });
 #            }
-            $chr_count{$k}{ $chr_txt || $chr_state } ++;
+        return $chr_txt || $chr_state;
+    };
+
+    print "\n* Summary\nHit types starting with '_' are internal stuff.\n";
+    my %chr_count; # key = regexp, value = { chr => hitcount }
+    while (my ($k, $info) = each %fnum) {
+        $chr_count{$k} = {};
+        foreach my $v (@{ $hit{$k} }) {
+            $chr_count{$k}{ $find_chr->($k, $v) } ++;
             $chr_count{$k}{total} ++;
         }
     }
     print Dump({ line_hit_counts => \%count, per_chr => \%chr_count });
 
     print "\n* Issues\n";
-    foreach my $k (sort keys %hit) {
-        printf qq{** %-20s %d\n}, $k, scalar @{ $hit{$k} };
+    my %dump; # key = **heading, value = \@text
+    foreach my $k (keys %hit) {
         foreach my $v (@{ $hit{$k} }) {
-            printf qq{*** %s\n}, join " ", @{ $v->{$k} };
-            print Dump($v);
+            my $section =
+              ($fnum{$k}
+#               ? sprintf('** %-30s on %10s', $k, $find_chr->($k, $v))
+               ? sprintf('** %10s, %30s', $find_chr->($k, $v), $k)
+               : sprintf('**  [all] %s', $k));
+            push @{ $dump{$section} },
+              sprintf qq{*** %s\n%s\n}, (join " ", @{ $v->{$k} }), $v->{TEXT};
         }
     }
+    nested_dump(\%dump);
 }
 
+
+sub nested_dump {
+    my ($dumph) = @_;
+    foreach my $H (sort keys %$dumph) {
+        printf "%-25s (%4d)\n", $H, scalar @{ $dumph->{$H} };
+        print @{ $dumph->{$H} };
+    }
+    %$dumph = ();
+    return ();
+}
 
 sub match_keyed {
     my ($txt, $re) = @_;
