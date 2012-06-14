@@ -26,7 +26,7 @@ Matthew Astley mca@sanger.ac.uk
 sub main {
     my $MEMSTAMP_RE = qr{\[\d{4}-\d{2}-\d{2} [0-9:]{8}, mem +\d+\]};
     my $W = qr{^WARNING:};
-    my $CWHO = qr{\[ ?chromosome = (\S+?)\. (?:gene|transcript) author = (\S+?)\] ?};
+    my $CWHO = qr{\[ ?chromosome = (\S+?)\. (?:gene|transcript) author = (\S+?)\][ .]*(Gene is 'annotation in progress'|)};
     my $DS = qr{\[(\d{2}/\d{2}/\d{4})\]};
     my $GG = qr{(\S+ \(\S+\))};
 
@@ -50,14 +50,14 @@ sub main {
        _chr_hid => qr{^chromosome chromosome:Otter:\S+ is hidden$},
        _biotype_new => qr{$W Found new gene biotype \S+},
        _species_hashref => qr{$W  Can't match species name from database \S+ with 'regions' hashref. Exiting$},
-
+       _closedFH => qr{^print\(\) on closed filehandle MAIL_FILE at .*$},
 
        # VQC._* ignored as biological issues
        VQCT_pot_selC => qr{^VQCT_pot_selC POTENTIAL SELENO },
        VQCT_CDS_remark => qr{$W VQCT_CDS_remark (\S+) has (.*?) 'CDS (start|end) not found' remark (.*?) $CWHO$},
        VQCT_no_stop => qr{$W VQCT_no_stop NO STOP: (\S+) pig gene (\S+) has a (\S+) transcript $GG that has a translation without a stop codon\. $CWHO$},
-       VQCT_internal_stop => qr{$W VQCT_internal_stop INTERNAL STOPS HAVANA: Transcript (\S+?) .* from gene (\S+) has non '\w+' stop codons.*?  $DS $CWHO\.\)$},
-       VQCG_NPC_CDS => qr{$W VQCG_NPC_CDS MISCLASSIFIED GENE: ig_segment gene $GG has translations\. $CWHO$},
+       VQCT_internal_stop => qr{$W VQCT_internal_stop INTERNAL STOPS HAVANA: Transcript (\S+?) .* from gene (\S+) has non '\w+' stop codons.*?  $DS $CWHO\)$},
+       VQCG_NPC_CDS => qr{$W VQCG_NPC_CDS MISCLASSIFIED GENE: (\S+) gene $GG has translations\. $CWHO$},
        VQCT_biotype_inconst_CDS => qr{$W VQCT_biotype_inconst_CDS MISCLASSIFIED: (\S+) transcript $GG doesn't have a translation\. $CWHO$},
        VQCG_biotype_CDS_mismatch => qr{$W VQCG_biotype_CDS_mismatch MISCLASSIFIED TRANS: (\S+) transcript $GG has a translation\. $CWHO$},
 
@@ -120,7 +120,10 @@ sub main {
   LINE: while (<>) {
         my $M = match_keyed($_, \%re);
 
-        warn "NO MATCH: $_" unless keys %$M;
+        if (!keys %$M) {
+            warn "NO MATCH: $_";
+            $count{' !! UNMATCHED !! '} ++;
+        }
 
         my (@unused, $skip, $push);
         while (my ($mk, $mv) = each %$M) {
@@ -149,6 +152,7 @@ sub main {
               };
         }
     }
+    close ARGV;
 
     print qq{-*- org -*-\n
 This file format is most usefully viewed with Emacs.
