@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.77 2012-05-28 15:39:20 mr6 Exp $
+#$Id: cDNA_update.pl,v 1.78 2012-06-18 10:55:26 db8 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1008,7 +1008,7 @@ sub write_to_file {
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
     my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
-    system("/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t $configvars{taxonomy_id} > $embl_fa_file");
+    system("bsub -I -q yesterday /software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t $configvars{taxonomy_id} > $embl_fa_file");
     open( RP, "<", $embl_fa_file )
       or croak("can't read $embl_fa_file\n");
     while ( my $entry = <RP> ) {
