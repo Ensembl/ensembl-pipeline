@@ -90,8 +90,7 @@ foreach my $species (@speciess){
 	   $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
 
   print "Checking config\n";
-  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST 
-			  REFINS WRITEINS WRITELOAD REFLOAD WRITENAME );
+  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST WRITENAME );
   config_setup(\@localconfigvars,$species);
 }
 # once thats all done sucessfully start the rule managers
@@ -348,13 +347,13 @@ sub DB_setup{
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name RfamBlast -program wublastn -program_file /usr/local/ensembl/bin/wublastn -database Rfam ".
 	  " -database_file $BLASTDIR/filtered.fasta  -parameters  \'W=12 B=10000 V=10000 -hspmax 0 -gspmax 0 -kap -cpus=1\'" .
-	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastRfam".
+	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastRfam -database_version $RFAMVERSION ".
 	      " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type SLICE";
     $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
 	" -logic_name BlastmiRNA -program wublastn -program_file wublastn -database  all_mirnas.fa ".
-	  "-database_file $BLASTDIR/all_mirnas.fa ".
+	  "-database_file $BLASTDIR/all_mirnas.fa -database_version $MIRBASEVERSION ".
 	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastmiRNA".
 	      " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type SLICE";
     $status += system($cmd);
