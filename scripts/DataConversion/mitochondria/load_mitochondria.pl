@@ -309,12 +309,15 @@ if ($MIT_LOGIC_NAME){
 if (!$MIT_DB_FILE) {
   warning("MIT_DB_FILE not defined");
 }
+if (!$MIT_DB_VERSION) {
+  warning("DB_VERSION not defined");
+}
 
 my $ensembl_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($logic_name);
 if(!defined $ensembl_analysis){
   #croak "analysis $logic_name not found\n";
   $ensembl_analysis =
-    Bio::EnsEMBL::Analysis->new( -logic_name => 'MT_genbank_import', );
+    Bio::EnsEMBL::Analysis->new( -logic_name => 'MT_genbank_import', -db_version => $MIT_DB_VERSION );
   if (defined $MIT_DB_FILE) {
     $ensembl_analysis->db_file($MIT_DB_FILE);
   }

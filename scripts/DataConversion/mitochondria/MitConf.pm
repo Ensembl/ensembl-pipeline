@@ -23,6 +23,7 @@ use vars qw( %MitConf );
   # OR you can include the full http path if you like
   # eg http://www.ncbi.nlm.nih.gov/nuccore/NC_001665
   MIT_DB_FILE => 'http://www.ncbi.nlm.nih.gov/nuccore/NC_XXXX',
+  MIT_DB_VERSION => 'NC_XXX.X'
 
   # if want the verbose output and sequence output after the load
   MIT_DEBUG => '',
