@@ -210,29 +210,34 @@ sub comparison_conf{
 
 
 
-sub job_submission_command{
-  my ($self, $logic_name, $output_dir, $verbose) = @_;                  
+sub job_submission_command {
+  my ( $self, $logic_name, $output_dir, $verbose ) = @_;
 
-  my $db_conf = $self->testdb->conf_hash;
-  my $dbport = $db_conf->{'port'};
-  my $dbhost = $db_conf->{'host'};
-  my $dbpass = $db_conf->{'pass'};
-  my $dbuser = $db_conf->{'user'};
-  my $dbname = $db_conf->{'dbname'};
+  my $db_conf = $self->testdb->conf_hash();
+  my $dbport  = $db_conf->{'port'};
+  my $dbhost  = $db_conf->{'host'};
+  my $dbpass  = $db_conf->{'pass'};
+  my $dbuser  = $db_conf->{'user'};
+  my $dbname  = $db_conf->{'dbname'};
 
   my $job_submission = "../scripts/job_submission.pl";
-  if(! -e $job_submission){
-    $self->execption("Can't run $job_submission if it doesn't exist");
+
+  if ( !-e $job_submission ) {
+    $self->exception("Can not find '$job_submission");
   }
-  my $db_args = $self->database_args($self->testdb);
-  my $cmd = "perl ".$job_submission." ";
-  $cmd .= $db_args." ";
+
+  my $db_args = $self->database_args( $self->testdb() );
+
+  my $cmd = "perl " . $job_submission . " ";
+  $cmd .= $db_args . " ";
   $cmd .= "-logic_name $logic_name ";
   $cmd .= "-output_dir $output_dir ";
-  $cmd .= "-force ";
-  $cmd .= "-verbose" if($verbose);
+  $cmd .= "-force";
+
+  if ($verbose) { $cmd .= " -verbose" }
+
   return $cmd;
-}
+} ## end sub job_submission_command
 
 =head2 rulemanager_command
 
@@ -497,24 +502,28 @@ sub setup_database{
 =cut
 
 
-sub check_output_dir{
+sub check_output_dir {
   my ($self) = @_;
-  if(-d $self->output_dir){
-    return 0;
-  }else{
-    eval{
-      mkdir($self->output_dir);
-      warning("Your command line-specified test output directory " . $self->output_dir .
-       " does not exist - it's being created";
-    };
-    if($@){
-      $self->exception("Failed to create ".$self->output_dir." $@");
-    }
-    $self->cleanup_dir(1);
-    return 1;
-  }
-}
 
+  if ( -d $self->output_dir ) {
+    return 0;
+  }
+
+  eval {
+    mkdir( $self->output_dir() );
+    warning( "Your command line-specified test output directory " .
+         $self->output_dir() . " does not exist - it will be created" );
+  };
+
+  if ($@) {
+    $self->exception(
+                    "Failed to create " . $self->output_dir() . " $@" );
+  }
+
+  $self->cleanup_dir(1);
+
+  return 1;
+}
 
 =head2 run_single_analysis
 

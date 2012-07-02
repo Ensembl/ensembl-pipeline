@@ -1,47 +1,53 @@
-# All lines started with the hash sign "#" will not be read as config.
+# $Id: TestDB.conf.example,v 1.5 2012-07-02 16:27:09 ak4 Exp $
+#
+# All lines starting with a hash ('#') will be ignored.
+#
+# This is an example file of TestDB.conf, a file which is read by
+# the test_single_analysis.pl or test_whole_pipeline.pl script in
+# ensembl-pipeline/test_system directory to create a TestDB object.
 
-# This is an example file of TestDB.conf, a file which is read by the
-# test_single_analysis.pl or test_whole_pipeline.pl script in 
-# enesmbl-pipeline/test_system directory to create a TestDB object.  
+{
+  # Database details
+  'port'   => 3306,
+  'driver' => 'mysql',
+  'user'   => 'myuser',
+  'pass'   => 'mypassword',
+  'host'   => 'myserver',
+  'dbname' => 'test_system_db',
 
-{ 
- #database details (Only use quotes for strings, not numbers)
- 'port'   => 3306,
- 'driver' => 'mysql',
- 'user'   => '',
- 'pass'   => '',
- 'host'   => 'ecs1d',
- 'dbname' => '',
+  # Location of the table structure files
+  'sql_files' => [
+    $ENV{'HOME'} .
+      '/ensembl-src/ensembl/sql/table.sql',    # the core tables
+    $ENV{'HOME'} . '/ensembl-src/ensembl-pipeline/sql/table.sql'
+    ,                                          # the pipeline tables
+  ],
 
-  #where the table structure files are
- 'sql_files' => ['../../ensembl-pipeline/sql/table.sql',   #the pipeline tables
-                 '../../ensembl/sql/table.sql'],   #the core tables
+  # Directory of the compressed archive containing all the tab-delimited
+  # files
+  'data_dir' => 'reference_data',
 
- #where the zip file containing all the tab-delimited files is
- 'data_dir' => 'reference_data',
+  # For the following three options, set to '0' for false, '1' for true:
 
- #for the following three options, set to '0' for 'false', '1' for 'true':
+  # The database already exists and the tables doesn't need to be loaded
+  'preloaded_tables' => 0,
 
- #the database already exists and the tables don't need loaded
- 'preloaded_tables' => 0,
+  # The data doesn't need to be loaded
+  'preloaded_data' => 0,
 
- #the data doesn't need loaded 
- 'preloaded_data' => 0,
+  # Set this to 1 to not unpack the compressed archive (it should
+  # already be unpacked).  This is usually set to 0 because the data
+  # usually have not been unpacked, unless you have performed this
+  # pipeline test recently with the option '-dont_cleanup'.
+  'dont_unzip' => 0,
 
- #don't need to unzip the zip file, the directory will already exist:
- #(this is usually set to "0" because the data usually have not been 
- #unzipped, unless you have performed this pipeline test recently with
- #the option "-dont_cleanup")
- 'dont_unzip' => 0,
+  'job_stats_sleep' => 60, }
 
- 'job_stats_sleep' => 60,
-}
+# Note if you set 'dont_unzip' to 1, the reference data needs to be
+# available in the $PWD/<species_name>/ directory.  Files in this
+# directory will not be deleted by this TestDB object even if the object
+# calls the cleanup method.
 
-
-# Note if "don't unzip" is marked the path still needs to be
-# {CWD}/species_name/* files. Files in this path won't be deleted by this
-# TestDB object even if the object calls the cleanup method.
-
-# If preloaded tables is specified, dbname must be specified and
-# the database won't be deleted by TestDB cleanup. preloaded_data must 
-# only be true if preloaded_tables is also true.
+# If 'preloaded_tables' is 1, then 'dbname' must be given and the
+# database won't be deleted by TestDB cleanup.  The 'preloaded_data'
+# setting must only be true if 'preloaded_tables' is also true.

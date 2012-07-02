@@ -1,49 +1,54 @@
-# All lines started with the hash sign "#" will not be read as config.
-
-# This is an example file of RefDB.conf, a file which is read by the
-# test_single_analysis.pl or test_whole_pipeline.pl script in
+# $Id: RefDB.conf.example,v 1.4 2012-07-02 16:27:09 ak4 Exp $
+#
+# All lines starting with a hash ('#') will be ignored.
+#
+# This is an example file of RefDB.conf, a file which is read by
+# the test_single_analysis.pl or test_whole_pipeline.pl script in
 # enesmbl-pipeline/test_system directory to create a RefDB object.
-         
 
-{ 
- #database details (Only use quotes for strings, not numbers)
+{
+  # Database details
+  'port'   => 3306,
+  'driver' => 'mysql',
+  'user'   => 'myuser',
+  'pass'   => 'mypassword',
+  'host'   => 'myserver',
+  'dbname' => 'test_system_db',
 
- 'port'   => 3306,
- 'driver' => 'mysql',
- 'user'   => '',
- 'pass'   => '',
- 'host'   => 'ecs1c',
- 'dbname' => '',
+  # Location of the table structure files
+  'sql_files' => [
+    ( defined( $ENV{'TESTROOT'} ) ? $ENV{'TESTROOT'} : '.' ) .
+      '/../../ensembl/sql/table.sql',    # the core tables
+    ( defined( $ENV{'TESTROOT'} ) ? $ENV{'TESTROOT'} : '.' ) .
+      '/../../ensembl-pipeline/sql/table.sql',    # the pipeline tables
+    ],
 
- #where the table structure files are:
- 'sql_files' => ['../../ensembl-pipeline/sql/table.sql',
-                 '../../ensembl/sql/table.sql'],
+  # Directory of the compressed archive containing all the tab-delimited
+  # files
+  'data_dir' => 'reference_data',
 
- #where the zip file containing all the tab files is
- 'data_dir' => 'reference_data',
+  # For the following three options, set to '0' for false, '1' for true:
 
- #for the following three options, set to '0' for 'false', '1' for 'true':
+  # The database already exists and the tables doesn't need to be loaded
+  'preloaded_tables' => 0,
 
- #the database already exists and the tables don't need loaded
- 'preloaded_tables' => 0,
+  # The data doesn't need to be loaded
+  'preloaded_data' => 0,
 
- #the data doesn't need loaded 
- 'preloaded_data' => 0,
+  # Do not unpack the compressed archive; the directory will already
+  # exist.  This is usually set to 1 because the data would have been
+  # unpack during the test to fill in the tables in TestDB. There's no
+  # need to unpack the archive again.
+  'dont_unzip' => 1,
 
- #don't need to unzip the zipped file; the directory will already exist:
- #(this is usually set to "1" because the data would have been unzipped
- #during the test to fill in the tables in TestDB. There's no need to 
- #unzip the file again.)
- 'dont_unzip' => 1,
-
- 'job_stats_sleep' => 60,
+  'job_stats_sleep' => 60,
 }
 
+# Note if you set 'dont_unzip' to 1, the reference data needs to be
+# available in the $PWD/<species_name>/ directory.  Files in this
+# directory will not be deleted by this RefDB object even if the object
+# calls the cleanup method.
 
-#Note if "don't unzip" is marked the path still needs to be
-#{CWD}/species_name/* files. Files in this path won't be deleted by this
-#RefDB object even if the object calls the cleanup method.
-
-# If preloaded tables is specified, dbname must be specified and
-# the database won't be deleted by RefDB cleanup. Preloaded_data must 
-# only be true if preloaded_tables is also true.
+# If 'preloaded_tables' is 1, then 'dbname' must be given and the
+# database won't be deleted by RefDB cleanup.  The 'preloaded_data'
+# setting must only be true if 'preloaded_tables' is also true.

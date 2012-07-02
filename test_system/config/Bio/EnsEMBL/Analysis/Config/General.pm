@@ -1,69 +1,85 @@
-# Ensembl module for Bio::EnsEMBL::Analysis::Config::General
-#
-# Copyright (c) 2004 Ensembl
-#
+=head1 LICENSE
+
+  Copyright (c) 1999-2012 The European Bioinformatics Institute and
+  Genome Research Limited.  All rights reserved.
+
+  This software is distributed under a modified Apache license.
+  For license details, please see
+
+    http://www.ensembl.org/info/about/code_licence.html
+
+=head1 CONTACT
+
+  Please email comments or questions to the public Ensembl
+  developers list at <dev@ensembl.org>.
+
+  Questions may also be sent to the Ensembl help desk at
+  <helpdesk@ensembl.org>.
+
+=cut
+
 =head1 NAME
 
 Bio::EnsEMBL::Analysis::Config::General
 
 =head1 SYNOPSIS
+
     use Bio::EnsEMBL::Analysis::Config::General;
     use Bio::EnsEMBL::Analysis::Config::General qw();
 
 =head1 DESCRIPTION
 
-    General analysis configuration.
+General analysis configuration.
 
-    It imports and sets a number of standard global variables into the
-    calling package. Without arguments all the standard variables are set,
-    and with a list, only those variables whose names are provided are set.
-    The module will die if a variable which doesn\'t appear in its
-    C<%Config> hash is asked to be set.
+It imports and sets a number of standard global variables into the
+calling package. Without arguments all the standard variables are set,
+and with a list, only those variables whose names are provided are set.
+The module will die if a variable which doesn't appear in its
+C<%Config> hash is asked to be set.
 
-   The variables can also be references to arrays or hashes.
+The variables can also be references to arrays or hashes.
 
-         Edit C<%Config> to add or alter variables.
+Edit C<%Config> to add or alter variables.
 
-         All the variables are in capitals, so that they resemble environment
-         variables.
-
-=head1 CONTACT
-
-B<dev@ensembl.org>
+All the variables are in capitals, so that they resemble environment
+variables.
 
 =cut
-         
+
 package Bio::EnsEMBL::Analysis::Config::General;
 
 use strict;
 use vars qw(%Config);
 
 %Config = (
-
-           # binaries, libraries and data files
-           BIN_DIR  => '/usr/local/ensembl/bin',
            
-           ###### Modify DATA_DIR before running the pipeline test!!! #####
-           DATA_DIR => '/your/cvs/checkout/dir/ensembl-pipeline/test_system/homo_sapiens/data',
-           LIB_DIR  => '/usr/local/ensembl/lib',
-
+           # binaries, libraries and data files
+            BIN_DIR => '/usr/local/ensembl/bin',
+            DATA_DIR =>
+              ( defined( $ENV{'TESTROOT'} ) ? $ENV{'TESTROOT'} : '.' ) .
+              '/homo_sapiens/data',
+            LIB_DIR => '/usr/local/ensembl/lib',
+           
            # Path where the parser and parameter files for FirstEF program are allocated
            PARAMETERS_DIR => '/vol/software/linux-i386/farm/lib/firstef/parameters/',
            PARSE_SCRIPT => '/vol/software/linux-i386/farm/lib/firstef/FirstEF_parser.pl',
-
            
            # The default directory the Runnable runs its analysis in
            ANALYSIS_WORK_DIR => '/tmp',
-           ANALYSIS_REPEAT_MASKING => ['RepeatMask'],
-  
+
+           ANALYSIS_REPEAT_MASKING => ['repeatmask'],
+ 
+           # Uniprot base directory, previously $BLASTDB
+           BLASTDB => $ENV{'BLASTDB'} || '/data/blastdb/Supported',
            CORE_VERBOSITY => 'WARNING',
-           LOGGER_VERBOSITY => 'OFF',
-           #the two versbosity values control when commands like warning or logger_info
-           #print to screen. The current settings give you most of what you want but
-           #look at Bio::EnsEMBL::Utils::Exception and
-           #Bio::EnsEMBL::Analysis::Tools::Logger for more info
+           LOGGER_VERBOSITY => 'OFF', # allowed : OFF, INFO, INFO_STACK_TRACE for logger_info subroutine 
            
-          );
+           #the two versbosity values control when commands like warning or logger_info
+           #print to screen The current settings give you most of what you want but 
+           #look at Bio::EnsEMBL::Utils::Exception and 
+           #Bio::EnsEMBL::Analysis::Tools::Logger for more info
+
+);
 
 
 
