@@ -1,3 +1,6 @@
+#!/usr/bin/env perl
+# $Id: slice_to_sql.pl,v 1.8 2012-07-03 09:27:56 ak4 Exp $
+
 =pod
 
 =head1 NAME slice_to_sql.pl
@@ -124,10 +127,9 @@ perl path/to/script/slice_to_sql2.pl -dbhost xxxx  -dbuser xxxx -dbport xxxx \
  
 =cut
 
-
-#!/usr/local/ensembl/bin/perl -w
-
 use strict;
+use warnings;
+
 use Getopt::Long;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -593,16 +595,16 @@ sub setup_tablelist{
 sub get_tables {
   my ($db) = @_;
 
- 	my $query = "show tables";
+    my $query = "show tables";
   
-	my $sth = $db->prepare($query);
-	my $res = $sth->execute;
+    my $sth = $db->prepare($query);
+    my $res = $sth->execute;
   
-	my @tables;
+    my @tables;
   
-	while (my $ref = $sth->fetchrow_arrayref) {
+    while (my $ref = $sth->fetchrow_arrayref) {
     push(@tables,$ref->[0]);
-	}
+    }
 
   return \@tables;
 }
