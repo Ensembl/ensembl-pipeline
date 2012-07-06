@@ -80,6 +80,7 @@ my $job_id;
 my $queue_manager;
 my $verbose = 0;
 my $job_limit;
+my $job_limit_add_running = 1; # true "no more than job_limit RUNning", false "aim for job_limit PENDing"
 my $queue_host;
 my $queue_name;
 my $sleep = 180;
@@ -355,13 +356,22 @@ sub job_stats {
 
 	&update_job_status(\%job_stats) if $update_job;
 
+        my $fillup_type = 'Pending';
+        if ($job_limit_add_running) {
+            # On this code path, I want to limit the number of RUNning
+            # jobs on the farm.  Too many uniprots will cause lustre
+            # IO problems.  LSF could maybe limit this using another
+            # token bucket?
+            $statuses_to_count{RUN} = 1;
+            $fillup_type .= ' or running';
+        } # else N jobs PENDing: ensure the queue never runs dry - throttle wide open!
   GLOBAL: foreach my $sub_id ( keys %job_stats ) {
 		if ( $statuses_to_count{ $job_stats{$sub_id} } ) {
 			$global_job_count++;
 		}
 	}
 
-	print "$global_job_count / $job_limit Pending jobs in the farm\n"
+	print "$global_job_count / $job_limit $fillup_type jobs in the farm\n"
 	  if ($verbose);
 
 	my $free_slots = $job_limit - $global_job_count; # number of free farm slots
