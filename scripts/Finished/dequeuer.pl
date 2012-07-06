@@ -225,8 +225,8 @@ while ($loop) {
             my $until = localtime(time() + $sleep);
             print "Finished for now (loop $loop), going to sleep for $sleep secs until $until\n";
         }
-	sleep($sleep);
-	$loop++ if $loop;
+        sleep($sleep) if $loop;
+        $loop++ if $loop;
 }
 &flush_batch();
 print "Exit DQdequeuer ....\n" if $verbose;
@@ -335,7 +335,8 @@ sub flush_queue {
 				&delete_job($id);
 			}
 			$slots-- if $submitted;
-			last SLOT unless $slots;
+			last SLOT unless $slots # stop if $slots all used
+                          && $job_limit && $loop; # these may go to zero asynchronously
 		}
 	}
 }
