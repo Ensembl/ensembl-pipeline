@@ -66,18 +66,8 @@ package Bio::EnsEMBL::Pipeline::Config::General;
 use strict;
 use vars qw(%Config);
 %Config = (
-  BIN_DIR  => '/usr/local/ensembl/bin',
-  DATA_DIR => '/usr/local/ensembl/data',
-  LIB_DIR  => '/usr/local/ensembl/lib',
-  PIPELINE_WORK_DIR   => '/tmp',
-  PIPELINE_INPUT_DIR => '',
-  PIPELINE_TARGET_DIR =>'',
-  SLICE_INPUT_ID_REGEX => '(\S+)\.(\d+)-(\d+):?([^:]*)',
-  PIPELINE_REPEAT_MASKING => ['RepeatMask','Dust'],	
-  SNAP_MASKING => [],
-  MAX_JOB_TIME => 86400,
-  KILLED_INPUT_IDS => '',
   RENAME_ON_RETRY => 1,
+  SGE_PERL5LIB_ENV_SCRIPT => "",
 );
 
 >>Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm

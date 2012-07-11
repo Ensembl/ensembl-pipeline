@@ -6,7 +6,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
-use Bio::EnsEMBL::Pipeline::Config::General;
+use Bio::EnsEMBL::Analysis::Config::General qw( BIN_DIR LIB_DIR DATA_DIR );
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Analysis::Config::Blast;
 use Bio::EnsEMBL::Analysis::Tools::Utilities;
