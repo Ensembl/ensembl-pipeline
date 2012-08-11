@@ -34,9 +34,10 @@ use vars qw( %MitConf );
   # Names of the sequences for the coord systems
   # Will try and parse this information out of the
   # Genbank file if left blank
-  MIT_CONTIG_SEQNAME      => '',
-  MIT_CHROMOSOME_SEQNAME  => '',
-  MIT_SUPERCONTIG_SEQNAME => '',
+  # NB please add contig, scaffold and chromosome name
+  MIT_CONTIG_SEQNAME      => '', # eg. NC_...
+  MIT_CHROMOSOME_SEQNAME  => '', # MT
+  MIT_SCAFFOLD_SEQNAME => '', # eg. NC_... can be same as contig
   MIT_CLONE_SEQNAME       => '',
 
   # Name of top level in coord system

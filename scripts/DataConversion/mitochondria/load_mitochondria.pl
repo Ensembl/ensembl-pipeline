@@ -36,7 +36,7 @@ my @genes;;
 my $translation; # JUST INCASE
 my $count;
 #use scaffold or supercontig:
-my $supercontig = 'supercontig';
+my $scaffold = 'scaffold';
 my %opt;
 my $path = undef;
 
@@ -51,7 +51,7 @@ GetOptions( \%opt,
             'dbname=s',
             'contig=s',         # MIT_CONTIG_SEQNAME
             'chromosome=s',     # MIT_CHROMOSOME_SEQNAME
-            'supercontig=s',    # MIT_SUPERCONTIG_SEQNAME
+            'scaffold=s',    # MIT_SCAFFOLD_SEQNAME
             'clone=s',          # MIT_CLONE_SEQNAME
             'toplevel=s',       # MIT_TOPLEVEL
             'gene_type=s',
@@ -664,10 +664,10 @@ sub _parse_coordinates() {
   # Use config file vales if they are present, otherwise get
   # seq names from GFF file
 
-  if ($MIT_SUPERCONTIG_SEQNAME) {
-    $assembly{$supercontig} = $MIT_SUPERCONTIG_SEQNAME;
+  if ($MIT_SCAFFOLD_SEQNAME) {
+    $assembly{$scaffold} = $MIT_SCAFFOLD_SEQNAME;
   } else {
-    $assembly{$supercontig} = $entries[0]{'accession'};
+    $assembly{$scaffold} = $entries[0]{'accession'};
   }
   if ($MIT_CLONE_SEQNAME) {
     $assembly{'clone'} = $MIT_CLONE_SEQNAME;
@@ -780,17 +780,17 @@ sub load_chromosomes {
   return 0 if ( scalar( keys %slices ) == 1 );
 
   # load the assembly
-  # Load a chromosome - supercontig entry in the asembly, if these
+  # Load a chromosome - scaffold entry in the asembly, if these
   # coord stestems exist
 
-  if ( $slices{'top_level'} && $slices{$supercontig} ) {
-    print "Making assembly for chromosome vs supercontig\n" if $MIT_DEBUG;
+  if ( $slices{'top_level'} && $slices{$scaffold} ) {
+    print "Making assembly for chromosome vs scaffold\n" if $MIT_DEBUG;
     &load_assembly( $slices{'top_level'}->get_seq_region_id,
                     $slices{'top_level'}->start,
                     $slices{'top_level'}->end,
-                    $slices{$supercontig}->get_seq_region_id,
-                    $slices{$supercontig}->start,
-                    $slices{$supercontig}->end,
+                    $slices{$scaffold}->get_seq_region_id,
+                    $slices{$scaffold}->start,
+                    $slices{$scaffold}->end,
                     1,
                     $output_db );
   }
