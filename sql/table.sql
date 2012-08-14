@@ -30,6 +30,7 @@ CREATE TABLE job_status (
   status            varchar(40) DEFAULT 'CREATED' NOT NULL,
   time              datetime NOT NULL,
   is_current        enum('n', 'y') DEFAULT 'n',
+  info              varchar(200) DEFAULT '',
 
   KEY (job_id),
   KEY (status),
@@ -42,6 +43,7 @@ CREATE TABLE job_status (
 # job_id     - job internal ID
 # status     - text string (e.g. 'CREATED' , 'RUNNING')
 # is_current - whether this status is the current status
+# info       - stdout_file from the previous run if it has failed
 
 
 
