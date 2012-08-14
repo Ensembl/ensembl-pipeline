@@ -636,17 +636,20 @@ sub set_status {
                                 WHERE  job_id = ?
                                   AND  is_current = 'y'
                                });
-        
+        my $info;
+        if ($stat_str eq 'FAILED' or $stat_str eq 'AWOL') {
+            $info = $job->stdout_file;
+        }
         $sth_ins = $self->prepare(q{
                                 INSERT into job_status
-                                (job_id, status, time, is_current)
-                                VALUES (?, ?, NOW(), 'y')
+                                (job_id, status, time, is_current, info)
+                                VALUES (?, ?, NOW(), 'y', ?)
                                });
 
         $sth_upd->execute($jobId);
         $sth_upd->finish;
 
-        $sth_ins->execute($jobId, $stat_str);
+        $sth_ins->execute($jobId, $stat_str, $info);
         $sth_ins->finish;
         
         $sth = $self->prepare("SELECT NOW()");

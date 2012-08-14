@@ -83,16 +83,16 @@ sub new {
   my $self = bless {}, $class;
   my ( $p, $f, $l ) = caller;
 
-  my ( $adaptor,  $dbID,        $submission_id,
-       $input_id, $analysis,    $stdout,
-       $stderr,   $retry_count, $output_dir,
-       $runner,   $number_output_dirs )
+  my ( $adaptor,    $dbID,     $submission_id,
+       $input_id,   $analysis, $stdout,
+       $stderr,     $rename,   $retry_count,
+       $output_dir, $runner,   $number_output_dirs )
     = rearrange( [ 'ADAPTOR',       'ID',
                    'SUBMISSION_ID', 'INPUT_ID',
                    'ANALYSIS',      'STDOUT',
-                   'STDERR',        'RETRY_COUNT',
-                   'OUTPUT_DIR',    'RUNNER',
-                   'NUMBER_OUTPUT_DIRS',
+                   'STDERR',        'RENAME_ON_RETRY',
+                   'RETRY_COUNT',   'OUTPUT_DIR',
+                   'RUNNER',        'NUMBER_OUTPUT_DIRS',
                  ],
                  @args );
 
@@ -112,6 +112,10 @@ sub new {
                  $analysis ) );
   }
 
+  if (!defined($rename)) {
+    $rename = $RENAME_ON_RETRY; #found in General.pm;
+  }
+
   $self->dbID($dbID);
   $self->adaptor($adaptor);
   $self->input_id($input_id);
@@ -120,56 +124,25 @@ sub new {
   $self->stderr_file($stderr);
   $self->retry_count($retry_count);
   $self->submission_id($submission_id);
-  $self->output_dir($output_dir);
-  $self->number_output_dirs($number_output_dirs);
+  $self->number_output_dirs($number_output_dirs || 10);
+  $self->rename_on_retry($rename);
 
-  if ( defined( $self->output_dir() ) ) {
-    $self->make_filenames();
-  }
-  else {
-    my $output_dir;
-
-    if ( !exists( $BATCH_QUEUES{ $analysis->logic_name() } ) ) {
-      # If the analysis is not configured in BatchQueue.pm, set
-      # output_dir by logic_name.
-      $output_dir =
-        $BATCH_QUEUES{'default'}{'output_dir'} . '/' .
-        $analysis->logic_name();
+  if ( !defined( $output_dir ) ) {
+    if ( exists $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} and
+         defined $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} )
+    {
+      $output_dir = $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'};
     }
     else {
-      if (
-        defined $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} )
-      {
-        # The analysis is configured...
-        $output_dir =
-          $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'};
-      }
-      else {
-        # Analysis is configured but the output directory is not
-        # defined; set_up_queues() will set it to default_output_dir but
-        # we reset-it here... (Why? /ak4)
-        $output_dir =
-          $BATCH_QUEUES{'default'}{'output_dir'} . '/' .
-          $analysis->logic_name();
-      }
+      $output_dir = $BATCH_QUEUES{'default'}{'output_dir'}.'/'.$analysis->logic_name();
     }
-
-    if ( !defined($output_dir) ) {
-      throw( "Need an output directory passed in from RuleManager " .
-             "or from Config/BatchQueue $!" );
-    }
-
-    $self->output_dir($output_dir);
-    $self->make_filenames();
-  } ## end else [ if ( defined( $self->output_dir...))]
-
-  $self->runner($runner);
-
-  if ( !$self->runner() ) {
-    my $queue  = $BATCH_QUEUES{ $self->analysis()->logic_name() };
-    my $runner = $queue->{'runner'};
-    $self->runner($runner);
   }
+
+  $self->output_dir($output_dir);
+  $self->make_filenames() if (!$stdout and !$stderr);
+
+  $runner = $BATCH_QUEUES{ $self->analysis()->logic_name() }->{'runner'} unless $runner;
+  $self->runner($runner);
 
   return $self;
 } ## end sub new
@@ -363,6 +336,11 @@ sub flush_runs {
     if ( ! $lastjob) {
       throw( "Last batch job not in db" );
     }
+    $lastjob->make_filenames;
+
+    my $run_index = $self->retry_count();
+
+
     # jhv LD_LIBRARY_PATH lsf-pre-exec hack  
     # We're running the runner.pl with /usr/local/ensembl32/bin/perl - this is a bit un-usual , but it's 
     # currently ( July 2010 ) needed to overcome some lsf bug / lsf security feature. 
@@ -399,8 +377,6 @@ sub flush_runs {
     # 
     # If the setting is not an array, the code reverts to using the old
     # '_retry' setting, if present.
-
-    my $run_index = $self->retry_count();
 
     if ( ref($system_queue) eq 'ARRAY' ) {
       # The 'queue' setting is an array, pick out the one corresponding
@@ -512,12 +488,6 @@ sub flush_runs {
       my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
       foreach my $job (@jobs) {
 
-        if( $job->retry_count > 0 ) {
-          for ( $job->stdout_file, $job->stderr_file ) {
-            open( FILE, ">".$_ ); close( FILE );
-          }
-        }
-
         #print STDERR "altering stderr file to ".$lastjob->stderr_file."\n";
         if ($batch_job->id) {
           $job->submission_id( $batch_job->id );
@@ -598,6 +568,8 @@ sub runLocally {
 
   local *STDOUT;
   local *STDERR;
+
+  $self->make_filenames;
 
   if ( ! open(STDOUT, ">".$self->stdout_file)) {
     $self->set_status( "FAILED" );
@@ -915,16 +887,19 @@ sub make_filenames {
   my $fname = $self->input_id;
   $fname =~ s/\/+$//;
   if ($fname =~ /\//) {
-    my ($suffix) = $fname =~ /\/([^\/]+)$/;
-    $fname = $suffix;
+  my ($suffix) = $fname =~ /\/([^\/]+)$/;
+  $fname = $suffix;
   }
   $fname .= "." . $self->analysis->logic_name;
   $fname .= "." . int(rand(1000));
-
-  $self->stdout_file($dir.$fname.".out") unless($self->stdout_file);
-  $self->stderr_file($dir.$fname.".err") unless($self->stderr_file);
+  $self->stdout_file($dir.$fname.'.out') unless $self->stdout_file;
+  $self->stderr_file($dir.$fname.'.err') unless $self->stderr_file;
+  
+  if ($self->retry_count > 0 and $self->can_retry($self->analysis->logic_name) and $self->rename_on_retry) {
+    $self->stdout_file($dir.$fname.'.retry'.$self->retry_count.'.out');
+    $self->stderr_file($dir.$fname.'.retry'.$self->retry_count.'.err');
+  }
 }
-
 
 =head2 stdout_file
 
@@ -1213,5 +1188,24 @@ sub number_output_dirs {
    $self->{number_output_dirs} = $arg if $arg ; 
    return $self->{number_output_dirs}; 
 } 
+
+=head2 rename_on_retry 
+
+  Arg [1]   : int
+  Function  : boolean toggle as to whether perform a certain action
+  Returntype: int
+  Exceptions: none
+  Example   : if($self->rename_on_retry)
+
+=cut
+
+
+#whether to rename job's output files when retried
+sub rename_on_retry{
+  my $self = shift;
+
+  $self->{'rename_on_retry'} = shift if (@_);
+  return $self->{'rename_on_retry'};
+}
 
 1;

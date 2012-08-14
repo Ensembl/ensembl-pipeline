@@ -679,9 +679,6 @@ sub can_job_run{
     if (($status eq 'FAILED' || $status eq 'AWOL') && $cj->can_retry) {
       print "\nRetrying job with status $status!!!!\n" if $self->be_verbose;
 
-      if ($self->rename_on_retry) {
-        $self->rename_files($cj);
-      }
       $cj->set_status('CREATED');
       $job = $cj;
     }
@@ -733,6 +730,7 @@ sub rename_files{
   }
   return 1;
 }
+
 
 
 =head2 job_stats/job_limit_check
