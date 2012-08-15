@@ -148,9 +148,9 @@ GENBANK_ENTRY: for my $g (@$genbank_ref) {
        $start = join ("-", @starts)  ;   
 
      } elsif ($k=~/end/) {  
-       my @starts = @{$entry{$k}} ;   
-       throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;   
-       $end = join ("-", @starts)  ;  
+       my @ends = @{$entry{$k}} ;   
+       throw ( " not a single-exon-gene ") if scalar(@ends) > 1  ;   
+       $end = join ("-", @ends)  ;  
 
      } elsif ($k=~m/note/){  
        $note = $entry{$k} ;  
