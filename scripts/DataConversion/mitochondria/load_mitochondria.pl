@@ -27,6 +27,7 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
 use Bio::SeqIO;
+use Bio::EnsEMBL::SeqEdit;
 
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw warning);
@@ -144,11 +145,13 @@ GENBANK_ENTRY: for my $g (@$genbank_ref) {
 
      if ($k=~/start/) {   
        my @starts = @{$entry{$k}} ;    
+       #warning ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
        throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
        $start = join ("-", @starts)  ;   
 
      } elsif ($k=~/end/) {  
        my @ends = @{$entry{$k}} ;   
+       #warning ( " not a single-exon-gene ") if scalar(@ends) > 1  ;   
        throw ( " not a single-exon-gene ") if scalar(@ends) > 1  ;   
        $end = join ("-", @ends)  ;  
 
@@ -504,6 +507,19 @@ sub load_db(){
     print "dbID = $dbid\n" if $MIT_DEBUG;
     my $stored_gene = $output_db->get_GeneAdaptor->fetch_by_dbID($dbid);
     foreach my $transc (@{$stored_gene->get_all_Transcripts}) {
+      if ($transc->translation && $transc->translate()->seq() =~ /^[^M]/) {
+        warning("Adding SeqEdit for non-methionine start codon in translation ".$transc->translate()->seq());
+        my $seq_edit = Bio::EnsEMBL::SeqEdit->new(
+              -CODE    => 'amino_acid_sub', 
+              -NAME    => 'Amino acid substitution', 
+              -DESC    => 'Some translations have been manually curated for amino acid substitiutions. For example a stop codon may be changed to an amino acid in order to prevent premature truncation, or one amino acid can be substituted for another.', 
+              -START   => 1,
+              -END     => 1, 
+              -ALT_SEQ => 'M' 
+              );
+        my $attribute = $seq_edit->get_Attribute();
+        $output_db->get_AttributeAdaptor()->store_on_Translation($transc->translation, [$attribute]);
+      }
       if ($transc->translation && $transc->translate()->seq() =~ /\*/) {
         throw("Stop codon found in translation ".$transc->translate()->seq());
       }
@@ -589,6 +605,7 @@ sub _parse_coordinates() {
         || $_ =~ /^rRNA/
         || $_ =~ /^CDS/
         || $_ =~ /^ACCESSION/
+        || $_ =~ /\/translation/
         || $_ =~ /^source/ )
     {
       $index++;
@@ -601,8 +618,11 @@ sub _parse_coordinates() {
 
       if ( $_ =~ /ACCESSION/ ) {
         $entries[$index]{'accession'} = $string[1];
+      } elsif ($_ =~ /^\/translation\=\"(\w)/) { 
+        if ($1 ne 'M') {
+          throw("Translation starts with non-methionine amino acid $1 : $_");
+        }
       }
-
       else {
         if ( $string[1] =~ 'complement' ) {
           $entries[$index]{'strand'} = '-1';
