@@ -3,6 +3,7 @@ package  Bio::EnsEMBL::Analysis::Config::Blast;
 
 %Config = 
   (
+   BLASTDB=>'/data/blastdb/Supported/',
    BLAST_CONFIG => 
    {
     DEFAULT => 
