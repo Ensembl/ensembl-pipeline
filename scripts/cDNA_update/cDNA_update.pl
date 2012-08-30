@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.79 2012-06-18 14:02:43 db8 Exp $
+#$Id: cDNA_update.pl,v 1.80 2012-08-30 00:09:30 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -895,70 +895,6 @@ sub fastafiles {
 
     eval {
 
-
-#        my $ls_cmd = "ls -n $SOURCE_DIR/$VERTRNA $SOURCE_DIR/$VERTRNA_UPDATE $REFSEQ_SOURCE/$REFSEQ";
-#        open(READER, "$ls_cmd |") or die "Can't run '$ls_cmd'\n";
-#        
-#
-#        while (<READER>) {
-#            @filestamp = split( " ", $_ );
-#            my @path = split "/", $filestamp[7];
-#            my $file = $path[scalar(@path)-1];
-#            print "FILE: ".$file."\n";
-#            my $stampA = join( "-", @filestamp[ 5 .. 6 ] );
-#            $stampA = $stampA."-".$file;
-#            $cmd = "ls -n " . $DATA_DIR."/".$file;
-#            print "cmd: ".$cmd."\n";
-#            @filestamp = split( " ", `$cmd` );
-#            next if ($? != 0);
-#            my @pathB = split "/", $filestamp[7];
-#            my $fileB = $pathB[scalar(@pathB)-1];
-#            my $stampB = join( "-", @filestamp[ 5 .. 6 ] );
-#            $stampB = $stampB."-".$fileB;
-#
-#            print "A: ".$stampA." B: ".$stampB."\n";
-#            print "7: ". $filestamp[7]."\n";
-#  
-#            if ( $stampA eq $stampB ) {
-#                # No changes...
-#                if ( $file eq $VERTRNA ) {
-#                    $vertrna_ver = 0;
-#                } elsif ( $file eq $VERTRNA_UPDATE ) {
-#                    $vertrna_upd_ver = 0;
-#                } elsif ( $file eq $REFSEQ ) {
-#                    $refseq_ver = 0;
-#                }
-#            }
-#        } ## end while (<READER>)
-#        close(READER);
-#
-#        # Copy files
-#        if ($vertrna_ver) {
-#            $cmd = "scp -p "
-#                . $SOURCE_DIR . "/" . $VERTRNA . " "
-#                . $DATA_DIR   . "/" . $VERTRNA;
-#
-#            print $cmd, "\n";
-#
-#            $status += system($cmd);
-#        }
-#        if ($vertrna_upd_ver) {
-#            $cmd = "scp -p "
-#                . $SOURCE_DIR . "/" . $VERTRNA_UPDATE . " "
-#                . $DATA_DIR   . "/" . $VERTRNA_UPDATE;
-#
-#            print $cmd, "\n";
-#            $status += system($cmd);
-#        }
-#        if ($refseq_ver) {
-#            $cmd = "scp -p "
-#                . $REFSEQ_SOURCE . "/" . $REFSEQ . " "
-#                . $DATA_DIR   . "/" . $REFSEQ;
-#
-#            print $cmd, "\n";
-#            $status += system($cmd);
-#        }
-
         for my $pfile ($SOURCE_DIR.'/'.$VERTRNA, $SOURCE_DIR.'/'.$VERTRNA_UPDATE, $REFSEQ_SOURCE.'/'.$REFSEQ) {
             my @pstamp = stat $pfile;
             my ($file) = $pfile =~ /([^\/]*)$/;
@@ -966,6 +902,7 @@ sub fastafiles {
                 my @stamp = stat $DATA_DIR.'/'.$file;
                 next unless ($pstamp[9] > $stamp[9]);
             }
+            $update = 1;
             $cmd = 'scp -p '.$pfile.' '.$DATA_DIR.'/'. $file;
 
             print $cmd, "\n";
@@ -975,13 +912,10 @@ sub fastafiles {
         if ($status) { croak("Error while copying files.\n"); }
         print "Copied necessary files.\n";
         my $file = $DATA_DIR . $newfile;
-        if ( $vertrna_upd_ver or $vertrna_ver or $refseq_ver ) {
-            $update = 1;
-            write_to_file();
-        }
+        write_to_file() if ($update);
 
         my $newfile2 = remove_kill_list_object();
-        if ($update) {
+        if ($update or !-e $newfile2.'.clipped') {
             polya_clipping($newfile2);
         }
     };
@@ -1008,7 +942,7 @@ sub write_to_file {
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
     my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
-    system("bsub -I -q yesterday /software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t $configvars{taxonomy_id} > $embl_fa_file");
+    system('bsub -I -q yesterday "/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t '.$configvars{taxonomy_id}.' > '.$embl_fa_file.'"');
     open( RP, "<", $embl_fa_file )
       or croak("can't read $embl_fa_file\n");
     while ( my $entry = <RP> ) {
@@ -1024,6 +958,8 @@ sub write_to_file {
         print WP '>' . $entry;
     }
     close(RP);
+    # Just to avoid a missing \n
+    print WP "\n";
     print("\nRead EMBL file.\n");
 
     # Read RefSeq file

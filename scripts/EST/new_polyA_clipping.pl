@@ -174,10 +174,10 @@ while ( my $fullseq = $seqin->next_seq ) {
   } else {
     print STDERR "Sequence removed: ". $unclipped->display_id . "\n";
   }
-  if($err_file){
-    close STDERR;
-  }
 
+}
+if($err_file){
+  close STDERR;
 }
 
 
