@@ -79,9 +79,6 @@ use vars qw(%Config);
         HOST         => "$ENV{HOST}" , 
         GENEBUILD_ID => undef,
 
-        # default sequence files
-        VERTRNA        => 'embl_vertrna-1',
-        VERTRNA_UPDATE => 'emnew_vertrna-1',
 
     },
 

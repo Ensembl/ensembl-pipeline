@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.80 2012-08-30 00:09:30 th3 Exp $
+#$Id: cDNA_update.pl,v 1.81 2012-09-04 14:27:24 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -266,9 +266,6 @@ my %configvars = (
                  "MIN_LENGTH"        => $MIN_LENGTH ,         # from cDNAUpdate
                  "CVS_DIR"           => $CVS_DIR,             # from cDNAUpdate
                  "DATA_DIR"          => $DATA_DIR,            # from cDNAUpdate
-                 "VERTRNA"           => $VERTRNA,             # from cDNAUpdate
-                 "VERTRNA_UPDATE"    => $VERTRNA_UPDATE,      # from cDNAUpdate
-                 "REFSEQ"            => $REFSEQ,              # from cDNAUpdate
                  "FASTASPLIT"        => $FASTA_SPLIT,         # from cDNAUpdate
                  "POLYA_CLIPPING"    => $POLYA_CLIPPING,      # from cDNAUpdate
                  "RESOURCE"          => $RESOURCE,
@@ -428,8 +425,7 @@ if ( $option eq "prepare" ) {
             }
         } else {
             print "\nYou said don't fetch files, checking if files exist...\n\n";
-            if (    -e $DATA_DIR . "/" . $REFSEQ
-                 && -e $DATA_DIR . "/" . $VERTRNA ) {
+            if (    -e $DATA_DIR . "/" . $REFSEQ) {
                 print(   "Files are present in the directory, "
                        . "removing sequences on the kill-list.\n\n" );
 
@@ -895,24 +891,18 @@ sub fastafiles {
 
     eval {
 
-        for my $pfile ($SOURCE_DIR.'/'.$VERTRNA, $SOURCE_DIR.'/'.$VERTRNA_UPDATE, $REFSEQ_SOURCE.'/'.$REFSEQ) {
-            my @pstamp = stat $pfile;
-            my ($file) = $pfile =~ /([^\/]*)$/;
-            if (-e $DATA_DIR.'/'.$file) {
-                my @stamp = stat $DATA_DIR.'/'.$file;
-                next unless ($pstamp[9] > $stamp[9]);
-            }
-            $update = 1;
-            $cmd = 'scp -p '.$pfile.' '.$DATA_DIR.'/'. $file;
-
-            print $cmd, "\n";
-
-            $status += system($cmd);
+        my @pstamp = stat $REFSEQ_SOURCE.'/'.$REFSEQ;
+        if (-e $DATA_DIR.'/'.$REFSEQ) {
+            my @stamp = stat $DATA_DIR.'/'.$REFSEQ;
+            next unless ($pstamp[9] > $stamp[9]);
         }
-        if ($status) { croak("Error while copying files.\n"); }
-        print "Copied necessary files.\n";
-        my $file = $DATA_DIR . $newfile;
-        write_to_file() if ($update);
+        $cmd = 'scp -p '.$REFSEQ_SOURCE.'/'.$REFSEQ.' '.$DATA_DIR.'/'. $REFSEQ;
+
+        print $cmd, "\n";
+
+        if (system($cmd)) { croak("Error while copying files.\n"); }
+        print "Copied necessary files.\nGetting EMBL sequences...\n";
+        write_to_file();
 
         my $newfile2 = remove_kill_list_object();
         if ($update or !-e $newfile2.'.clipped') {
@@ -942,7 +932,8 @@ sub write_to_file {
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
     my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
-    system('bsub -I -q yesterday "/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t '.$configvars{taxonomy_id}.' > '.$embl_fa_file.'"');
+    system('bsub -I -q yesterday -M1000000 -R"select[mem>1000] rusage[mem=1000]" "/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t '.$configvars{taxonomy_id}.' > '.$embl_fa_file.'"');
+    die("bsub failed probably because of some memory requirements\n") if ($?);
     open( RP, "<", $embl_fa_file )
       or croak("can't read $embl_fa_file\n");
     while ( my $entry = <RP> ) {
@@ -1725,14 +1716,6 @@ sub clean_up {
 
     if ( !$option ) {
         # Remove files (fasta, chunks, sql)
-        if ( -e $DATA_DIR . "/" . $VERTRNA ) {
-            $cmd     = "rm " . $DATA_DIR . "/" . $VERTRNA;
-            $status += system($cmd);
-        }
-        if ( -e $DATA_DIR . "/" . $VERTRNA_UPDATE ) {
-            $cmd     = "rm " . $DATA_DIR . "/" . $VERTRNA_UPDATE;
-            $status += system($cmd);
-        }
         if ( -e $DATA_DIR . "/" . $REFSEQ ) {
             $cmd     = "rm " . $DATA_DIR . "/" . $REFSEQ;
             $status += system($cmd);
@@ -2330,6 +2313,7 @@ sub polya_clipping {
     } 
       $cmd .=  $DATA_DIR . "/" . $trim_file . " " . $newfile3;
 
+    $cmd = 'bsub -I -q yesterday -M1000000 -R"select[mem>1000] rusage[mem=1000]" "'.$cmd.'"';
     print $cmd, "\n";
 
     if ( system($cmd) ) {
