@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.82 2012-09-10 16:18:27 amonida Exp $
+#$Id: cDNA_update.pl,v 1.83 2012-09-10 16:45:14 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -292,6 +292,7 @@ my %configvars = (
                "MODULE_NAME"       => $MODULE_NAME,          # from cDNAUpdate
                "SOURCE_DIR"        => $SOURCE_DIR,           # from cDNAUpdate
                "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,        # from cDNAUpdate
+               "REFSEQ"            => $REFSEQ,               # from cDNAUpdate
                "BATCH_SIZE"        => $BATCH_SIZE,           # from cDNAUpdate
                "RETRY_BATCH_SIZE"  => $RETRY_BATCH_SIZE,
                "chunkDIR"          => $chunkDIR,
@@ -890,19 +891,24 @@ sub fastafiles {
     my @filestamp;
 
     eval {
+        for my $pfile ( $REFSEQ_SOURCE.'/'.$REFSEQ) {
+            my @pstamp = stat $pfile;
+            my ($file) = $pfile =~ /([^\/]*)$/;
+            if (-e $DATA_DIR.'/'.$file) {
+                my @stamp = stat $DATA_DIR.'/'.$file;
+                next unless ($pstamp[9] > $stamp[9]);
+            }
+            $update = 1;
+            $cmd = 'scp -p '.$pfile.' '.$DATA_DIR.'/'. $file;
 
-        my @pstamp = stat $REFSEQ_SOURCE.'/'.$REFSEQ;
-        if (-e $DATA_DIR.'/'.$REFSEQ) {
-            my @stamp = stat $DATA_DIR.'/'.$REFSEQ;
-            next unless ($pstamp[9] > $stamp[9]);
+            print $cmd, "\n";
+
+            $status += system($cmd);
         }
-        $cmd = 'scp -p '.$REFSEQ_SOURCE.'/'.$REFSEQ.' '.$DATA_DIR.'/'. $REFSEQ;
-
-        print $cmd, "\n";
-
-        if (system($cmd)) { croak("Error while copying files.\n"); }
-        print "Copied necessary files.\nGetting EMBL sequences...\n";
-        write_to_file();
+        if ($status) { croak("Error while copying files.\n"); }
+        print "Copied necessary files.\n";
+        my $file = $DATA_DIR . $newfile;
+        write_to_file() if ($update);
 
         my $newfile2 = remove_kill_list_object();
         if ($update or !-e $newfile2.'.clipped') {
@@ -942,7 +948,7 @@ sub write_to_file {
         # Extract & save id
         $entry =~ s/^([\w\.\d]+)\s.*\n{1}?/$1\n/;
         if ( !$1 ) {
-            croak(   "\n$VERTRNA_UPDATE: " . "unmatched id pattern:\n$entry\n" );
+            croak(   "\nunmatched id pattern:\n$entry\n" );
         }
         # Re-write fasta entry
         $entry =~ s/\>//g;
@@ -1130,7 +1136,9 @@ sub DB_setup {
             my $tables_to_delete =  'analysis '           . 'assembly '
                                   . 'assembly_exception ' . 'attrib_type '
                                   . 'coord_system '       . 'meta '
-                                  . 'meta_coord '         . 'seq_region_attrib ';
+                                  . 'meta_coord '         . 'seq_region_attrib '
+                                  . 'seq_region_synonym'  . 'karyotype',
+                                  . 'mapping_set';
 
             # Delete unnecessary tables
             # 1 = pipeline db
