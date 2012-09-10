@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.81 2012-09-04 14:27:24 th3 Exp $
+#$Id: cDNA_update.pl,v 1.82 2012-09-10 16:18:27 amonida Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -263,44 +263,44 @@ my $submitName      = "SubmitcDNAChunk";
 my $genomelist      = join "\',\'", @masked_genome;
 
 my %configvars = (
-                 "MIN_LENGTH"        => $MIN_LENGTH ,         # from cDNAUpdate
-                 "CVS_DIR"           => $CVS_DIR,             # from cDNAUpdate
-                 "DATA_DIR"          => $DATA_DIR,            # from cDNAUpdate
-                 "FASTASPLIT"        => $FASTA_SPLIT,         # from cDNAUpdate
-                 "POLYA_CLIPPING"    => $POLYA_CLIPPING,      # from cDNAUpdate
-                 "RESOURCE"          => $RESOURCE,
-                 "RETRY_RESOURCE"    => $RETRY_RESOURCE,
-                 "DBUSER"            => $DBUSER,           # from cDNAUpdate
-                 "DBPASS"            => $DBPASS,           # from cDNAUpdate
-                 "DBUSER_RO"         => $DBUSER_RO,        # from cDNAUpdate
-                 "REF_DBNAME"        => $REF_DBNAME,       # from cDNAUpdate
-                 "REF_DBHOST"        => $REF_DBHOST,       # from cDNAUpdate
-                 "REF_DBPORT"        => $REF_DBPORT,       # from cDNAUpdate
-                 "PIPE_DBNAME"       => $PIPE_DBNAME,      # from cDNAUpdate
-                 "PIPE_DBHOST"       => $PIPE_DBHOST,      # from cDNAUpdate
-                 "PIPE_DBPORT"       => $PIPE_DBPORT,      # from cDNAUpdate
-                 "OUTPUT_DBNAME"     => $OUTPUT_DBNAME,    # from cDNAUpdate
-                 "OUTPUT_DBHOST"     => $OUTPUT_DBHOST,    # from cDNAUpdate
-                 "OUTPUT_DBPORT"     => $OUTPUT_DBPORT,    # from cDNAUpdate
-                 "PRODUCTION_DBNAME" => $PRODUCTION_DBNAME,    # from cDNAUpdate
-                 "PRODCUTION_DBHOST" => $PRODUCTION_DBHOST,    # from cDNAUpdate
-                 "PRODUCTION_DBPORT" => $PRODUCTION_DBPORT,    # from cDNAUpdate
-                 "taxonomy_id"       => $TAX_ID,              # from cDNAUpdate
-                 "PROGRAM_NAME"      => $PROGRAM_NAME,        # from cDNAUpdate
-                 "PROGRAM_VERSION"   => $PROGRAM_VERSION,     # from cDNAUpdate
-                 "PROGRAM_FILE"      => $PROGRAM_FILE,        # from cDNAUpdate
-                 "MODULE_NAME"       => $MODULE_NAME,         # from cDNAUpdate
-                 "SOURCE_DIR"        => $SOURCE_DIR,          # from cDNAUpdate
-                 "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,   # from cDNAUpdate
-                 "BATCH_SIZE"        => $BATCH_SIZE,   # from cDNAUpdate
-                 "RETRY_BATCH_SIZE"  => $RETRY_BATCH_SIZE,
-                 "chunkDIR"          => $chunkDIR,
-                 "outDIR"            => $outDIR,
-                 "configDIR"         => $configDIR,
-                 "newfile"           => $newfile,
-                 "config_file"       => $config_file,
-                 "masked_genome"     => $genomelist,
-                 "newFeatureName"    => $newFeatureName );
+               "MIN_LENGTH"        => $MIN_LENGTH,           # from cDNAUpdate
+               "CVS_DIR"           => $CVS_DIR,              # from cDNAUpdate
+               "DATA_DIR"          => $DATA_DIR,             # from cDNAUpdate
+               "FASTASPLIT"        => $FASTA_SPLIT,          # from cDNAUpdate
+               "POLYA_CLIPPING"    => $POLYA_CLIPPING,       # from cDNAUpdate
+               "RESOURCE"          => $RESOURCE,
+               "RETRY_RESOURCE"    => $RETRY_RESOURCE,
+               "DBUSER"            => $DBUSER,               # from cDNAUpdate
+               "DBPASS"            => $DBPASS,               # from cDNAUpdate
+               "DBUSER_RO"         => $DBUSER_RO,            # from cDNAUpdate
+               "REF_DBNAME"        => $REF_DBNAME,           # from cDNAUpdate
+               "REF_DBHOST"        => $REF_DBHOST,           # from cDNAUpdate
+               "REF_DBPORT"        => $REF_DBPORT,           # from cDNAUpdate
+               "PIPE_DBNAME"       => $PIPE_DBNAME,          # from cDNAUpdate
+               "PIPE_DBHOST"       => $PIPE_DBHOST,          # from cDNAUpdate
+               "PIPE_DBPORT"       => $PIPE_DBPORT,          # from cDNAUpdate
+               "OUTPUT_DBNAME"     => $OUTPUT_DBNAME,        # from cDNAUpdate
+               "OUTPUT_DBHOST"     => $OUTPUT_DBHOST,        # from cDNAUpdate
+               "OUTPUT_DBPORT"     => $OUTPUT_DBPORT,        # from cDNAUpdate
+               "PRODUCTION_DBNAME" => $PRODUCTION_DBNAME,    # from cDNAUpdate
+               "PRODCUTION_DBHOST" => $PRODUCTION_DBHOST,    # from cDNAUpdate
+               "PRODUCTION_DBPORT" => $PRODUCTION_DBPORT,    # from cDNAUpdate
+               "taxonomy_id"       => $TAX_ID,               # from cDNAUpdate
+               "PROGRAM_NAME"      => $PROGRAM_NAME,         # from cDNAUpdate
+               "PROGRAM_VERSION"   => $PROGRAM_VERSION,      # from cDNAUpdate
+               "PROGRAM_FILE"      => $PROGRAM_FILE,         # from cDNAUpdate
+               "MODULE_NAME"       => $MODULE_NAME,          # from cDNAUpdate
+               "SOURCE_DIR"        => $SOURCE_DIR,           # from cDNAUpdate
+               "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,        # from cDNAUpdate
+               "BATCH_SIZE"        => $BATCH_SIZE,           # from cDNAUpdate
+               "RETRY_BATCH_SIZE"  => $RETRY_BATCH_SIZE,
+               "chunkDIR"          => $chunkDIR,
+               "outDIR"            => $outDIR,
+               "configDIR"         => $configDIR,
+               "newfile"           => $newfile,
+               "config_file"       => $config_file,
+               "masked_genome"     => $genomelist,
+               "newFeatureName"    => $newFeatureName );
 
 # Fasta chunk specifications:
 my $maxseqlength      = 17000;
