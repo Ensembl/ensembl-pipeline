@@ -1,4 +1,4 @@
-#!/software/bin/perl
+#!/software/bin/perl-5.12.2
 
 =head1 NAME
 
