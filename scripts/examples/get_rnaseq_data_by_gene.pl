@@ -12,30 +12,34 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 my $corehost   = 'ensembldb.ensembl.org';
 my $coreport   = 5306;
 my $coreuser   = 'anonymous';
+my $rnaseqhost = 'ensembldb.ensembl.org';
+my $rnaseqport = '5306';
+my $rnasequser = 'anonymous';
 my $coredbname;
-my $rnaseqhost   = 'ensembldb.ensembl.org';
-my $rnaseqport   = '5306';
-my $rnasequser   = 'anonymous';
 my $rnaseqdbname;
 my $id_file;
 my $outfile;
 my $exon;
 my $verbose;
+my $help;
 
 &GetOptions (
-        'corehost=s'       => \$corehost,
-        'coreport=s'       => \$coreport,
-        'coreuser=s'       => \$coreuser,
-        'coredbname=s'     => \$coredbname,
-        'rnaseqhost=s'       => \$rnaseqhost,
-        'rnaseqport=s'       => \$rnaseqport,
-        'rnasequser=s'       => \$rnasequser,
-        'rnaseqdbname=s'     => \$rnaseqdbname,
-        'id_file=s'     => \$id_file,
-        'outfile=s'     => \$outfile,
-        'exon_info!'       => \$exon,
+        'corehost=s'     => \$corehost,
+        'coreport=s'     => \$coreport,
+        'coreuser=s'     => \$coreuser,
+        'coredbname=s'   => \$coredbname,
+        'rnaseqhost=s'   => \$rnaseqhost,
+        'rnaseqport=s'   => \$rnaseqport,
+        'rnasequser=s'   => \$rnasequser,
+        'rnaseqdbname=s' => \$rnaseqdbname,
+        'id_file=s'      => \$id_file,
+        'outfile=s'      => \$outfile,
+        'exon_info!'     => \$exon,
         'verbose!'       => \$verbose,
+        'help!'          => \$help,
         );
+
+&usage if (!$coredbname or !$rnaseqdbname or !$id_file or $help);
 
 my @ensembl_list_ids;
 my @xref_list_ids;
@@ -142,3 +146,23 @@ foreach my $gene (@genes) {
     }
 }
 close(WF);
+
+sub usage {
+    print <<EOF
+perl $0 -coredbname <dbname> [-corehost <dbhost>] [-coreport <dbport>] [-coreuser <dbuser>] -rnaseqdbname <dbname> [-rnaseqhost <dbhost>] [-rnaseqport <dbport>] [-rnasequser <dbuser>] -id_file <path_to_your_file> [-outfile <path_to_your_output_file>] [-exon_info] [-verbose]
+
+   -coredbname   Name of the core database
+   -corehost     Name of the host for the core DB, default is ensembldb.ensembl.org
+   -coreport     Port for the connection, default is 5603
+   -coreuser     User name, default is anonymous
+   -rnaseqdbname Name of the rnaseq database, contains the RNASeq models
+   -rnaseqhost   Name of the host for the rnaseq DB, default is ensembldb.ensembl.org
+   -rnaseqport   Port for the connection, default is 5603
+   -rnasequser   User name, default is anonymous
+   -id_file      File that contains the list of HGNC gene names or Ensembl gene ids (BRCA2, ENSG00000083642,...)
+   -outfile      Output file, if not set, it will concatenate '.out' to the name of id_file
+   -exon_info    Display the read spanning intron count for each intron, otherwise it's the sum for the entire transcript
+   -verbose
+EOF
+;
+}
