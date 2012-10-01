@@ -1,30 +1,19 @@
-=head1 LICENSE
+# Ensembl Pipeline module for handling job submission via Sun Grid Engine 
+# load sharing software
+#
+# Cared for by Steve Searle
+#
+# Copyright Steve Searle
+#
+# You may distribute this module under the same terms as perl itself
+#
+# POD documentation - main docs before the code
 
-  Copyright (c) 1999-2012 The European Bioinformatics Institute and
-  Genome Research Limited.  All rights reserved.
-
-  This software is distributed under a modified Apache license.
-  For license details, please see
-
-    http://www.ensembl.org/info/about/code_licence.html
-
-=head1 CONTACT
-
-  Please email comments or questions to the public Ensembl
-  developers list at <dev@ensembl.org>.
-
-  Questions may also be sent to the Ensembl help desk at
-  <helpdesk@ensembl.org>.
-
-=cut
-
-=head1 AUTHORS
-
-Steve Searle
+=pod
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::BatchSubmission::SGE_GridEngine_v6 - module for handling job submission via Sun Grid Engine load sharing software
+Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine
 
 =head1 SYNOPSIS
 
@@ -50,6 +39,10 @@ not defined in the base class and which enables the pipeline to submit jobs
 in a distributed environment using Sun Grid Engine.
 
 See base class Bio::EnsEMBL::Pipeline::BatchSubmission for more info
+
+=head1 CONTACT
+
+Post general queries to B<ensembl-dev@ebi.ac.uk>
 
 =head1 APPENDIX
 
@@ -81,6 +74,21 @@ sub new{
 }
 
 
+##################
+#accessor methods#
+##################
+
+sub qsub {
+  my ($self,$qsub_line) = @_;
+
+  if (defined($qsub_line)) {
+    $self->{_qsub} = $qsub_line;
+  }
+  return $self->{_qsub};
+}
+
+##other accessor are in base class##
+
 ######################
 #command line methods#
 ######################
@@ -104,7 +112,8 @@ sub construct_command_line{
    # the sun grid engine. 
 
    open(QSUB, '>', $test.'.sh');
-   print QSUB "#!/usr/bin/tcsh\n";  
+   #print QSUB "#!/usr/bin/tcsh\n";  
+   print QSUB "#!/bin/bash\n";  
 
    if (!defined $SGE_PERL5LIB_ENV_SCRIPT || length($SGE_PERL5LIB_ENV_SCRIPT) == 0 ) {   
      throw("Missing config variable : SGE_PERL5LIB_ENV_SCRIPT !!! \n".
@@ -125,14 +134,16 @@ sub construct_command_line{
   if($stdout){
    #$qsub_line = "qsub -V -cwd -v FINAL_STDOUT=".$stdout;
    # add by GT
-   print QSUB "setenv FINAL_STDOUT $stdout\n"; 
+   #print QSUB "setenv FINAL_STDOUT $stdout\n"; 
+   print QSUB "export FINAL_STDOUT=$stdout\n"; 
    $stdout =~s/:+/_/g; # outout file can't include ::  
    $qsub_line .= " -o $stdout "; # jhv 
   }else{
     #$qsub_line = "qsub -V -cwd -v FINAL_STDOUT=".$self->stdout_file;
     $ffstdout = $self->stdout_file;
     $ffstdout =~s/:+/_/g; # outout file can't include ::  
-    print QSUB "setenv FINAL_STDOUT $ffstdout\n"; 
+    #print QSUB "setenv FINAL_STDOUT $ffstdout\n"; 
+    print QSUB "export FINAL_STDOUT=$ffstdout\n"; 
     print "XXX SETTING STDOUT $ffstdout\n"; 
     $qsub_line .= " -o $ffstdout "; # jhv 
   } 
@@ -141,7 +152,8 @@ sub construct_command_line{
   if($stderr){
     #$qsub_line .= " -v FINAL_STDERR=".$stderr;
     #add by GT
-    print QSUB "setenv FINAL_STDERR $stderr\n"; 
+    #print QSUB "setenv FINAL_STDERR $stderr\n"; 
+    print QSUB "export FINAL_STDERR=$stderr\n"; 
     $stderr =~s/:+/_/g; # outout file can't include ::  
     $qsub_line .= " -e $stderr "; # jhv 
   }else{
@@ -150,7 +162,8 @@ sub construct_command_line{
    # $qsub_line .= " -v FINAL_STDERR=".$self->stderr_file;
    # add by GT
    #$stderrprint = .$self->stderr_file;
-    print QSUB "setenv FINAL_STDERR $ffstdout.err\n";
+    #print QSUB "setenv FINAL_STDERR $ffstdout.err\n";
+    print QSUB "export FINAL_STDERR=$ffstdout.err\n";
     print "XXX SETTING STDERR $ffstdout \n"; 
     $qsub_line .= " -e $ffstderr "; # jhv 
   } 
@@ -159,8 +172,10 @@ sub construct_command_line{
   #$qsub_line .= " -o /tmp -e /tmp";
 
   #add by GT
-  print QSUB "setenv SGE_STDOUT_PATH /tmp\n";
-  print QSUB "setenv SGE_STDERR_PATH /tmp\n"; 
+  #print QSUB "setenv SGE_STDOUT_PATH /tmp\n";
+  print QSUB "export SGE_STDOUT_PATH=/tmp\n";
+  #print QSUB "setenv SGE_STDERR_PATH /tmp\n"; 
+  print QSUB "export SGE_STDERR_PATH=/tmp\n"; 
 
 # Depends on queues being made for each node with name node.q
   if($self->nodes){
@@ -200,16 +215,16 @@ sub construct_command_line{
     $ge_wrapper = __FILE__;
     #$ge_wrapper =~ s:GridEngine.pm:../../../../../scripts/ge_wrapper.pl:;
     $ge_wrapper =~ s:SGE_GridEngine_v6.pm:../../../../../scripts/ge_wrapper.pl:;
-    print $ge_wrapper . "\n";
+    print "Setting ge_wrapper to [$ge_wrapper]\n";
     my $caller = caller(0);
     $self->throw("ge_wrapper not found - needs to be set in $caller\n") unless -x $ge_wrapper;
   }
 
   #$qsub_line .= " $ge_wrapper \"".$command . "\"";
-#  $self->command($qsub_line);
+#  $self->qsub($qsub_line);
 
 
-  print "$ge_wrapper\n";
+  print "ge_wrapper is [$ge_wrapper]\n";
   print "command is\n";
   print "$command\n";
 
@@ -218,12 +233,13 @@ sub construct_command_line{
   print QSUB "$gewrappercommand\n";
 
   # change qsub_line by GT
-  $qsub_line = "qsub " . $qsub_line . " $test.sh\n";
+  #$qsub_line = "qsub -l slot_limit=1  -V" . $qsub_line . " $test.sh\n";
+  $qsub_line = "qsub  -V" . $qsub_line . " $test.sh\n";
 
-  $self->command($qsub_line);
+  $self->qsub($qsub_line);
 
   print "SGE: have command line\n";
-  print "CMD : $qsub_line\n\n";
+#  print "CMD : $qsub_line\n\n";
 
   close (QSUB);
 }
@@ -235,16 +251,16 @@ sub open_command_line{
 
   print "run open_command_line in GridEngine.pm\n";
 
-  print STDERR $self->command." 2>&1 \n";
+  print STDERR $self->qsub." 2>&1 \n";
   print STDERR "opening command line\n";
-  open(SUB, $self->command." 2>&1 |");
+  open(SUB, $self->qsub." 2>&1 |");
   my $geid;
   while(<SUB>){
     if (/Your job (\d+)/) {
       $geid = $1;
     }
   }
-  print STDERR "have opened ".$self->command."\n";
+  print STDERR "have opened ".$self->qsub."\n";
   print STDERR "geid ".$geid."\n";
   $self->id($geid);
   close(SUB);
@@ -259,12 +275,12 @@ sub temp_filename{
   #for ( keys %ENV ) {  
   #   print STDERR "key $_ $ENV{$_}\n";
   #} 
-  $self->{'tmp_jobfilename'} = $ENV{'JOB_NAME'};
+  $self->{'sge_jobfilename'} = $ENV{'JOB_NAME'};
 
   print "ENV{JOB_NAME}=$ENV{'JOB_NAME'} in GridEngine.pm\n";
 
-  print " JOBNAME " . $self->{'tmp_jobfilename'} . "\n"; 
-  return $self->{'tmp_jobfilename'};
+  print " JOBNAME " . $self->{'sge_jobfilename'} . "\n"; 
+  return $self->{'sge_jobfilename'};
 }
 
 #add by GT
