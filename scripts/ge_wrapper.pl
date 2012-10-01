@@ -1,4 +1,4 @@
-#!/usr/local/ensembl/bin/perl 
+#!/usr/bin/env perl
 
 # A simple wrapper script for running jobs through GridEngine.
 #
