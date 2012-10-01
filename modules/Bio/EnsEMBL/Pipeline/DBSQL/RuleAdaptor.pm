@@ -290,7 +290,7 @@ sub fetch_by_goal{
 
   warning("Can't get the dbID for the analysis with logic_name ".
         $goal_analysis->logic_name . "in database " . 
-        $self->db->dbname ) unless $rule ;
+        $self->db->dbc->dbname ) unless $rule ;
 
   return $rule;
 }
