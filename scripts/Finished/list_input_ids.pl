@@ -50,85 +50,98 @@ use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
-my $dataset_name;
-my $cs         = 'chromosome';
-my $cs_version = 'Otter';
-my $target_cs  = 'contig';
-my $target_cs_version;
-my $add_target_cs;
-my $seqreg_name;
-my $verbose;
-my $purpose;
-my $help = 0;
-Bio::Otter::Lace::Defaults::do_getopt(
-        'dataset=s'           => \$dataset_name,
-        'set|name:s'          => \$seqreg_name,
-        'cs:s'                => \$cs,
-        'cs_version:s'        => \$cs_version,
-        'target_cs:s'         => \$target_cs,
-        'target_cs_version:s' => \$target_cs_version,
-        'purpose=s'           => \$purpose,
-        'add-target-cs!'      => \$add_target_cs,
-        'verbose!'            => \$verbose,
-        'h|help'              => \$help
-);
 
-if ($help) {
-        exec( 'perldoc', $0 );
-}
-
-if ( !$dataset_name ) {
-        throw("You must specify a dataset name (-dataset option");
-}
-
-if ( !$seqreg_name ) {
-        throw("You must specify a seq_region name (-set option)");
-}
-
-# Client communicates with otter HTTP server
-my $cl = Bio::Otter::Lace::Defaults::make_Client();
-
-# DataSet interacts directly with an otter database
-my $ds = $cl->get_DataSet_by_name($dataset_name);
-
-my $otter_dba = $ds->get_cached_DBAdaptor;
-my $pipe_dba = $ds->get_pipeline_DBAdaptor(1);
-
-#my $db = new Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor(
-#        -host   => $host,
-#        -user   => $user,
-#        -pass   => $pass,
-#        -port   => $port,
-#        -dbname => $p_name
-#);
-
-my $slice_a              = $pipe_dba->get_SliceAdaptor;
-
-# This table is experimental, but proved itself useful to me.
-my $purph = $pipe_dba->prepare
-  (q{INSERT INTO input_id_purpose (input_id, purpose) VALUES (?,?)});
-
-my $slice = $slice_a->fetch_by_region( $cs, $seqreg_name, undef, undef, undef, $cs_version );
-if ( !$slice ) {
-    warn(
-        "No seq_region [$seqreg_name] found in dataset [$dataset_name] for coord_system [$cs] and cs_version [$cs_version]"
+sub main {
+    my $dataset_name;
+    my $cs         = 'chromosome';
+    my $cs_version = 'Otter';
+    my $target_cs  = 'contig';
+    my $target_cs_version;
+    my $add_target_cs;
+    my $seqreg_name;
+    my $verbose;
+    my $purpose;
+    my $help = 0;
+    Bio::Otter::Lace::Defaults::do_getopt(
+            'dataset=s'           => \$dataset_name,
+            'set|name:s'          => \$seqreg_name,
+            'cs:s'                => \$cs,
+            'cs_version:s'        => \$cs_version,
+            'target_cs:s'         => \$target_cs,
+            'target_cs_version:s' => \$target_cs_version,
+            'purpose=s'           => \$purpose,
+            'add-target-cs!'      => \$add_target_cs,
+            'verbose!'            => \$verbose,
+            'h|help'              => \$help
     );
-}
-my $target_projection = $slice->project($target_cs);
-foreach my $ct (@$target_projection) {
-    my $target_slice = $ct->to_Slice();
-    my $target        =
-        $slice_a->fetch_by_region( $target_cs,
-                                   $target_slice->seq_region_name,
-                                   undef, undef, undef, $target_cs_version );
 
-    if (defined $purpose) {
-        $purph->execute($target->name, $purpose);
+    if ($help) {
+            exec( 'perldoc', $0 );
     }
 
-    if ($add_target_cs) {
-        print STDOUT $target->name(), "\t", uc $target_cs, "\n";
-    } else {
-        print STDOUT $target->name(), "\n";
+    if ( !$dataset_name ) {
+            throw("You must specify a dataset name (-dataset option");
+    }
+
+    if ( !$seqreg_name ) {
+            throw("You must specify a seq_region name (-set option)");
+    }
+
+    # Client communicates with otter HTTP server
+    my $cl = Bio::Otter::Lace::Defaults::make_Client();
+
+    # DataSet interacts directly with an otter database
+    my $ds = $cl->get_DataSet_by_name($dataset_name);
+
+    my $otter_dba = $ds->get_cached_DBAdaptor;
+    my $pipe_dba = $ds->get_pipeline_DBAdaptor(1);
+
+    do_slice($dataset_name, $pipe_dba,
+             $cs, $cs_version, $seqreg_name,
+             $purpose,
+             $add_target_cs, $target_cs, $target_cs_version);
+
+    return 0;
+}
+
+
+sub do_slice {
+    my ($dataset_name, $pipe_dba,
+        $cs, $cs_version, $seqreg_name,
+        $purpose,
+        $add_target_cs, $target_cs, $target_cs_version) = @_;
+
+    my $slice_a              = $pipe_dba->get_SliceAdaptor;
+
+    # This table is experimental, but proved itself useful to me.
+    my $purph = $pipe_dba->prepare
+      (q{INSERT INTO input_id_purpose (input_id, purpose) VALUES (?,?)});
+
+    my $slice = $slice_a->fetch_by_region( $cs, $seqreg_name, undef, undef, undef, $cs_version );
+    if ( !$slice ) {
+        warn(
+            "No seq_region [$seqreg_name] found in dataset [$dataset_name] for coord_system [$cs] and cs_version [$cs_version]"
+        );
+    }
+    my $target_projection = $slice->project($target_cs);
+    foreach my $ct (@$target_projection) {
+        my $target_slice = $ct->to_Slice();
+        my $target        =
+            $slice_a->fetch_by_region( $target_cs,
+                                       $target_slice->seq_region_name,
+                                       undef, undef, undef, $target_cs_version );
+
+        if (defined $purpose) {
+            $purph->execute($target->name, $purpose);
+        }
+
+        if ($add_target_cs) {
+            print STDOUT $target->name(), "\t", uc $target_cs, "\n";
+        } else {
+            print STDOUT $target->name(), "\n";
+        }
     }
 }
+
+
+exit main();
