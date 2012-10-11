@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.83 2012-09-10 16:45:14 amonida Exp $
+#$Id: cDNA_update.pl,v 1.84 2012-10-11 10:45:56 cgg Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1137,8 +1137,8 @@ sub DB_setup {
                                   . 'assembly_exception ' . 'attrib_type '
                                   . 'coord_system '       . 'meta '
                                   . 'meta_coord '         . 'seq_region_attrib '
-                                  . 'seq_region_synonym'  . 'karyotype',
-                                  . 'mapping_set';
+                                  . 'seq_region_synonym ' . 'karyotype '
+                                  . 'mapping_set ';
 
             # Delete unnecessary tables
             # 1 = pipeline db
