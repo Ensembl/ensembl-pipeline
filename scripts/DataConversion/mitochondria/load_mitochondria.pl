@@ -16,8 +16,6 @@ All configuration is done through MitConf.pm
 =cut
 
 use strict;
-use Carp;
-#use Bio::EnsEMBL::Pipeline::Config::MitConf qw(%MitConf);
 use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
@@ -26,12 +24,25 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
-use Bio::SeqIO;
 use Bio::EnsEMBL::SeqEdit;
+use Bio::EnsEMBL::Pipeline::Tools::GeneBankParser;
+
 
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw warning);
 
+use constant {
+    INFO_TYPE         => 'DIRECT',
+    INFO_TEXT         => 'Imported from GeneBank',
+    REFSEQ_PEP        => 'RefSeq_peptide',
+    REFSEQ_XPEP       => 'RefSeq_peptide_predicted',
+    STATUS            => 'KNOWN',
+    CHECK_CODON_TABLE => 2
+};
+
+my %EXTERNAL_DB = ( 'GeneID'               => 'EntrezGene',
+                    'UniProtKB/Swiss-Prot' => 'Uniprot/SWISSPROT',
+                  );
 my $help;
 my @genes;;
 my $translation; # JUST INCASE
@@ -61,6 +72,7 @@ GetOptions( \%opt,
             'codon_table=i',
             'name=s',
             'genbank_file=s',
+            'noxref!',
             'path=s', );
             # or &usage();
 
@@ -91,7 +103,7 @@ $MIT_RRNA_TYPE    = $opt{rrna_type}    if $opt{rrna_type};
 unless (    $MIT_DBHOST && $MIT_DBUSER
          && $MIT_DBNAME && $MIT_GENBANK_FILE
          && !$help ) {
-  warn( "Can't run without MitConf.pm values: "
+  warning( "Can't run without MitConf.pm values: "
       . "MIT_DBHOST $MIT_DBHOST "
       . "MIT_DBUSER $MIT_DBUSER "
       . "MIT_DBNAME $MIT_DBNAME "
@@ -112,81 +124,11 @@ if ($help) {
 }
 ############################
 #PARSE GENBANK FILE FIRST
-
-my ($genbank_ref,$assembly_ref)  = &_parse_coordinates; 
-
-# filter the genbank-entries in the file because the tRNA's are 
-# redundant ( ( some tRNA features are annotated by tRNAscan-SE 
-# which we don't want to load ) 
-
-my ($s,$e) ;  
-my %nonred_entries ; 
-
-my %why1 = %{ ${$genbank_ref}[0] } ;
-my %why2 = %{ ${$genbank_ref}[1] } ;
-
-
-my $save_entry ; 
-GENBANK_ENTRY: for my $g (@$genbank_ref) {   
-
-   my %entry = %$g ;  
-
-   # 
-   #  filter / find entries :
-   #  kill all entries which have at leat 2 times the same start/end and an additional note 
-   #  "anotated by tRNA-scan-SE" 
-    
-   #  get start/end and note out of the entry   
-   my $start="" ; 
-   my $end = "" ; 
-   my $note ="";
-
-   foreach my $k (sort keys %entry) {  
-
-     if ($k=~/start/) {   
-       my @starts = @{$entry{$k}} ;    
-       #warning ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
-       throw ( " not a single-exon-gene ") if scalar(@starts) > 1  ;  
-       $start = join ("-", @starts)  ;   
-
-     } elsif ($k=~/end/) {  
-       my @ends = @{$entry{$k}} ;   
-       #warning ( " not a single-exon-gene ") if scalar(@ends) > 1  ;   
-       throw ( " not a single-exon-gene ") if scalar(@ends) > 1  ;   
-       $end = join ("-", @ends)  ;  
-
-     } elsif ($k=~m/note/){  
-       $note = $entry{$k} ;  
-     } elsif ($k=~m/organism/){      
-        $save_entry = $g ;
-        next GENBANK_ENTRY  ; 
-     } 
-   }   
-   
-     if (!exists $nonred_entries{"$start-$end"} && $start && $end ){
-       if ( $note!~m/tRNAscan-SE/) {  
-         $nonred_entries{"$start-$end"}=\%entry;   
-       }else {  
-         print " feature with coords $start-$end will be skipped because $note\n" ; 
-       } 
-     }
-}
-
-#my @genbank = @{$genbank_ref};  
-my @genbank ; 
-push @genbank , $save_entry ; 
-push @genbank , values %nonred_entries ;
- 
-#print Dumper(\@genbank);
-
-my %assembly = %{$assembly_ref};
-
-##########################
-# Get chromosome sequence 
-
-my $seq_file = Bio::SeqIO->new( -file   => $MIT_GENBANK_FILE,
-                                -format => 'genbank', );
-my $chromosome_seq = $seq_file->next_seq;
+open(my $fh, $MIT_GENBANK_FILE) || die("Could not open GeneBank file $MIT_GENBANK_FILE\n");
+my $genebank = Bio::EnsEMBL::Pipeline::Tools::GeneBankParser->new($fh);
+my $genebank_hash = $genebank->next_entry;
+close($fh);
+my $features = $genebank_hash->{-features};
 
 ####################
 #Open db for writing
@@ -204,32 +146,25 @@ my $output_db =
 
 my $meta_container = $output_db->get_MetaContainer();
 my $db_taxon_id = $meta_container->get_taxonomy_id(); 
-my $gb_taxon_id ; 
-
-my %genome ; 
-
-foreach my $entry (@genbank ){ 
-  if ($$entry{source}){  
-     $gb_taxon_id = $$entry{'db_xref'};   
-     #  print "\n\n\n$gb_taxon_id \n\n\n" ; 
-      %genome = %{$entry} ; 
-  }
+my $gb_taxon_id; 
+foreach my $feature (@$features) {
+    if (exists $feature->{source}) {
+        $gb_taxon_id = $feature->{source}->{db_xref}->{taxon};
+        last;
+    }
 }
 
-#$gb_taxon_id =~ s/^taxon://;
-#if ($db_taxon_id  == $gb_taxon_id){
-#  print "Genbank taxon id $gb_taxon_id matches the taxon id in the meta table\n";
-#}else {
-#  croak "taxonomy id in the genbank file $gb_taxon_id is not equal to the id found in the meta table $db_taxon_id \n";
-#}
-#
+if ($db_taxon_id != $gb_taxon_id) {
+    throw("Your taxon ids differ: $db_taxon_id and $gb_taxon_id\n");
+}
+
 ###########################################
 # write chromosome if it is not already there
 
 my $dbe_adaptor = $output_db->get_DBEntryAdaptor;
 my $slice_adaptor = $output_db->get_SliceAdaptor;
-my $slice = $slice_adaptor->fetch_by_region('toplevel',$MIT_NAME);
-my $slices_ref =  &get_chromosomes($assembly_ref,$genbank_ref, $output_db);
+my $slice = $slice_adaptor->fetch_by_region('toplevel', $MIT_NAME);
+my $slices_ref =  &get_chromosomes($genebank_hash, $output_db);
 my %slices = %{$slices_ref};
 
 if ($slice){
@@ -244,7 +179,7 @@ if ($slice){
   my $answer = <>;
   chomp $answer;
   if ($answer eq "y" or $answer eq "Y"){
-    &load_chromosomes(\%slices, $output_db, $chromosome_seq );
+    &load_chromosomes(\%slices, $output_db, $genebank_hash->{-seq} );
     $slice = $slice_adaptor->fetch_by_region('toplevel',$MIT_NAME);
   }
   else {
@@ -336,130 +271,187 @@ if(!defined $ensembl_analysis){
  # subsequent indecies contain all the other annotations 
  # 
 
-print " have " . scalar(@genbank) . " ENTRIES \n" ;  
-
-for (my $i=1; $i <= $#genbank; $i++){
-  my %h = %{ $genbank[$i] };
-  print "ENTRY $i\n";
-  foreach ( keys %h ) {
-    printf "%20s\t%s\n", $_, $h{$_};
-    if ( /start/ || /end/ ) {
-      my @tmp = @{ $h{$_} };
-      print "STARTS: ";
-      print join( "\t", @tmp ) . "\n";
+my $length = scalar(@$features);
+my $entry_count = 1;
+for (my $index = 1; $index < $length; $index++) {
+    my $feature = $features->[$index];
+    my ($key) = keys %$feature;
+    next unless ($key eq 'CDS' or $key =~ /[tr]RNA/);
+    printf "ENTRY %d\n========\n", $entry_count;
+    if (@{$feature->{$key}->{exons}} > 1) {
+        if ($feature->{$key}->{note} =~ /frameshift/i) {
+            warning('There is a frameshift in '.$feature->{$key}->{product}.", the gene has more than one exon!\n");
+        }
+        else {
+            throw($feature->{$key}->{product}." has more than one exon!\n");
+        }
     }
-  }
-  print "\nXXXXXXXXXXXXXXXXXXXXXX\n" ; 
-
-
-  my $desc = $genbank[$i]{'product'};
-  my $type = $genbank[$i]{'type'};
-  my $status = "KNOWN";
-
-  my $acc;
-  if ($genbank[$i]{'protein_id'}){
-    $acc =  $genbank[$i]{'protein_id'};
-  }
-  else{
-    $acc = $why1{'accession'}."  ".${$genbank[$i]{'start'}}[0]."  ".${$genbank[$i]{'end'}}[0]; 
-  }
-
-  my $strand =  $genbank[$i]{'strand'};
-  if ($type eq 'tRNA'){
-    $type = $MIT_TRNA_TYPE;
-  }
-  if ($type eq 'rRNA'){
-    $type = $MIT_RRNA_TYPE;
-  }
-  print "\n***********************************************************\n" ; 
-  my $analysis = $ensembl_analysis;
-  my $transcript = new Bio::EnsEMBL::Transcript;
-  my $start_exon;
-  my $end_exon;
-  my $total_exons = scalar(@{$genbank[$i]{'start'}}-1);
-  # exons are stored in an array within the hash incase of multi exon genes
-
-  for (my $exon_number=0; $exon_number <= $total_exons ; $exon_number ++){
-    my $start = $genbank[$i]{'start'}[$exon_number];
-    my $end   = $genbank[$i]{ 'end' }[$exon_number];
-
-    ###########################################################
-    # Dodgy hack to solve problem of frameshifts in pseudogenes
-
-    if ($exon_number > 0 && $start <= $genbank[$i]{ 'end' }[$exon_number-1]){
-      $start = $genbank[$i]{ 'end' }[$exon_number-1]+1;
+    if (exists $feature->{$key}->{note} and $feature->{$key}->{note} =~ /tRNAscan-SE/) {
+        warning('Skipping '.$feature->{$key}->{product}.' : '.$feature->{$key}->{note}."\n");
+        next;
     }
-
-    #######
-    # EXONS
-
-    my $exon = new Bio::EnsEMBL::Exon;
-    $exon->start($start); 
-    $exon->end($end);
-    $exon->strand($strand);
-    $exon->slice($slice);
-    $exon->phase(0);
-    $exon->end_phase(($exon->end - $exon->start + 1)%3);
-
     #############
     # TRANSCRIPTS
 
-    $transcript->add_Exon($exon);
-    $start_exon = $exon if($exon_number == 0);
-    $end_exon = $exon if($exon_number == $total_exons);
+    my $transcript = new Bio::EnsEMBL::Transcript;
+    my $exon_number = 0;
+    my $start_exon;
+    my $end_exon;
+    foreach my $exon_hash (@{$feature->{$key}->{exons}}) {
+        my $exon = new Bio::EnsEMBL::Exon;
+        $exon->start($exon_hash->{start}); 
+        $exon->end($exon_hash->{end});
+        $exon->strand($exon_hash->{strand});
+        $exon->slice($slice);
+        $exon->phase(0);
+        $exon->end_phase(($exon->end - $exon->start + 1)%3);
+        $transcript->add_Exon($exon);
+        $start_exon = $exon if ($exon_number == 0);
+        $end_exon = $exon;
+        ++$exon_number;
+    }
+    $transcript->start_Exon($start_exon);
+    $transcript->end_Exon  ( $end_exon );
+    my $type;
+    my $gene = new Bio::EnsEMBL::Gene;
+    if ($key =~ /(\w)RNA/) {
+        if ($1 eq 't') {
+            $type = $MIT_TRNA_TYPE;
+        }
+        elsif ($1 eq 'r') {
+            $type = $MIT_RRNA_TYPE;
+        }
+        else {
+            $type = 'UNKNOWN';
+            warning('Unknow type for '.$key."\n");
+        }
+    }
+    elsif ($key eq 'CDS') {
+        #############
+        # TRANSLATION
+
+        throw('Translation table is '.$feature->{$key}->{transl_table}.' instead of '.$MIT_CODON_TABLE."\n") unless ($MIT_CODON_TABLE eq $feature->{$key}->{transl_table});
+        my $translation = new  Bio::EnsEMBL::Translation(
+                             -START_EXON => $start_exon,
+                             -END_EXON   => $end_exon,
+                             -SEQ_START  => 1,
+                             -SEQ_END    => $transcript->length,
+                             );
+
+        my %h_dbentry;
+        foreach my $dbentry (@{$dbe_adaptor->fetch_all_by_name($feature->{$key}->{gene})}) {
+            next unless $dbentry->info_type eq 'UNMAPPED';
+            push(@{$h_dbentry{$dbentry->primary_id}}, $dbentry);
+        }
+        if (!exists $opt{noxref}) {
+            foreach my $db_xref_key (keys %{$feature->{$key}->{db_xref}}) {
+                next if ($db_xref_key eq 'GI');
+                if (exists $h_dbentry{$feature->{$key}->{db_xref}->{$db_xref_key}}) {
+                    # add dbentry to transcript only if they are of unmapped type
+                    warning('Xref already exists for '.$feature->{$key}->{db_xref}->{$db_xref_key}."\t".$feature->{$key}->{gene}."\n");
+                    foreach my $dbentry (@{$h_dbentry{$feature->{$key}->{db_xref}->{$db_xref_key}}}) {
+                        $dbentry->info_type(INFO_TYPE);
+                        $dbentry->info_text(INFO_TEXT);
+                        $gene->add_DBEntry($dbentry);
+                    }
+                }
+                else {
+                    if (exists $EXTERNAL_DB{$db_xref_key}) {
+                        my $db_entry = Bio::EnsEMBL::DBEntry->new(
+                          -adaptor     => $dbe_adaptor,
+                          -primary_id  => $feature->{$key}->{db_xref}->{$db_xref_key},
+                          -display_id  => $feature->{$key}->{gene},
+                          -description => $feature->{$key}->{product},
+                          -dbname      => $EXTERNAL_DB{$db_xref_key},
+                          -info_type   => INFO_TYPE,
+                          -info_text   => INFO_TEXT,
+                        );
+                        $gene->add_DBEntry($db_entry);
+                    }
+                    else {
+                        warning('Not using xref '.$feature->{$key}->{db_xref}->{$db_xref_key}. ' from '.$db_xref_key);
+                    }
+                }
+            }
+            if (exists $feature->{$key}->{protein_id}) {
+                my $dbname = $feature->{$key}->{protein_id} =~ /^NP/ ? REFSEQ_PEP : REFSEQ_XPEP;
+                my $dbxentry = Bio::EnsEMBL::DBEntry->new(
+                  -adaptor     => $dbe_adaptor,
+                  -primary_id  => $feature->{$key}->{protein_id},
+                  -display_id  => $feature->{$key}->{gene},
+                  -description => $feature->{$key}->{product},
+                  -dbname      => $dbname,
+                  -info_type   => INFO_TYPE,
+                  -info_text   => INFO_TEXT,
+                );
+                $translation->add_DBEntry($dbxentry);
+            }
+        }
+        if (exists $feature->{$key}->{note} and $feature->{$key}->{note} =~ /frameshift/) {
+            warning('There is a frameshift in: '.$feature->{$key}->{gene}."\nNote: ".$feature->{$key}->{note});
+        }
+        if (exists $feature->{$key}->{transl_except}) {
+            if ($feature->{$key}->{transl_except} =~ /pos:(\d+),aa:(\w\+)/) {
+                my $alt_seq;
+                my $pos = $1;
+                if ($2 eq 'TERM') {
+                    $alt_seq = 'AA' if ($feature->{$key}->{transl_except} =~ /TAA/);
+                    my $seq_edit = Bio::EnsEMBL::SeqEdit->new(
+                          -CODE    => '_rna_edit', 
+                          -NAME    => 'rna_edit', 
+                          -DESC    => 'RNA edit', 
+                          -START   => $pos,
+                          -END     => $pos, 
+                          -ALT_SEQ => $alt_seq
+                          );
+                    $translation->add_Attributes($seq_edit->get_Attribute());
+                }
+            }
+        }
+        if (exists $feature->{$key}->{fragment}) {
+            warning('The gene '.$feature->{$key}->{gene}." is fragmented, a methionine will be added!\n");
+        }
+        $transcript->translation($translation);
+        if ($transcript->translate()->seq() =~ /\*/) {
+          throw("Stop codon found in translation ".$transcript->translate()->seq());
+        }
+        if ($transcript->translate()->seq() =~ /^[^M]/) {
+          warning("Adding SeqEdit for non-methionine start codon in translation ".$transcript->translate()->seq());
+          my $seqedit = Bio::EnsEMBL::SeqEdit->new(
+                -CODE    => 'amino_acid_sub', 
+                -NAME    => 'Amino acid substitution', 
+                -DESC    => 'Some translations have been manually curated for amino acid substitiutions. For example a stop codon may be changed to an amino acid in order to prevent premature truncation, or one amino acid can be substituted for another.', 
+                -START   => 1,
+                -END     => 1, 
+                -ALT_SEQ => 'M' 
+                );
+          $transcript->translation()->add_Attributes($seqedit->get_Attribute());
+        }
+        $type = $MIT_GENE_TYPE;
+    }
+    eval {
+      $gene->biotype($type);
+      $gene->analysis($ensembl_analysis);
+      $gene->status(STATUS);
+      $gene->description($feature->{$key}->{product});
+      $transcript->biotype($type);
+      $transcript->analysis($ensembl_analysis);
+      $gene->add_Transcript($transcript);
+      $count++;
+    };
+    if ($@){
+      print "Error: $@\n";
+      exit;
+    } 
+    printf "\t%-12s %5d\n\t%-12s %5d\n\t%-12s %s\n\t%-12s %s\n***********************************************\n\n", 'Start:',  $gene->start, 'End:', $gene->end, 'Description:', $gene->description, 'Biotype:', $gene->biotype;
+    ++$entry_count;
+    push @genes,$gene; 
   } 
-
-  $transcript->start_Exon($start_exon);
-  $transcript->end_Exon  ( $end_exon );
-
-  #############
-  # TRANSLATION
-
-  if ($type eq 'CDS'){
-    $translation = new  Bio::EnsEMBL::Translation(
-						 -START_EXON => $start_exon,
-						 -END_EXON   => $end_exon,
-						 -SEQ_START  => 1,
-						 -SEQ_END    => $transcript->length,
-						 );
-    $transcript->translation($translation);
-    $analysis = $ensembl_analysis;
-    $type = $MIT_GENE_TYPE;
-   }
-  $transcript->biotype($type);
-  #############
-  # Make  genes
-   print "create new trans with start at " . $transcript->seq_region_start."\n" ; 
-
-  my $gene = new Bio::EnsEMBL::Gene;
-  eval {
-    $gene->biotype($type);
-    $gene->analysis($analysis);
-    $gene->status($status);
-    $gene->description($desc);
-    $transcript->biotype($type);
-    $transcript->analysis($analysis);
-    $gene->add_Transcript($transcript);
-    $count++;
-  };
-  if ($@){
-    print "Error: $@\n";
-    exit;
-  } 
-  #print " pushing " . $gene->seq_region_start . "\n" ; 
-  push @genes,$gene; 
-}
 
 
 print "Have ".scalar(@genes)." gene objects\n";   
 
-@genes = sort {$a->seq_region_start <=> $b->seq_region_start } @genes ;  
-
-foreach my $gene (@genes ) { 
-  print  $gene->seq_region_start . "\n" ;  
-}  
-
-print " TESTING : Do you want to load them into the db ? (Y/N) ";
+print " LOADING : Do you want to load them into the db ? (Y/N) ";
   my $answer = <>;
   chomp $answer;
   if ($answer eq "y" or $answer eq "Y"){
@@ -506,235 +498,60 @@ sub load_db(){
     my $dbid = $output_db->get_GeneAdaptor->store($gene);
     print "dbID = $dbid\n" if $MIT_DEBUG;
     my $stored_gene = $output_db->get_GeneAdaptor->fetch_by_dbID($dbid);
-    foreach my $transc (@{$stored_gene->get_all_Transcripts}) {
-      if ($transc->translation && $transc->translate()->seq() =~ /^[^M]/) {
-        warning("Adding SeqEdit for non-methionine start codon in translation ".$transc->translate()->seq());
-        my $seq_edit = Bio::EnsEMBL::SeqEdit->new(
-              -CODE    => 'amino_acid_sub', 
-              -NAME    => 'Amino acid substitution', 
-              -DESC    => 'Some translations have been manually curated for amino acid substitiutions. For example a stop codon may be changed to an amino acid in order to prevent premature truncation, or one amino acid can be substituted for another.', 
-              -START   => 1,
-              -END     => 1, 
-              -ALT_SEQ => 'M' 
-              );
-        my $attribute = $seq_edit->get_Attribute();
-        $output_db->get_AttributeAdaptor()->store_on_Translation($transc->translation, [$attribute]);
-      }
-      if ($transc->translation && $transc->translate()->seq() =~ /\*/) {
-        throw("Stop codon found in translation ".$transc->translate()->seq());
-      }
-    }
   }
   return 0;
-}
-
-
-
-#######################################
-# PARSE COORDINATES OUT OF GENBANK FILE
-
-sub _parse_coordinates() {
-
-  print "Parsing coords\n" if $MIT_DEBUG;
-
-  my $desc;
-  my $acc;
-  my $start;
-  my $end;
-  my $strand;
-  my $type;
-  my $go = 'stop';
-  my $index=-1;
-  my @entries;
-  my %entry;
-  my %assembly;
-  my $comment;
-  my @genbank_file;
-  $assembly{$MIT_TOPLEVEL} = $MIT_NAME;
-
-  #################################################
-  # Read genbank file into array, join broken lines
-
-
-  open (GENBANK,$MIT_GENBANK_FILE) or die "Cannot open genbank file $MIT_GENBANK_FILE\n";
-  my $line;
-  while (<GENBANK>){
-    chomp;
-    $_ =~ s/^\s{5}//;
-    $line .= $_;
-    next if ($line =~ /\,$/);
-    push @genbank_file,$line;
-    $line = "";
-  }
-  close GENBANK;
-
-  ####################################
-  # Array of hashes holds genbank data
-
-  my $first_entry = 0  ;
-
-  # read all entries and than filter the predictions
-
-  for (@genbank_file) {
-    # ignore sequence data
-    next if $_ =~ /^\d+/;
-
-    my @sources = split /\s+/;
-
-    # make comma delimited
-    $_ =~ s/\s+/,/g;
-    # comment line holds contig name
-    if ( $_ =~ /^COMMENT/ ) {
-      $go = "comment";
-    }
-    # ignore features section
-    if ( $_ =~ /^FEATURES/ ) {
-      $go = "stop";
-    }
-    if ( $go eq "comment" ) {
-      $comment .= $_;
-      next;
-    }
-    # stop parsing unless line starts wih a comma:
-    unless ( $_ =~ /^\,/ ) {
-      $go = "stop";
-    }
-    # Types of entries to parse all others are ignored, could be
-    # extended if needed
-    if (    $_ =~ /^tRNA/
-        || $_ =~ /^rRNA/
-        || $_ =~ /^CDS/
-        || $_ =~ /^ACCESSION/
-        || $_ =~ /\/translation/
-        || $_ =~ /^source/ )
-    {
-      $index++;
-      push( @entries, %entry );
-      # splits the line into words and parses them into the hash
-      $_ =~ s/^\,//;
-      $_ =~ s/\,/\./g;
-      $_ =~ s/\)//g;
-      my @string = split( /\./, $_ );
-
-      if ( $_ =~ /ACCESSION/ ) {
-        $entries[$index]{'accession'} = $string[1];
-      } elsif ($_ =~ /^\/translation\=\"(\w)/) { 
-        if ($1 ne 'M') {
-          throw("Translation starts with non-methionine amino acid $1 : $_");
-        }
-      }
-      else {
-        if ( $string[1] =~ 'complement' ) {
-          $entries[$index]{'strand'} = '-1';
-        } else {
-          $entries[$index]{'strand'} = '1';
-        }
-        $string[0] =~ s/\s+//g;
-        $string[1] =~ s/\D+//g;
-
-        $entries[$index]{'type'} = $string[0];
-
-        ##################################################
-        # Pushes starts and stops into array to accomodate
-        # The rare occurances of multiexon genes
-        # assumes coords alternate between start and stop
-
-        my $key = 'start';
-        for ( my $i = 1 ; $i <= $#string ; $i++ ) {
-          if ( $string[$i] =~ /\d+/ ) {
-            push @{ $entries[$index]{$key} }, $string[$i];
-            if ( $key eq 'end' ) {
-              $key = 'start';
-              next;
-            }
-            if ( $key eq 'start' ) {
-              $key = 'end';
-              next;
-            }
-          }
-        }
-      } ## end else [ if ( $_ =~ /ACCESSION/)
-      # got the first line of the entry, now parse subsequent lines
-      $go = 'go';
-    } ## end if ( $_ =~ /^tRNA/ || ...
-
-    if ( $go eq 'go' ) {
-      my @temp = split( /\"/, $_ );
-      if ( $temp[1] ) {
-        $temp[0] =~ s/\W+//g;
-        $temp[1] =~ s/,+/ /g;
-        $entries[$index]{ $temp[0] } = $temp[1];
-      } else {
-        if ( $temp[0] && $temp[0] eq ',/pseudo' ) {
-          $entries[$index]{'type'} = 'pseudogene';
-        }
-      }
-    }
-  } ## end for (@genbank_file)
-
-  for (my $array_index =0; $array_index <= $#entries ;$array_index ++){
-    # Check for trans-splicing events
-    if ( $entries[$array_index]{'note'} && $entries[$array_index]{'note'} eq 'trans-splicing'){
-      print "Genbank file contains trans-splicing event that this script cannot parse\nexiting...\n";
-      exit 0;
-    }
-  }
-
-  #############################################################
-  # Use config file vales if they are present, otherwise get
-  # seq names from GFF file
-
-  if ($MIT_SCAFFOLD_SEQNAME) {
-    $assembly{$scaffold} = $MIT_SCAFFOLD_SEQNAME;
-  } else {
-    $assembly{$scaffold} = $entries[0]{'accession'};
-  }
-  if ($MIT_CLONE_SEQNAME) {
-    $assembly{'clone'} = $MIT_CLONE_SEQNAME;
-  } else {
-    if ( $comment =~ /reference,sequence,was,derived,from,(\w+)./ ) {
-      $assembly{'clone'} = "$1";
-    }
-  }
-  if ($MIT_CONTIG_SEQNAME) {
-    $assembly{'contig'} = $MIT_CONTIG_SEQNAME;
-  } else {
-    if ( $comment =~ /reference,sequence,was,derived,from,(\w+)./ ) {
-      $assembly{'contig'} = "$1."
-        . @{ $entries[1]{'start'} }[0] . "."
-        . @{ $entries[1]{'end'} }[0];
-    }
-  }
-  return \@entries, \%assembly;
 }
 
 ################################
 # Get the sequence if requested
 
 sub get_chromosomes {
-  my ($assembly_ref,$genbank_ref,$output_db,) = @_;
-  my %assembly = %{$assembly_ref};
-  my @genbank =@{$genbank_ref};
+  my ($genbank_ref,$output_db,) = @_;
   my %slices;
+
+  my %assembly;
+  $assembly{$MIT_TOPLEVEL} = $MIT_NAME;
+  if ($MIT_SCAFFOLD_SEQNAME) {
+      $assembly{$scaffold} = $MIT_SCAFFOLD_SEQNAME;
+  }
+  else {
+      $assembly{$scaffold} = $genebank_hash->{-accession};
+  }
+  if ($MIT_CLONE_SEQNAME) {
+      $assembly{'clone'} = $MIT_CLONE_SEQNAME;
+  }
+  else {
+      if ( $genebank_hash->{_comment} =~ /reference\s+sequence\s+was\s+derived\s+from\s+(\w+)./ ) {
+          $assembly{'clone'} = "$1";
+      }
+  }
+  if ($MIT_CONTIG_SEQNAME) {
+      $assembly{'contig'} = $MIT_CONTIG_SEQNAME;
+  }
+  else {
+      if ( $genebank_hash->{_comment} =~ /reference\s+sequence\s+was\s+derived\s+from\s+(\w+)./ ) {
+          $assembly{'contig'} = $1.'.1'.$genebank_hash->{_length};
+      }
+  }
+
   my $csa = $output_db->get_CoordSystemAdaptor();
   my $sa  = $output_db->get_SliceAdaptor();
   # Get all coord systems in the database:
   # Make a slice for each coord system
 
-  #$csa->fetch_all->[0]->version($path);
   foreach my $cs (@{$csa->fetch_all()}) {
     my $name = $cs->name;
     $name =  'top_level' if ($cs->name eq $MIT_TOPLEVEL);
     $name =  'seq_level' if ($cs->is_sequence_level);
-    if($assembly{$cs->name}){
+    if ($assembly{$cs->name}){
       $slices{$name}  = Bio::EnsEMBL::Slice->new
       (
         -coord_system      => $cs,
-        -start             => $genbank[1]{'start'}[0],
-        -end               => $genbank[1]{'end'}[0],
+        -start             => 1,
+        -end               => $genbank_ref->{_length},
         -strand            => 1,
         -seq_region_name   => $assembly{$cs->name},
-        -seq_region_length => $genbank[1]{'end'}[0] - $genbank[1]{'start'}[0]+1,
+        -seq_region_length => $genbank_ref->{_length},
       );
    
     }
@@ -776,7 +593,7 @@ sub load_chromosomes {
   foreach my $cs (  sort keys %slices ) {
     print "Slice " . $slices{$cs}->name . "\n" if $MIT_DEBUG;
     if ( $cs eq 'seq_level' ) {
-      $sa->store( $slices{$cs}, \$seq_ref->seq );
+      $sa->store( $slices{$cs}, \$seq_ref );
       $aa->store_on_Slice( $slices{$cs}, \@codonusage );
       $slices{$cs}->adaptor($sa);
       print "Storing seqlevel \n" if $MIT_DEBUG;
@@ -842,11 +659,9 @@ sub load_assembly {
        $contig_ori, $db ) = @_;
 
   if ( !$contig ) {
-    #print STDERR "trying to insert into ".$chr_id." ".$chr_start." ".$chr_end."\n";
     die "contig id must be defined for this to work\n";
   }
   my $sql = "insert into assembly(asm_seq_region_id, asm_start, asm_end, cmp_seq_region_id, cmp_start, cmp_end, ori) values(?, ?, ?, ?, ?, ?, ?)";
-  # print "$sql\n";
   my $sth = $db->dbc->prepare($sql);
   $sth->execute( $chr_id, $chr_start, $chr_end, $contig, $contig_start,
                  $contig_end, $contig_ori );
@@ -869,7 +684,7 @@ sub check_codon_table {
   $sth->finish;
 
 
-  if ($val == 2) {
+  if ($val == CHECK_CODON_TABLE) {
     $found = 1;
   }
   return $found;
