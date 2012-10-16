@@ -40,14 +40,14 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases qw (
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases qw (
 							     GB_FINALDBHOST
 							     GB_FINALDBNAME
 							     GB_DBHOST
 							     GB_DBNAME
 							    );
 
-use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneBuilder qw (
+use Bio::EnsEMBL::Analysis::Config::GeneBuild::GeneBuilder qw (
 							       GB_FINAL_GENETYPE
 							      );
 
