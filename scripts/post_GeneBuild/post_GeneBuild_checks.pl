@@ -40,7 +40,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long;
-use Bio::EnsEMBL::Analysis::Config::GeneBuild::Databases qw (
+use Bio::EnsEMBL::Analysis::Config::Databases qw (
 							     GB_FINALDBHOST
 							     GB_FINALDBNAME
 							     GB_DBHOST
