@@ -219,8 +219,13 @@ sub parse_fasta{
     if ($regex) {
       ($name) = $name =~ /$regex/;
     }
-    warning("You are going to store with name ".$name." are you sure ".
-            "this is what you wanted") if($verbose);
+    print( "Loading ".$name."\n" ) if($verbose) ;
+    if( $name !~ /^\w+\.\d/ || length($name)>40 )
+    {
+        warning( "Name ".$name." does not look like a valid accession - are you sure ".
+            "this is what you want?" )
+    }
+
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
     if($store_seq){
       # check that we don't have ambiguous bases in the DNA sequence
