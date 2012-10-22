@@ -335,7 +335,7 @@ for (my $index = 1; $index < $length; $index++) {
                              -START_EXON => $start_exon,
                              -END_EXON   => $end_exon,
                              -SEQ_START  => 1,
-                             -SEQ_END    => $transcript->length,
+                             -SEQ_END    => $end_exon->length,
                              );
 
         my %h_dbentry;
@@ -541,8 +541,11 @@ sub get_chromosomes {
 
   foreach my $cs (@{$csa->fetch_all()}) {
     my $name = $cs->name;
+    print STDERR $name, "\n";
+    print STDERR $cs->is_sequence_level, "\n";
     $name =  'top_level' if ($cs->name eq $MIT_TOPLEVEL);
     $name =  'seq_level' if ($cs->is_sequence_level);
+print STDERR keys %assembly, "\n";
     if ($assembly{$cs->name}){
       $slices{$name}  = Bio::EnsEMBL::Slice->new
       (
@@ -557,6 +560,7 @@ sub get_chromosomes {
     }
   }
 
+print STDERR keys %slices, "\n";
   # Die before storing anything unless you have sequences that are top level and seq level
   # Unless you only have one coord system in which case you set it to both seq and top level
   die "Cannot find seq_level coord system" unless $slices{'seq_level'};
