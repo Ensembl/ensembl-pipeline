@@ -30,6 +30,9 @@ Optional arguments:
                                         many regions on the reference assembly can be mapped to one region
                                         on the alternative assembly (e.g. in new clone overlaps)
     --altdbname=NAME                    alternative database NAME
+                                        Note: alternative databases are not functional in 1.35. This
+                                        script requires current and alternative assemblies to reside in
+                                        the same database.
 
     --ref_start                         start coordinate on reference chromosomes
     --ref_end                           end coordinate on reference chromosomes
