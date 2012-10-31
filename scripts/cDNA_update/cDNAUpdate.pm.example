@@ -59,7 +59,6 @@ use vars qw(%Config);
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
-        SOURCE_DIR  => '/data/blastdb/Supported',#formerly /data/blastdb                                             
         REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',#formerly /data/blastdb/refseqdna
 
         # Taxonomy db for loading meta_table - should not need to change
@@ -67,7 +66,7 @@ use vars qw(%Config);
         TAXONDBHOST => 'ens-livemirror',
         TAXONDBPORT => 3306,
 
-        # For the comparison only
+        # For the comparison only 
         OLD_FEATURE_NAME => 'cdna_update',
 
         # These variables need to be set, please do so in the
@@ -78,13 +77,16 @@ use vars qw(%Config);
         USER         => "$ENV{USER}" ,
         HOST         => "$ENV{HOST}" , 
         GENEBUILD_ID => undef,
+        # When using the run-force option, if you align less than XX% of your cDNA in the first run,
+        # it switch back to the normal run mode
+        ALIGNMENT_THRESHOLD => 70,
 
 
     },
 
     human => {
 
-        # all dbs except the REF_DBNAME will be created automaticly 
+        # PIPE_* and OUTPUT_* DBs will be created automatically 
 
         REF_DBNAME => '',      # homo_sapiens_core_56_37a
         REF_DBHOST => '',      # ens-staging 
@@ -141,7 +143,7 @@ use vars qw(%Config);
 
     mouse => {
 
-        # all dbs except the REF_DBNAME + LAST_DB* will be created automatically 
+        # PIPE_* and OUTPUT_* DBs will be created automatically 
 
         REF_DBNAME => '',     # mus_musculus_core_50_37c
         REF_DBHOST => '',     # ens-staging 

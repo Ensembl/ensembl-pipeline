@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.84 2012-10-11 10:45:56 cgg Exp $
+#$Id: cDNA_update.pl,v 1.85 2012-10-31 14:17:07 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -57,7 +57,9 @@ prepare     Read the configuration file cDNAUpdate.pm.
 
 test-run    (optional but recommended) Run a test_Runnable.
 
-run         Start the analysis.
+run         Start the analysis, interactive run.
+
+run-force   Start the analysis and do the 2nd and 3rd step if needed
 
 compare     Compare the number of alignments per chromosome with the
             previous cDNA_update.
@@ -78,11 +80,11 @@ results are dna_align_features in an ESTGENE-type database.
 Check out the latest code to match the database to be updated, for
 example:
 
-   cvs co -r branch-ensembl-53 ensembl
-   cvs co -r branch-ensembl-53 ensembl-pipeline
-   cvs co -r branch-ensembl-53 ensembl-analysis
-   cvs co -r branch-ensembl-53 ensembl-compara
-   cvs co -r branch-ensembl-53 ensembl-killlist
+   cvs co -r branch-ensembl-69 ensembl
+   cvs co -r branch-ensembl-69 ensembl-pipeline
+   cvs co -r branch-ensembl-69 ensembl-analysis
+   cvs co -r branch-ensembl-69 ensembl-compara
+   cvs co -r branch-ensembl-69 ensembl-killlist
 
 *MAKE SURE THAT YOU HAVE THE LATEST ensembl/sql/table.sql FILE*
 
@@ -196,15 +198,15 @@ use Data::Dumper;
 use DBI;
 use DBD::mysql;
 
-#use Bio::EnsEMBL::KillList::KillList;
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Analysis::Tools::Utilities qw ( get_input_arg );
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBConnection;
+use Bio::EnsEMBL::Analysis::Tools::ConfigWriter;
 use cDNAUpdate; 
 
 # We need the Net::SSH module from somewhere:
-use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
+#use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
 # Not used anymore use Net::SSH qw(sshopen2);
 
 my $species;
@@ -290,7 +292,6 @@ my %configvars = (
                "PROGRAM_VERSION"   => $PROGRAM_VERSION,      # from cDNAUpdate
                "PROGRAM_FILE"      => $PROGRAM_FILE,         # from cDNAUpdate
                "MODULE_NAME"       => $MODULE_NAME,          # from cDNAUpdate
-               "SOURCE_DIR"        => $SOURCE_DIR,           # from cDNAUpdate
                "REFSEQ_SOURCE"     => $REFSEQ_SOURCE,        # from cDNAUpdate
                "REFSEQ"            => $REFSEQ,               # from cDNAUpdate
                "BATCH_SIZE"        => $BATCH_SIZE,           # from cDNAUpdate
@@ -315,10 +316,11 @@ if ( !$option or
           and $option ne "prepare"
           and $option ne "test-run"
           and $option ne "run"
+          and $option ne "run-force"
           and $option ne "clean"
           and $option ne "compare" ) ) { 
    print "\n\nYou have to supply an option to the cDNA_update.pl command - valid options are : \n\n\t";
-   print  "perl cDNA_update.pl [ prepare | test-run | run | compare | clean ]\n\n" ; 
+   print  "perl cDNA_update.pl [ prepare | test-run | run | run-force | compare | clean ]\n\n" ; 
    sleep(1) ; 
    exec('perldoc', $0);
 }
@@ -329,6 +331,11 @@ my $pipe_db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,
                      $DBPASS );
 
 my $progress_status = undef;
+my $force_run = 0;
+if ($option eq 'run-force') {
+    $force_run = 1;
+    $option = 'run';
+}
 
 if ( $option eq "prepare" ) {
 
@@ -345,7 +352,7 @@ if ( $option eq "prepare" ) {
     if ( !defined($progress_status) ) {
 
         my $ref_db = connect_db( $REF_DBHOST, $REF_DBPORT,
-                                 $REF_DBNAME, "ensro" );
+                                 $REF_DBNAME, $DBUSER_RO );
 
         # Check existence of source databases
         if ( !$ref_db ) {
@@ -389,7 +396,7 @@ if ( $option eq "prepare" ) {
                                       $DBPASS );
 
             my $target_db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-                                        $OUTPUT_DBNAME, "ensro" );
+                                        $OUTPUT_DBNAME, $DBUSER_RO );
 
             if ( $pipe_db->dbc->dbname() && $target_db->dbc->dbname() ) {
                 print("\nDatabases exist, good! so we continue with the process.\n");
@@ -520,6 +527,11 @@ elsif ( $option eq "run" ) {
         if ( $progress_status == 4 ) {
 
             $num_missing_cdnas = find_missing_cdnas();
+            my $total_sequences = `grep -c '>' $DATA_DIR/$newFeatureName.seqs.clipped`;
+            if ((100-($num_missing_cdnas*100/$total_sequences)) < $ALIGNMENT_THRESHOLD) {
+                print "\n====================\n\nLess than $ALIGNMENT_THRESHOLD% of the cDNA sequences have aligned to the genome!\nStopping the run-force mode.\n\n====================\n";
+                $force_run = 0;
+            }
 
             $progress_status = 5;
             update_progress_status($progress_status);
@@ -532,7 +544,7 @@ elsif ( $option eq "run" ) {
         }
 
         # Rerunning the analysis
-        if ( $progress_status >= 5 && get_input_arg() ) {
+        if ( $progress_status >= 5 && ($force_run or get_input_arg()) ) {
             $rerun_flag = 1;
 
             # Change the logic_name and directories
@@ -552,14 +564,16 @@ elsif ( $option eq "run" ) {
             # Remaking fasta files
             if ( $progress_status == 5 ) {
 
-                config_setup();
+                check_vars();
+                change_exonerate_parameters();
+                add_new_analysis_to_batchqueue();
                 remake_fasta_files();
 
                 $progress_status = 6;
                 update_progress_status($progress_status);
 
                 print("\nSet databases for next run? (y/n) ");
-                if ( get_input_arg() ) {
+                if ( $force_run or get_input_arg() ) {
                     $rerun_flag = 1;
                     if ( !DB_setup() ) {
                         unclean_exit();
@@ -568,7 +582,7 @@ elsif ( $option eq "run" ) {
                            . "for next round.\n\n" );
                 }
                 print("Should we start the 2nd run ? (y/n) ");
-                if ( get_input_arg() ) {
+                if ( $force_run or get_input_arg() ) {
                     if ( !run_analysis() ) {
 
                         # If run_analysis is not successful, return to
@@ -588,11 +602,11 @@ elsif ( $option eq "run" ) {
         }
     }
 
-    elsif ( $progress_status >= 6 ) {
+    if ( $progress_status >= 6 ) {
 
         if ( $progress_status == 6 ) {
             print("Do you want to check for AWOL jobs ? (y/n) ");
-            if ( get_input_arg() ) {
+            if ( $force_run or get_input_arg() ) {
                 print "checking for AWOL jobs...\n";
                 chase_jobs();
 
@@ -710,105 +724,70 @@ sub config_setup {
     if ( !defined $ENV{"OSTYPE"} ) {
         $ENV{"OSTYPE"} = "";
     }
-    # import function, to be included in all config files
-    my $import_sub = '
-        sub import {
-            my ($callpack) = caller(0);
-            my $pack = shift;
-            my @vars = @_ ? @_ : keys(%Config);
-            return unless @vars;
-            eval "package $callpack; use vars qw(".
-            join(\' \', map { \'$\'.$_ } @vars) . ")";
-            die $@ if $@;
-            foreach (@vars) {
-            if (defined $Config{ $_ }) {
-                no strict \'refs\';
-                *{"${callpack}::$_"} = \$Config{ $_ };
-            }else {
-                die "Error: Config: $_ not known\n";
-            }
-            }
-        }
-        1;
-        ';
     check_vars();
 
     # Check existence of source databases
     if ( !connect_db( $REF_DBHOST, $REF_DBPORT,
-                      $REF_DBNAME, "ensro" ) ) {
+                      $REF_DBNAME, $DBUSER_RO ) ) {
         croak("Could not find $REF_DBNAME.");
     }
-
-    # Go through config info to create defined files,
-    # back-up the original, write version with filled-in variables
-    open( RP, "<", "$config_file" )
-      or croak("Can't open config file definitions $config_file.");
-
-    local $/ = '>>';
-    <RP>;
-
-    while ( my $content = <RP> ) {
-
-        # Get specific config-file name
-        $content =~ s/([\w\/_\-\.]+)\n//;
-        $header = $1;
-
-        $header =~ m/(.+\/)([\w\._\-]*)$/g;
-        $path     = $1;
-        $filename = $2;
-        $content =~ s/>>//;
-
-        # Replace variables in config file
-        foreach my $configvarref ( keys %configvars ) {
-            $content =~ s/\<$configvarref\>/$configvars{$configvarref}/g;
-        }
-
-        # If rerunning seqs change Exonerate options:
-        if (   ( $filename =~ /Exonerate2Genes/ )
-            && ( $rerun_flag == 1 ) ) {
-            # Because only interested in those which don't align after new parameters
-
-            # $content =~ s/-verbosity => 0/-verbosity => 1/;  # old regex, didn't work
-
-            # Due to config hash formatting, there are usually many trailing
-            # whitespaces between the hash key and values. Must include the
-            # spaces in the regex to carry out the substitution as intended:
-            $content =~ s/\-verbosity\s+=>\s0/-verbosity => 1/;
-
-            my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
-            $content =~ s/--softmasktarget TRUE/$substitute/;
-        }
-
-        # Backup file if exists
-        if ( -e $CVS_DIR . "/" . $header ) {
-            print $CVS_DIR. "/" . $header . " exists\n";
-            eval {
-                move( $CVS_DIR      . "/" . $header,
-                      $configDIR    . "/" . $filecount );
-            };
-            if ($@) {
-                croak( "Failed to move "
-                     . $CVS_DIR     . "/" . $header
-                     . " to "
-                     . $configDIR   . "/" . $filecount
-                     . ". $@" );
-            }
-        }
-
-        # Store file location
-        $saved_files{$filecount} = $header;
-
-        # Write modified file
-        $filename = $CVS_DIR . "/" . $path . $filename;
-
-        open( WP, ">", $filename )
-          or croak("Can't create new config file $filename.\n");
-        print WP $content . "\n" . $import_sub;
-        close WP;
-        $filecount++;
-    } ## end while ( my $content = <RP>)
-
-    close(RP);
+# We can simply do a cp of the example file here
+    my $pipe_general_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Pipeline::Config::General',
+        -backupdir => $configDIR,
+        -is_example => 1);
+    $saved_files{$pipe_general_cfg->modulename} = $pipe_general_cfg->write_config(1);
+    my $bq_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Pipeline::Config::BatchQueue',
+        -backupdir => $configDIR,
+        -is_example => 1,);
+    $bq_cfg->empty_queue_config();
+    my %cdna_batchqueue = ( logic_name     => $newFeatureName,
+                            output_dir     => $outDIR,
+                            batch_size     => $configvars{'BATCH_SIZE'},
+                            retries        => 1,
+                            resource       => $configvars{'RESOURCE'},
+                            retry_resource => 'select[mem>4000] rusage[mem=4000]',
+                            retry_sub_args => '-M4000000',
+                            );
+    $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
+    $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);
+# We can simply do a cp of the example file here
+    my $analysis_general_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::General',
+        -backupdir => $configDIR,
+        -is_example => 1);
+    $saved_files{$analysis_general_cfg->modulename} = $analysis_general_cfg->write_config(1);
+    my $database_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Databases',
+        -backupdir => $configDIR,
+        -is_example => 1);
+    $database_cfg->delete_databases(['REFERENCE_DB', 'EXONERATE_DB', 'KILL_LIST_DB']);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-dbname', $PIPE_DBNAME);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-host', $PIPE_DBHOST);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-user', $DBUSER);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-pass', $DBPASS);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-port', $PIPE_DBPORT);
+    $database_cfg->key_by_parent('EXONERATE_DB', '-dbname', $OUTPUT_DBNAME);
+    $database_cfg->key_by_parent('EXONERATE_DB', '-host', $OUTPUT_DBHOST);
+    $database_cfg->key_by_parent('EXONERATE_DB', '-user', $DBUSER);
+    $database_cfg->key_by_parent('EXONERATE_DB', '-pass', $DBPASS);
+    $database_cfg->key_by_parent('EXONERATE_DB', '-port', $OUTPUT_DBPORT);
+    $saved_files{$database_cfg->modulename} = $database_cfg->write_config(1);
+    my $exonerate_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Exonerate2Genes',
+        -backupdir => $configDIR,
+        -is_example => 1);
+    $exonerate_cfg->copy_analysis_from_config('CDNA_logic_name', 'cdna_update');
+    $exonerate_cfg->value_by_logic_name('cdna_update', 'GENOMICSEQS', $genomelist);
+    $exonerate_cfg->value_by_logic_name('cdna_update', 'QUERYSEQS', $chunkDIR);
+    $exonerate_cfg->value_by_logic_name('cdna_update', 'OBJECT', 'Bio::EnsEMBL::Analysis::Tools::CdnaUpdateTranscriptFilter');
+    my $parameters = $exonerate_cfg->value_by_logic_name('cdna_update', 'PARAMETERS');
+    # It's dirty I know... but it's the only way
+    $parameters->{-verbosity} = 0;
+    $exonerate_cfg->value_by_logic_name('cdna_update', 'PARAMETERS', $parameters);
+    $saved_files{$exonerate_cfg->modulename} = $exonerate_cfg->write_config(1);
+    my $killlist_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::GeneBuild::KillListFilter',
+        -backupdir => $configDIR,
+        -is_example => 1);
+    my @species = ($TAX_ID);
+    $killlist_cfg->value_by_logic_name('cdna_update', '-for_species', \@species);
+    $saved_files{$killlist_cfg->modulename} = $killlist_cfg->write_config(1);
 
     # Save data dump with config paths
     $Data::Dumper::Purity = 1;
@@ -819,7 +798,7 @@ sub config_setup {
     $/ = "\n";
     print(   "\nCreated backup of current config files, "
            . "new config files written.\n" );
-} ## end sub config_setup
+}
 
 
 # Check files & directories, create if necessary
@@ -1145,10 +1124,11 @@ sub DB_setup {
             delete_unwanted_tables( $tables_to_delete, 1 );
 
             # Copy defined db tables from current build
-            my $tables_to_dump =  'assembly '       . 'assembly_exception '
-                                . 'attrib_type '    . 'coord_system '
-                                . 'meta '           . 'seq_region '
-                                . 'seq_region_attrib ';
+            my $tables_to_dump =  'assembly '          . 'assembly_exception '
+                                . 'attrib_type '       . 'coord_system '
+                                . 'meta '              . 'seq_region '
+                                . 'seq_region_attrib ' . 'seq_region_synonym '
+                                . 'karyotype '         . 'mapping_set ';
 
             # Dump the tables to import_tables1.sql
             # 1 = file count
@@ -1292,9 +1272,18 @@ sub test_run {
 sub run_analysis {
     eval {
 
+        print "\nPlease monitor the output with:\n\n"
+              . "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/monitor"
+              . " -dbhost "   . $PIPE_DBHOST
+              . " -dbport "   . $PIPE_DBPORT
+              . " -dbuser "   . $DBUSER
+              . " -dbpass "   . $DBPASS
+              . " -dbname "   . $PIPE_DBNAME
+              . " -current_summary"
+              . " -finishedpercent\n" ;
         print("\n\nShall we start the actual analysis? (y/n) ");
 
-        if ( get_input_arg() ) {
+        if (($force_run and $rerun_flag) or get_input_arg() ) {
             $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
                  . " -dbhost "   . $PIPE_DBHOST
                  . " -dbport "   . $PIPE_DBPORT
@@ -1302,18 +1291,9 @@ sub run_analysis {
                  . " -dbpass "   . $DBPASS
                  . " -dbname "   . $PIPE_DBNAME;
 
-            print(  "\nSTARTING THE PIPELINE.\n"
+            print "\nSTARTING THE PIPELINE.\n"
                   . "Using command:\n\n"
-                  . $cmd
-                  . "\n\nPlease monitor the output with:\n\n"
-                  . "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/monitor"
-                  . " -dbhost "   . $PIPE_DBHOST
-                  . " -dbport "   . $PIPE_DBPORT
-                  . " -dbuser "   . $DBUSER
-                  . " -dbpass "   . $DBPASS
-                  . " -dbname "   . $PIPE_DBNAME
-                  . " -current_summary"
-                  . " -finishedpercent\n\n" );
+                  . $cmd;
 
             print "\n\nIf you stop the rule-manager due to inactivity / hanging you can restart the\n";
             print "cDNA update procedure using :\n\n\t\t\tperl cDNA_update.pl run\n\n" ; 
@@ -1440,15 +1420,19 @@ sub chase_jobs {
         print( "\nThere were $seq_count cdnas in the files which didn't run.\n"
              . "Would you like to try with smaller chunk files? (y/n) " );
 
-        my $ans = "";
-        if ( get_input_arg() ) {
-            print(  "Please specify number of chunk files to make "
-                  . "(maximum = 1 cdna per file): " );
+        if ( $force_run or get_input_arg() ) {
+            my $ans = "";
+            if ($force_run) {
+                $ans = $seq_count;
+            }
+            else {
+                print(  "Please specify number of chunk files to make "
+                      . "(maximum = 1 cdna per file): " );
 
-                my $ans = "";
                 chomp( $ans = <STDIN> );
+            }
 
-                if ( $ans > $seq_count ) {
+            if ( $ans > $seq_count ) {
                 carp("This would give less than 1 sequence per file.\n");
                 exit;
             } elsif ( $ans <= $chunk_numbers ) {
@@ -1471,7 +1455,9 @@ sub chase_jobs {
                 $configvars{"BATCH_SIZE"}     = $configvars{"RETRY_BATCH_SIZE"};
 
                 # Check that the new exonerate parameters are set
-                config_setup();
+                check_vars();
+                change_exonerate_parameters();
+                add_new_analysis_to_batchqueue();
 
                 $CHUNK    = $ans;
                 $chunkDIR = $DATA_DIR . "/chunks3";
@@ -1486,12 +1472,12 @@ sub chase_jobs {
                 }
 
                 # Isolate biggest sequences
-                check_chunksizes();
+                check_chunksizes() unless ($ans == $seq_count);
 
                 print("\nChopped up file.\n\n"
                     . "Set databases for next run? (y/n) ");
 
-                if ( get_input_arg() ) {
+                if ( $force_run or get_input_arg() ) {
                     $rerun_flag = 1;
                     if ( !DB_setup() ) { unclean_exit(); }
                     print("\n\nFinished setting up the analysis.\n");
@@ -1569,6 +1555,7 @@ sub why_cdnas_missed {
     close OUT;
 
     for my $output (@output) {
+        next unless (-e $DATA_DIR.'/'.$output);
         `find $DATA_DIR/$output/. | xargs -l1 grep "rpp" >> $file`;
         `find $DATA_DIR/$output/. | xargs -l1 grep "only" >> $file`;
         `find $DATA_DIR/$output/. | xargs -l1 grep "reject" >> $file`;
@@ -1858,10 +1845,10 @@ sub compare {
 
     # Pld alignments
     my $db1 = connect_db( $LAST_DBHOST, $LAST_DBPORT,
-                          $LAST_DBNAME, "ensro" );
+                          $LAST_DBNAME, $DBUSER_RO );
     # New alignments
     my $db2 = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
-                          $OUTPUT_DBNAME, "ensro" );
+                          $OUTPUT_DBNAME, $DBUSER_RO );
 
     # Get chromosome names / ids
     $sql = "SELECT coord_system_id "
@@ -2128,7 +2115,7 @@ sub dump_tables {
         print(   "\n$file_name exists, "
                . "do you still want to dump the tables? (y/n) " );
 
-        if ( get_input_arg() ) {
+        if ( $force_run or get_input_arg() ) {
             $cmd = $mysql_dump . $tables_to_dump . " > " . $file_name;
             print $cmd, "\n";
             $status += system($cmd);
@@ -2402,6 +2389,34 @@ sub connect_db {
     return $dbObj;
 } ## end sub connect_db
 
+sub change_exonerate_parameters {
+    my $exonerate_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Exonerate2Genes',
+        -backupdir => $configDIR);
+    $exonerate_cfg->copy_analysis_from_config($OLD_FEATURE_NAME, $newFeatureName);
+    $exonerate_cfg->value_by_logic_name($newFeatureName, 'GENOMICSEQS', $genomelist);
+    $exonerate_cfg->value_by_logic_name($newFeatureName, 'QUERYSEQS', $chunkDIR);
+    my $content = $exonerate_cfg->value_by_logic_name($newFeatureName, 'OPTIONS');
+    my $substitute = '--maxintron 400000 --bestn 10 --softmasktarget FALSE';
+    $content =~ s/--softmasktarget TRUE/$substitute/;
+    $exonerate_cfg->value_by_logic_name($newFeatureName, 'OPTIONS', $content);
+    $exonerate_cfg->value_by_logic_name($newFeatureName, '-verbosity', 1);
+    $saved_files{$exonerate_cfg->modulename} = $exonerate_cfg->write_config(1);
+}
+
+sub add_new_analysis_to_batchqueue {
+    my $bq_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Pipeline::Config::BatchQueue',
+        -backupdir => $configDIR);
+    my %cdna_batchqueue = ( logic_name     => $newFeatureName,
+                            output_dir     => $outDIR,
+                            batch_size     => $configvars{'BATCH_SIZE'},
+                            retries        => 1,
+                            resources      => $configvars{'RESOURCE'},
+                            retry_resource => 'select[mem>4000] rusage[mem=4000]',
+                            retry_sub_args => '-M4000000',
+                            );
+    $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
+    $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);
+}
 
 1;
 

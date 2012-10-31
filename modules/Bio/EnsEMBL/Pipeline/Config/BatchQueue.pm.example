@@ -173,7 +173,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.41 $ 
+# $Revision: 1.42 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -193,7 +193,7 @@ use vars qw(%Config);
 
   DEFAULT_BATCH_SIZE  => 10,
   DEFAULT_RETRIES     => 3,
-  DEFAULT_BATCH_QUEUE => '',  # Put in the queue of your choice, e.g. 'normal'
+  DEFAULT_BATCH_QUEUE => 'normal',  # Put in the queue of your choice, e.g. 'normal'
   DEFAULT_RESOURCE    => 'select[myens_build1tok>800 && myens_build2tok>800 && myens_build3tok>800 && myens_build4tok>800 && myens_build5tok>800 && myens_build6tok>800 && myens_build7tok>800 && myens_build8tok>800] rusage[myens_build1tok=10:myens_build2tok=10:myens_build3tok=10:myens_build4tok=10:myens_build5tok=10:myens_build6tok=10:myens_build7tok=10:myens_build8tok=10]',
   DEFAULT_SUB_ARGS    => '',
   DEFAULT_OUTPUT_DIR  => '',

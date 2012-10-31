@@ -218,8 +218,8 @@ sub blast_sanity_check{
     }
   }
   foreach my $k (keys %blast_hash) {
-    if(!$BLAST_CONFIG->{$k}){
-      print $BLAST_CONFIG." blast config does not contain entry for ".$k."\n";
+    if(!$BLAST_CONFIG_BY_LOGIC->{$k}){
+      print $BLAST_CONFIG_BY_LOGIC." blast config does not contain entry for ".$k."\n";
       $ok = 0;
     }
   }
