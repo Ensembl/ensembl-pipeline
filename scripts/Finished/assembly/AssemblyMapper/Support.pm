@@ -13,6 +13,8 @@ use Bio::EnsEMBL::Utils::Exception qw(throw); # FIXME - inconsistent die vs. err
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use AssemblyMapper::AlignSession;
 use AssemblyMapper::SlicePair;
+# require Bio::Otter::Lace::SatelliteDB # if we have pipeline_db_head
+
 
 Readonly my @OTTER_ALIGN_COMMON_OPTIONS => (
     'assembly=s',
@@ -398,26 +400,35 @@ sub session_setup {
     return 1;
 }
 
+
+=head2 get_pipe_db($dba)
+
+Given a DBAdaptor, return a possibly different DBAdaptor which also
+contains the same assembly and DNA but also contains repeat_features
+needed for meaningful alignments.
+
+Anacode keep analyses in a separate database (pipe_foo) from the
+curated data (loutre_foo).  If the necessary meta_key to find pipe_foo
+is not found, continue with the given C<$dba>.
+
+=cut
+
 sub get_pipe_db {
     my ($self, $dba) = @_;
 
+    # Are the repeat_features elsewhere?
     my $metakey = 'pipeline_db_head';
     my ($opt_str) = @{ $dba->get_MetaContainer()->list_value_by_key($metakey) };
-    return unless $opt_str;
-
-    my %anycase_options = (
-        eval $opt_str, ## no critic(BuiltinFunctions::ProhibitStringyEval)
-    );
-    if ($@) {
-        throw("Error evaluating '$opt_str' : $@");
+    if ($opt_str) {
+        # Yes, ensembl-otter will get access
+        require Bio::Otter::Lace::SatelliteDB;
+        return  Bio::Otter::Lace::SatelliteDB::get_DBAdaptor
+          ($dba, $metakey, 'Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor');
+    } else {
+        # No.  Do we need to rebless(ugh) to a
+        # Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor ?  Probably not.
+        return $dba;
     }
-
-    my %uppercased_options = ();
-    while( my ($k,$v) = each %anycase_options) {
-        $uppercased_options{uc($k)} = $v;
-    }
-
-    return Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(%uppercased_options);
 }
 
 sub output_info_as_yaml {
