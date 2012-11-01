@@ -134,13 +134,16 @@ sub create_tempdir {
 
     my $given = $self->support->param('tmpdir');
     my $tempdir;
-    my %opt = (CLEANUP => 1);
+    my %opt;
 
     if ($given) {
         # put temp files in here, for inspection later
         $self->support->log_error("$given is not a writable directory")
           unless -d $given && -w _;
         %opt = (CLEANUP => 0, DIR => $given);
+    } else {
+        # in $ENV{TMPDIR} or /tmp, and auto-clean
+        %opt = (CLEANUP => 1, TMPDIR => 1);
     }
 
     # create tmpdir to store input and output
