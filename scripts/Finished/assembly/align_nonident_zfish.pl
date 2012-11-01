@@ -161,7 +161,7 @@ my $A_sa = $A_dba->get_SliceAdaptor;
 my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
 
 # create tmpdir to store input and output
-$aligner->create_tempdir($support->param('tmpdir'));
+$aligner->create_tempdir();
 
 # loop over non-aligned regions in tmp_align table
 $support->log_stamped("Looping over non-aligned blocks...\n");
@@ -357,14 +357,6 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
   $support->log("Done.\n", 2);
 
-  # cleanup temp files
-  $support->log("Cleaning up temp files...\n", 2);
-  $aligner->cleanup_tmpfiles(
-    "$A_basename.fa",
-    "$R_basename.fa",
-  );
-  $support->log("Done.\n", 2);
-
   # log alignment stats
   $aligner->log_block_stats(2);
 
@@ -376,11 +368,6 @@ $support->log_stamped("Done.\n");
 
 # write alignments to assembly table
 $aligner->write_assembly($R_dba, \@R_chr_list, \@A_chr_list);
-
-# cleanup
-$support->log_stamped("\nRemoving tmpdir...\n");
-$aligner->remove_tempdir;
-$support->log_stamped("Done.\n\n");
 
 # overall stats
 $aligner->log_overall_stats;

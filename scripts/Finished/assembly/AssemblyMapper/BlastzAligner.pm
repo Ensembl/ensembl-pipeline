@@ -81,7 +81,8 @@ no warnings 'uninitialized';
 
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::SeqIO;
-use File::Path;
+use File::Temp;
+use Try::Tiny;
 
 use constant FMT1 => "%-30s%10.0f (%3.2f%%)\n";
 use constant FMT2 => "%-30s%10.0f\n";
@@ -118,11 +119,10 @@ sub new {
 
 =head2 create_tempdir
 
-  Arg[1]      : String $tmpdir - temporary directory name
+  Input       : $self->support->param('tmpdir')
   Example     : $aligner->create_tempdir;
-  Description : Creates a temporary directory in /tmp with a semi-random name
-                (username.timestamp.randomnumber). Alternatively, you can pass
-                it the name of a directory to use.
+  Description : Create a self-destructing temporary directory,
+                or check the given tmpdir is useful and use that.
   Return type : String - name of the tempdir created
   Exceptions  : Thrown if tempdir can't be created
   Caller      : general
@@ -131,42 +131,27 @@ sub new {
 
 sub create_tempdir {
     my $self = shift;
-    my $tempdir = shift;
 
-    if ($tempdir) {
-      unless (-d $tempdir) {
-        $self->support->log_error("Can't find tempdir $tempdir: $!");
-      }
+    my $given = $self->support->param('tmpdir');
+    my $tempdir;
+    my %opt = (CLEANUP => 1);
 
-    } else {
-      # create tmpdir to store input and output
-      my $user = `whoami`;
-      chomp $user;
-      $tempdir = "/tmp/$user.".time.".".int(rand(1000));
-      $self->support->log("Creating tmpdir $tempdir...\n");
-      system("mkdir $tempdir") == 0 or
-          $self->support->log_error("Can't create tmp dir $tempdir: $!\n");
-      $self->support->log("Done.\n");
+    if ($given) {
+        # put temp files in here, for inspection later
+        $self->support->log_error("$given is not a writable directory")
+          unless -d $given && -w _;
+        %opt = (CLEANUP => 0, DIR => $given);
     }
 
+    # create tmpdir to store input and output
+    $tempdir = File::Temp->newdir('blastzaligner.XXXXXX', %opt);
     $self->tempdir($tempdir);
+    $self->support->log("Working in tmpdir $tempdir\n");
+    # the object stringifies to $tempdir->dirname
+
     return $tempdir;
 }
 
-=head2 remove_tempdir
-
-  Example     : $aligner->remove_tempdir;
-  Description : Removes a temporary directory created by $self->create_tempdir.
-  Return type : none
-  Exceptions  : none
-  Caller      : general
-
-=cut
-
-sub remove_tempdir {
-    my $self = shift;
-    rmtree($self->tempdir) or $self->support->log_warning("Could not delete ".$self->tempdir.": $!\n");
-}
 
 =head2 write_sequence
 
@@ -391,33 +376,6 @@ sub parse_lastz_output {
     }
 }
 
-=head2 cleanup_tmpfiles
-
-  Arg[1-N]    : (optional) list @files - additional tmp files to delete
-  Example     : $self->cleanup_tmpfiles('e_seq.fa', 'v_seq.fa');
-  Description : deletes temporary files
-  Return type : none
-  Exceptions  : Warning if file cannot be deleted
-  Caller      : general
-  Status      : stable
-
-=cut
-
-sub cleanup_tmpfiles {
-  my $self = shift;
-  my @files = @_;
-
-  my $tmpdir = $self->tempdir;
-  my $id = $self->id;
-
-  push @files,
-    "blastz.$id.axt",
-    "blastz.$id.best.axt";
-
-  foreach my $file (@files) {
-    unlink("$tmpdir/$file") or $self->support->log_warning("Couldn't delete file $file: $!");
-  }
-}
 
 =head2 found_match
 
@@ -875,6 +833,7 @@ sub _by_chr_num {
 }
 
 =head2 apply_masks
+
 =cut
 
 sub apply_masks {
@@ -886,6 +845,7 @@ sub apply_masks {
 }
 
 =head2 apply_mask_inplace
+
 =cut
 
 sub apply_mask_inplace {

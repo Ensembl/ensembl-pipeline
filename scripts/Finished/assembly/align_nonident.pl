@@ -24,8 +24,8 @@ Optional arguments:
 
     --chromosomes, --chr=LIST           only process LIST chromosomes
     --bindir=DIR                        look for program binaries in DIR
-    --tmpfir=DIR                        use DIR for temporary files (useful for
-                                        re-runs after failure)
+    --tmpdir=DIR                        use DIR for temporary files and
+                                        leave them behind for inspection
 
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
@@ -183,7 +183,7 @@ sub do_align_nonident {
       my $aligner = AssemblyMapper::BlastzAligner->new(-SUPPORT => $support);
 
       # create tmpdir to store input and output
-      $aligner->create_tempdir($support->param('tmpdir'));
+      $aligner->create_tempdir();
 
       $aligner->id($id);
       $aligner->seq_region_name($asp->ref_chr);
@@ -308,14 +308,6 @@ sub do_align_nonident {
 
       $support->log("Done.\n", 2);
 
-      # cleanup temp files
-      $support->log("Cleaning up temp files...\n", 2);
-      $aligner->cleanup_tmpfiles(
-          "$A_basename.fa",
-          "$R_basename.fa",
-          );
-      $support->log("Done.\n", 2);
-
       # log alignment stats
       $aligner->log_block_stats(2);
 
@@ -327,10 +319,6 @@ sub do_align_nonident {
 
       # overall stats
       $aligner->log_overall_stats;
-
-      # cleanup
-      $support->log_stamped("\nRemoving tmpdir...\n");
-      $aligner->remove_tempdir;
 
   } # while ($row = fetchrow...)
 
