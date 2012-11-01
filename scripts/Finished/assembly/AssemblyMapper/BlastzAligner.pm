@@ -1,5 +1,9 @@
 package AssemblyMapper::BlastzAligner;
 
+use strict;
+use warnings;
+no warnings 'uninitialized';
+
 use File::Basename;
 use Bio::EnsEMBL::Analysis::Config::General;
 
@@ -74,10 +78,6 @@ Please post comments/questions to Anacode
 
 =cut
 
-
-use strict;
-use warnings;
-no warnings 'uninitialized';
 
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::SeqIO;
@@ -873,35 +873,22 @@ sub apply_mask_inplace {
     return $$seq_ref;
 }
 
-=head2 AUTOLOAD
 
-  Arg[1]      : (optional) String/Object - attribute to set
-  Example     : # setting a attribute
-                $self->attr($val);
-                # getting the attribute
-                $self->attr;
-                # undefining an attribute
-                $self->attr(undef);
-  Description : lazy function generator for getters/setters
-  Return type : String/Object
-  Exceptions  : none
-  Caller      : general
+sub __make_accessors {
+    my @acc = @_;
+    foreach my $attr (@acc) {
+        my $accessor = sub {
+            $_[0]->{'_data'}->{$attr} = $_[1] if (@_ > 1);
+            return $_[0]->{'_data'}->{$attr};
+        };
 
-=cut
-
-sub AUTOLOAD {
-    my $self = shift;
-    my $attr = our $AUTOLOAD;
-    $attr =~ s/.*:://;
-    return unless $attr =~ /[^A-Z]/;
-    no strict 'refs';
-    *{$AUTOLOAD} = sub {
-        $_[0]->{'_data'}->{$attr} = $_[1] if (@_ > 1);
-        return $_[0]->{'_data'}->{$attr};
-    };
-    $self->{'_data'}->{$attr} = shift if (@_);
-    return $self->{'_data'}->{$attr};
+        no strict 'refs';
+        *{$attr} = $accessor;
+    }
+    return ();
 }
 
-1;
+# make a well-defined set of accessors during compilation
+__make_accessors(qw( tempdir support bindir id seq_region_name ));
 
+1;
