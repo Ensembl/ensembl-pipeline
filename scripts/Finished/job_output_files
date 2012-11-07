@@ -1,0 +1,371 @@
+#! /software/bin/perl-5.12.2
+
+use strict;
+use warnings;
+
+=head1 NAME
+
+job_output_files - operate on files for job.std{out,err}_file
+
+=head1 SYNOPSIS
+
+ job_output_files -dataset <species> create /lustre/scratch110/mumble
+
+ job_output_files -dataset <species> subst /lustre/scratch103/mumble /lustre/scratch110/bumble
+
+ job_output_files -dataset <species> clean /lustre/scratch110/bumble
+
+=head1 DESCRIPTION
+
+This script performs several related operations to maintain the
+directory structure and files linked from the columns
+C<job.stdout_file> and C<job.stderr_file> used by the Pipeline.
+
+By default, nothing is done to any job whose current status was made
+in the last month.  This is to avoid updating any analysis which might
+be running.  Number of jobs skipped is reported.
+
+=head1 OPTIONS
+
+  -dataset <species>    the species or dataset to connect to
+  -minage <days>        jobs updated more recently than are skipped
+  -dry                  don't actually do anything
+
+=head1 ACTIONS
+
+After the options, there must be an action (subcommand) and its
+arguments.
+
+=head2 create <pipeline_output_dir> <default_output_dir>
+
+Create directory structure for this database, group writable.
+
+If directories are omitted, it consults
+
+=over 2
+
+=item * L<Bio::EnsEMBL::Pipeline::Config::General> for
+C<PIPELINE_OUTPUT_DIR> and changes the tail with
+C<s/default/$species/>
+
+=item * L<Bio::EnsEMBL::Pipeline::Config::BatchQueue> for
+C<DEFAULT_OUTPUT_DIR>
+
+=back
+
+respectively.
+
+In C<default_output_dir> subdirectories are created for analyses.
+In C<pipeline_output_dir> they are made for (0..9).
+
+=head2 clean <pipeline_output_dir | default_output_dir>*
+
+Remove from specified directory trees all files named /\.(err|out)$/
+older than C<minage> days.  No directories are removed.
+
+If no directories are given, species directory and default directory
+are cleaned.
+
+The L<find(1)> operations are rate-limited (in an arbitrary and
+hardwired way).
+
+When really deleting, a 1% of the filenames are listed to show things
+are happening.
+
+Dry run recommended!
+
+=head2 subst <new_dir> <old_dir>
+
+For all jobs not newer than C<minage>, replace the part matching
+C</^old_dir> with C<new_dir>.
+
+When C<old_dir> is not given, anything matching
+C<anydir/species/logic_name/number/leafname> is accepted and the first
+two elements are replaced.
+
+When C<old_dir> has a leading C<^> it is taken as a Perl regexp, else
+it is a fixed string.
+
+C<new_dir> defauts to C<PIPELINE_OUTPUT_DIR> for the species.
+
+Trailing-/ fixup is done on old & new; except when a regexp is given,
+when you should match a trailing-/.
+
+Dry run shows some matches and non-matches - recommended due to rule
+complexity.
+
+=head1 EXAMPLES
+
+Multi-species bulk updates I ran,
+
+ manysp="cat chicken chimp cow dog gibbon gorilla lemur marmoset mus_spretus platypus rat sordaria tomato tropicalis wallaby"
+ for sp in $manysp; do job_output_files -dataset $sp create /lustre/scratch110/sanger/mca/pipeline/pipeline_$sp /lustre/scratch110/sanger/mca/pipeline_default; done
+ for sp in $manysp; do job_output_files -dataset $sp  subst /lustre/scratch110/sanger/mca/pipeline/pipeline_$sp/  ^/lustre/scratch103/sanger/ml6/pipeline_$sp/+; done
+
+=head1 SEE ALSO
+
+F<ensembl-otter/db_t/pipeline/outfiles_valid.t>
+
+=head1 CAVEATS
+
+Naming rules are encoded into this script which seem to match our
+working practices.  It isn't always clear where these naming patterns
+came from - don't take this script as The Correct Way.
+
+No files are moved.  If you subst on the filenames for a job which has
+already run, then the existing files are orphaned (presumably later
+deleted by something).
+
+Doesn't use L<lfs(1)> C<find>.  The rate-limiting should be enough,
+there is no hurry to tidy up.
+
+=head1 AUTHOR
+
+Matthew Astley mca@sanger.ac.uk
+
+=cut
+
+use strict;
+use warnings;
+
+use Try::Tiny;
+use File::Path 'mkpath';
+use YAML 'Dump';
+use List::Util 'max';
+use Time::HiRes 'usleep';
+
+use Bio::Otter::Lace::Defaults;
+use Bio::Otter::Lace::PipelineDB;
+
+use Bio::EnsEMBL::Pipeline::Config::General   qw( PIPELINE_OUTPUT_DIR );
+use Bio::EnsEMBL::Pipeline::Config::BatchQueue qw( DEFAULT_OUTPUT_DIR );
+
+my ($exit, $dry, %opt);
+
+sub main {
+    ($exit, $dry) = (0, 0);
+    %opt = (minage => 30);
+
+    Bio::Otter::Lace::Defaults::do_getopt
+        ('dataset|D=s'   => \$opt{dataset},
+         'minage|A=s'    => \$opt{minage},
+         'dry!'          => \$dry, # not $opt{dry}, lest $opt{dryrun} be seen false
+         'h|help'        => \$opt{help});
+
+    exec(perldoc => $0) if $opt{help};
+
+    die "-minage must be a number >= 0, but is $opt{minage}"
+      unless $opt{minage} =~ /^\d+(?:\.\d+)?$/ && $opt{minage} >= 0;
+
+    my ($op, @arg) = @ARGV;
+    $op ||= '(no op given)';
+
+    if ($op eq 'create') {
+        do_create(@arg);
+    } elsif ($op eq 'subst') {
+        do_subst($opt{minage}, @arg);
+    } elsif ($op eq 'clean') {
+        do_clean($opt{minage}, @arg);
+    } else {
+        die "Syntax: $0 [ -dataset <dataset> ] [ -minage <days> ] < create | subst | clean > [ args...]\n";
+    }
+
+    return $exit;
+}
+
+
+{
+    my $pipe_dba;
+    sub pipe_dba {
+        return $pipe_dba ||= _pipe_dba();
+    }
+}
+sub _pipe_dba {
+    die "Cannot connect to pipe database without a dataset"
+      unless $opt{dataset};
+    my $cl = Bio::Otter::Lace::Defaults::make_Client();
+    my $ds = $cl->get_DataSet_by_name($opt{dataset});
+    my $otter_dba = $ds->get_cached_DBAdaptor;
+    return Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($otter_dba);
+}
+
+
+sub do_create {
+    my ($pipe, $default, @junk) = @_;
+    _junk(@junk);
+    _default(pipeline_output_dir => \$pipe,
+             'Bio::EnsEMBL::Pipeline::Config::General', $PIPELINE_OUTPUT_DIR, 1);
+    _default(default_output_dir => \$default,
+             'Bio::EnsEMBL::Pipeline::Config::BatchQueue', $DEFAULT_OUTPUT_DIR, 0);
+
+    my @logic_name = map { $_->logic_name } @{ pipe_dba()->get_AnalysisAdaptor->fetch_all };
+
+    umask 02;
+    foreach ($default, $pipe) { s{/+$}{} }
+    mkdirs(map {"${default}/$_"} @logic_name);
+    mkdirs(map {"${pipe}/$_"} (0..9));
+}
+
+sub _dbname_dir {
+    my $name = pipe_dba()->dbc->dbname;
+    $name =~ s{^pipe_}{pipeline_}; # why?  this seems to be the existing usage
+    return $name;
+}
+
+sub mkdirs {
+    my @dir = @_;
+    foreach my $dir (@dir) {
+        try {
+            my @s = stat $dir;
+            if (-d _ && ($s[2] & 07777) == 0775) {
+                print "Exists: $dir\n";
+            } elsif ($dry) {
+                printf("Would %s %s\n", -d _ ? 'chmod 0775' : 'mkpath', $dir)
+            } elsif (-d _) {
+                chmod 0775, $dir
+                  or die "chmod(0775, $dir): $!\n";
+            } else {
+                mkpath($dir, { verbose => 1});
+            }
+        } catch {
+            warn "[e] $_";
+            $exit |= 4;
+        }
+    }
+}
+
+
+sub _junk {
+    my @junk = @_;
+    warn "Ignoring junk arguments (@junk)\n" if @junk;
+    return ();
+}
+
+sub _default {
+    my ($what, $var, $mod, $default, $do_species_fix) = @_;
+    return () if defined $$var;
+
+    $$var = $default;
+    my $dbname = _dbname_dir();
+    my $did_fix = $do_species_fix &&
+      $$var =~ s{/pipe(line)?_default/*$}{/$dbname/};
+
+    my $fn = $mod;
+    $fn =~ s{::}{/}g;
+
+    warn qq{Took $what=$$var\n  from $INC{"$fn.pm"}\n};
+    warn "  nb. changed s/default/dbname\n" if $did_fix;
+
+    return ();
+}
+
+
+sub do_subst {
+    my ($minage, $new, $old, @junk) = @_;
+    _junk(@junk);
+    $minage *= 24*3600; # use seconds for SQL
+
+    if (!defined $new) {
+        _default(new_path => \$new,
+                 'Bio::EnsEMBL::Pipeline::Config::General', $PIPELINE_OUTPUT_DIR, 1);
+    }
+    $new =~ s{/*$}{/};
+
+    if (!defined $old) {
+        $old = ($new =~ m{/$}
+                ? qr{^.*/pipe(?:line)?_\w+/+(?=\d+/+[^/]+\.\w+$)}
+                : qr{^.*/pipe(?:line)?_\w+/*(?=/+\d+/+[^/]+\.\w+$)});
+        warn "Using default old-path pattern\n";
+    } elsif ($old =~ m{^\^}) {
+        $old = qr{$old};
+    } else {
+        $old =~ s{/*$}{};
+        $old = qr{^\Q$old\E/+};
+    }
+    warn "Will replace in filenames...\n old = $old\n new          = $new\n";
+
+    my $dbh = pipe_dba()->dbc->db_handle;
+    $dbh->begin_work;
+    my (@hit, @miss);
+    my $N = 100; # how many to show; all are done
+    my $R = $dbh->selectall_arrayref
+      (q{ SELECT j.job_id, j.stdout_file, j.stderr_file FROM job j
+          JOIN (SELECT * FROM job_status WHERE is_current='y') s USING (job_id)
+          WHERE s.time < now() - interval ? second }, {}, $minage);
+    while (my $row = shift @$R) {
+        my ($id, @fn) = @$row;
+        my @new_fn = @fn;
+        my @change;
+        my $w = max(map { length } (@fn, @new_fn));
+        foreach my $i (0,1) {
+            push @change, sprintf("   %${w}s\nto %${w}s\n", $fn[$i], $new_fn[$i])
+              if $new_fn[$i] =~ s{$old}{$new};
+        }
+        if (!@change) {
+            push @miss, $row if $dry && @miss < $N;
+        } else {
+            push @hit, [ $id, @change ] if !$dry || @hit < $N;
+            $dbh->do(q{ UPDATE job SET stdout_file=?, stderr_file=? WHERE job_id=? },
+                     {}, @new_fn, $id)
+              unless $dry;
+        }
+    }
+
+    my %info = (dry_run => $dry);
+    if ($dry) {
+        $info{"first_$N"} = { hit => \@hit, miss => \@miss };
+    } else {
+        $info{changed} = scalar @hit;
+    }
+    print Dump(\%info);
+
+    $dbh->commit;
+}
+
+
+sub do_clean {
+    my ($minage, @dir) = @_;
+
+    # "rm -r" gets through files on scratch103 100/sec
+    # so 100ms delay gives a 10% duty cycle
+    my $file_delay = 90; # millisec
+
+    if (!@dir) {
+        _default(pipeline_output_dir => \$dir[0],
+                 'Bio::EnsEMBL::Pipeline::Config::General', $PIPELINE_OUTPUT_DIR, 1);
+        _default(default_output_dir => \$dir[1],
+                 'Bio::EnsEMBL::Pipeline::Config::BatchQueue', $DEFAULT_OUTPUT_DIR, 0);
+    }
+
+    my @cmd = (find => @dir,
+               qw[ -xdev -type f ( -name *.out -o -name *.err ) ],
+               map {( $_ => "+$minage" )} qw( -mtime -ctime -atime ));
+
+    push @cmd, $dry ? ('-ls') : qw( -print -delete );
+    print "\n";
+
+
+    $| = 1;
+    open my $fh, '-|', @cmd
+      or die "Pipe from '@cmd' failed: $!";
+    my $n = 0;
+    while (<$fh>) {
+        usleep($file_delay * 1000); # microsec
+        if ($dry) {
+            print;
+        } else {
+            print '.';
+            print "\n$_" unless $n % 100;
+        }
+        $n ++;
+    }
+    print($dry ? "Would" : "Attempted to", " delete $n files\n");
+
+    unless (close $fh) {
+        $exit |= 2;
+        warn "Pipe from '@cmd' exited status $? / $!\n";
+    }
+}
+
+
+exit main();
