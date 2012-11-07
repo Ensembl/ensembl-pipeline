@@ -9,8 +9,8 @@ use vars qw( %MitConf );
   MIT_GENBANK_FILE => '/lustre/scratch103/ensembl/ba1/releases/v57/rat_MT_AC_000022.gb',
 
   # database to put sequnece and genes into
-  MIT_DBNAME => 'ba1_rattus_norvegicus_core_57_34y',
-  MIT_DBHOST => 'genebuild3',
+  MIT_DBNAME => 'th3_equus_caballus_core_69_2',
+  MIT_DBHOST => 'genebuild8',
   MIT_DBUSER => 'ensadmin',
   MIT_DBPASS => '***',
   MIT_DBPORT => '3306',
@@ -23,7 +23,7 @@ use vars qw( %MitConf );
   # OR you can include the full http path if you like
   # eg http://www.ncbi.nlm.nih.gov/nuccore/NC_001665
   MIT_DB_FILE => 'http://www.ncbi.nlm.nih.gov/nuccore/NC_XXXX',
-  MIT_DB_VERSION => 'NC_XXX.X'
+  MIT_DB_VERSION => 'NC_XXX.X',
 
   # if want the verbose output and sequence output after the load
   MIT_DEBUG => '',

@@ -45,7 +45,7 @@ $Author: th3 $
 
 =head1 VERSION
 
-$Revision: 1.1 $
+$Revision: 1.2 $
 
 =cut
 
@@ -186,25 +186,25 @@ sub _get_features {
     return unless $HASH->{__features};
     if ($line =~ /(\w+)\s+(<)?(\d+)\.\.(\d+)/) {
         $HASH->{__current} = $1;
-        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $2);
         $HASH->{-features}->[++$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{start} = $3;
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $2);
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $4;
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{strand} = 1;
     }
     elsif ($line =~ /(\w+)\s+complement\((\d+)\.\.(\d+)/) {
         $HASH->{__current} = $1;
-        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if ($line =~ '<');
         $HASH->{-features}->[++$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{start} = $2;
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if ($line =~ '<');
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $3;
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{strand} = -1;
     }
     elsif ($line =~ /(\w+)\s+(complement\()?join\((.+)/) {
         $HASH->{__current} = $1;
+        ++$HASH->{__feature_index};
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if ($line =~ '<');
         my $strand = 1;
         $strand = -1 if ($2);
         my $string = $3;
-        ++$HASH->{__feature_index};
         while ($string =~ /(\d+)\.\.(\d+)/g) {
             push(@{$HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}}, {start => $1, end => $2, strand => $strand});
         }

@@ -357,6 +357,7 @@ for (my $index = 1; $index < $length; $index++) {
                 }
                 else {
                     if (exists $EXTERNAL_DB{$db_xref_key}) {
+                        warning('Adding xref '.$feature->{$key}->{db_xref}->{$db_xref_key}. ' from '.$EXTERNAL_DB{$db_xref_key});
                         my $db_entry = Bio::EnsEMBL::DBEntry->new(
                           -adaptor     => $dbe_adaptor,
                           -primary_id  => $feature->{$key}->{db_xref}->{$db_xref_key},
@@ -391,17 +392,18 @@ for (my $index = 1; $index < $length; $index++) {
             warning('There is a frameshift in: '.$feature->{$key}->{gene}."\nNote: ".$feature->{$key}->{note});
         }
         if (exists $feature->{$key}->{transl_except}) {
-            if ($feature->{$key}->{transl_except} =~ /pos:(\d+),aa:(\w\+)/) {
+            if ($feature->{$key}->{transl_except} =~ /pos:(\d+),aa:(\w+)/) {
                 my $alt_seq;
                 my $pos = $1;
                 if ($2 eq 'TERM') {
                     $alt_seq = 'AA' if ($feature->{$key}->{transl_except} =~ /TAA/);
+                    warning("Adding SeqEdit for TAA stop codon completion by 3' AA residues addition.");
                     my $seq_edit = Bio::EnsEMBL::SeqEdit->new(
                           -CODE    => '_rna_edit', 
                           -NAME    => 'rna_edit', 
                           -DESC    => 'RNA edit', 
                           -START   => $pos,
-                          -END     => $pos, 
+                          -END     => $pos+1, 
                           -ALT_SEQ => $alt_seq
                           );
                     $translation->add_Attributes($seq_edit->get_Attribute());
@@ -443,7 +445,7 @@ for (my $index = 1; $index < $length; $index++) {
       print "Error: $@\n";
       exit;
     } 
-    printf "\t%-12s %5d\n\t%-12s %5d\n\t%-12s %s\n\t%-12s %s\n***********************************************\n\n", 'Start:',  $gene->start, 'End:', $gene->end, 'Description:', $gene->description, 'Biotype:', $gene->biotype;
+    printf "\t%-12s %s\n\t%-12s %s\n\t%-12s %5d\n\t%-12s %5d\n\t%-12s %5d\n***********************************************\n\n", 'Description:', $gene->description, 'Biotype:', $gene->biotype, 'Start:',  $gene->start, 'End:', $gene->end, 'Strand:', $gene->strand;
     ++$entry_count;
     push @genes,$gene; 
   } 
@@ -541,11 +543,8 @@ sub get_chromosomes {
 
   foreach my $cs (@{$csa->fetch_all()}) {
     my $name = $cs->name;
-    print STDERR $name, "\n";
-    print STDERR $cs->is_sequence_level, "\n";
     $name =  'top_level' if ($cs->name eq $MIT_TOPLEVEL);
     $name =  'seq_level' if ($cs->is_sequence_level);
-print STDERR keys %assembly, "\n";
     if ($assembly{$cs->name}){
       $slices{$name}  = Bio::EnsEMBL::Slice->new
       (
@@ -560,7 +559,6 @@ print STDERR keys %assembly, "\n";
     }
   }
 
-print STDERR keys %slices, "\n";
   # Die before storing anything unless you have sequences that are top level and seq level
   # Unless you only have one coord system in which case you set it to both seq and top level
   die "Cannot find seq_level coord system" unless $slices{'seq_level'};
