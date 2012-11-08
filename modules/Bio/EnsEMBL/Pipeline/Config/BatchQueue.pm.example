@@ -173,7 +173,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.42 $ 
+# $Revision: 1.43 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -192,9 +192,9 @@ use vars qw(%Config);
                           # ensembl cloud evironment
 
   DEFAULT_BATCH_SIZE  => 10,
-  DEFAULT_RETRIES     => 3,
+  DEFAULT_RETRIES     => 2,
   DEFAULT_BATCH_QUEUE => 'normal',  # Put in the queue of your choice, e.g. 'normal'
-  DEFAULT_RESOURCE    => 'select[myens_build1tok>800 && myens_build2tok>800 && myens_build3tok>800 && myens_build4tok>800 && myens_build5tok>800 && myens_build6tok>800 && myens_build7tok>800 && myens_build8tok>800] rusage[myens_build1tok=10:myens_build2tok=10:myens_build3tok=10:myens_build4tok=10:myens_build5tok=10:myens_build6tok=10:myens_build7tok=10:myens_build8tok=10]',
+  DEFAULT_RESOURCE    => 'rusage[myens_build1tok=10,myens_build2tok=10,myens_build3tok=10,myens_build4tok=10,myens_build5tok=10,myens_build6tok=10,myens_build7tok=10,myens_build8tok=10]',
   DEFAULT_SUB_ARGS    => '',
   DEFAULT_OUTPUT_DIR  => '',
   DEFAULT_CLEANUP     => 'no',
@@ -459,6 +459,9 @@ use vars qw(%Config);
       retry_resource => '',
       retry_sub_args => '',
     },
+
+#####
+# Batchqueue for the protein annotation pipeline
     {
       logic_name => 'prints',
       batch_size => 500,
@@ -548,6 +551,53 @@ use vars qw(%Config);
       retries => 2,
       output_dir => '',
     },
+#
+#####
+
+
+#####
+# Batchqueue for the ncRNA pipeline
+    {
+      logic_name => 'BlastmiRNA',
+      batch_size => 500,
+      resource   => 'select[mem>500] rusage[mem=500]',
+      retries    => 1,
+      sub_args   => '-M500000',
+      queue      => 'normal',
+    },
+    {
+      logic_name => 'RfamBlast',
+      batch_size => 300,
+      resource   => 'select[mem>500] rusage[mem=500]',
+      retries    => 1,
+      sub_args   => '-M300000',
+      queue      => 'normal',
+    },
+    {
+      logic_name => 'miRNA',
+      batch_size => 1,
+      retries    => 1,
+      resource   => 'select[mem>300] rusage[mem=300]',
+      sub_args   => '-M300000',
+      queue      => 'normal',
+    }, 
+       {
+      logic_name => 'ncRNA',
+      batch_size => 500,
+      retries    => 1,
+      resource   => 'select[mem>300] rusage[mem=300]',
+      sub_args   => '-M300000',
+      queue      => 'normal',
+    }, 
+    {
+      logic_name => 'BlastWait',
+      batch_size => 1,
+      resource   => 'linux',
+      retries    => 0,
+      queue => 'normal',
+    },
+#
+#####
 
 
   ]
