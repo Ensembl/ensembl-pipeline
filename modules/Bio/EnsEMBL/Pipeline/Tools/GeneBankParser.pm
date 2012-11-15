@@ -45,7 +45,7 @@ $Author: th3 $
 
 =head1 VERSION
 
-$Revision: 1.2 $
+$Revision: 1.3 $
 
 =cut
 
@@ -107,7 +107,7 @@ sub _parse_entry {
 
 sub _get_header {
     my $line = shift;
-    if ($line =~ /LOCUS\s+(\S+)\s+(\d+)\s+bp\s+(\w+)\s+(\w+)\s+(\w+)\s+(\S+)/i) {
+    if ($line =~ /^LOCUS\s+(\S+)\s+(\d+)\s+bp\s+(\w+)\s+(\w+)\s+(\w+)\s+(\S+)/i) {
         $HASH->{_locus_id} = $1;
         $HASH->{_length}   = $2;
         $HASH->{_molecule} = $3;
@@ -120,39 +120,39 @@ sub _get_header {
             $HASH->{-is_circular} = 0;
         }
     }
-    elsif ($line =~ /DEFINITION\s+(\S+.*\S)\s*$/i) {
+    elsif ($line =~ /^DEFINITION\s+(\S+.*\S)\s*$/i) {
         $HASH->{-definition} = $1;
     }
-    elsif ($line =~ /ACCESSION\s+(\S+)/i) {
+    elsif ($line =~ /^ACCESSION\s+(\S+)/i) {
        $HASH->{-accession} = $1;
     }
-    elsif ($line =~ /VERSION\s+\S+\.(\d+)\s+GI:(\d+)/i) {
+    elsif ($line =~ /^VERSION\s+\S+\.(\d+)\s+GI:(\d+)/i) {
         $HASH->{-version} = $1;
         $HASH->{-secondary_id} = $2;
     }
-    elsif ($line =~ /DBLINK\s+(\S+.*\S)\s*$/i) {
+    elsif ($line =~ /^DBLINK\s+(\S+.*\S)\s*$/i) {
         $HASH->{_dblink} = $1;
     }
-    elsif ($line =~ /KEYWORDS\s+([^.]*)(\.)?\s*$/i) {
+    elsif ($line =~ /^KEYWORDS\s+([^.]*)(\.)?\s*$/i) {
         push(@{$HASH->{_keywords}}, split(/;/, $1)) if ($1 ne '');
         if (!defined $2) {
             $HASH->{__hopen} = 1;
             $HASH->{__current} = '_keywords';
         }
     }
-    elsif ($line =~ /SOURCE\s+(\S+.*\S)\s*$/i) {
+    elsif ($line =~ /^SOURCE\s+(\S+.*\S)\s*$/i) {
         $HASH->{_source} = $1;
     }
     elsif ($line =~ /ORGANISM\s+(\S+.*\S)\s*$/i) {
         $HASH->{__hopen} = 1;
         $HASH->{__current} = '_taxonomy';
     }
-    elsif ($line =~ /COMMENT\s+(\S+.+)/i) {
+    elsif ($line =~ /^COMMENT\s+(\S+.+)/i) {
         $HASH->{__hopen} = 1;
         $HASH->{_comment} = $1;
         $HASH->{__current} = '_comment';
     }
-    elsif ($line =~ /REFERENCE/) {
+    elsif ($line =~ /^REFERENCE/) {
         delete $HASH->{__hopen} if ($HASH->{__hopen});
     }
     elsif (exists $HASH->{__hopen}) {
