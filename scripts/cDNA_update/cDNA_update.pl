@@ -1,6 +1,6 @@
 #!/usr/local/ensembl/bin/perl
 
-#$Id: cDNA_update.pl,v 1.85 2012-10-31 14:17:07 th3 Exp $
+#$Id: cDNA_update.pl,v 1.86 2012-11-21 13:55:08 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -2336,9 +2336,10 @@ sub sync_databases {
     # Copy analysis entries (and others, just to make sure)
     my $tables_to_copy =  'analysis '           . 'assembly '
                         . 'assembly_exception ' . 'attrib_type '
-                        . 'coord_system '       . 'meta '
-                        . 'meta_coord '         . 'seq_region '
-                        . 'seq_region_attrib';
+                        . 'coord_system '       . 'karyotype'
+                        . 'meta '               . 'mapping_set'
+                        . 'seq_region '         . 'seq_region_attrib'
+                        . 'seq_region_synonym';
 
     # Dump the tables from ref db
     # 3 = file count
