@@ -135,7 +135,6 @@ use List::Util 'max';
 use Time::HiRes 'usleep';
 
 use Bio::Otter::Lace::Defaults;
-use Bio::Otter::Lace::PipelineDB;
 
 use Bio::EnsEMBL::Pipeline::Config::General   qw( PIPELINE_OUTPUT_DIR );
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue qw( DEFAULT_OUTPUT_DIR );
@@ -185,8 +184,7 @@ sub _pipe_dba {
       unless $opt{dataset};
     my $cl = Bio::Otter::Lace::Defaults::make_Client();
     my $ds = $cl->get_DataSet_by_name($opt{dataset});
-    my $otter_dba = $ds->get_cached_DBAdaptor;
-    return Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($otter_dba);
+    return $ds->get_pipeline_DBAdaptor(1);
 }
 
 

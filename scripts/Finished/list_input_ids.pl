@@ -47,7 +47,6 @@ use strict;
 use warnings;
 
 use Bio::Otter::Lace::Defaults;
-use Bio::Otter::Lace::PipelineDB;
 
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
@@ -99,8 +98,6 @@ sub main {
 
     # DataSet interacts directly with an otter database
     my $ds = $cl->get_DataSet_by_name($dataset_name);
-
-    my $otter_dba = $ds->get_cached_DBAdaptor;
     my $pipe_dba = $ds->get_pipeline_DBAdaptor(1);
 
     my $exit = 0; # set bits on fail, per slice

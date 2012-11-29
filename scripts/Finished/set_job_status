@@ -34,7 +34,6 @@ use strict;
 use warnings;
 
 use Bio::Otter::Lace::Defaults;
-use Bio::Otter::Lace::PipelineDB;
 use Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 
 use Bio::EnsEMBL::Utils::Exception qw(throw);
@@ -60,8 +59,7 @@ sub main {
 
     my $cl = Bio::Otter::Lace::Defaults::make_Client();
     my $ds = $cl->get_DataSet_by_name($opt{dataset});
-    my $otter_dba = $ds->get_cached_DBAdaptor;
-    my $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($otter_dba);
+    my $pipe_dba = $ds->get_pipeline_DBAdaptor(1);
 
     my @job_created = set_status($pipe_dba, $opt{status}, @job_id);
 
