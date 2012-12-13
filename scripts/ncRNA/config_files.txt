@@ -128,14 +128,13 @@ use vars qw(%Config);
     {
       logic_name => 'miRNA',
       batch_size => 1,
-      retries    => 1,
-      resource   => 'select[mem>300] rusage[mem=300]',
-      sub_args   => '-M300000',
+      retries    => 0,
+      memory     => '2GB',
       queue      => 'normal',
       output_dir => '<DATADIR>/<species>/miRNA',
       cleanup    => 'no',
     }, 
-       {
+    {
       logic_name => 'ncRNA',
       batch_size => 500,
       retries    => 1,
