@@ -1,8 +1,5 @@
 #! /software/bin/perl-5.12.2
 
-use strict;
-use warnings;
-
 =head1 NAME
 
 job_output_files - operate on files for job.std{out,err}_file
