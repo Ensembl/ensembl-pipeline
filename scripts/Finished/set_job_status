@@ -1,4 +1,4 @@
-#!/software/bin/perl
+#!/software/bin/perl-5.12.2
 
 =head1 NAME
 
@@ -24,6 +24,8 @@ pipe_queue, across a database server.
     -status             new job_status.status value
     -requeue            also add CREATED jobs to pipe_queue
 
+job_id may be space and/or comma separated.
+
 =head1 AUTHOR
 
 Matthew Astley mca@sanger.ac.uk
@@ -44,12 +46,10 @@ sub main {
     Bio::Otter::Lace::Defaults::do_getopt
         ('dataset|D=s'   => \$opt{dataset},
          'status|S=s'    => \$opt{status},
-         'requeue|Q!'    => \$opt{requeue},
-         'h|help'        => \$opt{help});
+         'requeue|Q!'    => \$opt{requeue});
+    # help & syntax error are handled
 
-    exec(perldoc => $0) if $opt{help};
-
-    my @job_id = @ARGV;
+    my @job_id = split /[ ,]/, join ' ', @ARGV;
     if (my @not_id = grep { ! /^\d+$/ } @job_id) {
         die "Bad job_id @not_id";
     }
