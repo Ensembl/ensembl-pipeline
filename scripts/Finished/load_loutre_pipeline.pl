@@ -182,13 +182,12 @@ push @$dbas, $dba;
 
 my $pipe_dba;
 if ($do_pipe) {
-    my $meta_container = $dba->get_MetaContainer();
-    my ($pipe_param) = @{ $meta_container->list_value_by_key('pipeline_db_rw_head') };
-    if ($pipe_param) {
-        $pipe_dba = Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor->new(eval $pipe_param);
+    require Bio::Otter::Lace::PipelineDB;
+    $pipe_dba = Bio::Otter::Lace::PipelineDB::get_pipeline_rw_DBAdaptor($dba);
+
+    if ($pipe_dba) {
         push @$dbas, $pipe_dba;
-    }
-    else {
+    } else {
         throw(
 "You need to add the meta key 'pipeline_db_rw_head' in ${host}/${name} or unset the do_pipe option to populate ${host}/${name} only\n"
         );
