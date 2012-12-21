@@ -1,4 +1,7 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/find_N.pl,v $
+# $Revision: 1.2 $
+use warnings ;
 use strict;
 
 #script to parse a fasta file and identify sequences with large strings of 'N's

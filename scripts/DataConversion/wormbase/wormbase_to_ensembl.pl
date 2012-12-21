@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/wormbase/wormbase_to_ensembl.pl,v $
+# $Revision: 1.19 $
 
 =pod
 

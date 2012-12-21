@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/comparison.pl,v $
+# $Revision: 1.5 $
 
 =pod
 

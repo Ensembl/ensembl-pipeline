@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/genoscope2simpleGFF.pl,v $
+# $Revision: 1.2 $
  
+use warnings ;
 use strict;
  
 use Getopt::Long;

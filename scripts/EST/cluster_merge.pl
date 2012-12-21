@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl  -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/cluster_merge.pl,v $
+# $Revision: 1.7 $
 
 ############################################################
 # script to run the ClusterMerge Algorithm (Eduardo Eyras)
@@ -9,6 +11,7 @@
 #
 ############################################################
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;

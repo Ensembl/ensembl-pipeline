@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/setup_orthologue_evaluator.pl,v $
+# $Revision: 1.21 $
 
 =pod
 

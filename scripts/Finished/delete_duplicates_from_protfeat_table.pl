@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/delete_duplicates_from_protfeat_table.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 use Getopt::Long 'GetOptions';
 use DBI;

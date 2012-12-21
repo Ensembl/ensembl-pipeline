@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/prepare_PSILC.pl,v $
+# $Revision: 1.2 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

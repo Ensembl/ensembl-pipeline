@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl 
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/job_submission.pl,v $
+# $Revision: 1.10 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

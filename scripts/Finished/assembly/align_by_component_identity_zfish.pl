@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/align_by_component_identity_zfish.pl,v $
+# $Revision: 1.15 $
 
 =head1 NAME
 

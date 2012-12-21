@@ -1,9 +1,12 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/snp_ssaha_match.pl,v $
+# $Revision: 1.7 $
 #
 #This script run after snp_cross_match.pl. snp_cross_match.pl generate a list of refsnpid for which none of the clones #are on GP. snp_ssaha_match.pl by using ssaha method to locate the contigs on GP and then use cross_match to find
 #snp position
 #
 
+use warnings ;
 use strict;
 use IPC::Open2; 
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossSNPMap;

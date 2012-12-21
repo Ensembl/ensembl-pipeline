@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/bsub_for_getting_chr_sequence.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 use IO::File;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

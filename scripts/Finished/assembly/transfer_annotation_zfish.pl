@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/transfer_annotation_zfish.pl,v $
+# $Revision: 1.20 $
 
 =head1 NAME
 

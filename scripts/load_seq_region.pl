@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_seq_region.pl,v $
+# $Revision: 1.19 $
 
 =head1 NAME
 
@@ -67,6 +69,7 @@ table. T
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/submit_prot_analysis.pl,v $
+# $Revision: 1.10 $
 # Author: Emmanuel Mongin
 # Creation: 03.19.2001
 
@@ -24,6 +26,7 @@ This script will submit run_protein_RunnableDB
 
 =cut
 
+use warnings ;
 use strict;
 
 BEGIN {

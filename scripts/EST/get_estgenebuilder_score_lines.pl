@@ -1,4 +1,7 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_estgenebuilder_score_lines.pl,v $
+# $Revision: 1.2 $
+use warnings ;
 use strict;
 
 open LS, 'ls -R |' or die "Can't open pipe from ls : $!";

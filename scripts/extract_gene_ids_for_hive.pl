@@ -1,10 +1,13 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extract_gene_ids_for_hive.pl,v $
+# $Revision: 1.4 $
 
 # Usage: ./extract_gene_ids_for_hive.pl -analysis_id <number - optional>
 #                                       -status <status string - optional> 
 #                                       -file <filename - fasta file from blast db>
 #                                       > <output file>
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

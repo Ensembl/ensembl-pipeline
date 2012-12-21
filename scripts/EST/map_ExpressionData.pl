@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/map_ExpressionData.pl,v $
+# $Revision: 1.8 $
 
 
 =head1 NAME
@@ -31,6 +33,7 @@ this is a clone of run_EST_RunnableDB
     -analysis  The number of the analysisprocess we want to run
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

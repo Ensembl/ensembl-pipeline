@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/collect_PseudoGeneLabelling_output.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 
 # script to collect the output lines

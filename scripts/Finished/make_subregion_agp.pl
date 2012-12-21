@@ -1,4 +1,6 @@
-#!/software/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/make_subregion_agp.pl,v $
+# $Revision: 1.5 $
 
 =head1 NAME
 
@@ -71,6 +73,7 @@ Mustapha Larbaoui B<email> ml6@sanger.ac.uk
 
 =cut
 
+use warnings ;
 use strict;
 
 use Getopt::Long;

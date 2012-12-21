@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl  -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/wormbase/rnai_store.pl,v $
+# $Revision: 1.7 $
 
+use warnings ;
 use strict;
 use WormBase;
 use WormBaseConf;

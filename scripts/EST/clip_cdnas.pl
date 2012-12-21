@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/clip_cdnas.pl,v $
+# $Revision: 1.4 $
 
 # script to clip the ends of the given fasta file of cDNAs
 # clipping can be hard (physically remove bases; default) or
@@ -8,6 +10,7 @@
 # range and polya clipping are asked for, the range clipping
 # is performed first.  
 
+use warnings ;
 use strict; 
 use Getopt::Long;
 use Bio::Seq;

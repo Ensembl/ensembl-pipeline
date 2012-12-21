@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_human_ests.pl,v $
+# $Revision: 1.14 $
 
 =head1 NAME
 
@@ -20,6 +22,7 @@
 =cut
 
 
+use warnings ;
 use strict; 
 use Getopt::Long;
 use Bio::Seq;

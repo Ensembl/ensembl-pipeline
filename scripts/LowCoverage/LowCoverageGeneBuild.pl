@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/LowCoverage/LowCoverageGeneBuild.pl,v $
+# $Revision: 1.18 $
 
 =pod
 

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/find_pairs_cDNA_exonerate.pl,v $
+# $Revision: 1.3 $
 
 =head1 NAME
 
@@ -24,6 +26,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::ESTConf;
 use Getopt::Long;

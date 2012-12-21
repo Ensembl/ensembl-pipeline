@@ -1,7 +1,10 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_transcript_structures.pl,v $
+# $Revision: 1.5 $
 
 # script to dump info for the Oxford guys, for the Rat genome project
 
+use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/run_exonerate.pl,v $
+# $Revision: 1.3 $
 
 =head1 NAME
 
@@ -18,6 +20,7 @@ run_blat
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::SeqIO;

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/medaka/load_medaka.pl,v $
+# $Revision: 1.8 $
 
 =head1 NAME
 
@@ -13,6 +15,7 @@ Parses predicted medaka genes out of the given GFF file and writes them to the $
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

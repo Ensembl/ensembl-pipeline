@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rule_checker.pl,v $
+# $Revision: 1.2 $
 
+use warnings ;
 use strict;
 use Node;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;

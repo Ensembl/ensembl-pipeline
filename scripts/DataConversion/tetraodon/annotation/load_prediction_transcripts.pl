@@ -1,7 +1,10 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_prediction_transcripts.pl,v $
+# $Revision: 1.2 $
 
 ### gtf2ensembl
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

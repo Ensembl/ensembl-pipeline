@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/make_estgenebuilder_bsubs.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -21,6 +23,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

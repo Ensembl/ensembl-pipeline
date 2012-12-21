@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/make_input_ids_for_similarity_build.pl,v $
+# $Revision: 1.21 $
 
 =head1 NAME
 
@@ -17,6 +19,7 @@ make_input_ids_for_similarity_build.pl
 
 =cut
 
+use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;

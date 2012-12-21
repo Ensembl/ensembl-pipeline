@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_agp.pl,v $
+# $Revision: 1.16 $
 
 
 =head1 NAME
@@ -43,6 +45,7 @@ here is an example commandline
     -help      displays this documentation with PERLDOC
 
 =cut
+use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;

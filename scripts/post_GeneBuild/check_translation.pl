@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_translation.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 
@@ -17,6 +19,7 @@ It\'s a stripped down version of gene2flat.
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

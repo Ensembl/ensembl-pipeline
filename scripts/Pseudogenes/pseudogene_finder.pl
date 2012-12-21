@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/pseudogene_finder.pl,v $
+# $Revision: 1.5 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::PseudoGenes;						     

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_cDNA_exonerate.pl,v $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -22,6 +24,7 @@ compare_cDNA_exonerate.pl
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (

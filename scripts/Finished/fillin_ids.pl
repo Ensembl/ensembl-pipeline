@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/fillin_ids.pl,v $
+# $Revision: 1.2 $
 #
 # fill ids into input_id_analysis table
 # 17.10.2002 Kerstin Jekosch [kj2@sanger.ac.uk]
@@ -7,6 +9,7 @@
 # Added to cvs the 11st of May 2010 by ml6
 # This script is used during the preparation of the Vega database before running the protein pipeline
 
+use warnings ;
 use strict;
 use DBI;
 use Getopt::Long 'GetOptions';

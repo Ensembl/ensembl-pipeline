@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_test_compara.pl,v $
+# $Revision: 1.5 $
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;

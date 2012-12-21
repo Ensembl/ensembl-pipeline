@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/mRNA/get_cdnas_from_EMBL.pl,v $
+# $Revision: 1.5 $
 
 =head1 NAME
 
@@ -20,6 +22,7 @@
 =cut
 
 
+use warnings ;
 use strict; 
 use Getopt::Long;
 use Bio::Seq;

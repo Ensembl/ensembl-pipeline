@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/predict_ncRNA.pl,v $
+# $Revision: 1.19 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);

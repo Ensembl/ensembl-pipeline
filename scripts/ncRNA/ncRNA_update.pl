@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/ncRNA_update.pl,v $
+# $Revision: 1.43 $
 
 
+use warnings ;
 use ncRNA_update_config; 
 use strict;
 use vars qw(%Config);

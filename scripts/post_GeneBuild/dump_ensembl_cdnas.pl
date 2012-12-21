@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_cdnas.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -10,6 +12,7 @@ dumps in Fastaa format the cdnas of all the genes in a database specified
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

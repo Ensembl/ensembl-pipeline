@@ -1,9 +1,12 @@
-#!/usr/local/ensembl/bin/perl -w 
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/why_cdnas_didnt_hit.pl,v $
+# $Revision: 1.2 $
 
 #script to gather evidence from the various analyses I have run to determine why cDNAs have no alignments in the db
 
 #perl identify_hit_failings.pl 
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 

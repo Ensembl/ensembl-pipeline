@@ -1,9 +1,12 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_compara.pl,v $
+# $Revision: 1.4 $
 
 # EXIT STATUS
 # 0 all is fine
 # 1 Problem in parsing input file
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;

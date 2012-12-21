@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/AlignWise/run_alignwise.pl,v $
+# $Revision: 1.3 $
 
 ############################################################
 # script to get a multiple alignment from a set of species
@@ -9,6 +11,7 @@
 #
 # the multiple alignment is used to run alignwise
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;

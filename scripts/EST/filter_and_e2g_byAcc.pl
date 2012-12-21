@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/filter_and_e2g_byAcc.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 
@@ -21,6 +23,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (

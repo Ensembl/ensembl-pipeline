@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_Exons.pl,v $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -15,6 +17,7 @@ and reads as input an input_id in the style of other Runnables, i.e. -input_id c
 
 =cut
 
+use warnings ;
 use strict;  
 use diagnostics;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

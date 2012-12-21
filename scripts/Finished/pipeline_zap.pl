@@ -1,4 +1,6 @@
-#! /software/bin/perl-5.12.2
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/pipeline_zap.pl,v $
+# $Revision: 1.2 $
 use strict;
 use warnings;
 

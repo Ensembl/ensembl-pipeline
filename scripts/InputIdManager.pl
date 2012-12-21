@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/InputIdManager.pl,v $
+# $Revision: 1.3 $
 
 
 # InputIdManager.pl
@@ -60,6 +62,7 @@ Insert list of bugs here!
 =cut
 
 
+use warnings ;
 use strict;
 use FileHandle;
 use Getopt::Long;

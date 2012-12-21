@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rework_paralogues_data.pl,v $
+# $Revision: 1.5 $
 
+use warnings ;
 use strict;
 
 my $input_dir = shift @ARGV;

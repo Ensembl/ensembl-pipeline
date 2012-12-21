@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/check_repeat_masked.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 

@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/assembly/extract_ultracontigs.pl,v $
+# $Revision: 1.2 $
 
 
 while(<>) {

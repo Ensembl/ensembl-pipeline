@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/make_PseudoGeneFinder_bsubs.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 
@@ -21,6 +23,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

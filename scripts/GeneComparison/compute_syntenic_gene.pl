@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compute_syntenic_gene.pl,v $
+# $Revision: 1.4 $
 
+use warnings ;
 use strict;  
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;

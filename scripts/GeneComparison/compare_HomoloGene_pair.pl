@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_HomoloGene_pair.pl,v $
+# $Revision: 1.11 $
 
 
+use warnings ;
 use strict;
 
 use Getopt::Long;

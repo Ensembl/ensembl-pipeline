@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/update_pseudogenes.pl,v $
+# $Revision: 1.2 $
 
 =head1 OPTIONS
 
@@ -20,6 +22,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;

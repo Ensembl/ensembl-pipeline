@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/find_big_clusters.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 
 my $MAX_CLUSTER_SIZE = 50;

@@ -1,9 +1,12 @@
-#!/software/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/run_prot_pipeline.pl,v $
+# $Revision: 1.8 $
 
 
 # Author: ck1@sanger.ac.uk
 # Modified by ml6@sanger.ac.uk
 
+use warnings ;
 use strict;
 use Getopt::Long 'GetOptions';
 use DBI;

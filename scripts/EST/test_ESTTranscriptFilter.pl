@@ -1,4 +1,7 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/test_ESTTranscriptFilter.pl,v $
+# $Revision: 1.4 $
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;

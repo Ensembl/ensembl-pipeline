@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/lsf_submission.pl,v $
+# $Revision: 1.9 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);

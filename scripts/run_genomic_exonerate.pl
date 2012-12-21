@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_genomic_exonerate.pl,v $
+# $Revision: 1.2 $
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::ExonerateGenomic;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

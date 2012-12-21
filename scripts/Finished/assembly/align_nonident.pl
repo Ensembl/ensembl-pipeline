@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/align_nonident.pl,v $
+# $Revision: 1.19 $
 
 =head1 NAME
 

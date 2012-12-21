@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
+# $Revision: 1.29 $
 
 =head1 Synopsis
 
@@ -15,6 +17,7 @@ All configuration is done through MitConf.pm
 
 =cut
 
+use warnings ;
 use strict;
 use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

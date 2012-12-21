@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extra_database_setup.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -96,6 +98,7 @@ finds any duplicated lines between your dumped files and the database you
 are loading into it will not load the duplicate lines but instead skip them
 
 =cut
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

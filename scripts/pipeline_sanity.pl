@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl 
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/pipeline_sanity.pl,v $
+# $Revision: 1.9 $
 # this is a script to check pipeline sanity before you run your pipeline
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;

@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/reverse_existing_mapping.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 

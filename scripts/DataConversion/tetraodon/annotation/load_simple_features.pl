@@ -1,10 +1,13 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_simple_features.pl,v $
+# $Revision: 1.2 $
 
 # load_align_features.pl
 #
 # Loads a 'extended' GFF file containing DNA/Protein align features 
 # Alignments themselves will not be stored. 
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/make_bsubs_compare_HomoloGene_pairs.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;  
 use Bio::EnsEMBL::Pipeline::GeneComparison::ObjectMap;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;

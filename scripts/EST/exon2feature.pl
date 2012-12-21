@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/exon2feature.pl,v $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -22,6 +24,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Getopt::Long;

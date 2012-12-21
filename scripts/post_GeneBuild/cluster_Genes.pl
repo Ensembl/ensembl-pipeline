@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/cluster_Genes.pl,v $
+# $Revision: 1.3 $
 
 =head1 NAME
 
@@ -15,6 +17,7 @@ them into genes.
 
 =cut
 
+use warnings ;
 use strict;  
 use diagnostics;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

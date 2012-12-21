@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_firstef.pl,v $
+# $Revision: 1.3 $
 
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF;

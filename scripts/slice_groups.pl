@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/slice_groups.pl,v $
+# $Revision: 1.2 $
 
 # This script generates groups of toplevel slices from a
 # database, ensuring that each group is no bigger than
@@ -9,6 +11,7 @@
 # in the given directory
 
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/get_transcripts_with_this_evidence.pl,v $
+# $Revision: 1.6 $
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

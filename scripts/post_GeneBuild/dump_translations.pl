@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_translations.pl,v $
+# $Revision: 1.2 $
 
 
 =head1 NAME
@@ -18,6 +20,7 @@ This info is specified in the command line
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

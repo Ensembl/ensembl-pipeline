@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ExonerateArray.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::Exonerate2Array;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

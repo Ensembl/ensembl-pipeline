@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/test_ClusterMerge.pl,v $
+# $Revision: 1.5 $
 
 
+use warnings ;
 use strict;
 use diagnostics;
 

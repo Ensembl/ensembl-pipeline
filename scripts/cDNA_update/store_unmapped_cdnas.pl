@@ -1,8 +1,11 @@
-#!/usr/local/ensembl/bin/perl -w 
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/store_unmapped_cdnas.pl,v $
+# $Revision: 1.11 $
 
 #script to gather evidence from the various analyses run to determine why cDNAs have no alignments in the db
 #store this into the database
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::KillList::KillList;
 use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;

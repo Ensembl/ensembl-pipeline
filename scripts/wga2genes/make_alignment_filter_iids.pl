@@ -1,5 +1,8 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/wga2genes/make_alignment_filter_iids.pl,v $
+# $Revision: 1.3 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

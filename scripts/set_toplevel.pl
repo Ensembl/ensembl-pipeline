@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/set_toplevel.pl,v $
+# $Revision: 1.8 $
 
 =head1 NAME
 

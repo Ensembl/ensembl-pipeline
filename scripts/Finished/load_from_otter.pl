@@ -1,4 +1,6 @@
-#!/software/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_from_otter.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -58,6 +60,7 @@ Mustapha Larbaoui B<email> ml6@sanger.ac.uk
 
 =cut
 
+use warnings ;
 use strict;
 
 use Getopt::Long;

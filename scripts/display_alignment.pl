@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/display_alignment.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -79,6 +81,7 @@ File where alignment will be saved.
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;

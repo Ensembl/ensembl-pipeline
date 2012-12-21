@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/transfer_annotation_logfilter.pl,v $
+# $Revision: 1.10 $
 
 use strict;
 use warnings;

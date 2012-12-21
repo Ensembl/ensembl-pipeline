@@ -1,4 +1,7 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/check_estgenebuilder_jobs.pl,v $
+# $Revision: 1.6 $
+use warnings ;
 use strict;
 
 ### usage: /dir/where the /chr/dirs/sit/> ~/ensembl-scripts/check_estgenebuilder_jobs.pl

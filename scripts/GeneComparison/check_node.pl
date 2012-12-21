@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/check_node.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 
@@ -18,6 +20,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf qw (
 							     COMP_cDNA_CHUNKDIR

@@ -1,5 +1,7 @@
 #!/usr/bin/env perl
-# $Id: analysis_setup.pl,v 1.11 2012-07-09 13:56:16 ak4 Exp $
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/analysis_setup.pl,v $
+# $Revision: 1.12 $
+# $Id: analysis_setup.pl,v 1.12 2012-12-21 14:40:14 rn6 Exp $
 
 # POD documentation - main docs before the code
 

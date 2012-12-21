@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_GeneCombiner.pl,v $
+# $Revision: 1.7 $
 
 
 =head1 NAME
@@ -31,6 +33,7 @@ run_GeneCombiner.pl
     -analysis  The number of the analysisprocess we want to run
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

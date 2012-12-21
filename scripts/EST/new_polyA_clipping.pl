@@ -1,4 +1,7 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/new_polyA_clipping.pl,v $
+# $Revision: 1.21 $
+use warnings ;
 use strict;
 
 =pod

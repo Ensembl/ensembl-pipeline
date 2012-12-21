@@ -1,10 +1,13 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/alignment_squiz.pl,v $
+# $Revision: 1.3 $
 
 # A fairly hacky script to scan through a bunch of alignments
 # and dig out the odd looking ones.
 
 # This script contains a goodly amount of hard-coding.  Beware.
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;

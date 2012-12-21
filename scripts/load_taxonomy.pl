@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_taxonomy.pl,v $
+# $Revision: 1.13 $
 
 #this is a copy of sections of /ensembl-compara/scripts/taxonomy/taxonTreeTool.pl
 #uses -dbname style commands 
@@ -11,6 +13,7 @@
 #ncbi_taxonomy -lcdbhost ia64g -lcdbport 3306 -lcdbname sd3_tenrec_1_ref -lcdbuser ensadmin \
 #-lcdbpass ****
 
+use warnings ;
 use strict;
 use Switch;
 use Getopt::Long;

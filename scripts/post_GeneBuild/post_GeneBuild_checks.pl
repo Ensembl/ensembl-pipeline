@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/post_GeneBuild_checks.pl,v $
+# $Revision: 1.10 $
 
 =head1 NAME
 
@@ -35,6 +37,7 @@ GeneBuild::GeneBuilder::GB_FINAL_GENETYPE
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

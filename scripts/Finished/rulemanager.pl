@@ -1,5 +1,8 @@
-#!/software/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/rulemanager.pl,v $
+# $Revision: 1.23 $
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);

@@ -1,6 +1,9 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/chunk_protein_file.pl,v $
+# $Revision: 1.5 $
 
 
+use warnings ;
 use strict;
 use Getopt::Long 'GetOptions';
 use DBI;

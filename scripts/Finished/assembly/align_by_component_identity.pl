@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/align_by_component_identity.pl,v $
+# $Revision: 1.36 $
 
 
 my $component_cs = 'contig';    # 'contig' or 'clone'

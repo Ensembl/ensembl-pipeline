@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/RuleHandler.pl,v $
+# $Revision: 1.18 $
 
 =head1 NAME
 
@@ -50,6 +52,7 @@ RuleHandler.pl -optio
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 

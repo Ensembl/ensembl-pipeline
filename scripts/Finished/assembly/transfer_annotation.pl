@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/transfer_annotation.pl,v $
+# $Revision: 1.43 $
 
 =head1 NAME
 

@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/genoscope2alignGFF.pl,v $
+# $Revision: 1.3 $
  
+use warnings ;
 use strict;
  
 use Getopt::Long;

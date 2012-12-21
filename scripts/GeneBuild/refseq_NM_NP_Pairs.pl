@@ -1,4 +1,7 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/refseq_NM_NP_Pairs.pl,v $
+# $Revision: 1.3 $
+use warnings ;
 use strict;
 use Getopt::Long;
 

@@ -1,4 +1,6 @@
-#!/software/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/create_agp_from_scaffold.pl,v $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -47,6 +49,7 @@ Mustapha Larbaoui B<email> ml6@sanger.ac.uk
 
 =cut
 
+use warnings ;
 use strict;
 
 use Getopt::Long;

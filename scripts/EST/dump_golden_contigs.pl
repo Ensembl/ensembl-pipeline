@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/dump_golden_contigs.pl,v $
+# $Revision: 1.6 $
 
 =head1 NAME
 
@@ -21,6 +23,7 @@
 
 =cut
 
+use warnings ;
 use strict;
 use Getopt::Long;
 use Bio::SeqIO;

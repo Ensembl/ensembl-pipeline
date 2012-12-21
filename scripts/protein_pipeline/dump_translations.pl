@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/dump_translations.pl,v $
+# $Revision: 1.18 $
 
 =head1 NAME
 
@@ -16,6 +18,7 @@ dump_translations.pl dumps out the translations of all the genes in a database.
 
 =cut
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

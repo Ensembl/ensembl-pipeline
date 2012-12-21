@@ -1,4 +1,6 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/snp_cross_match.pl,v $
+# $Revision: 1.3 $
 #
 #This version store all data from dbSNP as a hash, keyed by refsnpid.
 #go through all data to find the same version first.
@@ -7,6 +9,7 @@
 #then use find_diff_entries.pl to get a set unique entries to be read into dbSNP
 
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossSNPMap;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

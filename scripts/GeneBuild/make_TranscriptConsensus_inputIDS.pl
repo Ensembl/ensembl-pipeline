@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/make_TranscriptConsensus_inputIDS.pl,v $
+# $Revision: 1.6 $
 
 
 =head1 NAME

@@ -1,8 +1,11 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ModelTraining/genewise_splice_site.pl,v $
+# $Revision: 1.3 $
 #This script will produce 2 files (5' and 3' splice site regions).
 #These 2 files can then be used to create a genewise gene.stat model
 #Contact dev@ensembl.org
 
+use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

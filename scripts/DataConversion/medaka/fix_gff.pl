@@ -1,4 +1,6 @@
-#!/usr/local/ensembl/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/medaka/fix_gff.pl,v $
+# $Revision: 1.2 $
 
 =head1 NAME
 
@@ -11,6 +13,7 @@ Checks that all CDS have length divisible by 3
 
 =cut
 
+use warnings ;
 use strict;
 use MedakaConf;
 use Getopt::Long;

@@ -1,4 +1,6 @@
-#!/software/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/dequeuer.pl,v $
+# $Revision: 1.30 $
 
 =pod
 
@@ -65,6 +67,7 @@ Mustapha Larbaoui B<email> ml6@sanger.ac.uk
 
 =cut
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::General;

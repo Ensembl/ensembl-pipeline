@@ -1,4 +1,7 @@
-#!/usr/local/bin/perl -w
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_estlengths.pl,v $
+# $Revision: 1.3 $
+use warnings ;
 use strict;
 $|=1;
 use Getopt::Long;

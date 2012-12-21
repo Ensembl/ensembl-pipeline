@@ -1,5 +1,8 @@
-#!/usr/local/bin/perl
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/transfer_ncRNAs.pl,v $
+# $Revision: 1.47 $
 
+use warnings ;
 use strict;
 use ncRNA_update_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
