@@ -112,7 +112,7 @@ viewer, such as SeaView or JalView.
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/EvidenceAlignment.pm,v $
-# $Version: $
+# $Revision: 1.52 $
 package Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 
 use vars qw(@ISA);

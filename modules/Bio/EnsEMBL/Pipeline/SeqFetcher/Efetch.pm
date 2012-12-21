@@ -43,7 +43,7 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Efetch.pm,v $
-# $Version: $
+# $Revision: 1.7 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Efetch;
 
 use warnings ;

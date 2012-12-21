@@ -1,5 +1,5 @@
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Finished_Dfetch.pm,v $
-# $Version: $
+# $Revision: 1.15 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch;
 
 use warnings ;

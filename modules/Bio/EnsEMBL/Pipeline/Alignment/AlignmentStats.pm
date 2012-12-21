@@ -123,7 +123,7 @@ mapped to a given transcript.
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/AlignmentStats.pm,v $
-# $Version: $
+# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::Alignment::AlignmentStats;
 
 use warnings ;

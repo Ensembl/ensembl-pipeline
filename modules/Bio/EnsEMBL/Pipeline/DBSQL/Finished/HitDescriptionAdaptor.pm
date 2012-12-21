@@ -2,7 +2,7 @@
 ### Bio::EnsEMBL::Pipeline::DBSQL::Finished::HitDescriptionAdaptor
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/HitDescriptionAdaptor.pm,v $
-# $Version: $
+# $Revision: 1.3 $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::HitDescriptionAdaptor;
 
 use warnings ;

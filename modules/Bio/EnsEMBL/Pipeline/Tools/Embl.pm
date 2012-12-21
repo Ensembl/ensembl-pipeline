@@ -34,7 +34,7 @@ Designed to only read one embl entry @ a time, as they can be big.
 =cut
 
 # $Source: $
-# $Version: $
+# $Revision: $
 package Bio::EnsEMBL::Pipeline::Tools::Embl;
 
 ### embl ###

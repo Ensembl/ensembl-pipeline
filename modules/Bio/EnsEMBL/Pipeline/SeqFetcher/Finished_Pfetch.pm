@@ -1,6 +1,6 @@
 
 # $Source: $
-# $Version: $
+# $Revision: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 
 use warnings ;

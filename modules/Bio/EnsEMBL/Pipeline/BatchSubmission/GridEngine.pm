@@ -62,7 +62,7 @@ methods are usually preceded with a _
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/GridEngine.pm,v $
-# $Version: $
+# $Revision: 1.10 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
 
 use warnings ;

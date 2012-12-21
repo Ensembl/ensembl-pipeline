@@ -46,7 +46,7 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::PAML -
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/PAML.pm,v $
-# $Version: $
+# $Revision: 1.8 $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::PAML;
 
 use warnings ;

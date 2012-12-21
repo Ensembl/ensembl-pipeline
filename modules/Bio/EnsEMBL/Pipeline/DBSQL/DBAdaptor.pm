@@ -48,7 +48,7 @@ Internal methods are usually preceded with a _
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/DBAdaptor.pm,v $
-# $Version: $
+# $Revision: 1.25 $
 package Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 

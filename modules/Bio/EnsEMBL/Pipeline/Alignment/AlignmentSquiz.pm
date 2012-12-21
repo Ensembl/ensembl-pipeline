@@ -38,7 +38,7 @@ AlignmentSquizz -
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/AlignmentSquiz.pm,v $
-# $Version: $
+# $Revision: 1.5 $
 package AlignmentSquizz;
 
 sub new {

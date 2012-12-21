@@ -1,5 +1,5 @@
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/PipeQueue.pm,v $
-# $Version: $
+# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 
 =head1 NAME

@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Tools::MM_Taxonomy -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Tools/MM_Taxonomy.pm,v $
-# $Version: $
+# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::Tools::MM_Taxonomy;
 
 use warnings ;

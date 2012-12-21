@@ -2,7 +2,7 @@
 ### Bio::EnsEMBL::Pipeline::Finished::HitDescription
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/HitDescription.pm,v $
-# $Version: $
+# $Revision: 1.3 $
 package Bio::EnsEMBL::Pipeline::Finished::HitDescription;
 
 use warnings ;

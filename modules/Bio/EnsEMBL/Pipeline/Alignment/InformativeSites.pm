@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Alignment::InformativeSites -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/InformativeSites.pm,v $
-# $Version: $
+# $Revision: 1.8 $
 package Bio::EnsEMBL::Pipeline::Alignment::InformativeSites;
 
 use warnings ;

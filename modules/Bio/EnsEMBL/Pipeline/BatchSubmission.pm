@@ -81,7 +81,7 @@ methods are usually preceded with a _
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission.pm,v $
-# $Version: $
+# $Revision: 1.22 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission;
 
 

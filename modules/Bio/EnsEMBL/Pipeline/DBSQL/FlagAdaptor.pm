@@ -40,7 +40,7 @@ Internal methods are usually preceded with a _
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/FlagAdaptor.pm,v $
-# $Version: $
+# $Revision: 1.10 $
 package Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor;
 
 use warnings ;

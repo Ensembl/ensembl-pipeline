@@ -49,7 +49,7 @@ The rest of the documentation details each of the object methods. Internal metho
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/AnalysisAdaptor.pm,v $
-# $Version: $
+# $Revision: 1.22 $
 package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 
 use warnings ;

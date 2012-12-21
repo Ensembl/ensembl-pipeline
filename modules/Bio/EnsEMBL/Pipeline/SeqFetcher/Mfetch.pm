@@ -49,10 +49,10 @@ rearrange(order, list); #instead
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Mfetch.pm,v $
-# $Revision: 1.23 $ 
+# $Revision: 1.24 $ 
 
 # Let the code begin...
-# $Version: $
+# $Revision: 1.24 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Mfetch;
 
 use strict;

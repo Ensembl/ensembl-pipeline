@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Analysis -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Analysis.pm,v $
-# $Version: $
+# $Revision: 1.18 $
 package Bio::EnsEMBL::Pipeline::Analysis;
 
 use warnings ;

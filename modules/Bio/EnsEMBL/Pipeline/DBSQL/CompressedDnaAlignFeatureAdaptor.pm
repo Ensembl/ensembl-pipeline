@@ -46,7 +46,7 @@ compressed
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/CompressedDnaAlignFeatureAdaptor.pm,v $
-# $Version: $
+# $Revision: 1.5 $
 package Bio::EnsEMBL::Pipeline::DBSQL::CompressedDnaAlignFeatureAdaptor;
 use warnings ;
 use vars qw(@ISA);

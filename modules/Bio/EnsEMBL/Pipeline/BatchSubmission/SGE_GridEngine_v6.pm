@@ -54,7 +54,7 @@ methods are usually preceded with a _
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/SGE_GridEngine_v6.pm,v $
-# $Version: $
+# $Revision: 1.13 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::SGE_GridEngine_v6; 
 
 use warnings ;

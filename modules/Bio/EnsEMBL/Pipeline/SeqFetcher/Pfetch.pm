@@ -49,7 +49,7 @@ rearrange(order, list); #instead
 
 # Let the code begin...
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Pfetch.pm,v $
-# $Version: $
+# $Revision: 1.13 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use strict;

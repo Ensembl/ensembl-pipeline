@@ -44,7 +44,7 @@ Internal methods are usually preceded with a _
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Rule.pm,v $
-# $Version: $
+# $Revision: 1.29 $
 package Bio::EnsEMBL::Pipeline::Rule;
 
 use warnings ;

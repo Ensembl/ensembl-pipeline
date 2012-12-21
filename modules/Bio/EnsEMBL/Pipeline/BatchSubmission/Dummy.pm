@@ -36,7 +36,7 @@ could potentially implement some checking code but currently not necessary
 
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/Dummy.pm,v $
-# $Version: $
+# $Revision: 1.5 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::Dummy;
 
 
