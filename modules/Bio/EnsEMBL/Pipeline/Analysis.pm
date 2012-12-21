@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::Analysis -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Analysis.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Analysis;
 
+use warnings ;
 use  vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Analysis;

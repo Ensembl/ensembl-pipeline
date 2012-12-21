@@ -42,8 +42,11 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/DBAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::DBAdaptor;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;

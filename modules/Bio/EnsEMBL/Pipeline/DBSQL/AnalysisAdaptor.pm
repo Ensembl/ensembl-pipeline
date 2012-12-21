@@ -48,8 +48,11 @@ The rest of the documentation details each of the object methods. Internal metho
 # Let the code begin...
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/AnalysisAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);

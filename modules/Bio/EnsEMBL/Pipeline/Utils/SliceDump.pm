@@ -32,6 +32,8 @@ Bio::EnsEMBL::Pipeline::Utils::SliceDump -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Utils/SliceDump.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Utils::SliceDump;
 
 use strict;

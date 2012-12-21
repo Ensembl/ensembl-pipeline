@@ -36,8 +36,11 @@ Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/AlignmentSeq.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Alignment::AlignmentSeq;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::Seq;

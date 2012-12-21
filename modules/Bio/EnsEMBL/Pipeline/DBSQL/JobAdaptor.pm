@@ -47,8 +47,11 @@ The rest of the documentation details each of the object methods. Internal metho
 
 # Let the code begin...
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/JobAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::JobAdaptor;
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::Job;
 use Bio::EnsEMBL::Pipeline::Status;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace_dump 

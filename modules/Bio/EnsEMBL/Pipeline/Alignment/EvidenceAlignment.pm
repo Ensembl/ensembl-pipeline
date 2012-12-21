@@ -37,6 +37,7 @@ viewer/editor.
 
 Quick start - use the following code if you want the 
 alignment of an ensembl transcript with the evidence 
+use warnings ;
 used to predict it:
 
 my $evidence_alignment =
@@ -110,6 +111,8 @@ viewer, such as SeaView or JalView.
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/EvidenceAlignment.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Alignment::EvidenceAlignment;
 
 use vars qw(@ISA);

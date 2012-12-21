@@ -28,6 +28,7 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment -
 
 =head1 SYNOPSIS
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
  Create our object, specifying the genetic code needed to 
@@ -69,6 +70,8 @@ foreach my $seq (@$align){
 
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/CodonBasedAlignment.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
 use strict;

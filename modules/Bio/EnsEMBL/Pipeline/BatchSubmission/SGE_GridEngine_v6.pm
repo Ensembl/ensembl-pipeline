@@ -53,8 +53,11 @@ methods are usually preceded with a _
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/SGE_GridEngine_v6.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::SGE_GridEngine_v6; 
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::BatchSubmission; 
 use Bio::EnsEMBL::Utils::Exception qw(throw warning); 
 use Bio::EnsEMBL::Pipeline::Config::General;

@@ -45,7 +45,10 @@ compressed
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/CompressedDnaAlignFeatureAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::CompressedDnaAlignFeatureAdaptor;
+use warnings ;
 use vars qw(@ISA);
 use strict;
 

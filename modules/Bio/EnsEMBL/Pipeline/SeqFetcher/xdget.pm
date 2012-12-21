@@ -52,8 +52,11 @@ Internal methods are usually preceded with a _
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/xdget.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);

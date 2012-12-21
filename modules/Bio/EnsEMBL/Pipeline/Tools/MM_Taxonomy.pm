@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::Tools::MM_Taxonomy -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Tools/MM_Taxonomy.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Tools::MM_Taxonomy;
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use DBI;

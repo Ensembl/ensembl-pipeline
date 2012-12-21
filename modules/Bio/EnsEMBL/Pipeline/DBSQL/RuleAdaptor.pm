@@ -42,8 +42,11 @@
 
 # Let the code begin...
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/RuleAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::Rule;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Utils::Exception qw (throw warning);

@@ -37,6 +37,8 @@ AlignmentSquizz -
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/AlignmentSquiz.pm,v $
+# $Version: $
 package AlignmentSquizz;
 
 sub new {

@@ -43,8 +43,11 @@ Internal methods are usually preceded with a _
 # Let the code begin...
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Rule.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Rule;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);

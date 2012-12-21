@@ -35,6 +35,8 @@ The rest of the documentation details each of the object methods. Internal metho
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/RuleManager.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::RuleManager;
 
 

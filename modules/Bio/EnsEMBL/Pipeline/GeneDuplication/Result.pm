@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::Result -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/Result.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::Result;
 
+use warnings ;
 use strict;
 use vars qw(@ISA);
 use Bio::EnsEMBL::Root;

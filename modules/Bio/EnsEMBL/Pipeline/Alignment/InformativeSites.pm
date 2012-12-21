@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::Alignment::InformativeSites -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment/InformativeSites.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Alignment::InformativeSites;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;

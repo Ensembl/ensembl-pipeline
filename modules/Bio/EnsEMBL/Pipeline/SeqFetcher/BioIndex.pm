@@ -42,8 +42,11 @@ Internal methods are usually preceded with a _
 =cut
 
 # Let the code begin...
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/BioIndex.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex;

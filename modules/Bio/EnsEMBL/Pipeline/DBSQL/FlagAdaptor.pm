@@ -39,8 +39,11 @@ Internal methods are usually preceded with a _
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/FlagAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor;
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::Flag;
 use Bio::EnsEMBL::Root;
 use vars qw(@ISA);

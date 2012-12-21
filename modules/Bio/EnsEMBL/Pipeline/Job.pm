@@ -42,9 +42,12 @@ Bio::EnsEMBL::Pipeline::Job -
 
 # Let the code begin...
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Job.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Job;
 
 
+use warnings ;
 use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;

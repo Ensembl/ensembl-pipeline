@@ -32,9 +32,12 @@ Bio::EnsEMBL::Pipeline::BatchSubmission::Local -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/Local.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::Local;
 
 
+use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);

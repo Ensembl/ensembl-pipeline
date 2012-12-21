@@ -34,6 +34,8 @@ Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks -
 
 use strict;
 use warnings;
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Utils/PipelineSanityChecks.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 
 use vars qw(@ISA);

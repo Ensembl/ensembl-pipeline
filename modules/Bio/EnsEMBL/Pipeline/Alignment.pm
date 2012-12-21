@@ -37,8 +37,11 @@ information about the alignment too.
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Alignment;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);

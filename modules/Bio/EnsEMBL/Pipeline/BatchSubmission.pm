@@ -80,9 +80,12 @@ methods are usually preceded with a _
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::BatchSubmission;
 
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;

@@ -44,8 +44,11 @@ Internal methods are usually preceded with a _
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Flag.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Flag;
 
+use warnings ;
 use vars qw(@ISA);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use strict;

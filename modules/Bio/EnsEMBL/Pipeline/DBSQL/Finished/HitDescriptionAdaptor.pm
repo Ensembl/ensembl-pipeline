@@ -1,8 +1,11 @@
 
 ### Bio::EnsEMBL::Pipeline::DBSQL::Finished::HitDescriptionAdaptor
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/HitDescriptionAdaptor.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::HitDescriptionAdaptor;
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::Finished::HitDescription;
 use base 'Bio::EnsEMBL::DBSQL::BaseAdaptor';

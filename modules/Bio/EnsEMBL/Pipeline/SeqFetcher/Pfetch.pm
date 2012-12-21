@@ -41,12 +41,15 @@ The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 Method Bio::EnsEMBL::Root::_rearrange is deprecated.
+use warnings ;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 rearrange(order, list); #instead
 
 =cut
 
 # Let the code begin...
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Pfetch.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use strict;

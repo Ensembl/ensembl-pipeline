@@ -35,9 +35,12 @@ could potentially implement some checking code but currently not necessary
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/Dummy.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::Dummy;
 
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
 use strict;

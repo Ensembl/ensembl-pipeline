@@ -45,8 +45,11 @@ Internal methods are usually preceded with a _
 =cut
 
 # Let the code begin...
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Getz.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
 
+use warnings ;
 use strict;
 use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;

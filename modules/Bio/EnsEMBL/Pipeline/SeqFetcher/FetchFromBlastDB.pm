@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/FetchFromBlastDB.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;

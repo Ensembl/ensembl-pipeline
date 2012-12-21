@@ -1,3 +1,5 @@
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/PipeQueue.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Finished::PipeQueue;
 
 =head1 NAME

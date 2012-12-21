@@ -1,8 +1,11 @@
 
 ### Bio::EnsEMBL::Pipeline::Finished::HitDescription
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/HitDescription.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::Finished::HitDescription;
 
+use warnings ;
 use strict;
 
 sub new {

@@ -1,5 +1,8 @@
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Finished_Dfetch.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch;
 
+use warnings ;
 use strict;
 use DBI;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::xdget;

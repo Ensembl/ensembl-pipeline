@@ -45,8 +45,11 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::PAML -
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/PAML.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::PAML;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Pipeline::RunnableI;

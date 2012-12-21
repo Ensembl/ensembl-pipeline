@@ -32,8 +32,11 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::Finder -
 
 =cut
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/Finder.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::Finder;
 
+use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::Root;

@@ -1,6 +1,9 @@
 
+# $Source: $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Pfetch;
 
+use warnings ;
 use strict;
 use Bio::Root::Root;
 use Bio::DB::RandomAccessI;

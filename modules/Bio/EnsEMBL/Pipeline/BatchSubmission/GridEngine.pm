@@ -61,8 +61,11 @@ methods are usually preceded with a _
 =cut
 
 
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/GridEngine.pm,v $
+# $Version: $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::GridEngine;
 
+use warnings ;
 use Bio::EnsEMBL::Pipeline::BatchSubmission;
 use vars qw(@ISA);
 use strict;
