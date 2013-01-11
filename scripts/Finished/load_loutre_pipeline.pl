@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_loutre_pipeline.pl,v $
-# $Revision: 1.24 $
+# $Revision: 1.25 $
 
 =head1 NAME
 
@@ -88,7 +88,7 @@ Here are some command line examples:
     [AGP_FILE]
 
 
-=head1 CONTACT
+=head1 AUTHOR
 
 Mustapha Larbaoui B<email> ml6@sanger.ac.uk
 
@@ -218,6 +218,7 @@ my $seqset_info     = {};
         my ($input_type, $agp_chr_name, $chr_start, $chr_end, $n, $type, $acc_ver, $ctg_start, $ctg_end, $ctg_ori) =
           check_line($_);
 
+# $set is set once from commandline, so why store to hash?
         if ($end_value{$set}) {
             if ($chr_end > $end_value{$set}) {
                 $end_value{$set} = $chr_end;
@@ -246,11 +247,27 @@ my $seqset_info     = {};
         }
 
         #split into accesion number and version number
-        my ($acc, $sv) = $acc_ver =~ /^(.+)\.(\d+)$/;
+        my ($acc, $sv) = $acc_ver =~ /^(.+)\.(\d+)$/
+          or throw("Unexpected: '$acc_ver' is not ACC.SV");
 
-        my $contig_key = $acc . $sv . $ctg_start . $ctg_end . $set;
+        {
+            my $chr_len = $chr_end - $chr_start + 1;
+            my $ctg_len = $ctg_end - $ctg_start + 1;
+            throw("Non-parallel AGP segment $n: len ctg=$ctg_len != chr=$chr_len")
+              unless $chr_len == $ctg_len;
+            throw("Negative length AGP segment $n: ctg_len=$ctg_len")
+              unless $ctg_len > 0;
+        }
+
+
+# Suspicious stuff.  Suspect it should be an array, so overwrite is
+# probably bad.
+        my $contig_key = $acc . $sv . $ctg_start . $ctg_end . $set; # digits run together
+        throw("dup in %$contigs_hashref ($contig_key)")
+          if exists $contigs_hashref->{$contig_key};
         $contigs_hashref->{$contig_key} =
-          [ $agp_chr_name, $chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori, $acc, $sv, $set ];
+          [ $agp_chr_name, # unused
+            $chr_start, $chr_end, $ctg_start, $ctg_end, $ctg_ori, $acc, $sv, $set ];
         $chr_href->{$agp_chr_name} = 1;
         $contig_number++;
     }
@@ -298,15 +315,13 @@ my $seqset_info     = {};
 
         };
         if ($@) {
-            foreach (@$dbas) { $_->dbc->db_handle->rollback }
-            throw(
+            rollbacks_throw(
                 qq{
-                    A coord_system matching the arguments does not exsist in the cord_system table,
+                    A coord_system matching the arguments does not exist in the cord_system table,
                     please ensure you have the right coord_system entry in the database [$@]
                 }
             );
         }
-        my $slice;
         my $ana = $analysis_a->fetch_by_logic_name('SubmitContig');
 
         # insert the sequence set as a chromosome in seq_region
@@ -314,7 +329,9 @@ my $seqset_info     = {};
         my $stored_sets = [];
         foreach my $name (keys(%end_value)) {
             my $endv = $end_value{$name};
-            eval { $slice = $slice_a->fetch_by_region('chromosome', $name, undef, undef, undef, $cs_version); };
+            my $slice = eval {
+                $slice_a->fetch_by_region('chromosome', $name, undef, undef, undef, $cs_version);
+            };
             if ($slice) {
                 push @$stored_sets, $name;
             }
@@ -325,8 +342,7 @@ my $seqset_info     = {};
             }
         }
         if (@$stored_sets) {
-            foreach (@$dbas) { $_->dbc->db_handle->rollback }
-            throw(
+            rollbacks_throw(
                 "Sequence set " . join(" ", @$stored_sets) . " is/are already in database <" . $dba->dbc->dbname . ">");
         }
 
@@ -338,11 +354,10 @@ my $seqset_info     = {};
                 values
                 (?,?,?,?,?,?,?) };
         my $insert_sth = $dba->dbc->prepare($insert_query);
-        my $error      = '';
+        my $dnafetch_error = '';
       CLONE: for (keys %$contigs_hashref) {
-
-            my $chr_name     = $contigs_hashref->{$_}->[0];
-            my $sequence_set = $contigs_hashref->{$_}->[8];
+#            my $chr_name     = $contigs_hashref->{$_}->[0];
+            my $sequence_set = $contigs_hashref->{$_}->[8]; # eq $set
             my $chr_start    = $contigs_hashref->{$_}->[1];
             my $chr_end      = $contigs_hashref->{$_}->[2];
             my $contig_start = $contigs_hashref->{$_}->[3];
@@ -369,6 +384,10 @@ my $seqset_info     = {};
                 print STDOUT "\tclone and contig < ${acc_ver} ; ${contig_name} > are already in database\n";
                 $clone_seq_reg_id = $clone->get_seq_region_id;
                 $ctg_seq_reg_id   = $contig->get_seq_region_id;
+
+                my $ctgl = $contig->length;
+                rollbacks_throw("Existing contig $contig_name len $ctgl != clone $acc_ver len $clone_length")
+                  unless $ctgl == $clone_length;
             }
             else {
                 ##fetch the dna sequence from pfetch server or a local fasta file with acc_ver id
@@ -384,11 +403,16 @@ my $seqset_info     = {};
                         $objects{$acc_ver} = $seqobj;
                     };
                     if ($@) {
-                        $error .= $@;
+                        $dnafetch_error .= $@;
                         next CLONE;
                     }
                 }
 
+                my $so_len = $seqobj->length;
+                if (defined $clone_length && $clone_length != $so_len) {
+                    # found clone but not contig; and lengths disagree
+                    rollbacks_throw("clone[name=$acc_ver,len=$clone_length] exists, would use contig_name=$contig_name; but fetched len=$so_len");
+                }
                 $clone_length = $seqobj->length;
                 $contig_name .= $clone_length unless $clone;
                 my $contig_seq = $seqobj->seq;
@@ -398,8 +422,7 @@ my $seqset_info     = {};
                     $clone = &make_slice($acc_ver, 1, $clone_length, $clone_length, 1, $clone_cs);
                     $clone_seq_reg_id = $slice_a->store($clone);
                     if (!$clone_seq_reg_id) {
-                        foreach (@$dbas) { $_->dbc->db_handle->rollback }
-                        throw("clone seq_region_id has not been returned for the accession $acc_ver");
+                        rollbacks_throw("clone seq_region_id has not been returned for the accession $acc_ver");
                     }
                     ##make attribute for clone and insert attribute to seq_region_attrib & attrib_type tables
                     $attr_a->store_on_Slice($clone, &make_clone_attribute($acc, $ver));
@@ -407,6 +430,10 @@ my $seqset_info     = {};
                 else {
                     print STDOUT "\tclone < ${acc_ver} > is already in database\n";
                     $clone_seq_reg_id = $clone->get_seq_region_id;
+
+                    # but we already pfetched the sequence, let's check it
+                    rollbacks_throw("Existing clone[srid=$clone_seq_reg_id] sequence differs")
+                      unless $clone->seq eq $contig_seq;
                 }
 
                 if (!$contig) {
@@ -414,10 +441,15 @@ my $seqset_info     = {};
                     $contig = &make_slice($contig_name, 1, $clone_length, $clone_length, 1, $contig_cs);
                     $ctg_seq_reg_id = $slice_a->store($contig, \$contig_seq);
                     if (!$ctg_seq_reg_id) {
-                        foreach (@$dbas) { $_->dbc->db_handle->rollback }
-                        throw("contig seq_region_id has not been returned for the contig $contig_name");
+                        rollbacks_throw("contig seq_region_id has not been returned for the contig $contig_name");
                     }
+                } else {
+                    rollbacks_throw("That's weird.  What are we doing here? cl[name=$acc_ver]=$clone ctg=$contig");
                 }
+            }
+
+            if ($contig_end > $clone_length) {
+                rollbacks_throw("Rejecting bad INSERT INTO assembly contig[name=$contig_name,end=$contig_end] for clone[name=$acc_ver,len=$clone_length]");
             }
 
             ##insert chromosome to contig assembly data into assembly table
@@ -431,12 +463,16 @@ my $seqset_info     = {};
               if ($do_submit and $dba->dbc->dbname =~ /pipe_/);
 
         }
-        if ($error) {
-            foreach (@$dbas) { $_->dbc->db_handle->rollback }
-            throw($error);
-        }
+        rollbacks_throw($dnafetch_error) if $dnafetch_error;
     }
     foreach (@$dbas) { $_->dbc->db_handle->commit }
+}
+
+
+sub rollbacks_throw {
+    my ($msg) = @_;
+    foreach (@$dbas) { $_->dbc->db_handle->rollback }
+    throw($msg);
 }
 
 #
@@ -445,7 +481,7 @@ my $seqset_info     = {};
 sub make_clone_attribute {
     my ($acc, $ver) = @_;
     my @attrib;
-    my $attrib = &make_attribute('htg', 'htg', 'High Throughput phase attribute', '3');
+    my $attrib = &make_attribute('htg', 'htg', 'High Throughput phase attribute', '3'); # it fibs because we threw away $type, but usually is 3
     push @attrib, $attrib;
 
     #   push @attrib,
