@@ -56,7 +56,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/LSF.pm,v $
-# $Revision: 1.46 $
+# $Revision: 1.47 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
 use warnings ;
@@ -184,6 +184,7 @@ sub open_command_line {
 
   if ( open( my $pipe, '-|' ) ) {
     while (<$pipe>) {
+      next if /Mapping .* project definition to group/;
       if (/Job <(\d+)>/) {
         $lsf = $1;
       } else {
