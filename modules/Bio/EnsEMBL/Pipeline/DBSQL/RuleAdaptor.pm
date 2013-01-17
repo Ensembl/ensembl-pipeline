@@ -43,7 +43,7 @@
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/RuleAdaptor.pm,v $
-# $Revision: 1.27 $
+# $Revision: 1.28 $
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use warnings ;
@@ -291,8 +291,8 @@ sub fetch_by_goal{
     throw(" can't find analysis in database\n" ) ; 
   } 
 
-  warning("Can't get the dbID for the analysis with logic_name ".
-        $goal_analysis->logic_name . "in database " . 
+  warning("Can't get the dbID for the analysis with logic_name '".
+        $goal_analysis->logic_name . "' in database " . 
         $self->db->dbc->dbname ) unless $rule ;
 
   return $rule;
