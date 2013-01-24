@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/transfer_annotation_logfilter.pl,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 
 use strict;
 use warnings;
@@ -171,9 +171,10 @@ sub main {
         } else {
             # plaintext
             if (@skipping) {
-                print "  |$_" if $opt{'verbose'};
+                print "| $_" if $opt{'verbose'};
             } else {
                 $showed_any = 1;
+                print '* ' if $opt{'verbose'};
                 print;
             }
         }
