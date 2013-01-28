@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
-# $Revision: 1.29 $
+# $Revision: 1.30 $
 
 =head1 Synopsis
 
@@ -166,6 +166,7 @@ if ($db_taxon_id != $gb_taxon_id) {
 
 my $dbe_adaptor = $output_db->get_DBEntryAdaptor;
 my $slice_adaptor = $output_db->get_SliceAdaptor;
+my $attrib_adaptor = $output_db->get_AttributeAdaptor;
 my $slice = $slice_adaptor->fetch_by_region('toplevel', $MIT_NAME);
 my $slices_ref =  &get_chromosomes($genebank_hash, $output_db);
 my %slices = %{$slices_ref};
@@ -189,6 +190,31 @@ if ($slice){
     print "Ok gene load aborted.\n";
     exit 0;
   }
+}
+if ($slice->is_chromosome) {
+    my $max_attrib = 1;
+    my $answer;
+    my ($attrib) = @{$slice->get_all_Attributes('karyotype_rank')};
+    if (defined $attrib) {
+        print "Your mitochondrion already have a karyotype rank: ", $attrib->value, "\n"
+            , "Shall we remove it and insert a new rank? (Y/N) ";
+        $answer = <>;
+        chomp $answer;
+        if ($answer eq 'y' or $answer eq 'Y') {
+            $attrib_adaptor->remove_on_Slice($slice, $attrib);
+        }
+    }
+    foreach my $chromosome (@{$slice->adaptor->fetch_all('chromosome')}) {
+        foreach my $attrib (@{$chromosome->get_all_Attributes('karyotype_rank')}) {
+            $max_attrib = $attrib->value if ($max_attrib < $attrib->value);
+        }
+    }
+    push my @rank,
+      Bio::EnsEMBL::Attribute->new(
+                    -CODE        => 'karyotype_rank',
+                    -VALUE       => ++$max_attrib );
+    print "Karyotype rank for the mitochondrion: $max_attrib\n";
+    $attrib_adaptor->store_on_Slice( $slice, \@rank ) unless (defined $answer and ($answer eq 'n' or $answer eq 'N'));
 }
 
 #########################################
@@ -244,7 +270,7 @@ my $logic_name;
 if ($MIT_LOGIC_NAME){
   $logic_name = $MIT_LOGIC_NAME;
 } else {
-  $logic_name = 'MT_genbank_import';
+  $logic_name = 'mt_genbank_import';
   print "Cannot find MIT_LOGIC_NAME - using standard logic name ensembl\n" if $MIT_DEBUG;
 }
 if (!$MIT_DB_FILE) {
@@ -258,7 +284,7 @@ my $ensembl_analysis = $output_db->get_AnalysisAdaptor->fetch_by_logic_name($log
 if(!defined $ensembl_analysis){
   #croak "analysis $logic_name not found\n";
   $ensembl_analysis =
-    Bio::EnsEMBL::Analysis->new( -logic_name => 'MT_genbank_import', -db_version => $MIT_DB_VERSION );
+    Bio::EnsEMBL::Analysis->new( -logic_name => 'mt_genbank_import', -db_version => $MIT_DB_VERSION );
   if (defined $MIT_DB_FILE) {
     $ensembl_analysis->db_file($MIT_DB_FILE);
   }
