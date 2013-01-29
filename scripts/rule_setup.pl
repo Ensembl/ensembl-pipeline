@@ -1,65 +1,59 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rule_setup.pl,v $
-# $Revision: 1.5 $
-
-# POD documentation - main docs before the code
-
-=pod
+# $Revision: 1.6 $
 
 =head1 NAME
 
-  rule_setup.pl
+rule_setup.pl
 
 =head1 SYNOPSIS
 
-  Script for writing the rule tables and generate the config needed to
-  generate the rule tables rule_goal and rule_condition.
+Script for writing the rule tables given a configuration file, or the
+other way around.
 
 =head1 DESCRIPTION
 
-  This script will both take a configuration file and write to the rule
-  tables or take the rule tables and write a configuration file.  The
-  database you point at must alraedy contain the pipeline tables as
-  defined in ensembl-pipeline/sql/table.sql
+This script will take a configuration file and write to the rule tables
+or take the rule tables and write a configuration file.  The database
+you point at must alraedy contain the pipeline tables as defined in
+ensembl-pipeline/sql/table.sql
 
 =head1 OPTIONS
 
-  Database options  
+Database options:
 
-    -dbhost    Host name for database.
-    -dbport    Port to connect to (optional).
-    -dbname    Database to connect to.
-    -dbuser    Username to connect as.
-    -dbpass    Password to use.
+  -dbhost   Host name for database.
+  -dbport   Port to connect to (optional).
+  -dbname   Database to connect to.
+  -dbuser   Username to connect as.
+  -dbpass   Password to use.
 
-   Other options
+Other options:
 
-     -read  Indicates to the script you want to read a configuration
-            file and write to the database.
+  -read     Read a configuration file and write to the database.
+  -write    Read the rule table and write a configuration file.
+  -file     File to read from or write too.
 
-     -write Indicates to the script you want to read the rule table and
-            write a configuration file.
-
-     -help  Displays help text.
+  -help     Displays help text.
 
 =head1 EXAMPLES
 
 To generate a configuration file based on the rule table of the database
 it is pointed at:
 
-  ./rule_setup.pl -dbhost ecs1b -dbuser ensadmin -dbpass ****
-                  -dbname my_pipeline_db -dbport 3306 -write
+  ./rule_setup.pl -dbhost ecs1b -dbuser ensadmin -dbpass **** \
+                  -dbname my_pipeline_db -dbport 3306 -write \
                   -file rule.conf
 
 To fill in an rule table based on the configuration file passed in:
 
-  ./rule_setup.pl -dbhost ecs1b -dbuser ensadmin -dbpass ****
-                  -dbname my_pipeline_db -dbport 3306 -read
+  ./rule_setup.pl -dbhost ecs1b -dbuser ensadmin -dbpass **** \
+                  -dbname my_pipeline_db -dbport 3306 -read \
                   -file rule.conf
 
-This is what a configuration entry should look like.  The header should
-be the goal analysis logic name and the conditions should be key value
-pairs:
+This is what a configuration entry should look like.  The header for
+each section should be the goal analysis logic name and the conditions
+should be key-value pairs:
 
   [RepeatMask]
   condition=SubmitContig
@@ -152,7 +146,7 @@ if ($read) {
   write_into_db( $db, \@rules );
 }
 else {
-  my $analyses = &read_db($db);
+  my $analyses = read_db($db);
   $analyses = [
     sort {
       $a->goalAnalysis->dbID() <=> $b->goalAnalysis->dbID()
