@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pre-release-site/set_stable_ids.pl,v $
-# $Revision: 1.9 $
+# $Revision: 1.10 $
 
 =head1 NAME
 
@@ -82,6 +82,12 @@ my $exon_query =
 
 my $exon_sth = $db->dbc->prepare($exon_query);
 
+# Arrays to hold write execution so that write only happens when 
+# there are no fails, i.e. no partial writes possible
+my @trans_write = ();
+my @translation_write = ();
+my @exon_write = ();
+
 GENE:
 foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
@@ -93,28 +99,31 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
   $proteins{$gene_protein_id}++;
 
   eval {
-    $sth->execute( $gene_protein_id . "_" . $proteins{$gene_protein_id},
-                   $proteins{$gene_protein_id}, $gene_id );
-
+    
     foreach my $transcript ( @{ $gene->get_all_Transcripts() } ) {
       my $transcript_protein_id =
         get_transcript_protein_id($transcript);
 
       $transcript_proteins{$transcript_protein_id}++;
 
-      $trans_sth->execute(
-                         $transcript_protein_id . "_" .
-                           $transcript_proteins{$transcript_protein_id},
-                         $transcript_proteins{$transcript_protein_id},
-                         $transcript->dbID() );
+      push(@trans_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
+	             ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$transcript->dbID());
 
-      my $translation = $transcript->translation();
 
-      $translation_sth->execute(
-                         $transcript_protein_id . "_" .
-                           $transcript_proteins{$transcript_protein_id},
-                         $transcript_proteins{$transcript_protein_id},
-                         $translation->dbID() );
+      if($transcript->translation())
+      {
+        my $translation = $transcript->translation();
+
+
+        push(@translation_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
+	                    ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$translation->dbID());
+      }
+
+      else
+      {
+        push(@translation_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
+	                     ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$transcript->dbID());
+      }
 
       my $exon_count = 1;
 
@@ -129,17 +138,28 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
           $transcript_proteins{$transcript_protein_id} . "." .
           $exon_count++;
 
-        $exon_sth->execute( $stable_id,
-                           $transcript_proteins{$transcript_protein_id},
-                           $exon_dbID );
+
+        push(@exon_write, $stable_id.":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$exon_dbID);
 
         $exons{$exon_dbID} = $stable_id;
+
       }
+
+
     } ## end foreach my $transcript ( @{...})
   };
 
   if ($@) {
     throw( "Stable ID insertion for gene " . $gene_id . " failed $@" );
+  }
+
+  else
+  {
+      my $gene_write_string = $gene_protein_id . "_" . $proteins{$gene_protein_id}.
+	                       ":\n:". $proteins{$gene_protein_id}.":\n:".$gene_id;
+
+      write_to_db($gene_id,$gene_write_string);
+      clear_write_arrays();
   }
 
 } ## end foreach my $gene_id ( @{ $db...})
@@ -166,4 +186,45 @@ sub get_transcript_protein_id {
   }
 
   throw( "Found no protein id for " . $transcript->dbID() );
+}
+
+sub write_to_db
+{
+  my ($gene_id,$gene_write_string) = @_;
+
+  my @tmp = split(':\n:',$gene_write_string);
+  
+  $sth->execute($tmp[0],$tmp[1],$tmp[2]);
+
+  @tmp = ();
+
+  foreach (@trans_write)
+  {
+      @tmp = split(':\n:',$_);
+      $trans_sth->execute($tmp[0],$tmp[1],$tmp[2]);
+  }
+
+  @tmp = ();
+
+  foreach (@translation_write)
+  {
+      @tmp = split(':\n:',$_);
+      $translation_sth->execute($tmp[0],$tmp[1],$tmp[2]);
+  }
+          
+  @tmp = ();
+
+  foreach (@exon_write)
+  {
+      @tmp = split(':\n:',$_);
+      $exon_sth->execute($tmp[0],$tmp[1],$tmp[2]);
+  }
+
+}
+
+sub clear_write_arrays
+{
+    @trans_write = ();
+    @translation_write = ();
+    @exon_write = ();
 }
