@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pre-release-site/set_stable_ids.pl,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 
 =head1 NAME
 
@@ -117,12 +117,6 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
 
         push(@translation_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
 	                    ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$translation->dbID());
-      }
-
-      else
-      {
-        push(@translation_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
-	                     ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$transcript->dbID());
       }
 
       my $exon_count = 1;
