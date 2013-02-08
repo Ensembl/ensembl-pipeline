@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_loutre_pipeline.pl,v $
-# $Revision: 1.25 $
+# $Revision: 1.26 $
 
 =head1 NAME
 
@@ -34,6 +34,7 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
     -do_pipe      (default: true) populate the pipeline satellite db
     -submit       (default: true) prime the analysis pipeline
                   i.e. add submitcontig rows in the input_id_anlysis table
+    -local_seq    (optional) only look for ".seq" files in current directory - no pfetching
     -skip_type    (optional) comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
     -assembly     (optional) attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
     -help|h       displays this documentation with PERLDOC
@@ -122,6 +123,7 @@ my $assembly;
 my $do_pipe   = 1;    # Set to load loutre and pipeline dbs
 my $do_submit = 1;    # Set if we want to prime the pipeline with the SubmitContig analysis
 my @skip;
+my $local_seq_files_only = 0;
 
 my $usage = sub { exec('perldoc', $0); };
 
@@ -139,6 +141,7 @@ my $usage = sub { exec('perldoc', $0); };
     'assembly=s'    => \$assembly,
     'do_pipe!'      => \$do_pipe,
     'submit!'       => \$do_submit,
+    'local_seq!'    => \$local_seq_files_only,
     'h|help!'       => $usage
 ) or $usage->();
 
@@ -398,8 +401,13 @@ my $seqset_info     = {};
                 }
                 else {
                     eval {
-                        $seqobj = pfetch_acc_sv($acc_ver) || pfetch_ftpghost_acc_sv($acc_ver) || localfile_acc_sv($acc_ver)
-                          || die "No sequence for <$acc_ver>\n";
+                        if ($local_seq_files_only) {
+                            $seqobj = localfile_acc_sv($acc_ver);
+                        }
+                        else {
+                            $seqobj = pfetch_acc_sv($acc_ver) || pfetch_ftpghost_acc_sv($acc_ver) || localfile_acc_sv($acc_ver);
+                        }
+                        die "No sequence for <$acc_ver>\n" unless $seqobj;
                         $objects{$acc_ver} = $seqobj;
                     };
                     if ($@) {
