@@ -173,7 +173,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.44 $ 
+# $Revision: 1.45 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -570,7 +570,7 @@ use vars qw(%Config);
       batch_size => 300,
       resource   => 'select[mem>500] rusage[mem=500]',
       retries    => 1,
-      sub_args   => '-M300000',
+      sub_args   => '-M500000',
       queue      => 'normal',
     },
     {
