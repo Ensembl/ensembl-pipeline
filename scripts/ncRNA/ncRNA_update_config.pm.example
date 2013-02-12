@@ -11,28 +11,21 @@ use vars qw(%Config);
 				  DBNAME     => "human_ref_db",
 				  DBPORT     => "3306",
 				  DBHOST     => "genebuildX",
+				  DBTOKEN    => "myens_buildXtok",
 				  # DB to write to (Also the pipeline database)
-				  WRITEHOST  => "genebuildY",
-				  WRITEPORT  => "3306",
 				  WRITENAME  => "ncRNA_db",
-                  #Old load management system
-				  # mysql instance source db is on
-				  #REFINS     => "myens_buildXtok",
-				  # lsf load for source db
-				  #REFLOAD    => 800,
-				  # mysql instance pipeline/output db is on
-			      #WRITEINS   => "myens_buildYtok",
-				  # lsf load for pipeline/output db
-				  #WRITELOAD  => 800,
+				  WRITEPORT  => "3306",
+				  WRITEHOST  => "genebuildY",
+				  WRITETOKEN => "myens_buildYtok",
 				 },	
 				 
 	             # etc for however many species you want	 				 				 
 		     },
            DATADIR   => "/path/to/store/output",
-           CVSDIR    => "/path/to/cvs/",
+           CVSDIR    => "/path/to/cvs",
            WRITEUSER => "mysql_write_access",
-           BIOPERL_LIVE_PATH => "/path/to/bioperl-live",
-           BIOPERL_RUN_PATH=> "/path/to/bioperl-run",
+           ROUSER => "mysql_readonly_access",
+           BIOPERL_PATH => "/path/to/bioperl",
 
            MIRBASEVERSION => "18.0",
            RFAMVERSION => "10.1",

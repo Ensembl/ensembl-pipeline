@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/predict_ncRNA.pl,v $
-# $Revision: 1.19 $
+# $Revision: 1.20 $
 
 use warnings ;
 use strict;
@@ -144,7 +144,7 @@ SPECIES:  foreach my $species (@speciess){
       
       my $total = scalar(keys (%thr));
       my $complete;
-      my $last;
+      my $last = 0;
       print "\n0_________10________20________30________40________50________60________70________80________90_______100\n";
       foreach my $domain (sort keys %thr){
 	$count ++;
@@ -281,17 +281,12 @@ SPECIES:  foreach my $species (@speciess){
 
   print "Finished species $species\n";
   # do I want to start the rulemanager again at this point?
-  my $perlpath = $ENV{"PERL5LIB"};
 
   open (SPEC,">$species.csh") or die ("Cannot open file $species.csh");
   print SPEC "#!/bin/csh\n\n";
-  $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
-     "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
-      "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-        "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
-  print SPEC "setenv PERL5LIB ".$ENV{"PERL5LIB"}."\n";
+  print SPEC 'setenv PERL5LIB ', "$DATADIR/$species:$CVSDIR", '/ensembl-analysis/modules:',
+     $CVSDIR, '/ensembl-pipeline/modules:', $CVSDIR, '/ensembl/modules:', $BIOPERL_PATH, "\n";
   
-  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
   # if all be well, run the rulemanager
   my $cmd_rulemanager = "bsub -o $species.out -q normal perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
@@ -300,16 +295,13 @@ SPECIES:  foreach my $species (@speciess){
 	  "-dbuser ensadmin -dbpass $pass -once\n";
 
   print SPEC "$cmd_rulemanager\n";
+  close(SPEC) || die('Could not close csh script file');
   print "Monitor:\n";
-  my $cmd = "perl $CVSDIR/ensembl-pipeline/scripts/monitor ".
-    "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
-      "-dbport $CONFIG->{$species}->{\"WRITEPORT\"} ".
-	"-dbhost $CONFIG->{$species}->{\"WRITEHOST\"} ".
-	  "-dbuser ensadmin -dbpass $pass -current -finishedp";
+  print 'perl ', $CVSDIR, '/ensembl-pipeline/scripts/monitor -dbname', $CONFIG->{$species}->{'WRITENAME'},
+      '-dbport ', $CONFIG->{$species}->{'WRITEPORT'}, '-dbhost ', $CONFIG->{$species}->{'WRITEHOST'},
+	  '-dbuser ensadmin -dbpass ', $pass, ' -current -finishedp';
   
-  print "$cmd\n";
   # set it back to previous
-  $ENV{"PERL5LIB"}= $perlpath;
 }
 
 exit;

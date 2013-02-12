@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/ncRNA_update.pl,v $
-# $Revision: 1.43 $
+# $Revision: 1.44 $
 
 
 use warnings ;
@@ -11,6 +11,7 @@ use Getopt::Long;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
 use Bio::SeqIO;
+use Bio::EnsEMBL::Analysis::Tools::ConfigWriter;
 
 my $usage = "perl ncRNA_update.pl 
 -pass *  
@@ -60,9 +61,10 @@ if (scalar(@species_list)) {
   @speciess = (keys %$CONFIG);
 }
 
-my @globalvars = ($DATADIR, $CVSDIR, $WRITEUSER, $CONFIG, $BLASTDIR);
+my @globalvars = ($DATADIR, $CVSDIR, $WRITEUSER, $ROUSER, $CONFIG, $BLASTDIR);
 check_vars(\@globalvars);
-foreach my $species (@speciess){
+foreach my $species (@speciess) {
+    print "SPECIES = $species\n";
 ###########################################################
 # gonna need seperate config and checkouts of the code    #
 # for each species?....                                   #
@@ -71,16 +73,7 @@ foreach my $species (@speciess){
 # and also the batchqueue                                 #
 ###########################################################
 
-  system ("mkdir $DATADIR") unless -e $DATADIR;
-  system ("mkdir $DATADIR/$species") unless -e "$DATADIR/$species";
-  system ("mkdir $DATADIR/$species/Bio") unless -e "$DATADIR/$species/Bio";
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL") unless -e "$DATADIR/$species/Bio/EnsEMBL" ;
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis";
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline";
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis/Config";
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild") unless -e "$DATADIR/$species/Bio/EnsEMBL/Analysis/Config/GeneBuild";
-  system ("mkdir $DATADIR/$species/Bio/EnsEMBL/Pipeline/Config") unless -e "$DATADIR/$species/Bio/EnsEMBL/Pipeline/Config";
-  # set up batchqueue output dirs
+  config_setup($species);
   # start the db set up if required
   DB_setup($species,
 	   $CONFIG->{$species}->{"WRITEHOST"},
@@ -92,22 +85,14 @@ foreach my $species (@speciess){
 	   $CONFIG->{$species}->{"DBNAME"},
 	   $CONFIG->{$species}->{"WRITENAME"}) if $dbsetup;
 
-  print "Checking config\n";
-  my @localconfigvars =qw(WRITEHOST WRITEPORT DBNAME DBPORT DBHOST WRITENAME );
-  config_setup(\@localconfigvars,$species);
-}
 # once thats all done sucessfully start the rule managers
-my $perlpath = $ENV{"PERL5LIB"};
-foreach my $species (@speciess){
   open (SPEC,">$species.csh") or die ("Cannot open file $species.csh");
   print SPEC "#!/bin/csh\n\n";
-  $ENV{"PERL5LIB"} = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules:$CVSDIR/ensembl-analysis/scripts:".
-     "$CVSDIR/ensembl-pipeline/scripts:$CVSDIR/ensembl-pipeline/modules:".
-      "$CVSDIR/ensembl/scripts:$CVSDIR/ensembl/modules:".
-        "$BIOPERL_LIVE_PATH:$BIOPERL_RUN_PATH";
-  print SPEC "setenv PERL5LIB ".$ENV{"PERL5LIB"}."\n";
+  my $perl5lib = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules".
+     ":$CVSDIR/ensembl-pipeline/modules:$CVSDIR/ensembl/modules".
+     ":$BIOPERL_PATH";
+  print SPEC 'setenv PERL5LIB '.$perl5lib."\n";
   
-  system ("perl $CVSDIR/ensembl-pipeline/scripts/setup_batchqueue_outputdir.pl"); 
   # if all be well, run the rulemanager
   my $cmd_rulemanager = "bsub -o $species.out -q normal perl $CVSDIR/ensembl-pipeline/scripts/rulemanager.pl ".
     "-dbname  $CONFIG->{$species}->{\"WRITENAME\"} ".
@@ -125,139 +110,81 @@ foreach my $species (@speciess){
   
   print "$cmd\n";
   close SPEC;
-};
+}
 
-# set it back to previous
- $ENV{"PERL5LIB"}= $perlpath;
 # next need to make sure paths output directories and config files are set up correctly.
 # felixes script does this beautifully, I shall pinch methods from that.
 exit;
 
 # Write required config files for analysis.
-# Stores content and location of original files for later restoration.
-# The required config values are written into placeholders in the config skeleton file (config_files.txt)
-#  using the variables defined above.
 
-sub config_setup{
-  my ($vars,$species) =@_;
-  print "SPECIES = $species\n";
-  my $status = 0;
-  my $filecount = 0;
-  my ($header, $filename, $path, $tempdir);
-  my $db;
-  #set env var to avoid warnings
-  if(!defined $ENV{"OSTYPE"} ){
-    $ENV{"OSTYPE"} = "";
-  }
-  #import function, to be included in all config files
-  my $import_sub = '
-  sub import {
-    my ($callpack) = caller(0);
-   my $pack = shift;
-   my @vars = @_ ? @_ : keys(%Config);
-    return unless @vars;
-    eval "package $callpack; use vars qw(".
-      join(\' \', map { \'$\'.$_ } @vars) . ")";
-    die $@ if $@;
-    foreach (@vars) {
-      if (defined $Config{ $_ }) {
-        no strict \'refs\';
-	*{"${callpack}::$_"} = \$Config{ $_ };
-      }else {
-	die "Error: Config: $_ not known\n";
-      }
+sub config_setup {
+    my $species = shift;
+
+    my @analysis_list = ('RfamBlast', 'BlastmiRNA', 'miRNA', 'BlastWait', 'ncRNA');
+    my @repeat_masking = ('repeatmask', 'dust');
+    my $output_dir = $DATADIR.'/'.$species;
+    #set env var to avoid warnings
+    if(!defined $ENV{"OSTYPE"} ){
+      $ENV{"OSTYPE"} = "";
     }
-  }
-  1;
- ';
 
-
-  check_vars($vars,$species);
-  #check existence of source databases
-  print "$species\n";
-  print $CONFIG->{$species}->{"DBHOST"}," ".
-          $CONFIG->{$species}->{"DBPORT"}," ".
-	    $CONFIG->{$species}->{"DBNAME"}," "."\n";
-			
-  unless( connect_db(
-		 $CONFIG->{$species}->{"DBHOST"},
-		 $CONFIG->{$species}->{"DBPORT"},
-		 $CONFIG->{$species}->{"DBNAME"},
-		 'ensro')){
-      die "could not find ".$CONFIG->{$species}->{"DBNAME"}."\n";
-  }
-  $db = connect_db(
-		 $CONFIG->{$species}->{"WRITEHOST"},
-		 $CONFIG->{$species}->{"WRITEPORT"},
-		 $CONFIG->{$species}->{"WRITENAME"},
-		 'ensro');
-
-  unless  ( $db ) {
-      die "could not find ".$CONFIG->{$species}->{"WRITENAME"}."\n";
-  }
-# add global variables
-  push @$vars,"DATADIR";
-  push @$vars,"species";
-  # Numbers of slices vary wildly esp with 2x genomes so I am counting slice number for each db
-  # So I can sumbit 50 Blast RFAM and 25 BLast miRNA jobs per species
-  my $slices = sql("SELECT COUNT(*) FROM input_id_analysis WHERE analysis_id = 7",$db)->[0];
-  my $miRNA_batch = int( $slices / 25 );
-  my $RFAM_batch  = int( $slices / 50 );
-  # put a hard limit on it - batches can be *too* big
-  $RFAM_batch  = 5000 if  $RFAM_batch  > 5000;
-  $miRNA_batch = 5000 if  $miRNA_batch > 5000;  
-  # don't allow a batch size of 0
-  $miRNA_batch = 1 unless $miRNA_batch;
-  $RFAM_batch  = 1 unless $RFAM_batch;
-  print "Have $slices slices, using a batch size of $RFAM_batch for RFAM and " . 
-     " $miRNA_batch for miRNA\n";
-  #go thru config info to create defined files,
-  #back-up the original, write version with filled-in variables
-  open(RP, "<", "$config_file") or die("can't open config file definitions $config_file");
-  local $/ = '>>';
-  <RP>;
-  while(my $content = <RP>){
-    #get specific config-file name
-    $content  =~ s/([\w\/_\-\.]+)\n//;
-    $header   = $1;
-    $header   =~ m/(.+\/)([\w\._\-]*)$/g;
-    $path     = $1;
-    $filename = $2;
-    $content  =~ s/>>//;
-    #replace variables in config file
-    foreach my $configvar (@$vars){
-      my $configvarref;
-      if ($configvar eq "DATADIR"){     
-      	$configvarref = $DATADIR;
-      } 
-      elsif ($configvar eq "species") {
-       	$configvarref = $species;
-      }
-       else {
-        $configvarref = $CONFIG->{$species}->{$configvar};
-      }
-      $content =~ s/\<PASS\>/$pass/g;
-      $content =~ s/\<$configvar\>/$configvarref/g;
-      $content =~ s/\<MIRNABATCH\>/$miRNA_batch/;
-      $content =~ s/\<RFAMBATCH\>/$RFAM_batch/;
+    # We can simply do a cp of the example file here
+    my $pipe_general_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Pipeline::Config::General',
+        -is_example => 1);
+    $pipe_general_cfg->moduledir($output_dir);
+    $pipe_general_cfg->create_path;
+    $pipe_general_cfg->write_config(1);
+    my $bq_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Pipeline::Config::BatchQueue',
+        -is_example => 1,);
+    $bq_cfg->moduledir($output_dir);
+    $bq_cfg->empty_queue_config(\@analysis_list);
+    my $token;
+    $token = $CONFIG->{$species}->{DBTOKEN}.'=20:duration=10' if ($CONFIG->{$species}->{DBTOKEN});
+    $token = $CONFIG->{$species}->{WRITETOKEN}.'=20' if ($CONFIG->{$species}->{WRITETOKEN});
+    if ($token) {
+        foreach my $analysis (@analysis_list) {
+            my $value = $bq_cfg->analysis_from_batchqueue($analysis);
+            if ($value->{resource} =~ /rusage/) {
+                $value->{resource} =~ s/(rusage\[)/$1$token, /;
+            }
+            else {
+                $value->{resource} .= ' '.$token;
+            }
+            $bq_cfg->analysis_from_batchqueue($analysis, $value);
+        }
     }
-    #write modified file
-    $filename = "$DATADIR/$species/$path/$filename";
-    open(WP, ">", $filename) or die("can't create new config file $filename.\n");
-    print WP $content."\n".$import_sub;
-    close WP;
-    $filecount++;
-  }
-  close(RP);
-
-  # get the path to BatchQueue.pm
-  my $BQpath = $path;
-  $BQpath =~ s/Analysis/Pipeline/g;
-
-  print "New config files written.\n";
-  print "You might want to edit $DATADIR/$species/$BQpath/BatchQueue.pm\n\n";
+    $bq_cfg->root_value('DEFAULT_OUTPUT_DIR', $output_dir);
+    $bq_cfg->write_config(1);
+    # We can simply do a cp of the example file here
+    my $analysis_general_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::General',
+        -is_example => 1);
+    # RepeatMask and Dust were in the config file template so I want to be sure that we still have them
+    $analysis_general_cfg->root_value('ANALYSIS_REPEAT_MASKING', \@repeat_masking);
+    $analysis_general_cfg->moduledir($output_dir);
+    $analysis_general_cfg->create_path;
+    $analysis_general_cfg->write_config(1);
+    my $database_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Databases',
+        -is_example => 1);
+    $database_cfg->moduledir($output_dir);
+    $database_cfg->delete_databases(['REFERENCE_DB', 'GENEBUILD_DB']);
+    $database_cfg->key_by_parent('REFERENCE_DB', '-dbname', $CONFIG->{$species}->{"DBNAME"});
+    $database_cfg->key_by_parent('REFERENCE_DB', '-host', $CONFIG->{$species}->{"DBHOST"});
+    $database_cfg->key_by_parent('REFERENCE_DB', '-user', $ROUSER);
+    $database_cfg->delete_key_by_parent('REFERENCE_DB', '-pass');
+    $database_cfg->key_by_parent('REFERENCE_DB', '-port', $CONFIG->{$species}->{"DBPORT"});
+    $database_cfg->key_by_parent('GENEBUILD_DB', '-dbname', $CONFIG->{$species}->{"WRITENAME"});
+    $database_cfg->key_by_parent('GENEBUILD_DB', '-host', $CONFIG->{$species}->{"WRITEHOST"});
+    $database_cfg->key_by_parent('GENEBUILD_DB', '-user', $WRITEUSER);
+    $database_cfg->key_by_parent('GENEBUILD_DB', '-pass', $pass);
+    $database_cfg->key_by_parent('GENEBUILD_DB', '-port', $CONFIG->{$species}->{"WRITEPORT"});
+    $database_cfg->write_config(1);
+    # We can simply do a cp of the example file here
+    my $blast_general_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Blast',
+        -is_example => 1);
+    $blast_general_cfg->moduledir($output_dir);
+    $blast_general_cfg->write_config(1);
 }
-
 
 #check files & directories, create if necessary
 
@@ -305,7 +232,7 @@ sub DB_setup{
 	}
     }
     print "Creating database $WRITENAME @ $WRITEHOST : $WRITEPORT \n" if $verbose;
-    $status  =  system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass -e\"CREATE DATABASE $WRITENAME;\"");
+    $status  = system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass -e\"CREATE DATABASE $WRITENAME;\"");
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < "."$CVSDIR/ensembl/sql/table.sql");
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < "."$CVSDIR/ensembl-pipeline/sql/table.sql");
     $status += system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass $WRITENAME < "."$CVSDIR/ensembl-pipeline/sql/flag.sql");
@@ -483,21 +410,21 @@ sub prepare_RFAM{
   die ("Error with obtaining hairpin.fa  file from ftp://mirbase.org/pub/mirbase/CURRENT/hairpin.fa\n") if $exit > 0;
   print "done\n";
   # use bioperl to parse it
-    my $miRNA = Bio::SeqIO-> new
-    (
-     -file => "$BLASTDIR/all_mirnas.embl",
-     -format => "embl",
-    );
-  my $miRNA_fasta = Bio::SeqIO-> new
-    (
-     -file => ">$BLASTDIR/all_mirnas.fa",
-     -format => "Fasta",
-    );
-  # write to fasta file 
-  while (my $seq = $miRNA->next_seq){
-    $seq->desc($seq->accession." ".$seq->desc);
-    $miRNA_fasta->write_seq($seq);
-  }
+#    my $miRNA = Bio::SeqIO-> new
+#    (
+#     -file => "$BLASTDIR/all_mirnas.embl",
+#     -format => "embl",
+#    );
+#  my $miRNA_fasta = Bio::SeqIO-> new
+#    (
+#     -file => ">>$BLASTDIR/all_mirnas.fa",
+#     -format => "Fasta",
+#    );
+#  # write to fasta file 
+#  while (my $seq = $miRNA->next_seq){
+#    $seq->desc($seq->accession." ".$seq->desc);
+#    $miRNA_fasta->write_seq($seq);
+#  }
 
   print "Fetching all Rfam fasta sequences...";
   my $RFAM = Bio::SeqIO-> new
