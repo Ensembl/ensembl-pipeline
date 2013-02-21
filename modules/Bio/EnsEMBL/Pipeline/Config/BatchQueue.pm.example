@@ -173,7 +173,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.45 $ 
+# $Revision: 1.46 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -577,16 +577,16 @@ use vars qw(%Config);
       logic_name => 'miRNA',
       batch_size => 1,
       retries    => 1,
-      resource   => 'select[mem>300] rusage[mem=300]',
-      sub_args   => '-M300000',
+      resource   => 'select[mem>500] rusage[mem=500]',
+      sub_args   => '-M500000',
       queue      => 'normal',
     }, 
        {
       logic_name => 'ncRNA',
       batch_size => 500,
       retries    => 1,
-      resource   => 'select[mem>300] rusage[mem=300]',
-      sub_args   => '-M300000',
+      resource   => 'select[mem>500] rusage[mem=500]',
+      sub_args   => '-M500000',
       queue      => 'normal',
     }, 
     {
