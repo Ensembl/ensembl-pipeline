@@ -1,12 +1,13 @@
 ### Bio::EnsEMBL::Pipeline::DBSQL::Finished::ProteinAlignFeatureAdaptor
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/ProteinAlignFeatureAdaptor.pm,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::ProteinAlignFeatureAdaptor;
 use warnings ;
 use vars qw(@ISA);
 use strict;
 
+use DBI qw(:sql_types);
 use Data::Dumper;
 
 use Bio::EnsEMBL::DnaPepAlignFeature;
@@ -82,24 +83,23 @@ sub store{
      $analysis_adaptor->store($feat->analysis());
    }
 
-   my $original = $feat;
+    my $original = $feat;
     $analysis_id = $feat->analysis->dbID;
-   ($feat, $seq_region_id) = $self->_pre_store($feat);
-
-   $sth->bind_param(1,$seq_region_id,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(2,$feat->start,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(3,$feat->end,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(4,$feat->strand,{ TYPE => 'SQL_TINYINT' });
-   $sth->bind_param(5,$feat->hstart,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(6,$feat->hend,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(7,$feat->hseqname,{ TYPE => 'SQL_VARCHAR' });
-   $sth->bind_param(8,$feat->cigar_string,{ TYPE => 'SQL_LONGVARCHAR' });
-   $sth->bind_param(9,$analysis_id,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(10,$feat->score,{ TYPE => 'SQL_DOUBLE' });
-   $sth->bind_param(11,$feat->p_value,{ TYPE => 'SQL_DOUBLE' });
-   $sth->bind_param(12,$feat->percent_id,{ TYPE => 'SQL_FLOAT' });
-   $sth->bind_param(13,$feat->external_db_id,{ TYPE => 'SQL_INTEGER' });
-   $sth->bind_param(14,$feat->hcoverage,{ TYPE => 'SQL_DOUBLE' });
+    ($feat, $seq_region_id) = $self->_pre_store($feat);
+    $sth->bind_param(1,  $seq_region_id,        SQL_INTEGER     );
+    $sth->bind_param(2,  $feat->start,          SQL_INTEGER     );
+    $sth->bind_param(3,  $feat->end,            SQL_INTEGER     );
+    $sth->bind_param(4,  $feat->strand,         SQL_TINYINT     );
+    $sth->bind_param(5,  $feat->hstart,         SQL_INTEGER     );
+    $sth->bind_param(6,  $feat->hend,           SQL_INTEGER     );
+    $sth->bind_param(7,  $feat->hseqname,       SQL_VARCHAR     );
+    $sth->bind_param(8,  $feat->cigar_string,   SQL_LONGVARCHAR );
+    $sth->bind_param(9,  $analysis_id,          SQL_INTEGER     );
+    $sth->bind_param(10, $feat->score,          SQL_DOUBLE      );
+    $sth->bind_param(11, $feat->p_value,        SQL_DOUBLE      );
+    $sth->bind_param(12, $feat->percent_id,     SQL_FLOAT       );
+    $sth->bind_param(13, $feat->external_db_id, SQL_INTEGER     );
+    $sth->bind_param(14, $feat->hcoverage,      SQL_DOUBLE      );
 
    eval { 
        $sth->execute();
