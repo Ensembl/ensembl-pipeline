@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/rulemanager.pl,v $
-# $Revision: 1.23 $
+# $Revision: 1.24 $
 
 use warnings ;
 use strict;
@@ -72,7 +72,7 @@ my $utils_verbosity = 'WARNING';    #how verbose do you want the
 my $unlock = 0
   ; # deletes the lock of a pipeline (the entry in the meta table 'pipeline.lock'
 
-my $shuffle;
+my $shuffle = 1;
 my $accumulators       = 1;
 my $force_accumulators = 0;
 my $reread_input_ids   = 0;    # toggle whether to reread input_id each time the
@@ -528,8 +528,6 @@ sub get_db_version {
 sub shuffle {
 	my (@in) = @_;
 	my @out;
-
-	srand;
 
 	push @out, splice( @in, rand @in, 1 ) while @in;
 
