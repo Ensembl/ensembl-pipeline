@@ -1,9 +1,11 @@
-#!/usr/local/ensembl/bin/perl -w 
-
+#!/usr/bin/env perl
+# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/test_RunnableDB,v $
+# $Revision: 1.40 $
+use warnings;
 use strict;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Analysis;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 
 my $dbhost;
@@ -27,12 +29,12 @@ my $utils_verbosity = 'WARNING'; #how verbose do you want the
 #Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
 #WARNING as this gives warning and throws but not deprecates or infos
 my @command_args = @ARGV;
-&GetOptions( 
-            'dbhost=s'      => \$dbhost,
-            'dbname=s'      => \$dbname,
-            'dbuser=s'      => \$dbuser,
-            'dbpass=s'      => \$dbpass,
-            'dbport=s'      => \$dbport,
+GetOptions( 
+            'dbhost|host|h=s'      => \$dbhost,
+            'dbname|db|D=s'      => \$dbname,
+            'dbuser|user|u=s'      => \$dbuser,
+            'dbpass|pass|p=s'      => \$dbpass,
+            'dbport|port|P=s'      => \$dbport,
             'input_id:s'  => \$input_id,
             'analysis|logic_name:s'  => \$logic_name,
             'check'       => \$check,
@@ -88,8 +90,7 @@ if(!$analysis){
     " ".$input_type."\n" if($verbose);
   print STDERR "This object will be stored in the database when the ".
     "features are written\n" if($verbose && $write);
-  #$analysis = new Bio::EnsEMBL::Analysis
-    $analysis = new Bio::EnsEMBL::Pipeline::Analysis
+  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
     (-logic_name => $logic_name,
      -module     => $module,
      -input_type => $input_type
