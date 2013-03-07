@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_agp.pl,v $
-# $Revision: 1.16 $
+# $Revision: 1.17 $
 
 
 =head1 NAME
@@ -48,11 +48,11 @@ here is an example commandline
 use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 my $host   = '';
-my $port   = '';
+my $port   = '3306';
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
@@ -64,19 +64,19 @@ my $agpfile;
 my $help;
 my $name_file;
 
-&GetOptions(
-            'dbhost:s'   => \$host,
-            'dbport:n'   => \$port,
-            'dbname:s'   => \$dbname,
-            'dbuser:s'   => \$dbuser,
-            'dbpass:s'   => \$dbpass,
+GetOptions(
+            'host|dbhost|h:s'   => \$host,
+            'port|dbport|P:n'   => \$port,
+            'dbname|db|D:s'   => \$dbname,
+            'user|dbuser|u:s'   => \$dbuser,
+            'pass|dbpass|p:s'   => \$dbpass,
             'assembled_name:s' => \$assembled_name,
             'assembled_version:s' => \$assembled_version,
             'component_name:s' => \$component_name,
             'component_version:s' => \$component_version,
             'agp_file:s' => \$agpfile,
             'name_file:s' => \$name_file,
-            'h|help'     => \$help,
+            'help'     => \$help,
             ) or ($help = 1);
 
 if(!$host || !$dbuser || !$dbname || !$dbpass){

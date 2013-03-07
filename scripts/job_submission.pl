@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/job_submission.pl,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
@@ -63,11 +63,11 @@ my $seq_level;
 my $top_level;
 
 GetOptions(
-           'dbhost=s'      => \$dbhost,
-           'dbname=s'      => \$dbname,
-           'dbuser=s'      => \$dbuser,
-           'dbpass=s'      => \$dbpass,
-           'dbport=s'      => \$dbport,
+           'host|dbhost|h:s'      => \$dbhost,
+           'dbname|db|D:s'      => \$dbname,
+           'user|dbuser|u:s'      => \$dbuser,
+           'pass|dbpass|p:s'      => \$dbpass,
+           'port|dbport|P:s'      => \$dbport,
            'help!'                  => \$help,
            'verbose!'               => \$verbose,
            'queue_manager=s'        => \$queue_manager,
@@ -82,7 +82,7 @@ GetOptions(
            'force!'                 => \$force,
            'input_id_file=s'        => \$ids_to_run,
            'make_input_ids!'        => \$make_input_ids,
-           'coord_system:s'         => \$coord_system,
+           'coord_system|cs_name:s'         => \$coord_system,
            'coord_system_version:s' => \$coord_system_version,
            'slice'                  => \$slice,
            'slice_size:s'           => \$slice_size,

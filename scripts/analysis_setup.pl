@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/analysis_setup.pl,v $
-# $Revision: 1.13 $
-# $Id: analysis_setup.pl,v 1.13 2013-01-29 14:59:48 ak4 Exp $
+# $Revision: 1.14 $
+# $Id: analysis_setup.pl,v 1.14 2013-03-07 12:56:42 fm2 Exp $
 
 =head1 NAME
 
@@ -90,7 +90,7 @@ There is an example file in this directory called "example_analysis.conf".
 use strict;
 use warnings;
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use AnalysisCreation;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -113,17 +113,17 @@ my $help;
 my $pipeline = 1;
 my $update;
 
-if ( !GetOptions( 'dbhost=s'     => \$dbhost,
-                  'dbname=s'     => \$dbname,
-                  'dbuser=s'     => \$dbuser,
-                  'dbpass=s'     => \$dbpass,
-                  'dbport=s'     => \$dbport,
+if ( !GetOptions( 'host|dbhost|h:s'     => \$dbhost,
+                  'dbname|db|D:s'     => \$dbname,
+                  'user|dbuser|u:s'     => \$dbuser,
+                  'pass|dbpass|p:s'     => \$dbpass,
+                  'port|dbport|P:s'     => \$dbport,
                   'read!'        => \$read,
                   'write!'       => \$write,
                   'pipeline_db!' => \$pipeline,
                   'update!'      => \$update,
                   'file=s'       => \$file,
-                  'h|help!'      => \$help, ) ||
+                  'help!'      => \$help, ) ||
      $help )
 {
   usage();

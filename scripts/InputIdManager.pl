@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/InputIdManager.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 
 # InputIdManager.pl
@@ -65,7 +65,7 @@ Insert list of bugs here!
 use warnings ;
 use strict;
 use FileHandle;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;

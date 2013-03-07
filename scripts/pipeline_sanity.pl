@@ -1,11 +1,11 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/pipeline_sanity.pl,v $
-# $Revision: 1.9 $
+# $Revision: 1.10 $
 # this is a script to check pipeline sanity before you run your pipeline
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -18,15 +18,15 @@ my $host     = '';
 my $dbname   = '';
 my $dbuser   = '';
 my $pass     = '';
-my $port     = '';
+my $port     = '3306';
 my $info; #prints out more info if true
 
-&GetOptions(
-            'dbhost:s'          => \$host,
-            'dbname:s'          => \$dbname,
-            'dbuser:s'          => \$dbuser,
-            'dbpass:s'          => \$pass,	    
-            'dbport:s'          => \$port,
+GetOptions(
+            'host|dbhost|h:s'          => \$host,
+            'dbname|db|D:s'          => \$dbname,
+            'user|dbuser|u:s'          => \$dbuser,
+            'pass|dbpass|p:s'          => \$pass,	    
+            'port|dbport|P:s'          => \$port,
             'verbose!' => \$info,
            );
 

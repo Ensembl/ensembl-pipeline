@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rulemanager.pl,v $
-# $Revision: 1.34 $
+# $Revision: 1.35 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks;
 use Bio::EnsEMBL::Pipeline::RuleManager;
@@ -84,11 +84,11 @@ my $number_output_dirs = 10;
 my $distribute;
 my $reverse;
 GetOptions(
-           'dbhost=s'               => \$dbhost,
-           'dbname=s'               => \$dbname,
-           'dbuser=s'               => \$dbuser,
-           'dbpass=s'               => \$dbpass,
-           'dbport=s'               => \$dbport,
+           'host|dbhost|h:s'               => \$dbhost,
+           'dbname|db|D:s'               => \$dbname,
+           'user|dbuser|u:s'               => \$dbuser,
+           'pass|dbpass|p:s'               => \$dbpass,
+           'port|dbport|P:s'               => \$dbport,
            'help!'                  => \$help,
            'verbose!'               => \$verbose,
            'queue_manager=s'        => \$queue_manager,

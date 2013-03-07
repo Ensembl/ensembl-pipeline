@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_seq_region.pl,v $
-# $Revision: 1.19 $
+# $Revision: 1.20 $
 
 =head1 NAME
 
@@ -75,10 +75,10 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Slice;
 use Bio::EnsEMBL::CoordSystem;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 my $host   = '';
-my $port   = '';
+my $port   = '3306';
 my $dbname = '';
 my $dbuser = '';
 my $dbpass = '';
@@ -94,13 +94,13 @@ my $verbose = 0;
 my $regex;
 my $name_file;
 
-&GetOptions(
-            'dbhost:s'   => \$host,
-            'dbport:n'   => \$port,
-            'dbname:s'   => \$dbname,
-            'dbuser:s'   => \$dbuser,
-            'dbpass:s'   => \$dbpass,
-            'coord_system_name:s' => \$cs_name,
+GetOptions(
+            'host|dbhost|h:s'   => \$host,
+            'port|dbport|P:n'   => \$port,
+            'dbname|db|D:s'   => \$dbname,
+            'user|dbuser|u:s'   => \$dbuser,
+            'pass|dbpass|p:s'   => \$dbpass,
+            'coord_system_name|cs_name:s' => \$cs_name,
             'coord_system_version:s' => \$cs_version,
             'rank:i' => \$rank,
             'sequence_level!' => \$sequence_level,
@@ -110,7 +110,7 @@ my $name_file;
             'verbose!' => \$verbose,
             'regex:s' => \$regex,
             'name_file:s' => \$name_file,
-            'h|help'     => \$help,
+            'help'     => \$help,
            ) or ($help = 1);
 
 if(!$host || !$dbuser || !$dbname || !$dbpass){

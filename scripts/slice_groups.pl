@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/slice_groups.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 # This script generates groups of toplevel slices from a
 # database, ensuring that each group is no bigger than
@@ -13,7 +13,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
@@ -28,15 +28,15 @@ my (
     $group_size,
     $outdir,
 );
-
+$dbport = '3306';
 $dbuser = 'ensro';
 
-&GetOptions(
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+GetOptions(
+            'dbname|db|D:s' => \$dbname,
+            'user|dbuser|u:s' => \$dbuser,
+            'host|dbhost|h:s' => \$dbhost,
+            'port|dbport|P:s' => \$dbport,
+            'pass|dbpass|p:s' => \$dbpass,
             'maxslicesize=s' => \$slice_size,
             'maxgroupsize=s' => \$group_size,
             'outdir=s'    => \$outdir,

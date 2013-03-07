@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_taxonomy.pl,v $
-# $Revision: 1.13 $
+# $Revision: 1.14 $
 
 #this is a copy of sections of /ensembl-compara/scripts/taxonomy/taxonTreeTool.pl
 #uses -dbname style commands 
@@ -16,7 +16,7 @@
 use warnings ;
 use strict;
 use Switch;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 
 $| = 1;
@@ -31,7 +31,7 @@ $self->{'scale'} = 10;
 
 my ($help, $taxondbhost, $taxondbport, $taxondbname);
 my ($lcdbhost, $lcdbport, $lcdbname, $lcdbuser, $lcdbpass);
-
+$lcdbport='3306';
 
 GetOptions('help'           => \$help,
            'taxon_id=i'     => \$self->{'taxon_id'},
@@ -39,11 +39,11 @@ GetOptions('help'           => \$help,
            'taxondbhost=s'  => \$taxondbhost,
            'taxondbport=s'  => \$taxondbport,
            'taxondbname=s'  => \$taxondbname,
-           'dbhost|lcdbhost=s'     => \$lcdbhost,
-           'dbport|lcdbport=s'     => \$lcdbport,
-           'dbname|lcdbname=s'     => \$lcdbname,
-           'dbuser|lcdbuser=s'     => \$lcdbuser,
-	   'dbpass|lcdbpass=s'     => \$lcdbpass,
+           'dbhost|lcdbhost|host|h=s'     => \$lcdbhost,
+           'dbport|lcdbport|port|P=s'     => \$lcdbport,
+           'dbname|lcdbname|db|D=s'     => \$lcdbname,
+           'dbuser|lcdbuser|user|u=s'     => \$lcdbuser,
+	   'dbpass|lcdbpass|pass|p=s'     => \$lcdbpass,
           );
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/setup_orthologue_evaluator.pl,v $
-# $Revision: 1.21 $
+# $Revision: 1.22 $
 
 =pod
 
@@ -66,7 +66,7 @@ Internal methods are usually preceded with a '_'
  
 use strict;
 use warnings;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Registry; 
 
 use FindBin;  
@@ -98,13 +98,13 @@ my %opt = (
     exonerate_file => 'exonerate-0.8.3',
 );
 
-&GetOptions(
+GetOptions(
     \%opt,
-    'dbname=s',
-    'dbuser=s',
-    'dbhost=s',
-    'dbport=s',
-    'dbpass=s',
+    'dbname|db|D:s',
+    'user|dbuser|u:s',
+    'host|dbhost|h:s',
+    'port|dbport|P:s',
+    'pass|dbpass|p:s',
     'verbose+',  
     'exonerate_file=s', # specify the name of the exonerate program_file for analysis table 
                         # in /usr/local/bin/ensembl/bin if don't want to use the default 

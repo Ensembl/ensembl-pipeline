@@ -1,26 +1,26 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rule_checker.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 use warnings ;
 use strict;
 use Node;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
-my $host = "ecs4";
-my $port = 3350;
-my $pass = undef;
-my $user = "ensro";
-my $dbname = "steve_test_pipe";
+my $host = '';
+my $port = '3306';
+my $pass = '';
+my $user = 'ensro';
+my $dbname = '';
 
-&GetOptions(
-  'host:s'    => \$host,
-  'user:s'    => \$user,
-  'dbname:s'  => \$dbname,
-  'pass:s'    => \$pass,
-  'port:n'    => \$port,
+GetOptions(
+  'host|dbhost|h:s'    => \$host,
+  'user|dbuser|u:s'    => \$user,
+  'dbname|db|D:s'  => \$dbname,
+  'pass|dbpass|p:s'    => \$pass,
+  'port|dbport|P:n'    => \$port,
 );
 
 

@@ -1,15 +1,15 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/id_increment.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $file;
 my @number;
 my $backup = 1;
-&GetOptions(
+GetOptions(
             'file:s' => \$file,
 	    'number_column:s@' => \@number,
 	    'backup!' => \$backup,

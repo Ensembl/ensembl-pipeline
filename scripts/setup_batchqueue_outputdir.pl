@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/setup_batchqueue_outputdir.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 use warnings ;
 use strict;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $h;
 my $help;

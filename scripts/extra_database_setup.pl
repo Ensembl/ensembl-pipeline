@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extra_database_setup.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -100,7 +100,7 @@ are loading into it will not load the duplicate lines but instead skip them
 =cut
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
@@ -122,12 +122,12 @@ my $local;
 my $genes;
 my $sequence;
 
-&GetOptions(
-            'dbhost=s'            => \$dbhost,
-            'dbname=s'            => \$dbname,
-            'dbuser=s'            => \$dbuser,
-            'dbpass=s'            => \$dbpass,
-            'dbport=s'            => \$dbport,
+GetOptions(
+            'host|dbhost|h:s'            => \$dbhost,
+            'dbname|db|D:s'            => \$dbname,
+            'user|dbuser|u:s'            => \$dbuser,
+            'pass|dbpass|p:s'            => \$dbpass,
+            'port|dbport|P:s'            => \$dbport,
             'help!'               => \$help,
             'target_info=s@'      => \@target_info,
             'dump!'               => \$dump,

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_GeneCombiner.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 
 =head1 NAME
@@ -35,7 +35,7 @@ run_GeneCombiner.pl
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 # this script connects to the db it is going to write to
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw (
@@ -49,7 +49,7 @@ use Bio::EnsEMBL::Pipeline::Config::GeneBuild::GeneCombiner qw (
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
-my $port   = undef;
+my $port   = '3306';
 my $dbname = $REF_DBNAME;
 my $dbuser = $REF_DBUSER;
 my $dbpass = $REF_DBPASS;
@@ -66,17 +66,18 @@ my $acc;
 my $analysis_logic_name;
 
 # can override db options on command line
-&GetOptions( 
+GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
 	     'analysis:s'    => \$analysis_logic_name,
              'write'         => \$write,
              'check'         => \$check,
              'parameters:s'  => \$params,
-             'dbname:s'      => \$dbname,
-             'dbhost:s'      => \$host,
-             'dbuser:s'      => \$dbuser,
-             'dbpass:s'      => \$dbpass,
+             'dbname|db|D:s'      => \$dbname,
+             'host|dbhost|h:s'      => \$host,
+             'user|dbuser|u:s'      => \$dbuser,
+             'pass|dbpass|p:s'      => \$dbpass,
+             'port|dbport|P:n'      => \$port,
 	     );
 
 $| = 1;
@@ -96,6 +97,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(
     -user             => $dbuser,
     -dbname           => $dbname,
     -pass             => $dbpass,
+    -port             => $port,
  );
 
 die "No input id entered" unless defined ($input_id);

@@ -88,7 +88,8 @@ if(!$analysis){
     " ".$input_type."\n" if($verbose);
   print STDERR "This object will be stored in the database when the ".
     "features are written\n" if($verbose && $write);
-  $analysis = new Bio::EnsEMBL::Pipeline::Analysis
+  #$analysis = new Bio::EnsEMBL::Analysis
+    $analysis = new Bio::EnsEMBL::Pipeline::Analysis
     (-logic_name => $logic_name,
      -module     => $module,
      -input_type => $input_type

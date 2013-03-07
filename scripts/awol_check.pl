@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/awol_check.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
@@ -20,11 +20,11 @@ my $verbose;
 my $help;
 my @command_args = @ARGV;
 GetOptions(
-           'dbhost=s'      => \$dbhost,
-           'dbname=s'      => \$dbname,
-           'dbuser=s'      => \$dbuser,
-           'dbpass=s'      => \$dbpass,
-           'dbport=s'      => \$dbport,
+           'host|dbhost|h:s'      => \$dbhost,
+           'dbname|db|D:s'      => \$dbname,
+           'user|dbuser|u:s'      => \$dbuser,
+           'pass|dbpass|p:s'      => \$dbpass,
+           'port|dbport|P:s'      => \$dbport,
            'verbose!' => \$verbose,
            'ignore_lock!' => \$ignore_lock,
            'queue_manager=s' => \$queue_manager,

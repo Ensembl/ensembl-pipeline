@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/make_assembly_patch_input_ids.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 #Written in June 2010, based on make_input_ids, to make input IDs for working with the 
 #patches introduced into the human genome in patch release 1 of GRCh37
@@ -82,7 +82,7 @@ use Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 use Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $host;
 my $user;
@@ -102,17 +102,17 @@ my $all_patch_types;
 my $on_or_after;
 my $all_dates;
 my $slice_size = undef;
-&GetOptions(
-            'dbhost:s'     => \$host,
-            'dbport:n'     => \$port,
-            'dbuser:s'     => \$user,
-            'dbpass:s'     => \$pass,
-            'dbname:s'     => \$dbname,
-            'coord_system:s'       => \$coord_system,
+GetOptions(
+            'host|dbhost|h:s'     => \$host,
+            'port|dbport|P:n'     => \$port,
+            'user|dbuser|u:s'     => \$user,
+            'pass|dbpass|p:s'     => \$pass,
+            'dbname|db|D:s'     => \$dbname,
+            'coord_system|cs_name:s'       => \$coord_system,
             'coord_system_version:s' => \$coord_system_version,
             'logic_name:s' => \$logic_name,
             'input_id_type:s' => \$input_id_type,
-            'h|help'            => \$help,
+            'help'            => \$help,
             'insert_analysis!' => \$insert_analysis,
             'date:s' => \$date,
             'patch_fix!' => \$patch_fix,

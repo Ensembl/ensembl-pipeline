@@ -63,7 +63,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::AnalysisAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Rule; 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $host;
 my $user = '';
@@ -87,12 +87,12 @@ my $input_id_type;
 my $help;
 my $create_submission_ana ;
 my $uppercase; 
-&GetOptions(
-            'dbhost:s'  => \$host,
-            'dbport:n'  => \$port,
-            'dbuser:s'  => \$user,
-            'dbpass:s'  => \$pass,
-            'dbname:s'  => \$dbname,
+GetOptions(
+            'dbhost|host|h:s'  => \$host,
+            'dbport|port|P:n'  => \$port,
+            'dbuser|user|u:s'  => \$user,
+            'dbpass|pass|p:s'  => \$pass,
+            'dbname|db|D:s'  => \$dbname,
             'logic_name:s' => \$logic_name,
             'database:s'   => \$database,
             'database_version:s' => \$database_version,
@@ -107,7 +107,7 @@ my $uppercase;
             'gff_feature:s'      => \$gff_feature,
             'input_id_type:s'       => \$input_id_type,
             'uppercase|uc!'       => \$uppercase,
-            'h|help'            => \$help, 
+            'help'            => \$help, 
             'auto|all!'   => \$create_submission_ana ,  # creates a submission analysis automatically and adds rule too 
            );
 

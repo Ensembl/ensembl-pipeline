@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/set_toplevel.pl,v $
-# $Revision: 1.8 $
+# $Revision: 1.9 $
 
 =head1 NAME
 
@@ -45,13 +45,13 @@ use Bio::EnsEMBL::Utils::Exception qw(throw);
 
 use POSIX qw(ceil);
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
 
 { # block to avoid namespace pollution what are you talking about?
   my $dbhost = '';
-  my $dbport = '';
+  my $dbport = '3306';
   my $dbname = '';
   my $dbuser = '';
   my $dbpass = '';
@@ -60,13 +60,13 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 
   my @coord_system;
 
-  GetOptions( 'dbhost|host:s'          => \$dbhost,
-              'dbport|port:n'          => \$dbport,
-              'dbuser|user:s'          => \$dbuser,
-              'dbpass|pass:s'          => \$dbpass,
-              'dbname|D:s'             => \$dbname,
+  GetOptions( 'host|dbhost|h:s'          => \$dbhost,
+              'port|dbport|P:n'          => \$dbport,
+              'user|dbuser|u:s'          => \$dbuser,
+              'pass|dbpass|p:s'          => \$dbpass,
+              'dbname|db|D:s'             => \$dbname,
               'ignore_coord_system:s@' => \@coord_system,
-              'h|help'                 => \$help,
+              'help'                 => \$help,
   ) or ( $help = 1 );
 
   if(!$dbhost || !$dbuser || !$dbname || !$dbpass){

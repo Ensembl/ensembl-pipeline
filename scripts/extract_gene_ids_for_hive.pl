@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extract_gene_ids_for_hive.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 # Usage: ./extract_gene_ids_for_hive.pl -analysis_id <number - optional>
 #                                       -status <status string - optional> 
@@ -9,7 +9,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my ($analysis_id, $status, $filename);
 

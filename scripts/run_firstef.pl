@@ -1,11 +1,11 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_firstef.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::RunnableDB::FirstEF;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
@@ -22,7 +22,7 @@ use Bio::EnsEMBL::Pipeline::Config::FirstEF qw (
 my $input_id;
 my $write = 0;
 
-&GetOptions( 
+GetOptions( 
 	     'input_id:s'  => \$input_id,
              'write'       => \$write
 	     );

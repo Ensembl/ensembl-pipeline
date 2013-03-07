@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/RuleHandler.pl,v $
-# $Revision: 1.18 $
+# $Revision: 1.19 $
 
 =head1 NAME
 
@@ -54,7 +54,7 @@ RuleHandler.pl -optio
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -72,17 +72,17 @@ my $host     = 'localhost';
 my $dbname   = 'pipeline';
 my $dbuser   = 'ensadmin';
 my $pass     = '';
-my $port     = '';
+my $port     = '3306';
 my $help; 
 my $add_rule ; 
 my %rule_goals; # hash to link up goals with rules for speed later
 
 GetOptions(
-  'dbhost:s'     => \$host,
-  'dbname:s'     => \$dbname,
-  'dbuser:s'     => \$dbuser,
-  'dbpass:s'     => \$pass,
-  'dbport:s'     => \$port,
+  'host|dbhost|h:s'     => \$host,
+  'dbname|db|D:s'     => \$dbname,
+  'user|dbuser|u:s'     => \$dbuser,
+  'pass|dbpass|p:s'     => \$pass,
+  'port|dbport|P:s'     => \$port,
   'goal=s'       => \$goal,
   'condition=s@' => \@conditions,
   'insert'       => \$insert,
@@ -90,7 +90,7 @@ GetOptions(
   'analyses'     => \$show_analyses,
   'rules'        => \$show_rules,
   'ruleId=i'     => \$ruleId,
-  'h|help'       => \$help,
+  'help'       => \$help,
   'auto!' =>
     \$add_rule, # automatically create the condtion out of supplied logic_name
 );

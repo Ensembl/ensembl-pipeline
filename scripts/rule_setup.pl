@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rule_setup.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -77,7 +77,7 @@ See example_rule.conf for an example of a configuration file.
 use strict;
 use warnings;
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use RuleCreation;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -98,11 +98,11 @@ my $file;
 my $help;
 my $pipeline = 1;
 
-if ( !GetOptions( 'dbhost=s'     => \$dbhost,
-                  'dbname=s'     => \$dbname,
-                  'dbuser=s'     => \$dbuser,
-                  'dbpass=s'     => \$dbpass,
-                  'dbport=s'     => \$dbport,
+if ( !GetOptions( 'host|dbhost|h:s'     => \$dbhost,
+                  'dbname|db|D:s'     => \$dbname,
+                  'user|dbuser|u:s'     => \$dbuser,
+                  'pass|dbpass|p:s'     => \$dbpass,
+                  'port|dbport|P:s'     => \$dbport,
                   'read|insert!' => \$read,
                   'write!'       => \$write,
                   'file=s'       => \$file,
