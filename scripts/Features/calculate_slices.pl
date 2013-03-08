@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Features/calculate_slices.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 use warnings ;
 use strict;
@@ -8,7 +8,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
 use Bio::EnsEMBL::SeqFeature;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
 my $dbhost;
@@ -23,8 +23,8 @@ my $max_feature_count = 200;
 
 &GetOptions(
 	    'chr_name:s'      => \$chr_name,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+	    'dbhost|host|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'outfile:s'       => \$outfile,
 	    'max_length:s'    => \$max_length,
 	    'max_feature_count' => \$max_feature_count,
