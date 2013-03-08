@@ -1,21 +1,21 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Features/make_bsubs_for_calculate_slices.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 use warnings ;
 use strict;
 use IO::File;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
 my $dbhost;
 my $dbname;
 my $outdir;
 
-&GetOptions(
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+GetOptions(
+	    'dbhost|host|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'outdir:s'        => \$outdir,
 	    );
 
