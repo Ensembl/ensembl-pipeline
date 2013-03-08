@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/ncRNA_update.pl,v $
-# $Revision: 1.44 $
+# $Revision: 1.45 $
 
 
 use warnings ;
 use ncRNA_update_config; 
 use strict;
 use vars qw(%Config);
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Data::Dumper;
 use Bio::SeqIO;
@@ -30,8 +30,8 @@ my $refresh;
 my $norfam;
 my @species_list;
 $| = 1;
-&GetOptions(
-	    'pass=s'       => \$pass,
+GetOptions(
+	    'pass|dbpass|p=s'       => \$pass,
 	    'verbose!'     => \$verbose,
 	    'config=s'     => \$config_file,
 	    'dbsetup!'     => \$dbsetup,
