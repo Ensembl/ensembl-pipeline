@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/predict_ncRNA.pl,v $
-# $Revision: 1.20 $
+# $Revision: 1.21 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
@@ -37,8 +37,8 @@ my $norfam;
 
 $| = 1; 
 
-&GetOptions(
-	    'pass=s'    => \$pass,
+GetOptions(
+	    'pass|p|dbpass=s'    => \$pass,
 	    'verbose!'  => \$verbose, 
 	    'species=s' => \@species_list,
 	    'norfam!'      => \$norfam,
