@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ModelTraining/genewise_splice_site.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 #This script will produce 2 files (5' and 3' splice site regions).
 #These 2 files can then be used to create a genewise gene.stat model
 #Contact dev@ensembl.org
@@ -9,7 +9,7 @@ use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
 my $dbhost;
@@ -25,8 +25,8 @@ my $genetype; # default genetype
 
 
 GetOptions(
-	   'dbname:s'    => \$dbname,
-	   'dbhost:s'    => \$dbhost,
+	   'dbname|db|D:s'    => \$dbname,
+	   'dbhost|host|h:s'    => \$dbhost,
 	   'dnadbhost:s' => \$dnadbhost,
 	   'dnadbname:s' => \$dnadbname,
 	   'genetype:s'  => \$genetype,
