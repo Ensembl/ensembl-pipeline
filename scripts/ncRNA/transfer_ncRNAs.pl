@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/transfer_ncRNAs.pl,v $
-# $Revision: 1.47 $
+# $Revision: 1.48 $
 
 use warnings ;
 use strict;
@@ -8,7 +8,7 @@ use ncRNA_update_config;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 # This code is intended to transfer the ncRNA genes into the staging server db
 # it deletes old ncRNAs
@@ -49,12 +49,12 @@ my $use_old_ncRNAs;
 
 $| = 1;
 
-GetOptions( 'pass=s'            => \$pass,
+GetOptions( 'pass|dbpass|p=s'            => \$pass,
             'write!'            => \$write,
             'delete!'           => \$delete,
-            'dbname=s'          => \$final_dbname,
-            'dbhost=s'          => \$final_host,
-            'dbport=s'          => \$final_port,
+            'dbname|db|D=s'          => \$final_dbname,
+            'dbhost|host|h=s'          => \$final_host,
+            'dbport|port|P=s'          => \$final_port,
             'species=s'         => \$species,
             'whitelist=s'       => \$list,
             'xrefs=s'           => \$xrefs,
