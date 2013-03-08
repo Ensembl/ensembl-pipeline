@@ -1,28 +1,28 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_test_compara.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 use warnings ;
 use strict;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 print STDERR "starttime: ",time,"\n";
 
 my $host   = 'ecs1b';
-my $port   = undef;
+my $port   = '3306';
 my $dbname = 'abel_crossmatch';
 my $dbuser = 'ensadmin';
 my $pass   = '***';
 my $alnprog = 'crossmatch';
 my $min_score = 50;
 
-&GetOptions('dbhost:s' => \$host,
-	    'dbport:i' => \$port,
-	    'dbname:s' => \$dbname,
-	    'dbuser:s' => \$dbuser,
-	    'pass:s' => \$pass,
+GetOptions('dbhost|host|h:s' => \$host,
+	    'dbport|port|P:i' => \$port,
+	    'dbname|db|D:s' => \$dbname,
+	    'dbuser|user|u:s' => \$dbuser,
+	    'pass|dbpass|p:s' => \$pass,
 	    'alnprog:s' => \$alnprog,
 	    'min_score:f' => \$min_score);
 

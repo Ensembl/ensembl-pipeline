@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_compara.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 # EXIT STATUS
 # 0 all is fine
@@ -10,7 +10,7 @@ use warnings ;
 use strict;
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::RunnableDB::CrossComparer;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 $| = 1;
 
@@ -40,11 +40,11 @@ Get from a Fasta file mouse DNA sequences. Sequences are named as a VirtualConti
 chr_name.chr_start.chr_end
 And compare the human sequemce to the mouse sequences present in the Fasta file.
 
- -help       show this menu
- -h          compara database hostname
- -d          compara database name
- -u          database user name
- -p          database password
+ -help                   show this menu
+ -h|host|dbhost          compara database hostname
+ -d|D|db|dbname          compara database name
+ -u|user|dbuser          database user name
+ -p|pass|dbpass          database password
  -alnprog    program used for alignment (default: bl2seq) see perldoc CrossComparer.pm for details
  -alntype    program used for alignment (default: blastn) see perldoc CrossComparer.pm for details
  -parameters parameters (options) added to the executable command line
@@ -73,10 +73,10 @@ my $filter = "Bio::EnsEMBL::Compara::Filter::Greedy";
 my $parameters = "-g T -W 10 -G 1 -E 2";
 
 unless (GetOptions('help' => \$help,
-		   'h=s' => \$host,
-		   'd=s' => \$dbname,
-		   'u=s' => \$dbuser,
-		   'p=s' => \$pass,
+		   'h|host|dbhost=s' => \$host,
+		   'd|dbname|db|D=s' => \$dbname,
+		   'u|user|dbuser=s' => \$dbuser,
+		   'p|pass|dbpass=s' => \$pass,
 		   'alnprog=s' => \$alnprog,
 		   'alntype=s' => \$alntype,
 		   'parameters=s' => \$parameters,
