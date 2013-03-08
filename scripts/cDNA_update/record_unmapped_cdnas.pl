@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/record_unmapped_cdnas.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 #script to gather evidence from the various analyses I have run to determine why cDNAs have no alignments in the db
 
@@ -14,7 +14,7 @@ use Bio::EnsEMBL::KillList::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
 
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $record_separator = $/;
 
@@ -22,14 +22,15 @@ my ($gss, $seq_file, $user, $host);
 my ($port, $dbname, $species, $vertrna, $refseq);
 my ($vertrna_update, $infile, $outfile, $findN_prog);
 my ($reasons_file);
+$port = '3306';
 
-&GetOptions(
+GetOptions(
             'gss=s'      	=> \$gss,
             'seq_file=s'      	=> \$seq_file,
-            'user=s'            => \$user,
-            'host=s'    	=> \$host,
-            'port=s'    	=> \$port,
-            'dbname=s'    	=> \$dbname,
+            'user|dbuser|u=s'            => \$user,
+            'host|dbhost|h=s'    	=> \$host,
+            'port|dbport|P=s'    	=> \$port,
+            'dbname|db|D=s'    	=> \$dbname,
             'species=s'    	=> \$species,
             'vertrna=s'    	=> \$vertrna,
             'refseq=s'    	=> \$refseq,

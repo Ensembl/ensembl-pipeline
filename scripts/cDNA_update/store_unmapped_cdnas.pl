@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/store_unmapped_cdnas.pl,v $
-# $Revision: 1.11 $
+# $Revision: 1.12 $
 
 #script to gather evidence from the various analyses run to determine why cDNAs have no alignments in the db
 #store this into the database
@@ -18,14 +18,16 @@ my ($port, $dbname, $species, $vertrna, $refseq);
 my ( $infile, $outfile, $findN_prog);
 my ($reasons_file);
 
-&GetOptions(
+$port = '3306';
+
+GetOptions(
             'gss=s'            => \$gss,
             'seq_file=s'       => \$seq_file,
-            'user=s'           => \$user,
-	    'pass=s'           => \$pass,
-            'host=s'           => \$host,
-            'port=s'           => \$port,
-            'dbname=s'         => \$dbname,
+            'user|dbuser|u=s'           => \$user,
+	    'pass|dbpass|p=s'           => \$pass,
+            'host|dbhost|h=s'           => \$host,
+            'port|dbport|P=s'           => \$port,
+            'dbname|db|D=s'         => \$dbname,
             'species=s'        => \$species,
             'vertrna=s'        => \$vertrna,
             'refseq=s'         => \$refseq,
