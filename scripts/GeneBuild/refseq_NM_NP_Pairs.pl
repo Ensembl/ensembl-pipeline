@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/refseq_NM_NP_Pairs.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Pipeline::Config::GeneBuild::Databases;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
@@ -19,18 +19,18 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
 my $refseqfile;
 my $dbhost;
-my $dbport;
+my $dbport='3306';
 my $dbname;
 my $dbuser;
 my $dbpass;
 
-&GetOptions(
+GetOptions(
 	    'refseq:s' => \$refseqfile,
-	    'dbhost:s' => \$dbhost,
-	    'dbport:n' => \$dbport,
-	    'dbname:s' => \$dbname,
-	    'dbuser:s' => \$dbuser,
-	    'dbpass:s' => \$dbpass,
+	    'dbhost|host|h:s' => \$dbhost,
+	    'dbport|port|P:n' => \$dbport,
+	    'dbname|db|D:s' => \$dbname,
+	    'dbuser|user|u:s' => \$dbuser,
+	    'dbpass|pass|p:s' => \$dbpass,
 	   );
 
 &check_parameters;

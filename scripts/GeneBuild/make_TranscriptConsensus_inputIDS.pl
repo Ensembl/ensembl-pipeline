@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/make_TranscriptConsensus_inputIDS.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 
 =head1 NAME
@@ -65,7 +65,7 @@ use strict;
 use warnings;
 
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::SeqIO;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 
@@ -99,17 +99,17 @@ my $sr_names_file;
 my $path ;
 
 
-&GetOptions(
+GetOptions(
             'seq_region_names:s'=> \@seq_region_names,
             'sr_names_file:s'   => \$sr_names_file,
-            'dbname:s'          => \$dbname,
-            'dbhost:s'          => \$dbhost,
-            'dbpass:s'          => \$dbpass,
-            'dbuser:s'          => \$dbuser,
-            'dbport:s'          => \$dbport,
+            'dbname|db|D:s'          => \$dbname,
+            'dbhost|host|h:s'          => \$dbhost,
+            'dbpass|pass|p:s'          => \$dbpass,
+            'dbuser|user|u:s'          => \$dbuser,
+            'dbport|port|P:s'          => \$dbport,
             'outfile:s'         => \$outfile,
-            'coord_system:s'    => \$coordsystem,
-            'path:s'            => \$path,
+            'coord_system|cs_name:s'    => \$coordsystem,
+            'path|cs_version:s'            => \$path,
             'slice_size=i'      => \$slice_size,
             'analysis=s'        => \$analysis,
             'submit_analysis=s' => \$submit_analysis,
