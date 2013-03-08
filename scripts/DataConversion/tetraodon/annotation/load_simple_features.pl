@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_simple_features.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 # load_align_features.pl
 #
@@ -24,13 +24,14 @@ my (
     $gff_source
 );
 
+$dbport = '3306';
 
-&GetOptions(
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+GetOptions(
+            'dbname|db|D=s' => \$dbname,
+            'dbuser|user|u=s' => \$dbuser,
+            'dbhost|host|h=s' => \$dbhost,
+            'dbport|port|P=s' => \$dbport,
+            'dbpass|pass|p=s' => \$dbpass,
             'gff_feat=s' => \$gff_feature,
             'gff_source=s' => \$gff_source,
 );

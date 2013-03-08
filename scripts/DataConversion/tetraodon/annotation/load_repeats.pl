@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_repeats.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::RepeatFeature;
@@ -20,13 +20,14 @@ my (
     $gff_source
 );
 
+$dbport = '3306';
 
-&GetOptions(
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+GetOptions(
+            'dbname|db|D=s' => \$dbname,
+            'dbuser|user|u=s' => \$dbuser,
+            'dbhost|host|h=s' => \$dbhost,
+            'dbport|port|P=s' => \$dbport,
+            'dbpass|pass|p=s' => \$dbpass,
             'gff_source=s' => \$gff_source,
             'gff_feature=s' => \$gff_feature,
             );

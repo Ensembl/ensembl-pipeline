@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_genes.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 ### gtf2ensembl
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Transcript;
@@ -26,12 +26,14 @@ my ($dbhost,
     $do_stable_ids,
     );
 
-&GetOptions(
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+$dbport = '3306';
+
+GetOptions(
+            'dbname|db|D=s' => \$dbname,
+            'dbuser|user|u=s' => \$dbuser,
+            'dbhost|host|h=s' => \$dbhost,
+            'dbport|port|P=s' => \$dbport,
+            'dbpass|pass|p=s' => \$dbpass,
             'test=s'     => \$test,
             'stableids' => \$do_stable_ids,
 );

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/genoscope2cDNAalign.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 # custom script to import the SQL dump of the Genoscope cDNA alignments
 # and write them as DnaDnaAlignFeatures.
@@ -9,7 +9,7 @@
 use warnings ;
 use strict;
  
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::FeaturePair;
 use Bio::EnsEMBL::DnaDnaAlignFeature;
@@ -32,12 +32,14 @@ my (
     @all_features,
     );
 
-&GetOptions(
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+$dbport = '3306';
+
+GetOptions(
+            'dbname|db|D=s' => \$dbname,
+            'dbuser|user|u=s' => \$dbuser,
+            'dbhost|host|h=s' => \$dbhost,
+            'dbport|port|P=s' => \$dbport,
+            'dbpass|pass|p=s' => \$dbpass,
             'perexon=s' => \$per_exon,
             'verbose'  => \$verbose,
             'debug'    => \$debug,
