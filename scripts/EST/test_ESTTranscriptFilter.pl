@@ -1,9 +1,9 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/test_ESTTranscriptFilter.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::Runnable::ESTTranscriptFilter;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
@@ -11,10 +11,10 @@ my $dbname;
 my $dbhost;
 my $input_id;
 
-&GetOptions( 
+GetOptions( 
 	     'input_id:s'    => \$input_id,
-	     'dbname:s'      => \$dbname,
-             'dbhost:s'      => \$dbhost,
+	     'dbname|db|D:s'      => \$dbname,
+             'host|dbhost|h:s'      => \$dbhost,
 	     );
 
 unless ( $input_id && $dbname && $dbhost ){

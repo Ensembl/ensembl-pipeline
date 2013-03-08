@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/dump_estgene_evidence.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 # script that dumps a tab delimited file first column contains the
 # transcript ids (defaulted to stable_id) and the second column contains
@@ -11,7 +11,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $file;
 
@@ -24,9 +24,9 @@ my $dbpass = undef;
 
 my $genetype = 'genomewise';
 
-&GetOptions(
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+GetOptions(
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'genetype:s'      => \$genetype,
 	    'output:s'          => \$file,
 	   );

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/exon2feature.pl,v $
-# $Revision: 1.4 $
+# $Revision: 1.5 $
 
 =head1 NAME
 
@@ -27,7 +27,7 @@
 use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 # ref db holds the exonerate_e2g gene/exon/supporting feature data
 my $refdbname    = 'mouse_sanger_Oct01_est';
@@ -135,7 +135,7 @@ print "\\N\t$contig\t$seq_start\t$seq_end\t$score\t$strand\t$analysis_id\t$name\
 =cut
 
 sub get_variables{
-&GetOptions( 
+GetOptions( 
 	    'refdb:s'      => \$refdbname,
 	    'refuser:s'    => \$refuser,
 	    'refhost:s'    => \$refhost,

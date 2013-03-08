@@ -1,17 +1,17 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/prepare_ests.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 use warnings ;
 use strict;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my @infiles;
 my $outfile;
 my $kill_list_file;
 
-&GetOptions(
+GetOptions(
             'kill_list:s'    => \$kill_list_file,
             'infiles:s'      => \@infiles,
             'outfile:s'      => \$outfile,

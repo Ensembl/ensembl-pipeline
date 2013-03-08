@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_estlengths.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 use warnings ;
 use strict;
 $|=1;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $estfile;
-&GetOptions(
+GetOptions(
 	    'estfile:s' => \$estfile,
 	   );
 

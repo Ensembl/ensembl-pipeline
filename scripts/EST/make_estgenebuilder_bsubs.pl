@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/make_estgenebuilder_bsubs.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -25,7 +25,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 					EST_TMPDIR
@@ -45,7 +45,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 use Getopt::Long;
 my $slice_file;
 
-&GetOptions(
+GetOptions(
 	        'slice_file:s'      => \$slice_file,
 	       );
 

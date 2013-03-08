@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/recover_estgenebuilder_bsub_lines_from_input_ids.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $job_file;
 
-&GetOptions( 
+GetOptions( 
 	    'job_file:s'     => \$job_file,
 	   );
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/submit_jobs.pl,v $
-# $Revision: 1.9 $
+# $Revision: 1.10 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Env; 
 
 ###############
@@ -33,7 +33,7 @@ my $panic    = 10000;
 # the file with the bsub commands
 my $file;
 
-&GetOptions( 
+GetOptions( 
             'jobs:i'     => \$jobs,
             'sleep:i'    => \$sleep,
             'slowdown:i' => \$slowdown,

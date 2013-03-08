@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/run_exonerate.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -22,7 +22,7 @@ run_blat
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::SeqIO;
 
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::Exonerate qw (
@@ -46,7 +46,7 @@ my $analysis;
 my $query_seq;
 
 # can override db options on command line
-&GetOptions( 
+GetOptions( 
 	    'runnable:s'    => \$runnable,
 	    'analysis:s'    => \$analysis,
 	    'write'         => \$write,

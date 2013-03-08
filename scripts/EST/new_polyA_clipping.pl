@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/new_polyA_clipping.pl,v $
-# $Revision: 1.21 $
+# $Revision: 1.22 $
 use warnings ;
 use strict;
 
@@ -75,7 +75,7 @@ use Bio::EnsEMBL::Analysis::Tools::PolyAClipping;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::Seq;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my (
     $data,
@@ -91,7 +91,7 @@ my $err_file = '';
 # NOTE : This script is used in production code ( cdna_update ) - please do not
 # change the calls / options, otherewise the cDNA update code breaks ...
 #
-&GetOptions(
+GetOptions(
             'readfile:s'   => \$data,             # '/path/to/unclipped/cdnas_unclipped.fa';
             'outfile:s'    => \$clipped_cdnas,    # '/path/to/clipped/cdnas_clipped.fa';
             'trim'         => \$trim,             # trimming flag

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/test_ClusterMerge.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 
 use warnings ;
@@ -12,7 +12,7 @@ use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Exon;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dbname;
@@ -37,8 +37,8 @@ my $info;
 $| = 1;
 
 
-&GetOptions( 'dbhost:s'  => \$dbhost,
-	     'dbname:s'  => \$dbname,
+GetOptions( 'host|dbhost|h:s'  => \$dbhost,
+	     'dbname|db|D:s'  => \$dbname,
 	     'dnadbhost:s'=> \$dnadbhost,
 	     'dnadbname:s'=> \$dnadbname,
 	     'input_id:s'=> \$input_id,

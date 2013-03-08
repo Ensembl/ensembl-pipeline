@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/filter_and_e2g_byAcc.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 =head1 NAME
 
@@ -25,7 +25,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
 					EST_RUNNER
 					EST_FILTER_RUNNABLE
@@ -75,7 +75,7 @@ if ($output ne ''){
 =cut
 
 sub get_variables {
-  &GetOptions( 
+  GetOptions( 
 	      'input_id:s'      => \$input_id,
 	      'acc:s'           => \$acc,
 	     );

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_human_ests.pl,v $
-# $Revision: 1.14 $
+# $Revision: 1.15 $
 
 =head1 NAME
 
@@ -24,7 +24,7 @@
 
 use warnings ;
 use strict; 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::EnsEMBL::Utils::PolyA;
@@ -38,7 +38,7 @@ my $clip;
 my $softmask;
 my $min_length = 60;
 
-&GetOptions( 
+GetOptions( 
 	    'estfile:s'     => \$estfile,
 	    'outfile:s'     => \$seqoutfile,
 	    'clip'          => \$clip,

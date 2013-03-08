@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/cluster_merge.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 ############################################################
 # script to run the ClusterMerge Algorithm (Eduardo Eyras)
@@ -13,7 +13,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::Runnable::ClusterMerge;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
@@ -36,7 +36,7 @@ my $help;
 
 ############################################################
 
-&GetOptions( 
+GetOptions( 
 	    #'gff_format:s'        => \$gff_format,
 	     'input:s'                   => \$input,
 	     'output:s'                  => \$output,

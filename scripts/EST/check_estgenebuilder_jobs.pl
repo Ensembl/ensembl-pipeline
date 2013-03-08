@@ -1,18 +1,18 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/check_estgenebuilder_jobs.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 use warnings ;
 use strict;
 
 ### usage: /dir/where the /chr/dirs/sit/> ~/ensembl-scripts/check_estgenebuilder_jobs.pl
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $exit;
 my $memory;
 my $exception;
 
-&GetOptions( 
+GetOptions( 
 	    'exit'     => \$exit,
 	    'memory'   => \$memory,
 	    'exception'=> \$exception,

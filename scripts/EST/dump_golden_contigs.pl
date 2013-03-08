@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/dump_golden_contigs.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -25,7 +25,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
@@ -48,11 +48,11 @@ $dbuser  = $EST_REFDBUSER;
 $dbhost  = $EST_REFDBHOST;
 
 # otherwise get them from the command line
-&GetOptions( 
-	    'dbname:s'     => \$dbname,
-	    'dbhost:s'     => \$dbhost,
+GetOptions( 
+	    'dbname|db|D:s'     => \$dbname,
+	    'host|dbhost|h:s'     => \$dbhost,
 	    'outfile:s'    => \$outfile,
-	    'path:s'       => \$path,
+	    'path|cs_version:s'       => \$path,
 	   );
 
 # usage

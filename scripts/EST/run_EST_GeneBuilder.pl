@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/run_EST_GeneBuilder.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 
 =head1 NAME
@@ -35,7 +35,7 @@ run_EST_RunnableDB
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 # this script connects to the db it is going to write to
 use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
@@ -53,7 +53,7 @@ use Bio::EnsEMBL::Pipeline::Config::cDNAs_ESTs::EST_GeneBuilder_Conf qw (
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 #use Bio::EnsEMBL::DBLoader;
 my $dbtype = 'rdb';
-my $port   = undef;
+my $port   = '3306';
 my $dbname = $EST_REFDBNAME;
 my $dbuser = $EST_REFDBUSER;
 my $dbpass = $EST_REFDBPASS;
@@ -70,16 +70,16 @@ my $analysis;
 my $use_label;
 
 # can override db options on command line
-&GetOptions( 
+GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
              'analysis:s'    => \$analysis,
 	     'write'         => \$write,
              'check'         => \$check,
-             'dbname:s'      => \$dbname,
-             'dbhost:s'      => \$host,
-             'dbuser:s'      => \$dbuser,
-             'dbpass:s'      => \$dbpass,
+             'dbname|db|D:s'      => \$dbname,
+             'host|dbhost|h:s'      => \$host,
+             'user|dbuser|u:s'      => \$dbuser,
+             'pass|dbpass|p:s'      => \$dbpass,
 	     'use_label'     => \$use_label,
            );
 
