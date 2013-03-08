@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/bsubs_for_comparing_whole_genomes.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 use warnings ;
 use strict;
 use IO::File;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $fh = new IO::File;
 
@@ -16,9 +16,9 @@ my $dbuser = 'ensro';
 my $dbname;
 my $outdir;
 
-&GetOptions(
-	    'dbname:s'       => \$dbname,
-	    'dbhost:s'       => \$dbhost,
+GetOptions(
+	    'dbname|db|D:s'       => \$dbname,
+	    'host|dbhost|h:s'       => \$dbhost,
 	    'outdir:s'       => \$outdir,
 	    );
 
