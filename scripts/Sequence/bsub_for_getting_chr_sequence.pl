@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/bsub_for_getting_chr_sequence.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
 use IO::File;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $fh = new IO::File;
 
@@ -19,15 +19,15 @@ my $coord_system;
 my $coord_system_version;
 my $dbpass;
 my $dbport = 3306;
-&GetOptions(
-            'dbname:s'       => \$dbname,
-            'dbhost:s'       => \$dbhost,
+GetOptions(
+            'dbname|db|D:s'       => \$dbname,
+            'dbhost|host|h:s'       => \$dbhost,
             'outdir:s'       => \$outdir,
-            'dbuser:s' => \$dbuser,
-            'dbport:s' => \$dbport,
-            'dbpass:s' => \$dbpass,
-            'coord_system:s' => \$coord_system,
-            'coord_system_version:s' => \$coord_system_version,
+            'dbuser|user|u:s' => \$dbuser,
+            'dbport|port|P:s' => \$dbport,
+            'dbpass|pass|p:s' => \$dbpass,
+            'coord_system|cs_name:s' => \$coord_system,
+            'coord_system_version|cs_version:s' => \$coord_system_version,
 	    );
 
 unless( $dbhost &&  $dbname && $outdir && $coord_system){

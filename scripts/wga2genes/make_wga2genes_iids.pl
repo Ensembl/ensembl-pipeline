@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/wga2genes/make_wga2genes_iids.pl,v $
-# $Revision: 1.12 $
+# $Revision: 1.13 $
 
 # Generation of input ids for WGA2Genes. Segments the
 # genome into regions that (1) contain at least one gene,
@@ -8,7 +8,7 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Pipeline::Analysis;
 
@@ -57,13 +57,13 @@ $compara_dbport = 3306;
 $source_type = 'protein_coding';
 $source_align_type = 'BLASTZ_NET';
 
-&GetOptions(
+GetOptions(
             
-            'dbname=s' => \$dbname,
-            'dbuser=s' => \$dbuser,
-            'dbhost=s' => \$dbhost,
-            'dbport=s' => \$dbport,
-            'dbpass=s' => \$dbpass,
+            'dbname|db|D=s' => \$dbname,
+            'dbuser|user|u=s' => \$dbuser,
+            'dbhost|host|h=s' => \$dbhost,
+            'dbport|port|P=s' => \$dbport,
+            'dbpass|pass|p=s' => \$dbpass,
             'querydbname=s' => \$query_dbname,
             'querydbhost=s' => \$query_dbhost,
             'querydbport=s' => \$query_dbport,

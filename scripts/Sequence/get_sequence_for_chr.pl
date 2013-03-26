@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/get_sequence_for_chr.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 # dump_seq_into_fastA.pl
 # it reads a bit of sequence and dump it into a fasA file, to eb able to view it in Apollo
@@ -10,7 +10,7 @@ use strict;
 
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 # get a contig with a piece-of/entire  chromosome
 
@@ -27,19 +27,19 @@ my $dbname;
 my $dbpass;
 my $dbport = 3306;
 
-&GetOptions(
+GetOptions(
             'seq_region_name:s' => \$name,
-            'dbname:s'       => \$dbname,
-            'dbhost:s'       => \$dbhost,
-            'dbpass:s' => \$dbpass,
-            'dbuser:s' => \$dbuser,
-            'dbport:s' => \$dbport,
+            'dbname|db|D:s'       => \$dbname,
+            'dbhost|host|h:s'       => \$dbhost,
+            'dbpass|pass|p:s' => \$dbpass,
+            'dbuser|user|u:s' => \$dbuser,
+            'dbport|port|P:s' => \$dbport,
             'mask'           => \$mask,
             'dust'           => \$dust,
             'softmask'       => \$softmask,
             'maskall'        => \$maskall,
             'outfile:s'      => \$outfile,
-            'coord_system:s' => \$coord_system,
+            'coord_system|cs_name:s' => \$coord_system,
 	    
 	    );
 

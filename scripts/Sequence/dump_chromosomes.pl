@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/dump_chromosomes.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -26,12 +26,12 @@
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 
 my $dbname;
-my $dbport;
+my $dbport = 3306;
 my $dbhost;
 my $dbuser;
 my $dbpass;
@@ -40,11 +40,11 @@ my $dust;
 my $outdir;
 my $chr;
 
-&GetOptions('dbname:s'   => \$dbname,
-	    'dbport:s'   => \$dbport,
-	    'dbhost:s'   => \$dbhost,
-	    'dbuser:s'   => \$dbuser,
-	    'dbpass:s'   => \$dbpass,
+GetOptions('dbname|db|D:s'   => \$dbname,
+	    'dbport|port|P:s'   => \$dbport,
+	    'dbhost|host|h:s'   => \$dbhost,
+	    'dbuser|user|u:s'   => \$dbuser,
+	    'dbpass|pass|p:s'   => \$dbpass,
 	    'repeatmask' => \$repeatmask,
 	    'dust'       => \$dust,
 	    'outdir:s'   => \$outdir,

@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/dump_seq_into_fastA.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 # dump_seq_into_fastA.pl
 # it reads a bit of sequence and dump it into a fasA file, to eb able to view it in Apollo
@@ -11,7 +11,7 @@ use diagnostics;
 
 use Bio::SeqIO;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
 
@@ -29,14 +29,14 @@ my $dbname;
 my $maskall;
 
 
-&GetOptions(
+GetOptions(
 	    'input_id:s' => \$input_id,
 	    'masked'     => \$masked,
 	    'softmasked' => \$softmasked,
 	    'maskall'    => \$maskall,
 	    'dust'       => \$dust,
-	    'dbname:s'   => \$dbname,
-	    'dbhost:s'   => \$dbhost,
+	    'dbname|db|D:s'   => \$dbname,
+	    'dbhost|host|h:s'   => \$dbhost,
 	   );
 
 unless ( $input_id && $dbname && $dbhost ){
