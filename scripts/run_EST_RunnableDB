@@ -32,7 +32,7 @@ run_EST_RunnableDB
 =cut
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::Pipeline::ESTConf qw (
                                         EST_E2G_DBNAME
@@ -43,7 +43,7 @@ use Bio::EnsEMBL::Pipeline::ESTConf qw (
 
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-my $port   = undef;
+my $port   = 3306;
 my $dbname = $EST_E2G_DBNAME;
 my $dbuser = $EST_E2G_DBUSER;
 my $dbpass = $EST_E2G_DBPASS;
@@ -59,17 +59,17 @@ my $pepfile;
 my $analysis;
 
 # can override db options on command line
-&GetOptions( 
+GetOptions( 
 	     'input_id:s'    => \$input_id,
 	     'runnable:s'    => \$runnable,
              'analysis:s'    => \$analysis,
 	     'write'         => \$write,
              'check'         => \$check,
              'parameters:s'  => \$params,
-             'dbname:s'      => \$dbname,
-             'dbhost:s'      => \$host,
-             'dbuser:s'      => \$dbuser,
-             'dbpass:s'      => \$dbpass,
+             'dbname|db|D:s'      => \$dbname,
+             'dbhost|host|h:s'      => \$host,
+             'dbuser|user|u:s'      => \$dbuser,
+             'dbpass|pass|p:s'      => \$dbpass,
 
 	     );
 
