@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/update_pseudogenes.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 =head1 OPTIONS
 
@@ -25,7 +25,7 @@
 use warnings ;
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 
 my $dbhost;
@@ -42,12 +42,12 @@ my $file;
 my $logic_name;
 my $analysis;
 
-&GetOptions( 
-	    'dbhost=s'      => \$dbhost,
-	    'dbname=s'      => \$dbname,
-	    'dbuser=s'      => \$dbuser,
-	    'dbpass=s'      => \$dbpass,
-	    'dbport=s'      => \$dbport,
+GetOptions( 
+	    'dbhost|host|h=s'      => \$dbhost,
+	    'dbname|db|D=s'      => \$dbname,
+	    'dbuser|user|u=s'      => \$dbuser,
+	    'dbpass|pass|p=s'      => \$dbpass,
+	    'dbport|port|P=s'      => \$dbport,
 	    'dnadbhost=s'   => \$dnadbhost,
 	    'dnadbname=s'   => \$dnadbname,
 	    'dnadbuser=s'   => \$dnadbuser,

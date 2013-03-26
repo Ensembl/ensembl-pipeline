@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/find_processed_pseudogenes.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost    = 'ecs2d';
 my $dbuser    = 'ensro';
@@ -24,9 +24,9 @@ my $similarity_protein = "other-protein";
 my $genetype;
 
 $dbuser = "ensro";
-&GetOptions(
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
+GetOptions(
+	    'dbname|db|D:s'    => \$dbname,
+	    'dbhost|host|h:s'    => \$dbhost,
 	    'dnadbname:s'    => \$dnadbname,
 	    'dnadbhost:s'    => \$dnadbhost,
 	    'genetype:s'  => \$genetype,

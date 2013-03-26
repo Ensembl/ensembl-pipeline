@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/test_this_genewise.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 use warnings ;
 use strict;
@@ -9,7 +9,7 @@ use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::PseudoGeneTests;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost    = 'ecs2c'; 
 my $dbuser    = 'ensro';
@@ -92,7 +92,7 @@ my $transcript_id;
 my $gene_id;
 my $outfile;
 
-&GetOptions(
+GetOptions(
 	    'gene_id:s'          => \$gene_id,
 	    'transcript_id:s'    => \$transcript_id,
 	    #'outfile:s'          => \$outfile,
