@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_translations.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 
 =head1 NAME
@@ -26,7 +26,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dbuser    = 'ensro';
@@ -41,8 +41,8 @@ my $dnadbpass = undef;
 my $genetype;
 my $peptide_file = 'peptides.fa';
 
-&GetOptions( 'dbhost:s'       => \$dbhost,
-	     'dbname:s'       => \$dbname,
+GetOptions( 'host|dbhost|h:s'       => \$dbhost,
+	     'dbname|db|D:s'       => \$dbname,
 	     'dnadbhost:s'    => \$dnadbhost,
 	     'dnadbname:s'    => \$dnadbname,
 	     'peptide_file:s' => \$peptide_file,

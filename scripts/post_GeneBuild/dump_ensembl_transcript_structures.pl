@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_transcript_structures.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 # script to dump info for the Oxford guys, for the Rat genome project
 
@@ -8,7 +8,7 @@ use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use strict;
 
 my $dbname;
@@ -21,8 +21,8 @@ my $genetype;
 
 my $file = 'ensembl_transcript_structures';
 
-&GetOptions( 'dbhost:s'       => \$dbhost,
-	     'dbname:s'       => \$dbname,
+GetOptions( 'host|dbhost|h:s'       => \$dbhost,
+	     'dbname|db|D:s'       => \$dbname,
 	     'dnadbname:s'     => \$dnadbname,
 	     'dnadbhost:s'     => \$dnadbhost,
 	     'genetype:s'     => \$genetype,

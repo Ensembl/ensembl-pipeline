@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_cDNA.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 =head1 NAME
 
@@ -22,7 +22,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dbuser = 'ensro';
@@ -42,13 +42,13 @@ my $t_id;
 my $gstable_id;
 my $g_id;
 
-&GetOptions(
+GetOptions(
 	    'tstable_id:s' => \$tstable_id,
 	    't_id:s' => \$t_id,
 	    'g_id:s' => \$g_id,
 	    'gstable_id:s' => \$gstable_id,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'dnadbhost:s'     => \$dnadbhost,
 	    'dnadbname:s'     => \$dnadbname,
 	    'genetype:s'      => \$genetype,

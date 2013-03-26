@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/get_transcripts_with_this_evidence.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 use warnings ;
 use strict;
@@ -8,7 +8,7 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $file;
 
@@ -24,13 +24,13 @@ my $genetype;
 my $protein_id;
 my $dna_id;
 
-&GetOptions(
+GetOptions(
 	    'protein_id:s'    => \$protein_id,
 	    'dna_id:s'        => \$dna_id,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'genetype:s'      => \$genetype,
-            'path:s'          => \$path,
+            'path|cs_version:s'          => \$path,
 );
 
 unless ( $protein_id || $dna_id ){

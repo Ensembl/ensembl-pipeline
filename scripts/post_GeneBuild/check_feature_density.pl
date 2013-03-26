@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_feature_density.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dbuser = 'ensro';
@@ -16,10 +16,10 @@ my $dbpass = undef;
 
 my $feature_name;
 
-&GetOptions(
+GetOptions(
 	    'feature_name:s' => \$feature_name,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	   );
 
 unless ( $feature_name ){

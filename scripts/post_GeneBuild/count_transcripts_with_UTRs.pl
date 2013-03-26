@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/count_transcripts_with_UTRs.pl,v $
-# $Revision: 1.2 $
+# $Revision: 1.3 $
 
 use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use strict;
 
 my $dbname;
@@ -15,8 +15,8 @@ my $dbuser = 'ensro';
 
 my $genetype;
 
-&GetOptions( 'dbhost:s'       => \$dbhost,
-	     'dbname:s'       => \$dbname,
+GetOptions( 'host|dbhost|h:s'       => \$dbhost,
+	     'dbname|db|D:s'       => \$dbname,
 	     'genetype:s'     => \$genetype,
 	   );
 

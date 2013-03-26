@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/cluster_Genes.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 =head1 NAME
 
@@ -23,7 +23,7 @@ use diagnostics;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneComparison;
 use Bio::EnsEMBL::Pipeline::GeneComparison::TranscriptCluster;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 ## load all the parameters
 use Bio::EnsEMBL::Pipeline::GeneComparison::GeneCompConf;
@@ -46,10 +46,10 @@ my $genome;
 my @genetypes;
 
 # options
-&GetOptions( 
+GetOptions( 
 	    'input_id:s'  => \$input_id,
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
+	    'dbname|db|D:s'    => \$dbname,
+	    'host|dbhost|h:s'    => \$dbhost,
 	    'genome'      => \$genome,
 	    'genetypes:s'  => \@genetypes,
 	   );

@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/classify_transcripts_by_evidence.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dnadbhost;
@@ -21,8 +21,8 @@ my $genetype;
 
 $dbuser = "ensro";
 GetOptions(
-	   'dbname:s'    => \$dbname,
-	   'dbhost:s'    => \$dbhost,
+	   'dbname|db|D:s'    => \$dbname,
+	   'host|dbhost|h:s'    => \$dbhost,
 #	   'dnadbname:s'  => \$dnadbname,
 #	   'dnadbhost:s'  => \$dnadbhost,
 	   'genetype:s'  => \$genetype,

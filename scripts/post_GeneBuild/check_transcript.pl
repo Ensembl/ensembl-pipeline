@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_transcript.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $file;
 
@@ -25,13 +25,13 @@ my $tstable_id;
 my $g_id;
 my $t_id;
 
-&GetOptions(
+GetOptions(
 	    'tstable_id:s' => \$tstable_id,
 	    't_id:s' => \$t_id,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
 	    'genetype:s'      => \$genetype,
-            'path:s'          => \$path,
+            'path|cs_version:s'          => \$path,
 );
 
 unless ( $t_id || $tstable_id){

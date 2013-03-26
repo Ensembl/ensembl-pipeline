@@ -1,10 +1,10 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/create_stable_ids.pl,v $
-# $Revision: 1.8 $
+# $Revision: 1.9 $
 
 use warnings ;
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw(throw); 
 use Bio::SeqIO;
@@ -17,10 +17,10 @@ my $dbname;
 my $label; 
 my $sql; 
 my $dbport = '3306' ;
-&GetOptions(
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
-            'dbport:i'    => \$dbport,
+GetOptions(
+	    'dbname|db|D:s'    => \$dbname,
+	    'host|dbhost|h:s'    => \$dbhost,
+            'port|dbport|P:i'    => \$dbport,
 	    'label:s'     => \$label,
             'sql!'        => \$sql, 
 

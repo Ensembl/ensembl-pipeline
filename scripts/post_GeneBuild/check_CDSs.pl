@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_CDSs.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 =head1 NAME
 
@@ -17,7 +17,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 my $file = 'ensembl_CDSs';
@@ -35,9 +35,9 @@ my $dnadbpass = undef;
 my $genetype;
 
 
-&GetOptions(
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
+GetOptions(
+	    'dbname|db|D:s'    => \$dbname,
+	    'host|dbhost|h:s'    => \$dbhost,
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
 	    'file:s'  => \$file,

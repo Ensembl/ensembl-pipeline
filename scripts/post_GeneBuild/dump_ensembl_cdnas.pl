@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_cdnas.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 =head1 NAME
 
@@ -17,7 +17,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils;
 
 my $file = 'ensembl_cdnas';
@@ -37,11 +37,11 @@ my $dnadbport;
 my $genetype;
 
 
-&GetOptions(
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
-	    'dbpass:s'    => \$dbpass,
-	    'dbport:s'    => \$dbport,
+GetOptions(
+	    'dbname|db|D:s'    => \$dbname,
+	    'host|dbhost|h:s'    => \$dbhost,
+	    'pass|dbpass|p:s'    => \$dbpass,
+	    'port|dbport|P:s'    => \$dbport,
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
 	    'dnadbpass:s'    => \$dnadbpass,

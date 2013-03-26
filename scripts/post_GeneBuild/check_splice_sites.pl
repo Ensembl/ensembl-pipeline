@@ -1,12 +1,12 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_splice_sites.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
 my $dnadbhost;
@@ -20,8 +20,8 @@ my $genetype;
 
 $dbuser = "ensro";
 GetOptions(
-	   'dbname:s'    => \$dbname,
-	   'dbhost:s'    => \$dbhost,
+	   'dbname|db|D:s'    => \$dbname,
+	   'host|dbhost|h:s'    => \$dbhost,
 	   'dnadbname:s'  => \$dnadbname,
 	   'dnadbhost:s'  => \$dnadbhost,
 	   'genetype:s'  => \$genetype,

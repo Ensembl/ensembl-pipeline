@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/fix_estgene.pl,v $
-# $Revision: 1.3 $
+# $Revision: 1.4 $
 
 use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Bio::EnsEMBL::Pipeline::Tools::GeneUtils;
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use strict;
 
 
@@ -22,7 +22,7 @@ my $target_dbhost;
 my $gene_id;
 my $check;
 
-&GetOptions('gene_id:s'          => \$gene_id,
+GetOptions('gene_id:s'          => \$gene_id,
 	    'target_dbname:s'  => \$target_dbname,
             'target_dbhost:s'  => \$target_dbhost,
 	    'check'            => \$check,

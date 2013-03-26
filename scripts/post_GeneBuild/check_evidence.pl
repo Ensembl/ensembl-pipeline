@@ -1,13 +1,13 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_evidence.pl,v $
-# $Revision: 1.6 $
+# $Revision: 1.7 $
 
 use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $file;
 
@@ -40,13 +40,13 @@ my $tstable_id;
 my $g_id;
 my $t_id;
 
-&GetOptions(
+GetOptions(
 	    'tstable_id:s' => \$tstable_id,
 	    't_id:s' => \$t_id,
 	    'tstable_id:s' => \$tstable_id,
-	    'dbhost:s'        => \$dbhost,
-	    'dbname:s'        => \$dbname,
-	    'dbuser:s'        => \$dbuser,
+	    'host|dbhost|h:s'        => \$dbhost,
+	    'dbname|db|D:s'        => \$dbname,
+	    'user|dbuser|u:s'        => \$dbuser,
 	    'genetype:s'      => \$genetype,
             );
 

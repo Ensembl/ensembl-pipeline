@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/post_GeneBuild_checks.pl,v $
-# $Revision: 1.10 $
+# $Revision: 1.11 $
 
 =head1 NAME
 
@@ -42,7 +42,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Analysis::Config::Databases qw (
 							     GB_FINALDBHOST
 							     GB_FINALDBNAME
@@ -73,9 +73,9 @@ my $genetype = "ensembl"; # default genetype
 
 
 $dbuser = "ensro";
-&GetOptions(
-	    'dbname:s'    => \$dbname,
-	    'dbhost:s'    => \$dbhost,
+GetOptions(
+	    'dbname|db|D:s'    => \$dbname,
+	    'host|dbhost|h:s'    => \$dbhost,
 	    'dnadbname:s' => \$dnadbname,
 	    'dnadbhost:s' => \$dnadbhost,
 	    'genetype:s'  => \$genetype,
