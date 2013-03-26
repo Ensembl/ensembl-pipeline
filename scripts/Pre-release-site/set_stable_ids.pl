@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pre-release-site/set_stable_ids.pl,v $
-# $Revision: 1.11 $
+# $Revision: 1.12 $
 
 =head1 NAME
 
@@ -29,7 +29,7 @@
 use strict;
 use warnings;
 
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Utils::Exception qw( deprecate throw warning );
@@ -40,11 +40,11 @@ my $name;
 my $user;
 my $pass;
 
-GetOptions( 'dbhost:s' => \$host,
-            'dbport:n' => \$port,
-            'dbname:s' => \$name,
-            'dbuser:s' => \$user,
-            'dbpass:s' => \$pass, );
+GetOptions( 'dbhost|h|host:s' => \$host,
+            'dbport|P|port:n' => \$port,
+            'dbname|D|db:s' => \$name,
+            'dbuser|u|user:s' => \$user,
+            'dbpass|p|pass:s' => \$pass, );
 
 my %proteins;
 my %transcript_proteins;
