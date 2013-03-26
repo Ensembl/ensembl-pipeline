@@ -14,7 +14,7 @@ This script is called by submit_prot_analysis.pl
 =cut
 
 use strict;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 BEGIN {
     require "Bio/EnsEMBL/Pipeline/Prot_analysis_Conf.pl";
@@ -27,7 +27,7 @@ use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBLoader;
 
 my $host   = '';
-my $port   = undef;
+my $port   = 3306;
 my $dbname = '';
 my $dbuser = 'ensro';
 my $dbpass = undef;
@@ -47,12 +47,12 @@ my %scripts_conf = %::scripts_conf;
 
 
 
-&GetOptions( 
-	     'dbhost:s'    => \$host,
-	     'dbport:n'    => \$port,
-	     'dbname:s'    => \$dbname,
-	     'dbuser:s'    => \$dbuser,
-	     'dbpass:s'    => \$dbpass,
+GetOptions( 
+	     'dbhost|host|h:s'    => \$host,
+	     'dbport|port|P:n'    => \$port,
+	     'dbname|db|D:s'    => \$dbname,
+	     'dbuser|user|u:s'    => \$dbuser,
+	     'dbpass|pass|p:s'    => \$dbpass,
 	     'input_id:s'  => \$input_id,
 	     'runnable:s'  => \$runnable,
 	     'analysis:n'  => \$analysisid,

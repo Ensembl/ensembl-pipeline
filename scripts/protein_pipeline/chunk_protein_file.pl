@@ -1,11 +1,11 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/chunk_protein_file.pl,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 
 
 use warnings ;
 use strict;
-use Getopt::Long 'GetOptions';
+use Getopt::Long qw(:config no_ignore_case);
 use DBI;
 use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General qw(
 								   PA_PEPTIDE_FILE
@@ -20,12 +20,12 @@ use Bio::EnsEMBL::Pipeline::Config::Protein_Annotation::General qw(
 # will be incremented which is used in the input_id_analysis table
 
 my ($dbhost, $dbuser, $dbpass, $dbport, $dbname, $help);
-
-GetOptions('dbhost=s' => \$dbhost,
-           'dbuser=s' => \$dbuser,
-           'dbpass=s' => \$dbpass,
-           'dbport=s' => \$dbport,
-           'dbname=s' => \$dbname,
+$dbport='3306';
+GetOptions('dbhost|host|h=s' => \$dbhost,
+           'dbuser|user|u=s' => \$dbuser,
+           'dbpass|pass|p=s' => \$dbpass,
+           'dbport|port|P=s' => \$dbport,
+           'dbname|db|D=s' => \$dbname,
           );    # plus default options
 				
 exec('perldoc', $0) if !($dbhost && $dbuser && $dbpass && $dbport && $dbname);

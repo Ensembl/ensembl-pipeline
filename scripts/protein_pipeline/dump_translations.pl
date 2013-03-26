@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/dump_translations.pl,v $
-# $Revision: 1.18 $
+# $Revision: 1.19 $
 
 =head1 NAME
 
@@ -23,7 +23,7 @@ use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
-use Getopt::Long;
+use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost       = '';
 my $dbuser       = '';
@@ -41,11 +41,11 @@ my $biotype      = undef;
 my $file;
 
 GetOptions(
-	   'dbhost=s'    => \$dbhost,
-	   'dbname=s'    => \$dbname,
-	   'dbuser=s'    => \$dbuser,
-	   'dbpass=s'    => \$dbpass,
-	   'dbport=s'    => \$dbport,
+	   'dbhost|host|h=s'    => \$dbhost,
+	   'dbname|db|D=s'    => \$dbname,
+	   'dbuser|user|u=s'    => \$dbuser,
+	   'dbpass|pass|p=s'    => \$dbpass,
+	   'dbport|port|P=s'    => \$dbport,
            'dnadbhost=s' => \$dnadbhost,
            'dnadbname=s' => \$dnadbname,
            'dnadbuser=s' => \$dnadbuser,
