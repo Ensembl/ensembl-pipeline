@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
-# $Revision: 1.30 $
+# $Revision: 1.31 $
 
 =head1 Synopsis
 
@@ -19,6 +19,7 @@ All configuration is done through MitConf.pm
 
 use warnings ;
 use strict;
+use Net::FTP;
 use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
@@ -75,6 +76,7 @@ GetOptions( \%opt,
             'codon_table=i',
             'name=s',
             'genbank_file=s',
+            'download!',
             'noxref!',
             'path=s', );
             # or &usage();
@@ -125,6 +127,26 @@ unless (    $MIT_DBHOST && $MIT_DBUSER
 if ($help) {
     exec('perldoc', $0);
 }
+
+my $base_ncbi_ftp = 'ftp://ftp.ncbi.nlm.nih.gov';
+if (exists $opt{download}) {
+    my ($gbacc) = $MIT_DB_VERSION =~ /(\w+)/;
+    my $base_cmd = 'wget -q "http://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+    my $ftp_cmd = $base_cmd.'/esearch.fcgi?db=nuccore&term='.$gbacc.'"';
+    open(FH, "$ftp_cmd -O - | ") or die("Could not search for the genebank file\n");
+    while (my $line = <FH>) {
+        my ($gbid) = $line =~ /<Id>(\d+)/;
+        if ($gbid) {
+            $ftp_cmd = $base_cmd.'/efetch.fcgi?db=nuccore&retmod=text&rettype=gb&id='.$gbid.'"';
+            if (system($ftp_cmd.' -O '.$MIT_GENBANK_FILE)) {
+                die("Could not retrieve the genbank file\n");
+            }
+            last;
+        }
+    }
+    close(FH) or die("Could not close command\n");
+}
+
 ############################
 #PARSE GENBANK FILE FIRST
 open(my $fh, $MIT_GENBANK_FILE) || die("Could not open GeneBank file $MIT_GENBANK_FILE\n");
