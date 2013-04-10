@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rule_setup.pl,v $
-# $Revision: 1.7 $
+# $Revision: 1.8 $
 
 =head1 NAME
 
@@ -106,7 +106,7 @@ if ( !GetOptions( 'host|dbhost|h:s'     => \$dbhost,
                   'read|insert!' => \$read,
                   'write!'       => \$write,
                   'file=s'       => \$file,
-                  'h|help!'      => \$help, ) ||
+                  'help!'      => \$help, ) ||
      $help )
 {
   usage();
