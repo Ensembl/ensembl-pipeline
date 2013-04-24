@@ -1,7 +1,7 @@
 CREATE TABLE job (
   job_id            int(10) unsigned NOT NULL auto_increment,
   input_id          varchar(100) NOT NULL,
-  analysis_id       smallint(5) unsigned NOT NULL,
+  analysis_id       smallint unsigned NOT NULL,
   submission_id     mediumint(10) unsigned NOT NULL,
   stdout_file       varchar(1000) NOT NULL,
   stderr_file       varchar(1000) NOT NULL,
@@ -84,7 +84,7 @@ CREATE TABLE rule_conditions (
 CREATE TABLE input_id_analysis (
   input_id          varchar(100) not null,
   input_id_type     varchar(40) not null,
-  analysis_id       smallint(10) unsigned NOT NULL,
+  analysis_id       smallint unsigned NOT NULL,
   created           datetime NOT NULL,
   runhost           varchar(20) NOT NULL,
   db_version        varchar(40) NOT NULL,
@@ -109,6 +109,6 @@ CREATE TABLE input_id_analysis (
 
 
 CREATE table input_id_type_analysis (
-  analysis_id       smallint(10) unsigned NOT NULL,
+  analysis_id       smallint unsigned NOT NULL,
   input_id_type     varchar(40) NOT NULL
 );
