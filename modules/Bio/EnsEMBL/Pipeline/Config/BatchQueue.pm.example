@@ -78,33 +78,25 @@
     duration of the first 10 minutes when the job is running (means 200
     hosts * 10 connections = 2000 connections):
 
-      resource =>
-        'select[linux && myens_build2tok>2000] ' .
-        'rusage[myens_build2tok=10:duration=10]',
+      resource => 'select[linux] rusage[myens_build2tok=10:duration=10]',
 
     Running on 'linux' hosts with not more than 2000 active connections
     for genebuild3 and genebuild7, 10 connections per job to each db-instance
     for the first 10 minutes:
 
-      resource =>
-        'select[linux && myens_build3tok>200 && myens_build7tok>2000] ' .
-        'rusage[myens_build3tok=10:myens_build7tok=10:duration=10]',
+      resource => 'select[linux] rusage[myens_build3tok=10:myens_build7tok=10:duration=10]',
 
     Running on hosts of model 'X86_64' hosts with not more than 200
     active connections to genebuild3, 10 connections per job for the first
     10 minutes:
 
-      resource =>
-        'select[model==X86_64 && myens_build3tok>200] ' .
-        'rusage[myens_build3tok=10:duration=10]',
+      resource => 'select[model==X86_64] rusage[myens_build3tok=10:duration=10]',
 
     Running on hosts of host_group bc_hosts with not more than 200
     active connections to genebuild3, 10 connections per job for the first
     10 minutes:
 
-      resource =>
-        'select[myens_build3tok>200] ' .
-        'rusage[myens_build3tok=10:duration=10]',
+      resource => 'rusage[myens_build3tok=10:duration=10]',
 
       sub_args =>'-m bc_hosts',
 
@@ -173,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.46 $ 
+# $Revision: 1.47 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -268,14 +260,10 @@ use vars qw(%Config);
       retries    => 3,
       runner     => '',
 
-      resource =>
-        'select[mem>400 && myens_build2tok>2000] ' .
-        'rusage[mem=400:myens_build2tok=10]',
+      resource => 'select[mem>400] rusage[mem=400:myens_build2tok=10]',
       sub_args => '-M 400000',
 
-      retry_resource =>
-        'select[mem>700 && myens_build2tok>2000] ' .
-        'rusage[mem=700:myens_build2tok=10]',
+      retry_resource => 'select[mem>700] rusage[mem=700:myens_build2tok=10]',
       retry_sub_args => '-M 700000',
 
       retry_queue    => '',
@@ -285,14 +273,10 @@ use vars qw(%Config);
       retries    => 3,
       runner     => '',
 
-      resource =>
-        'select[mem>300 && myens_build2tok>2000] ' .
-        'rusage[mem=300:myens_build2tok=10]',
+      resource => 'select[mem>300] rusage[mem=300:myens_build2tok=10]',
       sub_args => '-M 300000',
 
-      retry_resource =>
-        'select[mem>500 && myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
+      retry_resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
       retry_sub_args => '-M 500000',
 
       retry_queue    => '',
@@ -375,14 +359,10 @@ use vars qw(%Config);
       retries    => 3,
       runner     => '',
 
-      resource =>
-        'select[mem>300 && myens_build2tok>2000] ' .
-        'rusage[mem=300:myens_build2tok=10]',
+      resource => 'select[mem>300] rusage[mem=300:myens_build2tok=10]',
       sub_args => '-M 300000 -sp 100',  # Run before vertrna and unigene
 
-      retry_resource =>
-        'select[mem>500 && myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
+      retry_resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
       retry_sub_args => '-M 500000 -sp 100',  # Run before vertrna and unigene
 
       retry_queue    => '',
@@ -392,9 +372,7 @@ use vars qw(%Config);
       retries    => 3,
       runner     => '',
 
-      resource =>
-        'select[mem>500 && myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
+      resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
       sub_args => '-M 500000 -sp 95',    # Run after uniprot
 
       retry_resource => '',
@@ -406,9 +384,7 @@ use vars qw(%Config);
       retries    => 3,
       runner     => '',
 
-      resource =>
-        'select[mem>500 && myens_build2tok>2000] ' .
-        'rusage[mem=500:myens_build2tok=10]',
+      resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
       sub_args => '-M 500000 -sp 90',    # Run after vertrna
 
       retry_resource => '',
