@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
-# $Revision: 1.31 $
+# $Revision: 1.32 $
 
 =head1 Synopsis
 
@@ -19,7 +19,6 @@ All configuration is done through MitConf.pm
 
 use warnings ;
 use strict;
-use Net::FTP;
 use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
@@ -29,19 +28,22 @@ use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::SeqEdit;
+use Bio::EnsEMBL::SeqRegionSynonym;
 use Bio::EnsEMBL::Pipeline::Tools::GeneBankParser;
 
+use Time::localtime;
 
 use Getopt::Long;
 use Bio::EnsEMBL::Utils::Exception qw(stack_trace throw warning);
 
 use constant {
-    INFO_TYPE         => 'DIRECT',
-    INFO_TEXT         => 'Imported from GeneBank',
-    REFSEQ_PEP        => 'RefSeq_peptide',
-    REFSEQ_XPEP       => 'RefSeq_peptide_predicted',
-    STATUS            => 'KNOWN',
-    CHECK_CODON_TABLE => 2
+    INFO_TYPE           => 'DIRECT',
+    INFO_TEXT           => 'Imported from GeneBank',
+    REFSEQ_PEP          => 'RefSeq_peptide',
+    REFSEQ_XPEP         => 'RefSeq_peptide_predicted',
+    STATUS              => 'KNOWN',
+    NCBI_EXTERNAL_DB_ID => 700,
+    CHECK_CODON_TABLE   => 13
 };
 
 my %EXTERNAL_DB = ( 'GeneID'               => 'EntrezGene',
@@ -49,10 +51,11 @@ my %EXTERNAL_DB = ( 'GeneID'               => 'EntrezGene',
                   );
 my $help;
 my @genes;;
-my $translation; # JUST INCASE
 my $count;
 #use scaffold or supercontig:
 my $scaffold = 'scaffold';
+my $contig = 'contig';
+my $clone = 'clone';
 my %opt;
 my $path = undef;
 
@@ -104,6 +107,9 @@ $MIT_CODON_TABLE  = $opt{codon_table}  if $opt{codon_table};
 $MIT_GENE_TYPE    = $opt{gene_type}    if $opt{gene_type};
 $MIT_TRNA_TYPE    = $opt{trna_type}    if $opt{trna_type};
 $MIT_RRNA_TYPE    = $opt{rrna_type}    if $opt{rrna_type};
+$scaffold         = $opt{scaffold}     if $opt{scaffold};
+$contig           = $opt{contig}       if $opt{contig};
+$clone            = $opt{clone}        if $opt{clone};
 
 unless (    $MIT_DBHOST && $MIT_DBUSER
          && $MIT_DBNAME && $MIT_GENBANK_FILE
@@ -128,7 +134,6 @@ if ($help) {
     exec('perldoc', $0);
 }
 
-my $base_ncbi_ftp = 'ftp://ftp.ncbi.nlm.nih.gov';
 if (exists $opt{download}) {
     my ($gbacc) = $MIT_DB_VERSION =~ /(\w+)/;
     my $base_cmd = 'wget -q "http://eutils.ncbi.nlm.nih.gov/entrez/eutils';
@@ -214,7 +219,7 @@ if ($slice){
   }
 }
 if ($slice->is_chromosome) {
-    my $max_attrib = 1;
+    my $max_attrib = 0;
     my $answer;
     my ($attrib) = @{$slice->get_all_Attributes('karyotype_rank')};
     if (defined $attrib) {
@@ -490,6 +495,7 @@ for (my $index = 1; $index < $length; $index++) {
       $transcript->biotype($type);
       $transcript->analysis($ensembl_analysis);
       $gene->add_Transcript($transcript);
+      $gene->canonical_transcript($transcript);
       $count++;
     };
     if ($@){
@@ -552,6 +558,16 @@ sub load_db(){
     print "dbID = $dbid\n" if $MIT_DEBUG;
     my $stored_gene = $output_db->get_GeneAdaptor->fetch_by_dbID($dbid);
   }
+  my $geneset_date = sprintf("%d-%02s", (localtime->year()+1900), localtime->mon);
+  my $last_geneset_update = $meta_container->single_value_by_key('genebuild.last_geneset_update');
+  if ($last_geneset_update) {
+      $meta_container->update_key_value('genebuild.last_geneset_update', $geneset_date);
+      print STDOUT "Meta key last_geneset_update was $last_geneset_update changed to $geneset_date\n";
+  }
+  else {
+      $meta_container->store_key_value('genebuild.last_geneset_update', $geneset_date);
+      print STDOUT "Setting meta key last_geneset_update to $geneset_date\n";
+  }
   return 0;
 }
 
@@ -571,19 +587,19 @@ sub get_chromosomes {
       $assembly{$scaffold} = $genebank_hash->{-accession};
   }
   if ($MIT_CLONE_SEQNAME) {
-      $assembly{'clone'} = $MIT_CLONE_SEQNAME;
+      $assembly{$clone} = $MIT_CLONE_SEQNAME;
   }
   else {
       if ( $genebank_hash->{_comment} =~ /reference\s+sequence\s+was\s+derived\s+from\s+(\w+)./ ) {
-          $assembly{'clone'} = "$1";
+          $assembly{$clone} = "$1";
       }
   }
   if ($MIT_CONTIG_SEQNAME) {
-      $assembly{'contig'} = $MIT_CONTIG_SEQNAME;
+      $assembly{$contig} = $MIT_CONTIG_SEQNAME;
   }
   else {
       if ( $genebank_hash->{_comment} =~ /reference\s+sequence\s+was\s+derived\s+from\s+(\w+)./ ) {
-          $assembly{'contig'} = $1.'.1'.$genebank_hash->{_length};
+          $assembly{$contig} = $1.'.1'.$genebank_hash->{_length};
       }
   }
 
@@ -594,6 +610,7 @@ sub get_chromosomes {
 
   foreach my $cs (@{$csa->fetch_all()}) {
     my $name = $cs->name;
+    print STDERR $name, ':', $cs->is_sequence_level, "\n";
     $name =  'top_level' if ($cs->name eq $MIT_TOPLEVEL);
     $name =  'seq_level' if ($cs->is_sequence_level);
     if ($assembly{$cs->name}){
@@ -685,6 +702,14 @@ sub load_chromosomes {
                     $output_db );
   }
 
+  if ( scalar( keys %slices ) == 2 ) {
+      my $seqregionsynonym = Bio::EnsEMBL::SeqRegionSynonym->new(
+        -seq_region_id  => $slices{'top_level'}->get_seq_region_id,
+        -external_db_id => NCBI_EXTERNAL_DB_ID,
+        -synonym        => 'MT');
+      my $srs= $output_db->get_SeqRegionSynonymAdaptor();
+      $srs->store($seqregionsynonym);
+  }
   # Load assemby tables for each other coord system vs seq_level
 
   foreach my $cs ( keys %slices ) {
