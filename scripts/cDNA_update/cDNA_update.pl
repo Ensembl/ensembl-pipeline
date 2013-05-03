@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.88 $
+# $Revision: 1.89 $
 
-#$Id: cDNA_update.pl,v 1.88 2012-12-21 14:40:17 rn6 Exp $
+#$Id: cDNA_update.pl,v 1.89 2013-05-03 10:26:14 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1119,7 +1119,7 @@ sub DB_setup {
                                   . 'coord_system '       . 'meta '
                                   . 'meta_coord '         . 'seq_region_attrib '
                                   . 'seq_region_synonym ' . 'karyotype '
-                                  . 'mapping_set ';
+                                  . 'mapping_set '        . 'seq_region_mapping ';
 
             # Delete unnecessary tables
             # 1 = pipeline db
@@ -1130,7 +1130,8 @@ sub DB_setup {
                                 . 'attrib_type '       . 'coord_system '
                                 . 'meta '              . 'seq_region '
                                 . 'seq_region_attrib ' . 'seq_region_synonym '
-                                . 'karyotype '         . 'mapping_set ';
+                                . 'karyotype '         . 'mapping_set '
+                                . 'seq_region_mapping ';
 
             # Dump the tables to import_tables1.sql
             # 1 = file count
