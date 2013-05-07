@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/dequeuer.pl,v $
-# $Revision: 1.30 $
+# $Revision: 1.31 $
 
 =pod
 
@@ -187,7 +187,7 @@ if(@host_to_skip) {
 if(scalar(@where)) {
     $sql_fetch .= ' WHERE '.join(' AND ', @where);
 }
-$sql_fetch .= " ORDER BY priority DESC, CREATED ASC LIMIT ? ";
+$sql_fetch .= " ORDER BY priority DESC, md5(id)/*kinda-shuffle*/  LIMIT ? ";
 
 my $fetch; # sth obtained on demand
 
