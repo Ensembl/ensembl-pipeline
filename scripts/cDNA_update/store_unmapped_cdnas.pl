@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/store_unmapped_cdnas.pl,v $
-# $Revision: 1.13 $
+# $Revision: 1.14 $
 
 #script to gather evidence from the various analyses run to determine why cDNAs have no alignments in the db
 #store this into the database
@@ -109,13 +109,19 @@ my @files = ($vertrna);
 
 my (%EMBL_ids);
 
-foreach my $file(@files){
+foreach my $file(@files)
+{
   open(IN, "<", $file) or die("can t read $file\n");
-  while (my $entry = <IN>){
-    #extract & save id
-    $entry =~ s/^>([\w\.\d]+)\s.*\n{1}?/$1\n/;
-    if(!$1){ die "\n$file: unmatched id pattern:\n$entry\n"; }
-    $EMBL_ids{$1} = 1;
+  
+  while (my $entry = <IN>)
+  {
+    if ( $entry =~ /^>/ )
+    {
+        #extract & save id
+        $entry =~ s/^>([\w\.\d]+)\s.*\n{1}?/$1\n/;
+        if(!$1){ die "\n$file: unmatched id pattern:\n$entry\n"; }
+        $EMBL_ids{$1} = 1;
+    }
   }
   close IN;
 }
@@ -124,23 +130,34 @@ foreach my $file(@files){
 #read RefSeq file - has diff format so have to do separately
 open(IN, "<", $refseq) or die("can t read $refseq.\n");
 
-while (my $entry = <IN>){
-	my $id = "";
-	if($entry =~ m/^>gi.+ref\|(NM_.+)\| $species.*/){
-		$id = $1;
-	}
-	elsif($entry =~ m/^>gi.+ref\|(NR_.+)\| $species.*/){
-		$id = $1;
-	}
-	else{
-		next;
-	}
-	if($id){
-	  #reduce header to accession number
-	  $EMBL_ids{$id} = 1;
-	}
+while (my $entry = <IN>)
+{
+  if ( $entry =~ /^>/ )
+  {
+      my $id = "";
+      if($entry =~ m/^>gi.+ref\|(NM_.+)\| $species.*/)
+      {
+          $id = $1;
+      }
+      elsif($entry =~ m/^>gi.+ref\|(NR_.+)\| $species.*/)
+      {
+          $id = $1;
+      }
+      else
+      {
+          next;
+      }
+      if($id)
+      {
+          #reduce header to accession number
+          $EMBL_ids{$id} = 1;
+      }
+  }
 }
 close IN;   
+
+exit ;
+
 
 #list those which did not give an output from ExonerateTranscriptFilter:
 #this may be because they are in the database...!
