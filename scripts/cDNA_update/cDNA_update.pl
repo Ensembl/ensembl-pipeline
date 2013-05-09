@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.89 $
+# $Revision: 1.90 $
 
-#$Id: cDNA_update.pl,v 1.89 2013-05-03 10:26:14 th3 Exp $
+#$Id: cDNA_update.pl,v 1.90 2013-05-09 15:43:27 rn6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -683,7 +683,8 @@ elsif ( $option eq "compare" ) {
     if ( get_input_arg() ) {
         $progress_status = get_status($pipe_db->dbc());
 
-        if ( $progress_status == 11 ) {
+        if ( $progress_status == 11 ) 
+        {
             print(   "\nRunning checks after cDNA-update.\n"
                 . "checking through alignments & genes.\n" );
 
@@ -692,6 +693,11 @@ elsif ( $option eq "compare" ) {
 
             $progress_status = 12;
             update_progress_status($progress_status);
+        }
+        else
+        {
+            print(   "\nNot starting compare - progress_status is ".$progress_status
+                . ", should be 11.\n" );
         }
     } else {
         croak("\nChange the analysis_ids first before running "
