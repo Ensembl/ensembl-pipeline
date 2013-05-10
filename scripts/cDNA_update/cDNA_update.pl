@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.90 $
+# $Revision: 1.91 $
 
-#$Id: cDNA_update.pl,v 1.90 2013-05-09 15:43:27 rn6 Exp $
+#$Id: cDNA_update.pl,v 1.91 2013-05-10 13:36:57 rn6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1601,7 +1601,9 @@ sub update_metacoord {
     my @table_names = qw(gene
                          exon
                          dna_align_feature
-                         transcript);
+                         transcript
+                         assembly_exception,
+                         karyotype ) ;
 
     my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
                          $OUTPUT_DBNAME, $DBUSER,
