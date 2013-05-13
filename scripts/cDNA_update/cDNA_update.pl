@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.91 $
+# $Revision: 1.92 $
 
-#$Id: cDNA_update.pl,v 1.91 2013-05-10 13:36:57 rn6 Exp $
+#$Id: cDNA_update.pl,v 1.92 2013-05-13 11:53:22 rn6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -141,7 +141,7 @@ The check points have been set after the following steps:
   8. Finding cDNAs with many hits to genome
   9. Storing cDNAs as unmapped objects
   10. Updating the meta coordinate table
-  11. Updating the meta table
+  11. Updating the various tables
   12. Comparison with previous analysis
 
 You would need to remove the progress_status entry from the meta table
@@ -1629,7 +1629,7 @@ sub update_metacoord {
 } ## end sub update_metacoord
 
 
-# Setting various meta table entries.
+# Setting various core table entries.
 sub fix_metatable {
 
     my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
@@ -1667,6 +1667,28 @@ sub fix_metatable {
     $sth->finish;
 
     $sql = "UPDATE transcript set biotype = 'cdna_update'";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # set canonical transcripts - user checks 1 gene, 1 transcript
+    $sql = "UPDATE gene, transcript SET gene.canonical_transcript_id = transcript.transcript_id WHERE gene.gene_id = transcript.gene_id ";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # dna_align feature external DB IDs
+    $sql = "UPDATE dna_align_feature SET external_db_id = 700";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE dna_align_feature SET external_db_id = 1800 WHERE hit_name LIKE 'NM_%' ";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE dna_align_feature SET external_db_id = 1820 WHERE hit_name LIKE 'NR_%'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
