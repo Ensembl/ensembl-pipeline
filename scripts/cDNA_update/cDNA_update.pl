@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.92 $
+# $Revision: 1.93 $
 
-#$Id: cDNA_update.pl,v 1.92 2013-05-13 11:53:22 rn6 Exp $
+#$Id: cDNA_update.pl,v 1.93 2013-05-13 11:57:23 rn6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -1694,7 +1694,7 @@ sub fix_metatable {
     $sth->finish;
 
     # Remove some meta keys not needed in the cdna database
-    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date') " ;
+    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date', 'assembly.web_accession_source', 'assembly.web_accession_type') " ;
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
