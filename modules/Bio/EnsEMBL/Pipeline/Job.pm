@@ -43,7 +43,7 @@ Bio::EnsEMBL::Pipeline::Job -
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Job.pm,v $
-# $Revision: 1.133 $
+# $Revision: 1.134 $
 package Bio::EnsEMBL::Pipeline::Job;
 
 
@@ -131,8 +131,9 @@ sub new {
   $self->rename_on_retry($rename);
 
   if ( !defined( $output_dir ) ) {
-    if ( exists $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} and
-         defined $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} )
+    if ( exists $BATCH_QUEUES{ $analysis->logic_name() } and
+         exists $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'} and
+         defined $BATCH_QUEUES{ $analysis->logic_name()}{'output_dir'} )
     {
       $output_dir = $BATCH_QUEUES{ $analysis->logic_name() }{'output_dir'};
     }
@@ -144,7 +145,18 @@ sub new {
   $self->output_dir($output_dir);
   $self->make_filenames() if (!$stdout and !$stderr);
 
-  $runner = $BATCH_QUEUES{ $self->analysis()->logic_name() }->{'runner'} unless $runner;
+    if (not defined $runner) {
+    if ( exists $BATCH_QUEUES{ $analysis->logic_name() } and
+         exists $BATCH_QUEUES{ $analysis->logic_name() }{'runner'} and
+         defined $BATCH_QUEUES{ $analysis->logic_name()}{'runner'} )
+    {
+      $runner = $BATCH_QUEUES{ $analysis->logic_name() }{'runner'};
+    }
+    else {
+      $runner = $BATCH_QUEUES{'default'}{'runner'};
+    }
+  }
+
   $self->runner($runner);
 
   return $self;
