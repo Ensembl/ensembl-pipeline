@@ -115,7 +115,7 @@ use vars qw(%Config);
         # Select the good DB for the tokens, the first one is the pipeline DB
         RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => 'R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
+        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
@@ -173,7 +173,7 @@ use vars qw(%Config);
         # Select the good DB for the tokens, the first one is the pipeline DB
         RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => 'R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
+        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
