@@ -43,13 +43,14 @@ Bio::EnsEMBL::Pipeline::Job -
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Job.pm,v $
-# $Revision: 1.134 $
+# $Revision: 1.135 $
 package Bio::EnsEMBL::Pipeline::Job;
 
 
 use warnings ;
 use vars qw(@ISA $SAVE_RUNTIME_INFO);
 use strict;
+use File::Copy;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Analysis::Tools::Logger;
@@ -911,8 +912,14 @@ sub make_filenames {
   $self->stderr_file($dir.$fname.'.err') unless $self->stderr_file;
   
   if ($self->retry_count > 0 and $self->can_retry($self->analysis->logic_name) and $self->rename_on_retry) {
-    $self->stdout_file($dir.$fname.'.retry'.$self->retry_count.'.out');
-    $self->stderr_file($dir.$fname.'.retry'.$self->retry_count.'.err');
+      if (-e $self->stdout_file) {
+          move($self->stdout_file, $self->stdout_file.'.retry'.$self->retry_count) || throw('Failed to copy log file '.$self->stdout_file);
+      }
+      if (-e $self->stderr_file) {
+          move($self->stderr_file, $self->stderr_file.'.retry'.$self->retry_count) || throw('Failed to copy log file '.$self->stderr_file);
+      }
+    $self->stdout_file($dir.$fname.$self->retry_count.'.out');
+    $self->stderr_file($dir.$fname.$self->retry_count.'.err');
   }
 }
 

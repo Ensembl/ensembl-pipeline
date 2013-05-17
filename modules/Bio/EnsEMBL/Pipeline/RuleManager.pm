@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/RuleManager.pm,v $
-# $Revision: 1.30 $
+# $Revision: 1.31 $
 package Bio::EnsEMBL::Pipeline::RuleManager;
 
 
@@ -719,6 +719,7 @@ sub can_job_run{
 sub rename_files{
   my ($self, $job) = @_;
   
+  warn('Use of this function is DEPRECATED as it can induce problems');
   if (!$job || !$job->isa("Bio::EnsEMBL::Pipeline::Job")) {
     throw("Need a job object " . $job . " to rename its files\n");
   }
