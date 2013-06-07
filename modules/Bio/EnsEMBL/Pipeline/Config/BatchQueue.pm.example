@@ -165,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.47 $ 
+# $Revision: 1.48 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -255,48 +255,6 @@ use vars qw(%Config);
       retry_queue      => '',
       retry_batch_size => 5,
     },
-    { logic_name => 'genscan',
-      batch_size => 120,
-      retries    => 3,
-      runner     => '',
-
-      resource => 'select[mem>400] rusage[mem=400:myens_build2tok=10]',
-      sub_args => '-M 400000',
-
-      retry_resource => 'select[mem>700] rusage[mem=700:myens_build2tok=10]',
-      retry_sub_args => '-M 700000',
-
-      retry_queue    => '',
-    },
-    { logic_name => 'firstef',
-      batch_size => 2000,
-      retries    => 3,
-      runner     => '',
-
-      resource => 'select[mem>300] rusage[mem=300:myens_build2tok=10]',
-      sub_args => '-M 300000',
-
-      retry_resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
-      retry_sub_args => '-M 500000',
-
-      retry_queue    => '',
-    },
-    { logic_name => 'cpg',
-      batch_size => 10,
-      retries    => 3,
-      runner     => '',
-
-      # cpg generally uses little memory
-      resource => '',
-      sub_args => '',
-
-      # This is unlikely to be used as most cpg jobs uses less than
-      # 100MB (default memory limit on Sanger LSF).
-      retry_resource => 'select[mem>200] rusage[mem=200]',
-      retry_sub_args => '-M 200000',
-
-      retry_queue => '',
-    },
     { logic_name => 'job_using_more_than_4_gig_of_memory',
       batch_size => 10,
       retries    => 3,
@@ -309,22 +267,6 @@ use vars qw(%Config);
       retry_resource => '',
       retry_sub_args => '',
       retry_queue    => '',
-    },
-    { logic_name => 'eponine',
-      batch_size => 2000,
-      retries    => 3,
-      runner     => '',
-
-      # eponine will probably need about 1GB of memory, it seems to use
-      # anywhere between 500MB and 700MB.
-      resource => 'select[mem>1000] rusage[mem=1000]',
-      sub_args => '-M 1000000',
-
-      # Give it 2GB if 1GB wasn't enough (unlikely)
-      retry_resource => 'select[mem>2000] rusage[mem=2000]',
-      retry_sub_args => '-M 2000000',
-
-      retry_queue => '',
     },
     { logic_name  => 'trf',
       batch_size  => 2000,
@@ -340,57 +282,62 @@ use vars qw(%Config);
       retry_resource => 'select[mem>1000] rusage[mem=1000]',
       retry_sub_args => '-M 1000000',
     },
-    { logic_name  => 'trnascan',
-      batch_size  => 2000,
-      retries     => 3,
-      runner      => '',
-      retry_queue => '',
-
-      # trnascan has a similar memory footprint to trf
-      resource => 'select[mem>200] rusage[mem=200]',
-      sub_args => '-M 200000',
-
-      # As for trf
-      retry_resource => 'select[mem>1000] rusage[mem=1000]',
-      retry_sub_args => '-M 1000000',
-    },
-    { logic_name => 'uniprot',
-      batch_size => 500,
-      retries    => 3,
-      runner     => '',
-
-      resource => 'select[mem>300] rusage[mem=300:myens_build2tok=10]',
-      sub_args => '-M 300000 -sp 100',  # Run before vertrna and unigene
-
-      retry_resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
-      retry_sub_args => '-M 500000 -sp 100',  # Run before vertrna and unigene
-
-      retry_queue    => '',
-    },
-    { logic_name => 'vertrna',
-      batch_size => 600,
-      retries    => 3,
-      runner     => '',
-
-      resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
-      sub_args => '-M 500000 -sp 95',    # Run after uniprot
-
-      retry_resource => '',
-      retry_sub_args => '',
-      retry_queue    => '',
-    },
-    { logic_name => 'unigene',
-      batch_size => 600,
-      retries    => 3,
-      runner     => '',
-
-      resource => 'select[mem>500] rusage[mem=500:myens_build2tok=10]',
-      sub_args => '-M 500000 -sp 90',    # Run after vertrna
-
-      retry_resource => '',
-      retry_sub_args => '',
-      retry_queue    => '',
-    },
+  {
+    logic_name     => 'cpg',                                                  
+    batch_size     => 500,
+    resource       => 'rusage[myens_build1tok=10]', 
+    queue          => 'normal',
+  },
+  {
+    logic_name => 'eponine',
+    batch_size => 2000, 
+    resource   => 'rusage[myens_build1tok=10]',
+    memory     => ['300MB','1GB','2GB'],
+    queue      => 'normal',
+    verbosity  => 'INFO',
+  },
+  {
+    logic_name => 'trnascan',
+    batch_size => 2000,
+    resource   => 'rusage[myens_build1tok=10]',
+    memory     => ['200MB', '1GB'],
+    queue      => 'normal',
+  },
+  {
+    logic_name     => 'firstef',
+    batch_size     => 2000,
+    resource       => 'rusage[myens_build1tok=10]',
+    memory         => ['200MB', '1GB'],
+  },
+  {
+    logic_name     => 'genscan',
+    batch_size     => 120, # generally we use the default for this which is 120.
+    resource       => 'rusage[myens_build1tok=10]',
+    memory         => ['300MB','1GB','3GB'],
+  },
+  {
+    logic_name     => 'uniprot',
+    batch_size     => 10,      # uniprot takes a long itme
+    resource       => 'rusage[myens_build1tok=25]  span[hosts=1]',
+    sub_args       => '-n 3',
+    retry_resource       => 'rusage[myens_build1tok=25]  span[hosts=1]',
+    retry_sub_args       => '-n 3',
+    memory         => ['300MB','1GB','3GB'],
+    queue          => 'normal',
+  },
+  {
+    logic_name => 'unigene',
+    batch_size     =>  100, 
+    resource       => 'rusage[myens_build1tok=10]',
+    memory         => ['300MB','1GB','3GB'],
+    queue          => 'normal',
+  },
+  {
+    logic_name => 'vertrna',
+    batch_size     => 25,
+    resource       => 'rusage[myens_build1tok=10]',
+    memory         => ['300MB','1GB','3GB'],
+   }, 
     {
       logic_name => 'sim_consensus',
       batch_size => 200,
