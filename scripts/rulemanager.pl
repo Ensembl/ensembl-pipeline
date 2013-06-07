@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rulemanager.pl,v $
-# $Revision: 1.35 $
+# $Revision: 1.36 $
 
 use warnings ;
 use strict;
@@ -38,6 +38,7 @@ my $runner;         # the runner script to use when running jobs (this will be
                     # over ridden by anything in config
 my $output_dir;     # the output_dir to use when running jobs (this won't be
                     # over ridden when running jobs
+my $previous_output_backup; #put the output of the previous jobs in renamed directory
 my $job_limit;      # the maximum number of jobs of a perdefined status that are
                     # in the system. The predefined statuses are set in the BatchQueue.pm config
                     # module and currently refer to LSF
@@ -67,7 +68,6 @@ my $utils_verbosity = 'WARNING'; #how verbose do you want the
                                  #Bio::EnsEMBL::Utils::Exceptions module to be by default it is set to
                                  #WARNING as this gives warning and throws but not deprecates or infos
 my $unlock =0 ;    # deletes the lock of a pipeline (the entry in the meta table 'pipeline.lock'
-
 my $shuffle;
 my $accumulators = 1;
 my $force_accumulators = 0;
@@ -97,6 +97,7 @@ GetOptions(
            'sleep_per_job=s'        => \$sleep_per_job,
            'runner=s'               => \$runner,
            'output_dir=s'           => \$output_dir,
+           'previous_output_backup!'=> \$previous_output_backup,
            'job_limit=s'            => \$job_limit,
            'mark_awol!'             => \$mark_awol,
            'rename_on_retry'        => \$rename_on_retry,
@@ -252,6 +253,15 @@ foreach my $rule (@$all_rules) {
   if ($rule->goalAnalysis->input_id_type eq 'ACCUMULATOR') {
     $accumulator_analyses{$rule->goalAnalysis->logic_name} = $rule->goalAnalysis;
   }
+}
+
+if( $previous_output_backup && (scalar(@analyses_to_run)==0)  )
+{
+    warn("Previous output directories are only backed up for analyses specified with -analysis\n")
+}
+elsif( $previous_output_backup )
+{
+    $rulemanager->backup_output_directories(\%analyses_to_run) ;
 }
 
 setup_pipeline(\%analyses_to_run, \%analyses_to_skip, $all_rules, 
