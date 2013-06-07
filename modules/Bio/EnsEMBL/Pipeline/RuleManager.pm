@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/RuleManager.pm,v $
-# $Revision: 1.31 $
+# $Revision: 1.32 $
 package Bio::EnsEMBL::Pipeline::RuleManager;
 
 
@@ -1280,6 +1280,61 @@ sub check_if_done {
   }
 
   return 0;
+}
+
+=head2 backup_output_directories
+
+  Arg [1]   : list of analyses
+  Function  : create backups of analyses output directories in the DEFAULT_OUTPUT_DIR
+  Returntype: none
+  Exceptions: failure to move directories
+  Example   : 
+
+=cut
+
+sub backup_output_directories
+{
+  my ($self, $analyses_to_run) = @_ ;
+
+  #check the default output dir has been set - this will be the backup location
+  my $base_output_dir = $DEFAULT_OUTPUT_DIR ;
+  if( $DEFAULT_OUTPUT_DIR eq '' )
+  {
+      delete_lock() ;
+      throw( "Directory '" . $DEFAULT_OUTPUT_DIR . 
+             "' not a valid location for output backup directories. Set DEFAULT_OUTPUT_DIR in BatchQueue.pm." ) ;
+  }
+  print "Backup operation dir is ".$base_output_dir."\n" ;
+
+  #timestamp for the name
+  my ( $sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst ) = localtime( time() ) ;
+  my $timestamp = "_".($mon+1)."-".$mday."-".$hour."-".$min ;
+  print "Timestamp used is ".$timestamp."\n" ;
+
+  #cycle through the analyses and move the existing directories (if they exist)
+  foreach my $dbID (keys %$analyses_to_run) 
+  {
+      my $ana = $self->analysis_adaptor->fetch_by_dbID( $dbID ) ;
+      
+      #obtain the current output directory specification
+      my $previous_output_dir = $base_output_dir.'/'.$ana->logic_name() ; 
+
+      if( -e $previous_output_dir )
+      {
+          #make the destination backup directory
+          my $backup_dir = $base_output_dir . '/' . $ana->logic_name . $timestamp ;
+          #do the backup
+          eval
+          {
+              system( "mv ".$previous_output_dir." ".$backup_dir ) ;  
+          };
+          if( $@ )
+          {
+              throw( "Failed to move ".$previous_output_dir." to backup dir ".$backup_dir." $@" );
+          } 
+          print "Moved previous run output from ".$previous_output_dir." to backup dir ".$backup_dir."\n" ;
+      }
+  }   
 }
 
 sub number_output_dirs { 
