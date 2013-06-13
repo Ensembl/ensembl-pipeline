@@ -1,5 +1,5 @@
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Tools/GeneBankParser.pm,v $
-# $Revision: 1.5 $
+# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::Tools::GeneBankParser;
 
 =pod
@@ -43,11 +43,11 @@ See subroutines.
 
 =head1 MAINTAINER
 
-$Author: rn6 $
+$Author: db8 $
 
 =head1 VERSION
 
-$Revision: 1.5 $
+$Revision: 1.6 $
 
 =cut
 
@@ -186,18 +186,20 @@ sub _get_features {
         $HASH->{__seq} = 1;
     }
     return unless $HASH->{__features};
-    if ($line =~ /(\w+)\s+(<)?(\d+)\.\.(\d+)/) {
+    if ($line =~ /(\w+)\s+(<)?(\d+)\.\.(>)?(\d+)/) {
         $HASH->{__current} = $1;
         $HASH->{-features}->[++$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{start} = $3;
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $2);
-        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $4;
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $4);
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $5;
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{strand} = 1;
     }
-    elsif ($line =~ /(\w+)\s+complement\((\d+)\.\.(\d+)/) {
+    elsif ($line =~ /(\w+)\s+complement\((<)?(\d+)\.\.(>)?(\d+)/) {
         $HASH->{__current} = $1;
-        $HASH->{-features}->[++$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{start} = $2;
-        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if ($line =~ '<');
-        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $3;
+        $HASH->{-features}->[++$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{start} = $3;
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $2);
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{fragment} = 1 if (defined $4);
+        $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{end} = $5;
         $HASH->{-features}->[$HASH->{__feature_index}]->{$HASH->{__current}}->{exons}->[0]->{strand} = -1;
     }
     elsif ($line =~ /(\w+)\s+(complement\()?join\((.+)/) {
