@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
-# $Revision: 1.32 $
+# $Revision: 1.33 $
 
 =head1 Synopsis
 
@@ -43,7 +43,7 @@ use constant {
     REFSEQ_XPEP         => 'RefSeq_peptide_predicted',
     STATUS              => 'KNOWN',
     NCBI_EXTERNAL_DB_ID => 700,
-    CHECK_CODON_TABLE   => 13
+    CHECK_CODON_TABLE   => 2
 };
 
 my %EXTERNAL_DB = ( 'GeneID'               => 'EntrezGene',
@@ -750,7 +750,7 @@ sub check_codon_table {
   my ($out_db,$mt_slice) = @_;
   my $found;
   my $mt_slice_dbID = $slice_adaptor->get_seq_region_id($mt_slice);
-
+   print STDERR "   $mt_slice_dbID \n";
   my $sql = "SELECT sra.value ".
             "FROM seq_region_attrib sra, attrib_type att ".
             "WHERE sra.attrib_type_id = att.attrib_type_id ".
