@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Utils::InputIDFactory -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Utils/InputIDFactory.pm,v $
-# $Revision: 1.23 $
+# $Revision: 1.24 $
 package Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 
 use strict;
@@ -500,7 +500,9 @@ sub get_filenames{
   if(!$self->dir){
     $self->throw("need a directory inorder to fetch the filenames to be used as input_ids $!");
   }
-
+  if(! -d $self->dir){
+    $self->throw("No directory ".$self->dir." exists.");
+  }
   my @input_ids;
 
   opendir(DIR, $self->dir);   
