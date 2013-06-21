@@ -14,7 +14,7 @@ this script will insert analysis objects into a ensembl core database
 with the pipeline tables added on
 
 for the script to work the db files are required as are -logic_name
--module and -type
+-module and -input_id_type
 
 =head1 OPTIONS
 
