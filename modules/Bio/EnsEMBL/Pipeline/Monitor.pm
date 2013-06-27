@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Monitor -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Monitor.pm,v $
-# $Revision: 1.33 $
+# $Revision: 1.34 $
 package Bio::EnsEMBL::Pipeline::Monitor;
 use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -95,7 +95,7 @@ sub print_header {
 }
 
 sub show_current_status {
-  my ($self) = @_;
+  my ($self, $logic_name) = @_;
 
   #Show running/failed jobs grouped by status and analysis name.
 
@@ -113,9 +113,10 @@ sub show_current_status {
   my @aid;
 
   while (my $ref = $sth->fetchrow_hashref) {
+    my $name   = $ref->{'logic_name'};
+    next unless (defined $logic_name and $name eq $logic_name);
     my $count  = $ref->{'count(*)'};
     my $status = $ref->{'status'};
-    my $name   = $ref->{'logic_name'};
     my $aid    = $ref->{'analysis_id'};
 
     if (!defined($maxcount) || length($count) > $maxcount) {
@@ -219,7 +220,7 @@ sub show_current_status_summary {
 
 #show running/failed jobs grouped by status
 sub show_finished_summary {
-  my ($self, $no_submit, $show_percent) = @_;
+  my ($self, $no_submit, $show_percent, $logic_name) = @_;
 
   my $sth = $self->dbobj->prepare("select count(*),a.logic_name,a.analysis_id from input_id_analysis i, analysis  a where a.analysis_id = i.analysis_id group by a.analysis_id");
 
@@ -234,8 +235,9 @@ sub show_finished_summary {
   my @ids;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $count  = $ref->{'count(*)'};
     my $name = $ref->{'logic_name'};
+    next unless (defined $logic_name and $name eq $logic_name);
+    my $count  = $ref->{'count(*)'};
     my $id = $ref->{'analysis_id'};
 
     if ($name =~ /Submit/){
@@ -384,7 +386,7 @@ sub show_analysisprocess {
 
 # show rules
 sub show_Rules {
-  my ($self) = @_;
+  my ($self, $logic_name) = @_;
 
   my $sth = $self->dbobj->prepare("select a.logic_name,rg.rule_id from rule_goal rg, analysis a where a.analysis_id = rg.goal");
 
@@ -397,8 +399,9 @@ sub show_Rules {
   my $maxid = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
+    next unless (defined $logic_name and $name eq $logic_name);
+    my $id = $ref->{'rule_id'};
 
     if (length($id) > $maxid) { $maxid = length($id);}
     if (length($name) > $maxname) {$maxname = length($name);}
@@ -424,7 +427,7 @@ sub show_Rules {
 }
 
 sub show_Rules_and_Conditions {
-  my ($self) = @_;
+  my ($self, $logic_name) = @_;
 
   my $sql = "select a.logic_name,rg.rule_id,rc.rule_condition from rule_conditions rc,rule_goal rg, analysis a where a.analysis_id = rg.goal and rg.rule_id = rc.rule_id";
   
@@ -441,8 +444,9 @@ sub show_Rules_and_Conditions {
   my $maxcond = 0;
 
   while (my $ref = $sth->fetchrow_hashref) {
-    my $id = $ref->{'rule_id'};
     my $name = $ref->{'logic_name'};
+    next unless (defined $logic_name and $name eq $logic_name);
+    my $id = $ref->{'rule_id'};
     my $cond = $ref->{'rule_condition'};
 
     if (length($id) > $maxid) { $maxid = length($id);}

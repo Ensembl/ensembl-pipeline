@@ -29,6 +29,7 @@ my $assembly_type   = undef; # shows unfinished input_ids & analyses in the asse
 my $input_id        = undef; # shows unfinished analyses for input_id
 my $lock            = 0;
 my $no_submit       = 0;
+my $logic_name      = undef;
 
 &GetOptions(
 	    'dbhost:s'          => \$dbhost,
@@ -47,6 +48,7 @@ my $no_submit       = 0;
 	    'unfinished'        => \$unfin,
 	    'nohits=s'          => \$ft_ana_id,
 	    'assembly=s'        => \$assembly_type,
+	    'logic_name=s'        => \$logic_name,
 	    'input_id=s'        => \$input_id,
             'no_submit!'        => \$no_submit,
 	    'h|help'		=> \$help,
@@ -82,14 +84,14 @@ my $ana_adaptor = $db->get_AnalysisAdaptor;
 my $monitor = new Bio::EnsEMBL::Pipeline::Monitor(-dbobj => $db);
 
 $monitor->lock_status($lock);
-$monitor->show_current_status                 if ($current);
-$monitor->show_current_status_summary         if ($current_summary);
-$monitor->show_finished_summary($no_submit,0) if ($finished);
-$monitor->show_analysisprocess                if ($analysis);
-$monitor->show_Rules                          if ($rules);
-$monitor->show_Rules_and_Conditions           if ($conditions);
-$monitor->get_unfinished_analyses(1)          if ($unfin);
-$monitor->show_finished_summary($no_submit,1) if ($finishedpercent);
+$monitor->show_current_status($logic_name)                 if ($current);
+$monitor->show_current_status_summary                      if ($current_summary);
+$monitor->show_finished_summary($no_submit,0, $logic_name) if ($finished);
+$monitor->show_analysisprocess                             if ($analysis);
+$monitor->show_Rules($logic_name)                          if ($rules);
+$monitor->show_Rules_and_Conditions($logic_name)           if ($conditions);
+$monitor->get_unfinished_analyses(1)                       if ($unfin);
+$monitor->show_finished_summary($no_submit,1, $logic_name) if ($finishedpercent);
 
 if ($status_analysis) {
   my ($status,$analysis)  = split(/:/,$status_analysis);
@@ -177,25 +179,23 @@ A Simple script using the Monitor.pm module to display information on the status
 
 =head2 [DISPLAY OPTIONS]
 
-   -current               shows the jobs currently in the database, 
-   the data is grouped by both analyses and status
-   -current_summary       shows the jobs in the database grouped by 
-                          status
+   -current               shows the jobs currently in the database, the data is grouped
+                           by both analyses and status
+   -current_summary       shows the jobs in the database grouped by status
    -finished              shows the finished jobs summary
    -finishedpercent       shows the finished jobs summary with calculated percentage
    -analysis              shows the analysis table
    -rules                 shows the rule_goal table
    -conditions            shows the rule_conditions table
    -status_analysis S:LN  shows the jobs with Status:Logic_Name
-   -unfinished            shows the unfinished input_ids & analyses in 
-                          the database.
-   -nohits FT:ANAID       shows clones with no hits in:with 
-                          Feature_Table:ANAlysis_ID, you can also use 
-                          a logic_name if you don't know the analysis id
-   -assembly TYPE         shows unfinished input_ids & analyses in the 
-   assembly of TYPE
+   -unfinished            shows the unfinished input_ids & analyses in the database.
+   -nohits FT:ANAID       shows clones with no hits in with Feature_Table:ANAlysis_ID,
+                           you can also use a logic_name if you don't know the analysis id
+   -assembly TYPE         shows unfinished input_ids & analyses in the assembly of TYPE
    -input_id INPUT_ID     shows unfinished analyses for INPUT_ID
    -lock                  prints information about the pipeline.lock
+   -logic_name            filter the result by the given logic_name for: -current, -finished,
+                           -finishedpercent and -conditions
    
 =head1 EXAMPLES
 
