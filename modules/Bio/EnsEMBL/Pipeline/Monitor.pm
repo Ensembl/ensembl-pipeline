@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Monitor -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Monitor.pm,v $
-# $Revision: 1.34 $
+# $Revision: 1.35 $
 package Bio::EnsEMBL::Pipeline::Monitor;
 use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -114,7 +114,7 @@ sub show_current_status {
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $name   = $ref->{'logic_name'};
-    next unless (defined $logic_name and $name eq $logic_name);
+    next if (defined $logic_name and $name ne $logic_name);
     my $count  = $ref->{'count(*)'};
     my $status = $ref->{'status'};
     my $aid    = $ref->{'analysis_id'};
@@ -236,7 +236,7 @@ sub show_finished_summary {
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $name = $ref->{'logic_name'};
-    next unless (defined $logic_name and $name eq $logic_name);
+    next if (defined $logic_name and $name ne $logic_name);
     my $count  = $ref->{'count(*)'};
     my $id = $ref->{'analysis_id'};
 
@@ -400,7 +400,7 @@ sub show_Rules {
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $name = $ref->{'logic_name'};
-    next unless (defined $logic_name and $name eq $logic_name);
+    next if (defined $logic_name and $name ne $logic_name);
     my $id = $ref->{'rule_id'};
 
     if (length($id) > $maxid) { $maxid = length($id);}
@@ -445,7 +445,7 @@ sub show_Rules_and_Conditions {
 
   while (my $ref = $sth->fetchrow_hashref) {
     my $name = $ref->{'logic_name'};
-    next unless (defined $logic_name and $name eq $logic_name);
+    next if (defined $logic_name and $name ne $logic_name);
     my $id = $ref->{'rule_id'};
     my $cond = $ref->{'rule_condition'};
 
