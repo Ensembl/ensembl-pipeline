@@ -56,7 +56,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/LSF.pm,v $
-# $Revision: 1.47 $
+# $Revision: 1.48 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
 use warnings ;
@@ -89,7 +89,9 @@ sub memstring_to_resource {
   my ( $self, $memstring ) = @_;
 
   my $resource_mem  = $self->memory_conversion( $memstring, 'MB' );
-  my $softlimit_mem = $self->memory_conversion( $memstring, 'KB' );
+  # for farm 3
+  my $softlimit_mem = $self->memory_conversion( $memstring, 'MB' );
+  #my $softlimit_mem = $self->memory_conversion( $memstring, 'KB' );
 
   my $resource = $self->resource();
 
@@ -106,7 +108,7 @@ sub memstring_to_resource {
     else {
       # ... otherwise just tag the resource onto the end of the string.
       $self->resource(
-                  sprintf( "%s %s", $resource, $new_resource_string ) );
+                  sprintf( "-R '%s' -R '%s'", $resource, $new_resource_string ) );
     }
   }
   else {
