@@ -1,7 +1,8 @@
-#!/usr/local/ensembl/bin/perl -w 
+#!/usr/bin/env perl
 
 $| = 1;
 
+use warnings;
 use strict;
 use Getopt::Long;
 
