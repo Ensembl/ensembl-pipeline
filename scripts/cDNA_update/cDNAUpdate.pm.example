@@ -87,6 +87,7 @@ use vars qw(%Config);
     human => {
 
         # PIPE_* and OUTPUT_* DBs will be created automatically 
+        # REF DB is existing core DB on staging with DNA
 
         REF_DBNAME => '',      # homo_sapiens_core_56_37a
         REF_DBHOST => '',      # ens-staging 
@@ -145,6 +146,7 @@ use vars qw(%Config);
     mouse => {
 
         # PIPE_* and OUTPUT_* DBs will be created automatically 
+        # REF DB is existing core DB on staging with DNA
 
         REF_DBNAME => '',     # mus_musculus_core_50_37c
         REF_DBHOST => '',     # ens-staging 
