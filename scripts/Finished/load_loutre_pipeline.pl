@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_loutre_pipeline.pl,v $
-# $Revision: 1.26 $
+# $Revision: 1.27 $
 
 =head1 NAME
 
@@ -232,7 +232,7 @@ my $seqset_info     = {};
         }
 
         if ($input_type ne 'AGP') {
-            #warn "Skipping $input_type type line\n";
+            warn "Skipping $input_type line: $_\n";
             next;
         }
 
