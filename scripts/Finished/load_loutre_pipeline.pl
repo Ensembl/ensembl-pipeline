@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_loutre_pipeline.pl,v $
-# $Revision: 1.27 $
+# $Revision: 1.28 $
 
 =head1 NAME
 
@@ -35,7 +35,8 @@ recovered from the ~/.netrc file. See the Net::Netrc module for more details.
     -submit       (default: true) prime the analysis pipeline
                   i.e. add submitcontig rows in the input_id_anlysis table
     -local_seq    (optional) only look for ".seq" files in current directory - no pfetching
-    -skip_type    (optional) comma separated list of clone status to ignore (e.g. A,D,F,G,O,P,W)
+    -skip_type    (optional) clone status to ignore (default C<>; e.g. C<ADGOPUW>).  Commas ignored.
+    -load_type    (optional) clone status to load (default C<F>).  Commas ignored.
     -assembly     (optional) attach a equiv_asm attribute (e.g. NCBI36, GRCh37)
     -help|h       displays this documentation with PERLDOC
 
@@ -122,7 +123,7 @@ my $description;
 my $assembly;
 my $do_pipe   = 1;    # Set to load loutre and pipeline dbs
 my $do_submit = 1;    # Set if we want to prime the pipeline with the SubmitContig analysis
-my @skip;
+my ($skip_type, $load_type) = ('', 'F');
 my $local_seq_files_only = 0;
 
 my $usage = sub { exec('perldoc', $0); };
@@ -137,7 +138,8 @@ my $usage = sub { exec('perldoc', $0); };
     'cs_version:s'  => \$cs_version,
     'set=s'         => \$set,
     'description=s' => \$description,
-    'skip_type=s'   => \@skip,
+    'skip_type=s'   => \$skip_type,
+    'load_type=s'   => \$load_type,
     'assembly=s'    => \$assembly,
     'do_pipe!'      => \$do_pipe,
     'submit!'       => \$do_submit,
@@ -145,7 +147,7 @@ my $usage = sub { exec('perldoc', $0); };
     'h|help!'       => $usage
 ) or $usage->();
 
-setup_patterns( split(/,/, join(',', @skip)) );
+setup_patterns($load_type, $skip_type);
 
 my $agp_file = $ARGV[0];    # takes the remaining argument as the filename to be read
 throw("cannot load assembly details, as there is no agp file")
@@ -559,15 +561,26 @@ sub make_slice {
     my ($known_type, $accepted_type);
 
     sub setup_patterns {
-        my (@skip) = @_;
+        my ($load_type, $skip_type) = @_;
 
-        my %accepted_type = map {$_ => 1} qw{ A D F G O P W };
-        foreach my $s (@skip) {
-            delete $accepted_type{$s};
+        my (%known, %load);
+        foreach my $t (split //, $load_type) {
+            next if $t eq ',';
+            $load{$t} = 1;
+            $known{$t} = 1;
         }
-        my $accepted_str = join '', keys %accepted_type;
-        $accepted_type = qr{^[$accepted_str]$};
-        $known_type    = qr{^[ADFGNOPUW]$};
+        my $gap_type = 'N';
+        foreach my $t (split //, $gap_type.$skip_type) {
+            next if $t eq ',';
+            $known{$t} = 1;
+            die "AGP type $t: load + skip both specified" if $load{$t};
+        }
+        my $load = join '', sort keys %load;
+        my $known = join '', sort keys %known;
+        $accepted_type = qr{^[$load]$};
+        $known_type    = qr{^[$known]$};
+        warn "AGP types: known valid = $known, accepted for loading = $load\n";
+        return;
     }
 
     sub check_line {
@@ -580,6 +593,7 @@ sub make_slice {
         # (GenBank/EMBL/DDBJ) submission.
         #  Current acceptable values are:
         #    A=Active Finishing
+        #      equivalent to 'Unfinished'
         #    D=Draft HTG (often phase1 and phase2
         #    are called Draft, whether or not they have
         #    the draft keyword).
@@ -589,8 +603,8 @@ sub make_slice {
         #    O=Other sequence (typically means no
         #    HTG keyword)
         #    P=Pre Draft
-        #    U= gap of unknown size, typically
-        #    defaulting to predefined values.
+        #    U= gap of unknown size, typically defaulting to predefined values.
+        #       but it may also be 'Unfinished' in some contexts
         #    W=WGS contig
         ##
 
