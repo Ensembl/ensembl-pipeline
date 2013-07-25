@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Monitor -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Monitor.pm,v $
-# $Revision: 1.36 $
+# $Revision: 1.37 $
 package Bio::EnsEMBL::Pipeline::Monitor;
 use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -112,10 +112,8 @@ sub show_current_status {
   my @names;
   my @aid;
 
-  print STDERR $logic_name, "\n";
   while (my $ref = $sth->fetchrow_hashref) {
     my $name   = $ref->{'logic_name'};
-    print STDERR $name, "\n";
     next if (defined $logic_name and $name !~ /$logic_name/);
     my $count  = $ref->{'count(*)'};
     my $status = $ref->{'status'};
