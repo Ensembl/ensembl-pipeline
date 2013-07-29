@@ -2,7 +2,7 @@ CREATE TABLE job (
   job_id            int(10) unsigned NOT NULL auto_increment,
   input_id          varchar(100) NOT NULL,
   analysis_id       smallint(5) unsigned NOT NULL,
-  submission_id     mediumint(10) NOT NULL,
+  submission_id     int(10) NOT NULL,
   stdout_file       varchar(1000) NOT NULL,
   stderr_file       varchar(1000) NOT NULL,
   retry_count       tinyint(2) unsigned default 0,
