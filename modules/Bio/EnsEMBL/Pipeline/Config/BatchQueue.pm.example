@@ -165,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.48 $ 
+# $Revision: 1.49 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -192,15 +192,14 @@ use vars qw(%Config);
   DEFAULT_CLEANUP     => 'no',
   DEFAULT_VERBOSITY   => 'WARNING',
 
+
   # The two variables below are to overcome a bug in LSF.  We're
   # currently running the pre-exec with a different perl.  LSF currently
   # unsets the LD_LIBRARY_PATH which we need for certain 64bit libraries
   # in pre-exec commands (more info see LSF_LD_SECURITY variable).
+  DEFAULT_LSF_PRE_EXEC_PERL =>'/software/ensembl/central/bin/perl',
+  DEFAULT_LSF_PERL =>'/software/ensembl/central/bin/perl',
 
-  DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl',
-  # ONLY use 32bit perl for lsf -pre-exec jobs
-  DEFAULT_LSF_PERL =>'/usr/local/ensembl32/bin/perl',
-  # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
 
   # SANGER farm: Don't forget to source source
   # /software/intel_cce_80/bin/iccvars.csh for big mem jobs.
