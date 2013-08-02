@@ -109,7 +109,7 @@
     To allocate 4Gb of memory:
 
       resource  => 'select[mem>4000] rusage[mem=4000]',
-      sub_args  => '-M 4000000'
+      sub_args  => '-M 4000'
 
 =head3 Short memory specification string
 
@@ -165,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.49 $ 
+# $Revision: 1.50 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -244,12 +244,12 @@ use vars qw(%Config);
 
       # Most RepeatMasker jobs need not more than 500MB.
       resource => 'select[mem>500] rusage[mem=500]',
-      sub_args => '-M 500000',
+      sub_args => '-M 500',
 
       # Some jobs might fail (unlikely with 1M slices), but they will
       # defintely pass with 2GB.
       retry_resource => 'select[mem>2000] rusage[mem=2000]',
-      retry_sub_args => '-M 2000000',
+      retry_sub_args => '-M 2000',
 
       retry_queue      => '',
       retry_batch_size => 5,
@@ -275,11 +275,11 @@ use vars qw(%Config);
 
       # trf is a borderline case for the 100MB limit, give it 200MB.
       resource => 'select[mem>200] rusage[mem=200]',
-      sub_args => '-M 200000',
+      sub_args => '-M 200',
 
       # For really big things, it might need more, give it 1GB
       retry_resource => 'select[mem>1000] rusage[mem=1000]',
-      retry_sub_args => '-M 1000000',
+      retry_sub_args => '-M 1000',
     },
   {
     logic_name     => 'cpg',                                                  
@@ -342,7 +342,7 @@ use vars qw(%Config);
       batch_size => 200,
       resource       => 'select[mem>2000] rusage[mem=2000]',
       retries        => 3,
-      sub_args       => '-M 2000000',
+      sub_args       => '-M 2000',
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -364,7 +364,7 @@ use vars qw(%Config);
       batch_size => 100,
       resource       => 'select[mem>1500] rusage[mem=1500]',
       retries        => 3,
-      sub_args       => '-M 1500000',
+      sub_args       => '-M 1500',
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -375,7 +375,7 @@ use vars qw(%Config);
       batch_size => 100,
       resource       => 'select[mem>1000] rusage[mem=1000]',
       retries        => 3,
-      sub_args       => '-M 1000000',
+      sub_args       => '-M 1000',
       runner         => '',
       retry_queue    => '',
       retry_resource => '',
@@ -484,7 +484,7 @@ use vars qw(%Config);
       batch_size => 500,
       resource   => 'select[mem>500] rusage[mem=500]',
       retries    => 1,
-      sub_args   => '-M500000',
+      sub_args   => '-M500',
       queue      => 'normal',
     },
     {
@@ -492,7 +492,7 @@ use vars qw(%Config);
       batch_size => 300,
       resource   => 'select[mem>500] rusage[mem=500]',
       retries    => 1,
-      sub_args   => '-M500000',
+      sub_args   => '-M500',
       queue      => 'normal',
     },
     {
@@ -500,7 +500,7 @@ use vars qw(%Config);
       batch_size => 1,
       retries    => 1,
       resource   => 'select[mem>500] rusage[mem=500]',
-      sub_args   => '-M500000',
+      sub_args   => '-M500',
       queue      => 'normal',
     }, 
        {
@@ -508,7 +508,7 @@ use vars qw(%Config);
       batch_size => 500,
       retries    => 1,
       resource   => 'select[mem>500] rusage[mem=500]',
-      sub_args   => '-M500000',
+      sub_args   => '-M500',
       queue      => 'normal',
     }, 
     {
