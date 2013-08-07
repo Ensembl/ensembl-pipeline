@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rulemanager.pl,v $
-# $Revision: 1.36 $
+# $Revision: 1.37 $
 
 use warnings ;
 use strict;
@@ -50,6 +50,9 @@ my $once;           # Only run the loop once
 my @starts_from;    # array of logic_names which are used to get the starting
                     # input_id hash
 my @analyses_to_run;  # array of logic_names of analyses to run
+my @like_analyses_to_run; # array of MySQL patterns to match logic names from
+my $dry_like;       # a flag used in conjuction with logic_name_like to print matched
+                    # logic names but not run the pipeline
 my @analyses_to_skip; # array of logic_names of analyses to skip
 my @types_to_run;   # array of input_id_types to consider for the run
 my @types_to_skip;  # array of input_id_types to not consider for the run
@@ -103,6 +106,8 @@ GetOptions(
            'rename_on_retry'        => \$rename_on_retry,
            'starts_from=s@'         => \@starts_from,
            'analysis|logic_name=s@' => \@analyses_to_run,
+           'logic_name_like=s@'     => \@like_analyses_to_run,
+           'dry_like!'              => \$dry_like,
            'skip_analysis=s@'       => \@analyses_to_skip,
            'input_id_type=s@'       => \@types_to_run,
            'skip_input_id_type=s@'  => \@types_to_skip,
@@ -136,9 +141,9 @@ GetOptions(
 perldoc() if $perldoc;
 verbose($utils_verbosity);
 
-
 @analyses_to_run = map {split/,/} @analyses_to_run ; 
 @types_to_run    = map {split/,/} @types_to_run ; 
+@like_analyses_to_run = map {split/,/} @like_analyses_to_run ;
 
 unless ($dbhost && $dbname && $dbuser) {
     print STDERR "Must specify database with -dbhost, -dbname, -dbuser and -dbpass\n";
@@ -202,6 +207,36 @@ if ($dbload) {
 } else {
   our $CHECK_DBLOAD = 0;
   warn("!!\nIf you need database load managment use -dbload and add a line resource in your BatchQueue.pm file\n!!");
+}
+
+if(@like_analyses_to_run) {
+
+    my @like_analysis_array = @{$rulemanager->like_logic_name2dbID(\@like_analyses_to_run)};
+
+    if(scalar @like_analysis_array == 0) {
+        throw("Error: you have used logic_name_like but there are no matching analyses in the analysis table! Check the pattern you are using!");
+    }
+
+    print "Analyses specified through standard logic_name flag:\n";
+    foreach (@analyses_to_run) {
+      print $_."\n";  
+    } 
+    print "\n";
+
+    if ($dry_like) {
+      print "Exiting dry run for logic_name_like\n\n";
+      $rulemanager->db->pipeline_unlock;
+      exit(0);
+    } 
+
+    else {
+
+      foreach my $indv_logic_name (@like_analysis_array) {
+          push(@analyses_to_run,$indv_logic_name);
+      }
+  
+    }
+      
 }
 
 
