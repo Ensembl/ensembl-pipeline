@@ -36,7 +36,7 @@ The rest of the documentation details each of the object methods. Internal metho
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/RuleManager.pm,v $
-# $Revision: 1.32 $
+# $Revision: 1.33 $
 package Bio::EnsEMBL::Pipeline::RuleManager;
 
 
@@ -46,7 +46,6 @@ use warnings;
 use File::Copy;
 use Sys::Hostname;
 use Socket;
-
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -1170,6 +1169,68 @@ sub logic_name2dbID {
 }
 
 
+=head2 like_logic_name2dbID
+
+  Arg [1]   : arrayref of MySQL LIKE strings
+  Function  : produce a hash keyed on analysis dbID based on array passed 
+  in. Matches analyses based on the patterns provided in the array passed
+  in using the MySQL LIKE operation. 
+  Returntype: hashref 
+  Exceptions: none
+  Example   : 
+
+=cut
+
+sub like_logic_name2dbID {
+  my ($self, $logic_name_like) = @_;
+  my @logic_names;  
+  
+  foreach my $like_syntax (@$logic_name_like) {
+
+    my $sth = $self->db->prepare("         
+              SELECT analysis_id, logic_name FROM analysis
+              WHERE logic_name like \"".$like_syntax."\"");
+    my $res = $sth->execute;
+
+    if($res eq "0E0") {
+      $res = 0;  
+    }
+
+    print "Using logic_name_like....\n";
+    print "For \'".$like_syntax."\' found ".$res." entries in the analysis table\n\n";
+
+    if ($res > 0) {
+      print "Will run on the following analyses:\n\n";
+
+      while (my $ref = $sth->fetchrow_hashref) {
+        my $indv_logic_name = $ref->{'logic_name'};
+        my $indv_analysis_id = $ref->{'analysis_id'};
+        print "Logic name: ".$indv_logic_name." (".$indv_analysis_id.")\n";
+
+        if ($indv_analysis_id) {
+          push(@logic_names,$indv_logic_name);
+        }
+
+        else {
+            print "Couldn't find an analysis id for $indv_logic_name!\n";
+        }
+       
+      }
+
+      print "\n";
+
+    }
+
+    else {
+        print "Warning: no analyses found for pattern \'".$like_syntax."\'!!!\n\n";
+    }
+
+  }
+
+  return \@logic_names;  
+
+}
+
 =head2 input_ids_setup
 
   Arg [1]   : string, filename pointing file of input_ids to run
@@ -1192,15 +1253,16 @@ sub input_id_setup{
   $self->empty_input_ids;
   
   if ($ids_to_run) {
-    
+   
     $id_hash = $self->read_id_file($ids_to_run);
   } elsif (@$starts_from) {
-    
+   
     my @analyses;
 
     foreach my $logic_name(@$starts_from){
       my $analysis = $self->analysis_adaptor->
         fetch_by_logic_name($logic_name);
+   
       push(@analyses, $analysis);
     }
     $id_hash = $self->starts_from_input_ids(\@analyses);
