@@ -167,7 +167,7 @@ use vars qw(%Config);
     LIB_DIR  => '/usr/local/ensembl/lib',
 
     ANALYSIS_WORK_DIR => '/tmp',
-    ANALYSIS_REPEAT_MASKING => ['RepeatMask','Dust'],
+    ANALYSIS_REPEAT_MASKING => ['repeatmask','dust'],
 
     CORE_VERBOSITY => 'WARNING',
     LOGGER_VERBOSITY => 'OFF',
