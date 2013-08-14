@@ -165,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.50 $ 
+# $Revision: 1.51 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -240,7 +240,6 @@ use vars qw(%Config);
       output_dir      => '/some_dir/',
       verbosity       => 'INFO',
       runnabledb_path => 'Bio/EnsEMBL/Analysis/RunnableDB',
-      lsf_perl        => '/usr/local/ensembl32/bin/perl',
 
       # Most RepeatMasker jobs need not more than 500MB.
       resource => 'select[mem>500] rusage[mem=500]',
@@ -258,7 +257,6 @@ use vars qw(%Config);
       batch_size => 10,
       retries    => 3,
       runner     => '',
-      lsf_perl   => '/usr/local/ensembl64/bin/perl',
 
       resource => '',
       sub_args => '',
