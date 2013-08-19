@@ -33,7 +33,7 @@ Bio::EnsEMBL::Pipeline::Monitor -
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Monitor.pm,v $
-# $Revision: 1.37 $
+# $Revision: 1.38 $
 package Bio::EnsEMBL::Pipeline::Monitor;
 use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
@@ -240,7 +240,7 @@ sub show_finished_summary {
     my $count  = $ref->{'count(*)'};
     my $id = $ref->{'analysis_id'};
 
-    if ($name =~ /Submit/){
+    if ($name =~ /Submit/i){
       next if($no_submit);
     }
 
