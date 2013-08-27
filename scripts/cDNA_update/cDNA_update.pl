@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.94 $
+# $Revision: 1.95 $
 
-#$Id: cDNA_update.pl,v 1.94 2013-06-11 10:31:51 cgg Exp $
+#$Id: cDNA_update.pl,v 1.95 2013-08-27 13:04:28 fm2 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -754,7 +754,7 @@ sub config_setup {
                             retries        => 1,
                             resource       => $configvars{'RESOURCE'},
                             retry_resource => 'select[mem>4000] rusage[mem=4000]',
-                            retry_sub_args => '-M4000000',
+                            retry_sub_args => '-M4000',
                             );
     $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
     $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);
@@ -925,7 +925,7 @@ sub write_to_file {
     open( WP, ">", $DATA_DIR . "/" . $newfile )
       or croak("can't create $newfile\n");
     my $embl_fa_file = "$DATA_DIR/embl_" . $configvars{taxonomy_id} . ".fa";
-    system('bsub -I -q yesterday -M1000000 -R"select[mem>1000] rusage[mem=1000]" "/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t '.$configvars{taxonomy_id}.' > '.$embl_fa_file.'"');
+    system('bsub -I -q yesterday -M1000 -R"select[mem>1000] rusage[mem=1000]" "/software/pubseq/bin/embl_cdna_fasta/bin/embl_cdna_fasta.pl -t '.$configvars{taxonomy_id}.' > '.$embl_fa_file.'"');
     die("bsub failed probably because of some memory requirements\n") if ($?);
     open( RP, "<", $embl_fa_file )
       or croak("can't read $embl_fa_file\n");
@@ -2341,7 +2341,7 @@ sub polya_clipping {
     } 
       $cmd .=  $DATA_DIR . "/" . $trim_file . " " . $newfile3;
 
-    $cmd = 'bsub -I -q yesterday -M1000000 -R"select[mem>1000] rusage[mem=1000]" "'.$cmd.'"';
+    $cmd = 'bsub -I -q yesterday -M1000 -R"select[mem>1000] rusage[mem=1000]" "'.$cmd.'"';
     print $cmd, "\n";
 
     if ( system($cmd) ) {
@@ -2446,7 +2446,7 @@ sub add_new_analysis_to_batchqueue {
                             retries        => 1,
                             resources      => $configvars{'RESOURCE'},
                             retry_resource => 'select[mem>4000] rusage[mem=4000]',
-                            retry_sub_args => '-M4000000',
+                            retry_sub_args => '-M4000',
                             );
     $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
     $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);

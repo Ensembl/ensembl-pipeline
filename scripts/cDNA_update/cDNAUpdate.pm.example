@@ -55,7 +55,7 @@ use vars qw(%Config);
         # Exonerate specifications
         PROGRAM_NAME    => "exonerate",
         PROGRAM_VERSION => "0.9.0",  
-        PROGRAM_FILE    => "/usr/local/ensembl/bin/exonerate-0.9.0",  #path to exonerate
+        PROGRAM_FILE    => "/software/ensembl/genebuild/usrlocalensemblbin/exonerate-0.9.0",  #path to exonerate
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
@@ -114,9 +114,9 @@ use vars qw(%Config);
         PRODUCTION_DBPORT => 3306,
 
         # Select the good DB for the tokens, the first one is the pipeline DB
-        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000000',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
+        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000',
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
@@ -173,9 +173,9 @@ use vars qw(%Config);
         PRODUCTION_DBPORT => 3306,
 
         # Select the good DB for the tokens, the first one is the pipeline DB
-        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000000',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000000',
+        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000',
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
@@ -187,7 +187,7 @@ use vars qw(%Config);
         ################################################################
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/GRCm38/softmasked_dusted/toplevel.fa',
+        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/GRCm38/softmasked_dusted/toplevel.with_nonref_and_grcm38_p1.no_duplicate.softmasked_dusted.fa',
 
         # Chunk size recommendations: 1500 for mouse
         # otherwise get AWOL jobs in first run

@@ -33,7 +33,7 @@ use vars qw(%Config);
   DEFAULT_RUNNABLEDB_PATH => 'Bio/EnsEMBL/Analysis/RunnableDB',
   DEFAULT_RUNNER          => '',
   DEFAULT_RETRY_QUEUE     => 'long',
-  DEFAULT_RETRY_SUB_ARGS  => '-M4000000',
+  DEFAULT_RETRY_SUB_ARGS  => '-M4000',
   DEFAULT_RETRY_RESOURCE  => 'select[mem>4000] rusage[mem=4000]',
   DEFAULT_LSF_PRE_EXEC_PERL =>'/usr/local/ensembl32/bin/perl', # ONLY use 32bit perl for lsf -pre-exec jobs
   DEFAULT_LSF_PERL          =>'/usr/local/ensembl32/bin/perl', # ONLY use ensembl64/bin/perl for memory jobs > 4 gb
@@ -60,10 +60,14 @@ package Bio::EnsEMBL::Analysis::Config::General;
 use strict;
 use vars qw(%Config);
 %Config = (
-    BIN_DIR  => '/usr/local/ensembl/bin',
-    DATA_DIR => '/usr/local/ensembl/data',
-    LIB_DIR  => '/usr/local/ensembl/lib',
+    #BIN_DIR  => '/usr/local/ensembl/bin',
+    #DATA_DIR => '/usr/local/ensembl/data',
+    #LIB_DIR  => '/usr/local/ensembl/lib',
 
+    BIN_DIR  => '/software/ensembl/genebuild/usrlocalensemblbin/',
+    DATA_DIR => '/software/ensembl/genebuild/usrlocalensembldata/',
+    LIB_DIR  => '/software/ensembl/genebuild/usrlocalensembllib/',
+   
     ANALYSIS_WORK_DIR       => '/tmp',
     ANALYSIS_REPEAT_MASKING => ['RepeatMask'],
     CORE_VERBOSITY          => 'WARNING',
