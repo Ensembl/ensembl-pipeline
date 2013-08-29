@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/dequeuer.pl,v $
-# $Revision: 1.31 $
+# $Revision: 1.32 $
 
 =pod
 
@@ -46,6 +46,7 @@ See the Net::Netrc module for more details.
   	-skip_pipeline	don't dequeue jobs stored in this pipeline(s)
   	-host		only dequeue jobs stored on this host(s)
   	-skip_host	don't dequeue jobs stored on this host(s)
+  	-skip_update don't run any update jobs
 
 These arguments are overridable configurations
 options from Bio::EnsEMBL::Pipeline::Config::BatchQueue.pm
@@ -99,6 +100,7 @@ my @pipeline_to_skip;
 my @host_to_run;
 my @host_to_skip;
 my $db_adaptors;
+my $skip_update = 0;
 
 my @PIPE_HOST = qw/otterpipe1 otterpipe2/;
 
@@ -131,6 +133,7 @@ GetOptions(
 	'skip_pipeline=s@'       => \@pipeline_to_skip,
 	'host=s@'		=> \@host_to_run,
 	'skip_host=s@'       => \@host_to_skip,
+	'skip_update!'      => \$skip_update,
 	'h|help!'         => $usage
 
   )
@@ -183,6 +186,9 @@ if(@host_to_run) {
 if(@host_to_skip) {
   my $skip_host_string = join("', '", @host_to_skip);
   push @where, "host NOT IN ('$skip_host_string')";
+}
+if ($skip_update) {
+    push(@where, "is_update = 0")
 }
 if(scalar(@where)) {
     $sql_fetch .= ' WHERE '.join(' AND ', @where);
