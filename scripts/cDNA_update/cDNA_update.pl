@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.95 $
+# $Revision: 1.96 $
 
-#$Id: cDNA_update.pl,v 1.95 2013-08-27 13:04:28 fm2 Exp $
+#$Id: cDNA_update.pl,v 1.96 2013-09-04 16:09:39 th3 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
@@ -753,8 +753,7 @@ sub config_setup {
                             batch_size     => $configvars{'BATCH_SIZE'},
                             retries        => 1,
                             resource       => $configvars{'RESOURCE'},
-                            retry_resource => 'select[mem>4000] rusage[mem=4000]',
-                            retry_sub_args => '-M4000',
+                            retry_resource => $configvars{'RETRY_RESOURCE'},
                             );
     $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
     $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);
@@ -2444,9 +2443,8 @@ sub add_new_analysis_to_batchqueue {
                             output_dir     => $outDIR,
                             batch_size     => $configvars{'BATCH_SIZE'},
                             retries        => 1,
-                            resources      => $configvars{'RESOURCE'},
-                            retry_resource => 'select[mem>4000] rusage[mem=4000]',
-                            retry_sub_args => '-M4000',
+                            resource      => $configvars{'RESOURCE'},
+                            retry_resource => $configvars{'RETRY_RESOURCE'},
                             );
     $bq_cfg->add_analysis_to_batchqueue($newFeatureName, \%cdna_batchqueue);
     $saved_files{$bq_cfg->modulename} = $bq_cfg->write_config(1);
