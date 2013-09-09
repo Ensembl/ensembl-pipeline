@@ -165,7 +165,7 @@
 =cut
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.52 $ 
+# $Revision: 1.53 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
@@ -229,7 +229,8 @@ use vars qw(%Config);
   DEFAULT_RUNNER         => '',
   DEFAULT_RETRY_QUEUE    => 'long',
   DEFAULT_RETRY_SUB_ARGS => '',
-  DEFAULT_RETRY_RESOURCE => '',
+  #DEFAULT_RETRY_RESOURCE => 'select[myens_build1tok>2000 && myens_build2tok>2000 && myens_build3tok>2000 && myens_build4tok>2000 && myens_build5tok>2000 && myens_build6tok>2000 && myens_build7tok>2000 && myens_build8tok>2000]  rusage[myens_build1tok=10:myens_build2tok=10:myens_build3tok=10:myens_build4tok=10:myens_build5tok=10:myens_build6tok=10:myens_build7tok=10:myens_build8tok=10]',
+  DEFAULT_RETRY_RESOURCE    => 'rusage[myens_build1tok=10,myens_build2tok=10,myens_build3tok=10,myens_build4tok=10,myens_build5tok=10,myens_build6tok=10,myens_build7tok=10,myens_build8tok=10]',
 
   QUEUE_CONFIG => [
     { logic_name      => 'repeatmask',
