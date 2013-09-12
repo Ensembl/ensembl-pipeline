@@ -49,7 +49,7 @@ my $logic_name      = undef;
 	    'unfinished'        => \$unfin,
 	    'nohits=s'          => \$ft_ana_id,
 	    'assembly=s'        => \$assembly_type,
-	    'logic_name=s'        => \$logic_name,
+	    'logic_name|ln=s'        => \$logic_name,
 	    'input_id=s'        => \$input_id,
             'no_submit!'        => \$no_submit,
 	    'h|help'		=> \$help,
