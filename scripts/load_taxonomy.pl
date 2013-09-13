@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_taxonomy.pl,v $
-# $Revision: 1.14 $
+# $Revision: 1.15 $
 
 #this is a copy of sections of /ensembl-compara/scripts/taxonomy/taxonTreeTool.pl
 #uses -dbname style commands 
@@ -167,6 +167,8 @@ sub load_taxonomy_in_core {
 #  if ($node->name eq 'Canis familiaris' ||
 #      $node->name eq 'Gorilla gorilla gorilla' ||
 #      $node->name eq 'Mustela putorius furo' 
+#      $node->name eq 'Ceratotherium simum simum' || 
+#      $node->name eq 'Orycteropus afer afer') {
 #     ) {
 #    $match_rank = 'subspecies';
 #  } else {
