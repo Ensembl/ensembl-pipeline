@@ -41,7 +41,7 @@ Internal methods are usually preceded with a _
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/RuleManager.pm,v $
-# $Revision: 1.19 $
+# $Revision: 1.20 $
 package Bio::EnsEMBL::Pipeline::Finished::RuleManager;
 
 use warnings ;
@@ -146,10 +146,6 @@ sub can_job_run {
 		{
 			print "Retrying job " . $cj->dbID . " with status $status\n"
 			  if $self->be_verbose;
-
-			if ( $self->rename_on_retry ) {
-				$self->rename_files($cj);
-			}
 			$cj->set_status('CREATED');
 			$job = $cj;
 			$job->output_dir($self->output_dir) if $self->output_dir;
