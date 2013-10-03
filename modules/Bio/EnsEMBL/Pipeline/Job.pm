@@ -43,7 +43,7 @@ Bio::EnsEMBL::Pipeline::Job -
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Job.pm,v $
-# $Revision: 1.135 $
+# $Revision: 1.136 $
 package Bio::EnsEMBL::Pipeline::Job;
 
 
@@ -69,6 +69,13 @@ my $batch_q_module = "Bio::EnsEMBL::Pipeline::BatchSubmission::$QUEUE_MANAGER";
 my $file = "$batch_q_module.pm";
 $file =~ s{::}{/}g;
 require "$file";
+
+# This is to catch in which state our job died. It will print the status of the running job
+# and its input_id
+my $SIGINT_INPUT_ID = 'NULL';
+my $SIGINT_STATUS = 'NULL';
+$SIG{INT} = \&_inthandler;
+
 
 # BATCH_QUEUES is a package variable which stores available 'queues'.
 # This allows different analysis types to be sent to different nodes
@@ -615,6 +622,7 @@ sub runLocally {
 sub run_module {
   my $self = shift;
 
+  $SIGINT_INPUT_ID = $self->input_id;
   my $module     = $self->analysis->module;
   my $hash_key   = $self->analysis->logic_name;
   my $rdb;
@@ -669,6 +677,7 @@ sub run_module {
     
     # "READING"
     eval {   
+      $SIGINT_STATUS = 'READING';
       $self->set_status( "READING" );
       $res = $rdb->fetch_input;
     };
@@ -680,10 +689,12 @@ sub run_module {
     }
     
     if ($rdb->input_is_void) {
+      $SIGINT_STATUS = 'VOID';
       $self->set_status( "VOID" );
     } else {
       # "RUNNING"
       eval {
+        $SIGINT_STATUS = 'RUNNING';
         $self->set_status( "RUNNING" );
         $start = $self->get_last_status->created();
         $rdb->db->dbc->disconnect_when_inactive(1); 
@@ -707,6 +718,7 @@ sub run_module {
       
       # "WRITING"
       eval {
+        $SIGINT_STATUS = 'WRITING';
         $self->set_status( "WRITING" );
         $rdb->write_output;
 
@@ -724,6 +736,7 @@ sub run_module {
           $SAVE_RUNTIME_INFO = 0;
         }
 
+        $SIGINT_STATUS =  'SUCCESSFUL';
         $self->set_status("SUCCESSFUL");
         $end = $self->get_last_status->created();
       }; 
@@ -1228,6 +1241,10 @@ sub rename_on_retry{
 
   $self->{'rename_on_retry'} = shift if (@_);
   return $self->{'rename_on_retry'};
+}
+
+sub _inthandler {
+    print STDERR "ZUT! The job died while $SIGINT_STATUS for $SIGINT_INPUT_ID\n";
 }
 
 1;
