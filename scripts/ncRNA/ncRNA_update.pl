@@ -1,6 +1,6 @@
 #!/usr/bin/env perl
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/ncRNA_update.pl,v $
-# $Revision: 1.45 $
+# $Revision: 1.46 $
 
 
 use warnings ;
@@ -91,6 +91,7 @@ foreach my $species (@speciess) {
   my $perl5lib = "$DATADIR/$species:$CVSDIR/ensembl-analysis/modules".
      ":$CVSDIR/ensembl-pipeline/modules:$CVSDIR/ensembl/modules".
      ":$BIOPERL_PATH";
+  print SPEC "setenv BLASTMAT /software/ensembl/genebuild/usrlocalensembldata/blastmat\n";
   print SPEC 'setenv PERL5LIB '.$perl5lib."\n";
   
   # if all be well, run the rulemanager
@@ -145,11 +146,11 @@ sub config_setup {
     if ($token) {
         foreach my $analysis (@analysis_list) {
             my $value = $bq_cfg->analysis_from_batchqueue($analysis);
-            if ($value->{resource} =~ /rusage/) {
+            if (exists $value->{resource} and $value->{resource} =~ /rusage/) {
                 $value->{resource} =~ s/(rusage\[)/$1$token, /;
             }
             else {
-                $value->{resource} .= ' '.$token;
+                $value->{resource} .= " rusage[$token]";
             }
             $bq_cfg->analysis_from_batchqueue($analysis, $value);
         }
@@ -222,7 +223,7 @@ sub DB_setup{
     {
       print "Database $WRITENAME @ $WRITEHOST : $WRITEPORT already exists do you want to delete it? (y/n)\n";
       my $reply = <>;
-      chomp;
+      chomp($reply);
       if ($reply =~ /^Y/ or $reply =~ /^y/){    
           $status  = system("mysql -h$WRITEHOST -P$WRITEPORT -u$WRITEUSER -p$pass -e\"DROP DATABASE IF EXISTS $WRITENAME;\"");
           if($status && $status != 256){ die("couldnt drop old database $WRITENAME!\n"); 
@@ -275,7 +276,7 @@ sub DB_setup{
     $status += system($cmd);
     $cmd = "perl ".$CVSDIR."/ensembl-pipeline/scripts/add_Analysis ".
       " -dbhost $WRITEHOST -dbname $WRITENAME -dbuser $WRITEUSER  -dbport $WRITEPORT  -dbpass $pass".
-	" -logic_name RfamBlast -program wublastn -program_file /usr/local/ensembl/bin/wublastn -database Rfam ".
+	" -logic_name RfamBlast -program wublastn -program_file wublastn -database Rfam ".
 	  " -database_file $BLASTDIR/filtered.fasta  -parameters  \'W=12 B=10000 V=10000 -hspmax 0 -gspmax 0 -kap -cpus=1\'" .
 	    " -module Bio::EnsEMBL::Analysis::RunnableDB::BlastRfam -database_version $RFAMVERSION ".
 	      " module_version 1 -gff_source ensembl -gff_feature gene -input_id_type SLICE";
