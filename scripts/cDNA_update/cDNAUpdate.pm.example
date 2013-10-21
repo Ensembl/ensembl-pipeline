@@ -49,7 +49,7 @@ use vars qw(%Config);
         FIND_N_PATH             => '/ensembl-pipeline/scripts/cDNA_update/find_N.pl',
         STORE_UNMAPPED_PATH     => '/ensembl-pipeline/scripts/cDNA_update/store_unmapped_cdnas.pl',
         LOAD_TAX_PATH           => '/ensembl-pipeline/scripts/load_taxonomy.pl',
-        LOAD_PROD_DB            => '/ensembl/misc-scripts/production_database/scripts/populate_production_db_tables.pl',
+        LOAD_PROD_DB            => '/ensembl-production/scripts/production_database/populate_production_db_tables.pl',
         MIN_LENGTH              => 60,  # minimum length of cdna (otherwise they will be ignored ) 
 
         # Exonerate specifications
@@ -59,7 +59,7 @@ use vars qw(%Config);
         MODULE_NAME     => "Exonerate2Genes",
 
         # Source data files details
-        REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',#formerly /data/blastdb/refseqdna
+        REFSEQ_SOURCE => '/data/blastdb/Supported/refseqdna',
 
         # Taxonomy db for loading meta_table - should not need to change
         TAXONDBNAME => 'ncbi_taxonomy',
@@ -123,13 +123,12 @@ use vars qw(%Config);
 
         DATA_DIR => '',
 
-        # You shouldn't need to change the settings below but do check #
-        # that they are correct.                                       #
-        ################################################################
-
         # Path to the genomic sequence
         GENOMICSEQS => '/data/blastdb/Ensembl/Human/GRCh37/genome/softmasked/softmasked_dusted.fa',
 
+        # You shouldn't need to change the settings below but do check #
+        # that they are correct.                                       #
+        ################################################################
         # Chunk size recommendations: 5500 for human
         # otherwise get AWOL jobs in first run
         CHUNK => 5500,
@@ -182,12 +181,12 @@ use vars qw(%Config);
 
         DATA_DIR => '',
 
+        # Path to the genomic sequence
+        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/GRCm38/softmasked_dusted/toplevel.with_nonref_and_grcm38_p1.no_duplicate.softmasked_dusted.fa',
+
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
         ################################################################
-
-        # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Mouse/GRCm38/softmasked_dusted/toplevel.with_nonref_and_grcm38_p1.no_duplicate.softmasked_dusted.fa',
 
         # Chunk size recommendations: 1500 for mouse
         # otherwise get AWOL jobs in first run
