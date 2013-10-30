@@ -6,11 +6,11 @@ use vars qw( %MitConf );
 
 %MitConf = (
   #location of genbank file
-  MIT_GENBANK_FILE => '/lustre/scratch103/ensembl/ba1/releases/v57/rat_MT_AC_000022.gb',
+  MIT_GENBANK_FILE => '/path/to/species/NC_XXXXXX.X.gbwithparts',
 
   # database to put sequnece and genes into
-  MIT_DBNAME => 'th3_equus_caballus_core_69_2',
-  MIT_DBHOST => 'genebuild8',
+  MIT_DBNAME => '',
+  MIT_DBHOST => '',
   MIT_DBUSER => 'ensadmin',
   MIT_DBPASS => '***',
   MIT_DBPORT => '3306',
