@@ -1,5 +1,5 @@
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Finished_Dfetch.pm,v $
-# $Revision: 1.15 $
+# $Revision: 1.16 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch;
 
 use warnings ;
@@ -291,7 +291,7 @@ sub get_dbnames_like {
 	my ($self, $db) = @_;
 	my @dbs;
 
-	my $query = "SELECT database_name
+	my $query = "SELECT DISTINCT database_name
 				 FROM ini
 				 WHERE available = 'yes'
 				 AND database_category LIKE \'$db\'
