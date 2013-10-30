@@ -36,7 +36,7 @@ Internal methods are usually preceded with a _
 # Let the code begin...
 
 # $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/Job.pm,v $
-# $Revision: 1.30 $
+# $Revision: 1.31 $
 package Bio::EnsEMBL::Pipeline::Finished::Job;
 
 use warnings ;
@@ -355,191 +355,184 @@ sub batch_runRemote {
 =cut
 
 sub flush_runs {
-	my ( $self, $adaptor, $queue, $verbose ) = @_;
-	# flush_runs is optionally sent a queue to deal with
-	# @analyses is a list of logic_names (strings)
+    my ($self, $adaptor, $queue, $verbose) = @_;
 
-	my @analyses = ($queue) || ( keys %BATCH_QUEUES );
+    # flush_runs is optionally sent a queue to deal with
+    # @analyses is a list of logic_names (strings)
 
-	if ( !defined $adaptor ) {
-		throw("Cannot run remote without db connection");
-	}
+    my @analyses = ($queue) || (keys %BATCH_QUEUES);
 
-	local *FILE;
+    if (!defined $adaptor) {
+        throw("Cannot run remote without db connection");
+    }
 
-	my $dbc      = $adaptor->db->dbc;
-	my $host     = $dbc->host;
-	my $username = $dbc->username;
-	my $dbname   = $dbc->dbname;
-	my $pass     = $dbc->password;
-	my $port     = $dbc->port;
+    local *FILE;
 
-		# runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
-	# then in same directory as Job.pm,
-	# and fail if not found
+    my $dbc      = $adaptor->db->dbc;
+    my $host     = $dbc->host;
+    my $username = $dbc->username;
+    my $dbname   = $dbc->dbname;
+    my $pass     = $dbc->password;
+    my $port     = $dbc->port;
 
-		my $runner = $self->runner;
+    # runner.pl: first look at value set in RuleManager ($RUNNER_SCRIPT)
+    # then in same directory as Job.pm,
+    # and fail if not found
 
-		if ( !$runner || !-x $runner ) {
-		$runner = __FILE__;
-		$runner =~ s:/[^/]*$:/runner.pl:;
-		my $caller = caller(0);
-		throw(  "runner " . $runner
-			  . " not found - needs to be set in "
-			  . "$caller\n" )
-		  unless -x $runner;
-	}
-	  ANAL:
-	for my $anal (@analyses) {
-		my $queue = $BATCH_QUEUES{$anal};
-		my @job_ids;
-		@job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} }
-				if ($queue->{'jobs'}->{$host}->{$dbname});
-		if ( !@job_ids ) {
-			next ANAL;
-		}
-		print "\t\t$anal\t".scalar(@job_ids)." jobs\n" if $verbose;
-			my $this_runner = $queue->{'runner'};
-		$this_runner = ( -x $this_runner ) ? $this_runner : $runner;
+    my $runner = $self->runner;
 
-		my $lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] );
+    if (!$runner || !-x $runner) {
+        $runner = __FILE__;
+        $runner =~ s:/[^/]*$:/runner.pl:;
+        my $caller = caller(0);
+        throw("runner " . $runner . " not found - needs to be set in " . "$caller\n")
+          unless -x $runner;
+    }
+  ANAL:
+    for my $anal (@analyses) {
+        my $queue = $BATCH_QUEUES{$anal};
+        my @job_ids;
+        @job_ids = @{ $queue->{'jobs'}->{$host}->{$dbname} }
+          if ($queue->{'jobs'}->{$host}->{$dbname});
+        if (!@job_ids) {
+            next ANAL;
+        }
+        print "\t\t$anal\t" . scalar(@job_ids) . " jobs\n" if $verbose;
+        my $this_runner = $queue->{'runner'};
+        $this_runner = (-x $this_runner) ? $this_runner : $runner;
 
-		while( !$lastjob && @job_ids) {
-			pop @job_ids;
-			$lastjob = $adaptor->fetch_by_dbID( $job_ids[-1] ) if($job_ids[-1]);
-		}
+        my $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]);
 
-		if ( !$lastjob ) {
-			next ANAL;
-		}
+        while (!$lastjob && @job_ids) {
+            pop @job_ids;
+            $lastjob = $adaptor->fetch_by_dbID($job_ids[-1]) if ($job_ids[-1]);
+        }
 
-		my $pre_exec =
-		  $this_runner . " -check -output_dir " . $self->output_dir;
+        if (!$lastjob) {
+            next ANAL;
+        }
 
-		my $farm_queue    = $queue->{'queue'};
-		my $farm_resource = $queue->{'resource'};
-		my $param = ' -sp '.$self->priority.' ';
+        my $pre_exec = $this_runner . " -check -output_dir " . $self->output_dir;
 
-		$param .= $queue->{'sub_args'};
+        my $farm_queue    = $queue->{'queue'};
+        my $farm_resource = $queue->{'resource'};
+        my $param         = ' -sp ' . $self->priority . ' ';
 
-                # Extract original job memory spec (if any).  We may
-                # increase it - also have to bump the rusage.
-                my $mem_mb;
-                while ($param =~ s{(?:^|\s)\s*-M(\d{6,9})\b}{}) {
-                    my $param_kb = $1;
-                    my $param_mb = int($param_kb / 1000 + 0.75);
-                    warn "Multiple -M(kb) sub_args in QUEUE_CONFIG ".
-                      "for logic_name=$$queue{'logic_name'}" if defined $mem_mb;
-                    $mem_mb = $param_mb if !defined $mem_mb || $mem_mb < $param_mb;
+        $param .= $queue->{'sub_args'};
+
+        # Extract original job memory spec (if any).  We may
+        # increase it - also have to bump the rusage.
+        my $mem_mb;
+        while ($param =~ s/(?:^|\s)\s*-M(\d{6,9})\b//) {
+            my $param_mb = $1;
+            warn "Multiple -M(Mb) sub_args in QUEUE_CONFIG " . "for logic_name=$$queue{'logic_name'}"
+              if defined $mem_mb;
+            $mem_mb = $param_mb if !defined $mem_mb || $mem_mb < $param_mb;
+        }
+        $mem_mb = $DEFAULT_MEM_MB if !defined $mem_mb;
+
+        if ($self->priority == $BIG_MEM_PRIORITY) {
+            $mem_mb = $BIG_MEM_MB if $mem_mb < $BIG_MEM_MB;
+            $farm_queue = $BIG_MEM_QUEUE;
+        }
+
+        if ($self->priority == $LONG_JOB_PRIORITY) {
+            $farm_queue = $LONG_JOB_QUEUE;
+        }
+
+        # change job mysql token resource (otp1tok, otp2tok)
+        if (my ($otpnum) = $host =~ m{^otterpipe(\d+)$}) {
+            $farm_resource =~ s{\botp\d+tok\b}{otp${otpnum}tok}g;
+        }
+        else {
+            warn "Couldn't fix up resource $1 from dbhost $host"
+              if $farm_resource =~ m{\b(otp\d+tok)\b};
+        }
+
+        # Memory must be specified in -M, -Rselect and -Rrusage
+        $farm_resource = __munge_farm_resource($farm_resource, $mem_mb, $queue->{'logic_name'});
+
+        $param .= sprintf(" -M%d ", $mem_mb);    # other -M values were removed
+
+        my $batch_job = $batch_q_module->new(
+            -STDOUT     => $lastjob->stdout_file,
+            -STDERR     => $lastjob->stderr_file,
+            -PARAMETERS => $param,
+            -PRE_EXEC   => $pre_exec,
+            -QUEUE      => $farm_queue,
+            -JOBNAME    => $dbname . ':' . $anal,
+            -NODES      => $queue->{'nodes'},
+            -RESOURCE   => $farm_resource
+        );
+
+        my $cmd;
+
+        # check if the password has been defined, and write the
+        # "connect" command line accordingly otherwise -pass gets the
+        # first job id as password, instead of remaining undef
+
+        if ($pass) {
+            $cmd = $runner . " -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
+        }
+        else {
+            $cmd = $runner . " -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
+        }
+        $cmd .= " -output_dir " . $self->output_dir;
+        $cmd .= " -queue_manager $QUEUE_MANAGER  ";
+        if ($self->cleanup) {
+            $cmd .= " -cleanup ";
+        }
+        $cmd .= " @job_ids";
+
+        $batch_job->construct_command_line($cmd);
+
+        eval {
+
+            # SMJS LSF Specific for debugging
+            #print "Submitting: ", $batch_job->command, "\n";
+            $batch_job->open_command_line();
+        };
+
+        if ($@) {
+            print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
+            print STDERR "Using " . $batch_job->command . "\n";
+            foreach my $job_id (@job_ids) {
+                my $job = $adaptor->fetch_by_dbID($job_id);
+                $job->set_status("FAILED");
+            }
+        }
+        else {
+            my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
+            foreach my $job (@jobs) {
+
+                if ($job->retry_count > 0) {
+                    for ($job->stdout_file, $job->stderr_file) {
+                        open(FILE, ">" . $_);
+                        close(FILE);
+                    }
                 }
-                $mem_mb = $DEFAULT_MEM_MB if !defined $mem_mb;
 
-		if ( $self->priority == $BIG_MEM_PRIORITY ) {
-                    $mem_mb        = $BIG_MEM_MB if $mem_mb < $BIG_MEM_MB;
-                    $farm_queue    = $BIG_MEM_QUEUE;
-		}
-
-		if ( $self->priority == $LONG_JOB_PRIORITY ) {
-			$farm_queue    = $LONG_JOB_QUEUE;
-		}
-
-                # change job mysql token resource (otp1tok, otp2tok)
-                if (my ($otpnum) = $host =~ m{^otterpipe(\d+)$}) {
-                    $farm_resource =~ s{\botp\d+tok\b}{otp${otpnum}tok}g;
-                } else {
-                    warn "Couldn't fix up resource $1 from dbhost $host"
-                      if $farm_resource =~ m{\b(otp\d+tok)\b};
+                if ($batch_job->id) {
+                    $job->submission_id($batch_job->id);
                 }
+                else {
 
-                # Memory must be specified in -M, -Rselect and -Rrusage
-                $farm_resource = __munge_farm_resource
-                  ($farm_resource, $mem_mb, $queue->{'logic_name'});
-
-                $param .= sprintf(" -M%d ", $mem_mb * 1000); # other -M values were removed
-
-
-		my $batch_job = $batch_q_module->new(
-			-STDOUT     => $lastjob->stdout_file,
-			-STDERR     => $lastjob->stderr_file,
-			-PARAMETERS => $param,
-			-PRE_EXEC   => $pre_exec,
-			-QUEUE      => $farm_queue,
-			-JOBNAME    => $dbname . ':' . $anal,
-			-NODES      => $queue->{'nodes'},
-			-RESOURCE   => $farm_resource
-		);
-
-			my $cmd;
-
-			# check if the password has been defined, and write the
-		# "connect" command line accordingly otherwise -pass gets the
-		# first job id as password, instead of remaining undef
-
-		if ($pass) {
-			$cmd = $runner
-			  . " -dbhost $host -dbuser $username -dbname $dbname -dbpass $pass -dbport $port";
-		}
-		else {
-			$cmd = $runner
-			  . " -dbhost $host -dbuser $username -dbname $dbname -dbport $port";
-		}
-		$cmd .= " -output_dir " . $self->output_dir;
-		$cmd .= " -queue_manager $QUEUE_MANAGER  ";
-		if ( $self->cleanup ) {
-			$cmd .= " -cleanup ";
-		}
-		$cmd .= " @job_ids";
-
-			$batch_job->construct_command_line($cmd);
-
-			eval {
-
-				# SMJS LSF Specific for debugging
-			#print "Submitting: ", $batch_job->command, "\n";
-			$batch_job->open_command_line();
-		};
-
-			if ($@) {
-			print STDERR "Couldnt batch submit @job_ids \n[$@]\n";
-			print STDERR "Using " . $batch_job->command . "\n";
-			foreach my $job_id (@job_ids) {
-				my $job = $adaptor->fetch_by_dbID($job_id);
-				$job->set_status("FAILED");
-			}
-		}
-		else {
-			my @jobs = $adaptor->fetch_by_dbID_list(@job_ids);
-			foreach my $job (@jobs) {
-
-					if ( $job->retry_count > 0 ) {
-					for ( $job->stdout_file, $job->stderr_file ) {
-						open( FILE, ">" . $_ );
-						close(FILE);
-					}
-				}
-
-					if ( $batch_job->id ) {
-					$job->submission_id( $batch_job->id );
-				}
-				else {
-
-						# submission seems to have succeeded, but we didnt
-					# get a job ID. Safest NOT to raise an error here,
-					# (a warning would have already issued) but flag
-					print STDERR
-"Job: Null submission ID for the following, but continuing: @job_ids\n";
-					$job->submission_id(0);
-				}
-				$job->retry_count( $job->retry_count + 1 );
-				$job->set_status("SUBMITTED");
-				$job->stdout_file( $lastjob->stdout_file );
-				$job->stderr_file( $lastjob->stderr_file );
-			}
-			$adaptor->update(@jobs);
-		}
-		$queue->{'jobs'}->{$host}->{$dbname}         = [];
-		$queue->{'last_flushed'}->{$host}->{$dbname} = time;
-	}
+                    # submission seems to have succeeded, but we didnt
+                    # get a job ID. Safest NOT to raise an error here,
+                    # (a warning would have already issued) but flag
+                    print STDERR "Job: Null submission ID for the following, but continuing: @job_ids\n";
+                    $job->submission_id(0);
+                }
+                $job->retry_count($job->retry_count + 1);
+                $job->set_status("SUBMITTED");
+                $job->stdout_file($lastjob->stdout_file);
+                $job->stderr_file($lastjob->stderr_file);
+            }
+            $adaptor->update(@jobs);
+        }
+        $queue->{'jobs'}->{$host}->{$dbname}         = [];
+        $queue->{'last_flushed'}->{$host}->{$dbname} = time;
+    }
 }
 
 sub __munge_farm_resource {
