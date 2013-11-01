@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/make_gene2expression_bsubs.pl,v $
-# $Revision: 1.7 $
 
 =head1 NAME
 

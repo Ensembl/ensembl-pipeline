@@ -51,8 +51,6 @@ Internal methods are usually preceded with a _
 # Let the code begin...
 
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/StateInfoContainer.pm,v $
-# $Revision: 1.41 $
 package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use warnings ;

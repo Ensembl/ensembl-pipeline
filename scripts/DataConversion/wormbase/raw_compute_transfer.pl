@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/wormbase/raw_compute_transfer.pl,v $
-# $Revision: 1.5 $
 
 use warnings ;
 use strict;

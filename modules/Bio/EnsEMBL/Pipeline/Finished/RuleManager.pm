@@ -40,8 +40,6 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Finished/RuleManager.pm,v $
-# $Revision: 1.20 $
 package Bio::EnsEMBL::Pipeline::Finished::RuleManager;
 
 use warnings ;

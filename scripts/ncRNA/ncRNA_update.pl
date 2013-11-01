@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/ncRNA_update.pl,v $
-# $Revision: 1.46 $
 
 
 use warnings ;

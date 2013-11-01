@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/pipeline_sanity.pl,v $
-# $Revision: 1.10 $
 # this is a script to check pipeline sanity before you run your pipeline
 
 use warnings ;

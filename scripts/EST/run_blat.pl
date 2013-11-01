@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/run_blat.pl,v $
-# $Revision: 1.5 $
 
 =head1 NAME
 

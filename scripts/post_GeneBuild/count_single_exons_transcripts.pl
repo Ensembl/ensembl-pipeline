@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/count_single_exons_transcripts.pl,v $
-# $Revision: 1.3 $
 
 use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;

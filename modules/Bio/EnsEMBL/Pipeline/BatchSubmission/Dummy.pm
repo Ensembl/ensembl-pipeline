@@ -35,8 +35,6 @@ could potentially implement some checking code but currently not necessary
 =cut
 
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/Dummy.pm,v $
-# $Revision: 1.5 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::Dummy;
 
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/wormbase/feature_store.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

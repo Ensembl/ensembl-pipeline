@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/run_exonerate.pl,v $
-# $Revision: 1.4 $
 
 =head1 NAME
 

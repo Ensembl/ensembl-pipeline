@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/find_N.pl,v $
-# $Revision: 1.2 $
 use warnings ;
 use strict;
 

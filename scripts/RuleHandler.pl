@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/RuleHandler.pl,v $
-# $Revision: 1.19 $
 
 =head1 NAME
 

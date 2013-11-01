@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/check_estgenebuilder_jobs.pl,v $
-# $Revision: 1.7 $
 use warnings ;
 use strict;
 

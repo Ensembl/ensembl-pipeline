@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/dump_estgene_evidence.pl,v $
-# $Revision: 1.5 $
 
 # script that dumps a tab delimited file first column contains the
 # transcript ids (defaulted to stable_id) and the second column contains

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/HMMs/make_genewiseHMM_bsubs.pl,v $
-# $Revision: 1.3 $
 
 use warnings ;
 use strict;

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/protein_pipeline/chunk_protein_file.pl,v $
-# $Revision: 1.6 $
 
 
 use warnings ;

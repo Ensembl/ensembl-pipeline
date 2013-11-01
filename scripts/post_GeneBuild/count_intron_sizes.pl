@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/count_intron_sizes.pl,v $
-# $Revision: 1.6 $
 
 use warnings ;
 use strict;

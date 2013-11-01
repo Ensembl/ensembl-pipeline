@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_CDS.pl,v $
-# $Revision: 1.3 $
 
 
 =head1 NAME

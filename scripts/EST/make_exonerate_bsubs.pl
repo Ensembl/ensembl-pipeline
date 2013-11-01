@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/make_exonerate_bsubs.pl,v $
-# $Revision: 1.6 $
 
 =head1 NAME
 

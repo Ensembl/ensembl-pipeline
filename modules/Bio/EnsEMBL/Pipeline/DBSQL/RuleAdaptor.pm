@@ -42,8 +42,6 @@
 
 # Let the code begin...
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/RuleAdaptor.pm,v $
-# $Revision: 1.28 $
 package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use warnings ;

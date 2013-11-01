@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/make_tRNA_into_Genes.pl,v $
-# $Revision: 1.2 $
 
 use warnings ;
 use strict;

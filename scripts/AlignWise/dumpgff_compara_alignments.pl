@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/AlignWise/dumpgff_compara_alignments.pl,v $
-# $Revision: 1.4 $
 
 ############################################################
 # script to get a multiple alignment from a set of species

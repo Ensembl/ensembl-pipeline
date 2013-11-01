@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/list_new_clones.pl,v $
-# $Revision: 1.3 $
 
 =pod
 

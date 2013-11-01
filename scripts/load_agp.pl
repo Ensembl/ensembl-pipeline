@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_agp.pl,v $
-# $Revision: 1.17 $
 
 
 =head1 NAME

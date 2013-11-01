@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/test_ESTTranscriptFilter.pl,v $
-# $Revision: 1.5 $
 use warnings ;
 use strict;
 use Getopt::Long qw(:config no_ignore_case);

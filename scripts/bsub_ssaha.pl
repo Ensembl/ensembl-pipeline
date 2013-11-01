@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/bsub_ssaha.pl,v $
-# $Revision: 1.3 $
 #
 #all things about bsub jobs
 #

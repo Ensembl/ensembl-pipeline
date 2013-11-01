@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/InputIdManager.pl,v $
-# $Revision: 1.4 $
 
 
 # InputIdManager.pl

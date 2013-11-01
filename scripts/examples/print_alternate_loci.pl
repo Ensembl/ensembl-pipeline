@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/examples/print_alternate_loci.pl,v $
-# $Revision: 1.2 $
 
 use strict;
 use warnings;

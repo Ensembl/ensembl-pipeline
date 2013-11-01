@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/update_pseudogenes.pl,v $
-# $Revision: 1.3 $
 
 =head1 OPTIONS
 

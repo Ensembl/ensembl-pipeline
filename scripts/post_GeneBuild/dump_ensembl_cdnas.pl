@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_cdnas.pl,v $
-# $Revision: 1.7 $
 
 =head1 NAME
 

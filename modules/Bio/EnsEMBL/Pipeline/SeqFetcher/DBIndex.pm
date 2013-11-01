@@ -32,8 +32,6 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex -
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/DBIndex.pm,v $
-# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex;
 
 use warnings ;

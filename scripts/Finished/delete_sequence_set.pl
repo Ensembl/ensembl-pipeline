@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/delete_sequence_set.pl,v $
-# $Revision: 1.11 $
 
 =head1 NAME
 

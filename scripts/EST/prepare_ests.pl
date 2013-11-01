@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/prepare_ests.pl,v $
-# $Revision: 1.8 $
 
 use warnings ;
 use strict;

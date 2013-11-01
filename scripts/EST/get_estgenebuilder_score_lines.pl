@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_estgenebuilder_score_lines.pl,v $
-# $Revision: 1.2 $
 use warnings ;
 use strict;
 

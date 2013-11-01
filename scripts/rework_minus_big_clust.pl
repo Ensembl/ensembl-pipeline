@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rework_minus_big_clust.pl,v $
-# $Revision: 1.3 $
 
 use warnings ;
 use strict;

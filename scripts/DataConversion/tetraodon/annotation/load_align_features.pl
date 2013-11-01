@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_align_features.pl,v $
-# $Revision: 1.3 $
 
 # load_align_features.pl
 #

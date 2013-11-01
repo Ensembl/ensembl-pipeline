@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ge_wrapper.pl,v $
-# $Revision: 1.4 $
 
 # A simple wrapper script for running jobs through GridEngine.
 #

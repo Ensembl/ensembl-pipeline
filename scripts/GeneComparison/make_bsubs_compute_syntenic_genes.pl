@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/make_bsubs_compute_syntenic_genes.pl,v $
-# $Revision: 1.2 $
 
 use warnings ;
 use strict;  

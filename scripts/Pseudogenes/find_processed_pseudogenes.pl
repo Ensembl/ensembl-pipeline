@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Pseudogenes/find_processed_pseudogenes.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

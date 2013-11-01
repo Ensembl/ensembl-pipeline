@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/run_GeneCombiner.pl,v $
-# $Revision: 1.8 $
 
 
 =head1 NAME

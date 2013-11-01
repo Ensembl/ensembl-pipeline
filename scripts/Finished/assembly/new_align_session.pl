@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/new_align_session.pl,v $
-# $Revision: 1.2 $
 
 =head1 NAME
 

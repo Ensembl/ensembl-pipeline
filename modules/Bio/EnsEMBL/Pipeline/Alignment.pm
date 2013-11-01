@@ -37,8 +37,6 @@ information about the alignment too.
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Alignment.pm,v $
-# $Revision: 1.7 $
 package Bio::EnsEMBL::Pipeline::Alignment;
 
 use warnings ;

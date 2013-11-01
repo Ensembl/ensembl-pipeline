@@ -42,8 +42,6 @@ Bio::EnsEMBL::Pipeline::Job -
 
 # Let the code begin...
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Job.pm,v $
-# $Revision: 1.136 $
 package Bio::EnsEMBL::Pipeline::Job;
 
 

@@ -164,8 +164,6 @@
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.example,v $
-# $Revision: 1.53 $ 
 
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 

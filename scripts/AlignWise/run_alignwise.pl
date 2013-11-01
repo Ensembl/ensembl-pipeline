@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/AlignWise/run_alignwise.pl,v $
-# $Revision: 1.3 $
 
 ############################################################
 # script to get a multiple alignment from a set of species

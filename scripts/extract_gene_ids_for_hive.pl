@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extract_gene_ids_for_hive.pl,v $
-# $Revision: 1.5 $
 
 # Usage: ./extract_gene_ids_for_hive.pl -analysis_id <number - optional>
 #                                       -status <status string - optional> 

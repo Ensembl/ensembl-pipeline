@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/exon2feature.pl,v $
-# $Revision: 1.5 $
 
 =head1 NAME
 

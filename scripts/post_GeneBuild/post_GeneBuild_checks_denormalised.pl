@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl,v $
-# $Revision: 1.5 $
 
 =head1 NAME
 

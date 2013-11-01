@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/awol_check.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

@@ -44,8 +44,6 @@ Internal methods are usually preceded with a _
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Flag.pm,v $
-# $Revision: 1.8 $
 package Bio::EnsEMBL::Pipeline::Flag;
 
 use warnings ;

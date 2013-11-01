@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/alignment_squiz.pl,v $
-# $Revision: 1.3 $
 
 # A fairly hacky script to scan through a bunch of alignments
 # and dig out the odd looking ones.

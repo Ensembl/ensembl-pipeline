@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/load_genes.pl,v $
-# $Revision: 1.5 $
 
 ### gtf2ensembl
 

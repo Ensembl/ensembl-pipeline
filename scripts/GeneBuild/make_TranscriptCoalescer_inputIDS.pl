@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/make_TranscriptCoalescer_inputIDS.pl,v $
-# $Revision: 1.12 $
 
 use strict;
 use warnings;

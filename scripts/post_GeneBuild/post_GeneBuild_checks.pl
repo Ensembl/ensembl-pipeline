@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/post_GeneBuild_checks.pl,v $
-# $Revision: 1.11 $
 
 =head1 NAME
 

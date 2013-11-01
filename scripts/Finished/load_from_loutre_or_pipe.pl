@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/load_from_loutre_or_pipe.pl,v $
-# $Revision: 1.10 $
 
 =head1 NAME
 

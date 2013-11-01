@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/new_polyA_clipping.pl,v $
-# $Revision: 1.22 $
 use warnings ;
 use strict;
 

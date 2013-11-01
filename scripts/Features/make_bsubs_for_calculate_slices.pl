@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Features/make_bsubs_for_calculate_slices.pl,v $
-# $Revision: 1.6 $
 
 use warnings ;
 use strict;

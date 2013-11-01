@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/examples/get_rnaseq_data_by_gene.pl,v $
-# $Revision: 1.3 $
 
 use strict;
 use warnings;

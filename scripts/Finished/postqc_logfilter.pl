@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/postqc_logfilter.pl,v $
-# $Revision: 1.6 $
 
 use strict;
 use warnings;

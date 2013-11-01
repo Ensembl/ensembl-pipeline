@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/submit_jobs.pl,v $
-# $Revision: 1.10 $
 
 use warnings ;
 use strict;

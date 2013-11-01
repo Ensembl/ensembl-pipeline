@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/classify_transcripts_by_evidence.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

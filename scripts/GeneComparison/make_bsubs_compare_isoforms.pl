@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/make_bsubs_compare_isoforms.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;  

@@ -1,5 +1,3 @@
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Tools/GeneBankParser.pm,v $
-# $Revision: 1.6 $
 package Bio::EnsEMBL::Pipeline::Tools::GeneBankParser;
 
 =pod
@@ -43,11 +41,11 @@ See subroutines.
 
 =head1 MAINTAINER
 
-$Author: db8 $
+$Author: rn6 $
 
 =head1 VERSION
 
-$Revision: 1.6 $
+$Revision: 1.7 $
 
 =cut
 

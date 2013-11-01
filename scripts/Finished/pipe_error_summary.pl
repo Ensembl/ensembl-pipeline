@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/pipe_error_summary.pl,v $
-# $Revision: 1.3 $
 
 ### pipe_error_summary.pl
 

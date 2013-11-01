@@ -52,8 +52,6 @@ methods are usually preceded with a _
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/SGE_GridEngine_v6.pm,v $
-# $Revision: 1.14 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::SGE_GridEngine_v6;
 
 use warnings;

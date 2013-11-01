@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_compara.pl,v $
-# $Revision: 1.5 $
 
 # EXIT STATUS
 # 0 all is fine

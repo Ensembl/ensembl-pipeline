@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/fill_hit_desc.pl,v $
-# $Revision: 1.8 $
 ### fill_hit_desc ###
 
 use warnings ;

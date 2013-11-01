@@ -1,8 +1,6 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/cDNA_update/cDNA_update.pl,v $
-# $Revision: 1.96 $
 
-#$Id: cDNA_update.pl,v 1.96 2013-09-04 16:09:39 th3 Exp $
+#$Id: cDNA_update.pl,v 1.97 2013-11-01 12:05:32 rn6 Exp $
 
 # Original version cDNA_update.pl for human cDNAs
 # Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/predict_ncRNA.pl,v $
-# $Revision: 1.21 $
 
 use warnings ;
 use strict;

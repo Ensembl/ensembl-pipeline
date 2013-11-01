@@ -1,7 +1,5 @@
 ### Bio::EnsEMBL::Pipeline::DBSQL::Finished::DnaAlignFeatureAdaptor
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/DnaAlignFeatureAdaptor.pm,v $
-# $Revision: 1.5 $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::DnaAlignFeatureAdaptor;
 use warnings ;
 use vars qw(@ISA);

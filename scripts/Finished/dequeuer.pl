@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/dequeuer.pl,v $
-# $Revision: 1.32 $
 
 =pod
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/filter_and_e2g_byAcc.pl,v $
-# $Revision: 1.3 $
 
 =head1 NAME
 

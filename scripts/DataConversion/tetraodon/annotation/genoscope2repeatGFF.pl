@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/genoscope2repeatGFF.pl,v $
-# $Revision: 1.2 $
 
 my $repeat_source = "RepeatMasker";
 

@@ -32,8 +32,6 @@ Bio::EnsEMBL::Pipeline::BatchSubmission::Local -
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/Local.pm,v $
-# $Revision: 1.8 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::Local;
 
 

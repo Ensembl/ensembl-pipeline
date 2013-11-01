@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/map_ExpressionData.pl,v $
-# $Revision: 1.9 $
 
 
 =head1 NAME

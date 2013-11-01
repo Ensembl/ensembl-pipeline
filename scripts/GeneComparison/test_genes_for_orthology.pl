@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/test_genes_for_orthology.pl,v $
-# $Revision: 1.2 $
 
 
 ############################################################

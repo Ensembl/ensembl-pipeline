@@ -1,7 +1,5 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/analysis_setup.pl,v $
-# $Revision: 1.14 $
-# $Id: analysis_setup.pl,v 1.14 2013-03-07 12:56:42 fm2 Exp $
+# $Id: analysis_setup.pl,v 1.15 2013-11-01 12:05:30 rn6 Exp $
 
 =head1 NAME
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/check_node.pl,v $
-# $Revision: 1.6 $
 
 =head1 NAME
 

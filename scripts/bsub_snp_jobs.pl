@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/bsub_snp_jobs.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

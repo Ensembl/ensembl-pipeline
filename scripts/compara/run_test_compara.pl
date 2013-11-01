@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/compara/run_test_compara.pl,v $
-# $Revision: 1.6 $
 
 use warnings ;
 use strict;

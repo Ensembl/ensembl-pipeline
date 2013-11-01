@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/get_estlengths.pl,v $
-# $Revision: 1.4 $
 use warnings ;
 use strict;
 $|=1;

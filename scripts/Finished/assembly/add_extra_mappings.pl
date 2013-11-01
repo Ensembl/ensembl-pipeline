@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/add_extra_mappings.pl,v $
-# $Revision: 1.2 $
 
 =head1 NAME
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/get_transcripts_with_this_evidence.pl,v $
-# $Revision: 1.7 $
 
 use warnings ;
 use strict;

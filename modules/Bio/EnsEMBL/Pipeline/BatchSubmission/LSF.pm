@@ -55,8 +55,6 @@
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/BatchSubmission/LSF.pm,v $
-# $Revision: 1.48 $
 package Bio::EnsEMBL::Pipeline::BatchSubmission::LSF;
 
 use warnings ;

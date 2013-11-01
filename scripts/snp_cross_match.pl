@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/snp_cross_match.pl,v $
-# $Revision: 1.3 $
 #
 #This version store all data from dbSNP as a hash, keyed by refsnpid.
 #go through all data to find the same version first.

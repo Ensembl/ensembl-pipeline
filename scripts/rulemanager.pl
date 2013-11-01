@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/rulemanager.pl,v $
-# $Revision: 1.37 $
 
 use warnings ;
 use strict;

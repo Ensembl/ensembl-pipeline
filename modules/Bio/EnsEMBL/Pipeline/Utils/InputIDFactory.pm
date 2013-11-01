@@ -32,8 +32,6 @@ Bio::EnsEMBL::Pipeline::Utils::InputIDFactory -
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Utils/InputIDFactory.pm,v $
-# $Revision: 1.24 $
 package Bio::EnsEMBL::Pipeline::Utils::InputIDFactory;
 
 use strict;

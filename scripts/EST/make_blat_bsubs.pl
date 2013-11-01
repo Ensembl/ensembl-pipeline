@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/make_blat_bsubs.pl,v $
-# $Revision: 1.4 $
 
 =head1 NAME
 

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_cDNA_exonerate.pl,v $
-# $Revision: 1.4 $
 
 =head1 NAME
 

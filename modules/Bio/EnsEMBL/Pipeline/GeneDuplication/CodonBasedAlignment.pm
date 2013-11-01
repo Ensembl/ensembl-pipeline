@@ -70,8 +70,6 @@ foreach my $seq (@$align){
 
 
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/GeneDuplication/CodonBasedAlignment.pm,v $
-# $Revision: 1.12 $
 package Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
 use strict;

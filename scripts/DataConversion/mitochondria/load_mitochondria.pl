@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/mitochondria/load_mitochondria.pl,v $
-# $Revision: 1.33 $
 
 =head1 Synopsis
 

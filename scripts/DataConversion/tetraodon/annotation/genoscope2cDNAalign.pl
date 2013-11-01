@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/tetraodon/annotation/genoscope2cDNAalign.pl,v $
-# $Revision: 1.5 $
 
 # custom script to import the SQL dump of the Genoscope cDNA alignments
 # and write them as DnaDnaAlignFeatures.

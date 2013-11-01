@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/extra_database_setup.pl,v $
-# $Revision: 1.7 $
 
 =head1 NAME
 

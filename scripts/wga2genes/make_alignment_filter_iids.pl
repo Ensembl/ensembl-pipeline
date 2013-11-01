@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/wga2genes/make_alignment_filter_iids.pl,v $
-# $Revision: 1.4 $
 
 use warnings ;
 use strict;

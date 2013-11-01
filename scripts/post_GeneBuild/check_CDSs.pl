@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_CDSs.pl,v $
-# $Revision: 1.8 $
 
 =head1 NAME
 

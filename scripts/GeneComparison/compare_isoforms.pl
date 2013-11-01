@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/compare_isoforms.pl,v $
-# $Revision: 1.5 $
 
 use warnings ;
 use strict;  

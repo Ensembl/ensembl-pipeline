@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/make_input_ids.pl,v $
-# $Revision: 1.5 $
 
 =head1 NAME
 

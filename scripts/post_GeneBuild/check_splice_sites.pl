@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_splice_sites.pl,v $
-# $Revision: 1.6 $
 
 use warnings ;
 use strict;

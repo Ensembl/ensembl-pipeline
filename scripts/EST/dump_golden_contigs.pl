@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/EST/dump_golden_contigs.pl,v $
-# $Revision: 1.7 $
 
 =head1 NAME
 

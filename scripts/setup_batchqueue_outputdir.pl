@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/setup_batchqueue_outputdir.pl,v $
-# $Revision: 1.5 $
 
 use warnings ;
 use strict;

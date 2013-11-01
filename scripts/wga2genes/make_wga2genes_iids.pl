@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/wga2genes/make_wga2genes_iids.pl,v $
-# $Revision: 1.13 $
 
 # Generation of input ids for WGA2Genes. Segments the
 # genome into regions that (1) contain at least one gene,

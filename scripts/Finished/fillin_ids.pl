@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/fillin_ids.pl,v $
-# $Revision: 1.2 $
 #
 # fill ids into input_id_analysis table
 # 17.10.2002 Kerstin Jekosch [kj2@sanger.ac.uk]

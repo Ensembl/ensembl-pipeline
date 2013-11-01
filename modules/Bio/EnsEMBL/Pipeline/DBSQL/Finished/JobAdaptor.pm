@@ -35,8 +35,6 @@ Internal methods are usually preceded with a _
 
 # Let the code begin...
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/DBSQL/Finished/JobAdaptor.pm,v $
-# $Revision: 1.4 $
 package Bio::EnsEMBL::Pipeline::DBSQL::Finished::JobAdaptor;
 
 use warnings ;

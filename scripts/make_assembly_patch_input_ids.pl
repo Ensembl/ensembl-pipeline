@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/make_assembly_patch_input_ids.pl,v $
-# $Revision: 1.4 $
 
 #Written in June 2010, based on make_input_ids, to make input IDs for working with the 
 #patches introduced into the human genome in patch release 1 of GRCh37

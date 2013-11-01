@@ -32,8 +32,6 @@ Bio::EnsEMBL::Pipeline::Monitor -
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Monitor.pm,v $
-# $Revision: 1.38 $
 package Bio::EnsEMBL::Pipeline::Monitor;
 use warnings ;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);

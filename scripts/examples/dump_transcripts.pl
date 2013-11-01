@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/examples/dump_transcripts.pl,v $
-# $Revision: 1.2 $
 
 # # # 
 # You'll need bioperl and the ensembl core checkout in your PERL5LIB

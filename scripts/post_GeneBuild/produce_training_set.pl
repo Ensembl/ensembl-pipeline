@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/produce_training_set.pl,v $
-# $Revision: 1.3 $
 
 use warnings ;
 use strict;

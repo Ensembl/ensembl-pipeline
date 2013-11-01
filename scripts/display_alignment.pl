@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/display_alignment.pl,v $
-# $Revision: 1.6 $
 
 =head1 NAME
 

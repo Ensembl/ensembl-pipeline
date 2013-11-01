@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneComparison/find_isoform_pairs.pl,v $
-# $Revision: 1.5 $
 
 use warnings ;
 use strict;  

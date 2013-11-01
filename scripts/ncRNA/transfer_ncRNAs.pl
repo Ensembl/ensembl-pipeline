@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/ncRNA/transfer_ncRNAs.pl,v $
-# $Revision: 1.48 $
 
 use warnings ;
 use strict;

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Sequence/fetch_cdna_sequence.pl,v $
-# $Revision: 1.3 $
 
 # dump_seq_into_fastA.pl
 # it reads a bit of sequence and dump it into a fasA file, to eb able to view it in Apollo

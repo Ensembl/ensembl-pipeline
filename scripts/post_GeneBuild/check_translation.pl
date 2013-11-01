@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/check_translation.pl,v $
-# $Revision: 1.3 $
 
 =head1 NAME
 

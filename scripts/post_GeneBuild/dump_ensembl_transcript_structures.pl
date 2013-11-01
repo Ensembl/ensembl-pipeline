@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/post_GeneBuild/dump_ensembl_transcript_structures.pl,v $
-# $Revision: 1.6 $
 
 # script to dump info for the Oxford guys, for the Rat genome project
 

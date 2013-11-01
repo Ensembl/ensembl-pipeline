@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/dump_genes_from_core.pl,v $
-# $Revision: 1.5 $
 
 use warnings ;
 use strict;

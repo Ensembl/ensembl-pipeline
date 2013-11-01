@@ -48,8 +48,6 @@ rearrange(order, list); #instead
 =cut
 
 # Let the code begin...
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/SeqFetcher/Pfetch.pm,v $
-# $Revision: 1.13 $
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use strict;

@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/run_prot_pipeline.pl,v $
-# $Revision: 1.8 $
 
 
 # Author: ck1@sanger.ac.uk

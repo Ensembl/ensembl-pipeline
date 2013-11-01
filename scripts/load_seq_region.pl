@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/load_seq_region.pl,v $
-# $Revision: 1.20 $
 
 =head1 NAME
 

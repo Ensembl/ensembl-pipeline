@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/DataConversion/flybase/flybase_to_ensembl.pl,v $
-# $Revision: 1.12 $
 
 # "insert into seq_region_attrib (seq_region_id,attrib_type_id,value) values (seq_region_id_of_mitochondrion,11,5)"
 

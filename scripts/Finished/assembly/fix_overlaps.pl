@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/Finished/assembly/fix_overlaps.pl,v $
-# $Revision: 1.9 $
 
 =head1 NAME
 

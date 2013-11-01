@@ -1,6 +1,4 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/GeneBuild/make_input_ids_for_similarity_build.pl,v $
-# $Revision: 1.21 $
 
 =head1 NAME
 
