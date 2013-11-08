@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-# $Id: slice_to_sql.pl,v 1.8 2012-07-03 09:27:56 ak4 Exp $
 
 =pod
 

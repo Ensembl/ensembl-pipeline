@@ -1,8 +1,8 @@
 #!/usr/bin/env perl
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/scripts/test_RunnableDB,v $
-# $Revision: 1.40 $
+
 use warnings;
 use strict;
+
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Getopt::Long qw(:config no_ignore_case);

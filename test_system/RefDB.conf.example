@@ -1,10 +1,9 @@
-# $Id: RefDB.conf.example,v 1.4 2012-07-02 16:27:09 ak4 Exp $
 #
 # All lines starting with a hash ('#') will be ignored.
 #
 # This is an example file of RefDB.conf, a file which is read by
 # the test_single_analysis.pl or test_whole_pipeline.pl script in
-# enesmbl-pipeline/test_system directory to create a RefDB object.
+# ensembl-pipeline/test_system directory to create a RefDB object.
 
 {
   # Database details

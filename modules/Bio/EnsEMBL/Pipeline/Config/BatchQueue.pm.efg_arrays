@@ -172,9 +172,6 @@
 
 =cut
 
-# $Source: /tmp/ENSCOPY-ENSEMBL-PIPELINE/modules/Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm.efg_arrays,v $
-# $Revision: 1.7 $ 
-
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
 use strict;

@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-# $Id: test_whole_pipeline.pl,v 1.6 2012-07-02 16:27:10 ak4 Exp $
 
 =pod
 

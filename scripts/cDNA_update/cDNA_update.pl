@@ -1,9 +1,6 @@
 #!/usr/bin/env perl
 
-#$Id: cDNA_update.pl,v 1.97 2013-11-01 12:05:32 rn6 Exp $
-
 # Original version cDNA_update.pl for human cDNAs
-# Adapted for use with mouse cDNAs - Sarah Dyer 13/10/05
 
 # Uses new polyAclipping, stop list for gene trap cdnas (gss) and
 # cdnas which hit too many times (kill list).

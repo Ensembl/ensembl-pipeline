@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-# $Id: analysis_setup.pl,v 1.15 2013-11-01 12:05:30 rn6 Exp $
 
 =head1 NAME
 

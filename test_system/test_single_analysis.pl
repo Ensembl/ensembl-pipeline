@@ -1,5 +1,4 @@
 #!/usr/bin/env perl
-# $Id: test_single_analysis.pl,v 1.16 2012-07-02 16:27:09 ak4 Exp $
 
 =pod
 
