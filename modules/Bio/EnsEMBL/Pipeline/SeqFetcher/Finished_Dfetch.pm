@@ -101,7 +101,7 @@ sub fetch_descriptions {
 	# Fetch data from M&M database
 	# full sql query to get all sequence description: length, data class, description, taxon. id
 	my $full_query = qq{
-		SELECT e.accession_version, e.sequence_length,e.data_class, d.description, t.ncbi_tax_id
+		SELECT e.accession_version, e.sequence_length, e.data_class, d.description, t.ncbi_tax_id
 		FROM entry e, description d, taxonomy t
 		WHERE e.entry_id = d.entry_id
 		AND e.entry_id = t.entry_id
@@ -378,10 +378,10 @@ sub analysis{
 	my $db_files = $analysis->db || $analysis->db_file;
 
 	# Create the xdget seqfetcher
-	$db_files =~ s/\s//g;
+	$db_files =~ s/(^\s+|\s+$)//g;
 	my @databases;
 
-	foreach my $database ( split( ",", $db_files ) ) {
+	foreach my $database ( split(/[,\s]+/, $db_files ) ) {
 		if ( $database !~ /^\// ){
 		      $database = $BLAST_DIR . "/" . $database;
 		}
@@ -399,8 +399,8 @@ sub analysis{
 	}
 
 	my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::xdget->new(
-		-db => \@databases,
-        -executable => '/software/farm/bin/xdget');
+        -db => \@databases,
+        -executable => 'xdget');
 	$self->_seqfetcher($seqfetcher);
 
   }
