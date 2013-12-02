@@ -106,8 +106,14 @@ sub set_update_value {
 		$update_value = 2;
 		# split the embl blast db version "12-Mar-06 (85)" to
 		# patch version "12-Mar-06" and release version "85"
-		my ($patch_sv,$release_sv) = $db_version_saved =~ /^(\S+)\s+\((\d+)\)$/;
-		my ($patch_cv,$release_cv) = $db_version_current =~ /^(\S+)\s+\((\d+)\)$/;
+		my ($patch_sv,$release_sv) = $db_version_saved =~ /^(\S+)\s+\((\d+)\)$/
+                  or warn sprintf("db_version_saved[#%s for %s|%s]=%s\n",
+                                  $self->dbID, $self->input_id, $self->analysis->logic_name,
+                                  $db_version_saved);
+		my ($patch_cv,$release_cv) = $db_version_current =~ /^(\S+)\s+\((\d+)\)$/
+                  or warn sprintf("db_version_current[#%s for %s|%s]=%s\n",
+                                  $self->dbID, $self->input_id, $self->analysis->logic_name,
+                                  $db_version_current);
 		if($release_sv && ($release_sv eq $release_cv)){
 			$update_value = 1;
 		}
@@ -487,7 +493,7 @@ sub flush_runs {
         eval {
 
             # SMJS LSF Specific for debugging
-            #print "Submitting: ", $batch_job->command, "\n";
+            print STDERR "Submitting: ", $batch_job->command, "\n";
             $batch_job->open_command_line();
         };
 

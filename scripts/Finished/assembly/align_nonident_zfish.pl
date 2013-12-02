@@ -300,6 +300,7 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
 
   my $A_slice;
   if($A_pipe_dba){
+      eval {
     $A_slice = $A_pipe_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
       $row->{'alt_seq_region_name'},
@@ -307,6 +308,7 @@ BLOCK: while (my $row = $sth->fetchrow_hashref) {
       $row->{'alt_end'},
       1,
     );
+    };
   }
   $A_slice = $A_dba->get_SliceAdaptor->fetch_by_region(
       'chromosome',
