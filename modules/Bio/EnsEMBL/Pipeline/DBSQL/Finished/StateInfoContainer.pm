@@ -22,8 +22,9 @@ $sic = $dbobj->get_StateInfoContainer;
 
 =head1 DESCRIPTION
 
-Module which inherits from StateInfoContainer and overrides specific methods to implement the incremental
-updating of the Blast analysis used in the Finished Pipeline.
+Module which inherits from StateInfoContainer and overrides specific
+methods to implement the incremental updating of the Blast analysis used
+in the Finished Pipeline.
 
 =head1 FEEDBACK
 
