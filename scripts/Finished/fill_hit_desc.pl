@@ -82,20 +82,27 @@ use Data::Dumper;
 
     my $seqfetcher = Bio::EnsEMBL::Pipeline::SeqFetcher::Finished_Dfetch->new( -type => $table );
 
-    print STDOUT scalar(@$ids)." description(s) missing in $dbname\n" if scalar(@$ids);
+    warn scalar(@$ids)." description(s) missing in $dbname\n";
 
-    my $chunk_size = 1000;
+    my $chunk_size = 10_000;
+    my @failed;
     for (my $i = 0; $i < @$ids; $i += $chunk_size) {
         my $j = $i + $chunk_size - 1;
         $j = $#$ids if $j > $#$ids;
         my $chunk = [@$ids[$i..$j]];
-        my $failed = $seqfetcher->write_descriptions($db, $chunk,$chunk_size);
-        if (@$failed) {
-            warn "Failed to fetch:\n".join(",", @$failed)."\n";
-            print STDERR "Failed ".scalar(@$failed)." ids\n";
+        my $fail = $seqfetcher->write_descriptions($db, $chunk, $chunk_size);
+        if (@$fail) {
+            push(@failed, @$fail)
         }
     }
-    print STDOUT "FINISHED OK\n"
+    if (@failed) {
+        warn "Failed to fetch:\n@failed\n";
+        printf STDERR "Failed to fill in %d of %d hit descriptions requested\n", scalar(@failed), scalar(@$ids);
+    }
+    else {
+        warn "Filled in hit descriptions for all IDs\n";
+    }
+    warn "FINISHED OK\n"
 }
 
 sub useage{
