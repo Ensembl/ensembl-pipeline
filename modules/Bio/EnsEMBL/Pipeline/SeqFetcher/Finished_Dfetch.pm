@@ -43,9 +43,9 @@ sub write_descriptions {
     eval {
         $self->write_descriptions_found($dbh, $descriptions, $chunk_size);
     };
-    if ($@) {
-        warn $@;
+    if (my $err = $@) {
         $dbh->rollback;
+        throw("No hit_descriptions written: ", $err);
     }
     else {
         $dbh->commit;
