@@ -37,25 +37,13 @@ sub write_descriptions {
     $chunk_size ||= 1000;
 
     my ($descriptions, $failed) = $self->fetch_descriptions($id_list, $chunk_size);
-
-    my $dbh = $dbobj->dbc->db_handle;
-    $dbh->begin_work;
-    eval {
-        $self->write_descriptions_found($dbh, $descriptions, $chunk_size);
-    };
-    if (my $err = $@) {
-        $dbh->rollback;
-        throw("No hit_descriptions written: ", $err);
-    }
-    else {
-        $dbh->commit;
-    }
+    $self->write_descriptions_found($dbobj, $descriptions, $chunk_size);
 
     return $failed;
 }
 
 sub write_descriptions_found {
-    my ($self, $dbh, $descriptions, $chunk_size) = @_;
+    my ($self, $dbobj, $descriptions, $chunk_size) = @_;
 
     my @found_id = keys %$descriptions;
     for (my $i = 0; $i < @found_id; $i += $chunk_size) {
@@ -76,7 +64,7 @@ sub write_descriptions_found {
               , hit_taxon
               , hit_db)
             VALUES $placeholders};
-        my $sth = $dbh->prepare($sql);
+        my $sth = $dbobj->prepare($sql);
         $sth->execute(@sth_data);
     }
     return;

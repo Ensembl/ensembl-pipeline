@@ -84,25 +84,36 @@ use Data::Dumper;
 
     warn scalar(@$ids)." description(s) missing in $dbname\n";
 
-    my $chunk_size = 10_000;
-    my @failed;
-    for (my $i = 0; $i < @$ids; $i += $chunk_size) {
-        my $j = $i + $chunk_size - 1;
-        $j = $#$ids if $j > $#$ids;
-        my $chunk = [@$ids[$i..$j]];
-        my $fail = $seqfetcher->write_descriptions($db, $chunk, $chunk_size);
-        if (@$fail) {
-            push(@failed, @$fail)
+    my $dbh = $db->dbc->db_handle;
+    $dbh->begin_work;
+    eval {
+        my $chunk_size = 10_000;
+        my @failed;
+        for (my $i = 0; $i < @$ids; $i += $chunk_size) {
+            my $j = $i + $chunk_size - 1;
+            $j = $#$ids if $j > $#$ids;
+            my $chunk = [@$ids[$i..$j]];
+            my $fail = $seqfetcher->write_descriptions($db, $chunk, $chunk_size);
+            if (@$fail) {
+                push(@failed, @$fail)
+            }
         }
-    }
-    if (@failed) {
-        warn "Failed to fetch:\n@failed\n";
-        printf STDERR "Failed to fill in %d of %d hit descriptions requested\n", scalar(@failed), scalar(@$ids);
+        if (@failed) {
+            warn "Failed to fetch:\n@failed\n";
+            printf STDERR "Failed to fill in %d of %d hit descriptions requested\n", scalar(@failed), scalar(@$ids);
+        }
+        else {
+            warn "Filled in hit descriptions for all IDs\n";
+        }
+        warn "FINISHED OK\n"
+    };
+    if (my $err = $@) {
+        $dbh->rollback;
+        throw("No hit_descriptions written: ", $err);
     }
     else {
-        warn "Filled in hit descriptions for all IDs\n";
+        $dbh->commit;
     }
-    warn "FINISHED OK\n"
 }
 
 sub useage{
