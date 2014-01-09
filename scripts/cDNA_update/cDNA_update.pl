@@ -776,17 +776,17 @@ sub config_setup {
     my $database_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Databases',
         -backupdir => $configDIR,
         -is_example => 1);
-    $database_cfg->delete_databases(['REFERENCE_DB', 'EXONERATE_DB', 'KILL_LIST_DB']);
+    $database_cfg->delete_databases(['REFERENCE_DB', 'ESTCDNA_DB', 'KILL_LIST_DB']);
     $database_cfg->key_by_parent('REFERENCE_DB', '-dbname', $PIPE_DBNAME);
     $database_cfg->key_by_parent('REFERENCE_DB', '-host', $PIPE_DBHOST);
     $database_cfg->key_by_parent('REFERENCE_DB', '-user', $DBUSER);
     $database_cfg->key_by_parent('REFERENCE_DB', '-pass', $DBPASS);
     $database_cfg->key_by_parent('REFERENCE_DB', '-port', $PIPE_DBPORT);
-    $database_cfg->key_by_parent('EXONERATE_DB', '-dbname', $OUTPUT_DBNAME);
-    $database_cfg->key_by_parent('EXONERATE_DB', '-host', $OUTPUT_DBHOST);
-    $database_cfg->key_by_parent('EXONERATE_DB', '-user', $DBUSER);
-    $database_cfg->key_by_parent('EXONERATE_DB', '-pass', $DBPASS);
-    $database_cfg->key_by_parent('EXONERATE_DB', '-port', $OUTPUT_DBPORT);
+    $database_cfg->key_by_parent('ESTCDNA_DB', '-dbname', $OUTPUT_DBNAME);
+    $database_cfg->key_by_parent('ESTCDNA_DB', '-host', $OUTPUT_DBHOST);
+    $database_cfg->key_by_parent('ESTCDNA_DB', '-user', $DBUSER);
+    $database_cfg->key_by_parent('ESTCDNA_DB', '-pass', $DBPASS);
+    $database_cfg->key_by_parent('ESTCDNA_DB', '-port', $OUTPUT_DBPORT);
     $saved_files{$database_cfg->modulename} = $database_cfg->write_config(1);
     my $exonerate_cfg = Bio::EnsEMBL::Analysis::Tools::ConfigWriter->new( -modulename => 'Bio::EnsEMBL::Analysis::Config::Exonerate2Genes',
         -backupdir => $configDIR,
