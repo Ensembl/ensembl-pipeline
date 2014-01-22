@@ -1647,7 +1647,8 @@ sub fix_metatable {
                          $DBPASS );
 
     # Remove previous entries.
-    my $sql = "DELETE FROM meta WHERE meta_key like 'genebuild%" . "id'";
+    print STDOUT 'Updating the genebuild.id value...';
+    my $sql = "DELETE FROM meta WHERE meta_key = 'genebuild.id'";
     my $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
@@ -1658,8 +1659,10 @@ sub fix_metatable {
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
     # Set all gene and transcript statuses to putative.
+    print STDOUT 'Updating the status for genes and transcript...';
     $sql = "UPDATE gene set status = 'PUTATIVE'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
@@ -1669,8 +1672,10 @@ sub fix_metatable {
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
     # Set all gene and transcript biotypes to cdna_update.
+    print STDOUT 'Updating the biotype for genes and transcripts...';
     $sql = "UPDATE gene set biotype = 'cdna_update'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
@@ -1680,14 +1685,18 @@ sub fix_metatable {
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
     # set canonical transcripts - user checks 1 gene, 1 transcript
+    print STDOUT 'Setting canonical transcripts...';
     $sql = "UPDATE gene, transcript SET gene.canonical_transcript_id = transcript.transcript_id WHERE gene.gene_id = transcript.gene_id ";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
     # dna_align feature external DB IDs
+    print STDOUT 'Updating the external_db_id in dna_align_feature table...';
     $sql = "UPDATE dna_align_feature SET external_db_id = 700";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
@@ -1702,12 +1711,15 @@ sub fix_metatable {
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
     # Remove some meta keys not needed in the cdna database
+    print STDOUT 'Deleting unwanted meta keys...';
     $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date', 'assembly.web_accession_source', 'assembly.web_accession_type') " ;
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
+    print STDOUT "Done!\n";
 
 
     # Reload the taxonomy to make sure it's up to date.
