@@ -6,6 +6,8 @@ load_mitochondria.pl
 
 =head1 Description
 
+:-)
+
 Parses mitochondrial genes out of genbank format NC_ file  and writes them to the database specified.
 Can also load the sequence of the chromosome, the corresponding assembly entries and the appropriate attribute types if needed.
 
