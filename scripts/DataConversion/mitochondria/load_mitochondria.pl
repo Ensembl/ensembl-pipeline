@@ -66,9 +66,10 @@ GetOptions( \%opt,
             'dbpass=s',
             'dbport=i',
             'dbname=s',
+            'logic_name=s',     # analysis.logic_name for new created genes
             'contig=s',         # MIT_CONTIG_SEQNAME
             'chromosome=s',     # MIT_CHROMOSOME_SEQNAME
-            'scaffold=s',    # MIT_SCAFFOLD_SEQNAME
+            'scaffold=s',       # MIT_SCAFFOLD_SEQNAME
             'clone=s',          # MIT_CLONE_SEQNAME
             'toplevel=s',       # MIT_TOPLEVEL
             'gene_type=s',
