@@ -132,7 +132,7 @@ are optional.
   docs/running_tests.txt
   ensembl-pipeline/scripts/job_submission.pl
 
-  any questions pass to dev@ensembl.org
+  any questions pass to http://lists.ensembl.org/mailman/listinfo/dev
 
 =cut
 

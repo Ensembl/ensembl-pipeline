@@ -75,7 +75,7 @@ and the repeat libraries from EBI, as outlined in README.
 
 =head1 CONTACT
 
-dev@ensembl.org
+http://lists.ensembl.org/mailman/listinfo/dev
 
 =cut
 

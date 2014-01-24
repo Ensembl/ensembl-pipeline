@@ -479,7 +479,7 @@ Misc options
 
 =head1 CONTACT
 
-Post general queries to <dev@ensembl.org>
+Post general queries to <http://lists.ensembl.org/mailman/listinfo/dev>
 
 =head1 EXAMPLES
 

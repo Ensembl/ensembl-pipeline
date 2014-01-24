@@ -68,7 +68,7 @@ perl setup_orthologue_evaluator.pl -dbname <dbname> -dbuser -write
 
 =head1 CONTACT
 
-Post general queries to B<dev@ensembl.org>
+Post general queries to B<http://lists.ensembl.org/mailman/listinfo/dev>
 
 =head1 APPENDIX
 

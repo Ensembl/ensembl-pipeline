@@ -198,7 +198,7 @@ Hand-over target db.
 
 =head1 CONTACT
 
-dev@ensembl.org
+http://lists.ensembl.org/mailman/listinfo/dev
 
 =cut
 

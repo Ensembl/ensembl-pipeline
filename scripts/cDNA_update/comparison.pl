@@ -55,7 +55,7 @@ It bases the comparison on genes and tries to trace the hits using the supportin
 
 =head1 CONTACT
 
-dev@ensembl.org
+http://lists.ensembl.org/mailman/listinfo/dev
 
 =cut
 

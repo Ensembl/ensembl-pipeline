@@ -42,7 +42,7 @@ data from the wormbase in an automated fashion.
 
 =head1 CONTACT
 
-dev@ensembl.org
+http://lists.ensembl.org/mailman/listinfo/dev
 
 =cut
 $|=1; #turns off buffering on STDOUT

@@ -18,7 +18,7 @@
 
 #This script will produce 2 files (5' and 3' splice site regions).
 #These 2 files can then be used to create a genewise gene.stat model
-#Contact dev@ensembl.org
+#Contact http://lists.ensembl.org/mailman/listinfo/dev
 
 use warnings ;
 use strict;

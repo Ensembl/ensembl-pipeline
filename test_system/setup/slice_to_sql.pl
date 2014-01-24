@@ -4,7 +4,7 @@
 
 =head1 NAME slice_to_sql.pl
 
- mail dev@ensembl.org
+ mail http://lists.ensembl.org/mailman/listinfo/dev
 
 =head1 SYNOPSIS
 

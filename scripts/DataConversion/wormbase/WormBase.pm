@@ -20,7 +20,7 @@ parse gff and agp files from the wormbase database for caenorhabditis elegans to
 
 =head1 CONTACT
 
-dev@ensembl.org about code issues
+http://lists.ensembl.org/mailman/listinfo/dev about code issues
 wormbase-hel@wormbase.org about data issues
 
 =head1 APPENDIX
