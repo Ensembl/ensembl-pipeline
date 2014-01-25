@@ -63,7 +63,11 @@ use vars qw( %MitConf );
   # Types
   MIT_GENE_TYPE => 'protein_coding',
   MIT_TRNA_TYPE => 'Mt_tRNA',
-  MIT_RRNA_TYPE => 'Mt_rRNA', );
+  MIT_RRNA_TYPE => 'Mt_rRNA', 
+
+
+  MIT_SOURCE_NAME => "ensembl",# Set gene.source name 
+);
 
 sub import {
     my ($callpack) = caller(0); # Name of the calling package
