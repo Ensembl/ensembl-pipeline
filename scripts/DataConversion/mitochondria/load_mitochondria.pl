@@ -11,6 +11,28 @@ load_mitochondria.pl
 Parses mitochondrial genes out of genbank format NC_ file  and writes them to the database specified.
 Can also load the sequence of the chromosome, the corresponding assembly entries and the appropriate attribute types if needed.
 
+=head1 Example command line
+
+NOTE : Do NOT use the --contig flag to supply a name like **AY172335** or **AY172335.1.16299**.
+The script will fail.
+
+
+    perl ensembl-pipeline/scripts/DataConversion/mitochondria/load_mitochondria.pl \
+    -dbhost HOST -dbuser USER -dbport 9999 -dbpass PASS\
+    -dbname DATABASE_NAME \
+    -chromosome MT \
+    -name MT \
+    -scaffold NC_005089 \
+    -clone AY172335 \
+    -toplevel chromosome \
+    -gene_type test\
+    -trna_type test-Mt-tRNA \
+    -rrna_type test-Mt-tRNA \
+    -codon_table 2 \
+    -logic_name gmap_ncbi \
+    -genbank_file $BASE/downloads/sequence.gb
+
+
 =head1 Config
 
 All configuration is done through MitConf.pm
@@ -68,9 +90,10 @@ GetOptions( \%opt,
             'dbpass=s',
             'dbport=i',
             'dbname=s',
+            'logic_name=s',     # analysis.logic_name for new created genes
             'contig=s',         # MIT_CONTIG_SEQNAME
             'chromosome=s',     # MIT_CHROMOSOME_SEQNAME
-            'scaffold=s',    # MIT_SCAFFOLD_SEQNAME
+            'scaffold=s',       # MIT_SCAFFOLD_SEQNAME
             'clone=s',          # MIT_CLONE_SEQNAME
             'toplevel=s',       # MIT_TOPLEVEL
             'gene_type=s',
