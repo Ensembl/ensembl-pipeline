@@ -165,3 +165,9 @@ sub temp_filename{
   my ($self) = @_;
   return '/tmp/';
 }
+
+sub memstring_to_resource {
+    return '';
+}
+
+1;
