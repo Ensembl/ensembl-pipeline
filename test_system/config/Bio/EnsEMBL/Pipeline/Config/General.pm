@@ -31,7 +31,7 @@ variables.
 
 =head1 CONTACT
 
-B<dev@ensembl.org>
+B<http://lists.ensembl.org/mailman/listinfo/dev>
 
 =cut
 

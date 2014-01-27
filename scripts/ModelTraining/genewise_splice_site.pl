@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 
-# Copyright [1999-2013] Genome Research Ltd. and the EMBL-European Bioinformatics Institute
+# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -18,7 +18,7 @@
 
 #This script will produce 2 files (5' and 3' splice site regions).
 #These 2 files can then be used to create a genewise gene.stat model
-#Contact dev@ensembl.org
+#Contact http://lists.ensembl.org/mailman/listinfo/dev
 
 use warnings ;
 use strict;
