@@ -150,13 +150,13 @@ my @all_biotypes ;  # array of all biotypes to cluster
 
 
 unless ($coordsystem) {
-  print STDERR "you haven't supplied a coord_system_name using -coord_system --> I'll use 'chromosome' now\n" ;
-  $coordsystem = 'chromosome' ;
+  print STDERR "Warning: you haven't supplied a coord_system_name using -coord_system --> using 'toplevel' now!\n" ;
+  $coordsystem = 'toplevel' ;
 }
 
 unless ($outfile) {
   $outfile = "input_ids_" . $seq_region_names[0] . ".sql" ;
-  print STDERR "you haven't supplied a name for output-fasta-file with -outfile--> I'll use '$outfile' now\n" ;
+  print STDERR "Warning: you haven't supplied a name for output-fasta-file with -outfile--> using '$outfile' now!\n" ;
 }
 
 unless( $dbhost && $dbname &&  $outfile ) {
@@ -232,6 +232,14 @@ if (exists $var_hash->{$uc_logic}) {
 }
 
 my $input_dbs = $entry->{INPUT_GENES} ;
+
+# Throw in this scenario as script makes input ids even if it finds no input gene set
+unless($input_dbs)
+{
+  throw("No input gene sets found! Make sure you have a hash for your analysis in TranscriptConsensus.pm and\n"
+       ."that it contains an input gene set!\n");
+}
+
 my $ab_initio = $entry->{AB_INITIO_LOGICNAMES} ;
 
 # Check all databases declared in the Databases.pm config file exist
