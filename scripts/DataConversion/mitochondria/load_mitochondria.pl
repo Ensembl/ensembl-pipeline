@@ -97,6 +97,7 @@ GetOptions( \%opt,
             'trna_type=s',
             'rrna_type=s',
             'codon_table=i',
+            'source=s',         # Allow to set the gene.source by commandline option | MIT_SOURCE_NAME
             'name=s',
             'genbank_file=s',
             'download!',
@@ -121,6 +122,7 @@ if (    $opt{dbhost} && $opt{dbuser}
 
 $MIT_GENBANK_FILE = $opt{genbank_file} if $opt{genbank_file};
 $MIT_LOGIC_NAME   = $opt{logic_name}   if $opt{logic_name};
+$MIT_SOURCE_NAME  = $opt{source}       if $opt{source};
 $MIT_NAME         = $opt{name}         if $opt{name};
 $MIT_TOPLEVEL     = $opt{toplevel}     if $opt{toplevel};
 $MIT_CODON_TABLE  = $opt{codon_table}  if $opt{codon_table};
@@ -516,6 +518,7 @@ for (my $index = 1; $index < $length; $index++) {
       $transcript->analysis($ensembl_analysis);
       $gene->add_Transcript($transcript);
       $gene->canonical_transcript($transcript);
+      $gene->source($MIT_SOURCE_NAME);
       $count++;
     };
     if ($@){
