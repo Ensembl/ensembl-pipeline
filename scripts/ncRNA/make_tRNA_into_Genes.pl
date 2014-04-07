@@ -91,7 +91,7 @@ SPECIES:  foreach my $species (@speciess){
   
   my $ga  = $sdb->get_GeneAdaptor;
   my $sfa = $core_db->get_SimpleFeatureAdaptor;
-  foreach my $tRNA ( @{$sfa->fetch_all_by_logic_name('tRNAscan')} ) {
+  foreach my $tRNA ( @{$sfa->fetch_all_by_logic_name('trnascan')} ) {
     my $tRNA_Gene = make_gene($tRNA);
     push @tRNA_Genes , $tRNA_Gene if ( $tRNA_Gene) ;
   }
