@@ -502,17 +502,17 @@ use vars qw(%Config);
     {
       logic_name => 'RfamBlast',
       batch_size => 300,
-      resource   => 'select[mem>500] rusage[mem=500]',
+      resource   => 'select[mem>1500] rusage[mem=1500]',
       retries    => 1,
-      sub_args   => '-M500',
+      sub_args   => '-M1500',
       queue      => 'normal',
     },
     {
       logic_name => 'miRNA',
       batch_size => 1,
       retries    => 1,
-      resource   => 'select[mem>500] rusage[mem=500]',
-      sub_args   => '-M500',
+      resource   => 'select[mem>1000] rusage[mem=1000]',
+      sub_args   => '-M1000',
       queue      => 'normal',
     }, 
        {
