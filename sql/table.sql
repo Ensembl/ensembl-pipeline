@@ -11,7 +11,7 @@ CREATE TABLE job (
   PRIMARY KEY (job_id),
   KEY         (input_id),
   KEY         (analysis_id)
-);
+) ENGINE=MyISAM;
 
 # job_id        - job internal ID
 # input_id      - name (e.g. accession/Ensembl ID) of input
@@ -35,7 +35,7 @@ CREATE TABLE job_status (
   KEY (job_id),
   KEY (status),
   KEY (is_current)
-);
+) ENGINE=MyISAM;
 
 # job 'history' table - tracks each state of a job in its 'life'
 # one line per job/status
