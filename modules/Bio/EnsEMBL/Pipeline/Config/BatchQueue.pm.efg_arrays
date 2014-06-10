@@ -181,7 +181,7 @@
 package Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 
 use strict;
-use vars qw(%Config, @QUEUE_CONFIG);
+use vars qw(%Config @QUEUE_CONFIG);
 
 require "$ENV{'WORK_DIR'}/batch_queue.pm";
 %Config = (
