@@ -252,11 +252,12 @@ sub parse_fasta{
       # we are only allowed to load ATGCN
       if ($seq->seq =~ /[^ACGTN]+/i)
       {
-        $have_ambiguous_bases++;
+        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base. Changed all to N." ) ;
+        $have_ambiguous_bases++ ;
         my $seq_clean = $seq->seq ;
         $seq_clean =~ tr/RYKMSWBDHV/N/ ;
-        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base. Changed all to N." ) ;
-        $sa->store( $slice, $seq_clean ) ;
+        $seq->seq($seq_clean) ;
+        $sa->store($slice, \$seq->seq);
       }
       else
       {
