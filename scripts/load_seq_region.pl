@@ -197,10 +197,12 @@ if ($name_file){
 }
 
 
-if($fasta){
+if($fasta)
+{
   my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
-  if ($count_ambiguous_bases) {
-    throw("All sequences has loaded, but $count_ambiguous_bases slices have ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N.");
+  if ($count_ambiguous_bases) 
+  {
+    warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
   }
 }
 
@@ -222,7 +224,7 @@ sub parse_fasta{
     #NOTE, the code used to generate the name very much depends on the 
     #format of your fasta headers and what id you want to use
     #In this case we use the first word of the sequences description as
-    #parseed by SeqIO but you may want the id or you may want to use a
+    #parsed by SeqIO but you may want the id or you may want to use a
     #regular experssion to get the sequence you will need to check what 
     #this will produce, if you have checked your ids and you know what
     #you are getting you may want to comment out the warning about this
@@ -244,15 +246,20 @@ sub parse_fasta{
     }
 
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
-    if($store_seq){
-      # check that we don't have ambiguous bases in the DNA sequence
+    if($store_seq)
+    {
+      # substitute ambiguous bases in the DNA sequence - and warn
       # we are only allowed to load ATGCN
-      if ($seq->seq =~ /[^ACGTN]+/i) {
+      if ($seq->seq =~ /[^ACGTN]+/i)
+      {
         $have_ambiguous_bases++;
-        warning("Slice ".$name." has at least one non-ATGCN (RYKMSWBDHV) base. Please change to N.");
+        $seq->seq =~ tr/RYKMSWBDHV/N/ ;
+        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base. Changed all to N." ) ;
       }
       $sa->store($slice, \$seq->seq);
-    }else{
+    }
+    else
+    {
       $sa->store($slice);
     }
   }
