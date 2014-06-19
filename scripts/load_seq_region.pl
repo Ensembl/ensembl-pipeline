@@ -107,6 +107,7 @@ my $rank;
 my $verbose = 0;
 my $regex;
 my $name_file;
+my $keep_ambiguous_bases = 0 ;
 
 GetOptions(
             'host|dbhost|h:s'   => \$host,
@@ -125,6 +126,7 @@ GetOptions(
             'regex:s' => \$regex,
             'name_file:s' => \$name_file,
             'help'     => \$help,
+            'keep_ambiguous_bases'  => \$keep_ambiguous_bases
            ) or ($help = 1);
 
 if(!$host || !$dbuser || !$dbname || !$dbpass){
@@ -199,10 +201,17 @@ if ($name_file){
 
 if($fasta)
 {
-  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,);
+  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,$keep_ambiguous_bases);
   if ($count_ambiguous_bases) 
   {
-    warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
+    if( $keep_ambiguous_bases )
+    {
+        warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N." ) ;
+    }
+    else
+    {
+        warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
+    }
   }
 }
 
@@ -211,7 +220,7 @@ if($agp){
 }
 
 sub parse_fasta{
-  my ($filename, $cs, $sa, $store_seq,$regex,) = @_;
+  my ($filename, $cs, $sa, $store_seq,$regex,$keep_ambiguous_bases) = @_;
   my $have_ambiguous_bases = 0;
 
   my $seqio = new Bio::SeqIO(
@@ -219,7 +228,8 @@ sub parse_fasta{
                              -file=>$filename
                             );
   
-  while ( my $seq = $seqio->next_seq ) {
+  while ( my $seq = $seqio->next_seq ) 
+  {
     
     #NOTE, the code used to generate the name very much depends on the 
     #format of your fasta headers and what id you want to use
@@ -235,7 +245,8 @@ sub parse_fasta{
 
     #my $name = $name_vals[3]; 
        
-    if ($regex) {
+    if ($regex) 
+    {
       ($name) = $name =~ /$regex/;
     }
     print( "Loading ".$name."\n" ) if($verbose) ;
@@ -250,7 +261,13 @@ sub parse_fasta{
     {
       # substitute ambiguous bases in the DNA sequence - and warn
       # we are only allowed to load ATGCN
-      if ($seq->seq =~ /[^ACGTN]+/i)
+      if( $seq->seq =~ /[^ACGTN]+/i && $keep_ambiguous_bases )
+      {
+        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base." ) ;
+        $have_ambiguous_bases++ ;        
+        $sa->store( $slice, \$seq->seq ) ;
+      }
+      elsif( $seq->seq =~ /[^ACGTN]+/i )
       {
         warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base. Changed all to N." ) ;
         $have_ambiguous_bases++ ;
