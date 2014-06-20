@@ -27,7 +27,7 @@ load_seq_region.pl
 =head1 DESCRIPTION
 
 This script can do three things. Use the entries in a fasta file to load
-a set of seq_regions into the seq_region object. If desried the sequence
+a set of seq_regions into the seq_region object. If desired the sequence
 can also be stored. It can also load seq_regions which represent the
 assembled pieces from an agp file. The assembled pieces are represented by 
 the first 3 columns of the agp for further definition of the format see here
@@ -48,7 +48,7 @@ this would just load seq_regions to represent the entries in this file
 -coord_system_name clone -rank 3 -fasta_file clone.fa
 
 this will load the assembled pieces from the agp file into the seq_region
-table. T
+table.
 ./load_seq_region -dbhost host -dbuser user -dbname my_db -dbpass ****
 -coord_system_name chromosome -rank 1 -agp_file genome.agp
 
@@ -107,7 +107,7 @@ my $rank;
 my $verbose = 0;
 my $regex;
 my $name_file;
-my $keep_ambiguous_bases = 0 ;
+my $replace_ambiguous_bases = 0 ;
 
 GetOptions(
             'host|dbhost|h:s'   => \$host,
@@ -126,7 +126,7 @@ GetOptions(
             'regex:s' => \$regex,
             'name_file:s' => \$name_file,
             'help'     => \$help,
-            'keep_ambiguous_bases'  => \$keep_ambiguous_bases
+            'replace_ambiguous_bases'  => \$replace_ambiguous_bases
            ) or ($help = 1);
 
 if(!$host || !$dbuser || !$dbname || !$dbpass){
@@ -201,16 +201,16 @@ if ($name_file){
 
 if($fasta)
 {
-  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,$keep_ambiguous_bases);
+  my $count_ambiguous_bases = &parse_fasta($fasta, $cs, $sa, $sequence_level,$regex,$replace_ambiguous_bases);
   if ($count_ambiguous_bases) 
   {
-    if( $keep_ambiguous_bases )
+    if( $replace_ambiguous_bases )
     {
-        warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N." ) ;
+        warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
     }
     else
     {
-        warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
+        throw( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Please change all ambiguous bases (RYKMSWBDHV) to N." ) ;
     }
   }
 }
@@ -220,7 +220,7 @@ if($agp){
 }
 
 sub parse_fasta{
-  my ($filename, $cs, $sa, $store_seq,$regex,$keep_ambiguous_bases) = @_;
+  my ($filename, $cs, $sa, $store_seq,$regex,$replace_ambiguous_bases) = @_;
   my $have_ambiguous_bases = 0;
 
   my $seqio = new Bio::SeqIO(
@@ -259,15 +259,8 @@ sub parse_fasta{
     my $slice = &make_slice($name, 1, $seq->length, $seq->length, 1, $cs);
     if($store_seq)
     {
-      # substitute ambiguous bases in the DNA sequence - and warn
-      # we are only allowed to load ATGCN
-      if( $seq->seq =~ /[^ACGTN]+/i && $keep_ambiguous_bases )
-      {
-        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base." ) ;
-        $have_ambiguous_bases++ ;        
-        $sa->store( $slice, \$seq->seq ) ;
-      }
-      elsif( $seq->seq =~ /[^ACGTN]+/i )
+      #ambiguous bases: detect, warn and substitute (if required) 
+      if( $seq->seq =~ /[^ACGTN]+/i && $replace_ambiguous_bases )
       {
         warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base. Changed all to N." ) ;
         $have_ambiguous_bases++ ;
@@ -275,6 +268,12 @@ sub parse_fasta{
         $seq_clean =~ tr/RYKMSWBDHV/N/ ;
         $seq->seq($seq_clean) ;
         $sa->store($slice, \$seq->seq);
+      }
+      elsif( $seq->seq =~ /[^ACGTN]+/i  )
+      {
+        warning( "Slice ".$name." had at least one non-ATGCN (RYKMSWBDHV) base." ) ;
+        $have_ambiguous_bases++ ;        
+        $sa->store( $slice, \$seq->seq ) ;
       }
       else
       {
