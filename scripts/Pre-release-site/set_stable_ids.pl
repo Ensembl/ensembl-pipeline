@@ -101,15 +101,12 @@ my $exon_sth = $db->dbc->prepare($exon_query);
 my @trans_write = ();
 my @translation_write = ();
 my @exon_write = ();
-
 GENE:
 foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
-
   if ( defined( $gene->stable_id() ) ) { next GENE }
 
   my $gene_protein_id = get_gene_protein_id($gene);
-
   $proteins{$gene_protein_id}++;
 
   eval {
@@ -175,11 +172,9 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
 sub get_gene_protein_id {
   my ($gene) = @_;
 
-  foreach my $exon ( @{ $gene->get_all_Exons() } ) {
-    foreach my $sf ( @{ $exon->get_all_supporting_features() } ) {
-      my $protein_id = $sf->hseqname();
-      if ( defined($protein_id) ) { return $protein_id }
-    }
+  foreach my $transcript ( @{ $gene->get_all_Transcripts() } ) {
+    my $protein_id = get_transcript_protein_id($transcript);
+    if ( defined($protein_id) ) { return $protein_id };
   }
 
   throw( "Found no protein id for " . $gene->dbID() );
