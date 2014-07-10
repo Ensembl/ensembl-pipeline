@@ -112,7 +112,7 @@ sub new {
     $self->support($support);
 
     # set bindir
-    $self->bindir($self->support->param('bindir') || '/software/farm/bin');
+    $self->bindir($self->support->param('bindir') || '/software/ensembl/genebuild/usrlocalensemblbin');
 
     return $self;
 }
