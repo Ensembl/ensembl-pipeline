@@ -177,19 +177,29 @@ sub get_gene_hit_name {
     if ( defined($hit_name) ) { return $hit_name };
   }
 
-  throw( "Found no protein id for " . $gene->dbID() );
+  throw( "Found no hit_name for " . $gene->dbID() );
 }
 
 sub get_transcript_hit_name {
   my ($transcript) = @_;
 
+  my @sorted_sfs = ();
+
+  # get and sort the supporting features so that the PAFs come first
   foreach my $sf ( @{ $transcript->get_all_supporting_features() } ) {
-    my $hit_name = $sf->hseqname();
-    if ( defined($hit_name) ) { return $hit_name }
-    # Note that this is returning the first hit_name found. It could return either a PAF or a DAF so one feature type is not prioritised over the other.
+    if ($sf->isa("Bio::EnsEMBL::DnaPepAlignFeature")) { # PAF hit names are prioritised over DNA hit names
+      unshift(@sorted_sfs,$sf);
+    } else {
+      push(@sorted_sfs,$sf);
+    }
   }
 
-  throw( "Found no protein id for " . $transcript->dbID() );
+  foreach my $sorted_sf (@sorted_sfs) { 
+    my $hit_name = $sorted_sf->hseqname();
+    if ( defined($hit_name) ) { return $hit_name }
+  }
+
+  throw( "Found no hit_name for " . $transcript->dbID() );
 }
 
 sub write_to_db
