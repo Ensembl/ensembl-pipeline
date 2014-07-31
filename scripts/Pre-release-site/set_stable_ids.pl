@@ -106,19 +106,19 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
   my $gene = $db->get_GeneAdaptor->fetch_by_dbID($gene_id);
   if ( defined( $gene->stable_id() ) ) { next GENE }
 
-  my $gene_protein_id = get_gene_protein_id($gene);
-  $proteins{$gene_protein_id}++;
+  my $gene_hit_name = get_gene_hit_name($gene);
+  $proteins{$gene_hit_name}++;
 
   eval {
     
     foreach my $transcript ( @{ $gene->get_all_Transcripts() } ) {
-      my $transcript_protein_id =
-        get_transcript_protein_id($transcript);
+      my $transcript_hit_name =
+        get_transcript_hit_name($transcript);
 
-      $transcript_proteins{$transcript_protein_id}++;
+      $transcript_proteins{$transcript_hit_name}++;
 
-      push(@trans_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
-	             ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$transcript->dbID());
+      push(@trans_write,$transcript_hit_name . "_" .$transcript_proteins{$transcript_hit_name}.
+	             ":\n:".$transcript_proteins{$transcript_hit_name}.":\n:".$transcript->dbID());
 
 
       if($transcript->translation())
@@ -126,8 +126,8 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
         my $translation = $transcript->translation();
 
 
-        push(@translation_write,$transcript_protein_id . "_" .$transcript_proteins{$transcript_protein_id}.
-	                    ":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$translation->dbID());
+        push(@translation_write,$transcript_hit_name . "_" .$transcript_proteins{$transcript_hit_name}.
+	                    ":\n:".$transcript_proteins{$transcript_hit_name}.":\n:".$translation->dbID());
       }
 
       my $exon_count = 1;
@@ -139,12 +139,12 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
         if ( exists( $exons{$exon_dbID} ) ) { next EXON }
 
         my $stable_id =
-          $transcript_protein_id . "_" .
-          $transcript_proteins{$transcript_protein_id} . "." .
+          $transcript_hit_name . "_" .
+          $transcript_proteins{$transcript_hit_name} . "." .
           $exon_count++;
 
 
-        push(@exon_write, $stable_id.":\n:".$transcript_proteins{$transcript_protein_id}.":\n:".$exon_dbID);
+        push(@exon_write, $stable_id.":\n:".$transcript_proteins{$transcript_hit_name}.":\n:".$exon_dbID);
 
         $exons{$exon_dbID} = $stable_id;
 
@@ -160,8 +160,8 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
 
   else
   {
-      my $gene_write_string = $gene_protein_id . "_" . $proteins{$gene_protein_id}.
-	                       ":\n:". $proteins{$gene_protein_id}.":\n:".$gene_id;
+      my $gene_write_string = $gene_hit_name . "_" . $proteins{$gene_hit_name}.
+	                       ":\n:". $proteins{$gene_hit_name}.":\n:".$gene_id;
 
       write_to_db($gene_id,$gene_write_string);
       clear_write_arrays();
@@ -169,23 +169,24 @@ foreach my $gene_id ( @{ $db->get_GeneAdaptor->list_dbIDs() } ) {
 
 } ## end foreach my $gene_id ( @{ $db...})
 
-sub get_gene_protein_id {
+sub get_gene_hit_name {
   my ($gene) = @_;
 
   foreach my $transcript ( @{ $gene->get_all_Transcripts() } ) {
-    my $protein_id = get_transcript_protein_id($transcript);
-    if ( defined($protein_id) ) { return $protein_id };
+    my $hit_name = get_transcript_hit_name($transcript);
+    if ( defined($hit_name) ) { return $hit_name };
   }
 
   throw( "Found no protein id for " . $gene->dbID() );
 }
 
-sub get_transcript_protein_id {
+sub get_transcript_hit_name {
   my ($transcript) = @_;
 
   foreach my $sf ( @{ $transcript->get_all_supporting_features() } ) {
-    my $protein_id = $sf->hseqname();
-    if ( defined($protein_id) ) { return $protein_id }
+    my $hit_name = $sf->hseqname();
+    if ( defined($hit_name) ) { return $hit_name }
+    # Note that this is returning the first hit_name found. It could return either a PAF or a DAF so one feature type is not prioritised over the other.
   }
 
   throw( "Found no protein id for " . $transcript->dbID() );
