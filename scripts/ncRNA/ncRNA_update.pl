@@ -399,7 +399,7 @@ sub prepare_RFAM{
   
   # create Rfam.seed file
   my $exit;
-  print "Updating RFAM descriptions file ...\n";
+  print "Updating RFAM descriptions file ... using Sanger FTP site (consider using EBI mirror)\n";
   system ("mkdir $BLASTDIR") unless -e "$BLASTDIR";
   $exit =  system ("wget ftp://ftp.sanger.ac.uk/pub/databases/Rfam/CURRENT/Rfam.cm.gz  -O $BLASTDIR/Rfam.cm.gz");
   die ("Error with obtaining Rfam covariance model  file from
