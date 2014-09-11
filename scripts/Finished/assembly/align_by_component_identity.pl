@@ -41,6 +41,8 @@ Optional arguments:
 
     --skipcomponents=FILE               read list of components to skip from FILE
 
+    --checksum                          use a MD5 digest of the sequence of each component rather than name
+
     --conffile, --conf=FILE             read parameters from FILE
                                         (default: conf/Conversion.ini)
 
@@ -158,7 +160,8 @@ my $support = AssemblyMapper::Support->new(
         'ref_end=i',
         'alt_start=i',
         'alt_end=i',
-        'multiple!'
+        'multiple!',
+        'checksum!'
     ],
     );
 
@@ -172,6 +175,14 @@ my $multiple = $support->param('multiple');
 
 if ($multiple) {
     $support->log_error("--multiple mode disabled for now following May 2011 rewrite\n");
+}
+
+my $cmp_key_generator = \&get_cmp_key;
+
+#Runtime import if required
+if($support->param('checksum')) {
+  require Digest::MD5;
+  $cmp_key_generator = \&get_md5_cmp_key;
 }
 
 $support->connect_dbs;
@@ -332,7 +343,8 @@ sub do_align {
         map ($_->[$PROJ_END]   += ($Ref_start-1) , @R_components);
     }
 
-    my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
+    #my @assembly_diffs = sdiff(\@R_components,\@A_components,\&get_cmp_key);
+    my @assembly_diffs = sdiff(\@R_components,\@A_components,$cmp_key_generator);
 
     # loop over sdiff results
   DIFF: foreach my $diff (@assembly_diffs)  {
@@ -1031,6 +1043,15 @@ sub get_cmp_key {
     my $key = $slice->seq_region_name . ":". $slice->start . "-". $slice->end . ":". $slice->strand;
     $key.= ":".$cmp->from_start."-".$cmp->from_end.":".($cmp->from_end-$cmp->from_start+1) if $flag;
     return $key;
+}
+
+sub get_md5_cmp_key {
+  my ($cmp) = @_;
+  my $slice = $cmp->to_Slice();
+  my $md5 = Digest::MD5->new();
+  $md5->add($slice->seq());
+  my $digest = $md5->b64digest();
+  return $digest.'=='; #recommended interopt from Digest::MD5 docs
 }
 
 =head2 found_match
