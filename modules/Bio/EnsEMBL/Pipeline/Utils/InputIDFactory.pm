@@ -99,7 +99,8 @@ sub new{
       $seq_region_start,
       $seq_region_end,
       $hap_pair,
-      $include_non_reference)=rearrange([qw(DB 
+      $include_non_reference,
+      $use_mt)=rearrange([qw(DB
                                             SLICE 
                                             SINGLE 
                                             FILE
@@ -122,6 +123,7 @@ sub new{
                                             SEQ_REGION_END
                                             HAP_PAIR
  					    INCLUDE_NON_REFERENCE
+                        USE_MITOCHONDRION
                                            )], @_);
 
   $slice = 0 unless ($slice);
@@ -130,6 +132,7 @@ sub new{
   $hap_pair = 0 unless ($hap_pair);
   $include_non_reference = 0 unless ($include_non_reference);
   $translation_id = 0 unless($translation_id);
+  $use_mt = 0 unless($use_mt);
 
   if(!$db){
     throw("You can't create and store input_ids without a dbadaptor\n");
@@ -194,6 +197,7 @@ print "hap_pair: ",$hap_pair,"\n";
   $self->dir($dir) if($dir);
   $self->regex($regex) if($regex);
   $self->single_name($single_name) if($single_name);
+  $self->use_mitochondrion($use_mt) if($use_mt);
   return $self;
 }
 
@@ -339,6 +343,11 @@ sub seq_level{
   }
   return $self->{'seq_level'};
 }
+sub use_mitochondrion{
+  my $self = shift;
+  $self->{'use_mitochondrion'} = shift if(@_);
+  return $self->{'use_mitochondrion'};
+}
 
 
 sub get_analysis{
@@ -458,8 +467,11 @@ sub get_slice_names{
     $slices = split_Slices($slices,$self->slice_size,$self->slice_overlaps);
   }
 
+  my $mt_name = undef;
+  $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name unless($self->use_mitochondrion);
   my @ids;
   foreach my $slice(@$slices){
+    next if (defined $mt_name and $slice->seq_region_name eq $mt_name);
     push(@ids, $slice->name);
   }
 
