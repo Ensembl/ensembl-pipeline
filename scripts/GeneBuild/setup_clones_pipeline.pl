@@ -35,6 +35,7 @@ my $exonerate_exe = '/software/ensembl/genebuild/usrlocalensemblbin/exonerate-0.
 my $chunk_dir;
 my $submit_toplevel;
 my $include_non_reference = 0;
+my $reset_db = 0;
 my $fastasplit_exe = '/software/ensembl/bin/fastasplit_random';
 
 
@@ -59,6 +60,7 @@ my $fastasplit_exe = '/software/ensembl/bin/fastasplit_random';
         'create_cfg!' => \$create_cfg,
         'input_ids!' => \$input_ids,
         'clip!' => \$clipping,
+        'resetdb!' => \$reset_db,
         'verbose+'      => \$verbose,
         );
 
@@ -81,9 +83,13 @@ my $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
         );
 
 $| = 1 if ($verbose);
+if ($reset_db) {
+    reset_database($db, $alignment_ln, $linking_ln);
+    exit(0);
+}
 sanity_check($db, $fastasplit_exe, $chunk_dir);
 
-my $clones_info = prepare_fasta_file($xmlfile, $fasta_file, $clipping, $prepare_fasta);
+my $clones_info = prepare_fasta_file($xmlfile, $fasta_file, $clipping, $prepare_fasta) if ($prepare_fasta or $upload_info);
 create_analyses($db, $alignment_ln, $linking_ln) if ($create_analysis);
 upload_clones_information($db, $clones_info, $alignment_ln) if ($upload_info);
 add_input_ids($db, $alignment_ln, $linking_ln) if ($input_ids);
@@ -107,11 +113,12 @@ sub prepare_fasta_file {
     my $clip_quality_right;
     my $clip_vector_left;
     my $clip_vector_right;
+    my $skip;
     my %seen_skipped;
     print STDOUT "Reading XML..." if ($verbose);
     open(my $fh, $xmlfile) || die("Could not open $xmlfile");
     while (my $line = <$fh>) {
-        if ($line =~ /^\s+<trace>/){
+        if ($line =~ /^\s+<trace>/i){
             $single_entry = 1;
             $insert_size = undef;
             $insert_stdev = undef;
@@ -122,6 +129,7 @@ sub prepare_fasta_file {
             $clip_quality_right = undef;
             $clip_vector_left = undef;
             $clip_vector_right = undef;
+            $skip = undef;
         }
 
         elsif ($single_entry == 1) {
@@ -158,17 +166,23 @@ sub prepare_fasta_file {
             elsif ($line =~ /^\s+<clip_vector_left>(\d+)<\/clip_vector_left>/i) {
                 $clip_vector_left = $1;
             }
+            elsif ($line =~ /^\s+<trace_type_code>(\w+)<\/trace_type_code>/i) {
+                $skip = 1 unless ($1 =~ /^CLONEEND$/i);
+            }
             elsif ($line =~ /^\s+<clip_vector_right>(\d+)<\/clip_vector_right>/i) {
                 $clip_vector_right = $1;
             }
-            elsif ($line =~ /^\s+<\/trace>/) {
-                if ($accession) {
+            elsif ($line =~ /^\s+<\/trace>/i) {
+                if ($skip) {
+                    print STDOUT "This is not a CLONEEND: $trace_id\n";
+                    next;
+                }
+                elsif ($accession) {
                     print "Clone with accession $accession, skipping\n" if ($verbose > 1);
                     $seen_skipped{$accession} = 1;
                     next;
                 }
                 next if (!$trace_id or !$insert_size or !$insert_stdev or !$trace_direction or !$trace_name);
-# >918936606:CH243-100A1:F:CH243:184000:36800:1098268172037
                 $clone_infos{$trace_name} = [$trace_id, $clone_id, $trace_direction, $clone_lib, $insert_size, $insert_stdev, $trace_name, 0];
                 push(@{$clone_infos{$trace_name}}, $clip_quality_left, $clip_quality_right, $clip_vector_left, $clip_vector_right) if ($clipping);
                 $single_entry = 0;
@@ -222,9 +236,9 @@ sub prepare_fasta_file {
 sub create_analyses {
     my ($db, $alignment_ln, $linking_ln) = @_;
 
-    print STDOUT 'Creating analyses...' if ($verbose);
     my $analysis_adaptor = $db->get_AnalysisAdaptor;
     my $rule_adaptor = $db->get_RuleAdaptor;
+    print STDOUT 'Creating analyses...' if ($verbose);
     my $submit_exonerate_analysis = Bio::EnsEMBL::Pipeline::Analysis->new(
             -logic_name => 'Submit_'.$alignment_ln,
             -module => 'Dummy',
@@ -266,7 +280,7 @@ sub create_analyses {
     my $clone_link_rule = Bio::EnsEMBL::Pipeline::Rule->new( -goalanalysis => $clone_link_analysis );
     $clone_link_rule->add_condition($accumulator->logic_name);
     $clone_link_rule->add_condition($submit_clone_analysis->logic_name);
-    $rule_adaptor->store($accumulator_rule);
+    $rule_adaptor->store($clone_link_rule);
     print STDOUT "Done\n" if ($verbose);
 }
 
@@ -405,4 +419,28 @@ sub sanity_check {
         $error_msg .= "$chunk_dir does not exist!" unless (-d $chunk_dir);
     }
     throw($error_msg) if ($error_msg);
+}
+
+sub reset_database {
+    my ($db, $alignment_ln, $linking_ln) = @_;
+
+    my $analysis_adaptor = $db->get_AnalysisAdaptor;
+    my $rule_adaptor = $db->get_RuleAdaptor;
+    print STDOUT "Resetting $dbname:\n" if ($verbose);
+    for my $logic_name ($linking_ln, $alignment_ln.'_wait', $alignment_ln, "Submit_$alignment_ln", "Submit_$linking_ln") {
+        my $analysis = $analysis_adaptor->fetch_by_logic_name($logic_name);
+        next unless ($analysis);
+        print STDOUT "  Removing $logic_name..." if ($verbose);
+        print STDOUT "\n    Deleting input_ids..." if ($verbose > 1);
+        my $sth_rmiids = $analysis_adaptor->dbc->prepare('DELETE FROM input_id_analysis WHERE analysis_id = '.$analysis->dbID);
+        $sth_rmiids->execute();
+        print STDOUT "\n    Done\n    Deleting rules..." if ($verbose > 1);
+        while (my $rule = $rule_adaptor->fetch_by_goal($analysis)) {
+            $rule_adaptor->remove($rule);
+        }
+        print STDOUT "\n    Done\n" if ($verbose > 1);
+        $analysis_adaptor->remove($analysis);
+        print STDOUT "Done\n" if ($verbose);
+    }
+    print STDOUT "Resetting finished\n" if ($verbose);
 }
