@@ -131,9 +131,9 @@ use vars qw(%Config);
         PRODUCTION_DBPORT => 3306,
 
         # Select the good DB for the tokens, the first one is the pipeline DB
-        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000',
+        RETRY_RESOURCE => '-R"select[mem>4000] rusage[mem=4000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 4000',
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
