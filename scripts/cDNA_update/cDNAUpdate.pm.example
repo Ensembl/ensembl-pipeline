@@ -53,8 +53,9 @@ use vars qw(%Config);
         DBPASS     => '*****', 
         DBUSER_RO  => 'ensro',
 
-        # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
 
+
+        # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt', 
         #Only complete if the gss file isn't under CVS_DIR
         #If completed will replace CVS_DIR as prefix to GSS_PATH
@@ -137,7 +138,7 @@ use vars qw(%Config);
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
-
+        ENSCODE_DIR => '',
         DATA_DIR => '',
 
         # Path to the genomic sequence

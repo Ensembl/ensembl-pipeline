@@ -247,7 +247,7 @@ my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
 my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
 my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
-my $LOAD_PROD           = $CVS_DIR . $LOAD_PROD_DB;
+my $LOAD_PROD           = $ENSCODE_DIR . $LOAD_PROD_DB;
 my $GSS;
 
 if ( defined($GSS_PREFIX) ) {
@@ -267,7 +267,7 @@ my $cmd;
 my $status;
 
 # Temp. dirs & files:
-my $config_file     = $CVS_DIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
+my $config_file     = $ENSCODE_DIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
 my $newfile         = "cdna_update";
 my $configDIR       = $DATA_DIR."/configbackup";
 my $chunkDIR        = $DATA_DIR."/chunks";
@@ -280,6 +280,7 @@ my $genomelist      = join "\',\'", @masked_genome;
 my %configvars = (
                "MIN_LENGTH"        => $MIN_LENGTH,           # from cDNAUpdate
                "CVS_DIR"           => $CVS_DIR,              # from cDNAUpdate
+               "ENSCODE_DIR"       => $ENSCODE_DIR,              # from cDNAUpdate
                "DATA_DIR"          => $DATA_DIR,             # from cDNAUpdate
                "FASTASPLIT"        => $FASTA_SPLIT,          # from cDNAUpdate
                "POLYA_CLIPPING"    => $POLYA_CLIPPING,       # from cDNAUpdate
@@ -2095,13 +2096,13 @@ sub create_db {
     drop_create_database($db_name, $host, $port, 1);
 
     $cmd     = $mysql_cmd . " " . $db_name . " < "
-             . $CVS_DIR . "/ensembl/sql/table.sql";
+             . $ENSCODE_DIR . "/ensembl/sql/table.sql";
     $status += system($cmd);
 
     # If it's a pipeline db, add the pipeline tables.
     if ($is_pipeline) {
         $cmd     = $mysql_cmd . "$db_name < "
-                 . $CVS_DIR . "/ensembl-pipeline/sql/table.sql";
+                 . $ENSCODE_DIR . "/ensembl-pipeline/sql/table.sql";
         $status += system($cmd);
     }
 
