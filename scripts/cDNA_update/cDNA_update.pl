@@ -243,10 +243,10 @@ $| = 1;
 
 # Variables from configuration
 
-my $POLYA_CLIPPING      = $CVS_DIR . $POLYA_CLIPPING_PATH;
-my $FIND_N              = $CVS_DIR . $FIND_N_PATH;
-my $STORE_UNMAPPED      = $CVS_DIR . $STORE_UNMAPPED_PATH;
-my $LOAD_TAX            = $CVS_DIR . $LOAD_TAX_PATH;
+my $POLYA_CLIPPING      = $ENSCODE_DIR . $POLYA_CLIPPING_PATH;
+my $FIND_N              = $ENSCODE_DIR . $FIND_N_PATH;
+my $STORE_UNMAPPED      = $ENSCODE_DIR . $STORE_UNMAPPED_PATH;
+my $LOAD_TAX            = $ENSCODE_DIR . $LOAD_TAX_PATH;
 my $LOAD_PROD           = $ENSCODE_DIR . $LOAD_PROD_DB;
 my $GSS;
 
@@ -1293,7 +1293,7 @@ sub run_analysis {
     eval {
 
         print "\nPlease monitor the output with:\n\n"
-              . "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/monitor"
+              . "perl " . $ENSCODE_DIR . "/ensembl-pipeline/scripts/monitor"
               . " -dbhost "   . $PIPE_DBHOST
               . " -dbport "   . $PIPE_DBPORT
               . " -dbuser "   . $DBUSER
@@ -1304,7 +1304,7 @@ sub run_analysis {
         print("\n\nShall we start the actual analysis? (y/n) ");
 
         if (($force_run and $rerun_flag) or get_input_arg() ) {
-            $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
+            $cmd = "perl " . $ENSCODE_DIR . "/ensembl-pipeline/scripts/rulemanager.pl"
                  . " -dbhost "   . $PIPE_DBHOST
                  . " -dbport "   . $PIPE_DBPORT
                  . " -dbuser "   . $DBUSER
@@ -1950,7 +1950,7 @@ sub compare {
 
             $cmd = "bsub -q normal "
                  . "-o "                . $DATA_DIR . "/" . $chromosome . ".out "
-                 . "perl "              . $CVS_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
+                 . "perl "              . $ENSCODE_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
                  . " -chrom "           . $chromosome
                  . " -oldname "         . $OLD_FEATURE_NAME
                  . " -newname "         . $newFeatureName
@@ -2269,7 +2269,7 @@ sub setup_analysis {
                  . " -dbpass " . $DBPASS
                  . " -dbport " . $PIPE_DBPORT;
 
-    my $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+    my $cmd = "perl " . $ENSCODE_DIR . "/ensembl-pipeline/scripts/add_Analysis "
             . $sql_pipe
             . " -logic_name "      . $newFeatureName
             . " -program "         . $PROGRAM_NAME
@@ -2284,7 +2284,7 @@ sub setup_analysis {
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd = "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/add_Analysis "
+    $cmd = "perl " . $ENSCODE_DIR . "/ensembl-pipeline/scripts/add_Analysis "
          . $sql_pipe
          . " -logic_name "      . $submitName
          . " -module "          . "dummy"
@@ -2293,7 +2293,7 @@ sub setup_analysis {
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd =  "perl " . $CVS_DIR . "/ensembl-pipeline/scripts/RuleHandler.pl "
+    $cmd =  "perl " . $ENSCODE_DIR . "/ensembl-pipeline/scripts/RuleHandler.pl "
           . $sql_pipe
           . " -goal "       . $newFeatureName
           . " -condition "  . $submitName
@@ -2302,7 +2302,7 @@ sub setup_analysis {
     $status += system($cmd);
     print $cmd, "\n";
 
-    $cmd =  "perl ".$CVS_DIR."/ensembl-pipeline/scripts/make_input_ids "
+    $cmd =  "perl ".$ENSCODE_DIR."/ensembl-pipeline/scripts/make_input_ids "
           . $sql_pipe
           . " -file "
           . " -dir "        . $chunkDIR
