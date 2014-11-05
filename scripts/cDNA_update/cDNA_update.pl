@@ -246,6 +246,7 @@ my $FIND_N              = $ENSCODE_DIR . $FIND_N_PATH;
 my $STORE_UNMAPPED      = $ENSCODE_DIR . $STORE_UNMAPPED_PATH;
 my $LOAD_TAX            = $ENSCODE_DIR . $LOAD_TAX_PATH;
 my $LOAD_PROD           = $ENSCODE_DIR . $LOAD_PROD_DB;
+my $META_LEVELS         = $ENSCODE_DIR . $META_LEVELS_PATH;
 my $GSS;
 
 if ( defined($GSS_PREFIX) ) {
@@ -658,9 +659,11 @@ elsif ( $option eq "run" ) {
 
         # Updating the meta_coord table
         if ( $progress_status == 9 ) {
-            print("updating meta_coord table...\n");
-
+            print("Updating meta_coord table...\n");
             update_metacoord();
+
+            print("Setting meta_levels...\n");
+            update_metalevels();
 
             $progress_status = 10;
             update_progress_status($progress_status);
@@ -1636,6 +1639,22 @@ sub update_metacoord {
     print STDERR "Finished updating meta_coord table\n";
 } ## end sub update_metacoord
 
+# Update the metalevels
+sub update_metalevels
+{
+    my $cmd = "perl ".$META_LEVEL." " ;
+    my $db_info =  " -dbpattern " . $OUTPUT_DBNAME
+                 . " -host " . $OUTPUT_DBHOST
+                 . " -user " . $DBUSER
+                 . " -pass " . $DBPASS
+                 . " -port " . $OUTPUT_DBPORT;
+    my $cmd = $cmd.$db_info ;
+
+    if ( system($cmd) ) 
+    {
+        croak("Couldn't set meta_levels\n");
+    }
+} ## update_metalevels
 
 # Setting various core table entries.
 sub fix_metatable {
