@@ -1713,7 +1713,7 @@ sub fix_metatable {
 
     # Remove some meta keys not needed in the cdna database
     print STDOUT 'Deleting unwanted meta keys...';
-    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date', 'assembly.web_accession_source', 'assembly.web_accession_type') " ;
+    $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date', 'assembly.web_accession_source', 'assembly.web_accession_type', 'gencode.version') " ;
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
