@@ -22,7 +22,7 @@
 # cdnas which hit too many times (kill list).
 #
 # Will make three different logic names, eg mouse_cDNA_update,
-# mouse_cDNA_update_2 and mouse_cDNA_update_3 mouse_cDNA_update_2 and
+# mouse_cDNA_update_2 and mouse_cDNA_update_3. mouse_cDNA_update_2 and
 # mouse_cDNA_update_3 are the same.
 #
 # Mouse jobs can run in BatchQueue normal, human needs BatchQueue long
@@ -93,11 +93,13 @@ results are dna_align_features in an ESTGENE-type database.
 Check out the latest code to match the database to be updated, for
 example:
 
-   cvs co -r branch-ensembl-69 ensembl
-   cvs co -r branch-ensembl-69 ensembl-pipeline
-   cvs co -r branch-ensembl-69 ensembl-analysis
-   cvs co -r branch-ensembl-69 ensembl-compara
-   cvs co -r branch-ensembl-69 ensembl-killlist
+cd $ENSCODE
+git clone https://github.com/Ensembl/ensembl.git  
+git clone https://github.com/Ensembl/ensembl-pipeline.git
+git clone https://github.com/Ensembl/ensembl-analysis.git
+git clone https://github.com/Ensembl/ensembl-killlist.git
+git clone https://github.com/Ensembl/ensembl-production.git
+git clone https://github.com/Ensembl/ensembl-compara.git
 
 *MAKE SURE THAT YOU HAVE THE LATEST ensembl/sql/table.sql FILE*
 
@@ -218,10 +220,6 @@ use Bio::EnsEMBL::DBSQL::DBConnection;
 use Bio::EnsEMBL::Analysis::Tools::ConfigWriter;
 use cDNAUpdate; 
 
-# We need the Net::SSH module from somewhere:
-#use lib '/software/perl-5.8.8/lib/site_perl/5.8.8/';
-# Not used anymore use Net::SSH qw(sshopen2);
-
 my $species;
 
 print "Which species are you running, human or mouse? ";
@@ -255,7 +253,7 @@ if ( defined($GSS_PREFIX) ) {
     # checkouts.
     $GSS = $GSS_PREFIX . $GSS_PATH;
 } else {
-    $GSS = $CVS_DIR . $GSS_PATH;
+    $GSS = $ENSCODE_DIR . $GSS_PATH;
 }
 
 # When comparing to a previously updated cdna db
@@ -279,8 +277,7 @@ my $genomelist      = join "\',\'", @masked_genome;
 
 my %configvars = (
                "MIN_LENGTH"        => $MIN_LENGTH,           # from cDNAUpdate
-               "CVS_DIR"           => $CVS_DIR,              # from cDNAUpdate
-               "ENSCODE_DIR"       => $ENSCODE_DIR,              # from cDNAUpdate
+               "ENSCODE_DIR"       => $ENSCODE_DIR,          # from cDNAUpdate
                "DATA_DIR"          => $DATA_DIR,             # from cDNAUpdate
                "FASTASPLIT"        => $FASTA_SPLIT,          # from cDNAUpdate
                "POLYA_CLIPPING"    => $POLYA_CLIPPING,       # from cDNAUpdate
@@ -1148,7 +1145,7 @@ sub DB_setup {
                                 . 'meta '              . 'seq_region '
                                 . 'seq_region_attrib ' . 'seq_region_synonym '
                                 . 'karyotype '         . 'mapping_set '
-                                . 'seq_region_mapping ';
+                                . 'seq_region_mapping ' ;
 
             # Dump the tables to import_tables1.sql
             # 1 = file count
@@ -1258,7 +1255,7 @@ sub test_run {
               . "Query used: $sql\n\n" );
     }
 
-    $cmd = " perl " . $CVS_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
+    $cmd = " perl " . $ENSCODE_DIR . "/ensembl-analysis/scripts/test_RunnableDB"
          . " -dbhost "     . $PIPE_DBHOST
          . " -dbport "     . $PIPE_DBPORT
          . " -dbuser "     . $DBUSER
@@ -1860,7 +1857,7 @@ sub clean_up {
                   . $DATA_DIR
                   . "/configbackup/"
                   . $config_file . " "
-                  . $CVS_DIR . "/"
+                  . $ENSCODE_DIR . "/"
                   . $saved_files{$config_file};
             } else {
                 $cmd = "rm " . $configDIR . "/" . $config_file;
