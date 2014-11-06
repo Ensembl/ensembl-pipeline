@@ -14,8 +14,6 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
-
 # Original version cDNA_update.pl for human cDNAs
 
 # Uses new polyAclipping, stop list for gene trap cdnas (gss) and
@@ -1642,13 +1640,13 @@ sub update_metacoord {
 # Update the metalevels
 sub update_metalevels
 {
-    my $cmd = "perl ".$META_LEVEL." " ;
+    my $cmd = "perl ".$META_LEVELS." " ;
     my $db_info =  " -dbpattern " . $OUTPUT_DBNAME
                  . " -host " . $OUTPUT_DBHOST
                  . " -user " . $DBUSER
                  . " -pass " . $DBPASS
                  . " -port " . $OUTPUT_DBPORT;
-    my $cmd = $cmd.$db_info ;
+    $cmd = $cmd.$db_info ;
 
     if ( system($cmd) ) 
     {
