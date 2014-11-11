@@ -29,7 +29,7 @@ load_agp.pl
 This is a file for loading a standard agp file into the assembly table
 The agp format is described here
 
-http://www.sanger.ac.uk/Projects/C_elegans/DOCS/agp_files.shtml
+http://www.ncbi.nlm.nih.gov/projects/genome/assembly/agp/AGP_Specification.shtml
 
 Before you can use this script you need to have both the component
 and assembled pieces loaded into the seq_region table. This can be
