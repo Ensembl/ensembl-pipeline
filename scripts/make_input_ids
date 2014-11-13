@@ -178,6 +178,7 @@ my $seq_level;
 my $top_level;
 my $include_non_reference = 1;
 my $insert_analysis = 0;
+my $use_mitochondrion = 0;
 my $hap_pair;
 &GetOptions(
             'dbhost:s'     => \$host,
@@ -206,6 +207,7 @@ my $hap_pair;
             'insert_analysis!' => \$insert_analysis,
             'hap_pair'        => \$hap_pair,
             'seqregionname:s' => \$seq_region_name,
+            'mt!' => \$use_mitochondrion,
            );
 
 
@@ -275,6 +277,7 @@ my $inputIDFactory = new Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
    -slice_overlaps => $slice_overlap,
    -seq_region_name => $seq_region_name,
    -hap_pair => $hap_pair,
+   -use_mitochondrion => $use_mitochondrion,
   );
 
 
