@@ -6,7 +6,9 @@ echo "Using $PERL5LIB"
 if [ "$COVERALLS" = 'true' ]; then
   PERL5OPT='-MDevel::Cover=+ignore,bioperl,+ignore,ensembl-test' perl $PWD/ensembl-test/scripts/runtests.pl -verbose $PWD/modules/t $SKIP_TESTS
 else
-  # just test the basic syntax for all the scripts and modules
+  # just test the basic syntax for all the scripts and modules - rename .example files first
+  find $PWD/ensembl-analysis/modules -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
+  find $PWD/modules -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
   find $PWD/scripts -type f -name "*.pl" | xargs -i perl -c {}
   find $PWD/modules -type f -name "*.pm" | xargs -i perl -c {} 
 fi
