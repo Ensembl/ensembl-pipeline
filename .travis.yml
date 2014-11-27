@@ -1,0 +1,28 @@
+language: "perl"
+
+perl:
+  - "5.14"
+
+env:
+
+before_install:
+    - sudo apt-get -y update
+    - sudo apt-get -y install unzip
+    - sudo apt-get -y install sendmail
+    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl.git
+    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-external.git
+    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-analysis.git
+    - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
+    - unzip bioperl-release-1-2-3.zip
+
+
+install:
+    - cpanm -v --installdeps --with-recommends --notest --cpanfile ensembl/cpanfile .
+ 
+script: "./travisci/harness.sh"
+
+notifications:
+  email:
+    on_success: always
+    on_failure: always
+
