@@ -333,7 +333,9 @@ sub duplicates {
     # duplicate genes
     my @duplications = @{
       $ga->fetch_all_by_Slice_constraint( $gene->feature_Slice,
-                                          'biotype like "%RNA%" ' ) };
+                                          'biotype like "%RNA%" OR
+                                           biotype in ("CRISPR","antisense","antitoxin","ribozyme")
+                                          ' ) };
     if ( scalar( @duplications > 1 ) ) {
       print "Genes ";
       @duplications = sort { $a->dbID <=> $b->dbID } @duplications;
@@ -754,7 +756,13 @@ sub delete_genes {
     foreach my $gene (@genes) {
       next unless ( defined($gene) );
       unless (
-         ( $gene->biotype =~ /RNA/ && $gene->analysis->logic_name eq 'ncRNA' )
+         ( ($gene->biotype =~ /RNA/ or
+            $gene->biotype =~ /CRISPR/ or
+            $gene->biotype =~ /antisense/ or
+            $gene->biotype =~ /antitoxin/ or
+            $gene->biotype =~ /ribozyme/
+           )
+         && $gene->analysis->logic_name eq 'ncRNA' )
          or $gene->analysis->logic_name eq 'ncRNA_pseudogene' )
       {
         throw(   "Gene to be deleted is not a non coding gene " . $gene->dbID . "\t"
@@ -776,7 +784,12 @@ sub write_genes {
       next;
     }
     my $gene = lazy_load( $new_hash->{$key} );
-    unless ( $gene->biotype =~ /RNA/
+    unless ( ( $gene->biotype =~ /RNA/ or
+               $gene->biotype =~ /CRISPR/ or
+               $gene->biotype =~ /antisense/ or
+               $gene->biotype =~ /antitoxin/ or
+               $gene->biotype =~ /ribozyme/
+             )
              && (    $gene->analysis->logic_name eq 'ncRNA'
                   or $gene->analysis->logic_name eq 'miRNA' ) )
     {
@@ -894,7 +907,9 @@ sub fetch_genes {
       } else {
         @ncRNAs = @{
           $ga->fetch_all_by_Slice_constraint( $slice,
-                                              'biotype like "%RNA%" ' ) };
+                                              'biotype like "%RNA%" OR
+                                               biotype in ("CRISPR","antisense","antitoxin","ribozyme")
+                                              ' ) };
       }
       #  print "slice " . $slice->name . " got " . scalar(@ncRNAs) . "\n";
       foreach my $ncRNA (@ncRNAs) {
@@ -905,7 +920,15 @@ sub fetch_genes {
                  or $ncRNA->biotype eq 'misc_RNA'
                  or $ncRNA->biotype eq 'snRNA'
                  or $ncRNA->biotype eq 'snoRNA'
-                 or $ncRNA->biotype eq 'rRNA' )
+                 or $ncRNA->biotype eq 'rRNA'
+                 or $ncRNA->biotype eq 'CRISPR'
+                 or $ncRNA->biotype eq 'antisense'
+                 or $ncRNA->biotype eq 'antitoxin'
+                 or $ncRNA->biotype eq 'ribozyme'
+                 or $ncRNA->biotype eq 'scaRNA'
+                 or $ncRNA->biotype eq 'tRNA'
+                 or $ncRNA->biotype eq 'sRNA'
+                 )
         {
           $ignored_ncRNAs{ $ncRNA->biotype }++;
           next;
@@ -925,7 +948,9 @@ sub fetch_genes {
       @ncRNAs =
         @{ $ga->generic_fetch( "biotype != '" . $biotype_to_skip . "'" ) };
     } else {
-      @ncRNAs = @{ $ga->generic_fetch('biotype like "%RNA%"') };
+      @ncRNAs = @{ $ga->generic_fetch('biotype like "%RNA%" OR
+                                       biotype in ("CRISPR","antisense","antitoxin","ribozyme")
+      ') };
     }
     foreach my $ncRNA (@ncRNAs) {
       next
@@ -935,7 +960,15 @@ sub fetch_genes {
                or $ncRNA->biotype eq 'misc_RNA'
                or $ncRNA->biotype eq 'snRNA'
                or $ncRNA->biotype eq 'snoRNA'
-               or $ncRNA->biotype eq 'rRNA' )
+               or $ncRNA->biotype eq 'rRNA'
+               or $ncRNA->biotype eq 'CRISPR'
+               or $ncRNA->biotype eq 'antisense'
+               or $ncRNA->biotype eq 'antitoxin'
+               or $ncRNA->biotype eq 'ribozyme'
+               or $ncRNA->biotype eq 'scaRNA'
+               or $ncRNA->biotype eq 'tRNA'
+               or $ncRNA->biotype eq 'sRNA'
+               )
       {
         $ignored_ncRNAs{ $ncRNA->biotype }++;
         next;
