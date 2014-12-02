@@ -452,10 +452,6 @@ sub analysis {
         my @databases;
 
         foreach my $database (split(/[,\s]+/, $db_files)) {
-            if ($database !~ /^\//) {
-                $database = $BLAST_DIR . "/" . $database;
-            }
-
             if (-f $database) {
                 push(@databases, $database);
             }
