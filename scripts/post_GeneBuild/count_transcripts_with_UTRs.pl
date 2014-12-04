@@ -19,7 +19,6 @@
 use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Getopt::Long qw(:config no_ignore_case);
 use strict;
 
