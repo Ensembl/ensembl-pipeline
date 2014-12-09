@@ -20,7 +20,6 @@ use warnings ;
 use strict;
 
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 use Getopt::Long qw(:config no_ignore_case);
 
 my $dbhost;
