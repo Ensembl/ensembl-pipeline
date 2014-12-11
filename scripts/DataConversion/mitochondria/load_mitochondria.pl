@@ -515,6 +515,7 @@ for (my $index = 1; $index < $length; $index++) {
       $gene->status(STATUS);
       $gene->description($feature->{$key}->{product});
       $transcript->biotype($type);
+      $transcript->source($MIT_SOURCE_NAME);
       $transcript->analysis($ensembl_analysis);
       $gene->add_Transcript($transcript);
       $gene->canonical_transcript($transcript);

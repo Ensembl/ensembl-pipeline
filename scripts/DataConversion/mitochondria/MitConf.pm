@@ -66,7 +66,7 @@ use vars qw( %MitConf );
   MIT_RRNA_TYPE => 'Mt_rRNA', 
 
 
-  MIT_SOURCE_NAME => "ensembl",# Set gene.source name 
+  MIT_SOURCE_NAME => "insdc",# Set gene and transcript source. It has to be insdc as we import it from RefSeq
 );
 
 sub import {
