@@ -93,7 +93,7 @@ use warnings;
 
 use Getopt::Long qw(:config no_ignore_case);
 
-use RuleCreation;
+use Bio::EnsEMBL::Pipeline::RuleCreation;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 
 sub usage {

@@ -32,7 +32,6 @@ use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::SeqIO;
 use Getopt::Long qw(:config no_ignore_case);
-use Bio::EnsEMBL::Pipeline::Tools::TranscriptUtils;
 
 my $file = 'ensembl_CDSs';
 
