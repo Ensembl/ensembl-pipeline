@@ -132,7 +132,7 @@ use vars qw( %Config );
                            -port   => '3306',
                            -user   => 'ensro',
             },
-            KILL_LIST_DB => { -dbname => 'ba1_ensembl_kill_list',
+            KILL_LIST_DB => { -dbname => 'gb_kill_list',
                               -host   => 'genebuild6',
                               -port   => '3306',
                               -user   => 'ensro',
@@ -163,7 +163,7 @@ use vars qw( %Config );
                            -port   => '3306',
                            -user   => 'ensro',
             },
-            KILL_LIST_DB => { -dbname => 'ba1_ensembl_kill_list',
+            KILL_LIST_DB => { -dbname => 'gb_kill_list',
                               -host   => 'genebuild6',
                               -port   => '3306',
                               -user   => 'ensro',
@@ -198,7 +198,7 @@ use vars qw(%Config);
 %Config = (
 
     DATABASES => {
-        KILL_LIST_DB => { -dbname => 'ba1_ensembl_kill_list',
+        KILL_LIST_DB => { -dbname => 'gb_kill_list',
                           -host   => 'genebuild6',
                           -port   => '3306',
                           -user   => 'ensro',
