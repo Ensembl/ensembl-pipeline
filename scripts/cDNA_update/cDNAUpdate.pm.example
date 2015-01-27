@@ -197,7 +197,7 @@ use vars qw(%Config);
         RETRY_BATCH_SIZE => 1,
 
         CVS_DIR => '',
-
+        ENSCODE_DIR => '',
         DATA_DIR => '',
 
         # Path to the genomic sequence
