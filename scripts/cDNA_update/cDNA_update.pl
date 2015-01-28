@@ -252,7 +252,7 @@ if ( defined($GSS_PREFIX) ) {
     # checkouts.
     $GSS = $GSS_PREFIX . $GSS_PATH;
 } else {
-    $GSS = $ENSCODE_DIR . $GSS_PATH;
+    $GSS = $CVS_DIR . $GSS_PATH;
 }
 
 # When comparing to a previously updated cdna db
