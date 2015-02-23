@@ -128,7 +128,6 @@ use AssemblyMapper::Support;
 
 use Pod::Usage;
 use Readonly;
-use Switch;
 
 use Bio::EnsEMBL::Utils::Exception qw( throw );
 use Algorithm::Diff qw(sdiff);
@@ -360,15 +359,12 @@ sub do_align {
 
       my ($left,$right,$tag) = ('-','-','');
 
-      switch ($type) {
+      if ($type eq '+') { $left  = '-'; $tag   = '>'; $right = $A_key; }
+      elsif ($type eq '-') { $left  = $R_key; $tag   = '<'; $right = '-';    }
+      elsif ($type eq 'u') { $left  = $R_key; $tag   = '';  $right = $A_key; }
+      elsif ($type eq 'c') { $left  = $R_key; $tag   = '|'; $right = $A_key; }
 
-          case '+' { $left  = '-';    $tag   = '>'; $right = $A_key; }
-          case '-' { $left  = $R_key; $tag   = '<'; $right = '-';    }
-          case 'u' { $left  = $R_key; $tag   = '';  $right = $A_key; }
-          case 'c' { $left  = $R_key; $tag   = '|'; $right = $A_key; }
-
-          else { throw("Not expecting type '$type'"); }
-      }
+      else { throw("Not expecting type '$type'"); }
 
     MATCH_TYPE: {
 
