@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 
 
-# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -98,6 +98,7 @@ git clone https://github.com/Ensembl/ensembl-analysis.git
 git clone https://github.com/Ensembl/ensembl-killlist.git
 git clone https://github.com/Ensembl/ensembl-production.git
 git clone https://github.com/Ensembl/ensembl-compara.git
+git clone https://github.com/Ensembl/ensembl-external.git
 
 *MAKE SURE THAT YOU HAVE THE LATEST ensembl/sql/table.sql FILE*
 
@@ -252,11 +253,10 @@ if ( defined($GSS_PREFIX) ) {
     # checkouts.
     $GSS = $GSS_PREFIX . $GSS_PATH;
 } else {
-    $GSS = $ENSCODE_DIR . $GSS_PATH;
+    $GSS = $CVS_DIR . $GSS_PATH;
 }
 
 # When comparing to a previously updated cdna db
-# $oldFeatureName = $newFeatureName
 my $newFeatureName  = "cdna_update"; # the analysis name!
 
 my %saved_files;
@@ -353,7 +353,7 @@ if ( $option eq "prepare" ) {
         print "Good, you're running this in screen\n";
     } else {
         print(   "The program will exit now. "
-               . "Restart it again in a screen session.\n" );
+               . "Restart it in a screen session.\n" );
         unclean_exit();
     }
 
@@ -678,12 +678,7 @@ elsif ( $option eq "run" ) {
             update_progress_status($progress_status);
         }
 
-        print(   "\n\nNOTE!!! You should now change the analysis_ids "
-                . "of the cdnas in your database\n"
-                . "so that they all have the same logic name, "
-                . "otherwise the comparison script won't work;\n"
-                . "you will need to change both the gene and "
-                . "dna_align_feature tables.\n\n" );
+        print(   "\n\nAnalysis IDs have been updated automatically. Now run compare.\n\n" );
     } ## end elsif ( $progress >= 6 )
 }
 
@@ -1728,6 +1723,29 @@ sub fix_metatable {
     $sth->finish;
     print STDOUT "Done!\n";
 
+    # Tidy analyses 
+    print STDOUT 'Tidying the analyses...';
+    $sql = "UPDATE gene SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE transcript SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "UPDATE dna_align_feature SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    $sql = "DELETE FROM analysis WHERE analysis_id != 1";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+    print STDOUT "Done!\n";
+
     # Remove some meta keys not needed in the cdna database
     print STDOUT 'Deleting unwanted meta keys...';
     $sql = "DELETE FROM meta where meta_key in ('genebuild.havana_datafreeze_date', 'removed_evidence_flag.ensembl_dbversion', 'removed_evidence_flag.uniprot_dbversion', 'repeat.analysis', 'xref.timestamp', 'marker.priority', 'genebuild.method', 'genebuild.last_geneset_update', 'genebuild.initial_release_date', 'genebuild.start_date', 'assembly.web_accession_source', 'assembly.web_accession_type', 'gencode.version') " ;
@@ -1736,6 +1754,7 @@ sub fix_metatable {
     $sth->finish;
     print STDOUT "Done!\n";
 
+    #put everything as the same analysis
 
     # Reload the taxonomy to make sure it's up to date.
     my $cmd = "perl "       . $LOAD_TAX

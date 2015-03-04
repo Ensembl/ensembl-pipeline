@@ -1,7 +1,7 @@
 =head1 LICENSE
 
 
-# Copyright [1999-2014] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+# Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -381,14 +381,14 @@ sub flush_runs {
     my $pre_exec_perl = "perl"; 
     if ( defined $queue->{lsf_pre_exec_perl} ) {
       $pre_exec_perl = $queue->{lsf_pre_exec_perl}; 
-       warning("using lsf_pre_exec  : $pre_exec_perl \n");
+       
       if (! -x $pre_exec_perl ) {  
          throw("Your LSF_PRE_EXEC_PERL or DEFAULT_LSF_PRE_EXEC_PERL [$pre_exec_perl] is not executable\n");
       } 
     } 
     #my $pre_exec = '/usr/local/ensembl32/bin/perl ' . $this_runner." -check -output_dir ".$self->output_dir;
     my $pre_exec = $pre_exec_perl." ". $this_runner." -check -output_dir ".$self->output_dir;
-    warning("using $pre_exec_perl for the runner to overcome LSF_LD_SECURITY / 64 bit perl problem - see DEFAULT_LSF_PRE_EXEC_PERL in BatchQueue.pm-config ");
+
       
     my $system_queue = $queue->{'queue'};
     my $parameters   = $queue->{'sub_args'};
@@ -473,8 +473,8 @@ sub flush_runs {
  
     if ( defined $queue->{lsf_perl} ) {
       $exec_perl = $queue->{lsf_perl};  
-       warning("using lsf_perl : $exec_perl\n");
       if (! -x $exec_perl ) {  
+         warning("using lsf_perl : $exec_perl\n");
          throw("Your LSF_PERL or DEFAULT_LSF_PERL [$exec_perl] is not executable\n");
       } 
     } 
