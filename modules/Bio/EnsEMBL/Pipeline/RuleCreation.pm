@@ -64,7 +64,7 @@ an example config file can be found in this directory called
 example_rule.conf
 =cut
 
-package RuleCreation;
+package Bio::EnsEMBL::Pipeline::RuleCreation;
 
 use strict;
 use warnings;
