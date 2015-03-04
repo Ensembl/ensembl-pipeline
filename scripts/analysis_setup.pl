@@ -105,7 +105,7 @@ use warnings;
 
 use Getopt::Long qw(:config no_ignore_case);
 
-use AnalysisCreation;
+use Bio::EnsEMBL::Pipeline::AnalysisCreation;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 
