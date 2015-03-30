@@ -207,7 +207,7 @@ sub check_for_analysis {
       $goal_id_type ne $input_id_type) {
     print "In check_for_analysis failed input_id_type check as goal input_id type ".
       "isn't the same as the input_id type\n" if ($verbose);
-    $return += 1;
+      return 1;
   }
 
 
@@ -222,7 +222,7 @@ sub check_for_analysis {
     if ($goal == $analysis->dbID) {
       # already done
       print $goal_anal->logic_name." already done\n" if ($verbose);
-      $return += 2;
+      return 2;
     }
   }
 

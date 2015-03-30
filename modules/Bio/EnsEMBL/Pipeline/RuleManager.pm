@@ -1326,7 +1326,6 @@ sub input_id_setup{
 sub check_if_done {
   my ($self) = @_;
   my @jobs = $self->job_adaptor->fetch_all;
-  my $continue;
 
  JOB: 
   foreach my $job (@jobs) {
