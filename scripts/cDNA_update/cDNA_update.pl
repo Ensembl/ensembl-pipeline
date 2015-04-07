@@ -1225,7 +1225,7 @@ sub DB_setup {
 
 # Running a test first
 sub test_run {
-    print("\nRunning the test-RunnablDB.\n");
+    print("\nRunning the test-RunnableDB.\n");
 
     # Get one input id for testing
     my $db = connect_db( $PIPE_DBHOST, $PIPE_DBPORT,

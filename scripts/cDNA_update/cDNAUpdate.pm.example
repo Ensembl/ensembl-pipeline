@@ -143,7 +143,7 @@ use vars qw(%Config);
         DATA_DIR => '',
 
         # Path to the genomic sequence
-        GENOMICSEQS => '/data/blastdb/Ensembl/Human/GRCh37/genome/softmasked/softmasked_dusted.fa',
+        GENOMICSEQS => '/data/blastdb/Ensembl/human/GRCh38/genome/softmasked_dusted/softmasked_dusted.fa',
 
         # You shouldn't need to change the settings below but do check #
         # that they are correct.                                       #
