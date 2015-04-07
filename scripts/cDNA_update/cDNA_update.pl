@@ -688,7 +688,7 @@ elsif ( $option eq "compare" ) {
     if ( get_input_arg() ) {
         $progress_status = get_status($pipe_db->dbc());
 
-        if ( $progress_status == 11 ) 
+        if ( $progress_status >= 11 ) 
         {
             print(   "\nRunning checks after cDNA-update.\n"
                 . "checking through alignments & genes.\n" );
@@ -1981,8 +1981,8 @@ sub compare {
         print "\nSubmitting jobs for detailed analysis.\n\n";
         foreach my $chromosome ( keys %chromosomes_1 ) {
 
-            $cmd = "bsub -q normal "
-                 . "-o "                . $DATA_DIR . "/" . $chromosome . ".out "
+            $cmd = "bsub -q normal -M 1000 -R 'select[mem>1000] rusage[mem=1000]' "
+                 . "-o "                . $DATA_DIR . "/compare_" . $chromosome . ".out "
                  . "perl "              . $ENSCODE_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
                  . " -chrom "           . $chromosome
                  . " -oldname "         . $OLD_FEATURE_NAME
