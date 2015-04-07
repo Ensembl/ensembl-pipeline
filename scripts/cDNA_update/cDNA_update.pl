@@ -1725,17 +1725,17 @@ sub fix_metatable {
 
     # Tidy analyses 
     print STDOUT 'Tidying the analyses...';
-    $sql = "UPDATE gene SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sql = "UPDATE gene SET analysis_id = 1";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
 
-    $sql = "UPDATE transcript SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sql = "UPDATE transcript SET analysis_id = 1";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
 
-    $sql = "UPDATE dna_align_feature SET analysis_id = 1 WHERE analysis_id IN (3,5)";
+    $sql = "UPDATE dna_align_feature SET analysis_id = 1";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
