@@ -327,7 +327,7 @@ LINE: while (my $line = shift( @lines )) {
     # gene identifier as the transcript stable ID, they are 1:1 gene:transcript.
     # This is also the case for all tRNAscan-SE sources.
     if ($source eq 'tRNAscan-SE') {
-      ($transcript_id) = grep s/^Dbxref=GeneID:(\d+)\D+.*$/$1/, @atts;
+      ($transcript_id) = grep s/^Dbxref=GeneID:(\d+).*$/$1/, @atts;
     }    
     if ($seqname eq $MT_acc) {
       $transcript_id = $genes{$parent_id}{stable_id};
