@@ -58,6 +58,10 @@ use warnings;
 use 5.10.1; 
 use feature qw(say);
 use Getopt::Long;
+use POSIX qw(strftime);
+use File::stat;
+use File::Basename;
+
 use Bio::EnsEMBL::Utils::Exception qw(warning throw);
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Exon;
@@ -72,6 +76,7 @@ my ($host, $user, $pass, $dbname, $infile, $dnahost, $dnaport, $dnadbname, $dnap
 my $port = $dnaport = 3306;
 my $dnauser = 'ensro';
 my $cs = 'toplevel';
+my $anal_name = 'refseq_import';
 my ($verbose, $test_parse, $ignore_mt) = (0) x 3;
 my (%genes, %transcripts, %exons, %CDSs, %missing_sequences, %sequences, %tRNAs,
   %curated_genomic, %microRNAs, %rRNAs, %ribosomal_slippage ) = () x 11;
@@ -84,7 +89,7 @@ my (%genes, %transcripts, %exons, %CDSs, %missing_sequences, %sequences, %tRNAs,
   'dbname:s'    => \$dbname,          'dnaport:s'   => \$dnaport,   
   'infile:s'    => \$infile,          'verbose!'    => \$verbose,
   'test_parse!' => \$test_parse,      'ignore_mt!'  => \$ignore_mt,
-  'coord_system|cs:s' => \$cs,
+  'coord_system|cs:s' => \$cs,        'analysis:s'  => \$anal_name,
 );
 &usage unless defined ($dbname && $host && $user && $infile);
 
@@ -105,17 +110,38 @@ my $dna_db =  Bio::EnsEMBL::DBSQL::DBAdaptor->new(
   -dbname   => $dnadbname,
   -pass     => $dnapass,
   -species  => 'dna_'.$db->species());
+throw ("Your DNA_DB contains no DNA. You must provide a DNA_DB to connect to") unless (check_if_DB_contains_DNA($dna_db));
 $db->dnadb($dna_db);
-my $dna = check_if_DB_contains_DNA($dna_db);
-if(!$dna) {
-  throw ("Your DNA_DB contains no DNA. You must provide a DNA_DB to connect to");
-}
 
 my $sa = $db->get_SliceAdaptor;
 my $ga = $db->get_GeneAdaptor;
 my $aa = $db->get_AnalysisAdaptor;
-my $anal_name = 'refseq_import';
-my $analysis = Bio::EnsEMBL::Analysis->new(-logic_name => $anal_name);
+my $analysis = $aa->fetch_by_logic_name($anal_name);
+my $timestamp = strftime("%F %X", localtime(stat($infile)->mtime));
+my $infile_name = basename($infile);
+if ($analysis) {
+    if ($timestamp eq $analysis->db_version) {
+        print STDOUT "\nYour $anal_name is already at the latest version, $timestamp. NO need to load it again\nIf you really want to do it: touch $infile\n and start again.\n\n";
+        exit(0);
+    }
+    else {
+        if ($infile_name ne $analysis->db_file) {
+            warning('Your old analysis had '.$analysis->db_file." as db_file, it will be update to $infile_name\n");
+            $analysis->db_file($infile_name);
+        }
+        warning('Old db_version: '.$analysis->db_version."\nNew db_version: $timestamp\n");
+        $analysis->db_version($timestamp);
+        $aa->update($analysis) unless ($test_parse);
+    }
+}
+else {
+    $analysis = Bio::EnsEMBL::Analysis->new(
+        -logic_name => $anal_name,
+        -db => 'RefSeq',
+        -db_version => $timestamp,
+        -db_file => $infile_name,
+    );
+}
 # Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes 
 my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $genes_stored ) = (0) x 9;  
 my $version = 1;
