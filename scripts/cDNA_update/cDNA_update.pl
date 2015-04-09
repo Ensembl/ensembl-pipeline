@@ -2428,7 +2428,7 @@ sub sync_databases {
                         . 'coord_system '       . 'karyotype '
                         . 'meta '               . 'mapping_set '
                         . 'seq_region '         . 'seq_region_attrib '
-                        . 'seq_region_synonym ';
+                        . 'seq_region_synonym ' . 'seq_region_mapping ' ;
 
     # Dump the tables from ref db
     # 3 = file count
