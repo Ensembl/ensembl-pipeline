@@ -65,7 +65,7 @@ perform both functions for you if you have the appropriate database
 and config files
 
 =cut
-package AnalysisCreation;
+package Bio::EnsEMBL::Pipeline::AnalysisCreation;
 
 use strict;
 use warnings;
