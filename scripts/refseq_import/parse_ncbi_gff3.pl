@@ -65,6 +65,7 @@ use File::Basename;
 use Bio::EnsEMBL::Utils::Exception qw(warning throw);
 use Bio::EnsEMBL::Gene;
 use Bio::EnsEMBL::Exon;
+use Bio::EnsEMBL::DBEntry;
 use Bio::EnsEMBL::Transcript;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Analysis;
@@ -72,14 +73,16 @@ use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::GeneUtils;
 use HTML::Entities qw(decode_entities);
 
+use Data::Dumper;
+
 my ($host, $user, $pass, $dbname, $infile, $dnahost, $dnaport, $dnadbname, $dnapass);
 my $port = $dnaport = 3306;
 my $dnauser = 'ensro';
 my $cs = 'toplevel';
 my $anal_name = 'refseq_import';
 my ($verbose, $test_parse, $ignore_mt) = (0) x 3;
-my (%genes, %transcripts, %exons, %CDSs, %missing_sequences, %sequences, %tRNAs,
-  %curated_genomic, %microRNAs, %rRNAs, %ribosomal_slippage ) = () x 11;
+my (%genes, %transcripts, %exons, %CDSs, %xrefs, %missing_sequences, %sequences, %tRNAs,
+  %curated_genomic, %microRNAs, %rRNAs, %ig_genes, %ribosomal_slippage ) = () x 13;
 
 &GetOptions (
   'host:s'      => \$host,            'dnahost:s'   => \$dnahost, 
@@ -120,19 +123,20 @@ my $analysis = $aa->fetch_by_logic_name($anal_name);
 my $timestamp = strftime("%F %X", localtime(stat($infile)->mtime));
 my $infile_name = basename($infile);
 if ($analysis) {
-    if ($timestamp eq $analysis->db_version) {
-        print STDOUT "\nYour $anal_name is already at the latest version, $timestamp. NO need to load it again\nIf you really want to do it: touch $infile\n and start again.\n\n";
-        exit(0);
-    }
-    else {
-        if ($infile_name ne $analysis->db_file) {
-            warning('Your old analysis had '.$analysis->db_file." as db_file, it will be update to $infile_name\n");
-            $analysis->db_file($infile_name);
-        }
-        warning('Old db_version: '.$analysis->db_version."\nNew db_version: $timestamp\n");
-        $analysis->db_version($timestamp);
-        $aa->update($analysis) unless ($test_parse);
-    }
+#    if ($timestamp eq $analysis->db_version) {
+#        print STDOUT "\nYour $anal_name is already at the latest version, $timestamp. NO need to load it again\nIf you really want to do it: touch $infile\n and start again.\n\n";
+#        exit(0);
+#    }
+#    else {
+  if ($infile_name ne $analysis->db_file) {
+    warning('Your old analysis had '.$analysis->db_file." as db_file, it will be update to $infile_name\n");
+    $analysis->db_file($infile_name);
+  }
+
+  warning('Old db_version: '.$analysis->db_version."\nNew db_version: $timestamp\n");
+  $analysis->db_version($timestamp);
+  $aa->update($analysis) unless ($test_parse);
+#    }
 }
 else {
     $analysis = Bio::EnsEMBL::Analysis->new(
@@ -143,7 +147,7 @@ else {
     );
 }
 # Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes 
-my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $genes_stored ) = (0) x 9;  
+my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $igcnt, $genes_stored ) = (0) x 10;
 my $version = 1;
 my $status  = 'PUTATIVE';
 my $time    = time();
@@ -210,7 +214,7 @@ LINE: while (my $line = shift( @lines )) {
   chomp($attributes); 
   my @atts = split (/;/, $attributes);
   my ($id) = grep s/^ID=(\w+\d+)$/$1/, @atts;
-  
+
   # On the MT coding genes have CDS only and no exon. This means we can actually parse them as exons
   #$type='exon' if ( $seqname eq $MT_acc && $type eq 'CDS' );
 
@@ -258,21 +262,45 @@ LINE: while (my $line = shift( @lines )) {
     my ($pseudo)  = grep s/pseudo=(true)/$1/, @atts;
 
     my $description = "";
-    ($description) = grep s/^description=(microRNA).*/$1/, @atts;   
-   
-    
+    ($description) = grep s/^description=(microRNA).*/$1/, @atts;
+
+    # For the gene symbol first try the name attrib and failing that try the gene one. From what I've
+    # seen they have both been the same
+    my ($gene_symbol_src1) = grep s/^Name=(.+)/$1/, @atts;
+    my ($gene_symbol_src2) = grep s/^gene=(.+)/$1/, @atts;
+    if($gene_symbol_src1 ne $gene_symbol_src2) {
+      warning("Parsed out two different values for the gene symbol for ".$id."\nVal1: ".
+              $gene_symbol_src1."\nVal2: ".$gene_symbol_src2."\nThe script will choose Val1 over Val2 unless Val1 is undef");
+    }
+    my $gene_symbol;
+    if($gene_symbol_src1) {
+      $gene_symbol = $gene_symbol_src1;
+    } else {
+      $gene_symbol = $gene_symbol_src2;
+    }
+
+    if($gene_symbol) {
+      my $xref = Bio::EnsEMBL::DBEntry->new(
+                   -primary_id => $gene_id,
+                   -display_id => $gene_symbol,
+                   -dbname => 'EntrezGene',
+                 );
+      $xrefs{$id} = $xref;
+    } else {
+        warning("Could not find a gene symbol for GeneID: ".$id);
+    }
     # make a new gene
     if (! exists($genes{$id})) {
       $gcnt++;
-      say($type . " " . $id . " found") if ($verbose); 
-      
+      say($type . " " . $id . " found") if ($verbose);
+
       if ($pseudo) {
-        $biotype = 'pseudogene'; 
-        
+        $biotype = 'pseudogene';
+
         # Pseudogenes rarely have a transcript line (see the TRANSCRIPT block for an
-        # exception) therefore we use the Name as the stable_id for these.             
+        # exception) therefore we use the Name as the stable_id for these.
         my ($name) = grep s/^Name=(.*)$/$1/, @atts;
-        
+
         $transcripts{$id} = {
           id           => $id,
           parent_id    => $id,
@@ -304,13 +332,13 @@ LINE: while (my $line = shift( @lines )) {
         -SLICE        => $slice,
         -VERSION      => $version,
         -SOURCE       => $source,
-        -STATUS       => $status,        
+        -STATUS       => $status,
         -ANALYSIS     => $analysis,
         -BIOTYPE      => $biotype,
         -CREATED_DATE => $time,
       );
 
-      $genes{$id}=$gene; 
+      $genes{$id}=$gene;
 
       # set a flag if the source is 'Curated genomic'. These are a little
       # strange: they all seem to be pseudogenes but sometimes have exons and
@@ -319,7 +347,7 @@ LINE: while (my $line = shift( @lines )) {
       if ($source eq "Curated Genomic") {
         say("Found 'Curated Genomic'") if ($verbose);
         $genes{$id}{curated_genomic}='true';
-      }         
+      }
 
     } else {
       throw("Gene already exists " . $gene_id);
@@ -343,34 +371,40 @@ LINE: while (my $line = shift( @lines )) {
   #              non-overlapping loci within the genome. We skip these for now.
   #              'primary_transcript' denotes trans-splicing microRNAs as far as
   #              I can see.
-  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA)$/) {
-   
+  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment)$/) {
+
     my $biotype;
     my ($parent_id) = grep s/^Parent=(.*)$/$1/, @atts;
     my ($transcript_id) = grep s/^transcript_id=(.*)$/$1/, @atts;
-    
+
     # tRNAS/rRNAs on the MT do not have transcript_ids therefore use the parent
     # gene identifier as the transcript stable ID, they are 1:1 gene:transcript.
     # This is also the case for all tRNAscan-SE sources.
     if ($source eq 'tRNAscan-SE') {
       ($transcript_id) = grep s/^Dbxref=GeneID:(\d+).*$/$1/, @atts;
-    }    
+    }
     if ($seqname eq $MT_acc) {
       $transcript_id = $genes{$parent_id}{stable_id};
     }
-
-    # Anole has a tRNA *without* a parent! (maybe we should delete this block of
-    # code altogether until tRNAs are implemented?)
-    unless (defined $parent_id) {
-      if (exists $genes{$parent_id}) {
-        delete $genes{$parent_id};
-        $gcnt--;
-      }
-      next TRANSCRIPT;
+    if($type =~ /^\w_gene_segment$/) {
+      $transcript_id = $genes{$parent_id}{stable_id};
     }
 
+    # Can't see how the code below makes any sense, if $parent_id is defined it doesn't
+    # execute so if it does execute it means $parent_id is undef but then it checks to
+    # see if an undef key exists in the hash? I'm commenting it out
+#    unless (defined $parent_id) {
+       # Anole has a tRNA *without* a parent! (maybe we should delete this block of
+       # code altogether until tRNAs are implemented?)
+#      if (exists $genes{$parent_id}) {
+#        delete $genes{$parent_id};
+#        $gcnt--;
+#      }
+#      next TRANSCRIPT; # Seems wrong
+#    }
 
-    # biotypes need checking    
+
+    # biotypes need checking
     if ($type eq "transcript") {
       # some pseudogenes have transcripts, this is NCBIs odd mix of pseudo and misc_RNA
       if ($genes{$parent_id}{biotype} eq "pseudogene") {
@@ -378,38 +412,28 @@ LINE: while (my $line = shift( @lines )) {
         delete $transcripts{$parent_id};
         $tcnt--;
         $biotype ="pseudogene";
-      
       } else {
         ($biotype) =  grep s/^gbkey=(.*)$/$1/, @atts;
         # update parent gene biotype since it will now be protein coding.
         $genes{$parent_id}{biotype}=$biotype;
       }
-                                                      
 
     } elsif ($type eq "mRNA") {
       $biotype = 'protein_coding';
-      
-
     } elsif ($type eq "primary_transcript") {
       $biotype = $genes{$parent_id}{biotype};
       $microRNAs{$parent_id}=$id;
       $micnt++;
-    
-                
-    } elsif ($type eq "rRNA") { 
+    } elsif ($type eq "rRNA") {
       $biotype = "rRNA";
       $genes{$parent_id}{biotype} = $biotype;
       $rRNAs{$parent_id}=$id;
       $rrcnt++;
-
-
-    } elsif ($type eq "tRNA") { 
+    } elsif ($type eq "tRNA") {
       $biotype = "tRNA";
       $genes{$parent_id}{biotype} = $biotype;
       $tRNAs{$parent_id}=$id;
-
-
-    } elsif ($type eq "ncRNA") { 
+    } elsif ($type eq "ncRNA") {
       ($biotype) = grep s/^ncrna_class=(\w+)$/$1/, @atts;
       $genes{$parent_id}{biotype} = $biotype;
       # found a case where a primary transcript had the transcript ID but the ncRNA
@@ -419,17 +443,19 @@ LINE: while (my $line = shift( @lines )) {
         $transcript_id =~ s/,.*$//;
       }
       $ncnt++;
-      
-
-
+    } elsif($type =~ /^(\w)_gene_segment$/) {
+       $biotype = 'IG_'.$1.'_gene';
+       $genes{$parent_id}{biotype}=$biotype;
+       $ig_genes{$parent_id}=$id;
+       $transcript_id = $genes{$parent_id}{stable_id};
+       $igcnt++;
     } else {
       throw("Not yet supported: " . $type)
     }
-    
+
     # make a new transcript
     unless (exists($transcripts{$id})) {
-      say($type . " " . $id . " found") if ($verbose); 
-
+      say($type . " " . $id . " found") if ($verbose);
       $transcripts{$id} = {
         id           => $id,
         parent_id    => $parent_id,
@@ -444,8 +470,6 @@ LINE: while (my $line = shift( @lines )) {
     }
   } # end TRANSCRIPT
 
-
-   
   # ============================================================================
   # EXON :  Exons on their own are generally only used for non_coding objects. 
   #         But it's not that easy: occasionally we get a protein coding gene
@@ -454,42 +478,42 @@ LINE: while (my $line = shift( @lines )) {
   #         in the CDS lines if they exist.
   #         Gene segment lines (IG genes) are treated as exons also. Since IG 
   #         genes have no transcript line we need to fake one up here.  
-  elsif ($type =~ /^(exon|\w_gene_segment)$/) {
+  elsif ($type =~ /^(exon)$/) {
     my @exon_atts = split (/;/, $attributes);
     my ($exon_id) = grep s/^ID=(.*)$/$1/, @exon_atts;
     my ($parent_id) = grep s/^Parent=(.*)$/$1/, @exon_atts;
     my $biotype;
 
-    if (my ($segment_type) = $type =~ /^(\w)_gene_segment$/) {
-      $biotype = 'IG_'.$segment_type.'_gene';
+#    if (my ($segment_type) = $type =~ /^(\w)_gene_segment$/) {
+#      $biotype = 'IG_'.$segment_type.'_gene';
       # Fake up a transcript.
-      unless (exists $transcripts{$exon_id}) {
-        say("Faking up transcript for a ", $type);
+#      unless (exists $transcripts{$exon_id}) {
+#        say("Faking up transcript for a ", $type);
         # Unfortunately, multiple transcripts in the gene will get the same stable
         # id but that's just how RefSeq model them, without an explicit mRNA line.
-        my ($transcript_id) = grep s/^Dbxref=GeneID:(\d+)/$1/, @exon_atts;
-        $transcript_id =~ s/,.*$//;
+#        my ($transcript_id) = grep s/^Dbxref=GeneID:(\d+)/$1/, @exon_atts;
+#        $transcript_id =~ s/,.*$//;
         
-        $transcripts{$id} = {
-          id           => $exon_id,
-          parent_id    => $parent_id,
-          start        => $start,
-          end          => $end,
-          strand       => $strand,
-          biotype      => $biotype,
-          stable_id    => $transcript_id,
-          slice        => $slice,
-        };
-        $tcnt++;
+#        $transcripts{$id} = {
+#          id           => $exon_id,
+#          parent_id    => $parent_id,
+#          start        => $start,
+#          end          => $end,
+#          strand       => $strand,
+#          biotype      => $biotype,
+#          stable_id    => $transcript_id,
+#          slice        => $slice,
+#        };
+#        $tcnt++;
         # We can also set the gene biotype to the correct IG_?_gene biotype.
-        $genes{$parent_id}{biotype}=$biotype;
-      }                                                 
+#        $genes{$parent_id}{biotype}=$biotype;
+#     }                                                 
       # Finally, make sure we now set the parent_id to be the transcript_id
       # We are dealing with 'exon' lines in the file here - not transcripts!
-      $parent_id = $exon_id;
-    }
+#      $parent_id = $exon_id;
+#    }
 
-    $biotype = $transcripts{$parent_id}{biotype} unless $type =~ /^\w_gene_segment$/;
+    $biotype = $transcripts{$parent_id}{biotype};
     if ($biotype eq "protein_coding") {
       $phase = 0; # If the gene has CDS we will update this later
     } else {
@@ -501,12 +525,12 @@ LINE: while (my $line = shift( @lines )) {
     say($type . " " . $exon_id . " found") if ($verbose); 
 
     my $exon = Bio::EnsEMBL::Exon->new(
-      -START        => $start,        
+      -START        => $start,
       -END          => $end,
       -STRAND       => $strand,
       -PHASE        => $phase,
       -END_PHASE    => $phase,
-      -STABLE_ID    => $exon_id,   
+      -STABLE_ID    => $exon_id,
       -BIOTYPE      => $biotype,
       -VERSION      => $version,
       -CREATED_DATE => $time,
@@ -515,7 +539,6 @@ LINE: while (my $line = shift( @lines )) {
     push(@{$exons{$parent_id}}, $exon);
   } # end EXON
 
-    
 
   # ==========================================================================  
   # CDS : For protein coding genes this line contains the phase information
@@ -543,13 +566,13 @@ LINE: while (my $line = shift( @lines )) {
     # generate end_phase
     my $exon_length = ( $end - $start ) + 1; 
     my $end_phase = ( $exon_length + $phase ) % 3;
-    
+
     # make a new CDS, we can use exon objects
     $cdscnt++;
     say($type . " " . $cds_id . " found") if ($verbose); 
-     
+
     my $cds = Bio::EnsEMBL::Exon->new(
-      -START        => $start,        
+      -START        => $start,
       -END          => $end,
       -PHASE        => $phase,
       -END_PHASE    => $end_phase,
@@ -601,8 +624,6 @@ LINE: while (my $line = shift( @lines )) {
   }
 } # end LINE
 
-
-
 # ==============================================================================  
 # Now deal with adding the exons, CDSs and translations to new transcript objects
 # and then these transcripts to genes.
@@ -639,9 +660,9 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
       delete $genes{$parent_id};
       $gcnt--;
     }
-    next TRANSCRIPT;                    
+    next TRANSCRIPT;
   }
-         
+
   # Are there exons?
   if (exists $exons{$transcripts{$k}{id}}) {
     # Pseudogenes on the negative strand have their exons defined backwards,
@@ -654,15 +675,29 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
     } else {
       @exons = sort {$b->start() <=> $a->start()} @exons;
     } 
-    # retrospective note: file order is probably now assumed for this parser :-/  
+    # retrospective note: file order is probably now assumed for this parser :-/
+
 
     # TRANSLATION BLOCK - by far the most complicated block, therefore verbosely commented
     #                     plus I've left a lot of the debugging lines in since it is very
     #                     likely you'll have to add new code as more weird and wonderful
     #                     translations appear in the GFF3 files.
+
     my $translation;
-    # Use this to look up the correct CDS array:    
+    # Use this to look up the correct CDS array:
     my $transcript_id = $transcripts{$k}{id};
+    my $transcript_biotype = $transcripts{$k}{biotype};
+    # This code might not be needed in future if gene segment becomes a parent of CDS
+    if($transcript_biotype =~ /^IG_[CDJV]_gene$/) {
+      my $transcript_parent_id = $transcripts{$k}{parent_id};
+      say "Found IG biotype, checking for CDS associated with parent gene (".$transcript_parent_id.")";
+      if(exists $CDSs{$transcript_parent_id}) {
+        $CDSs{$transcript_id} = $CDSs{$transcript_parent_id};
+        say "Set CDS parent to: ".$transcript_parent_id;
+      } else {
+        say "No CDS present"
+      }
+    }
     # If we have CDSs we need to generate a translation
     if (exists $CDSs{$transcript_id}) {
       # These are the data we need to create a translation object
@@ -703,18 +738,19 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
         $gcnt--;
         next TRANSCRIPT;
       }
+
       # Loop through exons and find which is the start and end exon for the 
       # translation. Whilst we are doing this we also need to update the 
       # exon phase information. Single exon coding transcripts can be dealt
       # with separately. Single CDS in multi-exon transcripts complicate 
       # matters here so expect a lot of edge cases to test.
       if ($#exons > 0) {
-        # multi exon      
-        say("MULTI EXON (" . $num_exons . ") with " . $num_CDS . " CDS") if ($verbose);   
+        # multi exon
+        say("MULTI EXON (" . $num_exons . ") with " . $num_CDS . " CDS") if ($verbose);
         EXON_EXTENT: for my $i (0 .. $#exons) {
           say("i = " . $i . " cds start: " . $CDS[0]->start() .
               " exon extent: " . $exons[$i]->start() . "-" .
-              $exons[$i]->end()) if ($verbose); 
+              $exons[$i]->end()) if ($verbose);
           if ( $exons[$i]->end() >= $start_cds->start() && $exons[$i]->end() <= $start_cds->end() ) {
             say("IN search for START") if ($verbose);
             $start_exon = $exons[$i];
@@ -729,7 +765,7 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
               $end_rank = $start_rank;
               last EXON_EXTENT;
             }
-          }                 
+          }
           elsif ( $exons[$i]->start() >= $end_cds->start() && $exons[$i]->start() <= $end_cds->end() ) {
             say("IN search for END") if ($verbose);
             $end_exon = $exons[$i];
@@ -776,6 +812,7 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
         $exons[0]->end_phase($start_cds->end_phase());
         $tr_stable_id = $start_cds->stable_id();
       }
+
       # now we know the start and end of the coding exons, update the
       # translatable exons with the phase information from the CDSs.
       # Note that the CDS indices are still 0..-1 so they need their
@@ -845,7 +882,7 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
     # inherit the parent gene's source
     my $source = $genes{$parent_id}{source};
 
-    say("About to make transcript") if ($verbose);
+    say("\n\n\nAbout to make transcript") if ($verbose);
 
     my $transcript = Bio::EnsEMBL::Transcript->new(
       -START        => $transcripts{$k}{start},
@@ -861,7 +898,7 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
       -CREATED_DATE => $time,
       -EXONS        => \@exons,
     );
-    
+
     say("Check if gene parent found") if ($verbose);
     if (exists $genes{$parent_id}) {
       my $stabid = $transcript->stable_id();
@@ -894,14 +931,24 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
 # ==============================================================================  
 # store objects to the database
 unless ($test_parse) {
+  my $dbea = $db->get_DBEntryAdaptor;
   STORE: for my $k (keys %genes) {
     my $gene = $genes{$k};
+    unless(ref($gene) eq "Bio::EnsEMBL::Gene") {
+     warning("Issue with the following gene id: ".$k."\nNot a Gene object, skipping. Dump:\n".Dumper($gene));
+     next;
+    }
+
     say("gene start:end:strand is ". join( ":", map { $gene->$_ } qw(start end strand) )) if ($verbose);
     if ($gene->get_all_Transcripts()) {
+      if($xrefs{$k}) {
+         $gene->add_DBEntry($xrefs{$k});
+         $gene->display_xref($xrefs{$k});
+      }
       # code to handle HAP/PATCH regions, i.e. transform to toplevel
       $gene = $gene->transform('toplevel') unless $gene->slice()->is_toplevel();
-      #$ga->store($gene);
-      $ga->store($gene, undef, undef, 1);      
+      #fix_duplicate_transcript_stable_ids($gene);
+      $ga->store($gene, undef, undef, 1);
       $genes_stored++;
     } else {
       warning("Failed to save gene on " . $gene->seqname() . " @ " . $gene->seq_region_start());
@@ -942,6 +989,48 @@ sub check_if_DB_contains_DNA {
   }
 }
 
+sub fix_duplicate_transcript_stable_ids {
+  # Sometimes the stable id for transcripts in a gene are identical. For example if they
+  # used the gene stable id as their stable id (gene_segments). Sometimes it can be a mix
+  # of unique and duplicated entries (miRNAs did this). This subroutine will take a gene
+  # and version any non-unique transcript stable ids
+
+  # NOTE, need to change from using db ids as they don't exist yet
+  my $gene = @_;
+  my @transcripts = @{$gene->get_all_Transcripts()};
+  my $transcript_count = scalar(@transcripts);
+  unless($transcript_count > 1) {
+    next;
+  }
+
+  my %transcript_id_hash = ();
+  my $dup_count = 0;
+  foreach my $transcript (@transcripts) {
+    my $transcript_db_id = $transcript->dbID();
+    my $transcript_sid = $transcript->stable_id;
+    unless(defined($transcript_id_hash{$transcript_sid})) {
+      $transcript_id_hash{$transcript_sid} = [];
+    }
+    if($transcript_id_hash{$transcript_sid}) {
+      $dup_count++;
+    }
+    push(@{$transcript_id_hash{$transcript_sid}},$transcript_db_id);
+  }
+
+  if($dup_count) {
+    foreach my $transcript_sid (keys(%transcript_id_hash)) {
+      my @sid_array = @{$transcript_id_hash{$transcript_sid}};
+      unless(scalar(@sid_array) > 1) {
+        next;
+      }
+      for(my $i=0; $i<scalar(@sid_array); $i++) {
+        say "Warning: updating duplicate transcript stable id, set stable_id='".$transcript_sid.
+            "_".($i+1)."' where transcript_id=".$sid_array[$i]." and gene_id=".$gene->dbID;
+        
+      }
+    }
+  }
+}
 
 sub usage {
 say("
