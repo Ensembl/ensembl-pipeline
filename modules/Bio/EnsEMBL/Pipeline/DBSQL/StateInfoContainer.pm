@@ -151,7 +151,7 @@ sub store_input_id_analysis {
 # -----------------------------------------------------------------
   if($save_runtime_info){
   	print "Saving runtime info\n";
-  	print join("\t",($inputId, $analysis->dbID, $host, $analysis->db_version)) . "\n";
+    print join("\t",($inputId, $analysis->dbID, $host, $save_runtime_info)) . "\n";
       my $sth = $self->prepare(qq{
       	REPLACE INTO input_id_analysis
       	(input_id, input_id_type, analysis_id, created, runhost, result)

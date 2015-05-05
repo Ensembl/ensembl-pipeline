@@ -568,7 +568,6 @@ sub stable_id_mapping {
   # deleting
   foreach my $old_gene ( keys %$old_hash ) {
     next if $done{$old_gene};
-    my $gene = $old_hash->{$old_gene};
     if ($use_old_ncRNAs) {
       next if $gene->biotype =~ /pseudogene/;
     }
@@ -889,6 +888,7 @@ sub fetch_genes {
     my $inc    = scalar(@slices)/20;
     print STDERR "|------------------|\r|";
     foreach my $slice (@slices) {
+        print STDOUT $slice->name;
       $count++;
       if ( $count >= $inc ) {
         $count = 0;
@@ -907,9 +907,10 @@ sub fetch_genes {
       } else {
         @ncRNAs = @{
           $ga->fetch_all_by_Slice_constraint( $slice,
-                                              'biotype like "%RNA%" OR
+                                              'biotype like "%RNA" OR
                                                biotype in ("CRISPR","antisense","antitoxin","ribozyme")
                                               ' ) };
+      print STDOUT ' ', scalar(@ncRNAs), "\n";
       }
       #  print "slice " . $slice->name . " got " . scalar(@ncRNAs) . "\n";
       foreach my $ncRNA (@ncRNAs) {
