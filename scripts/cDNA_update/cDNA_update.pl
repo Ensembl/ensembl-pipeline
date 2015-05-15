@@ -253,7 +253,7 @@ if ( defined($GSS_PREFIX) ) {
     # checkouts.
     $GSS = $GSS_PREFIX . $GSS_PATH;
 } else {
-    $GSS = $CVS_DIR . $GSS_PATH;
+    $GSS = $ENSCODE_DIR . $GSS_PATH;
 }
 
 # When comparing to a previously updated cdna db
@@ -264,7 +264,6 @@ my $cmd;
 my $status;
 
 # Temp. dirs & files:
-my $config_file     = $ENSCODE_DIR."/ensembl-pipeline/scripts/cDNA_update/config_files.txt";
 my $newfile         = "cdna_update";
 my $configDIR       = $DATA_DIR."/configbackup";
 my $chunkDIR        = $DATA_DIR."/chunks";
@@ -310,7 +309,6 @@ my %configvars = (
                "outDIR"            => $outDIR,
                "configDIR"         => $configDIR,
                "newfile"           => $newfile,
-               "config_file"       => $config_file,
                "masked_genome"     => $genomelist,
                "newFeatureName"    => $newFeatureName );
 
