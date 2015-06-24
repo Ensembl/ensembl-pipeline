@@ -687,17 +687,19 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
     # Use this to look up the correct CDS array:
     my $transcript_id = $transcripts{$k}{id};
     my $transcript_biotype = $transcripts{$k}{biotype};
+
     # This code might not be needed in future if gene segment becomes a parent of CDS
-    if($transcript_biotype =~ /^IG_[CDJV]_gene$/) {
-      my $transcript_parent_id = $transcripts{$k}{parent_id};
-      say "Found IG biotype, checking for CDS associated with parent gene (".$transcript_parent_id.")";
-      if(exists $CDSs{$transcript_parent_id}) {
-        $CDSs{$transcript_id} = $CDSs{$transcript_parent_id};
-        say "Set CDS parent to: ".$transcript_parent_id;
-      } else {
-        say "No CDS present"
-      }
-    }
+#    if($transcript_biotype =~ /^IG_[CDJV]_gene$/) {
+#      my $transcript_parent_id = $transcripts{$k}{parent_id};
+#      say "Found IG biotype, checking for CDS associated with parent gene (".$transcript_parent_id.")";
+#      if(exists $CDSs{$transcript_parent_id}) {
+#        $CDSs{$transcript_id} = $CDSs{$transcript_parent_id};
+#        say "Set CDS parent to: ".$transcript_parent_id;
+#      } else {
+#        say "No CDS present"
+#      }
+#    }
+
     # If we have CDSs we need to generate a translation
     if (exists $CDSs{$transcript_id}) {
       # These are the data we need to create a translation object
