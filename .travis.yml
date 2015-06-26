@@ -22,11 +22,6 @@ before_install:
 
 install:
     - cpanm -v --installdeps --with-recommends --notest --cpanfile ensembl/cpanfile .
-    - mkdir modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Databases.pm
-    - mkdir modules/Bio/EnsEMBL/Pipeline/Config/Protein_Annotation
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Config/Protein_Annotation/General.pm
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Tools/TranscriptUtils.pm
  
 script: "./travisci/harness.sh"
 
