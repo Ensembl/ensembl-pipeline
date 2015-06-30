@@ -22,7 +22,8 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  find $PWD/scripts -type f -name "*.pl" | xargs -i perl -c {}
+  printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl"
+  find $PWD/scripts -type f -name "*.pl" ! -name "post_GeneBuild_checks_denormalised.pl" | xargs -i perl -c {}
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -30,14 +31,16 @@ else
   # Directory we don't want to check
   printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "Annacode modules"
   RES="! -path \"*Finished*\""
-  for D in "GeneDuplication"; do
-      printf " - \e[33m%s\n\e[0m" "${D}"
-      RES="${RES} ! -path \"*${D}*\""
+  P=( "GeneDuplication" )
+  for D in `seq 0 $((${#P[@]}-1))`; do
+      printf " - \e[33m%s\n\e[0m" "${P[$S]}"
+      RES=${RES}" ! -name `basename ${P[$S]}`"
   done
 # As long as EMBL parser has not been merge in ensembl-io master, we will avoid modules/Bio/EnsEMBL/Pipeline/SeqFetcher/UniProtKB.pm \ "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl"
-  for M in "Bio/EnsEMBL/Pipeline/SeqFetcher/UniProtKB.pm"; do
-      printf " - \e[33m%s\n\e[0m" "${M}"
-      RES="${RES} ! -name \"`basename ${M}`\""
+  M=( "Bio/EnsEMBL/Pipeline/SeqFetcher/UniProtKB.pm" )
+  for S in `seq 0 $((${#M[@]}-1))`; do
+      printf " - \e[33m%s\n\e[0m" "${M[$S]}"
+      RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   find $PWD/modules -type f -name "*.pm" `echo "$RES"` | xargs -i perl -c {}
   EXIT_CODE=$?
