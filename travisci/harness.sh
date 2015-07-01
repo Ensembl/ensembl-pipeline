@@ -22,17 +22,22 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl"
+  printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "Annacode scripts"
   RES="! -path \"*Finished*\""
   P=( "Hmms" \
     "Pseudogenes" \
     "EST")
   for D in `seq 0 $((${#P[@]}-1))`; do
-      printf " - \e[33m%s\n\e[0m" "${P[$S]}"
-      RES=${RES}" ! -path \"*`basename ${P[$S]}`"
+      printf " - \e[33m%s\n\e[0m" "${P[$D]}"
+      RES=${RES}" ! -path \"*`basename ${P[$D]}`*\""
+  done
+  M=( "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl" )
+  for S in `seq 0 $((${#M[@]}-1))`; do
+      printf " - \e[33m%s\n\e[0m" "${M[$S]}"
+      RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` ! -name post_GeneBuild_checks_denormalised.pl | xargs -i perl -c {}
+  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` | xargs -i perl -c {}
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -42,8 +47,8 @@ else
   RES="! -path \"*Finished*\""
   P=( "GeneDuplication" )
   for D in `seq 0 $((${#P[@]}-1))`; do
-      printf " - \e[33m%s\n\e[0m" "${P[$S]}"
-      RES=${RES}" ! -path `basename ${P[$S]}`"
+      printf " - \e[33m%s\n\e[0m" "${P[$D]}"
+      RES=${RES}" ! -path \"*`basename ${P[$D]}`*\""
   done
 # As long as EMBL parser has not been merge in ensembl-io master, we will avoid modules/Bio/EnsEMBL/Pipeline/SeqFetcher/UniProtKB.pm \ "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl"
   M=( "Bio/EnsEMBL/Pipeline/SeqFetcher/UniProtKB.pm" )
