@@ -17,6 +17,7 @@ else
       rt=$EXIT_CODE
   fi
   find $PWD/modules -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
+  find $PWD/scripts -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -36,12 +37,14 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` -exec perl -c {} \;
+  find $PWD/scripts -type f -name "*.pl" `echo "$RES"`
+  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` | xargs -I {} perl -c {}
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  find $PWD/scripts -type f -name "*.pm" -exec perl -c {} \;
+  find $PWD/scripts -type f -name "*.pm"
+  find $PWD/scripts -type f -name "*.pm" | xargs -I {}  perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -61,12 +64,14 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/modules -type f -name "*.pm" `echo "$RES"` -exec perl -c {} \;
+  find $PWD/modules -type f -name "*.pm" `echo "$RES"`
+  find $PWD/modules -type f -name "*.pm" `echo "$RES"` | xargs -I {} perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  find $PWD/modules -type f -name "*.pl" -exec perl -c {} \;
+  find $PWD/modules -type f -name "*.pl"
+  find $PWD/modules -type f -name "*.pl" | xargs -I {} perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
