@@ -24,7 +24,7 @@ else
   fi
   printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "Annacode scripts"
   RES="! -path \"*Finished*\""
-  P=( "Hmms" \
+  P=( "HMMs" \
     "Pseudogenes" \
     "EST")
   for D in `seq 0 $((${#P[@]}-1))`; do
@@ -37,7 +37,7 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` | xargs -i perl -c {}
+  find $PWD/ -type f -name "*.pl" `echo "$RES"` -exec perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -57,7 +57,7 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/modules -type f -name "*.pm" `echo "$RES"` | xargs -i perl -c {}
+  find $PWD/ -type f -name "*.pm" `echo "$RES"`  -exec perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
