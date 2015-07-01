@@ -1,9 +1,8 @@
 #!/bin/bash
-export PERL5LIB=$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/ensembl-test/modules:$PWD/ensembl/modules:$PWD/ensembl-external/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/modules:$PWD/ensembl-killlist/modules:$PWD/bioperl-run/lib
+export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules
 
 echo "Running test suite"
 echo "Using $PERL5LIB"
-rt=0
 if [ "$COVERALLS" = 'true' ]; then
   PERL5OPT='-MDevel::Cover=+ignore,bioperl,+ignore,ensembl-test' perl $PWD/ensembl-test/scripts/runtests.pl -verbose $PWD/modules/t $SKIP_TESTS
 else
@@ -37,7 +36,12 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/ -type f -name "*.pl" `echo "$RES"` -exec perl -c {} \;
+  find $PWD/scripts -type f -name "*.pl" `echo "$RES"` -exec perl -c {} \;
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -ne 0 ]; then
+      rt=$EXIT_CODE
+  fi
+  find $PWD/scripts -type f -name "*.pm" -exec perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -57,11 +61,19 @@ else
       RES=${RES}" ! -name `basename ${M[$S]}`"
   done
   printf "  RES = \e[33m%s\e[0m\n" "$RES"
-  find $PWD/ -type f -name "*.pm" `echo "$RES"`  -exec perl -c {} \;
+  find $PWD/modules -type f -name "*.pm" `echo "$RES"` -exec perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
+  find $PWD/modules -type f -name "*.pl" -exec perl -c {} \;
+  EXIT_CODE=$?
+  if [ "$EXIT_CODE" -ne 0 ]; then
+      rt=$EXIT_CODE
+  fi
+fi
+if [ -z "$rt" ]; then
+    rt=0
 fi
 if [ $rt -eq 0 ]; then
   if [ "$COVERALLS" = 'true' ]; then
