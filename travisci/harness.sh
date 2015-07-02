@@ -41,7 +41,7 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  find $PWD/scripts -type f -name "*.pm" | xargs -I {}  perl -c {} \;
+  find $PWD/scripts -type f -name "*.pm" `echo "$RES"` | xargs -I {}  perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
@@ -65,7 +65,7 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
-  find $PWD/modules -type f -name "*.pl" | xargs -I {} perl -c {} \;
+  find $PWD/modules -type f -name "*.pl" `echo "$RES"` | xargs -I {} perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
