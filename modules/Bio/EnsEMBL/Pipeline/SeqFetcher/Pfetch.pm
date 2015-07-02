@@ -57,9 +57,12 @@ rearrange(order, list); #instead
 package Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch;
 
 use strict;
+use warnings;
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
+# Just adding this module but it should properly remove I think once we have proper test for the module
+use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 
