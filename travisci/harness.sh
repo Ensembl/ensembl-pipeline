@@ -22,10 +22,12 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
+  printf "Working on:\e[32m %s\e[0m\n" "$PWD/scripts *.pl"
   printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "Annacode scripts"
-  RES="! -path \"*Finished*\""
+  RES="! -path *Finished*"
   P=( "HMMs" \
     "Pseudogenes" \
+    "GeneComparison" \
     "EST")
   for D in `seq 0 $((${#P[@]}-1))`; do
       printf " - \e[33m%s\n\e[0m" "${P[$D]}"
@@ -41,12 +43,14 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
+  printf "Working on:\e[32m %s\e[0m\n" "$PWD/scripts *.pm"
   find $PWD/scripts -type f -name "*.pm" `echo "$RES"` | xargs -I {}  perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
   # Directory we don't want to check
+  printf "Working on:\e[32m %s\e[0m\n" "$PWD/modules *.pm"
   printf "\e[31mWe will not test:\e[0m\n - \e[33m%s\e[0m\n" "Annacode modules"
   RES="! -path *Finished*"
   P=( "GeneDuplication" )
@@ -65,6 +69,7 @@ else
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
   fi
+  printf "Working on:\e[32m %s\e[0m\n" "$PWD/modules *.pl"
   find $PWD/modules -type f -name "*.pl" `echo "$RES"` | xargs -I {} perl -c {} \;
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
