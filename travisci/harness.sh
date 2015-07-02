@@ -1,5 +1,5 @@
 #!/bin/bash
-export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules
+export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/LowCoverage
 
 echo "Running test suite"
 echo "Using $PERL5LIB"
@@ -17,7 +17,7 @@ else
       rt=$EXIT_CODE
   fi
   find $PWD/modules -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
-  find $PWD/scripts -type f -name '*.example' | while read f; do mv "$f" "$PWD/modules/`basename ${f%.example}`"; done
+  find $PWD/scripts -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
