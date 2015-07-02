@@ -17,7 +17,7 @@ else
       rt=$EXIT_CODE
   fi
   find $PWD/modules -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
-  find $PWD/scripts -type f -name '*.example' | while read f; do mv "$f" "${f%.example}"; done
+  find $PWD/scripts -type f -name '*.example' | while read f; do mv "$f" "$PWD/modules/`basename ${f%.example}`"; done
   EXIT_CODE=$?
   if [ "$EXIT_CODE" -ne 0 ]; then
       rt=$EXIT_CODE
