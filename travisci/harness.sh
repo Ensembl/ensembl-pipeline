@@ -39,7 +39,14 @@ else
   "scripts/LowCoverage/LowCoverageGeneBuild.pl" \
   "scripts/compara/run_test_compara.pl" \
   "scripts/compara/run_compara.pl" \
+  "scripts/Features/calculate_slices.pl" \
+  "scripts/DataConversion/wormbase/sl2_store.pl" \
+  "scripts/DataConversion/wormbase/sl1_store.pl" \
+  "scripts/DataConversion/wormbase/rnai_store.pl" \
+  "scripts/DataConversion/wormbase/raw_compute_transfer.pl" \
+  "scripts/ExonerateArray.pl" \
   "scripts/make_firstef_bsubs.pl" \
+  "scripts/alignment_squiz.pl" \
   "scripts/est_discriminator.pl" )
   for S in `seq 0 $((${#M[@]}-1))`; do
       printf " - \e[33m%s\n\e[0m" "${M[$S]}"
