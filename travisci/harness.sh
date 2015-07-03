@@ -1,5 +1,5 @@
 #!/bin/bash
-export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild
+export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild:$PWD/scripts/ncRNA
 
 echo "Running test suite"
 echo "Using $PERL5LIB"
@@ -34,11 +34,12 @@ else
       RES=${RES}" ! -path *`basename ${P[$D]}`*"
   done
   M=( "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl" \
+  "scripts/post_GeneBuild/cluster_Genes.pl" \
   "scripts/GeneBuild/refseq_NM_NP_Pairs.pl" \
+  "scripts/LowCoverage/LowCoverageGeneBuild.pl" \
   "scripts/compara/run_test_compara.pl" \
   "scripts/compara/run_compara.pl" \
   "scripts/make_firstef_bsubs.pl" \
-  "scripts/LowCoverage/LowCoverageGeneBuild.pl" \
   "scripts/est_discriminator.pl" )
   for S in `seq 0 $((${#M[@]}-1))`; do
       printf " - \e[33m%s\n\e[0m" "${M[$S]}"
