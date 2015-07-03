@@ -35,7 +35,7 @@ use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::TranscriptUtils;
 
 my $file = 'ensembl_cdnas';
-≈
+
 my $dbhost;
 my $dbuser = 'admin' ;
 my $dbname;

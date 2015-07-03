@@ -111,7 +111,7 @@ sub show_transcript{
   print "Gene:$gene_id\tTranscript:$tran_id\tPeptide:$transl_id\n";
 
   my @exons = @{$tran->get_all_Exons};
-  print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\strand\tlength\n";
+  print "contig_id\tcontig_name\texon_id\tstart\tend\tphase\tend_phase\tstrand\tlength\n";
   foreach my $exon (@exons){
     
     # if exon is sticky print each component
