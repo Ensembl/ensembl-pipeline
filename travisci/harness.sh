@@ -1,5 +1,6 @@
 #!/bin/bash
-export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild:$PWD/scripts/ncRNA
+export
+PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild:$PWD/scripts/ncRNA:$PWD/scripts/DataConversion/medaka
 
 echo "Running test suite"
 echo "Using $PERL5LIB"
@@ -44,6 +45,11 @@ else
   "scripts/DataConversion/wormbase/sl1_store.pl" \
   "scripts/DataConversion/wormbase/rnai_store.pl" \
   "scripts/DataConversion/wormbase/raw_compute_transfer.pl" \
+  "scripts/DataConversion/wormbase/operon_store.pl" \
+  "scripts/DataConversion/wormbase/gene_store.pl" \
+  "scripts/DataConversion/wormbase/expr_store.pl" \
+  "scripts/AlignWise/run_alignwise.pl" \
+  "scripts/AlignWise/dumpgff_compara_alignments.pl" \
   "scripts/ExonerateArray.pl" \
   "scripts/make_firstef_bsubs.pl" \
   "scripts/alignment_squiz.pl" \
