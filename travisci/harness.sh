@@ -35,6 +35,10 @@ else
   done
   M=( "scripts/post_GeneBuild/post_GeneBuild_checks_denormalised.pl" \
   "scripts/GeneBuild/refseq_NM_NP_Pairs.pl" \
+  "scripts/compara/run_test_compara.pl" \
+  "scripts/compara/run_compara.pl" \
+  "scripts/make_firstef_bsubs.pl" \
+  "scripts/LowCoverage/LowCoverageGeneBuild.pl" \
   "scripts/est_discriminator.pl" )
   for S in `seq 0 $((${#M[@]}-1))`; do
       printf " - \e[33m%s\n\e[0m" "${M[$S]}"
