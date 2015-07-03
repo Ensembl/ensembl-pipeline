@@ -49,6 +49,7 @@ else
   "scripts/DataConversion/wormbase/gene_store.pl" \
   "scripts/DataConversion/wormbase/expr_store.pl" \
   "scripts/DataConversion/medaka/load_medaka.pl" \
+  "scripts/DataConversion/medaka/fix_gff.pl" \
   "scripts/AlignWise/run_alignwise.pl" \
   "scripts/AlignWise/dumpgff_compara_alignments.pl" \
   "scripts/ExonerateArray.pl" \
