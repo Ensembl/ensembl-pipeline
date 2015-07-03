@@ -1,6 +1,6 @@
 #!/bin/bash
-export
-PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild:$PWD/scripts/ncRNA:$PWD/scripts/DataConversion/medaka
+export PERL5LIB=$PWD/modules:$PWD/ensembl/modules:$PWD/ensembl-analysis/scripts:$PWD/ensembl-analysis/modules:$PWD/ensembl-compara/modules:$PWD/ensembl-killlist/modules:$PWD/ensembl-external/modules:$PWD/bioperl-live-bioperl-release-1-2-3:$PWD/bioperl-run/lib:$PWD/ensembl-test/modules
+export PERL5LIB=$PERL5LIB:$PWD/scripts/DataConversion/wormbase:$PWD/scripts/DataConversion/flybase:$PWD/scripts/DataConversion/mitochondria:$PWD/scripts/cDNA_update:$PWD/scripts/LowCoverage:$PWD/scripts/GeneBuild:$PWD/scripts/ncRNA:$PWD/scripts/DataConversion/medaka
 
 echo "Running test suite"
 echo "Using $PERL5LIB"
