@@ -57,8 +57,8 @@ use vars qw(%Config);
 
         # Path to gss file - contains accs from the GSS (Genome Survey Sequence) division of GenBank 
         GSS_PATH => '/ensembl-personal/genebuilders/cDNA_update/gss_acc.txt', 
-        #Only complete if the gss file isn't under CVS_DIR
-        #If completed will replace CVS_DIR as prefix to GSS_PATH
+        #Only complete if the gss file isn't under ENSCODE_DIR
+        #If completed will replace ENSCODE_DIR as prefix to GSS_PATH
         GSS_PREFIX => undef,
 
         # Various scripts required by the process.
@@ -138,7 +138,6 @@ use vars qw(%Config);
         RETRY_RESOURCE => '-R"select[mem>4000] rusage[mem=4000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 4000',
         RETRY_BATCH_SIZE => 1,
 
-        CVS_DIR => '',
         ENSCODE_DIR => '',
         DATA_DIR => '',
 
@@ -175,7 +174,7 @@ use vars qw(%Config);
         PIPE_DBPORT => 3306,
 
         OUTPUT_DBNAME => '',  # xx_mus_musculus_cdna_update
-        OUTPUT_DBHOST => '',  # genebuild_x
+        OUTPUT_DBHOST => '',  # genebuild_y
         OUTPUT_DBPORT => 3306,
 
         LAST_DBNAME => '',    # mus_musculus_cdna_49_37c
@@ -191,12 +190,11 @@ use vars qw(%Config);
         PRODUCTION_DBPORT => 3306,
 
         # Select the good DB for the tokens, the first one is the pipeline DB
-        RESOURCE => '-R"select[mem>1000] rusage[mem=1000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 1000',#can be used for token requirements, etc.
+        RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildYtok=20]" -M 2000',#can be used for token requirements, etc.
         BATCH_SIZE => 10,
-        RETRY_RESOURCE => '-R"select[mem>2000] rusage[mem=2000, myens_buildXtok=20:duration=5, myens_buildXtok=20]" -M 2000',
+        RETRY_RESOURCE => '-R"select[mem>4000] rusage[mem=4000, myens_buildXtok=20:duration=5, myens_buildYtok=20]" -M 4000',
         RETRY_BATCH_SIZE => 1,
 
-        CVS_DIR => '',
         ENSCODE_DIR => '',
         DATA_DIR => '',
 
