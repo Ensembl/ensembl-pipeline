@@ -5,10 +5,13 @@ perl:
 
 env:
 
+addons:
+    apt:
+        packages:
+        - unzip
+        - sendmail
+
 before_install:
-    - sudo apt-get -y update
-    - sudo apt-get -y install unzip
-    - sudo apt-get -y install sendmail
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-external.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-analysis.git
