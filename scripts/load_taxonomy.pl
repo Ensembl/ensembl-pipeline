@@ -29,7 +29,6 @@
 
 use warnings ;
 use strict;
-use Switch;
 use Getopt::Long qw(:config no_ignore_case);
 use Bio::EnsEMBL::Compara::DBSQL::DBAdaptor;
 
@@ -86,10 +85,14 @@ if (defined $lcdbname){
 
 Bio::EnsEMBL::Registry->no_version_check(1);
 
-switch($state) {
-  case 1 { fetch_by_ncbi_taxon_id($self); }
-  case 2 { fetch_by_scientific_name($self); }
-  case 3 { load_taxonomy_in_core($self); }
+if ($state == 1) {
+    fetch_by_ncbi_taxon_id($self);
+}
+elsif ($state == 2) {
+    fetch_by_scientific_name($self);
+}
+elsif ($state == 3) {
+    load_taxonomy_in_core($self);
 }
 
 

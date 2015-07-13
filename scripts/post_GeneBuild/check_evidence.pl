@@ -153,7 +153,7 @@ elsif ( $tstable_id){
   print  "From TranscriptAdaptor: $t_id\n";
   my $tran = $db->get_TranscriptAdaptor->fetch_by_stable_id($tstable_id);
   my @exons = @{$tran->get_all_Exons};
-  print "internal_id\tcontig_id\tcontig_name\tstart-end\tphase\tend_ph\strand\tlength\thit_name\tstart-end\tlength\tscore\tperc_idn";
+  print "internal_id\tcontig_id\tcontig_name\tstart-end\tphase\tend_ph\tstrand\tlength\thit_name\tstart-end\tlength\tscore\tperc_idn";
   foreach my $exon (@exons){
     
     # if exon is sticky print each component

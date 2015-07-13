@@ -15,17 +15,13 @@ before_install:
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-compara.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-killlist.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-io.git
+    - git clone --branch master --depth 1 https://github.com/bioperl/bioperl-run.git
     - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
     - unzip bioperl-release-1-2-3.zip
 
 
 install:
     - cpanm -v --installdeps --with-recommends --notest --cpanfile ensembl/cpanfile .
-    - mkdir modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Config/GeneBuild/Databases.pm
-    - mkdir modules/Bio/EnsEMBL/Pipeline/Config/Protein_Annotation
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Config/Protein_Annotation/General.pm
-    - echo "1;" > modules/Bio/EnsEMBL/Pipeline/Tools/TranscriptUtils.pm
  
 script: "./travisci/harness.sh"
 

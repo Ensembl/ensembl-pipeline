@@ -370,7 +370,7 @@ sub generate_transcripts{
   my @global_exons;
   my %overlapcheck;
 
-  use Bio::EnsEMBL::Pipeline::Tools::ExonUtils;
+  use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::ExonUtils qw(clone_Exon);
 
   #go through all genes
   GENE: foreach my $gene_name(keys(%$genesRef)){
@@ -525,7 +525,7 @@ sub generate_transcripts{
       $transcriptcount++;
       my @exons = ();
       foreach my $temp_exon (@global_exons){
-	push(@exons, Bio::EnsEMBL::Pipeline::Tools::ExonUtils->_clone_Exon($temp_exon));
+	push(@exons, clone_Exon($temp_exon));
       }
       my $translation_start = 1;
       my $first = 1;
