@@ -71,7 +71,7 @@ use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Analysis;
 use Bio::EnsEMBL::Translation;
 use Bio::EnsEMBL::Analysis::Tools::GeneBuildUtils::GeneUtils;
-use HTML::Entities qw(decode_entities);
+use Bio::EnsEMBL::IO::Parser::GFF3;
 
 use Data::Dumper;
 
@@ -184,52 +184,47 @@ while ($sth->fetch()) {
 #         between line types: always look up the parent object using the parent_id
 #         key if you need to know something about it or you need to inherit some 
 #         information from it.
-my $fh;
-unless (open($fh,'<',$infile)) {
-  die("Could not find " . $infile);
-}
-my @lines = <$fh>;
-close($fh);                           
+my $gff_file = Bio::EnsEMBL::IO::Parser::GFF3->open($infile);
 
-LINE: while (my $line = shift( @lines )) {   
-  next LINE if $line =~ /^#/;
-  my ($seqname,
-      $source,
-      $type,
-      $start,
-      $end,
-      $score,
-      $strand,
-      $phase,
-      $attributes) = split(/\t/, $line);
-  next LINE if ($seqname eq $MT_acc && $ignore_mt);    
-  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA)$/;
+LINE: while ($gff_file->next) {
+  my $seqname = $gff_file->get_seqname;
+  next LINE if ($seqname eq $MT_acc && $ignore_mt);
   next LINE if exists $missing_sequences{$seqname};
+  my $type = $gff_file->get_type;
+  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA)$/;
+  my $source = $gff_file->get_source;
+  my $start = $gff_file->get_start;
+  my $end = $gff_file->get_end;
+  my $score = $gff_file->get_score;
+  my $strand = $gff_file->get_strand;
+  my $phase = $gff_file->get_phase;
+  my $attributes = $gff_file->get_attributes;
   
-  # cols 1 and 2 can have HTML encoding which may affect us (indeed, NCBI now use %2C for commas in source)
-  $seqname = decode_entities($seqname);
-  $source  = decode_entities($source);
   
   # some data common to all lines let through the filter above:
-  chomp($attributes); 
-  my @atts = split (/;/, $attributes);
-  my ($id) = grep s/^ID=(\w+\d+)$/$1/, @atts;
+  my $id = $attributes->{ID};
 
   # On the MT coding genes have CDS only and no exon. This means we can actually parse them as exons
   #$type='exon' if ( $seqname eq $MT_acc && $type eq 'CDS' );
 
   # SLICE block
-  my $slice = $sa->fetch_by_region($cs, $seqname); 
+  my $slice;
+  if (exists $sequences{$seqname}) {
+    $slice = $sequences{$seqname};
+  }
+  else {
+    $slice = $sa->fetch_by_region($cs, $seqname);
   # It's important to get this right: Ensembl and RefSeq have different styles of handling slices
   # 1) Missing slices. Only report missing slices once. Missing slices are actually slices on
   # alternative assemblies
-  if (! defined $slice && ! exists $missing_sequences{$seqname}) {
-    $missing_sequences{$seqname}='';
-    say("Slice not found " . $seqname);
-    next LINE;
-  } else {
-    say("Slice " . $seqname . " found (" . $slice->name() . ")") unless exists $sequences{$seqname};
-    $sequences{$seqname}='';
+    if (! defined $slice && ! exists $missing_sequences{$seqname}) {
+      $missing_sequences{$seqname}='';
+      say("Slice not found " . $seqname);
+      next LINE;
+    } else {
+      say("Slice " . $seqname . " found (" . $slice->name() . ")") unless exists $sequences{$seqname};
+      $sequences{$seqname}= $slice;
+    }
   }
   # 2) Ignore annotations on pseudo-autosomal regions (currently only X/Y for human)
   if (@par_regions && $slice->get_seq_region_id() == $par_srid) {
@@ -243,9 +238,6 @@ LINE: while (my $line = shift( @lines )) {
 
   $source =~ s/\,.*$//;  # keep only one source, 'Curated Genomic,Gnomon' does not fit in the DB.
 
-  $strand = -1 if $strand eq '-';
-  $strand =  1 if $strand eq '+';
-  
   # now deal with the 'type' specific lines, from which, we will make Ensembl objects
 
 
@@ -257,17 +249,12 @@ LINE: while (my $line = shift( @lines )) {
   if ($type eq "gene") {
 
     my $biotype;                                   
-    my ($gene_id) = grep s/Dbxref=GeneID:(\d+)/$1/, @atts;
-    $gene_id =~ s/,.*$//;
-    my ($pseudo)  = grep s/pseudo=(true)/$1/, @atts;
-
-    my $description = "";
-    ($description) = grep s/^description=(microRNA).*/$1/, @atts;
+    my ($gene_id) = $attributes->{Dbxref} =~ /GeneID:(\d+)/;
 
     # For the gene symbol first try the name attrib and failing that try the gene one. From what I've
     # seen they have both been the same
-    my ($gene_symbol_src1) = grep s/^Name=(.+)/$1/, @atts;
-    my ($gene_symbol_src2) = grep s/^gene=(.+)/$1/, @atts;
+    my $gene_symbol_src1 = $attributes->{Name};
+    my $gene_symbol_src2 = $attributes->{gene};
     if($gene_symbol_src1 ne $gene_symbol_src2) {
       warning("Parsed out two different values for the gene symbol for ".$id."\nVal1: ".
               $gene_symbol_src1."\nVal2: ".$gene_symbol_src2."\nThe script will choose Val1 over Val2 unless Val1 is undef");
@@ -294,12 +281,12 @@ LINE: while (my $line = shift( @lines )) {
       $gcnt++;
       say($type . " " . $id . " found") if ($verbose);
 
-      if ($pseudo) {
+      if (exists $attributes->{pseudo}) {
         $biotype = 'pseudogene';
 
         # Pseudogenes rarely have a transcript line (see the TRANSCRIPT block for an
         # exception) therefore we use the Name as the stable_id for these.
-        my ($name) = grep s/^Name=(.*)$/$1/, @atts;
+        my $name = $attributes->{Name};
 
         $transcripts{$id} = {
           id           => $id,
@@ -313,7 +300,7 @@ LINE: while (my $line = shift( @lines )) {
         };
         $tcnt++;
 
-      } elsif (defined $description && $description eq "microRNA") {
+      } elsif (exists $attributes->{description} && $attributes->{description} =~ /microRNA/) {
         $biotype="miRNA";
 
       } else {
@@ -374,14 +361,14 @@ LINE: while (my $line = shift( @lines )) {
   elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment)$/) {
 
     my $biotype;
-    my ($parent_id) = grep s/^Parent=(.*)$/$1/, @atts;
-    my ($transcript_id) = grep s/^transcript_id=(.*)$/$1/, @atts;
+    my $parent_id = $attributes->{Parent};
+    my $transcript_id = $attributes->{transcript_id};
 
     # tRNAS/rRNAs on the MT do not have transcript_ids therefore use the parent
     # gene identifier as the transcript stable ID, they are 1:1 gene:transcript.
     # This is also the case for all tRNAscan-SE sources.
     if ($source eq 'tRNAscan-SE') {
-      ($transcript_id) = grep s/^Dbxref=GeneID:(\d+).*$/$1/, @atts;
+      ($transcript_id) = $attributes->{Dbxref} =~ /GeneID:(\d+)/;
     }
     if ($seqname eq $MT_acc) {
       $transcript_id = $genes{$parent_id}{stable_id};
@@ -413,7 +400,7 @@ LINE: while (my $line = shift( @lines )) {
         $tcnt--;
         $biotype ="pseudogene";
       } else {
-        ($biotype) =  grep s/^gbkey=(.*)$/$1/, @atts;
+        $biotype = $attributes->{gbkey};
         # update parent gene biotype since it will now be protein coding.
         $genes{$parent_id}{biotype}=$biotype;
       }
@@ -434,13 +421,12 @@ LINE: while (my $line = shift( @lines )) {
       $genes{$parent_id}{biotype} = $biotype;
       $tRNAs{$parent_id}=$id;
     } elsif ($type eq "ncRNA") {
-      ($biotype) = grep s/^ncrna_class=(\w+)$/$1/, @atts;
+      $biotype = $attributes->{ncrna_class};
       $genes{$parent_id}{biotype} = $biotype;
       # found a case where a primary transcript had the transcript ID but the ncRNA
       # does not, therefore use the gene_id instead...
       unless (defined $transcript_id) {
-        ($transcript_id) = grep s/^Dbxref=GeneID:(\d+)/$1/, @atts;
-        $transcript_id =~ s/,.*$//;
+        ($transcript_id) = $attributes->{Dbxref} =~ /GeneID:(\d+)/;
       }
       $ncnt++;
     } elsif($type =~ /^(\w)_gene_segment$/) {
@@ -479,9 +465,8 @@ LINE: while (my $line = shift( @lines )) {
   #         Gene segment lines (IG genes) are treated as exons also. Since IG 
   #         genes have no transcript line we need to fake one up here.  
   elsif ($type =~ /^(exon)$/) {
-    my @exon_atts = split (/;/, $attributes);
-    my ($exon_id) = grep s/^ID=(.*)$/$1/, @exon_atts;
-    my ($parent_id) = grep s/^Parent=(.*)$/$1/, @exon_atts;
+    my $exon_id = $attributes->{ID};
+    my $parent_id = $attributes->{Parent};
     my $biotype;
 
 #    if (my ($segment_type) = $type =~ /^(\w)_gene_segment$/) {
@@ -531,7 +516,6 @@ LINE: while (my $line = shift( @lines )) {
       -PHASE        => $phase,
       -END_PHASE    => $phase,
       -STABLE_ID    => $exon_id,
-      -BIOTYPE      => $biotype,
       -VERSION      => $version,
       -CREATED_DATE => $time,
       -SLICE        => $slice,
@@ -545,14 +529,13 @@ LINE: while (my $line = shift( @lines )) {
   #       We also need to store the start and end extents so that we can set
   #       the translation when we create transcripts later on.
   elsif ($type eq "CDS") {
-    my @cds_atts = split (/;/, $attributes);
-    my ($cds_id) = grep s/^ID=(.*)$/$1/, @cds_atts;
-    my ($parent_id) = grep s/^Parent=(.*)$/$1/, @cds_atts;
+    my $cds_id = $attributes->{ID};
+    my $parent_id = $attributes->{Parent};
     # and we will use this as the translation.stable_id...
-    my ($protein_id) = grep s/protein_id=(.*)$/$1/, @cds_atts;
+    my $protein_id = $attributes->{protein_id};
 
     # skip if exception=ribosomal slippage
-    my ($cds_exception) = grep s/^exception=(.*)$/$1/, @cds_atts;
+    my ($cds_exception) = $attributes->{exception};
     # Note: some species, e.g. Anole, have an exception that can be longer than solely
     # ribosomal slippage. e.g: 'exception=ribosomal slippage%2C annotated by transcript or proteomic data'
     if (defined $cds_exception && $cds_exception =~ /^ribosomal\sslippage/x) {
@@ -593,7 +576,6 @@ LINE: while (my $line = shift( @lines )) {
         -PHASE        => $phase,
         -END_PHASE    => $phase,
         -STABLE_ID    => $protein_id,   
-        -BIOTYPE      => $biotype,
         -VERSION      => $version,
         -CREATED_DATE => $time,
         -SLICE        => $slice,
