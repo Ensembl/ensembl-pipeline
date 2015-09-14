@@ -319,7 +319,7 @@ foreach my $batch_object (@batch_submission_objects) {
     eval {
       $batch_object->open_command_line;
     };
-    ifi ($@ || !$batch_object->id) {
+    if ($@ || !$batch_object->id) {
       throw("Failed to open ".$batch_object->command." $@");
     }
 
@@ -480,7 +480,7 @@ sub useage {
   print "Your commandline was :\n".
     "lsf_submission.pl ".join("\t", @$command_args), "\n\n";
 
-  print ("lsf_submission.pl is a script which will create and open ".
+  print "lsf_submission.pl is a script which will create and open ".
          "commandlines for the\nappropriate batch submission system ".
          "As standard it will produce command lines to run the\n".
          "test_RunnableDB script but it can be used to create".
@@ -508,11 +508,10 @@ sub useage {
          "input_id put\n".
          "-help will print out this".
          "information again\n-perldoc will print out the perl ".
-         "documentation\n\n");
+         "documentation\n\n";
   exit(0);
 }
 
-j
 sub perldoc{
   exec('perldoc', $0);
   exit(0);

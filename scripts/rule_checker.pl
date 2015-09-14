@@ -18,7 +18,7 @@
 
 use warnings ;
 use strict;
-use Node;
+use Bio::EnsEMBL::Pipeline::Utils::Node;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Getopt::Long qw(:config no_ignore_case);
 

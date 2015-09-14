@@ -29,7 +29,7 @@ use Bio::EnsEMBL::Utils::Exception qw(throw warning deprecate);
 use Bio::EnsEMBL::Analysis::Tools::Algorithms::ClusterUtils;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::SeqFeature;
-use ScriptUtils;
+use buildchecks::ScriptUtils;
 
 
 $| = 1;

@@ -93,7 +93,7 @@ use Bio::EnsEMBL::Analysis::Tools::Algorithms::ClusterUtils;
 
 use Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 use Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor;
-use ScriptUtils;
+use buildchecks::ScriptUtils;
 
 
 

@@ -38,7 +38,7 @@ Node -
 
 =cut
 
-package Node;
+package Bio::EnsEMBL::Pipeline::Utils::Node;
 use Bio::EnsEMBL::Root;
 use vars qw(@ISA);
 

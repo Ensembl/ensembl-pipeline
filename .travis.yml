@@ -5,14 +5,21 @@ perl:
 
 env:
 
+sudo: false
+
+addons:
+    apt:
+        packages:
+        - unzip
+
 before_install:
-    - sudo apt-get -y update
-    - sudo apt-get -y install unzip
-    - sudo apt-get -y install sendmail
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-external.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-analysis.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-compara.git
+    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-killlist.git
+    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-io.git
+    - git clone --branch master --depth 1 https://github.com/bioperl/bioperl-run.git
     - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
     - unzip bioperl-release-1-2-3.zip
 

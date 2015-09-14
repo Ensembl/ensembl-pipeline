@@ -130,6 +130,7 @@ use AssemblyMapper::Support;
 
 use Pod::Usage;
 use Readonly;
+
 #use Switch;
 
 use Bio::EnsEMBL::Utils::Exception qw( throw );
@@ -372,8 +373,8 @@ sub do_align {
 
       my ($left,$right,$tag) = ('-','-','');
 
-      if ($type eq '+') { $left  = '-';    $tag   = '>'; $right = $A_key; }
-      elsif ($type eq '-') { $left  = $R_key; $tag   = '<'; $right = '-'; }
+      if ($type eq '+') { $left  = '-'; $tag   = '>'; $right = $A_key; }
+      elsif ($type eq '-') { $left  = $R_key; $tag   = '<'; $right = '-';    }
       elsif ($type eq 'u') { $left  = $R_key; $tag   = '';  $right = $A_key; }
       elsif ($type eq 'c') { $left  = $R_key; $tag   = '|'; $right = $A_key; }
       else { throw("Not expecting type '$type'"); }

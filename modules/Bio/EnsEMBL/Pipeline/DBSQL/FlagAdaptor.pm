@@ -47,11 +47,11 @@ Internal methods are usually preceded with a _
 
 package Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor;
 
+use strict;
 use warnings ;
 use Bio::EnsEMBL::Pipeline::Flag;
 use Bio::EnsEMBL::Root;
 use vars qw(@ISA);
-use strict;
 
 use Carp;
 @ISA = qw( Bio::EnsEMBL::Root );
