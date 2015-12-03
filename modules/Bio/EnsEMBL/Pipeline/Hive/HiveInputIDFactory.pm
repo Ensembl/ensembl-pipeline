@@ -99,6 +99,7 @@ sub new{
       $seq_region_start,
       $seq_region_end,
       $hap_pair,
+      $use_mt,
       $include_non_reference)=rearrange([qw(DB 
                                             SLICE 
                                             SINGLE 
@@ -121,6 +122,7 @@ sub new{
                                             SEQ_REGION_START
                                             SEQ_REGION_END
                                             HAP_PAIR
+                                            MT
  					    INCLUDE_NON_REFERENCE
                                            )], @_);
 
@@ -130,6 +132,7 @@ sub new{
   $hap_pair = 0 unless ($hap_pair);
   $include_non_reference = 0 unless ($include_non_reference);
   $translation_id = 0 unless($translation_id);
+  $use_mt = 0 unless ($use_mt);
 
   if(!$db){
     throw("You can't create and store input_ids without a dbadaptor\n");
@@ -140,6 +143,7 @@ sub new{
           "TRANSLATION_ID, HAP_PAIR for the input id factory to work");
   }
   print "slice: ",$slice,"\n";
+  print "use_mitochondrion: ",$use_mt,"\n";
 print "file: ",$file,"\n";
 print "translation_id: ",$translation_id,"\n";
 print "single: ",$single,"\n";
@@ -199,6 +203,7 @@ print "hap_pair: ",$hap_pair,"\n";
   $self->dir($dir) if($dir);
   $self->regex($regex) if($regex);
   $self->single_name($single_name) if($single_name);
+  $self->use_mitochondrion($use_mt) if($use_mt);
   return $self;
 }
 
@@ -345,6 +350,11 @@ sub seq_level{
   }
   return $self->{'seq_level'};
 }
+sub use_mitochondrion{
+  my $self = shift;
+  $self->{'use_mitochondrion'} = shift if(@_);
+  return $self->{'use_mitochondrion'};
+}
 
 
 sub get_analysis{
@@ -464,8 +474,11 @@ sub get_slice_names{
     $slices = split_Slices($slices,$self->slice_size,$self->slice_overlaps);
   }
 
+  my $mt_name = undef;
+  $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name if ($self->use_mitochondrion);
   my @ids;
   foreach my $slice(@$slices){
+    next if (defined $mt_name and $slice->seq_region_name eq $mt_name);
     push(@ids, $slice->name);
   }
 
