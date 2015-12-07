@@ -475,7 +475,7 @@ sub get_slice_names{
   }
 
   my $mt_name = undef;
-  $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name if ($self->use_mitochondrion);
+  $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name unless ($self->use_mitochondrion);
   my @ids;
   foreach my $slice(@$slices){
     next if (defined $mt_name and $slice->seq_region_name eq $mt_name);
