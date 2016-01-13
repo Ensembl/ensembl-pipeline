@@ -54,6 +54,8 @@ here is an example commandline
                      the component pieces
     -component_version, the version of the component coord system
     -agp_file path to the the agp file
+    -convert_chrom_names boolean (default: true). convert UCSC-style
+                         chromosome names to Ensembl
     
     -help      displays this documentation with PERLDOC
 
@@ -73,6 +75,7 @@ my $assembled_name;
 my $assembled_version;
 my $component_name;
 my $component_version;
+my $convert_chrom_names = 1;
 my $agpfile;
 my $help;
 my $name_file;
@@ -89,6 +92,7 @@ GetOptions(
             'component_version:s' => \$component_version,
             'agp_file:s' => \$agpfile,
             'name_file:s' => \$name_file,
+            'convert_chrom_names!' => \$convert_chrom_names,
             'help'     => \$help,
             ) or ($help = 1);
 
@@ -182,7 +186,7 @@ LINE:while(<FH>){
 
   my ($a_id, $c_id);
   if(!$assembled_ids{$a_name}){
-    if($a_name =~ /^chr(\S+)/){
+    if($convert_chrom_names and ($a_name =~ /^chr(\S+)/)){
       $a_name = $1;
     }
     my $a_piece = $sa->fetch_by_region($assembled_cs->name, $a_name,
