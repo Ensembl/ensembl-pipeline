@@ -79,6 +79,7 @@ my ($host, $user, $pass, $dbname, $infile, $dnahost, $dnaport, $dnadbname, $dnap
 my $port = $dnaport = 3306;
 my $dnauser = 'ensro';
 my $cs = 'toplevel';
+my $csv = undef; # coordinate system version
 my $anal_name = 'refseq_import';
 my ($verbose, $test_parse, $ignore_mt) = (0) x 3;
 my (%genes, %transcripts, %exons, %CDSs, %xrefs, %missing_sequences, %sequences, %tRNAs,
@@ -93,6 +94,7 @@ my (%genes, %transcripts, %exons, %CDSs, %xrefs, %missing_sequences, %sequences,
   'infile:s'    => \$infile,          'verbose!'    => \$verbose,
   'test_parse!' => \$test_parse,      'ignore_mt!'  => \$ignore_mt,
   'coord_system|cs:s' => \$cs,        'analysis:s'  => \$anal_name,
+  'coord_system_version|csv:s' => \$csv,
 );
 &usage unless defined ($dbname && $host && $user && $infile);
 
@@ -213,7 +215,7 @@ LINE: while ($gff_file->next) {
     $slice = $sequences{$seqname};
   }
   else {
-    $slice = $sa->fetch_by_region($cs, $seqname);
+    $slice = $sa->fetch_by_region($cs, $seqname, undef, undef, undef, $csv, undef);
   # It's important to get this right: Ensembl and RefSeq have different styles of handling slices
   # 1) Missing slices. Only report missing slices once. Missing slices are actually slices on
   # alternative assemblies
