@@ -250,8 +250,13 @@ LINE: while ($gff_file->next) {
   #        this gene. 
   if ($type eq "gene") {
 
-    my $biotype;                                   
-    my ($gene_id) = $attributes->{Dbxref} =~ /GeneID:(\d+)/;
+    my $biotype;
+    my $db_xref = $attributes->{Dbxref};
+    unless($db_xref =~ /GeneID:(\d+)/) {
+      throw('Could not parse the GeneID for making the display xref');
+    }
+
+    my ($gene_id) = $1;
 
     # For the gene symbol first try the name attrib and failing that try the gene one. From what I've
     # seen they have both been the same
