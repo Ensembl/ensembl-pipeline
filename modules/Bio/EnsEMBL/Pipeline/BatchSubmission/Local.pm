@@ -89,6 +89,8 @@ sub open_command_line{
   if($@){
     throw("FAILED to open commandline locally $@");
   }
+# This is not the real job_id of the command but it's better than nothing...
+  $self->id($$);
   eval{
     if($self->stderr_file){
       $self->copy_output($self->temp_stderr, $self->stderr_file);
