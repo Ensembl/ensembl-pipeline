@@ -33,6 +33,7 @@ use vars qw(%Config);
 				  WRITEPORT  => "3306",
 				  WRITEHOST  => "genebuildY",
 				  WRITETOKEN => "myens_buildYtok",
+                  REPEATS => ['repeatmask', 'dust'],
 				 },	
 				 
 	             # etc for however many species you want	 				 				 
