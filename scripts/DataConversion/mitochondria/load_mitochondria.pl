@@ -38,7 +38,7 @@ All configuration is done through MitConf.pm
 
 use warnings ;
 use strict;
-use MitConf;
+#use MitConf;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
 use Bio::EnsEMBL::Exon;
 use Bio::EnsEMBL::Transcript;
@@ -77,6 +77,29 @@ my $contig = 'contig';
 my $clone = 'clone';
 my %opt;
 my $path = undef;
+my $non_interactive = 0;
+
+my $MIT_DBHOST;
+my $MIT_DBUSER;
+my $MIT_DBPASS;
+my $MIT_DBPORT;
+my $MIT_DBNAME;
+my $MIT_GENBANK_FILE='';
+my $MIT_LOGIC_NAME;
+my $MIT_SOURCE_NAME;
+my $MIT_NAME;
+my $MIT_TOPLEVEL;
+my $MIT_CODON_TABLE;
+my $MIT_GENE_TYPE;
+my $MIT_TRNA_TYPE;
+my $MIT_RRNA_TYPE;
+my $MIT_DB_VERSION;
+my $MIT_DEBUG;
+my $MIT_DB_FILE;
+my $MIT_SCAFFOLD_SEQNAME;
+my $MIT_CLONE_SEQNAME;
+my $MIT_CONTIG_SEQNAME;
+
 
  # options submitted with commandline override MitConf.pm 
 
@@ -102,7 +125,10 @@ GetOptions( \%opt,
             'genbank_file=s',
             'download!',
             'noxref!',
-            'path=s', );
+            'path=s',
+            'accession=s',
+            'non_interactive!',
+             );
             # or &usage();
 
 if ( $opt{path}){
@@ -129,9 +155,11 @@ $MIT_CODON_TABLE  = $opt{codon_table}  if $opt{codon_table};
 $MIT_GENE_TYPE    = $opt{gene_type}    if $opt{gene_type};
 $MIT_TRNA_TYPE    = $opt{trna_type}    if $opt{trna_type};
 $MIT_RRNA_TYPE    = $opt{rrna_type}    if $opt{rrna_type};
-$scaffold         = $opt{scaffold}     if $opt{scaffold};
-$contig           = $opt{contig}       if $opt{contig};
-$clone            = $opt{clone}        if $opt{clone};
+$MIT_DB_VERSION   = $opt{accession}    if $opt{accession};
+$MIT_SCAFFOLD_SEQNAME  = $opt{scaffold}     if $opt{scaffold};
+$MIT_CONTIG_SEQNAME    = $opt{contig}       if $opt{contig};
+$MIT_CLONE_SEQNAME     = $opt{clone}        if $opt{clone};
+$non_interactive       = 1                  if $opt{non_interactive};
 
 unless (    $MIT_DBHOST && $MIT_DBUSER
          && $MIT_DBNAME && $MIT_GENBANK_FILE
@@ -229,8 +257,14 @@ if ($slice){
   }
   print "Do you want to load the chromosome and "
       . "the associated assembly entries from the genbank file?(Y/N) ";
-  my $answer = <>;
-  chomp $answer;
+  my $answer;
+  if($non_interactive) {
+    $answer = "y";
+  } else {
+    $answer = <>;
+    chomp $answer;
+  }
+
   if ($answer eq "y" or $answer eq "Y"){
     &load_chromosomes(\%slices, $output_db, $genebank_hash->{-seq} );
     $slice = $slice_adaptor->fetch_by_region('toplevel',$MIT_NAME);
@@ -247,8 +281,13 @@ if ($slice->is_chromosome) {
     if (defined $attrib) {
         print "Your mitochondrion already have a karyotype rank: ", $attrib->value, "\n"
             , "Shall we remove it and insert a new rank? (Y/N) ";
-        $answer = <>;
-        chomp $answer;
+        if($non_interactive) {
+          $answer = "y";
+         } else {
+          $answer = <>;
+          chomp $answer;
+         }
+
         if ($answer eq 'y' or $answer eq 'Y') {
             $attrib_adaptor->remove_on_Slice($slice, $attrib);
         }
@@ -286,9 +325,14 @@ my @mt_genes = @{$slice->get_all_Genes};
 if (@mt_genes && scalar(@mt_genes) > 0){
   print "There are already ",scalar(@mt_genes)," genes in $MIT_NAME chromosome\n";
 
-  print "Do you want to remove them?(Y/N)\n";
-  my $g_answer = <>;
-  chomp $g_answer;
+  my $g_answer;
+  if($non_interactive) {
+    $g_answer = "y";
+  } else {
+    print "Do you want to remove them?(Y/N)\n";
+    $g_answer = <>;
+    chomp $g_answer;
+  }
   if ($g_answer eq "y" or $g_answer eq "Y"){
     my $gene_adaptor = $output_db->get_GeneAdaptor;
     foreach my $mt_gene(@mt_genes){  
@@ -297,11 +341,16 @@ if (@mt_genes && scalar(@mt_genes) > 0){
     }
     print "Genes removed succesfully, moving to new genes load\n";
   }else{
-    print "You choose not to remove the genes\n"
-        . "Do you want to keep loading the MT genes? "
-        . "(This may create duplicated entries)(Y/N)?\n";
-    my $load_answer = <>;
-    chomp $load_answer;
+    my $load_answer;
+    if($non_interactive) {
+      $load_answer = "y";
+    } else {
+      print "You choose not to remove the genes\n"
+         . "Do you want to keep loading the MT genes? "
+         . "(This may create duplicated entries)(Y/N)?\n";
+      $load_answer = <>;
+      chomp $load_answer;
+    }
     if ($load_answer eq "y" or $load_answer eq "Y"){
       print "Loading genes without removing existing ones, Thanks\n";
     }else{
@@ -535,8 +584,14 @@ for (my $index = 1; $index < $length; $index++) {
 print "Have ".scalar(@genes)." gene objects\n";   
 
 print " LOADING : Do you want to load them into the db ? (Y/N) ";
-  my $answer = <>;
-  chomp $answer;
+  my $answer;
+  if($non_interactive) {
+    $answer = "y";
+  } else {
+    $answer = <>;
+    chomp $answer;
+  }
+
   if ($answer eq "y" or $answer eq "Y"){
     &load_db($output_db,\@genes);
   }
