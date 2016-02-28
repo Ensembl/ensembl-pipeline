@@ -134,12 +134,14 @@ $f->login($ftpuser, $ftppassword) or die "Can't log $ftpuser in\n";
 my %INSDC2RefSeq;
 
 $species = ucfirst($species);
-if (mkdir($workdir.'/'.$species, 0777)) {
-	print STDOUT "$species directory created\n";
+unless(-e $workdir) {
+  my $cmd = "mkdir -p ".$workdir."/".$species;
+  my $return = system($cmd);
+  if($return) {
+    die("Could not create dir for $species\n.Commandline used:\n".$cmd);
+  }
 }
-else {
-	die("Could not create $species\n");
-}
+
 printf STDERR "Looking for %s accession mapping files\n", $species;
 
 # Scaffold_names file. Always look for this file whether we have
