@@ -250,13 +250,18 @@ LINE: while ($gff_file->next) {
   #        this gene. 
   if ($type eq "gene") {
 
-    my $biotype;
     my $db_xref = $attributes->{Dbxref};
     unless($db_xref =~ /GeneID:(\d+)/) {
       throw('Could not parse the GeneID for making the display xref');
     }
 
     my ($gene_id) = $1;
+
+    my $biotype = $attributes->{gene_biotype};
+    unless($biotype) {
+      throw("Could not find gene biotype");
+    }
+
 
     # For the gene symbol first try the name attrib and failing that try the gene one. From what I've
     # seen they have both been the same
@@ -288,13 +293,13 @@ LINE: while ($gff_file->next) {
       $gcnt++;
       say($type . " " . $id . " found") if ($verbose);
 
-      if (exists $attributes->{pseudo}) {
-        $biotype = 'pseudogene';
-
+#      if (exists $attributes->{pseudo}) {
+#        $biotype = 'pseudogene';
         # Pseudogenes rarely have a transcript line (see the TRANSCRIPT block for an
         # exception) therefore we use the Name as the stable_id for these.
-        my $name = $attributes->{Name};
 
+      if($biotype eq 'pseudogene' || $biotype eq 'other') {
+        my $name = $attributes->{Name};
         $transcripts{$id} = {
           id           => $id,
           parent_id    => $id,
@@ -307,15 +312,15 @@ LINE: while ($gff_file->next) {
         };
         $tcnt++;
 
-      } elsif (exists $attributes->{description} && $attributes->{description} =~ /microRNA/) {
-        $biotype="miRNA";
+      } #elsif (exists $attributes->{description} && $attributes->{description} =~ /microRNA/) {
+        #$biotype="miRNA";
 
-      } else {
-        $biotype='protein_coding';
+#      } else {
+#        $biotype='protein_coding';
         # It's possible that we find that this is misc_RNA when we come across a
         # transcript line for this gene, don't worry, we will update the gene 
         # biotype as and when this happens.
-      }
+#      }
 
       # we can make the Ensembl object for genes as we parse the file
       my $gene = Bio::EnsEMBL::Gene->new(
@@ -384,6 +389,11 @@ LINE: while ($gff_file->next) {
       $transcript_id = $genes{$parent_id}{stable_id};
     }
 
+    unless($parent_id) {
+      warning("Could not find the parent id for transcript type '".$type."' with id ".$transcript_id);
+      next;
+    }
+
     # Can't see how the code below makes any sense, if $parent_id is defined it doesn't
     # execute so if it does execute it means $parent_id is undef but then it checks to
     # see if an undef key exists in the hash? I'm commenting it out
@@ -401,11 +411,11 @@ LINE: while ($gff_file->next) {
     # biotypes need checking
     if ($type eq "transcript") {
       # some pseudogenes have transcripts, this is NCBIs odd mix of pseudo and misc_RNA
-      if ($genes{$parent_id}{biotype} eq "pseudogene") {
+      if ($genes{$parent_id}{biotype} eq "pseudogene" || $genes{$parent_id}{biotype} eq "other") {
         # remove the fake transcript and replace with this one
         delete $transcripts{$parent_id};
         $tcnt--;
-        $biotype ="pseudogene";
+        $biotype = $genes{$parent_id}{biotype};
       } else {
         $biotype = $attributes->{gbkey};
         # update parent gene biotype since it will now be protein coding.
@@ -474,6 +484,10 @@ LINE: while ($gff_file->next) {
   elsif ($type =~ /^(exon)$/) {
     my $exon_id = $attributes->{ID};
     my $parent_id = $attributes->{Parent};
+    unless($parent_id) {
+      warning("Could not find the parent id for exon id ".$exon_id);
+      next;
+    }
     my $biotype;
 
 #    if (my ($segment_type) = $type =~ /^(\w)_gene_segment$/) {
@@ -540,6 +554,11 @@ LINE: while ($gff_file->next) {
     my $parent_id = $attributes->{Parent};
     # and we will use this as the translation.stable_id...
     my $protein_id = $attributes->{protein_id};
+
+    unless($parent_id) {
+      warning("Could not find the parent id for cds id ".$cds_id);
+      next;
+    }
 
     # skip if exception=ribosomal slippage
     my ($cds_exception) = $attributes->{exception};
@@ -624,10 +643,32 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
   # but sometimes does not. All these lines in rat were pseudogenes. I am skipping
   # the gene lines without exons until I can find better documentation on them.
   my $parent_id = $transcripts{$k}{parent_id};
-  if (exists $genes{$parent_id}{curated_genomic} && ! exists $exons{$k}) {
-    say("Skipping curated_genomic transcript with no exons: " . $k) if $verbose;
-    $curated_genomic{$parent_id}=$parent_id;
-    next TRANSCRIPT;
+  my @exons = ();
+
+  # Get exons if there are present
+  if(exists $exons{$transcripts{$k}{id}}) {
+     @exons = @{$exons{$transcripts{$k}{id}}};
+  }
+
+  # This checks if there is a parent gene, if there is, and no exons are present, then make an exon IIF the biotype is pseudogene or other
+  if (exists $genes{$parent_id} && (scalar(@exons) == 0) && ($genes{$parent_id}{biotype} eq 'pseudogene' || $genes{$parent_id}{biotype} eq 'other')) {
+#    say("Skipping curated_genomic transcript with no exons: " . $k) if $verbose;
+    my $exon = Bio::EnsEMBL::Exon->new(
+        -START        => $genes{$parent_id}{start},
+        -END          => $genes{$parent_id}{end},
+        -STRAND       => $genes{$parent_id}{strand},
+        -PHASE        => -1,
+        -END_PHASE    => -1,
+        -STABLE_ID    => $genes{$parent_id}{stable_id},
+        -VERSION      => $version,
+        -CREATED_DATE => $time,
+        -SLICE        => $genes{$parent_id}{slice},
+      );
+
+     push(@exons,$exon);
+
+ #   $curated_genomic{$parent_id}=$parent_id;
+ #   next TRANSCRIPT;
   }
 
   # if this transcript has ribosomal slippage we want to delete it
@@ -653,17 +694,18 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
   }
 
   # Are there exons?
-  if (exists $exons{$transcripts{$k}{id}}) {
+ # if (exists $exons{$transcripts{$k}{id}}) {
+  if(scalar(@exons)) {
     # Pseudogenes on the negative strand have their exons defined backwards,
     # in essence, we flip them here BUT we use the same logic for all types
     # of exons to ensure we have them in the correct rank therefore we avoid
     # making any assumptions of the file order.
-    my @exons = @{$exons{$transcripts{$k}{id}}}; 
+#    my @exons = @{$exons{$transcripts{$k}{id}}}; 
     if ($exons[0]->strand() == 1) {
       @exons = sort {$a->start() <=> $b->start()} @exons;
     } else {
       @exons = sort {$b->start() <=> $a->start()} @exons;
-    } 
+    }
     # retrospective note: file order is probably now assumed for this parser :-/
 
 
@@ -729,6 +771,7 @@ TRANSCRIPT: foreach my $k (keys %transcripts) {
         $gcnt--;
         next TRANSCRIPT;
       }
+
 
       # Loop through exons and find which is the start and end exon for the 
       # translation. Whilst we are doing this we also need to update the 
