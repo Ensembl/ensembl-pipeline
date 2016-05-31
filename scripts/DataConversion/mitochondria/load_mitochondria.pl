@@ -78,7 +78,6 @@ my $clone = 'clone';
 my %opt;
 my $path = undef;
 my $non_interactive = 0;
-
 my $MIT_DBHOST;
 my $MIT_DBUSER;
 my $MIT_DBPASS;
@@ -185,21 +184,11 @@ if ($help) {
 }
 
 if (exists $opt{download}) {
-    my ($gbacc) = $MIT_DB_VERSION =~ /(\w+)/;
-    my $base_cmd = 'wget -q "http://eutils.ncbi.nlm.nih.gov/entrez/eutils';
-    my $ftp_cmd = $base_cmd.'/esearch.fcgi?db=nuccore&term='.$gbacc.'"';
-    open(FH, "$ftp_cmd -O - | ") or die("Could not search for the genebank file\n");
-    while (my $line = <FH>) {
-        my ($gbid) = $line =~ /<Id>(\d+)/;
-        if ($gbid) {
-            $ftp_cmd = $base_cmd.'/efetch.fcgi?db=nuccore&retmod=text&rettype=gb&id='.$gbid.'"';
-            if (system($ftp_cmd.' -O '.$MIT_GENBANK_FILE)) {
-                die("Could not retrieve the genbank file\n");
-            }
-            last;
-        }
-    }
-    close(FH) or die("Could not close command\n");
+  my $base_cmd = 'wget -q "http://eutils.ncbi.nlm.nih.gov/entrez/eutils';
+  my $ftp_cmd = $base_cmd.'/efetch.fcgi?db=nuccore&retmod=text&rettype=gb&id='.$MIT_DB_VERSION.'"';
+  if (system($ftp_cmd.' -O '.$MIT_GENBANK_FILE)) {
+    die("Could not retrieve the genbank file\n");
+  }
 }
 
 ############################
@@ -225,8 +214,8 @@ my $output_db =
 # Check taxon is correct
 
 my $meta_container = $output_db->get_MetaContainer();
-my $db_taxon_id = $meta_container->get_taxonomy_id(); 
-my $gb_taxon_id; 
+my $db_taxon_id = $meta_container->get_taxonomy_id();
+my $gb_taxon_id;
 foreach my $feature (@$features) {
     if (exists $feature->{source}) {
         $gb_taxon_id = $feature->{source}->{db_xref}->{taxon};
@@ -702,7 +691,6 @@ sub get_chromosomes {
         -seq_region_name   => $assembly{$cs->name},
         -seq_region_length => $genbank_ref->{_length},
       );
-   
     }
   }
 
