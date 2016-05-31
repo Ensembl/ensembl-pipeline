@@ -100,7 +100,8 @@ sub new{
       $seq_region_end,
       $hap_pair,
       $use_mt,
-      $include_non_reference)=rearrange([qw(DB 
+      $include_non_reference,
+      $min_slice_length)     =rearrange([qw(DB 
                                             SLICE 
                                             SINGLE 
                                             FILE
@@ -124,6 +125,7 @@ sub new{
                                             HAP_PAIR
                                             MT
  					    INCLUDE_NON_REFERENCE
+                                            MIN_SLICE_LENGTH
                                            )], @_);
 
   $slice = 0 unless ($slice);
@@ -133,7 +135,7 @@ sub new{
   $include_non_reference = 0 unless ($include_non_reference);
   $translation_id = 0 unless($translation_id);
   $use_mt = 0 unless ($use_mt);
-
+  $min_slice_length = 0 unless ($min_slice_length);
   if(!$db){
     throw("You can't create and store input_ids without a dbadaptor\n");
   }
@@ -204,6 +206,8 @@ print "hap_pair: ",$hap_pair,"\n";
   $self->regex($regex) if($regex);
   $self->single_name($single_name) if($single_name);
   $self->use_mitochondrion($use_mt) if($use_mt);
+  $self->min_slice_length($min_slice_length);
+
   return $self;
 }
 
@@ -356,6 +360,11 @@ sub use_mitochondrion{
   return $self->{'use_mitochondrion'};
 }
 
+sub min_slice_length {
+  my $self = shift;
+  $self->{'_min_slice_length'} = shift if(@_);
+  return $self->{'_min_slice_length'};
+}
 
 sub get_analysis{
   my ($self, $logic_name, $input_id_type, $insert) = @_;
@@ -475,10 +484,22 @@ sub get_slice_names{
   }
 
   my $mt_name = undef;
-  $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name unless ($self->use_mitochondrion);
+  if($self->use_mitochondrion) {
+    $mt_name = $sa->fetch_by_region('toplevel', 'MT')->seq_region_name;
+  }
+
   my @ids;
   foreach my $slice(@$slices){
-    next if (defined $mt_name and $slice->seq_region_name eq $mt_name);
+
+    if($slice->length() < $self->min_slice_length()) {
+      next;
+    }
+
+    unless($self->use_mitochondrion) {
+      if($slice->seq_region_name eq 'MT') {
+        next;
+      }
+    }
     push(@ids, $slice->name);
   }
 
