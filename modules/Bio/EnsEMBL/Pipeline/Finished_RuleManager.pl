@@ -4,14 +4,14 @@
 #
 
 # Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
-Copyright [2016] EMBL-European Bioinformatics Institute
-# 
+# # Copyright [2016] EMBL-European Bioinformatics Institute
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -38,7 +38,7 @@ use Bio::EnsEMBL::Pipeline::Config::Blast;
 use Bio::EnsEMBL::Pipeline::Config::General;
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
 use IO::Socket;
-use Data::Dumper; 
+use Data::Dumper;
 
 $| = 1; # localise?
 
@@ -126,7 +126,7 @@ unless (&config_sanity_check) {
     exit 1;
 }
 
-# command line options override 
+# command line options override
 # anything set in the environment variables.
 
 my $dbhost         = $ENV{'ENS_DBHOST'};
@@ -142,7 +142,7 @@ my $idlist         = undef;
 my ($done, $once)  = (0) x 2;
 my $no_run         = 0; # makes it only create jobs but doesn't submit to LSF
 my $runner         = undef;
-my $shuffle        = 0;  
+my $shuffle        = 0;
 my $output_dir     = undef;
 my @start_from     = ();
 my @assembly_types = ();
@@ -229,8 +229,8 @@ sub check_not_overloaded{
     warn "$NAMED : Checking Queue Manager status\n";
     # retry_failed_jobs($job_adaptor, $DEFAULT_RETRIES);
     my $queue = {
-        '-USER'  => 'rds', 
-        '-QUEUE' => $DEFAULT_BATCH_QUEUE, 
+        '-USER'  => 'rds',
+        '-QUEUE' => $DEFAULT_BATCH_QUEUE,
         '-DEBUG' => 0
         };
     #while ((ref($GET_PEND_JOBS) eq 'CODE') && !$term_sig && (&$GET_PEND_JOBS($queue) >= $MAX_PENDING_JOBS)) {
@@ -351,7 +351,7 @@ my @rules       = $rule_adaptor->fetch_all;
 
 my @id_list;     # All the input ids to check
 
-alarm $wakeup if $wakeup;  
+alarm $wakeup if $wakeup;
                 # Signal to the script to do something in the future,
                 # Such as check for failed jobs, no of jobs in queue
 
@@ -389,7 +389,7 @@ alarm $wakeup if $wakeup;
 }
 
 while (1) {
-    
+
     $submitted = {};
 
     # This loop reads input ids from the database a chunk at a time
@@ -438,7 +438,7 @@ while (1) {
 
     JOBID: while (@id_list) {
         my $id = shift @id_list;
-    
+
         # handle signals. they are 'caught' in the handler subroutines but
         # it is only here they we do anything with them. so if the script
         # is doing something somewhere else (getting IDs at the start of
@@ -592,7 +592,7 @@ while (1) {
               }
             }
             sigprocmask(SIG_UNBLOCK, $sigset2) or die "Can't unblock SIGALRM after batch_runRemote: $!\n";
-            
+
         }
 
     }
@@ -600,7 +600,7 @@ while (1) {
     &shut_down($DBADAPTOR) if $done || $once;
     my $this_time;# = flush_created_if_they_might_never_get_done($submitted,$DBADAPTOR);
     my $slept;
-    if($this_time){ 
+    if($this_time){
         # not much was submitted, probably because
 	# there was too many unfulfilled dependancies
 	# wait while the jobs finish
@@ -759,7 +759,7 @@ sub db_sanity_check{
                 LEFT JOIN input_id_type_analysis t ON a.analysis_id = t.analysis_id
 	        WHERE t.analysis_id IS NULL};
   $msg = "Some of your analyses don't have entries in the".
-         " input_id_type_analysis table"; 
+         " input_id_type_analysis table";
   execute_sanity_check($db, $query, $msg);
   #check that all types which aren't accumulators have entries in
   #input__id_analysis table
@@ -824,13 +824,13 @@ sub daemonize {
         print STDERR "$NAMED : $0 is already running as a daemon using pid file: <$PID_FILE>\n";
         exit;
     }
-}  
+}
 sub stop_daemon{
     if(my $pid = eval{get_pid()}){
         kill 9, $pid;
         unlink $PID_FILE;
         my $db;
-        eval{ 
+        eval{
             $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                                 -host   => $dbhost,
                                                                 -dbname => $dbname,
@@ -838,7 +838,7 @@ sub stop_daemon{
                                                                 -pass   => $dbpass,
                                                                 -port   => $dbport,
                                                             );
-            
+
         };
         if($@){
             print STDERR $@;
@@ -870,7 +870,7 @@ sub daemon_status{
 	}
         print STDERR "$NAMED : Checking the database...\n";
         my $db;
-        eval{ 
+        eval{
             $db = Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor->new(
                                                                 -host   => $dbhost,
                                                                 -dbname => $dbname,
@@ -878,7 +878,7 @@ sub daemon_status{
                                                                 -pass   => $dbpass,
                                                                 -port   => $dbport,
                                                             );
-            
+
         };
         if($@){
             print STDERR $@;
@@ -940,7 +940,7 @@ sub pause{
 	sigprocmask(SIG_UNBLOCK, $sigset) or die "Can't Unblock SIGINT for sleep: $!\n";
     }elsif($script & 2){
 	print STDERR "$NAMED : Going to sleep for $PAUSE secs\n";
-	sleep($PAUSE);	
+	sleep($PAUSE);
     }else{       # called from this script as a control
 	my $SIG = 31;
 	if(my $pid = eval{get_pid()}){
@@ -951,7 +951,7 @@ sub pause{
     }
 }
 sub check_db{
-    
+
 }
 sub restart{
     print STDERR "$NAMED : ****************************************\n";

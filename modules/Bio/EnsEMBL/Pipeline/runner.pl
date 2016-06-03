@@ -2,14 +2,14 @@
 
 
 # Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
-Copyright [2016] EMBL-European Bioinformatics Institute
-# 
+# # Copyright [2016] EMBL-European Bioinformatics Institute
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -78,7 +78,7 @@ if( $check ) {
 
 $queue_manager = $QUEUE_MANAGER unless($queue_manager);
 
-my $batch_q_module = 
+my $batch_q_module =
   "Bio::EnsEMBL::Pipeline::BatchSubmission::$queue_manager";
 
 
@@ -147,25 +147,25 @@ if($cleanup){
 
 sub run_jobs_with_selfcopy{
   my ($jobs, $host) = @_;
- 
+
   # fix needed here; when running a batch of jobs, a jobs failure causes
   # all output so far to be copied to the output directory. Upon completion
-  # of the whole batch, LSF then appends output for the whole batch  to the 
-  # end of the earlier-created file in the output directory. This causes 
-  # duplication of all output up to the point of the job failure. If you 
+  # of the whole batch, LSF then appends output for the whole batch  to the
+  # end of the earlier-created file in the output directory. This causes
+  # duplication of all output up to the point of the job failure. If you
   # intend to use for output for anything (e.g. data mining) then this will
   # obviously affect the results!
 
  JOB:foreach my $job(@$jobs) {
-    
+
     my $job_id = $job->dbID;
-    
+
     $job->execution_host($host);
-    
+
     eval{
       $job_adaptor->update($job);
     };
-    
+
     if($@){
       print STDERR "Job $job_id failed: [$@]";
       if($batch_q_object->can('copy_output')){
@@ -187,7 +187,7 @@ sub run_jobs_with_selfcopy{
     print STDERR "Input id is " . $job->input_id . "\n";
     print STDERR "Analysis is ".$job->analysis->logic_name."\n";
     print STDERR "Files are " . $job->stdout_file . " " . $job->stderr_file . "\n";
-    
+
     eval {
       $job->run_module;
     };
@@ -214,16 +214,16 @@ sub run_jobs_with_lsfcopy{
   my ($jobs, $host) = @_;
 
  JOB:foreach my $job(@$jobs) {
-    
+
     my $job_id = $job->dbID;
-    
+
     $job->execution_host($host);
-    
+
     eval{
       $job_adaptor->update($job);
     };
     if($@){
-      print STDERR "Job update ".$job->dbID." failed: [$@]";  
+      print STDERR "Job update ".$job->dbID." failed: [$@]";
     }
     print STDERR "Running job $job_id\n";
     print STDERR "Module is " . $job->analysis->module . "\n";
@@ -231,20 +231,20 @@ sub run_jobs_with_lsfcopy{
     print STDERR "Analysis is ".$job->analysis->logic_name."\n";
     print STDERR "Files are " . $job->stdout_file . " " .
       $job->stderr_file . "\n";
-    
+
     eval {
       $job->run_module;
     };
     $pants = $@;
-    
+
     if ($pants) {
       print STDERR "Job $job_id failed: [$pants]";
     }
-    
+
     print STDERR "Finished job $job_id\n";
     if ($job->current_status->status eq "SUCCESSFUL"){
       $job->adaptor->remove( $job );
     }
   }
-  
+
 }

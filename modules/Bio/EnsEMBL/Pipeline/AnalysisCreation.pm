@@ -1,13 +1,13 @@
 
 # Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
-Copyright [2016] EMBL-European Bioinformatics Institute
-# 
+# Copyright [2016] EMBL-European Bioinformatics Institute
+#
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
 # You may obtain a copy of the License at
-# 
+#
 #      http://www.apache.org/licenses/LICENSE-2.0
-# 
+#
 # Unless required by applicable law or agreed to in writing, software
 # distributed under the License is distributed on an "AS IS" BASIS,
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -15,13 +15,13 @@ Copyright [2016] EMBL-European Bioinformatics Institute
 # limitations under the License.
 
 
-# AnalysisCreation, class for creating analysis tables from config and 
+# AnalysisCreation, class for creating analysis tables from config and
 # writing config from analysis tables and blantanly plagered from code
 # written by Glenn Procter while designig a pipeline alternative
 #
 # POD documentation - main docs before the code
 
-=pod 
+=pod
 
 =head1 NAME
 
@@ -39,7 +39,7 @@ db_file=repbase
 program=RepeatMasker
 program_version=1
 program_file=RepeatMasker
-parameters=-low, -lib, /acari/work5a/lec/briggsae.lib 
+parameters=-low, -lib, /acari/work5a/lec/briggsae.lib
 module=RepeatMasker
 module_version=1
 gff_source=RepeatMasker
@@ -58,7 +58,7 @@ Post general queries to B<http://lists.ensembl.org/mailman/listinfo/dev>
 =head1 APPENDIX
 
 the class itself obviously doesn't' need to be instantiated but the either
-the script which uses it should be in the same directory as it or the 
+the script which uses it should be in the same directory as it or the
 directory which contains it should be in you PERL5LIB
 
 the analysis_setup script which should be found in the directory can
@@ -89,7 +89,7 @@ verbose('WARNING');
   Exceptions: if file doesn't exist
               if config format is in correct
               if key already exists for a particular header'
-  Caller    : 
+  Caller    :
   Example   : my @analyses = @{&parse_files($file)};
 
 =cut
@@ -101,7 +101,7 @@ sub parse_files {
   my @files = shift;
 
   my %headers;     # will store names of headers and number of keys for each
-  
+
   my $hcounter = 0;
   my %horder; # stores order in which entries were read
 
@@ -124,12 +124,12 @@ sub parse_files {
       next if (/^\s$/ || /^\#/);
 
       # [HEADER]
-      if (/^\[(.*)\]\s*$/) {         # $1 will be the header name, without the [] 
+      if (/^\[(.*)\]\s*$/) {         # $1 will be the header name, without the []
 	$header = $1;
 	$headers{$header} = 0;
         $horder{$header} = $hcounter++;
 	#print "Reading stanza $header\n";
-      } 
+      }
 
       # key=value
       if (/^([^=\s]+)\s*=\s*(.+?)\s*$/) {   # $1 = key, $2 = value
@@ -139,8 +139,8 @@ sub parse_files {
 	if (length($header) == 0) {
 	  throw("Found key/value pair $key/$value outside stanza");
 	}
-	#print "Key: $key Value: $value\n"; 
-      	
+	#print "Key: $key Value: $value\n";
+
 	# Check if this header/key is already defined
 	if (exists($config->{$header}->{$key})) {
 	  throw("$key is already defined for [$header]; cannot be redefined");
@@ -207,7 +207,7 @@ sub parse_files {
   Function  : Write the analysis objects into the database
   Returntype: N/A
   Exceptions: if dbadaptor is the wrong type of object
-  Caller    : 
+  Caller    :
   Example   : &write_into_db($db, \@analyses);
 
 =cut
@@ -227,7 +227,7 @@ sub write_into_db{
   my $analysis_adaptor = $db->get_AnalysisAdaptor;
   my $sql = "select analysis_id from analysis where logic_name = ?";
   my $sth = $db->prepare($sql);
-  ANALYSIS:foreach my $a(@$analyses){ 
+  ANALYSIS:foreach my $a(@$analyses){
     $sth->execute($a->logic_name);
     my ($analysis_id)= $sth->fetchrow;
     if($analysis_id){
@@ -240,7 +240,7 @@ sub write_into_db{
           my ($type) = $sth->fetchrow;
           if($type){
             throw("need ".$type." to be the same as ".$a->input_id_type .
-             " ( " .   $a->logic_name . " ) " ) 
+             " ( " .   $a->logic_name . " ) " )
               unless($type eq $a->input_id_type);
           }else{
             my $stored_sql = "insert into input_id_type_analysis ".
@@ -275,7 +275,7 @@ sub write_into_db{
   Function  : Read the analysis objects from the database
   Returntype: array ref of analysis objects
   Exceptions: if db isn't the correct type'
-  Caller    : 
+  Caller    :
   Example   : my $analyses = &read_db($db);
 
 =cut
@@ -288,7 +288,7 @@ sub read_db{
   if(!($db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor'))){
     throw("need a DBAdaptor not ".$db);
   }
- 
+
   my $analysis_adaptor = $db->get_AnalysisAdaptor;
 
   return $analysis_adaptor->fetch_all;
@@ -302,7 +302,7 @@ sub read_db{
   Function  : write a config file for the objects given
   Returntype: N/A
   Exceptions: if file doesnt exist
-  Caller    : 
+  Caller    :
   Example   : &write_file($file, $analyses);
 
 =cut
@@ -327,13 +327,13 @@ sub write_file{
     print FH "gff_source=".$a->gff_source."\n" if($a->gff_source);
     print FH "gff_feature=".$a->gff_feature."\n" if($a->gff_feature);
     if($a->can("input_id_type")){
-      print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);   
+      print FH "input_id_type=".$a->input_id_type."\n" if($a->input_id_type);
     }
     print FH "description ".$a->description."\n" if($a->description);
     print FH "display_name".$a->display_label."\n" if($a->display_label);
     print FH "\n\n";
   }
-  
+
 }
 
 1;
