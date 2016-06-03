@@ -1,20 +1,21 @@
 =head1 LICENSE
 
-
-# Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
 Copyright [2016] EMBL-European Bioinformatics Institute
-# 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-# 
-#      http://www.apache.org/licenses/LICENSE-2.0
-# 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -32,19 +33,19 @@ Dan Andrews <dta@sanger.ac.uk>
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment - 
+Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment -
 
 =head1 SYNOPSIS
 
 use warnings ;
 use Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
- Create our object, specifying the genetic code needed to 
- translate our sequences.  The commonest codes are: 
-   universal                => 1 
+ Create our object, specifying the genetic code needed to
+ translate our sequences.  The commonest codes are:
+   universal                => 1
    vertebrate mitochondrial => 2
- These numbers are the same as those you need to specify to 
- translate any Bio::Seq object.  Hence if you need a truly 
+ These numbers are the same as those you need to specify to
+ translate any Bio::Seq object.  Hence if you need a truly
  oddball genetic code, check the Bio::Seq module documentation.
 my $cba =
   Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
@@ -100,7 +101,7 @@ sub new {
 		      )], @args);
 
   unless (defined $genetic_code){
-    warning("Genetic code not specified.  Defaulting " . 
+    warning("Genetic code not specified.  Defaulting " .
 	    "to the so-called universal code.");
     $genetic_code = 1;
   }
@@ -144,7 +145,7 @@ sub sequences {
     $self->{_sequences} = shift;
 
     foreach my $seq (@{$self->{_sequences}}){
-      throw("Unexpected sequence type.  Should be Bio::Seq, " . 
+      throw("Unexpected sequence type.  Should be Bio::Seq, " .
 	    "but was [$seq]")
 	unless $seq->isa("Bio::Seq");
     }
@@ -172,7 +173,7 @@ sub run_alignment {
   my %desc_lookup;
 
   foreach my $nt_seq (@$seqs){
-    $nt_seqs{$nt_seq->display_id}     = $nt_seq; 
+    $nt_seqs{$nt_seq->display_id}     = $nt_seq;
     $desc_lookup{$nt_seq->display_id} = $nt_seq->desc;
   }
 
@@ -205,7 +206,7 @@ sub run_alignment {
       print "Adding gap to make sequences same length.\n";
     }
 
-#    throw("nt and aa sequences are not of corresponding lengths.") 
+#    throw("nt and aa sequences are not of corresponding lengths.")
 #      if scalar @nt_seq_array != scalar @aa_seq_array;
 
     my $aligned_nt_string = '';
@@ -251,7 +252,7 @@ sub _alignment {
     warning("CodonBasedAlignment::_alignment - unknown action specified ".
 		"[$action].  Must be \'add\' or \'clear\'");
   }
-  
+
   return $self->{_alignment};
 }
 
@@ -261,8 +262,8 @@ sub genetic_code {
   if (@_){
     $self->{_genetic_code} = shift;
   }
- 
-  throw("Genetic code not specified.") 
+
+  throw("Genetic code not specified.")
     unless $self->{_genetic_code};
 
   return $self->{_genetic_code}

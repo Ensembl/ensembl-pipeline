@@ -1,7 +1,21 @@
-# Ensembl module for Bio::EnsEMBL::Analysis::Config::Blast
-#
-# Copyright (c) 2004 Ensembl
-#
+=head1 LICENSE
+
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 NAME
 
@@ -10,7 +24,7 @@
 =head1 SYNOPSIS
 
   use Bio::EnsEMBL::Analysis::Config::Blast;
-  
+
   use Bio::EnsEMBL::Analysis::Config::Blast qw(BLAST_CONTIG);
 
 =head1 DESCRIPTION
@@ -20,16 +34,16 @@ blast RunnableDBs. This informs the various blast runnabledbs what
 Parser and Filter objects they should instantiate and also of any
 constructor arguments which should go to the Blast Runnable note any
 Blast constructor arguments will be overridden by the same key in
-analysis table parameters column. If you like to submit options to 
-the blastp / blastall program, use the parameters-colum in the analysis-table. 
+analysis table parameters column. If you like to submit options to
+the blastp / blastall program, use the parameters-colum in the analysis-table.
 Format of options submitted should be :
- 
-    -hitdist => 40 , -score => 20 , -cpu => 40 
+
+    -hitdist => 40 , -score => 20 , -cpu => 40
 
 
-If you are intending to use NCBI blast / blastall, the program to use is choosen by the 
-arguments supplied in the query-type and database-type parameters in the 
-PARSER_PARAMS section. ( -query_type => 'pep' and -database_type =>'pep' will 
+If you are intending to use NCBI blast / blastall, the program to use is choosen by the
+arguments supplied in the query-type and database-type parameters in the
+PARSER_PARAMS section. ( -query_type => 'pep' and -database_type =>'pep' will
 result in using blastp.
 
 
@@ -38,38 +52,38 @@ settings and is keyed on logic_name
 
 Important values are the key of the hash which should be the same as the
 the logic name of the analysis you are configuring
-and blast parser which should be a perl path to a object to parser the 
-blast report. 
+and blast parser which should be a perl path to a object to parser the
+blast report.
 
-the blast_parser object should fit the standard interface which is to 
+the blast_parser object should fit the standard interface which is to
 have a method called parse_file which accepts a filename as an argument and
-returns a set of results all other constructor arguements are optional but 
+returns a set of results all other constructor arguements are optional but
 the two parser objects which currently exist both need a regex, query type
 and database type the types needed for different flavours of blast
-can be found below and the two parser objects BPliteWrapper and 
+can be found below and the two parser objects BPliteWrapper and
 FilterBPlite both live in Bio/EnsEMBL/Analysis/Tools
 
-blast_filter should be a perl path to a filter object The filter module 
-isn't obligatory, if none is specified then the blast results won't be 
+blast_filter should be a perl path to a filter object The filter module
+isn't obligatory, if none is specified then the blast results won't be
 filters after parsing (note some parsers may do filtering) The only filter
-object which currently exists is 
+object which currently exists is
 Bio::EnsEMBL::Analysis::Tools::FeatureFilter. All filter objects must
-have a filter_results method but aside from that there is no other 
-requirements. Any constructor args should be specified in the hash. 
+have a filter_results method but aside from that there is no other
+requirements. Any constructor args should be specified in the hash.
 FeatureFilter can take min_score, max_pvalue coverage prune and hardprune
 
 blast_params is any constructor parameters for which ever blast module
 you are using. sequence ID format sometimes changes in the Uniprot, Unigene
-etc databases used in BLAST, so modify the regex if necessary.  note all 
-constructor parameters will be overridden by values got from the 
+etc databases used in BLAST, so modify the regex if necessary.  note all
+constructor parameters will be overridden by values got from the
 parameters column of the analysis table.
 
 AB_INITIO_LOGICNAME if for BlastGenscanPep/DNA runnabledbs for which
-ab initio predictions to use when running the blast and they currently 
+ab initio predictions to use when running the blast and they currently
 default to Genscan
 
 this example file contains a default setting which is what we use for out
-BlastGenscanPep against Swall 
+BlastGenscanPep against Swall
 =head1 CONTACT
 
 Post questions to the Ensembl development list: http://lists.ensembl.org/mailman/listinfo/dev
@@ -95,7 +109,7 @@ use vars qw(%Config);
 #
 #
 #    ########  Example-configuration for a 'standard' Uniprot run which uses
-#    ########  the program wublastp and the module BlastGenscanPep.pm  
+#    ########  the program wublastp and the module BlastGenscanPep.pm
 #
 #    Uniprot =>
 #            {
@@ -114,7 +128,7 @@ use vars qw(%Config);
 #                              -type => 'wu',
 #                             },
 #    ########  Example-configuration for a 'standard' Uniprot run which uses
-#    ########  the program blastall ( ncbi blast ) and the module BlastGenscanPep.pm   
+#    ########  the program blastall ( ncbi blast ) and the module BlastGenscanPep.pm
 #
 #    Uniprot_ncbiblast =>
 #            {
