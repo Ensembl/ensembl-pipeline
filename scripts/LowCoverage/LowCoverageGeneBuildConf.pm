@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-LowCoverageGeneBuildConf - 
+LowCoverageGeneBuildConf -
 
 =head1 SYNOPSIS
 
@@ -46,7 +49,7 @@ use vars qw( %LowCoverageGeneBuildConf );
 # Notes: this is mammal-specific
 
 %LowCoverageGeneBuildConf = (
-			     
+
 	 	# User-specific configuration:
 		  LC_USER		        => '', #ba1
 		  LC_GeneBuilderID		=> '', #4
@@ -58,20 +61,20 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_cvsDIR  			=> '',#/nfs/acari/ba1/PerlCode/
 		  LC_workDIR 			=> '',#/lustre/work1/ba1/test/
 		  LC_scratchDIR			=> '', #/lustre/scratch1/ba1/test/    Pipeline output directory
-		  
-		  
+
+
 		  # Species-specific configuration:
-		  LC_SPECIES 		=> '',#armadillo	
-		  LC_BUILD_VERSION	=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/	 
-		  
-		  
+		  LC_SPECIES 		=> '',#armadillo
+		  LC_BUILD_VERSION	=> '', #arma_1.0   in config dir eg. ensembl-config/armadillo/arma_1.0/
+
+
 		  #data-specific cofiguration from BROAD and EBI
 		  LC_AB_INITIO_LIB      => '', #/ecs4/work1/sd3/rabbit1/repeat_libraries/ab_initio.lib
 		  LC_SUPP_LIB           => '', #/ecs4/work1/sd3/rabbit1/repeat_libraries/supplemental.lib
 		  LC_ASSEMBLY_AGP	=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.agp
 		  LC_ASSEMBLY		=> '', #/ecs4/work1/sd3/rabbit1/assembly/assembly.bases #unzipped name
 		  LC_SCAFFOLDS		=> '', #/ecs4/work1/sd3/rabbit1/assembly/scaffolds.fasta #unzipped name
-		
+
 		# Taxonomy
 		# Not used any more (assembly name used instead)LC_DEFAULT	=> '', #RABBIT #use a short name (used for assembly) - look at ensj-healthcheck/src/org/ensembl/healthcheck/Species.java for ideas
 		  LC_NAME       => '', #Oryctolagus cuniculus #scientific name
@@ -79,7 +82,7 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  TAXON_DBHOST  => 'ens-livemirror',
 		  TAXON_DBPORT  => '3306',
 
-		 
+
 	 	# database to put sequence and genes into
 		  LC_DBNAME   => '',#ba1_test_code
 		  LC_DBHOST   => '',#genebuild1
@@ -94,23 +97,23 @@ use vars qw( %LowCoverageGeneBuildConf );
 		  LC_DEBUG   => 1,
 
 		# Your choice of which RepeatMasks should be used for Pipeline
-		# This is decided upon <after> all 3 repeatMask analyses are run, and <before> the 
+		# This is decided upon <after> all 3 repeatMask analyses are run, and <before> the
 		# RepeatMask-dependent analyses are run
 		  LC_REPMASK_CHOICE		=>  [('RepeatMask','Supp_RepeatMask')], #[ ('RepeatMask','Supp_RepeatMask') ]
 
 		# Groups of analyses
 		  LC_REPEATMASKS		=> [
-				 { 
-				   logic_name 	=> 'RepeatMask',				  
+				 {
+				   logic_name 	=> 'RepeatMask',
 				 },
-				 { 
-				   logic_name 	=> 'Supp_RepeatMask',				  
+				 {
+				   logic_name 	=> 'Supp_RepeatMask',
 				 },
 				 {
 				   logic_name 	=> 'Ab_initio_RepeatMask',
 				 }
 				],
-				 
+
 		  LC_REPEATMASK_INDEPENDENT	=> [
 		  		 {
 				   logic_name 	=> 'CpG',
@@ -143,7 +146,7 @@ use vars qw( %LowCoverageGeneBuildConf );
 				 {
 				   logic_name	=> 'Vertrna',
 				 },
-		  		],	  				 
+		  		],
 			    );
 
 

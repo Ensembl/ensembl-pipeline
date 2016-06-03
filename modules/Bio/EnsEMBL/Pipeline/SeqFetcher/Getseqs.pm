@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs -
 
 =head1 SYNOPSIS
 
@@ -38,12 +41,12 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::Getseqs -
 
 =head1 DESCRIPTION
 
-  Object to retrieve sequences as Bio::Seq, using getseqs by James Cuff. Sequences are fetched from a 
+  Object to retrieve sequences as Bio::Seq, using getseqs by James Cuff. Sequences are fetched from a
 database previously formatted with makeindex
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -77,7 +80,7 @@ sub new {
   if (defined $db) {
     $self->db($db);
   }
-  
+
   return $self; # success - we hope!
 }
 
@@ -97,14 +100,14 @@ sub executable {
     {
       $self->{'_exe'} = $exe;
     }
-  return $self->{'_exe'};  
+  return $self->{'_exe'};
 }
 
 =head2 db
 
   Title   : db
   Usage   : $self->db('/data/blastdb/dbname');
-  Function: Get/set for dbs to be searched. Checks that the database 
+  Function: Get/set for dbs to be searched. Checks that the database
             appropriate files are present, but nothing else.
   Returns : string
   Args    : string
@@ -120,14 +123,14 @@ sub db {
   if (defined $dbs){
     if (ref($dbs) eq 'ARRAY') {
       foreach my $db(@$dbs){
-	$self->throw("are you sure that $db has been formatted with makeindex?\n") 
+	$self->throw("are you sure that $db has been formatted with makeindex?\n")
 	  unless ( -e "$db.jidx");
 	push (@{$self->{'_db'}},$db);
       }
     }
   }
-  return (@{$self->{'_db'}});  
-  
+  return (@{$self->{'_db'}});
+
 }
 
 =head2 get_Seq_byacc
@@ -136,7 +139,7 @@ sub db {
   Usage   : $self->get_Seq_by_acc($accession);
   Function: Does the sequence retrieval via getseqs
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
@@ -145,20 +148,20 @@ sub  get_Seq_by_acc {
 
   if (!defined($acc)) {
     $self->throw("No accession input");
-  }  
-  
+  }
+
   my $seqstr;
   my $seq;
   my $getseqs = $self->executable;
   my @seqdb  = $self->db;
-  
+
  SEQDB:
   while(scalar(@seqdb) && !(defined $seq)){
     my $database = pop(@seqdb);
 
     last SEQDB unless defined $database;
     my $cmd = "$getseqs '$acc' $database";
-    
+
     open(IN,"$cmd 2>/dev/null |") or $self->throw("Error forking getseqs for accession [$acc]: getseqs");
     my $seqstr;
     while(<IN>){
@@ -174,10 +177,10 @@ sub  get_Seq_by_acc {
 			'-accession_number'  => $acc,
 			'-desc'              => "",
 			'-display_id'        => $acc);
-    
+
     }
   }
-  $self->throw("Could not getseqs sequence for [$acc]\n") unless defined $seq;    
+  $self->throw("Could not getseqs sequence for [$acc]\n") unless defined $seq;
   return $seq;
 }
 

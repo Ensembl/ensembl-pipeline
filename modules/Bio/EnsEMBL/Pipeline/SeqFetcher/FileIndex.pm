@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::FileIndex - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::FileIndex -
 
 =head1 SYNOPSIS
 
@@ -41,7 +44,7 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::FileIndex -
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -70,7 +73,7 @@ sub new {
   } else {
     $self->throw("Need a sequence file");
   }
-  
+
   return $self; # success - we hope!
 }
 
@@ -80,22 +83,22 @@ sub new {
   Usage   : $self->get_eq_by_acc($accession);
   Function: Does the sequence retrieval
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
 sub get_Seq_by_acc {
   my ($self, $acc) = @_;
-  
+
   if (!defined($acc)) {
     $self->throw("No accession input");
-  }  
-  
+  }
+
   if (defined($self->{_seqhash}{$acc})) {
      return $self->{_seqhash}{$acc};
   } else {
      $self->throw("Could not fetch sequence for [$acc]\n");
-  } 
+  }
 }
 
 sub seqfile {
@@ -104,19 +107,19 @@ sub seqfile {
 
   if (defined($file)) {
     open (INDEX,"<$file") || $self->throw("Can't open $file");
-    
+
     my $seqio = new Bio::SeqIO(-fh => \*INDEX, -format => 'fasta');
-    
+
     while (my $seq = $seqio->next_seq) {
       $self->{_seqhash}{$seq->id} = $seq;
     }
-    
+
     close(INDEX);
   } else {
     $self->throw("Must supply a seqfile to Bio:EnsEMBL::Pipeline::SeqFetcher::FileIndex");
   }
 }
-  
+
 sub list_all_ids {
   my ($self) = @_;
 

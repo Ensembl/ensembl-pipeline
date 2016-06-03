@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex -
 
 =head1 SYNOPSIS
 
@@ -38,15 +41,15 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex -
 
 =head1 DESCRIPTION
 
-    Object to retrieve sequences as Bio::Seq, from a bioperl index. 
-    The index is not made by this module; instead, the absolute path 
-    to the bioperl index must be set using $obj->bp_index. The format 
+    Object to retrieve sequences as Bio::Seq, from a bioperl index.
+    The index is not made by this module; instead, the absolute path
+    to the bioperl index must be set using $obj->bp_index. The format
     of the database must be set using bp_format.
 
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -71,16 +74,16 @@ use vars qw(@ISA);
 sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
-  
+
   my($index, $format) = $self->_rearrange(['INDEX',
 					   'FORMAT'], @args);
-  
+
   if (!defined $index) {
     $self->throw("No bioperl indexfile provided to BPIndex\n");
   }
   $self->bp_index($index);
-  
-  
+
+
   if (!defined $format) {
     $self->throw("No bioperl index format provided to BPIndex\n");
   }
@@ -101,14 +104,14 @@ sub new {
 =cut
 
 sub bp_index {
-  
+
   my ($self, $inx) = @_;
   if ($inx)
     {
       $self->{'_inx'} = $inx;
     }
-  return $self->{'_inx'};  
-  
+  return $self->{'_inx'};
+
 }
 
 =head2 bp_format
@@ -122,14 +125,14 @@ sub bp_index {
 =cut
 
 sub bp_format {
-  
+
   my ($self, $format) = @_;
   if ($format)
     {
       $self->{'_format'} = $format;
     }
-  return $self->{'_format'};  
-  
+  return $self->{'_format'};
+
 }
 
 =head2 get_Seq_by_acc
@@ -138,29 +141,29 @@ sub bp_format {
   Usage   : $self->get_Seq_by_acc($accession);
   Function: Does the sequence retrieval
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
 sub  get_Seq_by_acc {
   my ($self, $acc) = @_;
-  
+
   my $inx    = $self->bp_index;
   my $format = $self->bp_format;
-  
+
 
   if (!defined($acc)) {
     $self->throw("No accession input");
-  }  
+  }
 
   if (!defined($inx)) {
     $self->throw("No search index specified; cannot run");
-  }  
+  }
 
   if (!defined($format)) {
     $self->throw("No index format specified");
-  }  
-  
+  }
+
   my $type = 'Bio::Index::' . $format;
   my $index;
 
@@ -173,7 +176,7 @@ sub  get_Seq_by_acc {
     $self->warn("Problem opening the index [$inx] - check you have supplied the right format!");
     $self->throw ("[$tmp]!");
   }
-  
+
   # get the sequence
   my $seq;
   eval{
@@ -181,7 +184,7 @@ sub  get_Seq_by_acc {
   };
 
   $self->throw("Could not fetch sequence for [$acc]") unless defined $seq;
-  return $seq; 
+  return $seq;
 }
 
 1;

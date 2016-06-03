@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneDuplication::Finder - 
+Bio::EnsEMBL::Pipeline::GeneDuplication::Finder -
 
 =head1 SYNOPSIS
 
@@ -65,31 +69,31 @@ my $DEFAULT_DISTANCE_CUTOFF  = 1.000;
 
 =head2 new
 
-  Args       : -dbfile       - (string) Full path to a fasta formatted file of 
+  Args       : -dbfile       - (string) Full path to a fasta formatted file of
                                nucleotide sequences.
-               -blastdb      - A Bio::EnsEMBL::Pipeline::Runnable::BlastDB 
+               -blastdb      - A Bio::EnsEMBL::Pipeline::Runnable::BlastDB
                                object for which the run method has been invoked.
                -query_seq    - A Bio::Seq which is comprised of nucleotides.
                -blast_program           - Manually set the blast program (and
                                full path) that should be used.  Make sure the
                                program matches the index type chosen.  Defaults
                                to wublastn.
-               -blast_index_type        - The distribution of blast to use.  See 
+               -blast_index_type        - The distribution of blast to use.  See
                                Bio::EnsEMBL::Pipeline::Runnable::BlastDB->index_type
                                documentation.  Defaults to 'wu_new'.
                -hit_identity - (optional) Hit identity.  Defaults to 0.80
                -hit_coverage - (optional) Hit coverage.  Defults to 0.80
-               -work_dir     - (optional) Dir where working files are 
+               -work_dir     - (optional) Dir where working files are
                                           placed.  Defaults to /tmp.
                -codeml       - Full path to codeml executable.
                -genetic_code - 0 for Universal, 1 for Mitochondrial.  See
-                               the Bio::Seq->translate method for a full 
+                               the Bio::Seq->translate method for a full
                                list of options.
                -regex_query_species     - A regular expression that will parse
                                some portion of the ids of the query species (and
 			       not the ids of outgroup species).  Eg. 'ENSG'.
                -regex_outgroup_species  - A ref to an array of regular expressions
-                               that will parse the ids of the various outgroup 
+                               that will parse the ids of the various outgroup
                                species (but not the ids of the query species).
                                E.g. ['ENSMUSG', 'ENSRNOG']
                -distance_cutoff         - A genetic distance cutoff to apply for
@@ -173,7 +177,7 @@ sub new {
 
   Args[1]    : [optional] Input sequence (Bio::Seq)
   Example    : none
-  Description: Top level method that executes the gene duplicate 
+  Description: Top level method that executes the gene duplicate
                finding algorithm.
   Returntype : Bio::EnsEMBL::Pipeline::GeneDuplication::Result
   Exceptions : Warns if PAML run fails.
@@ -188,10 +192,10 @@ sub run {
   $self->_query_seq($input_seq)
     if $input_seq;
 
-  # Derive a list of sequences that look like duplications of 
+  # Derive a list of sequences that look like duplications of
   # the query sequence.
 
-  my $accepted_hits 
+  my $accepted_hits
     = $self->_find_recent_duplications($self->_query_seq);
 
   unless (scalar @$accepted_hits > 1) {
@@ -209,7 +213,7 @@ sub run {
 
   Args[1]    : Bio::Seq query sequence
   Example    : none
-  Description: This is the implementation of the main algorithm of 
+  Description: This is the implementation of the main algorithm of
                this module.
   Returntype :
   Exceptions :
@@ -295,12 +299,12 @@ sub _run_blast {
 sub _preliminary_filter {
   my ($self, $bplite_report) = @_;
 
-  # Process our blast report.  
+  # Process our blast report.
   #
   # For each blast hit:
   #   * throw away self matches (if any)
   #   * filter hits by identity and coverage
-  #   * align WHOLE genes of promising hits, re-filter by 
+  #   * align WHOLE genes of promising hits, re-filter by
   #       identity and coverage
   #   * calculate genetic distance between each subject and the query
 
@@ -309,18 +313,18 @@ sub _preliminary_filter {
  DISTINCT_HIT:
   while (my $sbjct = $bplite_report->nextSbjct){
 
-    # Mangle the BPLite::Sbjct object for its own good.  Quite 
-    # often the hit ids parsed by BPLite include the whole 
-    # Fasta header description line.  This is problematic if 
-    # sequence ids need to be compared or a hash is keyed on 
+    # Mangle the BPLite::Sbjct object for its own good.  Quite
+    # often the hit ids parsed by BPLite include the whole
+    # Fasta header description line.  This is problematic if
+    # sequence ids need to be compared or a hash is keyed on
     # this sequence id.  Here we simply lop the description
     # from each Sbjct->name, if there is one.
     $sbjct = $self->_fix_sbjct($sbjct);
 
-    # It appears that the BPLite::Sbjct object only allows 
-    # HSPs to be accessed once (as this process is closely 
+    # It appears that the BPLite::Sbjct object only allows
+    # HSPs to be accessed once (as this process is closely
     # tied to the parsing of the Blast report).  Hence, here
-    # we loop through them all here and store them in an 
+    # we loop through them all here and store them in an
     # array.
 
     my @hsps;
@@ -346,7 +350,7 @@ sub _preliminary_filter {
     next DISTINCT_HIT
       unless ($self->_appraise_hit_coverage($sbjct, \@hsps));
 
-    # Third, this has become a serious hit.  Make a pairwise 
+    # Third, this has become a serious hit.  Make a pairwise
     # alignment of the query and hit.
 
     my @seqs = ($self->_fetch_seq($self->_query_seq->display_id),
@@ -357,10 +361,10 @@ sub _preliminary_filter {
 
     my $align = $self->_pairwise_align(\@seqs);
 
-      # and filter by coverage and identity for the whole 
+      # and filter by coverage and identity for the whole
       # aligned sequences.
 
-    my ($min_coverage, $identity) 
+    my ($min_coverage, $identity)
       = $self->_calculate_coverage_and_identity($align);
 
     unless ($min_coverage >= $self->_coverage_cutoff &&
@@ -371,7 +375,7 @@ sub _preliminary_filter {
 
     # Forth, calculate the genetic distance while we are here.
 
-    my ($ka, $ks, $n, $s) 
+    my ($ka, $ks, $n, $s)
       = $self->_run_pairwise_paml($align);
 
     # Finally, store all this useful information.  Perhaps a proper
@@ -395,7 +399,7 @@ die "undefined N and S" unless defined $n and defined $s;
 
 =head2 _phylogenetic_filter
 
-  Args[1]    : 
+  Args[1]    :
   Example    : none
   Description:
   Returntype :
@@ -451,8 +455,8 @@ sub _phylogenetic_filter {
 
   foreach my $species (keys %hits_by_species) {
 
-    my @sorted_hits 
-      = sort {$good_hits->{$a}->{Ks} <=> $good_hits->{$b}->{Ks}} 
+    my @sorted_hits
+      = sort {$good_hits->{$a}->{Ks} <=> $good_hits->{$b}->{Ks}}
 	@{$hits_by_species{$species}};
     $sorted_hits_by_species{$species} = \@sorted_hits;
   }
@@ -475,7 +479,7 @@ sub _phylogenetic_filter {
 
     my $closest_hit_distance = $good_hits->{$closest_hit_id}->{Ks};
 
-    if (($closest_hit_distance < $closest_outgroup_distance) && 
+    if (($closest_hit_distance < $closest_outgroup_distance) &&
 	($closest_hit_distance > 0)) {
 
       $closest_outgroup_distance = $closest_hit_distance;
@@ -581,8 +585,8 @@ sub _run_pairwise_paml {
   if ($@){
     throw ("PAML failed to give a file that could be parsed.\n" .
 	     "This is a PAML/codeml error.\n" .
-	   "The offending aligned sequences are :\n>" . 
-	   $aligned_seqs->[0]->display_id . "\n" . $aligned_seqs->[0]->seq . "\n>" . 
+	   "The offending aligned sequences are :\n>" .
+	   $aligned_seqs->[0]->display_id . "\n" . $aligned_seqs->[0]->seq . "\n>" .
 	   $aligned_seqs->[1]->display_id . "\n" . $aligned_seqs->[1]->seq . "\n$@");
   }
 
@@ -613,7 +617,7 @@ sub _pairwise_align {
   throw ("Pairwise alignment was only expecting two sequences.")
     unless ((scalar @$seqs) == 2);
 
-  my $cba 
+  my $cba
     = Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment->new(
 	-genetic_code => 1);
 
@@ -694,23 +698,23 @@ sub _calculate_coverage_and_identity {
 sub _appraise_hit_coverage{
   my ($self, $sbjct, $hsps) = @_;
 
-  # Select our sequence length as being that of the 
+  # Select our sequence length as being that of the
   # longer sequence.
 
-  my $sbjct_length 
+  my $sbjct_length
     = $self->_fetch_seq($sbjct->name)->length;
 
   my ($longest_length) = sort {$a <=> $b} ($self->_query_seq->length, $sbjct_length);
 
 
-  # Look at all the hits along the length of the 
+  # Look at all the hits along the length of the
   # query and tally the collective coverage of the hits.
 
   my @query_coverage;
 
   foreach my $hsp (@$hsps) {
 
-    for (my $base_position = $hsp->query->start; 
+    for (my $base_position = $hsp->query->start;
 	 $base_position <= $hsp->query->end;
 	 $base_position++){
       $query_coverage[$base_position]++;
@@ -736,12 +740,12 @@ sub _appraise_hit_coverage{
 
   Args[1]    :
   Example    :
-  Description: A work-around for a BPLite::Sbjct annoyance.  The 
-               sbjct->name object returns the whole fasta description 
-               line for a subject hit.  If the input fasta sequence 
-               file includes more than an id on the description line, 
-               this will be passed back every time the name method is 
-               called.  This is a real pest is you are trying to 
+  Description: A work-around for a BPLite::Sbjct annoyance.  The
+               sbjct->name object returns the whole fasta description
+               line for a subject hit.  If the input fasta sequence
+               file includes more than an id on the description line,
+               this will be passed back every time the name method is
+               called.  This is a real pest is you are trying to
                match ids via a regex or use the ids as hash keys.
   Returntype :
   Exceptions :
@@ -768,7 +772,7 @@ sub _fix_sbjct {
   Args[1]    :
   Example    :
   Description:
-  Returntype : 
+  Returntype :
   Exceptions :
   Caller     :
 
@@ -805,7 +809,7 @@ sub _hit_identity{
 =cut
 
 sub outgroup_distance {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_outgroup_distance} = shift;
@@ -856,7 +860,7 @@ sub _fetch_seq {
 
   Args       : An arrayref of string sequence ids.
   Example    : none
-  Description: An alias to $self->_fetch_seq, but handles 
+  Description: An alias to $self->_fetch_seq, but handles
                multiple sequences.
   Returntype : Arrayref of Bio::Seq
   Exceptions : none
@@ -881,14 +885,14 @@ sub _fetch_seqs {
 
   Args[1]    : Bio::Seq
   Example    : $self->_force_cache($seq);
-  Description: Allows a sequence to be manually added to the seqfetcher 
-               cache.  This is useful for coping with user supplied 
-               sequences (eg. passed as a query sequence) that dont 
+  Description: Allows a sequence to be manually added to the seqfetcher
+               cache.  This is useful for coping with user supplied
+               sequences (eg. passed as a query sequence) that dont
                exist in any database.
   Returntype : 1
   Exceptions : Warns if sequence already exists in cache.  Throws if
                a defined sequence isnt supplied.
-  Caller     : 
+  Caller     :
 
 =cut
 
@@ -899,7 +903,7 @@ sub _force_cache {
     unless (defined $seq);
 
   if ($self->{_cache}->{$seq->display_id}){
-    warning('Sequence [' . $seq->display_id . 
+    warning('Sequence [' . $seq->display_id .
 	    '] already exists in cache, but will replace.');
   }
 
@@ -911,7 +915,7 @@ sub _force_cache {
 
 =head2 _seq_fetcher
 
-  Args       : (optional) A seqfetcher of any variety, as long as 
+  Args       : (optional) A seqfetcher of any variety, as long as
                it has a 'fetch' method.
   Example    : none
   Description: Holds SeqFetcher object.
@@ -927,7 +931,7 @@ sub _seq_fetcher {
   $self->{_seq_fetcher} = shift if @_;
 
   if (! $self->{_seq_fetcher}){
-    $self->{_seq_fetcher} = 
+    $self->{_seq_fetcher} =
       Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB->new(
 				     -db => $self->_blastdb);
   }
@@ -979,7 +983,7 @@ sub _blast_obj {
 
     # Create a new blast object with our mixed species input database.
 
-    $self->{_blast_obj} 
+    $self->{_blast_obj}
       = Bio::EnsEMBL::Pipeline::Runnable::MinimalBlast->new(
 		 -program         => $self->_blast_program,
 		 -blastdb         => $self->_blastdb,
@@ -1017,9 +1021,9 @@ sub _blastdb {
     throw ("Blast database has not been formatted.")
       unless $self->{_blastdb}->db_formatted;
 
-    throw ("Blast database has been built without the " . 
+    throw ("Blast database has been built without the " .
 	   "make_fetchable_index flag set (and this is " .
-	   "a problem because the database can not be " . 
+	   "a problem because the database can not be " .
 	   "used for sequence fetching).")
       unless $self->{_blastdb}->make_fetchable_index
   }
@@ -1094,7 +1098,7 @@ sub _query_seq {
   if (@_) {
     $self->{_query_seq} = shift;
 
-    throw ("Query sequence is not a Bio::Seq object [" . 
+    throw ("Query sequence is not a Bio::Seq object [" .
 	   $self->{_query_seq} . "]")
       unless $self->{_query_seq}->isa("Bio::Seq");
 
@@ -1176,7 +1180,7 @@ sub _identity_cutoff {
 =cut
 
 sub _coverage_cutoff {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_coverage_cutoff} = shift;
@@ -1203,7 +1207,7 @@ sub _coverage_cutoff {
 =cut
 
 sub _distance_cutoff {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_distance_cutoff} = shift;
@@ -1258,7 +1262,7 @@ sub _regex_query_species {
 =cut
 
 sub _regex_outgroup_species {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_regex_outgroup_species} = shift;
@@ -1277,9 +1281,9 @@ sub _regex_outgroup_species {
 
   Args       : int
   Example    : $self->_genetic_code(1);
-  Description: Holds an integer representing the genetic code.  To 
-               choose the correct integer consult the documentation 
-               used by the Bio::Seq->translate method.  1 is universal, 
+  Description: Holds an integer representing the genetic code.  To
+               choose the correct integer consult the documentation
+               used by the Bio::Seq->translate method.  1 is universal,
                2 is vertebrate mitochondria.
   Returntype : int
   Exceptions : Warns if called while unset.
@@ -1288,7 +1292,7 @@ sub _regex_outgroup_species {
 =cut
 
 sub _genetic_code {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_genetic_code} = shift;
@@ -1306,16 +1310,16 @@ sub _genetic_code {
 =head2 _distance_method
 
   Args       : String
-  Example    : 
-  Description: 
-  Returntype : 
+  Example    :
+  Description:
+  Returntype :
   Exceptions : Throws if set to an unrecognised string.
-  Caller     : 
+  Caller     :
 
 =cut
 
 sub _distance_method {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_distance_method} = shift;
@@ -1341,14 +1345,14 @@ sub _distance_method {
   Example    : $self->_codeml('/path/to/codeml')
   Description: Holds the path to the codeml executable
   Returntype : String
-  Exceptions : Throws if a full path is included, but the 
+  Exceptions : Throws if a full path is included, but the
                file is not executable.
   Caller     : $self->new, $self->_run_pairwise_paml
 
 =cut
 
 sub _codeml {
-  my $self = shift; 
+  my $self = shift;
 
   if (@_) {
     $self->{_codeml} = shift;
@@ -1358,7 +1362,7 @@ sub _codeml {
   $self->{_codeml} = 'codeml'
     unless $self->{_codeml};
 
-  # If it looks like our executable comes with a full 
+  # If it looks like our executable comes with a full
   # path, check that it will work.
 
   throw ("codeml executable not found or not " .

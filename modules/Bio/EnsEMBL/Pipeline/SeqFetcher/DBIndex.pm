@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex -
 
 =head1 SYNOPSIS
 
@@ -59,7 +63,7 @@ sub new {
     #Should we be able to search multiple databases?
 
     my( $database ) =  $self->_rearrange([qw(DATABASE)], @args);
-    
+
     # Store any parameters passed
     $self->database($database);
 
@@ -111,7 +115,7 @@ sub read_fileids {
     my $fileid_file = $self->database . "/fileids.dat";
 
     if (! -e $fileid_file) {
-	$self->throw("Fileid file [$fileid_file] doesn't exist for database [" . 
+	$self->throw("Fileid file [$fileid_file] doesn't exist for database [" .
 		     $self->database . "\n");
     }
 
@@ -125,12 +129,12 @@ sub read_fileids {
 	    my $fh = new FileHandle("<$name");
 	    $self->{_fileid}{$id}   = $fh;
 	    $self->{_dbfile}{$name} = $id;
-            $self->{_size}{$id}     = $size; 
+            $self->{_size}{$id}     = $size;
 	} else {
 	    $self->throw("Something's wrong - there are two identical file ids $id");
 	}
     }
-    
+
     close(FILEID);
 }
 
@@ -147,11 +151,11 @@ sub read_header {
 
     my $num_fields;
     my $record_width;
-   
+
     my @field_width;
 
     my $i = 0;
-    
+
     sysread($fh,$record_width,4);
     sysread($fh,$num_fields,4);
 
@@ -200,7 +204,7 @@ sub read_record {
   my $fileid;
   my $pos;
   my $length;
-    
+
   sysread($fh,$id,    $field_width[0]);
   sysread($fh,$fileid,$field_width[1]);
   sysread($fh,$pos,   $field_width[2]);
@@ -213,7 +217,7 @@ sub read_record {
 
 sub get_Seqs_by_id_array {
     my ($self,@ids) = @_;
-    
+
     my %entry;
 
     foreach my $id (@ids) {
@@ -260,7 +264,7 @@ sub get_Seq_by_id {
 sub get_entry {
   my ($self,$fh,$pos,$length) = @_;
 
-  
+
   my $entry;
 
   sysseek ($fh,$pos,0);
@@ -315,18 +319,18 @@ sub find_entry {
       }
 
       $start = $mid;
-      
+
       $self->find_entry($fh,$record_size,$start,$end,$id);
     } else {
 	print "No match\n";
     }
 
- }   
+ }
 
 sub make_index {
 
   my ($self,$dbname,$format,@files) = @_;;
-    
+
   if (!defined(@files)) {
     $self->throw("Must enter an array of filenames to index");
   }
@@ -345,7 +349,7 @@ sub make_index {
 
   $self->database($dbname);
   $self->_make_indexdir;
-  
+
 
   # Check the available disk space
 
@@ -354,16 +358,16 @@ sub make_index {
   $self->_make_config_file;
   $self->_make_fileid_file(@files);
 
-    
+
   # Finally lets index
   foreach my $file (@files) {
     $self->_index_file($file);
   }
- 
+
   $self->write_primary_index;
 
   # print some stats
-    
+
 }
 
 sub _index_file {
@@ -387,7 +391,7 @@ sub _index_file {
 
            my $begin = tell(FILE) - length( $_ );
            my $length = ($begin - $recstart);
-    
+
         if ($found) {
 	if (!defined($id)) {
 	    $self->throw("No id defined for sequence");
@@ -400,7 +404,7 @@ sub _index_file {
 	}
 	if (!defined($length)) {
 	    $self->throw("No length defined for " . $id . "\n");
-	} 
+	}
         $self->_add_id_position($id,$recstart,$fileid,$length);
          } else {
              $found = 1;
@@ -426,10 +430,10 @@ sub write_primary_index {
     open (INDEX,">" . $self->primary_index_file);
 
     my $recordlength = $self->{_maxidlength} +
-	               $self->{_maxfileidlength} + 
+	               $self->{_maxfileidlength} +
 	               $self->{_maxposlength} +
    		       $self->{_maxlengthlength} + 6;
-	
+
     foreach my $id (@ids) {
 	if (!defined($self->{_id}{$id}{_fileid})) {
 	    $self->throw("No fileid for $id\n");
@@ -441,7 +445,7 @@ sub write_primary_index {
 	    $self->throw("No length for $id");
 	}
 
-	my $record =  $id . "\t" . 
+	my $record =  $id . "\t" .
 	    $self->{_id}{$id}{_fileid} . "\t" .
 	    $self->{_id}{$id}{_pos} .    "\t" .
 	    $self->{_id}{$id}{_length};
@@ -455,7 +459,7 @@ sub write_primary_index {
     }
     close(INDEX);
 }
-	    
+
 sub primary_index_file {
     my ($self) = @_;
 
@@ -527,14 +531,14 @@ sub _make_fileid_file {
     my ($self,@files) = @_;
 
     my $dir = $self->database;
-    
+
     if (! -d $dir) {
 	$self->throw("[$dir] is not a directory.  Can't write fileid file");
     }
 
     my $fileid_name = $dir . "/fileid";
-    
-    
+
+
     open(FILEID,">$fileid_name") || $self->throw("Can't write fileid file [$fileid_name]");
 
     my $count = 1;
@@ -551,12 +555,12 @@ sub _make_fileid_file {
 
 sub get_fileid_by_filename {
     my ($self,$file) = @_;
-    
+
     if (!defined($self->{_dbfile})) {
 	$self->throw("No file to fileid mapping present.  Has the fileid file been read?");
     }
 
-    
+
     return $self->{_dbfile}{$file};
 }
 
@@ -600,10 +604,3 @@ sub namespace {
 }
 
 1;
-
-	
-
-    
-
-
-

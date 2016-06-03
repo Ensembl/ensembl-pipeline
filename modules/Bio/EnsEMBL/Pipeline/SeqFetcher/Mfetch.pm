@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::Mfetch - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::Mfetch -
 
 =head1 SYNOPSIS
 
@@ -44,7 +48,7 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::Mfetch -
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 Method Bio::EnsEMBL::Root::_rearrange is deprecated.
@@ -63,7 +67,7 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
-use Time::HiRes qw ( gettimeofday ) ; 
+use Time::HiRes qw ( gettimeofday ) ;
 use vars qw(@ISA);
 $|=0;
 @ISA = qw(Bio::DB::RandomAccessI);
@@ -73,18 +77,18 @@ sub new {
   my $self = bless {}, $class;
 
   my ($exe, $options ) = rearrange(['EXECUTABLE', 'OPTIONS'], @args);
- 
+
   if (!defined $exe) {
     $exe = 'mfetch';
   }
-  $self->executable($exe); 
+  $self->executable($exe);
 
-  if (defined $options) { 
-    $options=~s/^\s+//g; 
+  if (defined $options) {
+    $options=~s/^\s+//g;
     $self->options($options);
-  } 
-  # caching of sequences 
-  $self->{_seq_cache}={};      
+  }
+  # caching of sequences
+  $self->{_seq_cache}={};
 
   return $self; # success - we hope!
 }
@@ -105,7 +109,7 @@ sub executable {
     {
       $self->{'_exe'} = $exe;
     }
-  return $self->{'_exe'};  
+  return $self->{'_exe'};
 }
 
 =head2 options
@@ -137,25 +141,25 @@ sub options {
   Usage   : $self->get_eq_by_acc($accession);
   Function: Does the sequence retrieval via mfetch
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
 sub get_Seq_by_acc {
   my ($self, $acc) = @_;
-  
+
   if (!defined($acc)) {
     throw("No accession input");
-  }  
- 
-  if ( defined ( $self->{_seq_cache}{$acc})) {  
+  }
+
+  if ( defined ( $self->{_seq_cache}{$acc})) {
      return $self->{_seq_cache}{$acc};
-  } 
-  # seqence not cached, needs to be fetched 
+  }
+  # seqence not cached, needs to be fetched
   my $seqstr;
   my $seq;
-  my $mfetch = $self->executable; 
-  # the option for fetching a sequence only by mfetch is mfetch -v fasta  
+  my $mfetch = $self->executable;
+  # the option for fetching a sequence only by mfetch is mfetch -v fasta
   my $options = $self->options;
   if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
 
@@ -163,16 +167,16 @@ sub get_Seq_by_acc {
   if (defined $options){
     $command .= "$options ";
   }
-  
+
   $command .= $acc;
-  print STDERR "$command\n" if $self->{verbose}; 
-  open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc]: $mfetch");  
-   
-  while  (my $line=<IN>){  
-     chomp($line) ; 
-     next if $line=~m/>/;  
-     $seqstr.=$line; 
-  }  
+  print STDERR "$command\n" if $self->{verbose};
+  open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc]: $mfetch");
+
+  while  (my $line=<IN>){
+     chomp($line) ;
+     next if $line=~m/>/;
+     $seqstr.=$line;
+  }
   close IN or throw("Error running mfetch for accession [$acc]: \n$mfetch");
   chomp($seqstr);
   eval{
@@ -186,38 +190,38 @@ sub get_Seq_by_acc {
   if($@){
     print STDERR "$@\n";
   }
-  
+
   throw("Could not mfetch sequence for [$acc]\n") unless defined $seq;
 
   $self->{_seq_cache}{$acc}=$seq;
   return $seq;
-} 
+}
 
 
 =head2 get_Entry_Fields_no_mfetch
 
   Title   : get_Entry_Fields_no_mfetch
-  Usage   : $self->get_Entry_Fields_no_mfetch(\@accessions,\@fields,"/nfs/ensembl/amonida/uniprot_sprot_summary.dat","/nfs/ensembl/amonida/uniprot_trembl_summary.dat"); 
-          : $self->get_Entry_Fields_no_mfetch("Q5RFX5", \@fields,"/nfs/ensembl/amonida/uniprot_sprot_summary.dat","/nfs/ensembl/amonida/uniprot_trembl_summary.dat"); 
+  Usage   : $self->get_Entry_Fields_no_mfetch(\@accessions,\@fields,"/nfs/ensembl/amonida/uniprot_sprot_summary.dat","/nfs/ensembl/amonida/uniprot_trembl_summary.dat");
+          : $self->get_Entry_Fields_no_mfetch("Q5RFX5", \@fields,"/nfs/ensembl/amonida/uniprot_sprot_summary.dat","/nfs/ensembl/amonida/uniprot_trembl_summary.dat");
   Arg [0] : $self
-  arg [1] : ACC as string ( Q5RFX5 ) OR arrayref to array of acc 
+  arg [1] : ACC as string ( Q5RFX5 ) OR arrayref to array of acc
   arg [2] : arrayref to fields which you want to receive
             \@field = qw(  pe taxon acc )  ;
   arg [3] : Filepath to uniprot dumped file containing Swiss-Prot protein fields.
   arg [4] : Filepath to uniprot dumped file containing TrEMBL protein fields.
   Function: Does the retrieval of different files like Taxonomy_id or PE level via uniprot dumped files.
   Returns : arrayref to array of hashes for each acc.?
-  Args    : 
+  Args    :
 
 =cut
 
 sub get_Entry_Fields_no_mfetch {
-  my ($self,$sprot_file,$trembl_file,$acc_to_fetch,$fields) = @_; 
+  my ($self,$sprot_file,$trembl_file,$acc_to_fetch,$fields) = @_;
 
-   print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
+   print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose};
 
   if ( ref($acc_to_fetch)=~m/ARRAY/ ) {
-    print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
+    print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose};
 
     my @acc_to_fetch_no_version = ();
     foreach my $an_acc (@$acc_to_fetch)
@@ -233,104 +237,104 @@ sub get_Entry_Fields_no_mfetch {
 =head2 get_Entry_fields
 
   Title   : get_Entry_Fields
-  Usage   : $self->get_Entry_Fields(\@accessions,\@fields); 
-          : $self->get_Entry_Fields("Q5RFX5", \@fields); 
-  Arg [0] : $self 
-  arg [1] : ACC as string ( Q5RFX5 ) OR arrayref to array of acc 
-  arg [2] : arrayref to fields which you want to receive     
-            \@field = qw(  pe taxon acc )  ;  
-  Function: Does the retrieval of different files like Taxonomy_id or PE level via mfetch, 
+  Usage   : $self->get_Entry_Fields(\@accessions,\@fields);
+          : $self->get_Entry_Fields("Q5RFX5", \@fields);
+  Arg [0] : $self
+  arg [1] : ACC as string ( Q5RFX5 ) OR arrayref to array of acc
+  arg [2] : arrayref to fields which you want to receive
+            \@field = qw(  pe taxon acc )  ;
+  Function: Does the retrieval of different files like Taxonomy_id or PE level via mfetch,
             either for one acc or in batch mode.
   Returns : arrayref to array of hashes for each acc.?
-  Args    : 
+  Args    :
 
 =cut
 
 sub get_Entry_Fields {
-  my ($self, $acc_to_fetch,$fields) = @_; 
+  my ($self, $acc_to_fetch,$fields) = @_;
 
-   print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
+   print "Fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose};
 
-  if ( ref($acc_to_fetch)=~m/ARRAY/ ) {   
-    print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose}; 
-    return $self->get_Entry_Fields_BatchFetch($acc_to_fetch,$fields); 
-  } 
+  if ( ref($acc_to_fetch)=~m/ARRAY/ ) {
+    print "BatchFetch fields to get : " . join ( " " , @$fields )."\n" if $self->{verbose};
+    return $self->get_Entry_Fields_BatchFetch($acc_to_fetch,$fields);
+  }
   if (!defined($acc_to_fetch)) {
     throw("No accession input");
-  }  
+  }
 
-  print " try to fetch $acc_to_fetch\n"  if $self->{verbose}; 
-  my $command ;  
-  my %all_entries; 
-  my @entries_not_found;   
+  print " try to fetch $acc_to_fetch\n"  if $self->{verbose};
+  my $command ;
+  my %all_entries;
+  my @entries_not_found;
 
-  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);  
-  $command = $cmd_prefix ." " .  $acc_to_fetch; 
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);
+  $command = $cmd_prefix ." " .  $acc_to_fetch;
 
-  # extract acc if you do a wildcard like mfetch -i  "AJFLD%"  
+  # extract acc if you do a wildcard like mfetch -i  "AJFLD%"
 
   my $acc_format = $acc_to_fetch;
   $acc_format=~s/acc://g;
   $acc_format=~s/\%//g;
-  $acc_format=~s/\"//g; 
+  $acc_format=~s/\"//g;
 
-  print "cmd: $command\n" if $self->{verbose}; 
-  my @lines = @{$self->_mfetch_command($command)} ; 
-  #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");  
-  # my @lines = <IN> ; 
-  #close IN or throw("Error running mfetch for accession [$acc_format]: $command ");  
- 
-  my %entry;  
+  print "cmd: $command\n" if $self->{verbose};
+  my @lines = @{$self->_mfetch_command($command)} ;
+  #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_to_fetch]:  $command ");
+  # my @lines = <IN> ;
+  #close IN or throw("Error running mfetch for accession [$acc_format]: $command ");
 
-  for my $line ( @lines ) { 
-        chomp($line) ;    
+  my %entry;
+
+  for my $line ( @lines ) {
+        chomp($line) ;
         #print "LINE $line" if $self->{verbose};
-        # we're just parsing one entry so if we get a no_match we just return  .... 
-        
-        if ( $line =~m/no match/ ) {     
+        # we're just parsing one entry so if we get a no_match we just return  ....
+
+        if ( $line =~m/no match/ ) {
            print  "no entry found for $acc_to_fetch with $command\n" if $self->{verbose};
-           push @entries_not_found, $acc_to_fetch; 
-           return [\%all_entries , \@entries_not_found ] ; 
-        }  
+           push @entries_not_found, $acc_to_fetch;
+           return [\%all_entries , \@entries_not_found ] ;
+        }
 
-        my @l = split /\s+/, $line;     
-        my $key_field = shift @l ;     
+        my @l = split /\s+/, $line;
+        my $key_field = shift @l ;
 
-        # result can contain more than one line begining with same field identifier , ie  
-        #   AC Q4589; 
+        # result can contain more than one line begining with same field identifier , ie
+        #   AC Q4589;
         #   AC Q0999;
-        #   not sure how this works if we only get AC's ....   but why would we do this anyway ?  
-        
-        if ( $key_field =~/AC/) {  
-          if ( scalar(@l) > 1 ) {  
-            warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ; 
-          }   
-        }      
+        #   not sure how this works if we only get AC's ....   but why would we do this anyway ?
 
-        $entry{$key_field}.= join(" ", @l);    
+        if ( $key_field =~/AC/) {
+          if ( scalar(@l) > 1 ) {
+            warning ("more than one AC number returned : " . join(" ", @l) . "  - we ignore the others " . scalar(@l) . " objects\n") ;
+          }
+        }
+
+        $entry{$key_field}.= join(" ", @l);
         print "populating $key_field ... ".join(" ", @l) . "\n" if $self->{verbose};
-  }  
-  # populate all_entry-hash 
-  for my $field ( keys %entry ) {  
-    $all_entries{$acc_format}{$field}=$entry{$field}; 
+  }
+  # populate all_entry-hash
+  for my $field ( keys %entry ) {
+    $all_entries{$acc_format}{$field}=$entry{$field};
   }
 
-   if ( 0 )  { 
-     for my $key ( keys %all_entries ) {  
-         print "KEY $key\n";  
+   if ( 0 )  {
+     for my $key ( keys %all_entries ) {
+         print "KEY $key\n";
            my %tmp = %{$all_entries{$key}} ;
-           for ( keys %tmp ) {   
-              #if ( /AC/ ) { 
-              #  print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";  
-              #}else {  
-                print "\t\t$_ --> $tmp{$_}\n";  
+           for ( keys %tmp ) {
+              #if ( /AC/ ) {
+              #  print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";
+              #}else {
+                print "\t\t$_ --> $tmp{$_}\n";
               #}
-           }  
+           }
            print "\n" ;
-     }     
+     }
   }
-  return [\%all_entries , \@entries_not_found ] ; 
-} 
+  return [\%all_entries , \@entries_not_found ] ;
+}
 
 
 sub _mfetch_command {
@@ -348,15 +352,15 @@ sub _mfetch_command {
   Title   : get_Seq_by_acc_wildcard
   Usage   : $self->get_eq_by_acc($accession);
   Function: Does the sequence retrieval via mfetch
-  Returns : string  
-  Args    : 
+  Returns : string
+  Args    :
 
 =cut
 
 sub get_Seq_by_acc_wildcard {
   my ($self, $acc) = @_;
 
-  $acc=~s/\..*//g; # chop version off 
+  $acc=~s/\..*//g; # chop version off
 
   my $options = $self->options ;
   unless ( $options=~m/-v fasta/ ) {
@@ -378,17 +382,17 @@ sub get_Seq_by_acc_wildcard {
  return \@lines ;
 }
 
-sub build_acc_index { 
-   my ($acc) = @_ ;   
+sub build_acc_index {
+   my ($acc) = @_ ;
 
-   my %tmp ;  
-   my $position = 0 ; 
-   for my $ac ( @$acc ) {   
-     $tmp{$position} = $ac; 
+   my %tmp ;
+   my $position = 0 ;
+   for my $ac ( @$acc ) {
+     $tmp{$position} = $ac;
      $position++;
-   }  
-   return \%tmp ; 
-} 
+   }
+   return \%tmp ;
+}
 
 sub get_Entry_Fields_file {
   my ($filename,@acc) = @_;
@@ -459,11 +463,11 @@ sub get_Entry_Fields_file {
 sub get_Entry_Fields_BatchFetch_no_mfetch {
   my ($self,$sprot_file,$trembl_file,$acc,$fields) = @_;
 
-  unless ( ref($acc) =~m/ARRAY/ ) {   
-    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n"); 
+  unless ( ref($acc) =~m/ARRAY/ ) {
+    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n");
   }
 
-  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);   
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);
   my %acc_index = %{build_acc_index($acc)};
 
   my @acc_to_fetch = @$acc;
@@ -471,29 +475,29 @@ sub get_Entry_Fields_BatchFetch_no_mfetch {
   my @fetch_strings;
   push @fetch_strings,join( " ",@acc_to_fetch); # everything is fetched
 
-  print "got " . scalar(@fetch_strings) . " jobs to run \n"; 
-  my $command ;  
-  my @entries_not_found;   
-  my $last_acc; 
-  my %last_entry ;  
+  print "got " . scalar(@fetch_strings) . " jobs to run \n";
+  my $command ;
+  my @entries_not_found;
+  my $last_acc;
+  my %last_entry ;
   my $entry_number = 0;
-  my @lines ;  
-  # data fetching + parsing  
-  my %no_match_index;  
-  my $last_field ="";     
-  #my ( %little_hash, %all_entries ) ;  #c 
-  my ( $little_hash, $all_entries ) ; 
-  my $new_entry = 0;  
-  #my $no_match_found = 0 ; 
+  my @lines ;
+  # data fetching + parsing
+  my %no_match_index;
+  my $last_field ="";
+  #my ( %little_hash, %all_entries ) ;  #c
+  my ( $little_hash, $all_entries ) ;
+  my $new_entry = 0;
+  #my $no_match_found = 0 ;
 
-  STRING: for my $acc_string ( @fetch_strings ) {    
+  STRING: for my $acc_string ( @fetch_strings ) {
     $command = $cmd_prefix ." " .  $acc_string;
-    my @nr_acc = split /\s+/, $acc_string ;      
+    my @nr_acc = split /\s+/, $acc_string ;
 
-    print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ;  
+    print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ;
 
-    my $t0 = gettimeofday() ;  
-    print "starting no_mfetch\n" ;  
+    my $t0 = gettimeofday() ;
+    print "starting no_mfetch\n" ;
 
     my @lines_sprot = get_Entry_Fields_file($sprot_file,@nr_acc);
     print ("sprot finished, num of lines_sprot:".scalar(@lines_sprot)."\n");
@@ -528,53 +532,53 @@ sub get_Entry_Fields_BatchFetch_no_mfetch {
            push(@lines,"no match\n");
          } # end foreach one_acc
 
-    my $t1 = gettimeofday() ; 
-    my $delta_t = $t1 - $t0 ;  
-    print "time for no_mfetch : $delta_t\n" ; 
+    my $t1 = gettimeofday() ;
+    my $delta_t = $t1 - $t0 ;
+    print "time for no_mfetch : $delta_t\n" ;
 
-    # data parsing  
+    # data parsing
 
     LINE: for my $line ( @lines ) {
-      print "PARSING : $line\n" if $self->verbose(); 
+      print "PARSING : $line\n" if $self->verbose();
       chomp($line) ;
 
       if ( $line =~m/no match/ ) {
 
-        print "line contains \"no match\"  \n" if $self->{verbose} ;  
+        print "line contains \"no match\"  \n" if $self->{verbose} ;
         $last_field = "";
 
         # if we have an entry in memory store it
-         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
-              print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose}; 
-              my  $query_acc = $acc_index{$entry_number}; 
-              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
-              undef $little_hash;  
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored
+              print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose};
+              my  $query_acc = $acc_index{$entry_number};
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );
+              undef $little_hash;
               $entry_number++ ;
-              print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
+              print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ;
               print "NEW adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
-              push @entries_not_found,  $acc_index{$entry_number};  
-              $no_match_index{$entry_number}=1; 
-              next LINE;  
-         } 
-          print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};;   
-          if ( exists $no_match_index{$entry_number} ) {  
-            $entry_number++ ; 
-          } 
-          $no_match_index{$entry_number}=1;  
-          print "adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose}; 
-          push @entries_not_found,  $acc_index{$entry_number};  
-          $entry_number++ ; 
-          next LINE;  
-      }  
+              push @entries_not_found,  $acc_index{$entry_number};
+              $no_match_index{$entry_number}=1;
+              next LINE;
+         }
+          print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};;
+          if ( exists $no_match_index{$entry_number} ) {
+            $entry_number++ ;
+          }
+          $no_match_index{$entry_number}=1;
+          print "adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
+          push @entries_not_found,  $acc_index{$entry_number};
+          $entry_number++ ;
+          next LINE;
+      }
 
-      my @l = split /\s+/, $line;    
-      my $field = shift @l ;     
+      my @l = split /\s+/, $line;
+      my $field = shift @l ;
 
-      # parsing the start of the ENTRY with AC field  .... 
+      # parsing the start of the ENTRY with AC field  ....
 
       if ($field =~m/AC/ ) {
         if ( $last_field =~m/AC/)  {
-             # we have multiple AC fields in the entry which follow each other  AC xxx AC xxx 
+             # we have multiple AC fields in the entry which follow each other  AC xxx AC xxx
              $new_entry = 0 ;
          } else {
              print "\nnew entry found ...\n" if $self->{verbose} ;
@@ -583,60 +587,60 @@ sub get_Entry_Fields_BatchFetch_no_mfetch {
         }
       }
 
-      if ( $new_entry == 1 ) {    
-         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
-           if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...  
+      if ( $new_entry == 1 ) {
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored
+           if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...
 
-              print " NEW ENTRY STARTS\n" if $self->{verbose} ; 
-              # determine correct entry index 
-              while (  exists $no_match_index{$entry_number} ) { 
-                print $acc_index{$entry_number} . " is recorded as NO MATCH - checking next ...\n" if $self->{verbose} ; 
-                $entry_number++ ; 
-              } 
-              my $query_acc ; 
-              #if ( $no_match_found > 0 ) {  
-              #  print "no matches found ... $no_match_found \n" if $self->{verbose}; 
-              #  $query_acc = $acc_index{($entry_number-$no_match_found) };  
-              #  $no_match_found = 0; 
-              #} else { 
-                $query_acc = $acc_index{$entry_number}; 
+              print " NEW ENTRY STARTS\n" if $self->{verbose} ;
+              # determine correct entry index
+              while (  exists $no_match_index{$entry_number} ) {
+                print $acc_index{$entry_number} . " is recorded as NO MATCH - checking next ...\n" if $self->{verbose} ;
+                $entry_number++ ;
+              }
+              my $query_acc ;
+              #if ( $no_match_found > 0 ) {
+              #  print "no matches found ... $no_match_found \n" if $self->{verbose};
+              #  $query_acc = $acc_index{($entry_number-$no_match_found) };
+              #  $no_match_found = 0;
+              #} else {
+                $query_acc = $acc_index{$entry_number};
               #}
-              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );
 
 
               undef $little_hash;
               $entry_number++;
            }
          }
-        elsif ( exists $no_match_index{$entry_number} ) {  
+        elsif ( exists $no_match_index{$entry_number} ) {
             warning("entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n");
-            $entry_number++; 
+            $entry_number++;
         }
       }
-      # add to little hash  
-      $$little_hash{$field}.=join (" " , @l); 
-      $last_field = $field ;   
-    }  # next LINE 
-  } # next STRING - fetch next round 
- 
-  # add last entry to all_entries . 
-  $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$acc_index{$entry_number} );   
-  
-  if ( $self->{verbose}  ) { 
-    for my $key ( keys %{$all_entries} ) {  
+      # add to little hash
+      $$little_hash{$field}.=join (" " , @l);
+      $last_field = $field ;
+    }  # next LINE
+  } # next STRING - fetch next round
+
+  # add last entry to all_entries .
+  $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$acc_index{$entry_number} );
+
+  if ( $self->{verbose}  ) {
+    for my $key ( keys %{$all_entries} ) {
        print "KEY $key\n" ;
          my %tmp = %{$$all_entries{$key}} ;
-         for ( keys %tmp ) {   
-           print "\t\t$_ --> $tmp{$_}\n";  
+         for ( keys %tmp ) {
+           print "\t\t$_ --> $tmp{$_}\n";
          }
          print "\n" ;
     }
   }
-  # combine both  
-  return [$all_entries , \@entries_not_found ] ; 
+  # combine both
+  return [$all_entries , \@entries_not_found ] ;
 }
 
-=head2 get_Entry_Fields_BatchFetch 
+=head2 get_Entry_Fields_BatchFetch
 
   Title   : batch_fetch
   Usage   : $self->batch_retrieval(@accession_list);
@@ -644,164 +648,164 @@ sub get_Entry_Fields_BatchFetch_no_mfetch {
   Returns : reference to a list of Bio::Seq objects
   Args    : array of accession strings
 
-=cut 
+=cut
 
 
-sub get_Entry_Fields_BatchFetch { 
+sub get_Entry_Fields_BatchFetch {
   my ($self, $acc,$fields) = @_;
 
-  unless ( ref($acc) =~m/ARRAY/ ) {   
-    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n"); 
-  }  
+  unless ( ref($acc) =~m/ARRAY/ ) {
+    throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n");
+  }
 
-  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields() 
+  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields()
 
 
-  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);   
+  my $cmd_prefix = $self->_make_mfetch_prefix_command($fields);
   my %acc_index = %{build_acc_index($acc)};
-  # fetch in batches of 300   
-  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};   
-  print "got " . scalar(@fetch_strings) . " jobs to run \n"; 
-  my $command ;  
-  my @entries_not_found;   
-  my $last_acc; 
-  my %last_entry ;  
+  # fetch in batches of 300
+  my @fetch_strings = @{make_fetch_strings($acc, 1000 )};
+  print "got " . scalar(@fetch_strings) . " jobs to run \n";
+  my $command ;
+  my @entries_not_found;
+  my $last_acc;
+  my %last_entry ;
   my $entry_number = 0;
-  my @lines ;  
-  # data fetching + parsing  
-  my %no_match_index;  
-  my $last_field ="";     
-  #my ( %little_hash, %all_entries ) ;  #c 
-  my ( $little_hash, $all_entries ) ; 
-  my $new_entry = 0;  
-  #my $no_match_found = 0 ; 
+  my @lines ;
+  # data fetching + parsing
+  my %no_match_index;
+  my $last_field ="";
+  #my ( %little_hash, %all_entries ) ;  #c
+  my ( $little_hash, $all_entries ) ;
+  my $new_entry = 0;
+  #my $no_match_found = 0 ;
 
-  STRING: for my $acc_string ( @fetch_strings ) {    
+  STRING: for my $acc_string ( @fetch_strings ) {
     $command = $cmd_prefix ." " .  $acc_string;
-    my @nr_acc = split /\s+/, $acc_string ;      
+    my @nr_acc = split /\s+/, $acc_string ;
 
-    print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ;  
+    print $entry_number . " / " . keys (%acc_index) . " entries fetched\n" ;
 
-    if ( $self->{verbose} ) { 
+    if ( $self->{verbose} ) {
       print "\n\n$command \n\n" ;
     }
-    
-    my $t0 = gettimeofday() ;  
-    print "starting mfetch\n" ;  
-    my @lines = @{$self->_mfetch_command($command)} ; 
-    my $t1 = gettimeofday() ; 
-    my $delta_t = $t1 - $t0 ;  
-    print "time for mfetch : $delta_t\n" ; 
-    
-    # data parsing  
-   
-    LINE: for my $line ( @lines ) {  
-      print "PARSING : $line\n" if $self->verbose(); 
-      chomp($line) ;   
 
-      if ( $line =~m/no match/ ) {        
-# print "line $line\n"; 
-        print "line contains \"no match\"  \n" if $self->{verbose} ;  
-        $last_field = "";    
+    my $t0 = gettimeofday() ;
+    print "starting mfetch\n" ;
+    my @lines = @{$self->_mfetch_command($command)} ;
+    my $t1 = gettimeofday() ;
+    my $delta_t = $t1 - $t0 ;
+    print "time for mfetch : $delta_t\n" ;
 
-        # if we have an entry in memory store it  
-        
-         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
-              print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose}; 
-              my  $query_acc = $acc_index{$entry_number}; 
-              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
-              undef $little_hash;  
+    # data parsing
+
+    LINE: for my $line ( @lines ) {
+      print "PARSING : $line\n" if $self->verbose();
+      chomp($line) ;
+
+      if ( $line =~m/no match/ ) {
+# print "line $line\n";
+        print "line contains \"no match\"  \n" if $self->{verbose} ;
+        $last_field = "";
+
+        # if we have an entry in memory store it
+
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored
+              print " have no_match now, but a full entry in memory for ".  $acc_index{$entry_number} . "-- so let's try and store it.\n" if $self->{verbose};
+              my  $query_acc = $acc_index{$entry_number};
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );
+              undef $little_hash;
               $entry_number++ ;
-              print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ; 
+              print "stored and entry incremented : $entry_number   $acc_index{$entry_number} NO_MATCH \n" ;
               print "NEW adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
-              push @entries_not_found,  $acc_index{$entry_number};  
-              $no_match_index{$entry_number}=1; 
-              next LINE;  
-         } 
-          print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};;   
-          if ( exists $no_match_index{$entry_number} ) {  
-            $entry_number++ ; 
-          } 
-          $no_match_index{$entry_number}=1;  
-          print "adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose}; 
-          push @entries_not_found,  $acc_index{$entry_number};  
-          $entry_number++ ; 
-          next LINE;  
-      }  
-
-      my @l = split /\s+/, $line;    
-      my $field = shift @l ;     
-
-      # parsing the start of the ENTRY with AC field  .... 
-       
-      if ($field =~m/AC/ ) {       
-        if ( $last_field =~m/AC/)  {     
-             # we have multiple AC fields in the entry which follow each other  AC xxx AC xxx 
-             $new_entry = 0 ;   
-         } else { 
-             print "\nnew entry found ...\n" if $self->{verbose} ; 
-             $new_entry = 1; 
-             $last_field = $field ;  
-        } 
-      }   
-
-      if ( $new_entry == 1 ) {    
-         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored 
-           if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...  
-              
-              print " NEW ENTRY STARTS\n" if $self->{verbose} ; 
-              # determine correct entry index 
-              while (  exists $no_match_index{$entry_number} ) { 
-                print $acc_index{$entry_number} . " is recorded as NO MATCH - checking next ...\n" if $self->{verbose} ; 
-                $entry_number++ ; 
-              } 
-              my $query_acc ; 
-              #if ( $no_match_found > 0 ) {  
-              #  print "no matches found ... $no_match_found \n" if $self->{verbose}; 
-              #  $query_acc = $acc_index{($entry_number-$no_match_found) };  
-              #  $no_match_found = 0; 
-              #} else { 
-                $query_acc = $acc_index{$entry_number}; 
-              #}
-              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );   
-
-
-              undef $little_hash;  
-              $entry_number++; 
-           }  
-         } elsif ( exists $no_match_index{$entry_number} ) {  
-             warning("entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n");
-             $entry_number++; 
-         } 
+              push @entries_not_found,  $acc_index{$entry_number};
+              $no_match_index{$entry_number}=1;
+              next LINE;
+         }
+          print "no match for $entry_number -- $acc_index{$entry_number}\n" if $self->{verbose};;
+          if ( exists $no_match_index{$entry_number} ) {
+            $entry_number++ ;
+          }
+          $no_match_index{$entry_number}=1;
+          print "adding $acc_index{$entry_number} $entry_number to the list of no_matches \n" if $self->{verbose};
+          push @entries_not_found,  $acc_index{$entry_number};
+          $entry_number++ ;
+          next LINE;
       }
-      # add to little hash  
-      $$little_hash{$field}.=join (" " , @l); 
-      $last_field = $field ;   
-    }  # next LINE 
-  } # next STRING - fetch next round 
- 
-  # add last entry to all_entries . 
-  $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$acc_index{$entry_number} );   
-  
-  if ( $self->{verbose}  ) { 
-    for my $key ( keys %{$all_entries} ) {  
+
+      my @l = split /\s+/, $line;
+      my $field = shift @l ;
+
+      # parsing the start of the ENTRY with AC field  ....
+
+      if ($field =~m/AC/ ) {
+        if ( $last_field =~m/AC/)  {
+             # we have multiple AC fields in the entry which follow each other  AC xxx AC xxx
+             $new_entry = 0 ;
+         } else {
+             print "\nnew entry found ...\n" if $self->{verbose} ;
+             $new_entry = 1;
+             $last_field = $field ;
+        }
+      }
+
+      if ( $new_entry == 1 ) {
+         if (scalar(keys %$little_hash) > 0 ) {   # if we have read a full entry before which has not been stored
+           if ( $field =~/AC/ ) {                # if we NOW READ a  new entry we need to store the last one ...
+
+              print " NEW ENTRY STARTS\n" if $self->{verbose} ;
+              # determine correct entry index
+              while (  exists $no_match_index{$entry_number} ) {
+                print $acc_index{$entry_number} . " is recorded as NO MATCH - checking next ...\n" if $self->{verbose} ;
+                $entry_number++ ;
+              }
+              my $query_acc ;
+              #if ( $no_match_found > 0 ) {
+              #  print "no matches found ... $no_match_found \n" if $self->{verbose};
+              #  $query_acc = $acc_index{($entry_number-$no_match_found) };
+              #  $no_match_found = 0;
+              #} else {
+                $query_acc = $acc_index{$entry_number};
+              #}
+              $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$query_acc );
+
+
+              undef $little_hash;
+              $entry_number++;
+           }
+         } elsif ( exists $no_match_index{$entry_number} ) {
+             warning("entry with number $entry_number  ( $acc_index{$entry_number} ) was recorded as no_match  -incrementing entry ... \n");
+             $entry_number++;
+         }
+      }
+      # add to little hash
+      $$little_hash{$field}.=join (" " , @l);
+      $last_field = $field ;
+    }  # next LINE
+  } # next STRING - fetch next round
+
+  # add last entry to all_entries .
+  $all_entries = _add_information_to_big_hash($all_entries, $little_hash,$acc_index{$entry_number} );
+
+  if ( $self->{verbose}  ) {
+    for my $key ( keys %{$all_entries} ) {
        print "KEY $key\n" ;
          my %tmp = %{$$all_entries{$key}} ;
-         for ( keys %tmp ) {   
-           # if ( /AC/ ) { 
-           #   print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n"; 
-           # }else {  
-              print "\t\t$_ --> $tmp{$_}\n";  
+         for ( keys %tmp ) {
+           # if ( /AC/ ) {
+           #   print "\t\t$_ --> " . join(" ", @{$tmp{$_}} ). "\n";
+           # }else {
+              print "\t\t$_ --> $tmp{$_}\n";
            # }
-         }  
+         }
          print "\n" ;
-    }   
-  } 
+    }
+  }
 
-  # combine both  
+  # combine both
 
-  return [$all_entries , \@entries_not_found ] ; 
-} 
+  return [$all_entries , \@entries_not_found ] ;
+}
 
 
 sub get_Seq_BatchFetch {
@@ -811,7 +815,7 @@ sub get_Seq_BatchFetch {
     throw("if you use batchfetching you have to submit the acc-numbers in an array-reference\n");
   }
 
-  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields() 
+  # NOTE : mfetch does currently not work for fetching with wildcards. use get_entryFields()
 
   my $options = $self->options ;
   unless ( $options=~m/-v fasta/ ) {
@@ -821,7 +825,7 @@ sub get_Seq_BatchFetch {
 
   my %acc_index = %{build_acc_index($acc)};
 
-  # fetch in batches of 500   
+  # fetch in batches of 500
   my @fetch_strings = @{make_fetch_strings($acc, 500 )};
 
 
@@ -829,14 +833,14 @@ sub get_Seq_BatchFetch {
   my ($command) ;
   my $entry_number = 0;
 
-  # data fetching + parsing  
+  # data fetching + parsing
   STRING: for my $acc_string ( @fetch_strings ) {
     $command = $cmd_prefix ." " .  $acc_string;
     my @nr_acc = split /\s+/, $acc_string ;
 
-    # data retrieval   
-    #print $command ;  
-    my @lines = @{$self->_mfetch_command($command)} ; 
+    # data retrieval
+    #print $command ;
+    my @lines = @{$self->_mfetch_command($command)} ;
     #open(IN,"$command |") or throw("Error opening pipe to mfetch for accession [$acc_string]: $command ");
     #my @lines  = <IN> ;
     #close IN or throw("Error running mfetch for accession [$acc_string]: $command");
@@ -854,7 +858,7 @@ sub get_Seq_BatchFetch {
         push @clean, $line ;
       }
     }
-  } # fetch next round .. 
+  } # fetch next round ..
 
   for ( @entries_not_found ) {
     print "no entry found for : $_\n" if $self->{verbose};
@@ -873,125 +877,125 @@ sub get_Seq_BatchFetch {
 
 
 sub _add_information_to_big_hash {
-  my ($all, $little, $query_acc)  = @_ ;  
+  my ($all, $little, $query_acc)  = @_ ;
 
-  #my %all_entries = %$all;  #c 
-  #my %little_hash = %$little; #c  
-  #my %little_hash = %$little; #c  
+  #my %all_entries = %$all;  #c
+  #my %little_hash = %$little; #c
+  #my %little_hash = %$little; #c
 
   # $little_hash{AC} =  Q7PYN8; Q01FQ6;
-  # $little_hash{OC} =  Eukaryota; Metazoa; Arthropoda; Hexapoda; Insecta; Pterygota; 
+  # $little_hash{OC} =  Eukaryota; Metazoa; Arthropoda; Hexapoda; Insecta; Pterygota;
   # $little_hash{PE} =  4: Predicted;
- 
+
   my $acc_string = $$little{AC};
   $acc_string =~s/\;//g;
-  my @accession_numbers = split /\s+/, $acc_string ;   
+  my @accession_numbers = split /\s+/, $acc_string ;
 
-  # consistency check - the query acc which we used in the mfetch query should also be in the AC field of the entry returned ....  
-  my $found ;  
-  for my $returned_acc ( @accession_numbers ) {  
-     if ($query_acc =~m/$returned_acc/) {  
-        $found = 1; 
-     } 
-  } 
-  unless ( $found ) {  
-     throw( " the acc $query_acc can't be found in the query returned by mfetch [ " . join (" ", @accession_numbers) . " ]\n");  
-  } 
+  # consistency check - the query acc which we used in the mfetch query should also be in the AC field of the entry returned ....
+  my $found ;
+  for my $returned_acc ( @accession_numbers ) {
+     if ($query_acc =~m/$returned_acc/) {
+        $found = 1;
+     }
+  }
+  unless ( $found ) {
+     throw( " the acc $query_acc can't be found in the query returned by mfetch [ " . join (" ", @accession_numbers) . " ]\n");
+  }
 
 
-    unless ( exists $$all{$query_acc} ) { 
+    unless ( exists $$all{$query_acc} ) {
       $$all{$query_acc} = $little;
-    }else { 
-      # we already have an entry for this ACC. - check if the entries are the same ...  
-      print "Warning ! The acc. you like to add has already been indexed ...\n" ; 
-    
+    }else {
+      # we already have an entry for this ACC. - check if the entries are the same ...
+      print "Warning ! The acc. you like to add has already been indexed ...\n" ;
+
       # check if the entries are the same
 
-      for my $lk ( keys %$little) {    
-          if (  $$little{$lk}=~/$$all{$query_acc}{$lk}/ ) { 
-          } else {  
+      for my $lk ( keys %$little) {
+          if (  $$little{$lk}=~/$$all{$query_acc}{$lk}/ ) {
+          } else {
             warning( "POSSIBLE DATA INCONSITENCY !!!\n" );
-            print "NEW : $lk  --> $$little{$lk}\n" ; 
+            print "NEW : $lk  --> $$little{$lk}\n" ;
             print "OLD : $lk  --> $$all{$query_acc}{$lk}\n";
-          } 
-      } 
-      print "\n\n\n" ; 
-    }  
-  return $all; 
-}       
+          }
+      }
+      print "\n\n\n" ;
+    }
+  return $all;
+}
 
 
-sub make_fetch_strings {  
-   my ($acc_array, $size ) = @_;  
+sub make_fetch_strings {
+   my ($acc_array, $size ) = @_;
 
-   my @acc_to_fetch = @$acc_array;  
-   my @fetch_strings ; 
+   my @acc_to_fetch = @$acc_array;
+   my @fetch_strings ;
 
-   if ( scalar(@acc_to_fetch) > $size ) {   
-    while ( @acc_to_fetch ) {  
-      my @tmp =  splice (@acc_to_fetch, 0, $size ) ;   
-      push @fetch_strings, join ( " ", @tmp) ;  
-      #print $fetch_strings[-1]."\n" ; 
-    }  
-   } else {  
-     push @fetch_strings, join ( " ", @acc_to_fetch ) ; 
-   }    
-   return \@fetch_strings; 
+   if ( scalar(@acc_to_fetch) > $size ) {
+    while ( @acc_to_fetch ) {
+      my @tmp =  splice (@acc_to_fetch, 0, $size ) ;
+      push @fetch_strings, join ( " ", @tmp) ;
+      #print $fetch_strings[-1]."\n" ;
+    }
+   } else {
+     push @fetch_strings, join ( " ", @acc_to_fetch ) ;
+   }
+   return \@fetch_strings;
 }
 
 
 
-sub verbose { 
-   my ($self, $arg ) = @_ ; 
-   if (defined $arg ) { 
-      $self->{verbose}= $arg ;  
+sub verbose {
+   my ($self, $arg ) = @_ ;
+   if (defined $arg ) {
+      $self->{verbose}= $arg ;
    }
-}  
+}
 
 
- 
-sub _make_mfetch_prefix_command {  
-   my ($self, $f ) = @_ ; 
 
-   my $mfetch = $self->executable;  
+sub _make_mfetch_prefix_command {
+   my ($self, $f ) = @_ ;
+
+   my $mfetch = $self->executable;
    my $options = $self->options;
-   if (defined($options)) { 
+   if (defined($options)) {
      unless ($options =~ /^-/ ) {
-       $options = '-' . $options; 
+       $options = '-' . $options;
      }
-   }  
+   }
 
-   my $command = "$mfetch "; 
+   my $command = "$mfetch ";
 
-  # case 1 : we want to fetch entries with -f flag, ie 
-  # mfetch -f "acc Taxon " ABCDE890.1    
-  # user should only submit field names,NOT " -f Taxon " ... 
+  # case 1 : we want to fetch entries with -f flag, ie
+  # mfetch -f "acc Taxon " ABCDE890.1
+  # user should only submit field names,NOT " -f Taxon " ...
 
   if ( defined $f && ref($f)=~m/ARRAY/) {
-    my @fields = @$f ;   
-    if ( scalar(@fields) > 0 ) {   
-      my $f = join (" ",@fields) ;    
-      # remove -f flag if user has submitted it 
-      $f=~s/-f//g; 
-      # put 'acc' field at the beginning of the string and remove redundancy 
+    my @fields = @$f ;
+    if ( scalar(@fields) > 0 ) {
+      my $f = join (" ",@fields) ;
+      # remove -f flag if user has submitted it
+      $f=~s/-f//g;
+      # put 'acc' field at the beginning of the string and remove redundancy
       # and that it's there as well.
 
-      if ( $f=~m/acc/) {  
-        $f =~s/acc//g; 
+      if ( $f=~m/acc/) {
+        $f =~s/acc//g;
       }
-      $f = "acc " .$f; 
+      $f = "acc " .$f;
       $command .= " -f \"$f \" "      ;
     }
-  } 
-   
+  }
+
 
   if (defined $options){
     $command .= "$options ";
   }
-  if ($self->verbose ) { 
-    print "PREFIX COMMAND $command\n"  
+  if ($self->verbose ) {
+    print "PREFIX COMMAND $command\n"
   }
-  return $command ; 
-}  
+  return $command ;
+}
 
 1;

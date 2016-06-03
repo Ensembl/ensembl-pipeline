@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Utils::SliceDump - 
+Bio::EnsEMBL::Pipeline::Utils::SliceDump -
 
 =head1 SYNOPSIS
 
@@ -58,7 +61,7 @@ sub new{
   my ($class,@args) = @_;
   my $self = $class->SUPER::new(@args);
   &verbose('WARNING');
-  my ($db, $slice, $output_dir ) = rearrange ([ 'DB', 
+  my ($db, $slice, $output_dir ) = rearrange ([ 'DB',
                                                 'SLICE', 'OUTPUT_DIR'], @args);
   if(!$db){
     throw("Can't run SliceDump without a database adaptor");
@@ -80,7 +83,7 @@ sub new{
   Arg [1]   : Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
   Function  : stores the DBadaptor for the object
   Returntype: Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor
-  Exceptions: throws if argument passed in isn't a 
+  Exceptions: throws if argument passed in isn't a
               Bio::EnsEMBL::Pipeline::DBSQL::DBAdaptor'
   Example   : my $rules_adaptor = $self->db->get_RulesAdaptor;
 
@@ -143,7 +146,7 @@ sub slice {
 sub output_dir{
   my ($self, $output_dir) = @_;
   if($output_dir){
-    throw("Output dir ".$output_dir." must exist or we can't use it") 
+    throw("Output dir ".$output_dir." must exist or we can't use it")
       unless (-d $output_dir);
     $self->{'output_dir'} = $output_dir;
   }
@@ -211,14 +214,14 @@ sub dump_table{
   Arg [1]   : int, seq_region_id
   Arg [2]   : int, seq_region_start
   Arg [3]   : int, seq_region_end
-  Arg [4]   : int, boolean toggle 
+  Arg [4]   : int, boolean toggle
   Function  : This method will construct a standard where clause
   working on the assumption that the column names are seq_region_id,
   seq_region_start and seq_region_end the last toggle is to whether to
   get features which overlap the specified boundaries
   Returntype: string, the where clause
   Exceptions: throws if not passed a seq_region_id
-  Example   : 
+  Example   :
 
 =cut
 
@@ -226,7 +229,7 @@ sub dump_table{
 
 sub generate_where_clause{
   my ($self, $id, $start, $end, $overlaps_boundaries) = @_;
-  
+
   if(!$id){
     throw("Can't generate a where clause without seq_region_id");
   }
@@ -284,7 +287,7 @@ sub can_dump{
   Arg [1]   : string table name
   Arg [2]   : Bio::EnsEMBL::Slice
   Function  : generate a filename useable by mysql import on the basis of
-  the tablename and info from the slice, can't use Slice::name as the 
+  the tablename and info from the slice, can't use Slice::name as the
   format upsets mysqlimport
   Returntype: string, filename
   Exceptions: none
@@ -318,7 +321,7 @@ sub get_filename{
   Function  : check if any data can be dumped from the defined table
   and if it can call the dump table method with the appropriate
   arguments
-  Returntype: 1 if a dump was made 0 if not 
+  Returntype: 1 if a dump was made 0 if not
   Exceptions: throws if no slice is defined either in the method args or
   SliceDump::Slice or if that slice isn't a slice object'
   Example   : $SliceDump->dump_seq_region_table
@@ -415,7 +418,7 @@ sub dump_repeat_feature_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('repeat_feature', $id)){
     my $filename = $self->get_filename('repeat_feature', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('repeat_feature', $filename, $where_clause);
     return 1;
@@ -434,7 +437,7 @@ sub dump_simple_feature_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('simple_feature', $id)){
     my $filename = $self->get_filename('simple_feature', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('simple_feature', $filename, $where_clause);
     return 1;
@@ -453,7 +456,7 @@ sub dump_protein_align_feature_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('protein_align_feature', $id)){
     my $filename = $self->get_filename('protein_align_feature', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('protein_align_feature', $filename, $where_clause);
     return 1;
@@ -472,7 +475,7 @@ sub dump_dna_align_feature_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('dna_align_feature', $id)){
     my $filename = $self->get_filename('dna_align_feature', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('dna_align_feature', $filename, $where_clause);
     return 1;
@@ -491,7 +494,7 @@ sub dump_prediction_exon_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('prediction_exon', $id)){
     my $filename = $self->get_filename('prediction_exon', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('prediction_exon', $filename, $where_clause);
     return 1;
@@ -510,7 +513,7 @@ sub dump_prediction_transcript_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('prediction_transcript', $id)){
     my $filename = $self->get_filename('prediction_transcript', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('prediction_transcript', $filename, $where_clause);
     return 1;
@@ -529,7 +532,7 @@ sub dump_gene_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('gene', $id)){
     my $filename = $self->get_filename('gene', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('gene', $filename, $where_clause);
     return 1;
@@ -549,7 +552,7 @@ sub dump_exon_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('exon', $id)){
     my $filename = $self->get_filename('exon', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('exon', $filename, $where_clause);
     return 1;
@@ -568,7 +571,7 @@ sub dump_transcript_table{
   my $id = $slice->get_seq_region_id;
   if($self->can_dump('transcript', $id)){
     my $filename = $self->get_filename('transcript', $slice);
-    my $where_clause = $self->generate_where_clause($id, $slice->start, 
+    my $where_clause = $self->generate_where_clause($id, $slice->start,
                                                     $slice->end);
     $self->dump_table('transcript', $filename, $where_clause);
     return 1;
@@ -628,7 +631,7 @@ sub dump_repeat_consensus_table{
         "and rf.seq_region_start = ".$slice->start." ".
           "and rf.seq_region_end = ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('repeat_consensus', $filename, $where, $select, 
+    $self->dump_table('repeat_consensus', $filename, $where, $select,
                       $from, $out);
     return 1;
   }
@@ -658,7 +661,7 @@ sub dump_translation_table{
           "seq_region_start >= ".$slice->start." and ".
             "seq_region_end <= ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('translation', $filename, $where, $select, 
+    $self->dump_table('translation', $filename, $where, $select,
                       $from, $out);
     return 1;
   }
@@ -688,7 +691,7 @@ sub dump_exon_transcript_table{
           "seq_region_start >= ".$slice->start." and ".
             "seq_region_end <= ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('exon_transcript', $filename, $where, $select, 
+    $self->dump_table('exon_transcript', $filename, $where, $select,
                       $from, $out);
     return 1;
   }
@@ -717,7 +720,7 @@ sub dump_supporting_feature_table{
           "seq_region_start >= ".$slice->start." and ".
             "seq_region_end <= ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('supporting_feature', $filename, $where, $select, 
+    $self->dump_table('supporting_feature', $filename, $where, $select,
                       $from, $out);
     return 1;
   }
@@ -775,7 +778,7 @@ sub dump_exon_stable_id_table{
           "seq_region_start >= ".$slice->start." and ".
             "seq_region_end <= ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('exon_stable_id', $filename, $where, $select, 
+    $self->dump_table('exon_stable_id', $filename, $where, $select,
                       $from, $out);
     return 1;
   }
@@ -783,7 +786,7 @@ sub dump_exon_stable_id_table{
 }
 
 #dumps entries from the gene_stable_id table
-#must join to the gene table to do this 
+#must join to the gene table to do this
 
 sub dump_gene_stable_id_table{
   my ($self, $slice) = @_;
@@ -804,7 +807,7 @@ sub dump_gene_stable_id_table{
           "seq_region_start >= ".$slice->start." and ".
             "seq_region_end <= ".$slice->end." ";
     my $out = "into outfile '".$filename."'";
-    $self->dump_table('gene_stable_id', $filename, $where, $select, 
+    $self->dump_table('gene_stable_id', $filename, $where, $select,
                       $from, $out);
     return 1;
   }

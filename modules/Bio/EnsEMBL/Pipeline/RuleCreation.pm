@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -30,7 +33,7 @@ RuleCreation
 
 =head1 SYNOPSIS
 
-This class will parse config files to produce rule objects and store 
+This class will parse config files to produce rule objects and store
 them and will take rule tables and write a config file
 
 [RepeatMask]
@@ -51,8 +54,8 @@ condition=SubmitGenome
 
 =head1 APPENDIX
 
-the class itself obviously doesn't' need to be instantiated but the 
-either the script which uses it should be in the same directory as 
+the class itself obviously doesn't' need to be instantiated but the
+either the script which uses it should be in the same directory as
 it or the directory which contains it should be in you PERL5LIB
 
 the rule_setup script which should be found in the directory can
@@ -60,7 +63,7 @@ perform both functions for you if you have the appropriate database
 and config files
 
 
-an example config file can be found in this directory called 
+an example config file can be found in this directory called
 example_rule.conf
 =cut
 
@@ -73,7 +76,7 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 require Exporter;
 
 our @ISA = qw(Exporter);
-our @EXPORT = qw(parse_files write_into_db read_db write_file 
+our @EXPORT = qw(parse_files write_into_db read_db write_file
                  create_rules);
 
 verbose('WARNING');
@@ -87,7 +90,7 @@ verbose('WARNING');
   Exceptions: if file doesn't exist
               if config format is in correct
               if key already exists for a particular header'
-  Caller    : 
+  Caller    :
   Example   : my $rule_hash = parse_files($file);
 
 =cut
@@ -103,9 +106,9 @@ sub parse_files {
 
   my %config;
   # read each file
-  
+
   foreach my $file (@files) {
-    
+
     if (! -e $file) {
       throw("rule file $file not found\n");
     }
@@ -128,7 +131,7 @@ sub parse_files {
       }
       # key=value
       if (/^([^=\s]+)\s*=\s*(.+)/) {   # $1 = key, $2 = value
-        my $key = lc($1);  # keys stored as all lowercase, 
+        my $key = lc($1);  # keys stored as all lowercase,
         #values have case preserved
         my $value = $2;
         if (length($header) == 0) {
@@ -161,7 +164,7 @@ sub parse_files {
   containing condition logic_names
   Function  : create rules on the basis of the hash
   Returntype: array ref of Bio::EnsEMBL::Pipeline::Rule's
-  Exceptions: throws if not passed a dbadaptor or it is of the wrong 
+  Exceptions: throws if not passed a dbadaptor or it is of the wrong
   type or if not passed a rule hash or it is empty
   Example   : my @rules = @{create_rules($db, $rule_hash)}'
 
@@ -191,7 +194,7 @@ sub create_rules{
     my @conditions = @{$config->{$goal}};
     my %checked;
     foreach my $condition(@conditions) {
-      throw "$condition is not found in the database\n" 
+      throw "$condition is not found in the database\n"
         unless scalar($analysis_adaptor->fetch_by_logic_name($condition));
       $checked{$condition} = 1;
     }
@@ -216,7 +219,7 @@ sub create_rules{
   Function  : Write the rule objects into the database
   Returntype: N/A
   Exceptions: if dbadaptor is the wrong type of object
-  Caller    : 
+  Caller    :
   Example   : &write_into_db($db, \@rules);
 
 =cut
@@ -253,7 +256,7 @@ sub write_into_db{
   Function  : Read the rule objects from the database
   Returntype: array ref of rule objects
   Exceptions: if db isn't the correct type'
-  Caller    : 
+  Caller    :
   Example   : my $rules = &read_db($db);
 
 =cut
@@ -263,7 +266,7 @@ sub read_db{
   if(!($db->isa('Bio::EnsEMBL::DBSQL::DBAdaptor'))){
     throw("need a DBAdaptor not ".$db);
   }
- 
+
   my $rule_adaptor = $db->get_RuleAdaptor;
 
   my @rules = $rule_adaptor->fetch_all;
@@ -278,7 +281,7 @@ sub read_db{
   Function  : write a config file for the objects given
   Returntype: N/A
   Exceptions: if file doesnt exist
-  Caller    : 
+  Caller    :
   Example   : &write_file($file, $rules);
 
 =cut
@@ -288,7 +291,7 @@ sub write_file{
   #print STDERR "Opening ".$file."\n";
   open (FH, '>'.$file) or throw ("couldn't open $file to write to");
   foreach my $rule(@$rules){
-    
+
     print FH "[".$rule->goalAnalysis->logic_name."]\n";
     my @conditions = @{$rule->list_conditions};
     foreach my $condition(@conditions){

@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks - 
+Bio::EnsEMBL::Pipeline::Utils::PipelineSanityChecks -
 
 =head1 SYNOPSIS
 
@@ -55,7 +58,7 @@ sub new{
   my $caller = shift;
 
   my $class = ref($caller) || $caller;
-  
+
   my $self = bless({}, $class);
 
   $self->{'db'} = undef;
@@ -105,17 +108,17 @@ sub db_sanity_check{
   #check all the analyses have types
   $query = qq{SELECT COUNT(DISTINCT(a.analysis_id))
               FROM analysis a
-              LEFT JOIN input_id_type_analysis t 
+              LEFT JOIN input_id_type_analysis t
               ON a.analysis_id = t.analysis_id
               WHERE t.analysis_id IS NULL};
   $msg = "Some of your analyses don't have entries in the".
-    " input_id_type_analysis table"; 
+    " input_id_type_analysis table";
   $self->execute_sanity_check($query, $msg, $warn);
   #check that all types which aren't accumulators have entries in
   #input__id_analysis table
   $query = qq{SELECT DISTINCT(t.input_id_type)
-              FROM input_id_analysis i 
-              LEFT JOIN input_id_type_analysis t 
+              FROM input_id_analysis i
+              LEFT JOIN input_id_type_analysis t
               ON i.input_id_type = t.input_id_type
               WHERE t.input_id_type IS NULL
                 && t.input_id_type != 'ACCUMULATOR'};
@@ -123,7 +126,7 @@ sub db_sanity_check{
     " input_id_type_analysis table";
   $self->execute_sanity_check($query, $msg);
 
-  $query = qq{SELECT count(input_id) 
+  $query = qq{SELECT count(input_id)
               FROM input_id_analysis
               WHERE input_id_type = ''};
   $msg = "Some of your input_ids don't have a type in the input_id_analysis ".
@@ -146,7 +149,7 @@ sub execute_sanity_check{
 
 sub accumulator_sanity_check{
   my ($self, $rules, $accumulators) = @_;
-  
+
   my $sic = $self->db->get_StateInfoContainer;
   my $aa = $self->db->get_AnalysisAdaptor;
 
@@ -247,5 +250,3 @@ sub config_sanity_check {
 
 
 1;
-
-

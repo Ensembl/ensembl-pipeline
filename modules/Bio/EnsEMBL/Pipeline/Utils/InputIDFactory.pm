@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::Utils::InputIDFactory - 
+Bio::EnsEMBL::Pipeline::Utils::InputIDFactory -
 
 =head1 SYNOPSIS
 
@@ -59,12 +62,12 @@ use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
   Arg [2]   : int, toggle for slice based input_ids
   Arg [3]   : int toggle for single input_ids
   Arg [4]   : int toggle for filename based input_ids
-  Arg [5]   : int 
+  Arg [5]   : int
   Function  : creates an InputIDFactory object
   Returntype: Bio::EnsEMBL::Pipeline::Utils::InputIDFactory
   Exceptions: none
-  Caller    : 
-  Example   : 
+  Caller    :
+  Example   :
 
 =cut
 
@@ -72,27 +75,27 @@ sub new{
   my $caller = shift;
 
   my $class = ref($caller) || $caller;
-  
+
   my $self = bless({}, $class);
 
   $self->{'db'} = undef;
 
-  my ($db, 
-      $slice, 
-      $single, 
+  my ($db,
+      $slice,
+      $single,
       $file,
-      $translation_id, 
-      $slice_size, 
-      $slice_overlaps, 
+      $translation_id,
+      $slice_size,
+      $slice_overlaps,
       $seq_level,
       $top_level,
-      $dir, 
-      $regex, 
+      $dir,
+      $regex,
       $single_name,
-      $verbose, 
-      $logic_name, 
+      $verbose,
+      $logic_name,
       $input_id_type,
-      $insert_analysis, 
+      $insert_analysis,
       $coord_system,
       $coord_system_version,
       $seq_region_name,
@@ -101,21 +104,21 @@ sub new{
       $hap_pair,
       $include_non_reference,
       $use_mt)=rearrange([qw(DB
-                                            SLICE 
-                                            SINGLE 
+                                            SLICE
+                                            SINGLE
                                             FILE
-                                            TRANSLATION_ID 
-                                            SLICE_SIZE 
-                                            SLICE_OVERLAPS 
+                                            TRANSLATION_ID
+                                            SLICE_SIZE
+                                            SLICE_OVERLAPS
                                             SEQ_LEVEL
-                                            TOP_LEVEL 
-                                            DIR 
-                                            REGEX 
+                                            TOP_LEVEL
+                                            DIR
+                                            REGEX
                                             SINGLE_NAME
-                                            VERBOSE 
-                                            LOGIC_NAME 
+                                            VERBOSE
+                                            LOGIC_NAME
                                             INPUT_ID_TYPE
-                                            INSERT_ANALYSIS 
+                                            INSERT_ANALYSIS
                                             COORD_SYSTEM
                                             COORD_SYSTEM_VERSION
                                             SEQ_REGION_NAME
@@ -167,7 +170,7 @@ print "hap_pair: ",$hap_pair,"\n";
 #          "input ids created\n");
 #  }
 
-  $self->coord_system_version($coord_system_version) 
+  $self->coord_system_version($coord_system_version)
       if($coord_system_version);
   $self->seq_region_name($seq_region_name)
       if defined $seq_region_name;
@@ -189,7 +192,7 @@ print "hap_pair: ",$hap_pair,"\n";
     throw("if you want your analysis object to be inserted into the ".
           "database you must also provide an input_id_type");
   }
-  my $analysis = $self->get_analysis($logic_name, $input_id_type, 
+  my $analysis = $self->get_analysis($logic_name, $input_id_type,
                                      $insert_analysis);
   $self->logic_name($logic_name);
   $self->slice_size($slice_size) if($slice_size);
@@ -389,7 +392,7 @@ sub input_ids{
   my ($self, $input_ids) = @_;
 
   if($input_ids){
-   throw("Must has an array ref of input_ids not a $input_ids ") 
+   throw("Must has an array ref of input_ids not a $input_ids ")
       unless(ref($input_ids) eq 'ARRAY');
     $self->{'input_ids'} = $input_ids;
   }
@@ -400,12 +403,12 @@ sub input_ids{
 =head2 generate_input_ids
 
   Arg [1]   : none
-  Function  : on the basis of whats in config decides which method to 
+  Function  : on the basis of whats in config decides which method to
   call to generate the input_ids
   Returntype: Bio::EnsEMBL::Pipeline::IDSet
   Exceptions: throws if the type isn't recognised'
-  Caller    : 
-  Example   : 
+  Caller    :
+  Example   :
 
 =cut
 
@@ -440,13 +443,13 @@ sub get_slice_names{
   $self->slice_overlaps(0) if(!$self->slice_overlaps);
   $self->coord_system_version('') if(!$self->coord_system_version);
   if ($self->slice_size && $self->slice_size < 0) {
-    throw("Slice size must be >= 0. Currently " . 
+    throw("Slice size must be >= 0. Currently " .
           $self->slice_size);
   }
-  
+
   my $csa = $self->db->get_CoordSystemAdaptor();
   my $sa = $self->db->get_SliceAdaptor();
-  
+
   my $slices;
   if ($self->seq_region_name) {
     my $sname = sprintf("%s:%s:%s:%s:%s:",
@@ -458,10 +461,10 @@ sub get_slice_names{
 
     $slices = [$sa->fetch_by_name($sname)];
   } else {
-    $slices = $sa->fetch_all($self->coord_system, 
+    $slices = $sa->fetch_all($self->coord_system,
                              $self->coord_system_version,
 			     $self->include_non_reference);
-  }  
+  }
 
   if($self->slice_size > 0){
     $slices = split_Slices($slices,$self->slice_size,$self->slice_overlaps);
@@ -483,14 +486,14 @@ sub get_hap_pairs{
 
   my @ids;
 
-  my $assembly_exception_feature_adaptor =$self->db->get_AssemblyExceptionFeatureAdaptor(); 
+  my $assembly_exception_feature_adaptor =$self->db->get_AssemblyExceptionFeatureAdaptor();
   my @assembly_exception_features = @{$assembly_exception_feature_adaptor->fetch_all};
 
   $self->coord_system_version('') if(!$self->coord_system_version);
-  
+
   foreach my $aef(@assembly_exception_features){
     if ($aef->type eq 'HAP'){
-       
+
       my $sname = sprintf("%s:%s:%s:%s:%s:%s:%s:%s:%s:%s:",
                           $aef->slice->coord_system->name,
                           $aef->slice->coord_system->version,
@@ -502,9 +505,9 @@ sub get_hap_pairs{
                           $aef->alternate_slice->seq_region_name,
                           $aef->alternate_slice->start,
                           $aef->alternate_slice->end,);
-          
+
       push(@ids, $sname);
-      
+
     }
   }
   return \@ids;
@@ -521,7 +524,7 @@ sub get_filenames{
   }
   my @input_ids;
 
-  opendir(DIR, $self->dir);   
+  opendir(DIR, $self->dir);
   my @allfiles = readdir DIR;
   closedir DIR;
   my $regexp = $self->regex();
@@ -542,9 +545,9 @@ sub get_filenames{
         $file = $f;
       }
       push(@input_ids, $file) if($file);
-    }    
+    }
   }
-  
+
   return \@input_ids;
 }
 

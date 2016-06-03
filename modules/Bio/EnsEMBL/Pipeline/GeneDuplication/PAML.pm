@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::GeneDuplication::PAML - 
+Bio::EnsEMBL::Pipeline::GeneDuplication::PAML -
 
 =head1 SYNOPSIS
 
@@ -38,11 +42,11 @@ Bio::EnsEMBL::Pipeline::GeneDuplication::PAML -
 
  -Currently only implements codeml wrapper.  Should at least
    include baseml too.
- -Some perfectly acceptable PAML options set to 0 are being 
-   treated by Perl as 'unset'.  This probably is harmless, 
+ -Some perfectly acceptable PAML options set to 0 are being
+   treated by Perl as 'unset'.  This probably is harmless,
    but is a bug nonetheless.
- -Set/Get functions should check dependencies such that config 
-   errors are thrown by the perl layer rather than the paml 
+ -Set/Get functions should check dependencies such that config
+   errors are thrown by the perl layer rather than the paml
    application.  Tough.
  -Set functions should check that the set values are allowed.
 
@@ -127,9 +131,9 @@ sub new {
 				   RATEANCESTOR
 				   SMALL_DIFF)],@args);
 
-  throw ("Have sequence input and input file - which do I use?") 
+  throw ("Have sequence input and input file - which do I use?")
     if (defined $aligned_seqs && defined $seqfile);
-  
+
   $self->_aligned_seqs($aligned_seqs) if $aligned_seqs;
 
   $self->_codeml_executable($executable) if $executable;
@@ -163,21 +167,21 @@ sub new {
   $self->_treefile($getse)               if $getse;
   $self->_treefile($rateancestor)        if $rateancestor;
   $self->_treefile($small_diff)          if $small_diff;
-  
+
   return $self
 }
 
 sub DESTROY {
   my $self = shift;
 
-  unlink $self->_config_file if $self->_config_file; 
+  unlink $self->_config_file if $self->_config_file;
   unlink $self->_seqfile if $self->_seqfile;
 
   unlink ($self->work_dir . "/rub",    $self->work_dir . "/rst",
 	  $self->work_dir . "/rst1",   $self->work_dir . "/lnf",
 	  $self->work_dir . "/2ML.dN", $self->work_dir . "/2ML.dS",
-	  $self->work_dir . "/2ML.t",  $self->work_dir . "/2NG.dN", 
-	  $self->work_dir . "/2NG.dS", $self->work_dir . "/2NG.t") 
+	  $self->work_dir . "/2ML.t",  $self->work_dir . "/2NG.dN",
+	  $self->work_dir . "/2NG.dS", $self->work_dir . "/2NG.t")
     if $self->_outfile;
 
   unlink $self->_outfile if $self->_outfile;
@@ -185,7 +189,7 @@ sub DESTROY {
   warning ("Paml execution resulted in a core file being dumped.")
     if (unlink $self->work_dir . "/core");
 
-  warning ("Could not remove working directory [". $self->work_dir ."].\n$!") 
+  warning ("Could not remove working directory [". $self->work_dir ."].\n$!")
     if (! rmdir $self->work_dir);
 }
 
@@ -217,7 +221,7 @@ sub run_codeml {
   # Move back to original dir
   print STDERR $! if (! chdir $user_dir);
 
-  my $parser = Bio::Tools::Phylo::PAML->new('-file' => $self->_outfile, 
+  my $parser = Bio::Tools::Phylo::PAML->new('-file' => $self->_outfile,
 					    '-dir'  => $self->work_dir);
 
   return $parser;
@@ -225,7 +229,7 @@ sub run_codeml {
 
 
 # Make a temporary playground for PAML and some of its anti-social ways.
-# Execute application from here such that all unwanted temp files can be 
+# Execute application from here such that all unwanted temp files can be
 # neatly deleted.  Also, can copy assorted external files, like grantham.dat
 # here before execution.  Give temp dir a unique name to avoid conflicts
 # from multiple simultaneous jobs.
@@ -362,7 +366,7 @@ sub _aligned_seqs {
     $self->{_aligned_seqs} = shift;
 
     throw ("No sequences to set.")
-      unless $self->{_aligned_seqs} and 
+      unless $self->{_aligned_seqs} and
 	$self->{_aligned_seqs}->[0]->isa("Bio::Seq");
   }
 
@@ -473,7 +477,7 @@ sub _runmode {
 
   unless (defined $self->{_runmode}){
     throw ("Runmode has not been set.");
-  } 
+  }
 
   return $self->{_runmode} - 1 # Remember to remove one to return correct option.
 }
@@ -489,7 +493,7 @@ sub _seqtype {
 
   unless (defined $self->{_seqtype}){
     throw ("Seqtype has not been set.");
-  } 
+  }
 
   return $self->{_seqtype}
 }
@@ -505,7 +509,7 @@ sub _codonfreq {
   if ($self->_seqtype == 2 && !defined $self->{_codonfreq}){
 #    warning ("Codonfreq not set.  Defaulting to option 2: F3X4 frequencies.");
     return 2;
-  } 
+  }
 
   if (! $self->{_codonfreq}){
     return 2;
@@ -525,7 +529,7 @@ sub _aadist {
   unless (defined $self->{_aadist}){
 #    warning ("Aadist not set.  Defaulting to option 1: equal distances.");
     return 0;
-  } 
+  }
 
   return $self->{_aadist}
 }
@@ -543,7 +547,7 @@ sub _aaratefile {
 #      warning ("Aaratefile not set.  Defaulting to file wag.dat.");
     }
     return 'wag.dat';
-  } 
+  }
 
   return $self->{_aaratefile}
 }
@@ -558,7 +562,7 @@ sub _model {
 
   unless (defined $self->{_model}){
     throw ("Model has not been set.");
-  } 
+  }
 
   return $self->{_model} - 1 # Remove one to obtain correct value.
 }
@@ -572,7 +576,7 @@ sub _nssites {
 
   unless (defined $self->{_nssites}){
 #    warning ("NSsites has not been set.  Defaulting to 0.");
-  } 
+  }
 
   return $self->{_nssites}
 }
@@ -588,7 +592,7 @@ sub _icode {
   unless (defined $self->{_icode}){
     warning ("PAML: Defaulting to Universal Genetic Code.\n");
     return 0 # Universal code
-  } 
+  }
 
   return $self->{_icode}
 }
@@ -604,7 +608,7 @@ sub _mgene {
   unless (defined $self->{_mgene}){
 #    print STDERR "Defaulting to mgene = 0\n";
     return 0 # default to separate
-  } 
+  }
 
   return $self->{_mgene}
 }
@@ -620,7 +624,7 @@ sub _fix_kappa {
   unless (defined $self->{_fix_kappa}){
 #    print STDERR "Defaulting to unfixed kappa - will estimate kappa.\n";
     return 0 # default to unfixed kappa
-  } 
+  }
 
   return $self->{_fix_kappa}
 }
@@ -636,9 +640,9 @@ sub _kappa {
   if ($self->_fix_kappa != 0 && !defined $self->{_kappa}){
     throw ("Youve asked for kappa to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
-		 "fixed to.  Try setting '-kappa' => x or\n" . 
+		 "fixed to.  Try setting '-kappa' => x or\n" .
 		 "whatever");
-  } 
+  }
 
   if (! $self->{_kappa}){
     return 2;
@@ -657,7 +661,7 @@ sub _fix_omega {
   unless (defined $self->{_fix_omega}){
 #    print STDERR "Defaulting to unfixed omega - will estimate omega.\n";
     return 0 # default to unfixed omega
-  } 
+  }
 
   return $self->{_fix_omega}
 }
@@ -673,9 +677,9 @@ sub _omega {
   if ($self->_fix_omega != 0 && !defined $self->{_omega}){
     throw ("Youve asked for omega to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
-		 "fixed to.  Try setting '-omega' => x or\n" . 
+		 "fixed to.  Try setting '-omega' => x or\n" .
 		 "whatever");
-  } 
+  }
 
   if (! defined $self->{_omega}){
     return 0;
@@ -695,7 +699,7 @@ sub _fix_alpha {
   unless (defined $self->{_fix_alpha}){
 #    print STDERR "Defaulting to unfixed alpha - will estimate alpha.\n";
     return 0 # default to unfixed alpha
-  } 
+  }
 
   return $self->{_fix_alpha}
 }
@@ -711,9 +715,9 @@ sub _alpha {
   if ($self->_fix_alpha != 0 && !defined $self->{_alpha}){
     throw ("Youve asked for alpha to be fixed, but\n" .
 		 "have not specified a value for it to be\n" .
-		 "fixed to.  Try setting '-alpha' => x or\n" . 
+		 "fixed to.  Try setting '-alpha' => x or\n" .
 		 "whatever");
-  } 
+  }
 
   if (! defined $self->{_alpha}){
     return 0;
@@ -730,10 +734,10 @@ sub _malpha {
   }
 
   if (!defined $self->{_malpha}){
-    # silently default to 0.  Ive never used this - what 
+    # silently default to 0.  Ive never used this - what
     # other parameters does it depend on?
-    return 0 
-  } 
+    return 0
+  }
 
   return $self->{_malpha}
 }
@@ -746,10 +750,10 @@ sub _ncatg {
   }
 
   if (!defined $self->{_ncatg}){
-    # silently default to 10.  Ive never used this - what 
+    # silently default to 10.  Ive never used this - what
     # other parameters does it depend on?
-    return 10 
-  } 
+    return 10
+  }
 
   return $self->{_ncatg}
 }
@@ -766,7 +770,7 @@ sub _clock {
     # What other parameters are set with clock - should check these before throwing a warning.
 #    warning ("Clock parameter not set.  Defaulting to option 0: no clock.");
     return 0
-  } 
+  }
 
   return $self->{_clock}
 
@@ -783,7 +787,7 @@ sub _getse {
   if (!defined $self->{_getse}){
 #    print STDERR "By default, not estimating SE.\n";
     return 0
-  } 
+  }
 
   return $self->{_getse}
 }
@@ -800,7 +804,7 @@ sub _rateancestor {
 #    print STDERR "By default, RateAncestor option set to 0 - not" .
 #      "\nestimating ancestral states.\n";
     return 0
-  } 
+  }
 
   return $self->{_rateancestor}
 }
@@ -817,7 +821,7 @@ sub _small_diff {
   if (!defined $self->{_small_diff}){
     # Dont know what this does - default set directly from sample file.
     return '0.5e-6'
-  } 
+  }
 
   return $self->{_small_diff}
 

@@ -1,12 +1,21 @@
 =head1 LICENSE
 
-  Copyright (c) 1999-2012 The European Bioinformatics Institute and
-  Genome Research Limited.  All rights reserved.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
 
-  This software is distributed under a modified Apache license.
-  For license details, please see
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
 
-    http://www.ensembl.org/info/about/code_licence.html
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -52,31 +61,31 @@ use strict;
 use vars qw(%Config);
 
 %Config = (
-           
+
            # binaries, libraries and data files
             BIN_DIR => '/usr/local/ensembl/bin',
             DATA_DIR =>
               ( defined( $ENV{'TESTROOT'} ) ? $ENV{'TESTROOT'} : '.' ) .
               '/homo_sapiens/data',
             LIB_DIR => '/usr/local/ensembl/lib',
-           
+
            # Path where the parser and parameter files for FirstEF program are allocated
            PARAMETERS_DIR => '/vol/software/linux-i386/farm/lib/firstef/parameters/',
            PARSE_SCRIPT => '/vol/software/linux-i386/farm/lib/firstef/FirstEF_parser.pl',
-           
+
            # The default directory the Runnable runs its analysis in
            ANALYSIS_WORK_DIR => '/tmp',
 
            ANALYSIS_REPEAT_MASKING => ['repeatmask'],
- 
+
            # Uniprot base directory, previously $BLASTDB
            BLASTDB => $ENV{'BLASTDB'} || '/data/blastdb/Supported',
            CORE_VERBOSITY => 'WARNING',
-           LOGGER_VERBOSITY => 'OFF', # allowed : OFF, INFO, INFO_STACK_TRACE for logger_info subroutine 
-           
+           LOGGER_VERBOSITY => 'OFF', # allowed : OFF, INFO, INFO_STACK_TRACE for logger_info subroutine
+
            #the two versbosity values control when commands like warning or logger_info
-           #print to screen The current settings give you most of what you want but 
-           #look at Bio::EnsEMBL::Utils::Exception and 
+           #print to screen The current settings give you most of what you want but
+           #look at Bio::EnsEMBL::Utils::Exception and
            #Bio::EnsEMBL::Analysis::Tools::Logger for more info
 
 );

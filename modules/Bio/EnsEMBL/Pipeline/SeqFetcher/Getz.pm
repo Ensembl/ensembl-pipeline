@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::Getz - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::Getz -
 
 =head1 SYNOPSIS
 
@@ -45,7 +49,7 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::Getz -
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -69,18 +73,18 @@ sub new {
   my $self = bless {}, $class;
 
   my ($exe, $lib) = $self->_rearrange([
-				       'EXECUTABLE', 
+				       'EXECUTABLE',
 				       'LIBRARY'], @args);
 
   if (!defined $exe) {
     $exe = 'getz';
   }
   $self->executable($exe);
-  
-  
+
+
   if (defined $lib) {
     $self->library($lib);
-  }  
+  }
   return $self; # success - we hope!
 }
 
@@ -100,14 +104,14 @@ sub executable {
     {
       $self->{'_exe'} = $exe;
     }
-  return $self->{'_exe'};  
+  return $self->{'_exe'};
 }
 
 =head2 library
 
   Title   : library
   Usage   : $self->library('embl');
-  Function: Get/set for a library/libraries to search in 
+  Function: Get/set for a library/libraries to search in
   Returns : string
   Args    : string
 
@@ -118,7 +122,7 @@ sub library {
   if ($lib) {
       $self->{'_lib'} = $lib;
     }
-  return $self->{'_lib'};  
+  return $self->{'_lib'};
 }
 
 
@@ -128,7 +132,7 @@ sub library {
   Usage   : $self->get_Seq_by_acc($accession);
   Function: Does the sequence retrieval via getz
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
@@ -138,23 +142,23 @@ sub get_Seq_by_acc {
 
   if (!defined($acc)) {
     $self->throw("No id input");
-  }  
+  }
 
   if (!defined($libs)) {
     $self->throw("No search libs specified");
-  }  
-  
+  }
+
   my $seqstr;
   my $seq;
   my $getz     = $self->executable;
-  
-  open(IN, "$getz  -d -sf fasta '[libs={$libs}-AccNumber:$acc]' |") 
+
+  open(IN, "$getz  -d -sf fasta '[libs={$libs}-AccNumber:$acc]' |")
     or $self->throw("Error running getz for id [$acc]: $getz");
-  
+
   my $format = 'fasta';
-  
+
   my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>$format);
-  
+
   $seq = $fh->next_seq();
   close IN;
 
@@ -170,7 +174,7 @@ sub get_Seq_by_acc {
   Usage   : $self->get_Seq_by_id($id);
   Function: Does the sequence retrieval via getz
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
@@ -180,23 +184,23 @@ sub get_Seq_by_id {
 
   if (!defined($id)) {
     $self->throw("No id input");
-  }  
+  }
 
   if (!defined($libs)) {
     $self->throw("No search libs specified");
-  }  
-  
+  }
+
   my $seqstr;
   my $seq;
   my $getz     = $self->executable;
-  
-  open(IN, "$getz  -d -sf fasta '[libs={$libs}-ID:$id]' |") 
+
+  open(IN, "$getz  -d -sf fasta '[libs={$libs}-ID:$id]' |")
     or $self->throw("Error running getz for id [$id]: $getz");
-  
+
   my $format = 'fasta';
-  
+
   my $fh = Bio::SeqIO->new(-fh   => \*IN, "-format"=>$format);
-  
+
   $seq = $fh->next_seq();
   close IN;
 
@@ -213,7 +217,7 @@ sub get_Seq_by_id {
   Usage   : $self->batch_fetch(@accs);
   Function: Retrieves batches of sequences
   Returns : listref of Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 

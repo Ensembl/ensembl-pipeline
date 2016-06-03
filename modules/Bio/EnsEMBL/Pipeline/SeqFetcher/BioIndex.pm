@@ -1,18 +1,21 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
 
 =head1 CONTACT
 
@@ -26,7 +29,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex -
 
 =head1 SYNOPSIS
 
@@ -37,12 +40,12 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex -
 
 =head1 DESCRIPTION
 
-  Object to retrieve sequences as Bio::Seq, using getseqs by James Cuff. Sequences are fetched from a 
+  Object to retrieve sequences as Bio::Seq, using getseqs by James Cuff. Sequences are fetched from a
 database previously formatted with makeindex
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -71,7 +74,7 @@ sub new {
   if (defined $db) {
     $self->db($db);
   }
-  
+
   return $self; # success - we hope!
 }
 
@@ -80,7 +83,7 @@ sub new {
 
   Title   : db
   Usage   : $self->db('/data/blastdb/dbname');
-  Function: Get/set for dbs to be searched. Checks that the database 
+  Function: Get/set for dbs to be searched. Checks that the database
             appropriate files are present, but nothing else.
   Returns : string
   Args    : string
@@ -96,9 +99,9 @@ sub db {
   if (defined $dbs){
     if (ref($dbs) eq 'ARRAY') {
       foreach my $db(@$dbs){
-	$self->throw("are you sure that $db has been formatted with DBIndex? Some files are missing\n") 
+	$self->throw("are you sure that $db has been formatted with DBIndex? Some files are missing\n")
 	  unless (-d "$db" && -e "$db/config.dat" && -e "$db/fileids.dat");
-	
+
 	my $index =  new Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex(-database => $db);
 
 	$self->index($index);
@@ -107,8 +110,8 @@ sub db {
       }
     }
   }
-  return (@{$self->{'_db'}});  
-  
+  return (@{$self->{'_db'}});
+
 }
 
 =head2 index
@@ -145,7 +148,7 @@ sub index {
   Usage   : $self->get_Seq_by_acc($accession);
   Function: Does the sequence retrieval via getseqs
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
@@ -154,8 +157,8 @@ sub  get_Seq_by_acc {
 
   if (!defined($acc)) {
     $self->throw("No accession input");
-  }  
-  
+  }
+
   my $seq;
 
   foreach my $index ($self->index) {
@@ -168,9 +171,9 @@ sub  get_Seq_by_acc {
       my ($id,$desc) = split(/ /,$idstr,2);
 
       $id =~ s/^>//;
-      
+
       $seqstr =~ s/\n//g;
-      
+
       my $seq =  new Bio::Seq(-id      => $acc,
 			      -display_id => $acc,
 			      -seq    => $seqstr);

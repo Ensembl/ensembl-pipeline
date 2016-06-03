@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch -
 
 =head1 SYNOPSIS
 
@@ -43,7 +47,7 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::Pfetch -
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 Method Bio::EnsEMBL::Root::_rearrange is deprecated.
@@ -73,7 +77,7 @@ sub new {
   my $self = bless {}, $class;
 
   my ($exe, $options) = rearrange(['EXECUTABLE', 'OPTIONS'], @args);
-  
+
   if (!defined $exe) {
     $exe = 'pfetch';
   }
@@ -81,9 +85,9 @@ sub new {
 
   if (defined $options) {
     $self->options($options);
-  } 
-  # caching of sequences 
-  $self->{_seq_cache}={};    
+  }
+  # caching of sequences
+  $self->{_seq_cache}={};
 
   return $self; # success - we hope!
 }
@@ -104,7 +108,7 @@ sub executable {
     {
       $self->{'_exe'} = $exe;
     }
-  return $self->{'_exe'};  
+  return $self->{'_exe'};
 }
 
 =head2 options
@@ -124,7 +128,7 @@ sub options {
     {
       $self->{'_options'} = $options;
     }
-  return $self->{'_options'};  
+  return $self->{'_options'};
 
 }
 
@@ -134,21 +138,21 @@ sub options {
   Usage   : $self->get_eq_by_acc($accession);
   Function: Does the sequence retrieval via pfetch
   Returns : Bio::Seq
-  Args    : 
+  Args    :
 
 =cut
 
 sub  get_Seq_by_acc {
   my ($self, $acc) = @_;
-  
+
   if (!defined($acc)) {
     $self->throw("No accession input");
-  }  
- 
-  if ( defined ( $self->{_seq_cache}{$acc})) {  
+  }
+
+  if ( defined ( $self->{_seq_cache}{$acc})) {
      return $self->{_seq_cache}{$acc};
-  } 
-  # seqence not cached, needs to be fetched 
+  }
+  # seqence not cached, needs to be fetched
   my $seqstr;
   my $seq;
   my $pfetch = $self->executable;
@@ -167,7 +171,7 @@ sub  get_Seq_by_acc {
   open(IN,"$command |") or $self->throw("Error opening pipe to pfetch for accession [$acc]: $pfetch");
   $seqstr = <IN>;
   close IN or $self->throw("Error running pfetch for accession [$acc]: $pfetch");
-  
+
   chomp($seqstr);
   eval{
     if(defined $seqstr && $seqstr ne "no match") {
@@ -180,7 +184,7 @@ sub  get_Seq_by_acc {
   if($@){
     print STDERR "$@\n";
   }
-  
+
   $self->throw("Could not pfetch sequence for [$acc]\n") unless defined $seq;
 
   $self->{_seq_cache}{$acc}=$seq;
@@ -202,10 +206,10 @@ sub  batch_fetch {
   my $self = shift @_;
 
   my @sequence_list;
-  
+
   unless (scalar @_) {
     $self->throw("No accession input");
-  }  
+  }
 
   my $accession_concatenation;
   my @accession_list;
@@ -214,7 +218,7 @@ sub  batch_fetch {
     push (@accession_list, $acc);
     $accession_concatenation .= $acc . ' ';
   }
-  
+
   my $pfetch = $self->executable;
   my $options = $self->options;
   if (defined($options)) { $options = '-' . $options  unless $options =~ /^-/; }
@@ -234,13 +238,13 @@ sub  batch_fetch {
 
  SEQ:
   while (my $seqstr = <IN>) {
-    
+
     $seq_placemarker++;
 
     chomp($seqstr);
-    
+
     my $seq;
-    
+
     unless (defined $seqstr && $seqstr eq 'no match') {
 
       eval{
@@ -250,23 +254,23 @@ sub  batch_fetch {
 			      '-display_id'        => $accession_list[$seq_placemarker]);
 	}
       };
-      
+
       if($@){
 	print STDERR "$@\n";
       }
     }
 
     unless (defined $seq){
-      $self->warn("PFetch Error : Could not pfetch sequence for " . 
+      $self->warn("PFetch Error : Could not pfetch sequence for " .
 		  $accession_list[$seq_placemarker] . "\n");
       next SEQ;
     }
 
     push (@sequence_list, $seq);
   }
-  
+
   close IN or $self->throw("Error running pfetch : $pfetch");
-  
+
   return \@sequence_list;
 }
 

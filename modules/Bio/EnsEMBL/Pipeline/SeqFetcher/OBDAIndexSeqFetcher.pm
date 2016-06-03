@@ -1,18 +1,22 @@
 =head1 LICENSE
 
- Copyright [1999-2016] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
- 
- Licensed under the Apache License, Version 2.0 (the "License");
- you may not use this file except in compliance with the License.
- You may obtain a copy of the License at
- 
-      http://www.apache.org/licenses/LICENSE-2.0
- 
- Unless required by applicable law or agreed to in writing, software
- distributed under the License is distributed on an "AS IS" BASIS,
- WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- See the License for the specific language governing permissions and
- limitations under the License.
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
 
 =head1 CONTACT
 
@@ -26,7 +30,7 @@
 
 =head1 NAME
 
-Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher - 
+Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher -
 
 =head1 SYNOPSIS
 
@@ -46,10 +50,10 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher -
 =head1 DESCRIPTION
 
   This is basically a wrapper around the SeqFetcher Bio::DB::Flat::OBDAIndex,
-to use it in Ensembl in the same way as other SeqFetcher. 
+to use it in Ensembl in the same way as other SeqFetcher.
 It reads some configuration info from pipeConf.pl.
- 
-  Sequences are fetched from a 
+
+  Sequences are fetched from a
 database previously formatted with indicate (made by Steve Searle)
 
 =head1 METHODS
@@ -57,7 +61,7 @@ database previously formatted with indicate (made by Steve Searle)
 
 =head1 APPENDIX
 
-The rest of the documentation details each of the object methods. 
+The rest of the documentation details each of the object methods.
 Internal methods are usually preceded with a _
 
 =cut
@@ -80,17 +84,17 @@ use vars qw(@ISA);
 sub new {
   my ($class, @args) = @_;
   my $self = bless {}, $class;
-  
+
   my ($db, $format) = rearrange(['DB', 'FORMAT'], @args);
-  
+
   # expect an array of dbs
     throw("Sorry, you must specify a database") unless defined($db);
   #print STDERR "You passed a " . ref($db) . "\n";
   throw("Expected a reference to an array of db\n") unless ref($db) eq 'ARRAY';
-  
+
   $self->db($db);
 
-  
+
   foreach my $database ( $self->db ){
     # Prepend $ENV{BLASTDB} if not given a full path
     if ( $database !~ /^\// ){
@@ -109,7 +113,7 @@ sub new {
     if ( $db_name =~/(\S+)\.fa/){
       $db_name = $1;
     }
-    
+
     throw("Cannot define db_name") unless ( $db_name );
 
     # the index_dir is the directory path where the db sits
@@ -152,7 +156,7 @@ sub _seqfetcher{
 
   Title   : db
   Usage   : $self->db('/data/blastdb/dbname');
-  Function: Get/set for dbs to be searched. Checks that the database 
+  Function: Get/set for dbs to be searched. Checks that the database
             appropriate files are present, but nothing else.
   Returns : string
   Args    : string
@@ -172,8 +176,8 @@ sub db {
       }
     }
   }
-  return (@{$self->{'_db'}});  
-  
+  return (@{$self->{'_db'}});
+
 }
 
 =head2 get_Seq_by_acc
@@ -188,8 +192,8 @@ sub get_Seq_by_acc {
 
   if (!defined($acc)) {
     throw("No accession input");
-  }  
-  
+  }
+
   my $seq;
   my @seqfetchers = $self->_seqfetcher;
   my $have_secondary;
@@ -202,7 +206,7 @@ sub get_Seq_by_acc {
     if ( $@ ){
       warning("problem fetching sequence for $acc");
     }
-    
+
     if ( defined $seq ){
       $seq->display_id( $acc );
       $seq->accession_number( $acc );
@@ -214,14 +218,14 @@ sub get_Seq_by_acc {
   if(!defined $seq){
     my ($p, $f, $l) = caller;
     warning("OBDAIndexSeqFetcher: could not find sequence for primary key $acc in index ".$self->index_name." $f:$l\n") if(!$have_secondary);
-    
+
   FETCHER:
     foreach my $seqfetcher ( $self->_seqfetcher ){
-      
+
       my @secondary_namespaces = $seqfetcher->secondary_namespaces;
       foreach my $name ( @secondary_namespaces ){
 	#warning("seqfetcher $seqfetcher is looking in namespace $name for secondary key $acc\n");
-	
+
 	my @seqs;
 	eval{
 	  # this returns potentially an array of Bio::Seq
@@ -234,7 +238,7 @@ sub get_Seq_by_acc {
 	  warning("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
 	  next;
 	}
-	
+
 	if ( defined $seqs[0] ){
 	  $seqs[0]->display_id( $acc );
 	  $seqs[0]->accession_number( $acc );
@@ -260,7 +264,7 @@ sub get_Seq_by_acc {
   }
 
   return $seq;
-  
+
 }
 
 
@@ -283,7 +287,7 @@ sub get_Seq_by_secondary {
 
   if (!defined($acc)) {
     throw("No secondary key input");
-  }  
+  }
   if (!defined($name)){
     throw("No name space for the secondary key");
   }
@@ -292,7 +296,7 @@ sub get_Seq_by_secondary {
   my @seqfetchers = $self->_seqfetcher;
 
   foreach my $seqfetcher (@seqfetchers){
-    
+
     eval{
       # this returns potentially an array of Bio::Seq
       @seqs = $seqfetcher->get_Seq_by_secondary($name,$acc);
@@ -300,7 +304,7 @@ sub get_Seq_by_secondary {
     if ( $@ ){
       warning("problem fetching sequence for $acc");
     }
-    
+
     if ( @seqs > 1 ){
       warning("Multiple sequences (".scalar(@seqs).") for the same secondary accession $acc\n");
       next;
@@ -312,11 +316,11 @@ sub get_Seq_by_secondary {
       last;
     }
   }
-  
+
   unless (@seqs){
     warning("OBDAIndexSeqFetcher: could not find sequence for $acc");
   }
-  
+
   ##print STDERR "OBDAIndexSeqFetcher: returning sequence:\n";
   ##print STDERR "display_id: ".$seqs[0]->display_id."\n";
   ##print STDERR $seqs[0]->seq."\n";
@@ -331,10 +335,10 @@ sub index_name{
   return $self->{index_name};
 }
 
-=head2 secondary_namespaces 
+=head2 secondary_namespaces
 
   Function: Retrieves secondary_namespaces using OBDAIndex module
-  Returns : Arrayref 
+  Returns : Arrayref
 
 =cut
 sub secondary_namespaces {
@@ -351,10 +355,10 @@ sub secondary_namespaces {
   return \@secondary_namespaces;
 }
 
-=head2 get_entry_by_acc 
+=head2 get_entry_by_acc
 
   Function: Does the entry retrieval via the OBDAIndex module using the primary index key
-  Returns : String 
+  Returns : String
 
 =cut
 sub get_entry_by_acc {

@@ -1,3 +1,23 @@
+=head1 LICENSE
+
+Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
+Copyright [2016] EMBL-European Bioinformatics Institute
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+     http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+
+=cut
+
+
 =head1 NAME
 
     Bio::EnsEMBL::Analysis::Config::Databases
@@ -41,30 +61,19 @@
     All the variables are in capitals, so that they resemble
     environment variables.
 
-    A new key, DISTRIBUTED_DBS has been introduced in 09/2010. This key references an array of Strings, 
-    which point to different databases/keys in the $DATABASES hash. If you've got a database-intensive 
-    analysis, you can use DISTRIBUTED_DBS to select a database out of DISTRIBUTED_DBS randomly -  ie 
-    if you usually read from KILL_LIST_DB extensively, you an distrubute the db over multiple servers, 
+    A new key, DISTRIBUTED_DBS has been introduced in 09/2010. This key references an array of Strings,
+    which point to different databases/keys in the $DATABASES hash. If you've got a database-intensive
+    analysis, you can use DISTRIBUTED_DBS to select a database out of DISTRIBUTED_DBS randomly -  ie
+    if you usually read from KILL_LIST_DB extensively, you an distrubute the db over multiple servers,
     configure them in DATABASES and add the entres to DISTRIBUTED_DBS.  Remember to remove / rename the
-    original KILL_LIST_DB entry in DATABASES otherwise this one gets picked up. 
-    
-    
+    original KILL_LIST_DB entry in DATABASES otherwise this one gets picked up.
+
+
     DISTRIBUTED_DBS => {
                           KILL_LIST_DB => [ "KILL_LIST_DB_1", "KILL_LIST_DB_2" ],
                         },
 
 
-
-
-=head1 LICENSE
-
-    Copyright (c) 1999-2009 The European Bioinformatics Institute and
-    Genome Research Limited.  All rights reserved.
-
-    This software is distributed under a modified Apache license.
-    For license details, please see
-
-      http://www.ensembl.org/info/about/code_licence.html
 
 =head1 CONTACT
 
@@ -89,7 +98,7 @@ use vars qw(%Config);
     # repeats and features from raw computes (e.g. ab-inito
     # predictions, dna- or protein alignments )
 
-    REFERENCE_DB => { 
+    REFERENCE_DB => {
                       -port   => '3306',
                       -host   => 'myserver',
                       -user   => 'myuser',
@@ -101,7 +110,7 @@ use vars qw(%Config);
     # FPC_BlastMiniGenewise (TGE_gw or similarity_genewise - genes ) (
     # formerly GB_GW_DB )
 
-    GENEWISE_DB => { 
+    GENEWISE_DB => {
                      -dbname => '',
                      -host   => '',
                      -port   => '',
@@ -123,7 +132,7 @@ use vars qw(%Config);
     # The BLESSED_DB (formerly GB_BLESSED) holds the 'blessed'
     # gene-set ( if there is one )
 
-    BLESSED_DB => { 
+    BLESSED_DB => {
                     -dbname => '',
                     -host   => '',
                     -port   => '',
@@ -134,7 +143,7 @@ use vars qw(%Config);
     # The UTR_DB (formerly GB_COMB) holds genes made by the
     # UTR-addtion-run Combine_Genewises_and_E2Gs.pm writes to UTR_DB
 
-    UTR_DB => { 
+    UTR_DB => {
                 -dbname => '',
                 -host   => '',
                 -port   => '',
@@ -146,7 +155,7 @@ use vars qw(%Config);
     # GeneBuilder.pm writes its results to this database and
     # The Pseudogene-code READS from this database
 
-    GENEBUILD_DB => { 
+    GENEBUILD_DB => {
                       -dbname => '',
                       -host   => '',
                       -port   => '',
@@ -156,7 +165,7 @@ use vars qw(%Config);
 
     # PSEUDO_DB holds the pseudo-genes
 
-    PSEUDO_DB => { 
+    PSEUDO_DB => {
                    -dbname => '',
                    -host   => '',
                    -port   => '',
@@ -167,7 +176,7 @@ use vars qw(%Config);
     # COALESCER_DB is the DB where TranscriptCoalescer writes its
     # results to
 
-    COALESCER_DB => { 
+    COALESCER_DB => {
                       -dbname => '',
                       -host   => '',
                       -port   => '',
@@ -178,7 +187,7 @@ use vars qw(%Config);
     # OrthologueEvalutor, FindMissingGenes, etc. write it's results into
     # ORTHOLOGUE_DB
 
-    ORTHOLOGUE_DB => { 
+    ORTHOLOGUE_DB => {
                        -dbname => '',
                        -host   => '',
                        -port   => '',
@@ -189,7 +198,7 @@ use vars qw(%Config);
     # This database is use mainly with human an mouse for merging the
     # havana get set with the ensembl genebuild
 
-    HAVANA_DB => { 
+    HAVANA_DB => {
                    -dbname => '',
                    -host   => '',
                    -port   => '',
@@ -221,7 +230,7 @@ use vars qw(%Config);
     ### Databases for RunnableDB/CopyGenes.pm
     #############
 
-    COPY_SOURCE_DB => { 
+    COPY_SOURCE_DB => {
                         -dbname => '',
                         -host   => '',
                         -port   => '',
@@ -237,33 +246,33 @@ use vars qw(%Config);
                         -pass   => '',
     },
 
-    KILL_LIST_DB => { 
+    KILL_LIST_DB => {
                       -dbname => 'ba1_ensembl_kill_list',
                       -host   => 'genebuild6',
                       -port   => '3306',
                       -user   => 'ensro',
                       -pass   => '',
     },
-  },  
+  },
 
   #
-  # database with dna + repeat feature and repeat consensus table 
-  # 
+  # database with dna + repeat feature and repeat consensus table
+  #
 
-  DNA_DBNAME => "REFERENCE_DB", 
+  DNA_DBNAME => "REFERENCE_DB",
 
-  # 
-  # Arrayref. to distributed dbs ( see POD on top of file )   
-  #  
+  #
+  # Arrayref. to distributed dbs ( see POD on top of file )
+  #
 
     DISTRIBUTED_DBS => {
                          DITAG_DB_DIST => [ "DB_COPY_1","DB_COPY_2"],
                        },
-  #  
-  # MAIN_REFERENCE_DB should point to the database which is used as reference db. The MAIN_REFERENCE_DB 
-  # key is used in some cloud-based modules to automatically create new databaes. The 'vital tables' array 
-  # specifies which tables are dumped by some modules. 
-  #  
+  #
+  # MAIN_REFERENCE_DB should point to the database which is used as reference db. The MAIN_REFERENCE_DB
+  # key is used in some cloud-based modules to automatically create new databaes. The 'vital tables' array
+  # specifies which tables are dumped by some modules.
+  #
 
   MAIN_REFERENCE_DB => "REFERENCE_DB",
   VITAL_TABLES => ["analysis",
