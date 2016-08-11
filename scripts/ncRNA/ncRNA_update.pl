@@ -136,7 +136,7 @@ sub config_setup {
     my $species = shift;
 
     my @analysis_list = ('RfamBlast', 'BlastmiRNA', 'miRNA', 'BlastWait', 'ncRNA');
-    my @repeat_masking = ('repeatmask', 'dust');
+    my @repeat_masking = ('repeatmask_repbase_human', 'dust');
     my $output_dir = $DATADIR.'/'.$species;
     #set env var to avoid warnings
     if(!defined $ENV{"OSTYPE"} ){
