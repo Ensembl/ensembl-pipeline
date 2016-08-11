@@ -1,0 +1,8 @@
+%saved_files = (
+                 'Bio/EnsEMBL/Analysis/Config/Exonerate2Genes.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/Exonerate2Genes.pm.1462885439',
+                 'Bio/EnsEMBL/Pipeline/Config/BatchQueue.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/BatchQueue.pm.1462885439',
+                 'Bio/EnsEMBL/Analysis/Config/General.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/General.pm.1462885439',
+                 'Bio/EnsEMBL/Pipeline/Config/General.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/General.pm.1462885439',
+                 'Bio/EnsEMBL/Analysis/Config/Databases.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/Databases.pm.1462885439',
+                 'Bio/EnsEMBL/Analysis/Config/GeneBuild/KillListFilter.pm' => '/lustre/scratch109/sanger/cgg/cdna_update_human85/configbackup/KillListFilter.pm.1462885439'
+               );
