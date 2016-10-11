@@ -45,13 +45,8 @@ Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB -
 package Bio::EnsEMBL::Pipeline::SeqFetcher::FetchFromBlastDB;
 
 use warnings ;
-use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::Seq;
-
-@ISA = qw(Bio::EnsEMBL::Root);
-
 
 sub new {
   my ($class, @args) = @_;

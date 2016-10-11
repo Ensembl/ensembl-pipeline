@@ -53,13 +53,10 @@ package Bio::EnsEMBL::Pipeline::DBSQL::RuleAdaptor;
 
 use warnings ;
 use Bio::EnsEMBL::Pipeline::Rule;
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Utils::Exception qw (throw warning);
-use vars qw(@ISA);
 use strict;
 
 use Carp;
-@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 new
 

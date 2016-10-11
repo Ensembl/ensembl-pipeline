@@ -94,7 +94,6 @@ package Bio::EnsEMBL::Pipeline::BatchSubmission;
 use warnings ;
 use vars qw(@ISA);
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 
