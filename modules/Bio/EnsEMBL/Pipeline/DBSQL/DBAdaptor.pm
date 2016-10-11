@@ -62,7 +62,6 @@ use warnings ;
 use vars qw(@ISA);
 use strict;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Root;
 
 # Inherits from the base bioperl object
 

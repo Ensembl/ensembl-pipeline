@@ -51,11 +51,9 @@ package Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor;
 use strict;
 use warnings ;
 use Bio::EnsEMBL::Pipeline::Flag;
-use Bio::EnsEMBL::Root;
 use vars qw(@ISA);
 
 use Carp;
-@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 new
 
