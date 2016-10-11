@@ -66,11 +66,10 @@ use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 # Just adding this module but it should properly remove I think once we have proper test for the module
-use Bio::EnsEMBL::Root;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root Bio::DB::RandomAccessI);
+@ISA = qw(Bio::DB::RandomAccessI);
 
 sub new {
   my ($class, @args) = @_;

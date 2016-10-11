@@ -55,13 +55,8 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher::BioIndex;
 
 use warnings ;
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::SeqFetcher::DBIndex;
 use Bio::Seq;
-
-use vars qw(@ISA);
-
-@ISA = qw(Bio::EnsEMBL::Root);
 
 sub new {
   my ($class, @args) = @_;

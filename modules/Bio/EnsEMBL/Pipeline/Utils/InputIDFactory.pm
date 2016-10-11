@@ -47,12 +47,7 @@ use strict;
 use warnings;
 use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Analysis;
-use vars qw(@ISA);
-
-@ISA = ('Bio::EnsEMBL::Root');
-
 
 use Bio::EnsEMBL::Utils::Slice qw(split_Slices);
 

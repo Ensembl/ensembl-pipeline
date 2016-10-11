@@ -82,7 +82,6 @@ foreach my $seq (@$align){
 package Bio::EnsEMBL::Pipeline::GeneDuplication::CodonBasedAlignment;
 
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::Seq;
 use Bio::SeqIO;
 use Bio::Tools::Run::Alignment::Clustalw;

@@ -61,15 +61,10 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::DBSQL::StateInfoContainer;
 
 use warnings ;
-use Bio::EnsEMBL::Root;
 use Bio::EnsEMBL::Pipeline::Analysis;
 use Bio::EnsEMBL::Utils::Exception qw(throw warning);
 use Sys::Hostname;
-use vars qw(@ISA);
 use strict;
-
-@ISA = qw( Bio::EnsEMBL::Root );
-
 
 =head2 new
 

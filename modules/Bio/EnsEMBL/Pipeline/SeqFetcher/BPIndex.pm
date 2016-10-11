@@ -59,7 +59,6 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher::BPIndex;
 
 use warnings ;
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 # change these uses as new indices are released in bioperl - these are for 0.6.2
@@ -69,7 +68,7 @@ use Bio::Index::SwissPfam;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root Bio::DB::RandomAccessI);
+@ISA = qw(Bio::DB::RandomAccessI);
 
 sub new {
   my ($class, @args) = @_;

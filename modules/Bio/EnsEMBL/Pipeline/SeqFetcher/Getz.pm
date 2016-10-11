@@ -59,14 +59,13 @@ package Bio::EnsEMBL::Pipeline::SeqFetcher::Getz;
 
 use warnings ;
 use strict;
-use Bio::EnsEMBL::Root;
 use Bio::DB::RandomAccessI;
 use Bio::Seq;
 use Bio::SeqIO;
 
 use vars qw(@ISA);
 
-@ISA = qw(Bio::EnsEMBL::Root Bio::DB::RandomAccessI);
+@ISA = qw(Bio::DB::RandomAccessI);
 
 sub new {
   my ($class, @args) = @_;
