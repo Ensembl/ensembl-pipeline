@@ -42,11 +42,6 @@ Node -
 =cut
 
 package Bio::EnsEMBL::Pipeline::Utils::Node;
-use Bio::EnsEMBL::Root;
-use vars qw(@ISA);
-
-@ISA = qw(Bio::EnsEMBL::Root);
-
 
 sub new {
   my ($class, @args) = @_;
