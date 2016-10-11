@@ -50,8 +50,6 @@ use Bio::EnsEMBL::Utils::Exception qw(verbose throw warning info);
 use Bio::EnsEMBL::Utils::Argument qw( rearrange );
 use Bio::EnsEMBL::Analysis::Config::General qw( BIN_DIR LIB_DIR DATA_DIR );
 use Bio::EnsEMBL::Pipeline::Config::BatchQueue;
-use Bio::EnsEMBL::Root;
-@ISA = qw(Bio::EnsEMBL::Root);
 
 
 sub new{
