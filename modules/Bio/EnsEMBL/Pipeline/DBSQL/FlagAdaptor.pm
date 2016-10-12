@@ -47,7 +47,7 @@ Internal methods are usually preceded with a _
 =cut
 
 package Bio::EnsEMBL::Pipeline::DBSQL::FlagAdaptor;
-
+ 
 use strict;
 use warnings ;
 use Bio::EnsEMBL::Pipeline::Flag;
