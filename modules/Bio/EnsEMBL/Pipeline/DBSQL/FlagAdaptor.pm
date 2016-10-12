@@ -1,5 +1,5 @@
 =head1 LICENSE
- 
+  
 # Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
 # Copyright [2016] EMBL-European Bioinformatics Institute
 # 
