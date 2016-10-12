@@ -54,12 +54,8 @@ Internal methods are usually preceded with a _
 package Bio::EnsEMBL::Pipeline::Flag;
 
 use warnings ;
-use vars qw(@ISA);
 use Bio::EnsEMBL::Utils::Argument qw(rearrange);
 use strict;
-
-
-@ISA = qw( Bio::EnsEMBL::Root );
 
 =head2 new
 
