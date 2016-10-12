@@ -70,8 +70,10 @@ use Carp;
 
 
 sub new {
-  my ($class,$dbobj) = @_;
-  my $self = $class->SUPER::new();
+  my ($caller,$dbobj) = @_;
+
+  my $class = ref($caller) || $caller;
+  my $self = bless({}, $class);
 
   $self->db( $dbobj );
   return $self;
