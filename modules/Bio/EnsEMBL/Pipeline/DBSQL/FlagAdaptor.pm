@@ -54,7 +54,7 @@ use Bio::EnsEMBL::Pipeline::Flag;
 use vars qw(@ISA);
 
 use Carp;
-
+ 
 =head2 new
 
   Title   : new
