@@ -149,8 +149,8 @@ else {
         -db_file => $infile_name,
     );
 }
-# Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes 
-my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $igcnt, $genes_stored ) = (0) x 10;
+# Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes, lncRNA 
+my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $igcnt, $genes_stored, $lncrnascnt ) = (0) x 11;
 my $version = 1;
 my $status  = 'PUTATIVE';
 my $time    = time();
@@ -194,7 +194,7 @@ LINE: while ($gff_file->next) {
   next LINE if ($seqname eq $MT_acc && $ignore_mt);
   next LINE if exists $missing_sequences{$seqname};
   my $type = $gff_file->get_type;
-  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA)$/;
+  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA|lnc_RNA)$/;
   my $source = $gff_file->get_source;
   my $start = $gff_file->get_start;
   my $end = $gff_file->get_end;
@@ -233,7 +233,7 @@ LINE: while ($gff_file->next) {
   if (@par_regions && $slice->get_seq_region_id() == $par_srid) {
     foreach my $aref (@par_regions) {
       if ( ($start >= $$aref[0] && $start <= $$aref[1]) || ($end >= $$aref[0] && $end <= $$aref[1]) ) {
-        say("In PAR region, skip...") if $type =~ /^(gene|tRNA|ncRNA|\w_gene_segment|rRNA)$/;
+        say("In PAR region, skip...") if $type =~ /^(gene|tRNA|ncRNA|\w_gene_segment|rRNA|lnc_RNA)$/;
         next LINE;
       }
     }
@@ -371,7 +371,7 @@ LINE: while ($gff_file->next) {
   #              non-overlapping loci within the genome. We skip these for now.
   #              'primary_transcript' denotes trans-splicing microRNAs as far as
   #              I can see.
-  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment)$/) {
+  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment|lnc_RNA)$/) {
 
     my $biotype;
     my $parent_id = $attributes->{Parent};
@@ -453,6 +453,10 @@ LINE: while ($gff_file->next) {
        $ig_genes{$parent_id}=$id;
        $transcript_id = $genes{$parent_id}{stable_id};
        $igcnt++;
+    } elsif ($type eq "lnc_RNA"){
+      $biotype = "lncRNA";
+      $genes{$parent_id}{biotype} = $biotype;
+      $lncrnascnt++;
     } else {
       throw("Not yet supported: " . $type)
     }
@@ -1000,6 +1004,7 @@ say($ecnt . " exons parsed");
 say($ncnt . " non coding genes parsed");
 say($cgcnt . " Curated Genomic genes parsed");
 say($rrcnt . " rRNA genes parsed");
+say($lncrnascnt . " lncRNA genes parsed");
 say(scalar(keys %tRNAs) . " tRNA genes parsed");
 say("------------------------------------------");
 say($genes_stored, " genes stored");
