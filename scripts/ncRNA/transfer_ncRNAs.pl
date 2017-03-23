@@ -241,8 +241,8 @@ print "Overlaps\n";
 # non-coding overlaps
 if ($use_old_ncRNAs) {
   ( $noncoding_overlaps, $coding_overlaps, $merge_set ) =
-    overlaps( $new_hash, $old_sa, $old_ga, $final_ga )
-    unless $no_stable_ids;
+    overlaps( $new_hash, $old_sa, $old_ga, $final_ga );
+#    unless $no_stable_ids;
 } else {
   ( $noncoding_overlaps, $coding_overlaps, $merge_set ) =
     overlaps( $new_hash, $final_sa, $final_ga )
@@ -338,7 +338,7 @@ sub duplicates {
                                           ' ) };
     if ( scalar( @duplications > 1 ) ) {
       print "Genes ";
-      @duplications = sort { $a->dbID <=> $b->dbID } @duplications;
+      @duplications = sort { $b->dbID <=> $a->dbID } @duplications;
       print $duplications[0]->dbID . " and ";
       for ( my $i = 1 ; $i < scalar(@duplications) ; $i++ ) {
         my $dbid = $duplications[$i]->dbID;
@@ -476,8 +476,8 @@ sub at_content {
   my %blacklist;
   foreach my $key ( keys %$genes ) {
     my $perc_at;
-    my $longest_at;
-    my $count;
+    my $longest_at = 0;
+    my $count = 0;
     my $gene = $genes->{$key};
     # we want to eliminate genes with high 'AT' content, so we have 23
     # tests based on analysis of data over all genomes..
@@ -572,7 +572,6 @@ sub stable_id_mapping {
     if ($use_old_ncRNAs) {
       next if $gene->biotype =~ /pseudogene/;
     }
-    my $gene  = $old_hash->{$old_gene};
     my $trans = $gene->get_all_Transcripts->[0];
     # old gene does not need stable id transferring stable id is dead
     print SIDS "INSERT INTO stable_id_event(old_stable_id,old_version,new_stable_id,new_version,mapping_session_id,type,score) VALUES('"
@@ -791,6 +790,7 @@ sub write_genes {
                $gene->biotype =~ /ribozyme/
              )
              && (    $gene->analysis->logic_name eq 'ncRNA'
+                  or $gene->analysis->logic_name eq 'mirbase',
                   or $gene->analysis->logic_name eq 'miRNA' ) )
     {
       throw(   "Gene to be written is not a non coding gene "
@@ -815,9 +815,9 @@ sub write_genes {
     }
 
     print "Storing gene "
-      . $gene->dbID . "\t"
-      . $gene->stable_id . "\t"
-      . $gene->biotype . "\n";
+      , $gene->dbID , "\t"
+      , $gene->display_id , "\t"
+      , $gene->biotype , "\n";
     $ga->store($gene);
   } ## end foreach my $key ( keys %$new_hash)
   return;
@@ -915,6 +915,7 @@ sub fetch_genes {
       foreach my $ncRNA (@ncRNAs) {
         next
           unless (    $ncRNA->analysis->logic_name eq 'ncRNA'
+                   or $ncRNA->analysis->logic_name eq 'mirbase',
                    or $ncRNA->analysis->logic_name eq 'miRNA' );
         unless (    $ncRNA->biotype eq 'miRNA'
                  or $ncRNA->biotype eq 'misc_RNA'
@@ -955,6 +956,7 @@ sub fetch_genes {
     foreach my $ncRNA (@ncRNAs) {
       next
         unless (    $ncRNA->analysis->logic_name eq 'ncRNA'
+                   or $ncRNA->analysis->logic_name eq 'mirbase',
                  or $ncRNA->analysis->logic_name eq 'miRNA' );
       unless (    $ncRNA->biotype eq 'miRNA'
                or $ncRNA->biotype eq 'misc_RNA'
@@ -973,7 +975,7 @@ sub fetch_genes {
         $ignored_ncRNAs{ $ncRNA->biotype }++;
         next;
       }
-      next if $ncRNA->description =~ /RNAI/;
+      next if (defined $ncRNA->description and $ncRNA->description =~ /RNAI/);
       foreach my $genestoignore (@$genestoignore) {
         next if $ncRNA->description =~ /$genestoignore/;
       }
