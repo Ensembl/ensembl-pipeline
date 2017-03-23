@@ -323,7 +323,7 @@ my $option = $ARGV[0];
 
 if ( !$option or
             ( $option ne "prepare"
-          and $option ne "prepare"
+          and $option ne "prepare-force"
           and $option ne "test-run"
           and $option ne "run"
           and $option ne "run-force"
@@ -345,6 +345,10 @@ my $force_run = 0;
 if ($option eq 'run-force') {
     $force_run = 1;
     $option = 'run';
+}
+elsif ($option eq 'prepare-force') {
+    $force_run = 1;
+    $option = 'prepare';
 }
 
 if ( $option eq "prepare" ) {
@@ -373,13 +377,13 @@ if ( $option eq "prepare" ) {
         $ref_db->dbc->disconnect_if_idle();
 
         print("Shall we set the configuration? (y/n) ");
-        if ( get_input_arg() ) {
+        if ( $force_run or get_input_arg() ) {
             config_setup();
         }
 
         print "\nSet-up the databases?(y/n) ";
 
-        if ( get_input_arg() ) {
+        if ( $force_run or get_input_arg() ) {
             if ( !DB_setup() ) {
                 unclean_exit();
             }
@@ -437,7 +441,7 @@ if ( $option eq "prepare" ) {
     if ( $progress_status == 1 ) {
         print(   "\nGet fasta files? "
                . "kill-list objects will be removed as well. (y/n) " );
-        if ( get_input_arg() ) {
+        if ( $force_run or get_input_arg() ) {
             if ( !fastafiles() ) {
                 unclean_exit();
             }
@@ -672,6 +676,7 @@ elsif ( $option eq "run" ) {
 
             print("sorting out the meta table...\n");
 
+            update_genes_transcripts();
             fix_metatable();
 
             $progress_status = 11;
@@ -1649,36 +1654,47 @@ sub update_metalevels
     }
 } ## update_metalevels
 
-# Setting various core table entries.
-sub fix_metatable {
-
+sub update_genes_transcripts {
     my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
                          $OUTPUT_DBNAME, $DBUSER,
                          $DBPASS );
 
-    # Remove previous entries.
-    print STDOUT 'Updating the genebuild.id value...';
-    my $sql = "DELETE FROM meta WHERE meta_key = 'genebuild.id'";
+    print STDOUT "Checking one transcipt per gene\n";
+    my %gene;
+    my %transcript;
+    my $sql = "SELECT COUNT(*), logic_name FROM gene g, analysis a WHERE a.analysis_id = g.analysis_id GROUP BY a.analysis_id";
     my $sth = $db->dbc->prepare($sql);
     $sth->execute;
-    $sth->finish;
-
-    # Set the genebuild id.
-    $sql = "INSERT into meta (meta_key, meta_value) "
-         . "VALUES ('genebuild.id', '$GENEBUILD_ID' )";
+    while (my ($count, $ln) = $sth->fetchrow_array) {
+        $gene{$ln} = $count;
+    }
+    $sql = "SELECT COUNT(*), logic_name FROM transcript t, analysis a WHERE a.analysis_id = t.analysis_id GROUP BY a.analysis_id";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
-    $sth->finish;
-    print STDOUT "Done!\n";
-
+    while (my ($count, $ln) = $sth->fetchrow_array) {
+        $transcript{$ln} = $count;
+    }
+    my $error = undef;
+    while ( my ($ln, $count) = each %gene) {
+        $error = "Not the same number for analysis $ln: gene = $count ; transcript = ".$transcript{$ln}."\n" unless ($count == $transcript{$ln});
+    }
+    # If we don't have a one to one relationship we die because someting wrong happened
+    die($error) if ($error);
+    print STDOUT 'Updating the analysis_id for genes and transcript...';
+    $sql = "UPDATE gene SET analysis_id = (SELECT analysis_id FROM analysis WHERE logic_name = 'cdna_update')";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sql = "UPDATE transcript SET analysis_id = (SELECT analysis_id FROM analysis WHERE logic_name = 'cdna_update')";
+    $sth = $db->dbc->prepare($sql);
+    $sth->execute;
     # Set all gene and transcript statuses to putative.
     print STDOUT 'Updating the status for genes and transcript...';
-    $sql = "UPDATE gene set status = 'PUTATIVE'";
+    $sql = "UPDATE gene SET status = 'PUTATIVE'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
 
-    $sql = "UPDATE transcript set status = 'PUTATIVE'";
+    $sql = "UPDATE transcript SET status = 'PUTATIVE'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
@@ -1686,12 +1702,12 @@ sub fix_metatable {
 
     # Set all gene and transcript biotypes to cdna_update.
     print STDOUT 'Updating the biotype for genes and transcripts...';
-    $sql = "UPDATE gene set biotype = 'cdna_update'";
+    $sql = "UPDATE gene SET biotype = 'cdna_update'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
 
-    $sql = "UPDATE transcript set biotype = 'cdna_update'";
+    $sql = "UPDATE transcript SET biotype = 'cdna_update'";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
@@ -1741,6 +1757,24 @@ sub fix_metatable {
     $sth->finish;
 
     $sql = "DELETE FROM analysis WHERE analysis_id != 1";
+}
+# Setting various core table entries.
+sub fix_metatable {
+
+    my $db = connect_db( $OUTPUT_DBHOST, $OUTPUT_DBPORT,
+                         $OUTPUT_DBNAME, $DBUSER,
+                         $DBPASS );
+
+    # Remove previous entries.
+    print STDOUT 'Updating the genebuild.id value...';
+    my $sql = "DELETE FROM meta WHERE meta_key = 'genebuild.id'";
+    my $sth = $db->dbc->prepare($sql);
+    $sth->execute;
+    $sth->finish;
+
+    # Set the genebuild id.
+    $sql = "INSERT into meta (meta_key, meta_value) "
+         . "VALUES ('genebuild.id', '$GENEBUILD_ID' )";
     $sth = $db->dbc->prepare($sql);
     $sth->execute;
     $sth->finish;
@@ -1981,25 +2015,25 @@ sub compare {
         print "\nSubmitting jobs for detailed analysis.\n\n";
         foreach my $chromosome ( keys %chromosomes_1 ) {
 
-            $cmd = "bsub -q normal "
-                 . "-o "                . $DATA_DIR . "/" . $chromosome . ".out "
-                 . "perl "              . $ENSCODE_DIR . "/ensembl-pipeline/scripts/cDNA_update/comparison.pl "
-                 . " -chrom "           . $chromosome
-                 . " -oldname "         . $OLD_FEATURE_NAME
-                 . " -newname "         . $newFeatureName
-                 . " -dir "             . $DATA_DIR
-                 . " -olddbhost "       . $LAST_DBHOST
-                 . " -olddbport "       . $LAST_DBPORT
-                 . " -olddbname "       . $LAST_DBNAME
-                 . " -newdbhost "       . $OUTPUT_DBHOST
-                 . " -newdbport "       . $OUTPUT_DBPORT
-                 . " -newdbname "       . $OUTPUT_DBNAME
-                 . " -olddnadbhost "    . $LAST_DNADBHOST
-                 . " -olddnadbport "    . $LAST_DNADBPORT
-                 . " -olddnadbname "    . $LAST_DNADBNAME
-                 . " -newdnadbhost "    . $PIPE_DBHOST
-                 . " -newdnadbport "    . $PIPE_DBPORT
-                 . " -newdnadbname "    . $PIPE_DBNAME;
+            $cmd = 'bsub -q normal '.$configvars{'RESOURCE'}
+                 . ' -o '               . $DATA_DIR . '/' . $chromosome . '.out '
+                 . 'perl '              . $CVS_DIR . '/ensembl-pipeline/scripts/cDNA_update/comparison.pl '
+                 . ' -chrom '           . $chromosome
+                 . ' -oldname '         . $OLD_FEATURE_NAME
+                 . ' -newname '         . $newFeatureName
+                 . ' -dir '             . $DATA_DIR
+                 . ' -olddbhost '       . $LAST_DBHOST
+                 . ' -olddbport '       . $LAST_DBPORT
+                 . ' -olddbname '       . $LAST_DBNAME
+                 . ' -newdbhost '       . $OUTPUT_DBHOST
+                 . ' -newdbport '       . $OUTPUT_DBPORT
+                 . ' -newdbname '       . $OUTPUT_DBNAME
+                 . ' -olddnadbhost '    . $LAST_DNADBHOST
+                 . ' -olddnadbport '    . $LAST_DNADBPORT
+                 . ' -olddnadbname '    . $LAST_DNADBNAME
+                 . ' -newdnadbhost '    . $PIPE_DBHOST
+                 . ' -newdnadbport '    . $PIPE_DBPORT
+                 . ' -newdnadbname '    . $PIPE_DBNAME;
 
             if ( system($cmd) ) {
                 carp("Error occurred when submitting job!\n$cmd\n\n");
