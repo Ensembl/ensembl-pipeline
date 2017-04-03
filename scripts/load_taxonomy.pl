@@ -223,7 +223,7 @@ sub load_taxonomy_in_core {
     print "Found species.common_name = ",join (',',@{$node->get_all_values_for_tag('common name')}),"\n";
   }
   if ($node->has_tag('misspelling')) {
-    print "Found species.alias = ",$node->get_tagvalue('misspelling'),"\n";
+    print "Found species.alias = ",join (',',@{$node->get_all_values_for_tag('misspelling')}),"\n";
   }
   if ($node->has_tag('synonym')) {
     print "Found species.synonym = ", join (',',@{$node->get_all_values_for_tag('synonym')}),"\n";
