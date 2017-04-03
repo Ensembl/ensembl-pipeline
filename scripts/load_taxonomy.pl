@@ -141,8 +141,8 @@ sub fetch_by_ncbi_taxon_id {
   #if ($node->rank eq 'species' || $node->rank eq 'subspecies') {
     print "classification: ",$node->classification,"\n";
     print "scientific name: ",$node->binomial,"\n";
-    if (defined $node->common_name) {
-      print "common name: ",$node->common_name,"\n";
+    if ($node->has_tag('genbank common name')) {
+      print "common name: ",$node->get_value_for_tag('genbank common name'),"\n";
     } else {
       print "no common name\n";
     }
@@ -161,8 +161,8 @@ sub fetch_by_scientific_name {
   if ($node->rank eq 'species') {
     print "classification: ",$node->classification,"\n";
     print "scientific name: ",$node->binomial,"\n";
-    if (defined $node->common_name) {
-      print "common name: ",$node->common_name,"\n";
+    if ($node->has_tag('genbank common name')) {
+      print "common name: ",$node->get_value_for_tag('genbank common name'),"\n";
     } else {
       print "no common name\n";
     }
@@ -209,9 +209,9 @@ sub load_taxonomy_in_core {
   $mc->delete_key('species.common_name');
   $mc->delete_key('species.taxonomy_id');
   $mc->store_key_value('species.taxonomy_id',$node->node_id);
-  if (defined $node->common_name) {
-    $mc->store_key_value('species.common_name',$node->common_name);
-    print "Loading species.common_name = ",$node->common_name,"\n";
+  if ($node->has_tag('genbank common name')) {
+    $mc->store_key_value('species.common_name',$node->get_value_for_tag('genbank common name'));
+    print "Loading species.common_name = ",$node->get_value_for_tag('genbank common name'),"\n";
   }
   if ($node->has_tag('genbank common name')) {
     print "Found species.genbank_common_name = ",$node->get_tagvalue('genbank common name'),"\n";
