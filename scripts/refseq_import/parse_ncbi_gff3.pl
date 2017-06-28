@@ -77,7 +77,7 @@ use Bio::EnsEMBL::IO::Parser::GFF3;
 use Data::Dumper;
 
 my ($host, $user, $pass, $dbname, $infile, $dnahost, $dnaport, $dnadbname, $dnapass);
-my $port = $dnaport = 3306;
+my $port = $dnaport;
 my $dnauser = 'ensro';
 my $cs = 'toplevel';
 my $csv = undef; # coordinate system version
@@ -91,7 +91,7 @@ my (%genes, %transcripts, %exons, %CDSs, %xrefs, %missing_sequences, %sequences,
   'port:i'      => \$port,            'dnadbname:s' => \$dnadbname, 
   'user:s'      => \$user,            'dnauser:s'   => \$dnauser,
   'pass:s'      => \$pass,            'dnapass:s'   => \$dnapass,  
-  'dbname:s'    => \$dbname,          'dnaport:s'   => \$dnaport,   
+  'dbname:s'    => \$dbname,          'dnadbport|dnaport:s'   => \$dnaport,   
   'infile:s'    => \$infile,          'verbose!'    => \$verbose,
   'test_parse!' => \$test_parse,      'ignore_mt!'  => \$ignore_mt,
   'coord_system|cs:s' => \$cs,        'analysis:s'  => \$anal_name,
