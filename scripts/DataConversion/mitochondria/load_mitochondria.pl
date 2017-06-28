@@ -60,7 +60,6 @@ use constant {
     INFO_TEXT           => 'Imported from GeneBank',
     REFSEQ_PEP          => 'RefSeq_peptide',
     REFSEQ_XPEP         => 'RefSeq_peptide_predicted',
-    STATUS              => 'KNOWN',
     NCBI_EXTERNAL_DB_ID => 700,
     CHECK_CODON_TABLE   => 2
 };
@@ -550,7 +549,6 @@ for (my $index = 1; $index < $length; $index++) {
     eval {
       $gene->biotype($type);
       $gene->analysis($ensembl_analysis);
-      $gene->status(STATUS);
       $gene->description($feature->{$key}->{product});
       $transcript->biotype($type);
       $transcript->source($MIT_SOURCE_NAME);

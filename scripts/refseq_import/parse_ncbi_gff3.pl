@@ -1,7 +1,7 @@
 #!/usr/bin/env perl
 #
 # Copyright [1999-2015] Wellcome Trust Sanger Institute and the EMBL-European Bioinformatics Institute
-# Copyright [2016] EMBL-European Bioinformatics Institute
+# Copyright [2016-2017] EMBL-European Bioinformatics Institute
 # 
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -149,8 +149,8 @@ else {
         -db_file => $infile_name,
     );
 }
-# Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes 
-my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $igcnt, $genes_stored ) = (0) x 10;
+# Counts of gene, transcript, exons, non-coding, curated genomic, rRNA, CDS, genes, lncRNA 
+my ($gcnt, $tcnt, $ecnt, $ncnt, $cgcnt, $micnt, $rrcnt, $cdscnt, $igcnt, $genes_stored, $lncrnascnt, $rnascnt, $mirnascnt, $snornascnt, $snrnascnt ) = (0) x 15;
 my $version = 1;
 my $status  = 'PUTATIVE';
 my $time    = time();
@@ -194,7 +194,7 @@ LINE: while ($gff_file->next) {
   next LINE if ($seqname eq $MT_acc && $ignore_mt);
   next LINE if exists $missing_sequences{$seqname};
   my $type = $gff_file->get_type;
-  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA)$/;
+  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
   my $source = $gff_file->get_source;
   my $start = $gff_file->get_start;
   my $end = $gff_file->get_end;
@@ -233,7 +233,7 @@ LINE: while ($gff_file->next) {
   if (@par_regions && $slice->get_seq_region_id() == $par_srid) {
     foreach my $aref (@par_regions) {
       if ( ($start >= $$aref[0] && $start <= $$aref[1]) || ($end >= $$aref[0] && $end <= $$aref[1]) ) {
-        say("In PAR region, skip...") if $type =~ /^(gene|tRNA|ncRNA|\w_gene_segment|rRNA)$/;
+        say("In PAR region, skip...") if $type =~ /^(gene|tRNA|ncRNA|\w_gene_segment|rRNA|lnc_RNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
         next LINE;
       }
     }
@@ -371,7 +371,7 @@ LINE: while ($gff_file->next) {
   #              non-overlapping loci within the genome. We skip these for now.
   #              'primary_transcript' denotes trans-splicing microRNAs as far as
   #              I can see.
-  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment)$/) {
+  elsif ($type =~ /^(mRNA|tRNA|transcript|primary_transcript|rRNA|ncRNA|\w_gene_segment|lnc_RNA|\w*_RNA|miRNA|snoRNA|snRNA)$/) {
 
     my $biotype;
     my $parent_id = $attributes->{Parent};
@@ -453,6 +453,30 @@ LINE: while ($gff_file->next) {
        $ig_genes{$parent_id}=$id;
        $transcript_id = $genes{$parent_id}{stable_id};
        $igcnt++;
+    } elsif ($type eq "lnc_RNA"){
+      $biotype = "lncRNA";
+      $genes{$parent_id}{biotype} = $biotype;
+      $lncrnascnt++;
+    } elsif ($type eq "vault_RNA"){
+      $biotype = "vaultRNA";
+      $genes{$parent_id}{biotype} = $biotype;
+      $rnascnt++;
+    } elsif ($type =~ /^\w*_RNA$/){
+      $biotype = $type;
+      $genes{$parent_id}{biotype} = $biotype;
+      $rnascnt++;
+    } elsif ($type eq "miRNA"){
+      $biotype = $type;
+      $genes{$parent_id}{biotype} = $biotype;
+      $mirnascnt++;
+    } elsif ($type eq "snoRNA"){
+      $biotype = $type;
+      $genes{$parent_id}{biotype} = $biotype;
+      $snornascnt++;
+    } elsif ($type eq "snRNA"){
+      $biotype = $type;
+      $genes{$parent_id}{biotype} = $biotype;
+      $snrnascnt++;
     } else {
       throw("Not yet supported: " . $type)
     }
@@ -1000,6 +1024,11 @@ say($ecnt . " exons parsed");
 say($ncnt . " non coding genes parsed");
 say($cgcnt . " Curated Genomic genes parsed");
 say($rrcnt . " rRNA genes parsed");
+say($lncrnascnt . " lncRNA genes parsed");
+say($rnascnt . " *_RNA genes parsed");
+say($mirnascnt . " miRNA genes parsed");
+say($snornascnt . " snoRNA genes parsed");
+say($snrnascnt . " snRNA genes parsed");
 say(scalar(keys %tRNAs) . " tRNA genes parsed");
 say("------------------------------------------");
 say($genes_stored, " genes stored");
