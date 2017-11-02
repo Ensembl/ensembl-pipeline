@@ -194,7 +194,7 @@ LINE: while ($gff_file->next) {
   next LINE if ($seqname eq $MT_acc && $ignore_mt);
   next LINE if exists $missing_sequences{$seqname};
   my $type = $gff_file->get_type;
-  next LINE unless $type =~ /^(gene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
+  next LINE unless $type =~ /^(gene|pseudogene|mRNA|transcript|exon|CDS|ncRNA|\w_gene_segment|primary_transcript|rRNA|tRNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
   my $source = $gff_file->get_source;
   my $start = $gff_file->get_start;
   my $end = $gff_file->get_end;
@@ -233,7 +233,7 @@ LINE: while ($gff_file->next) {
   if (@par_regions && $slice->get_seq_region_id() == $par_srid) {
     foreach my $aref (@par_regions) {
       if ( ($start >= $$aref[0] && $start <= $$aref[1]) || ($end >= $$aref[0] && $end <= $$aref[1]) ) {
-        say("In PAR region, skip...") if $type =~ /^(gene|tRNA|ncRNA|\w_gene_segment|rRNA|lnc_RNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
+        say("In PAR region, skip...") if $type =~ /^(gene|pseudogene|tRNA|ncRNA|\w_gene_segment|rRNA|lnc_RNA|\w*_RNA|miRNA|snoRNA|snRNA)$/;
         next LINE;
       }
     }
@@ -249,7 +249,7 @@ LINE: while ($gff_file->next) {
   #        stage we can only really decide for sure if a gene is a pseudogene or
   #        not. When we get to the mRNA/transcript block we will learn more about
   #        this gene. 
-  if ($type eq "gene") {
+  if (($type eq "gene") or ($type eq "pseudogene")) {
 
     my $db_xref = $attributes->{Dbxref};
     unless($db_xref =~ /GeneID:(\d+)/) {
