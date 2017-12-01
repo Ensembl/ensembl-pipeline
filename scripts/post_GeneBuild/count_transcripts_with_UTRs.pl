@@ -19,19 +19,20 @@
 
 use warnings ;
 use Bio::EnsEMBL::DBSQL::DBAdaptor;
-use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
+# use Bio::EnsEMBL::Pipeline::SeqFetcher::OBDAIndexSeqFetcher;
 use Getopt::Long qw(:config no_ignore_case);
 use strict;
 
 my $dbname;
 my $dbhost;
 my $dbuser = 'ensro';
-
+my $dbport; 
 my $genetype;
 
 GetOptions( 'host|dbhost|h:s'       => \$dbhost,
 	     'dbname|db|D:s'       => \$dbname,
-	     'genetype:s'     => \$genetype,
+	     'dbport:s'        => \$dbport, 
+             'genetype:s'     => \$genetype,
 	   );
 
 unless ( $dbhost && $dbname ){
@@ -42,7 +43,8 @@ unless ( $dbhost && $dbname ){
 
 my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dbhost,
 					    -user   => $dbuser,
-					    -dbname => $dbname,
+					    -port   => $dbport,
+                                            -dbname => $dbname,
 					   );
 
 
@@ -50,7 +52,7 @@ my $db = new Bio::EnsEMBL::DBSQL::DBAdaptor(-host   => $dbhost,
 print STDERR "connected to $dbname : $dbhost\n";
 my $sa = $db->get_SliceAdaptor;
 
-my  @ids = @{$db->get_GeneAdaptor->list_geneIds};
+my  @ids = @{$db->get_GeneAdaptor->list_dbIDs()};
 
 my $only_utr_three = 0;
 my $only_utr_five  = 0;
@@ -74,8 +76,8 @@ foreach my $gene_id( @ids) {
     
     $total++;
 
-    my $five_seq  = $trans->five_prime_utr->seq;
-    my $three_seq = $trans->three_prime_utr->seq;
+    my $five_seq  = $trans->five_prime_utr_Feature; #->seq;
+    my $three_seq = $trans->three_prime_utr_Feature; # ->seq;
 
     if ( $five_seq && $three_seq ){
       $both++;
