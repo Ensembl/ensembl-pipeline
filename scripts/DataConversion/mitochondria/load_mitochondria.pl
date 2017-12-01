@@ -418,8 +418,15 @@ for (my $index = 1; $index < $length; $index++) {
         $exon->end($exon_hash->{end});
         $exon->strand($exon_hash->{strand});
         $exon->slice($slice);
-        $exon->phase(0);
-        $exon->end_phase(($exon->end - $exon->start + 1)%3);
+
+        if ($key !~ /CDS/) {
+          $exon->phase(-1);
+          $exon->end_phase(-1);
+        } else {
+          $exon->phase(0);
+          $exon->end_phase(($exon->end - $exon->start + 1)%3);
+        }
+
         $transcript->add_Exon($exon);
         $start_exon = $exon if ($exon_number == 0);
         $end_exon = $exon;
