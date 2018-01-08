@@ -109,6 +109,7 @@ my $verbose = 0;
 my $regex;
 my $name_file;
 my $replace_ambiguous_bases = 0 ;
+my $ignore_ambiguous_bases = 0;
 
 GetOptions(
             'host|dbhost|h:s'   => \$host,
@@ -127,7 +128,8 @@ GetOptions(
             'regex:s' => \$regex,
             'name_file:s' => \$name_file,
             'help'     => \$help,
-            'replace_ambiguous_bases'  => \$replace_ambiguous_bases
+            'replace_ambiguous_bases!'  => \$replace_ambiguous_bases,
+            'ignore_ambiguous_bases!' => \$ignore_ambiguous_bases,
            ) or ($help = 1);
 
 if(!$host || !$dbuser || !$dbname || !$dbpass){
@@ -208,6 +210,8 @@ if($fasta)
     if( $replace_ambiguous_bases )
     {
         warn( "All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Changed all ambiguous bases (RYKMSWBDHV) to N." ) ;
+    } elsif($ignore_ambiguous_bases) {
+      warn("All sequences has loaded, but $count_ambiguous_bases slices had ambiguous bases - see warnings. Did not change.") ;
     }
     else
     {
