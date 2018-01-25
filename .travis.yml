@@ -19,7 +19,7 @@ before_install:
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-compara.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-killlist.git
     - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-io.git
-    - git clone --branch master --depth 1 https://github.com/bioperl/bioperl-run.git
+    - git clone --branch release-1-6-9 --depth 1 https://github.com/bioperl/bioperl-run.git
     - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
     - unzip bioperl-release-1-2-3.zip
 
