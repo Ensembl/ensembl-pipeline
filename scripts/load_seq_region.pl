@@ -230,7 +230,7 @@ sub parse_fasta{
 
   my $seqio = new Bio::SeqIO(
                              -format=>'Fasta',
-                             -file=>$filename
+                             -file=> $filename =~ /\.gz$/? "gunzip -c $filename | " : $filename
                             );
   
   while ( my $seq = $seqio->next_seq ) 
