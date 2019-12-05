@@ -991,8 +991,8 @@ sub is_locked{
 
     $started = scalar localtime $started;
 
-    my $dbname = $self->db->dbname;
-    my $dbhost = $self->db->host;
+    my $dbname = $self->db->dbc->dbname;
+    my $dbhost = $self->db->dbc->host;
 
     my $error_str = ("Error: this pipeline appears to be running!\n\n".
                      "\tdb       $dbname\@$dbhost\n".
@@ -1008,7 +1008,7 @@ sub is_locked{
 
     print STDERR $error_str;
     throw("Can't run RuleManager there may be another rulemanager ".
-          "running look in ".$self->db->dbname." meta table ");
+          "running look in ".$self->db->dbc->dbname." meta table ");
   }
   return 1;
 }
@@ -1192,7 +1192,7 @@ sub like_logic_name2dbID {
   
   foreach my $like_syntax (@$logic_name_like) {
 
-    my $sth = $self->db->prepare("         
+    my $sth = $self->db->dbc->prepare("
               SELECT analysis_id, logic_name FROM analysis
               WHERE logic_name like \"".$like_syntax."\"");
     my $res = $sth->execute;
