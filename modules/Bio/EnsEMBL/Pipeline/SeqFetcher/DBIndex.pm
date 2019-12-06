@@ -326,7 +326,7 @@ sub make_index {
 
   my ($self,$dbname,$format,@files) = @_;;
 
-  if (!defined(@files)) {
+  if (!@files) {
     $self->throw("Must enter an array of filenames to index");
   }
 
