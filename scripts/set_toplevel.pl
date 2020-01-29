@@ -219,7 +219,11 @@ sub add_attrib_code {
 sub all_component_ids {
   # get all of the regions that are components of other seq regions (assembly.cmp_seq_region_id)
   my $db = shift;
-  my $sth = $db->dbc->prepare('SELECT distinct cmp_seq_region_id FROM assembly');
+  my $sth = $db->dbc->prepare('SELECT distinct a.cmp_seq_region_id ' .
+                        'FROM assembly a, seq_region sr, coord_system cs ' .
+                        'WHERE a.cmp_seq_region_id = sr.seq_region_id ' .
+                          'AND sr.coord_system_id = cs.coord_system_id ' .
+                          'AND  cs.attrib like "%default_version%" ');
 
   $sth->execute();
 
