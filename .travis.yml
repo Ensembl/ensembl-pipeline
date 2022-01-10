@@ -13,15 +13,17 @@ addons:
         - unzip
 
 before_install:
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl.git
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-external.git
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-analysis.git
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-compara.git
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-killlist.git
-    - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-io.git
-    - git clone --branch release-1-6-9 --depth 1 https://github.com/bioperl/bioperl-run.git
-    - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
-    - unzip bioperl-release-1-2-3.zip
+  - git clone --depth 1 https://github.com/Ensembl/ensembl-git-tools.git
+  - export PATH=$PATH:$PWD/ensembl-git-tools/bin
+  - git-ensembl --clone --branch master --secondray_branch main --depth 1 ensembl
+  - git clone --branch master --depth 1 ensembl-external
+  - git-ensembl --clone --branch master --secondray_branch main --depth 1 ensembl-analysis
+  - git-ensembl --clone --branch master --secondray_branch main --depth 1 ensembl-compara
+  - git clone --branch master --depth 1 https://github.com/Ensembl/ensembl-killlist.git
+  - git-ensembl --clone --branch master --secondary_branch main --depth 1 ensembl-io
+  - git clone --branch release-1-6-9 --depth 1 https://github.com/bioperl/bioperl-run.git
+  - wget https://github.com/bioperl/bioperl-live/archive/bioperl-release-1-2-3.zip
+  - unzip bioperl-release-1-2-3.zip
 
 
 install:
